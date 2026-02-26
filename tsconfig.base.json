@@ -5,11 +5,11 @@
     "lib": ["ES2022"],
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
-    "allowJs": true,
+    "allowJs": false,
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
-    "skipLibCheck": true,
+    "skipLibCheck": false,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
     "declaration": true,
@@ -17,3 +17,4 @@
     "sourceMap": true
   }
 }
+
