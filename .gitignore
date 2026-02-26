@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+*.log
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.test
+
+# Database
+*.db
+*.db-journal
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+coverage/
+.nyc_output/
+
+# Docker
+.dockerignore
+
+# Misc
+*.tgz
+cache/

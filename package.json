@@ -1,0 +1,26 @@
+{
+  "name": "branchforge",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Visual Novel IDE for Ren'Py",
+  "scripts": {
+    "install:all": "pnpm install",
+    "test": "pnpm -r --filter './packages/*' --filter './apps/*' test",
+    "test:unit": "pnpm -r --filter './packages/*' --filter './apps/*' test:unit",
+    "test:integration": "pnpm -r --filter './apps/*' test:integration",
+    "test:e2e": "echo \"E2E tests not yet implemented\"",
+    "dev": "pnpm --parallel -r --filter './apps/*' dev",
+    "build": "pnpm -r --filter './packages/*' --filter './apps/*' build",
+    "lint": "pnpm -r --filter './packages/*' --filter './apps/*' lint",
+    "typecheck": "pnpm -r --filter './packages/*' --filter './apps/*' typecheck",
+    "clean": "rm -rf node_modules apps/*/node_modules apps/*/dist packages/*/node_modules packages/*/dist"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  }
+}
