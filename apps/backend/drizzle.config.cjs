@@ -1,5 +1,5 @@
 module.exports = {
-  schema: './dist/db/schema.js',
+  schema: './dist-schema/db/schema/index.js',
   out: './src/db/migrations',
   dialect: 'postgresql',
   dbCredentials: {

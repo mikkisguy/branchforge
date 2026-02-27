@@ -4,7 +4,6 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "composite": true,
-    "module": "CommonJS",
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
     "noEmit": false,
@@ -14,5 +13,6 @@
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "exclude": ["node_modules", "dist", "**/*.test.ts"],
+  "references": []
 }
