@@ -40,3 +40,4 @@ coverage/
 cache/
 
 tsconfig.tsbuildinfo
+tsconfig.schema.tsbuildinfo

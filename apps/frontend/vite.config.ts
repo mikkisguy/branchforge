@@ -1,31 +1,35 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import path from 'node:path';
+import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react";
+import path from "node:path";
 
 export default defineConfig({
+  base: process.env.VITE_API_ENV === "development" ? "/" : "/",
   plugins: [react()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      "@": path.resolve(__dirname, "./src"),
     },
   },
   server: {
     port: 5173,
     proxy: {
-      '/api': {
-        target: 'http://localhost:3000',
+      [process.env.VITE_API_ENV === "development" ? "/api/" : "/api/"]: {
+        target: "https://example.com",
         changeOrigin: true,
+        secure: true,
       },
     },
+    allowedHosts: [".example.com"],
   },
   test: {
-    environment: 'jsdom',
+    environment: "jsdom",
     globals: true,
-    setupFiles: ['./src/test/setup.ts'],
-    include: ['src/**/*.test.{ts,tsx}'],
+    setupFiles: ["./src/test/setup.ts"],
+    include: ["src/**/*.test.{ts,tsx}"],
     coverage: {
-      provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      provider: "v8",
+      reporter: ["text", "json", "html"],
     },
   },
 });
+

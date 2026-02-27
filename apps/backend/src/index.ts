@@ -16,7 +16,7 @@ await server.register(cors, {
 
 await server.register(cookie);
 await server.register(session, {
-  secret: process.env.SESSION_SECRET ?? 'dev-secret-change-in-production',
+  secret: process.env.SESSION_SECRET ?? 'dev-secret-please-change-in-production',
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
