@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist-schema",
+    "rootDir": "./src",
+    "module": "CommonJS",
+    "noEmit": false
+  },
+  "include": ["src/db/schema/**/*.ts"],
+  "exclude": ["node_modules", "dist", "dist-schema", "**/*.test.ts"]
+}

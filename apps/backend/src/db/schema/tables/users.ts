@@ -1,21 +1,22 @@
 /**
- * Drizzle ORM Schema
+ * Users Table
  *
- * This is a placeholder for the full database schema.
- * The complete schema will be implemented based on Database_Schemas.md
- * when database features are added.
+ * Application users including owners and beta readers.
  */
 
-import { pgTable, uuid, text, timestamp, integer } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, index } from 'drizzle-orm/pg-core';
+import { userRoleEnum } from '../enums.js';
 
-// Users table (minimal for now)
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
+  role: userRoleEnum('role').default('OWNER'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  emailIdx: index('users_email_idx').on(table.email),
+}));
 
 // Types
 export type User = typeof users.$inferSelect;

@@ -52,7 +52,7 @@ importers:
         specifier: ^4.0.0
         version: 4.0.18(vitest@4.0.18)
       drizzle-kit:
-        specifier: ^0.31.0
+        specifier: ^0.31.9
         version: 0.31.9
       eslint:
         specifier: ^8.57.0
