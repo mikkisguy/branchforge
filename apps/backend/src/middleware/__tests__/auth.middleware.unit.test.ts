@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import Fastify, { FastifyRequest } from 'fastify';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
 import session from '@fastify/session';
 import { authenticate, optionalAuth, requireRole } from '../auth.middleware.js';
@@ -12,7 +12,7 @@ describe('Auth Middleware', () => {
     fastify = Fastify();
     await fastify.register(cookie);
     await fastify.register(session, {
-      secret: 'a'.repeat(32), // Session secret must be 32+ characters
+      secret: 'a'.repeat(32),
     });
   });
 
@@ -47,9 +47,8 @@ describe('Auth Middleware', () => {
 
       fastify.get('/protected', {
         onRequest: (request, reply, done) => {
-          // Mock authenticated session
           (request.session as any).user = mockUser;
-          return authenticate(request, reply).then(done).catch(done);
+          return authenticate(request as any, reply as any).then(done).catch(done);
         },
       }, async (request) => {
         requestUser = (request as any).user;
@@ -63,6 +62,112 @@ describe('Auth Middleware', () => {
 
       expect(response.statusCode).toBe(200);
       expect(requestUser).toEqual(mockUser);
+    });
+
+    it('should return 401 when session user has invalid structure', async () => {
+      const invalidUser = {
+        id: '123',
+        // Missing email and role
+      };
+
+      fastify.get('/protected', {
+        onRequest: (request, reply, done) => {
+          (request.session as any).user = invalidUser;
+          return authenticate(request as any, reply as any).then(done).catch(done);
+        },
+      }, async () => {
+        return { message: 'Should not reach here' };
+      });
+
+      const response = await fastify.inject({
+        method: 'GET',
+        url: '/protected',
+      });
+
+      expect(response.statusCode).toBe(401);
+      expect(JSON.parse(response.payload)).toEqual({
+        error: 'Unauthorized',
+        message: 'Invalid session',
+      });
+    });
+
+    it('should return 500 when session is undefined', async () => {
+      const originalConsoleError = console.error;
+      console.error = vi.fn();
+
+      fastify.get('/protected', {
+        onRequest: async (request, reply, done) => {
+          // Temporarily remove session
+          const originalSession = (request as any).session;
+          delete (request as any).session;
+
+          await authenticate(request as any, reply as any).then(() => {
+            // Restore session
+            (request as any).session = originalSession;
+            done();
+          }).catch(done);
+        },
+      }, async () => {
+        return { message: 'Should not reach here' };
+      });
+
+      const response = await fastify.inject({
+        method: 'GET',
+        url: '/protected',
+      });
+
+      expect(response.statusCode).toBe(500);
+      expect(JSON.parse(response.payload)).toEqual({
+        error: 'Internal Server Error',
+        message: 'Unable to verify authentication',
+      });
+      expect(console.error).toHaveBeenCalledWith(
+        'Auth error [authenticate]:',
+        'Session object is undefined'
+      );
+
+      console.error = originalConsoleError;
+    });
+
+    it('should handle errors when accessing session properties', async () => {
+      const originalConsoleError = console.error;
+      console.error = vi.fn();
+
+      // Create a mock session that throws when accessing user
+      const throwingSession = {
+        get user() {
+          throw new Error('Session storage read error');
+        },
+      };
+
+      fastify.get('/protected', {
+        onRequest: async (request, reply, done) => {
+          // Replace session with throwing mock
+          const originalSession = (request as any).session;
+          (request as any).session = throwingSession;
+
+          await authenticate(request as any, reply as any).then(() => {
+            (request as any).session = originalSession;
+            done();
+          }).catch(done);
+        },
+      }, async () => {
+        return { message: 'Should not reach here' };
+      });
+
+      const response = await fastify.inject({
+        method: 'GET',
+        url: '/protected',
+      });
+
+      expect(response.statusCode).toBe(500);
+      expect(JSON.parse(response.payload)).toEqual({
+        error: 'Internal Server Error',
+        message: 'Unable to verify authentication',
+      });
+      expect(console.error).toHaveBeenCalled();
+
+      console.error = originalConsoleError;
     });
   });
 
@@ -95,7 +200,7 @@ describe('Auth Middleware', () => {
       fastify.get('/optional', {
         onRequest: (request, reply, done) => {
           (request.session as any).user = mockUser;
-          return optionalAuth(request, reply).then(done).catch(done);
+          return optionalAuth(request as any, reply as any).then(done).catch(done);
         },
       }, async (request) => {
         requestUser = (request as any).user;
@@ -109,6 +214,100 @@ describe('Auth Middleware', () => {
 
       expect(response.statusCode).toBe(200);
       expect(requestUser).toEqual(mockUser);
+    });
+
+    it('should not attach user with invalid structure', async () => {
+      const invalidUser = {
+        id: '123',
+        // Missing email and role
+      };
+
+      let requestUser: PublicUser | undefined;
+
+      fastify.get('/optional', {
+        onRequest: (request, reply, done) => {
+          (request.session as any).user = invalidUser;
+          return optionalAuth(request as any, reply as any).then(done).catch(done);
+        },
+      }, async (request) => {
+        requestUser = (request as any).user;
+        return { ok: true };
+      });
+
+      const response = await fastify.inject({
+        method: 'GET',
+        url: '/optional',
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(requestUser).toBeUndefined();
+    });
+
+    it('should continue without error when session is undefined', async () => {
+      const originalConsoleError = console.error;
+      console.error = vi.fn();
+
+      fastify.get('/optional', {
+        onRequest: async (request, reply, done) => {
+          const originalSession = (request as any).session;
+          delete (request as any).session;
+
+          await optionalAuth(request as any, reply as any).then(() => {
+            (request as any).session = originalSession;
+            done();
+          }).catch(done);
+        },
+      }, async () => {
+        return { ok: true };
+      });
+
+      const response = await fastify.inject({
+        method: 'GET',
+        url: '/optional',
+      });
+
+      // optionalAuth handles undefined session gracefully - no error thrown, just returns early
+      expect(response.statusCode).toBe(200);
+      // No error logging for undefined session - early return is expected behavior
+
+      console.error = originalConsoleError;
+    });
+
+    it('should handle errors gracefully and continue', async () => {
+      const originalConsoleError = console.error;
+      console.error = vi.fn();
+
+      // Create a mock session that throws when accessing user
+      const throwingSession = {
+        get user() {
+          throw new Error('Session error');
+        },
+      };
+
+      fastify.get('/optional', {
+        onRequest: async (request, reply, done) => {
+          const originalSession = (request as any).session;
+          (request as any).session = throwingSession;
+
+          await optionalAuth(request as any, reply as any).then(() => {
+            (request as any).session = originalSession;
+            done();
+          }).catch(done);
+        },
+      }, async () => {
+        return { ok: true };
+      });
+
+      const response = await fastify.inject({
+        method: 'GET',
+        url: '/optional',
+      });
+
+      // Should continue without error (optionalAuth never blocks)
+      expect(response.statusCode).toBe(200);
+      expect(console.error).toHaveBeenCalled();
+
+      console.error = originalConsoleError;
     });
   });
 
@@ -140,7 +339,7 @@ describe('Auth Middleware', () => {
       fastify.get('/admin', {
         onRequest: (request, reply, done) => {
           (request.session as any).user = mockUser;
-          return ownerAuth(request, reply).then(done).catch(done);
+          return ownerAuth(request as any, reply as any).then(done).catch(done);
         },
       }, async () => {
         return { message: 'Should not reach here' };
@@ -170,7 +369,7 @@ describe('Auth Middleware', () => {
       fastify.get('/admin', {
         onRequest: (request, reply, done) => {
           (request.session as any).user = mockUser;
-          return ownerAuth(request, reply).then(done).catch(done);
+          return ownerAuth(request as any, reply as any).then(done).catch(done);
         },
       }, async (request) => {
         requestUser = (request as any).user;
@@ -198,7 +397,7 @@ describe('Auth Middleware', () => {
       fastify.get('/content', {
         onRequest: (request, reply, done) => {
           (request.session as any).user = readerUser;
-          return multiRoleAuth(request, reply).then(done).catch(done);
+          return multiRoleAuth(request as any, reply as any).then(done).catch(done);
         },
       }, async () => {
         return { ok: true };
@@ -210,6 +409,104 @@ describe('Auth Middleware', () => {
       });
 
       expect(response.statusCode).toBe(200);
+    });
+
+    it('should return 401 when session user has invalid structure', async () => {
+      const invalidUser = {
+        id: '123',
+        // Missing email and role
+      };
+
+      fastify.get('/admin', {
+        onRequest: (request, reply, done) => {
+          (request.session as any).user = invalidUser;
+          return ownerAuth(request as any, reply as any).then(done).catch(done);
+        },
+      }, async () => {
+        return { message: 'Should not reach here' };
+      });
+
+      const response = await fastify.inject({
+        method: 'GET',
+        url: '/admin',
+      });
+
+      expect(response.statusCode).toBe(401);
+      expect(JSON.parse(response.payload)).toEqual({
+        error: 'Unauthorized',
+        message: 'Invalid session',
+      });
+    });
+
+    it('should return 500 when session is undefined', async () => {
+      const originalConsoleError = console.error;
+      console.error = vi.fn();
+
+      fastify.get('/admin', {
+        onRequest: async (request, reply, done) => {
+          const originalSession = (request as any).session;
+          delete (request as any).session;
+
+          await ownerAuth(request as any, reply as any).then(() => {
+            (request as any).session = originalSession;
+            done();
+          }).catch(done);
+        },
+      }, async () => {
+        return { message: 'Should not reach here' };
+      });
+
+      const response = await fastify.inject({
+        method: 'GET',
+        url: '/admin',
+      });
+
+      expect(response.statusCode).toBe(500);
+      expect(console.error).toHaveBeenCalledWith(
+        'Auth error [requireRole]:',
+        'Session object is undefined'
+      );
+
+      console.error = originalConsoleError;
+    });
+
+    it('should handle errors when accessing session properties', async () => {
+      const originalConsoleError = console.error;
+      console.error = vi.fn();
+
+      const throwingSession = {
+        get user() {
+          throw new Error('Session storage error');
+        },
+      };
+
+      fastify.get('/admin', {
+        onRequest: async (request, reply, done) => {
+          const originalSession = (request as any).session;
+          (request as any).session = throwingSession;
+
+          await ownerAuth(request as any, reply as any).then(() => {
+            (request as any).session = originalSession;
+            done();
+          }).catch(done);
+        },
+      }, async () => {
+        return { message: 'Should not reach here' };
+      });
+
+      const response = await fastify.inject({
+        method: 'GET',
+        url: '/admin',
+      });
+
+      expect(response.statusCode).toBe(500);
+      expect(JSON.parse(response.payload)).toEqual({
+        error: 'Internal Server Error',
+        message: 'Unable to verify authorization',
+      });
+      expect(console.error).toHaveBeenCalled();
+
+      console.error = originalConsoleError;
     });
   });
 });
