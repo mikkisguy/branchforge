@@ -24,7 +24,7 @@ function ThemeSwatch({ theme, isActive, onClick }: { theme: ThemePalette; isActi
     <button
       onClick={onClick}
       className={`relative h-10 w-10 rounded-lg transition-all duration-200 ${
-        isActive ? "ring-2 ring-white scale-110 shadow-lg" : "opacity-60 hover:opacity-100"
+        isActive ? "ring-2 ring-primary scale-110 shadow-lg" : "opacity-60 hover:opacity-100"
       } ${colorClass}`}
       title={palette.name}
     >
@@ -43,11 +43,11 @@ export default function HomePage() {
   const { theme, setTheme } = useTheme();
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <div className="mx-auto max-w-4xl p-8 space-y-8">
         {/* Header */}
         <div className="text-center space-y-4">
-          <h1 className="text-5xl font-bold tracking-tight text-foreground">
+          <h1 className="font-display text-5xl tracking-tight text-foreground">
             BranchForge
           </h1>
           <p className="text-xl text-muted-foreground">
@@ -117,8 +117,8 @@ export default function HomePage() {
                 <CardDescription className="text-sm">Text entry field</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
-                <Input placeholder="Project name..." className="border-border/50" />
-                <Input placeholder="Author..." className="border-border/50" />
+                <Input placeholder="Project name..." className="border-input" />
+                <Input placeholder="Author..." className="border-input" />
               </CardContent>
             </Card>
 

@@ -60,6 +60,13 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans tracking-wide;
+    background-image: radial-gradient(
+      circle at 1px 1px,
+      rgba(255, 255, 255, 0.05) 2px,
+      transparent 0
+    );
+    background-size: 24px 24px;
   }
 }
+
