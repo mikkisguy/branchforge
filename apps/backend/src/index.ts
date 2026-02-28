@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import session from '@fastify/session';
 import { healthRoutes } from './routes/health.js';
+import { authRoutes } from './routes/auth.routes.js';
 
 const server = Fastify({
   logger: true,
@@ -28,6 +29,7 @@ await server.register(session, {
 // Routes
 const basePath = process.env.BASE_PATH ?? (process.env.NODE_ENV === 'production' ? '/api/' : '/api/api/');
 await server.register(healthRoutes, { prefix: basePath });
+await server.register(authRoutes, { prefix: basePath });
 
 // Start server
 const start = async () => {
