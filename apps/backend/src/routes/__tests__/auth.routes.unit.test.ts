@@ -4,13 +4,30 @@ import cookie from '@fastify/cookie';
 import session from '@fastify/session';
 import { authRoutes } from '../auth.routes.js';
 import * as authService from '../../services/auth.service.js';
+import * as rateLimiter from '../../services/rate-limiter.service.js';
 import type { PublicUser } from '../../middleware/auth.middleware.js';
 
-// Mock the auth service
+// Mock the auth service and rate limiter
 vi.mock('../../services/auth.service.js', () => ({
   register: vi.fn(),
   validateCredentials: vi.fn(),
 }));
+
+vi.mock('../../services/rate-limiter.service.js', () => ({
+  checkRateLimit: vi.fn(),
+  clearRateLimit: vi.fn(),
+}));
+
+// Mock console.error to avoid noise in tests
+const originalConsoleError = console.error;
+beforeEach(() => {
+  console.error = vi.fn();
+});
+
+afterEach(() => {
+  console.error = originalConsoleError;
+  vi.clearAllMocks();
+});
 
 describe('Auth Routes (Unit)', () => {
   let fastify: ReturnType<typeof Fastify>;
@@ -25,10 +42,6 @@ describe('Auth Routes (Unit)', () => {
     // Register auth routes
     await fastify.register(authRoutes);
     await fastify.ready();
-  });
-
-  afterEach(() => {
-    vi.clearAllMocks();
   });
 
   describe('POST /register', () => {
@@ -55,7 +68,7 @@ describe('Auth Routes (Unit)', () => {
       expect(authService.register).toHaveBeenCalledWith('test@example.com', 'password123');
     });
 
-    it('should fail with invalid email format', async () => {
+    it('should return generic error for invalid email format (security)', async () => {
       vi.mocked(authService.register).mockRejectedValue(new Error('Invalid email format'));
 
       const response = await fastify.inject({
@@ -69,11 +82,12 @@ describe('Auth Routes (Unit)', () => {
 
       expect(response.statusCode).toBe(400);
       expect(JSON.parse(response.payload)).toEqual({
-        error: 'Invalid email format',
+        error: 'Invalid registration data',
       });
+      expect(console.error).toHaveBeenCalledWith('Registration error:', 'Invalid email format');
     });
 
-    it('should fail with weak password', async () => {
+    it('should return generic error for weak password (security)', async () => {
       vi.mocked(authService.register).mockRejectedValue(new Error('Password must be at least 8 characters'));
 
       const response = await fastify.inject({
@@ -87,11 +101,12 @@ describe('Auth Routes (Unit)', () => {
 
       expect(response.statusCode).toBe(400);
       expect(JSON.parse(response.payload)).toEqual({
-        error: 'Password must be at least 8 characters',
+        error: 'Invalid registration data',
       });
+      expect(console.error).toHaveBeenCalledWith('Registration error:', 'Password must be at least 8 characters');
     });
 
-    it('should fail if email already registered', async () => {
+    it('should return generic error if email already registered (security)', async () => {
       vi.mocked(authService.register).mockRejectedValue(new Error('Email already registered'));
 
       const response = await fastify.inject({
@@ -105,11 +120,12 @@ describe('Auth Routes (Unit)', () => {
 
       expect(response.statusCode).toBe(400);
       expect(JSON.parse(response.payload)).toEqual({
-        error: 'Email already registered',
+        error: 'Invalid registration data',
       });
+      expect(console.error).toHaveBeenCalledWith('Registration error:', 'Email already registered');
     });
 
-    it('should fail if registration limit reached (single user)', async () => {
+    it('should return generic error if registration limit reached (security)', async () => {
       vi.mocked(authService.register).mockRejectedValue(new Error('Registration is limited to a single user'));
 
       const response = await fastify.inject({
@@ -123,8 +139,9 @@ describe('Auth Routes (Unit)', () => {
 
       expect(response.statusCode).toBe(400);
       expect(JSON.parse(response.payload)).toEqual({
-        error: 'Registration is limited to a single user',
+        error: 'Invalid registration data',
       });
+      expect(console.error).toHaveBeenCalledWith('Registration error:', 'Registration is limited to a single user');
     });
   });
 
@@ -134,6 +151,14 @@ describe('Auth Routes (Unit)', () => {
       email: 'test@example.com',
       role: 'OWNER',
     };
+
+    beforeEach(() => {
+      // Default: rate limit allows
+      vi.mocked(rateLimiter.checkRateLimit).mockReturnValue({
+        allowed: true,
+        remainingAttempts: 4,
+      });
+    });
 
     it('should login successfully with valid credentials', async () => {
       vi.mocked(authService.validateCredentials).mockResolvedValue(mockUser);
@@ -152,9 +177,49 @@ describe('Auth Routes (Unit)', () => {
         user: mockUser,
       });
       expect(authService.validateCredentials).toHaveBeenCalledWith('test@example.com', 'password123');
+      expect(rateLimiter.clearRateLimit).toHaveBeenCalled();
     });
 
-    it('should fail with invalid email', async () => {
+    it('should return 429 when rate limited', async () => {
+      vi.mocked(rateLimiter.checkRateLimit).mockReturnValue({
+        allowed: false,
+        remainingAttempts: 0,
+        retryAfter: 900,
+      });
+
+      const response = await fastify.inject({
+        method: 'POST',
+        url: '/login',
+        payload: {
+          email: 'test@example.com',
+          password: 'password123',
+        },
+      });
+
+      expect(response.statusCode).toBe(429);
+      expect(JSON.parse(response.payload)).toEqual({
+        error: 'Too many login attempts. Please try again later.',
+        retryAfter: 900,
+      });
+      expect(authService.validateCredentials).not.toHaveBeenCalled();
+    });
+
+    it('should return generic error for missing credentials (security)', async () => {
+      const response = await fastify.inject({
+        method: 'POST',
+        url: '/login',
+        payload: {
+          password: 'password123',
+        },
+      });
+
+      expect(response.statusCode).toBe(401);
+      expect(JSON.parse(response.payload)).toEqual({
+        error: 'Invalid credentials',
+      });
+    });
+
+    it('should return generic error for invalid email (security)', async () => {
       vi.mocked(authService.validateCredentials).mockResolvedValue(null);
 
       const response = await fastify.inject({
@@ -172,7 +237,7 @@ describe('Auth Routes (Unit)', () => {
       });
     });
 
-    it('should fail with invalid password', async () => {
+    it('should return generic error for invalid password (security)', async () => {
       vi.mocked(authService.validateCredentials).mockResolvedValue(null);
 
       const response = await fastify.inject({
@@ -190,16 +255,24 @@ describe('Auth Routes (Unit)', () => {
       });
     });
 
-    it('should fail with missing email', async () => {
+    it('should add rate limit headers on successful login', async () => {
+      vi.mocked(authService.validateCredentials).mockResolvedValue(mockUser);
+      vi.mocked(rateLimiter.checkRateLimit).mockReturnValue({
+        allowed: true,
+        remainingAttempts: 3,
+      });
+
       const response = await fastify.inject({
         method: 'POST',
         url: '/login',
         payload: {
+          email: 'test@example.com',
           password: 'password123',
         },
       });
 
-      expect(response.statusCode).toBe(400);
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['x-ratelimit-remaining']).toBe('3');
     });
   });
 
