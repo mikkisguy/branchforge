@@ -11,6 +11,11 @@ export default {
     "bg-[#3d4ac2]",
     "bg-[#9549b6]",
     "bg-[#6a6d95]",
+    // Dynamic theme swatch classes
+    "bg-forest-500",
+    "bg-periwinkle-500",
+    "bg-dark-amethyst-500",
+    "bg-graphite-500",
   ],
   theme: {
     container: {

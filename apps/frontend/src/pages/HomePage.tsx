@@ -10,14 +10,15 @@ const themePalettes: { name: string; key: ThemePalette; description: string; col
   { name: "Graphite", key: "graphite", description: "Neutral greys", color: "#888888" },
 ];
 
+// Helper function to get theme palette info
+function getThemeInfo(theme: ThemePalette) {
+  return themePalettes.find(p => p.key === theme);
+}
+
 function ThemeSwatch({ theme, isActive, onClick }: { theme: ThemePalette; isActive: boolean; onClick: () => void }) {
-  const palette = themePalettes.find(p => p.key === theme)!;
-  const colorClass = {
-    "forest": "bg-forest-500",
-    "periwinkle": "bg-periwinkle-500",
-    "dark-amethyst": "bg-dark-amethyst-500",
-    "graphite": "bg-graphite-500",
-  }[theme];
+  const palette = getThemeInfo(theme)!;
+  // Generate class name dynamically from theme key
+  const colorClass = `bg-${theme}-500`;
 
   return (
     <button
@@ -77,8 +78,8 @@ export default function HomePage() {
             {/* Theme description */}
             <div className="p-4 rounded-lg bg-muted/30 border border-border/30">
               <p className="text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">{themePalettes.find(p => p.key === theme)?.name}</span>
-                {" — "}{themePalettes.find(p => p.key === theme)?.description}
+                <span className="font-medium text-foreground">{getThemeInfo(theme)?.name}</span>
+                {" — "}{getThemeInfo(theme)?.description}
               </p>
             </div>
           </CardContent>
