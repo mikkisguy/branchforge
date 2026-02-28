@@ -46,17 +46,40 @@ function FloatingParticles() {
 }
 
 // Storybook-style panel with decorative corners
-function StoryPanel({ children, title, className = "" }: { children: React.ReactNode; title?: string; className?: string }) {
+function StoryPanel({
+  children,
+  title,
+  className = "",
+}: {
+  children: React.ReactNode;
+  title?: string;
+  className?: string;
+}) {
   return (
     <div className={`relative ${className}`}>
       {/* Decorative corner flourishes */}
-      <div className="absolute -top-1 -left-1 w-8 h-8 border-t-2 border-l-2 rounded-tl-lg" style={{ borderColor: "var(--theme-color)", opacity: 0.5 }} />
-      <div className="absolute -top-1 -right-1 w-8 h-8 border-t-2 border-r-2 rounded-tr-lg" style={{ borderColor: "var(--theme-color)", opacity: 0.5 }} />
-      <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-2 border-l-2 rounded-bl-lg" style={{ borderColor: "var(--theme-color)", opacity: 0.5 }} />
-      <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-2 border-r-2 rounded-br-lg" style={{ borderColor: "var(--theme-color)", opacity: 0.5 }} />
+      <div
+        className="absolute -top-1 -left-1 w-8 h-8 border-t-2 border-l-2 rounded-tl-lg"
+        style={{ borderColor: "var(--theme-color)", opacity: 0.5 }}
+      />
+      <div
+        className="absolute -top-1 -right-1 w-8 h-8 border-t-2 border-r-2 rounded-tr-lg"
+        style={{ borderColor: "var(--theme-color)", opacity: 0.5 }}
+      />
+      <div
+        className="absolute -bottom-1 -left-1 w-8 h-8 border-b-2 border-l-2 rounded-bl-lg"
+        style={{ borderColor: "var(--theme-color)", opacity: 0.5 }}
+      />
+      <div
+        className="absolute -bottom-1 -right-1 w-8 h-8 border-b-2 border-r-2 rounded-br-lg"
+        style={{ borderColor: "var(--theme-color)", opacity: 0.5 }}
+      />
 
       {title && (
-        <div className="absolute -top-3 left-6 px-4 py-1 text-sm font-display tracking-wide rounded" style={{ background: "var(--theme-color)", color: "white" }}>
+        <div
+          className="absolute -top-3 left-6 px-4 py-1 text-sm font-display tracking-wide rounded z-10"
+          style={{ background: "var(--theme-color)", color: "white" }}
+        >
           {title}
         </div>
       )}
@@ -69,15 +92,22 @@ function StoryPanel({ children, title, className = "" }: { children: React.React
 }
 
 // File tree styled like a book's table of contents
-function StorybookFileTree({ files, activeFile, onSelectFile }: {
+function StorybookFileTree({
+  files,
+  activeFile,
+  onSelectFile,
+}: {
   files: Array<{ name: string; type: "file" | "folder"; icon?: string }>;
   activeFile: string;
   onSelectFile: (name: string) => void;
 }) {
   return (
     <div className="space-y-1">
-      <div className="text-xs font-display tracking-wider text-muted-foreground mb-3 pb-2 border-b border-dashed" style={{ borderColor: "var(--theme-color)" }}>
-        📖 Contents
+      <div
+        className="text-s font-display tracking-wider text-muted-foreground mb-3 pb-2 border-b border-dashed"
+        style={{ borderColor: "var(--theme-color)" }}
+      >
+        Contents
       </div>
       {files.map((file, i) => (
         <button
@@ -92,7 +122,7 @@ function StorybookFileTree({ files, activeFile, onSelectFile }: {
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
           }`}
         >
-          <span>{file.icon || (file.type === "folder" ? "📁" : "📄")}</span>
+          <span>{file.icon || (file.type === "folder" ? "📁" : "↳")}</span>
           <span className="font-medium">{file.name}</span>
         </button>
       ))}
@@ -101,16 +131,22 @@ function StorybookFileTree({ files, activeFile, onSelectFile }: {
 }
 
 // Code editor with storybook styling
-function StorybookEditor({ content, language }: { content: string[]; language: string }) {
+function StorybookEditor({ content }: { content: string[]; language: string }) {
   return (
     <div className="font-mono text-sm h-full overflow-auto">
       <div className="flex">
-        <div className="text-muted-foreground/30 pr-3 py-2 select-none text-right" style={{ minWidth: "2rem" }}>
+        <div
+          className="text-muted-foreground/30 pr-3 py-2 select-none text-right"
+          style={{ minWidth: "2rem" }}
+        >
           {content.map((_, i) => (
             <div key={i}>{i + 1}</div>
           ))}
         </div>
-        <div className="flex-1 py-2 pl-2 border-l border-dashed" style={{ borderColor: "var(--theme-border-subtle)" }}>
+        <div
+          className="flex-1 py-2 pl-2 border-l border-dashed"
+          style={{ borderColor: "var(--theme-border-subtle)" }}
+        >
           {content.map((line, i) => (
             <div key={i} className="py-0.5">
               {line}
@@ -123,7 +159,17 @@ function StorybookEditor({ content, language }: { content: string[]; language: s
 }
 
 // Tab styled like a bookmark
-function BookmarkTab({ name, isActive, onClick, onClose }: { name: string; isActive: boolean; onClick: () => void; onClose?: () => void }) {
+function BookmarkTab({
+  name,
+  isActive,
+  onClick,
+  onClose,
+}: {
+  name: string;
+  isActive: boolean;
+  onClick: () => void;
+  onClose?: () => void;
+}) {
   return (
     <button
       onClick={onClick}
@@ -140,11 +186,20 @@ function BookmarkTab({ name, isActive, onClick, onClose }: { name: string; isAct
       <span className="relative z-10">{name}</span>
       {/* Bookmark tail effect */}
       {isActive && (
-        <div className="absolute bottom-0 left-0 right-0 h-2" style={{ background: "var(--theme-color)", clipPath: "polygon(0 100%, 5% 0, 95% 0, 100% 100%)" }} />
+        <div
+          className="absolute bottom-0 left-0 right-0 h-2"
+          style={{
+            background: "var(--theme-color)",
+            clipPath: "polygon(0 100%, 5% 0, 95% 0, 100% 100%)",
+          }}
+        />
       )}
       {onClose && (
         <button
-          onClick={(e) => { e.stopPropagation(); onClose(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
           className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded flex items-center justify-center hover:bg-white/20"
         >
           ×
@@ -155,17 +210,34 @@ function BookmarkTab({ name, isActive, onClick, onClose }: { name: string; isAct
 }
 
 // Status bar styled like a storybook footer
-function StorybookStatusBar({ lineCount, language, themeName }: { lineCount: number; language: string; themeName: string }) {
+function StorybookStatusBar({
+  lineCount,
+  language,
+  themeName,
+}: {
+  lineCount: number;
+  language: string;
+  themeName: string;
+}) {
   return (
-    <div className="flex items-center justify-between px-4 py-2 text-xs bg-card/90 backdrop-blur border-t border-dashed" style={{ borderColor: "var(--theme-border-subtle)" }}>
+    <div
+      className="flex items-center justify-between px-4 py-2 text-xs bg-card/90 backdrop-blur border-t border-dashed"
+      style={{ borderColor: "var(--theme-border-subtle)" }}
+    >
       <div className="flex items-center gap-4">
         <span className="text-muted-foreground">📜 {language}</span>
         <span className="text-muted-foreground">✨ {themeName}</span>
       </div>
       <div className="flex items-center gap-4">
         <span className="text-muted-foreground">Line {lineCount}</span>
-        <span className="flex items-center gap-1.5" style={{ color: "var(--theme-color)" }}>
-          <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "var(--theme-color)" }} />
+        <span
+          className="flex items-center gap-1.5"
+          style={{ color: "var(--theme-color)" }}
+        >
+          <span
+            className="w-2 h-2 rounded-full animate-pulse"
+            style={{ background: "var(--theme-color)" }}
+          />
           <span>Ready to write</span>
         </span>
       </div>
@@ -199,9 +271,9 @@ export default function HomePageStorybookIDE() {
 
   const files = [
     { name: "my-project", type: "folder" as const, icon: "📚" },
-    { name: "script.rpy", type: "file" as const, icon: "📝" },
-    { name: "characters.rpy", type: "file" as const, icon: "👥" },
-    { name: "choices.rpy", type: "file" as const, icon: "🔀" },
+    { name: "script.rpy", type: "file" as const },
+    { name: "characters.rpy", type: "file" as const },
+    { name: "choices.rpy", type: "file" as const },
   ];
 
   const fileContents: Record<string, string[]> = {
@@ -214,7 +286,7 @@ export default function HomePageStorybookIDE() {
     ],
     "characters.rpy": [
       '<span class="text-purple-400">define</span> <span class="text-blue-400">e</span> <span class="text-muted-foreground">=</span> <span class="text-purple-400">Character</span><span class="text-muted-foreground">(</span><span class="text-green-400">"Eileen"</span><span class="text-muted-foreground">)</span>',
-      '',
+      "",
       '<span class="text-purple-400">define</span> <span class="text-blue-400">p</span> <span class="text-muted-foreground">=</span> <span class="text-purple-400">Character</span><span class="text-muted-foreground">(</span><span class="text-green-400">"Protagonist"</span><span class="text-muted-foreground">)</span>',
     ],
     "choices.rpy": [
@@ -225,7 +297,7 @@ export default function HomePageStorybookIDE() {
     ],
   };
 
-  const themeInfo = themePalettes.find(p => p.key === theme);
+  const themeInfo = themePalettes.find((p) => p.key === theme);
 
   return (
     <div className="min-h-screen relative flex flex-col">
@@ -237,7 +309,9 @@ export default function HomePageStorybookIDE() {
           <button
             onClick={() => setMode("story")}
             className={`px-6 py-2 rounded-full text-sm font-display tracking-wide transition-all ${
-              mode === "story" ? "text-white" : "text-muted-foreground hover:text-foreground"
+              mode === "story"
+                ? "text-white"
+                : "text-muted-foreground hover:text-foreground"
             }`}
             style={mode === "story" ? { background: "var(--theme-color)" } : {}}
           >
@@ -246,9 +320,13 @@ export default function HomePageStorybookIDE() {
           <button
             onClick={() => setMode("editor")}
             className={`px-6 py-2 rounded-full text-sm font-display tracking-wide transition-all ${
-              mode === "editor" ? "text-white" : "text-muted-foreground hover:text-foreground"
+              mode === "editor"
+                ? "text-white"
+                : "text-muted-foreground hover:text-foreground"
             }`}
-            style={mode === "editor" ? { background: "var(--theme-color)" } : {}}
+            style={
+              mode === "editor" ? { background: "var(--theme-color)" } : {}
+            }
           >
             ✏️ Editor Mode
           </button>
@@ -258,14 +336,18 @@ export default function HomePageStorybookIDE() {
       {/* Floating theme switcher */}
       <div className="fixed top-4 right-4 z-50">
         <StoryPanel className="!p-3">
-          <div className="text-xs text-muted-foreground mb-2 font-display">Colors</div>
+          <div className="text-xs text-muted-foreground mb-2 font-display">
+            Colors
+          </div>
           <div className="flex gap-2">
             {themePalettes.map((palette) => (
               <button
                 key={palette.key}
                 onClick={() => setTheme(palette.key)}
                 className={`w-7 h-7 rounded transition-all ${
-                  theme === palette.key ? "scale-110 ring-2 ring-white ring-offset-2 ring-offset-card" : "opacity-60 hover:opacity-100 hover:scale-105"
+                  theme === palette.key
+                    ? "scale-110 ring-2 ring-white ring-offset-2 ring-offset-card"
+                    : "opacity-60 hover:opacity-100 hover:scale-105"
                 }`}
                 style={{ background: palette.color }}
                 title={palette.name}
@@ -281,21 +363,30 @@ export default function HomePageStorybookIDE() {
           <div className="max-w-2xl w-full space-y-8">
             {/* Title */}
             <div className="text-center space-y-4">
-              <h1 className="font-display text-6xl tracking-wide leading-tight pb-2" style={{
-                background: "linear-gradient(135deg, var(--theme-color) 0%, white 50%, var(--theme-color) 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text"
-              }}>
+              <h1
+                className="font-display text-6xl tracking-wide leading-tight pb-2"
+                style={{
+                  background:
+                    "linear-gradient(135deg, var(--theme-color) 0%, white 50%, var(--theme-color) 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                }}
+              >
                 BranchForge
               </h1>
-              <p className="text-xl tracking-widest uppercase text-muted-foreground">Visual Novel IDE</p>
+              <p className="text-xl tracking-widest uppercase text-muted-foreground">
+                Visual Novel IDE
+              </p>
             </div>
 
             {/* Dialogue Box */}
             <StoryPanel title="???">
               <div className="text-lg leading-relaxed">
-                <span className="text-foreground">{dialogueText}<span className="animate-pulse">|</span></span>
+                <span className="text-foreground">
+                  {dialogueText}
+                  <span className="animate-pulse">|</span>
+                </span>
               </div>
             </StoryPanel>
 
@@ -307,7 +398,10 @@ export default function HomePageStorybookIDE() {
                 style={{ background: "var(--theme-color)", color: "white" }}
               >
                 <span className="relative z-10">Begin Your Story</span>
-                <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-30 transition-opacity" style={{ background: "white" }} />
+                <div
+                  className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-30 transition-opacity"
+                  style={{ background: "white" }}
+                />
               </button>
             </div>
 
@@ -321,22 +415,11 @@ export default function HomePageStorybookIDE() {
       ) : (
         // EDITOR MODE
         <div className="flex-1 flex flex-col pt-16">
-          {/* Editor Title */}
-          <div className="px-8 pb-4">
-            <h1 className="font-display text-3xl tracking-wide" style={{ color: "var(--theme-color)" }}>
-              ✏️ Writing Desk
-            </h1>
-          </div>
-
           {/* Main Editor Layout */}
-          <div className="flex-1 flex gap-4 px-8 pb-4 overflow-hidden">
+          <div className="flex-1 flex gap-4 px-8 pb-4 overflow-visible">
             {/* Sidebar - File Tree */}
             <div className="w-56">
-              <StoryPanel title="Contents" className="h-full">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-sm font-display">📚 {themeInfo?.name}</span>
-                </div>
-
+              <StoryPanel className="h-full">
                 <button
                   className="w-full py-2 px-3 rounded text-sm font-medium mb-4 transition-colors"
                   style={{ background: "var(--theme-color)", color: "white" }}
@@ -356,39 +439,72 @@ export default function HomePageStorybookIDE() {
             <div className="flex-1 flex flex-col">
               {/* Tabs */}
               <div className="flex items-end mb-0">
-                <BookmarkTab name="script.rpy" isActive={activeFile === "script.rpy"} onClick={() => setActiveFile("script.rpy")} />
-                <BookmarkTab name="characters.rpy" isActive={activeFile === "characters.rpy"} onClick={() => setActiveFile("characters.rpy")} />
-                <BookmarkTab name="choices.rpy" isActive={activeFile === "choices.rpy"} onClick={() => setActiveFile("choices.rpy")} />
+                <BookmarkTab
+                  name="script.rpy"
+                  isActive={activeFile === "script.rpy"}
+                  onClick={() => setActiveFile("script.rpy")}
+                />
+                <BookmarkTab
+                  name="characters.rpy"
+                  isActive={activeFile === "characters.rpy"}
+                  onClick={() => setActiveFile("characters.rpy")}
+                />
+                <BookmarkTab
+                  name="choices.rpy"
+                  isActive={activeFile === "choices.rpy"}
+                  onClick={() => setActiveFile("choices.rpy")}
+                />
               </div>
 
               {/* Editor */}
               <StoryPanel className="flex-1 !mt-0">
-                <StorybookEditor content={fileContents[activeFile] || []} language="Ren'Py" />
+                <StorybookEditor
+                  content={fileContents[activeFile] || []}
+                  language="Ren'Py"
+                />
               </StoryPanel>
             </div>
 
             {/* Right Panel - Character Reference */}
             <div className="w-64">
-              <StoryPanel title="Characters" className="h-full">
+              <StoryPanel className="h-full">
                 <div className="space-y-4">
-                  <div className="text-center p-4 rounded-lg border border-dashed" style={{ borderColor: "var(--theme-border-subtle)" }}>
+                  <div
+                    className="text-center p-4 rounded-lg border border-dashed"
+                    style={{ borderColor: "var(--theme-border-subtle)" }}
+                  >
                     <div className="text-4xl mb-2">👤</div>
                     <p className="text-sm font-medium">Protagonist</p>
-                    <p className="text-xs text-muted-foreground">The writer of their own fate</p>
+                    <p className="text-xs text-muted-foreground">
+                      The writer of their own fate
+                    </p>
                   </div>
-                  <div className="text-center p-4 rounded-lg border border-dashed" style={{ borderColor: "var(--theme-border-subtle)" }}>
+                  <div
+                    className="text-center p-4 rounded-lg border border-dashed"
+                    style={{ borderColor: "var(--theme-border-subtle)" }}
+                  >
                     <div className="text-4xl mb-2">👩</div>
                     <p className="text-sm font-medium">Eileen</p>
-                    <p className="text-xs text-muted-foreground">A mysterious guide</p>
+                    <p className="text-xs text-muted-foreground">
+                      A mysterious guide
+                    </p>
                   </div>
                 </div>
 
                 {/* Branching visualization */}
-                <div className="mt-6 pt-4 border-t border-dashed" style={{ borderColor: "var(--theme-border-subtle)" }}>
-                  <p className="text-xs font-display tracking-wider text-muted-foreground mb-3">🔀 Story Branches</p>
+                <div
+                  className="mt-6 pt-4 border-t border-dashed"
+                  style={{ borderColor: "var(--theme-border-subtle)" }}
+                >
+                  <p className="text-s font-display tracking-wider text-muted-foreground mb-3">
+                    Story Branches
+                  </p>
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center gap-2 text-muted-foreground">
-                      <span className="w-2 h-2 rounded-full" style={{ background: "var(--theme-color)" }} />
+                      <span
+                        className="w-2 h-2 rounded-full"
+                        style={{ background: "var(--theme-color)" }}
+                      />
                       <span>ending_a</span>
                     </div>
                     <div className="flex items-center gap-2 text-muted-foreground">
@@ -412,3 +528,4 @@ export default function HomePageStorybookIDE() {
     </div>
   );
 }
+
