@@ -26,8 +26,15 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["Kanit", "sans-serif"],
+        display: ["Sirin Stencil", "cursive"],
+      },
+      letterSpacing: {
+        tighter: "-0.05em",
+      },
       colors: {
-        border: "hsl(var(--border))",
+        border: "var(--theme-border)",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",

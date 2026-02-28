@@ -11,7 +11,7 @@ const themeConfigs: Record<ThemePalette, ThemeColors> = {
   "forest": { primary: "#40bb82", hover: "#52c992" },
   "periwinkle": { primary: "#3d4ac2", hover: "#515fcc" },
   "dark-amethyst": { primary: "#9549b6", hover: "#a960c7" },
-  "graphite": { primary: "#888888", hover: "#9a9a9a" },
+  "graphite": { primary: "#9ca3af", hover: "#b0b7c4" },
 };
 
 interface ThemeContextType {
@@ -30,7 +30,7 @@ function isValidTheme(value: string): value is ThemePalette {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ThemePalette>(() => {
     const saved = localStorage.getItem("branchforge-theme");
-    return saved && isValidTheme(saved) ? saved : "forest";
+    return saved && isValidTheme(saved) ? saved : "periwinkle";
   });
 
   const colors = themeConfigs[theme];
