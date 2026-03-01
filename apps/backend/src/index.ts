@@ -4,6 +4,7 @@ import cookie from '@fastify/cookie';
 import session from '@fastify/session';
 import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './routes/auth.routes.js';
+import { createDrizzleSessionStore } from './services/session-store.service.js';
 
 const server = Fastify({
   logger: true,
@@ -16,14 +17,27 @@ await server.register(cors, {
 });
 
 await server.register(cookie);
+
+// Create persistent session store
+const sessionStore = createDrizzleSessionStore({
+  // Clean up expired sessions every hour
+  cleanupInterval: 60 * 60 * 1000,
+});
+
 await server.register(session, {
   secret: process.env.SESSION_SECRET ?? 'dev-secret-please-change-in-production',
+  store: sessionStore,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     sameSite: 'lax',
     maxAge: 86400000, // 24 hours
+    // Add additional security headers for production
+    path: process.env.BASE_PATH ?? (process.env.NODE_ENV === 'production' ? '/api/' : '/api/api/'),
   },
+  // Save session on every request to ensure session data is up-to-date
+  saveUninitialized: false,
+  rolling: false,
 });
 
 // Routes
