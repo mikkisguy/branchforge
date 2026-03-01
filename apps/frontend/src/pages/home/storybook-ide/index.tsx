@@ -5,10 +5,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { themePalettes, BASE_URL } from "@/lib/constants";
 import {
   FloatingParticles,
-  ModeToggle,
-  ThemeSwitcher,
+  TopRightPanel,
 } from "@/components/storybook-ide";
-import { Button } from "@/components/ui/button";
 import { StoryMode } from "./StoryMode";
 import { EditorMode } from "./EditorMode";
 
@@ -29,23 +27,16 @@ export function HomePageStorybookIDE() {
     <div className="min-h-screen relative flex flex-col">
       <FloatingParticles />
 
-      {/* Mode Toggle */}
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
-        <ModeToggle mode={mode} setMode={setMode} />
-      </div>
+      {/* Top right control panel */}
+      <TopRightPanel
+        mode={mode}
+        setMode={setMode}
+        theme={theme}
+        setTheme={setTheme}
+        themePalettes={themePalettes}
+        onLogout={handleLogout}
+      />
 
-      {/* User info and logout */}
-      <div className="fixed top-4 left-4 z-50 flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">{user?.email}</span>
-        <Button variant="outline" size="sm" onClick={handleLogout}>
-          Logout
-        </Button>
-      </div>
-
-      {/* Floating theme switcher */}
-      <div className="fixed top-4 right-4 z-50">
-        <ThemeSwitcher theme={theme} setTheme={setTheme} themePalettes={themePalettes} />
-      </div>
 
       {mode === "story" ? (
         <StoryMode setMode={setMode} />
