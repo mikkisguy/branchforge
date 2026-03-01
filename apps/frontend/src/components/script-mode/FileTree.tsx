@@ -1,21 +1,17 @@
 // File tree styled like a book's table of contents
-export interface StorybookFile {
+export interface ScriptFile {
   name: string;
   type: "file" | "folder";
   icon?: string;
 }
 
-interface StorybookFileTreeProps {
-  files: StorybookFile[];
+interface FileTreeProps {
+  files: ScriptFile[];
   activeFile: string;
   onSelectFile: (name: string) => void;
 }
 
-export function StorybookFileTree({
-  files,
-  activeFile,
-  onSelectFile,
-}: StorybookFileTreeProps) {
+export function FileTree({ files, activeFile, onSelectFile }: FileTreeProps) {
   return (
     <div className="space-y-1">
       <div

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { StoryPanel } from "@/components/storybook-ide";
+import { StoryPanel } from "@/components/ide-shared";
 import { Logo } from "@/components/ui/logo";
 
 interface WriteModeProps {

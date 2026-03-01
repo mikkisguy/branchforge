@@ -1,18 +1,18 @@
 import { useState } from "react";
+import { StoryPanel } from "@/components/ide-shared";
 import {
-  StoryPanel,
-  StorybookFileTree,
-  StorybookEditor,
+  FileTree,
   BookmarkTab,
-  StorybookStatusBar,
-  type StorybookFile,
-} from "@/components/storybook-ide";
+  StatusBar,
+  type File,
+  ScriptEditor,
+} from "@/components/script-mode";
 
 interface ScriptModeProps {
   themeName: string;
 }
 
-const files: StorybookFile[] = [
+const files: File[] = [
   { name: "my-project", type: "folder", icon: "" },
   { name: "script.rpy", type: "file" },
   { name: "characters.rpy", type: "file" },
@@ -57,7 +57,7 @@ export function ScriptMode({ themeName }: ScriptModeProps) {
               + New Chapter
             </button>
 
-            <StorybookFileTree
+            <FileTree
               files={files}
               activeFile={activeFile}
               onSelectFile={setActiveFile}
@@ -88,7 +88,7 @@ export function ScriptMode({ themeName }: ScriptModeProps) {
 
           {/* Editor */}
           <StoryPanel className="flex-1 !mt-0">
-            <StorybookEditor
+            <ScriptEditor
               content={fileContents[activeFile] || []}
               language="Ren'Py"
             />
@@ -148,7 +148,7 @@ export function ScriptMode({ themeName }: ScriptModeProps) {
       </div>
 
       {/* Status Bar */}
-      <StorybookStatusBar
+      <StatusBar
         lineCount={fileContents[activeFile]?.length || 0}
         language="Ren'Py"
         themeName={themeName}
@@ -156,3 +156,4 @@ export function ScriptMode({ themeName }: ScriptModeProps) {
     </div>
   );
 }
+

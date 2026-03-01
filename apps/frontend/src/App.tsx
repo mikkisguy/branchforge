@@ -1,5 +1,5 @@
 import { Routes, Route } from "react-router-dom";
-import { HomePageStorybookIDE } from "./pages/home/storybook-ide";
+import { HomePageIDE } from "./pages/ide";
 import { LoginPage } from "./pages/auth/login";
 import { RegisterPage } from "./pages/auth/register";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -19,7 +19,7 @@ function App() {
               path={BASE_URL}
               element={
                 <ProtectedRoute>
-                  <HomePageStorybookIDE />
+                  <HomePageIDE />
                 </ProtectedRoute>
               }
             />

@@ -1,10 +1,10 @@
 // Code editor with storybook styling
-interface StorybookEditorProps {
+interface EditorProps {
   content: string[];
   language: string;
 }
 
-export function StorybookEditor({ content = [] }: StorybookEditorProps) {
+export function ScriptEditor({ content = [] }: EditorProps) {
   return (
     <div className="font-mono text-sm h-full overflow-auto">
       <div className="flex">
