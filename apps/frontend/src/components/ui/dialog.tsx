@@ -6,9 +6,10 @@ interface DialogProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   children: React.ReactNode;
+  closeOnBackdropClick?: boolean;
 }
 
-export function Dialog({ open, onOpenChange, children }: DialogProps) {
+export function Dialog({ open, onOpenChange, children, closeOnBackdropClick = true }: DialogProps) {
   useEffect(() => {
     function handleEscape(e: KeyboardEvent) {
       if (e.key === "Escape") {
@@ -29,7 +30,7 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/30 backdrop-blur-sm"
-        onClick={() => onOpenChange?.(false)}
+        onClick={closeOnBackdropClick ? () => onOpenChange?.(false) : undefined}
       />
       {/* Content */}
       {children}
