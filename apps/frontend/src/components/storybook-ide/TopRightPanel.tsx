@@ -71,10 +71,10 @@ export function TopRightPanel({
                 ? "text-white bg-[var(--theme-color)]"
                 : "text-muted-foreground hover:text-foreground"
             }`}
-            title="Script Mode"
+            title="Editor Mode"
           >
             <SquarePen className="w-4 h-4" />
-            <span>Script</span>
+            <span>Editor</span>
           </button>
         </div>
 
