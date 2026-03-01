@@ -4,7 +4,7 @@ interface EditorProps {
   language: string;
 }
 
-export function Editor({ content = [] }: EditorProps) {
+export function ScriptEditor({ content = [] }: EditorProps) {
   return (
     <div className="font-mono text-sm h-full overflow-auto">
       <div className="flex">
@@ -30,3 +30,4 @@ export function Editor({ content = [] }: EditorProps) {
     </div>
   );
 }
+

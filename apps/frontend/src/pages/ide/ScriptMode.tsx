@@ -1,13 +1,11 @@
 import { useState } from "react";
-import {
-  StoryPanel,
-} from "@/components/ide-shared";
+import { StoryPanel } from "@/components/ide-shared";
 import {
   FileTree,
-  Editor,
   BookmarkTab,
   StatusBar,
   type File,
+  ScriptEditor,
 } from "@/components/script-mode";
 
 interface ScriptModeProps {
@@ -90,7 +88,7 @@ export function ScriptMode({ themeName }: ScriptModeProps) {
 
           {/* Editor */}
           <StoryPanel className="flex-1 !mt-0">
-            <Editor
+            <ScriptEditor
               content={fileContents[activeFile] || []}
               language="Ren'Py"
             />
@@ -158,3 +156,4 @@ export function ScriptMode({ themeName }: ScriptModeProps) {
     </div>
   );
 }
+

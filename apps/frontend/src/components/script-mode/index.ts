@@ -1,5 +1,6 @@
-export { Editor } from "./Editor";
+export { ScriptEditor } from "./ScriptEditor";
 export { FileTree } from "./FileTree";
 export { BookmarkTab } from "./BookmarkTab";
 export { StatusBar } from "./StatusBar";
-export type { File } from "./FileTree";
+export type { ScriptFile as File } from "./FileTree";
+
