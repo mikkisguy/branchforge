@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSettings } from "@/contexts/SettingsContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,11 +20,65 @@ import { APP_NAME } from "../../../lib/version";
 export function RegisterPage() {
   const navigate = useNavigate();
   const { register } = useAuth();
+  const { signUpsEnabled, isLoading: settingsLoading } = useSettings();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  // Show loading state while checking settings
+  if (settingsLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-8">
+          <div className="text-center">
+            <Logo className="text-4xl" />
+          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Create Account</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">Loading...</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Show disabled state when signups are closed
+  if (!signUpsEnabled) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-8">
+          <div className="text-center">
+            <Logo className="text-4xl" />
+          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Registration Closed</CardTitle>
+              <CardDescription>
+                New user registration is currently disabled. Please contact an administrator.
+              </CardDescription>
+            </CardHeader>
+            <CardFooter>
+              <p className="text-sm text-muted-foreground">
+                Already have an account?{" "}
+                <Link
+                  to={`${BASE_URL}login`}
+                  className="text-primary hover:underline"
+                >
+                  Sign in
+                </Link>
+              </p>
+            </CardFooter>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();

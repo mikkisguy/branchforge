@@ -125,8 +125,8 @@ describe('Auth Routes (Unit)', () => {
       expect(console.error).toHaveBeenCalledWith('Registration error:', 'Email already registered');
     });
 
-    it('should return generic error if registration limit reached (security)', async () => {
-      vi.mocked(authService.register).mockRejectedValue(new Error('Registration is limited to a single user'));
+    it('should return generic error if registration is disabled (security)', async () => {
+      vi.mocked(authService.register).mockRejectedValue(new Error('Registration is currently disabled'));
 
       const response = await fastify.inject({
         method: 'POST',
@@ -141,7 +141,7 @@ describe('Auth Routes (Unit)', () => {
       expect(JSON.parse(response.payload)).toEqual({
         error: 'Invalid registration data',
       });
-      expect(console.error).toHaveBeenCalledWith('Registration error:', 'Registration is limited to a single user');
+      expect(console.error).toHaveBeenCalledWith('Registration error:', 'Registration is currently disabled');
     });
   });
 
