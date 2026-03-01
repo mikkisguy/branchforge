@@ -25,6 +25,30 @@ const tabs: TabOption[] = [
   { id: "system", label: "System Admin" },
 ];
 
+/**
+ * Helper function to filter tabs based on user role and ensure a valid active tab.
+ * Only users with OWNER role can see the System Admin tab.
+ *
+ * @param activeTab - The currently active tab
+ * @param userRole - The user's role (optional)
+ * @returns An object with filtered tabs and the appropriate active tab
+ */
+function useVisibleTabs(activeTab: Tab, userRole?: string) {
+  return useMemo(() => {
+    // Filter out system tab for non-OWNER users
+    const visibleTabs = tabs.filter(
+      (tab) => tab.id !== "system" || userRole === "OWNER"
+    );
+
+    // If current active tab is not visible, switch to first visible tab
+    const adjustedActiveTab = visibleTabs.find((t) => t.id === activeTab)
+      ? activeTab
+      : visibleTabs[0]?.id || activeTab;
+
+    return { visibleTabs, activeTab: adjustedActiveTab };
+  }, [activeTab, userRole]);
+}
+
 interface SettingsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -35,17 +59,15 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const { user } = useAuth();
   const { signUpsEnabled, updateSignUpsSetting, isLoading: settingsLoading, isSaving } = useSettings();
 
-  // Filter tabs based on user role - only OWNER can see System Admin tab
-  const visibleTabs = useMemo(() => {
-    return tabs.filter(tab => tab.id !== "system" || user?.role === "OWNER");
-  }, [user?.role]);
+  // Use helper to get visible tabs and ensure valid active tab
+  const { visibleTabs, activeTab: adjustedActiveTab } = useVisibleTabs(activeTab, user?.role);
 
-  // If the current active tab is no longer visible, switch to the first visible tab
+  // Sync state if active tab was adjusted by helper
   useMemo(() => {
-    if (!visibleTabs.find(t => t.id === activeTab) && visibleTabs.length > 0) {
-      setActiveTab(visibleTabs[0].id);
+    if (adjustedActiveTab !== activeTab) {
+      setActiveTab(adjustedActiveTab);
     }
-  }, [activeTab, visibleTabs]);
+  }, [adjustedActiveTab, activeTab]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -52,17 +52,23 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
       throw new Error('Only administrators can change this setting');
     }
 
+    const previousValue = signUpsEnabled;
+
     setIsSaving(true);
+    // Optimistically update the UI for immediate feedback
+    setSignUpsEnabled(enabled);
+
     try {
       await settingsApi.updateSetting('sign_ups_enabled', enabled);
-      setSignUpsEnabled(enabled);
       toast.success(
         enabled ? 'Sign-ups have been enabled' : 'Sign-ups have been disabled',
         'Setting saved'
       );
     } catch (err) {
+      // Revert to the previous value on error
+      setSignUpsEnabled(previousValue);
       toast.error(
-        'Failed to update setting. Please try again.',
+        'Failed to update setting. The original value has been restored.',
         'Error'
       );
       throw err;
