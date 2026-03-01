@@ -78,7 +78,7 @@ export function TopRightPanel({
           </button>
         </div>
 
-        <div className="w-px h-6 bg-border/50 mx-1" />
+        <div className="h-6 bg-border/50 mx-1" />
 
         {/* Theme Dropdown */}
         <div className="relative" ref={dropdownRef}>
@@ -117,8 +117,6 @@ export function TopRightPanel({
             </div>
           )}
         </div>
-
-        <div className="w-px h-6 bg-border/50 mx-1" />
 
         {/* Settings */}
         <button
