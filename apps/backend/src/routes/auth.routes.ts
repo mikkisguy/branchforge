@@ -172,7 +172,12 @@ async function loginHandler(
   // Successful login - clear rate limit for this IP
   clearRateLimit(clientIp);
 
-  // Store user in session
+  // Session rotation: regenerate session ID before storing user data
+  // This prevents session fixation attacks where an attacker could set a known session ID
+  const oldSession = request.session;
+  await request.session.regenerate();
+
+  // Store user in the new session
   request.session.user = user;
 
   // Add rate limit headers

@@ -1,10 +1,17 @@
 {
-  "extends": "./tsconfig.json",
   "compilerOptions": {
+    "target": "ESNext",
+    "module": "CommonJS",
+    "lib": ["ESNext"],
+    "moduleResolution": "node",
     "outDir": "./dist-schema",
     "rootDir": "./src",
-    "module": "CommonJS",
-    "noEmit": false
+    "resolveJsonModule": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": false,
+    "declaration": true
   },
   "include": ["src/db/schema/**/*.ts"],
   "exclude": ["node_modules", "dist", "dist-schema", "**/*.test.ts"]

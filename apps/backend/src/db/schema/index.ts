@@ -19,6 +19,7 @@ export * from './enums.js';
 
 // User tables
 export * from './tables/users.js';
+export * from './tables/sessions.js';
 
 // Project tables
 export * from './tables/projects.js';
