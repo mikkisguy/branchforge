@@ -62,7 +62,7 @@ export function TopRightPanel({
             title="Write Mode"
           >
             <BookOpen className="w-4 h-4" />
-            <span>Write</span>
+            Write
           </button>
           <button
             onClick={() => setMode("script")}
@@ -74,7 +74,7 @@ export function TopRightPanel({
             title="Script Mode"
           >
             <SquarePen className="w-4 h-4" />
-            <span>Script</span>
+            Script
           </button>
         </div>
 
@@ -129,7 +129,7 @@ export function TopRightPanel({
         {/* Logout */}
         <button
           onClick={onLogout}
-          className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+          className="p-2 rounded-md text-muted-foreground hover:text-destructive-muted hover:bg-destructive/10 transition-colors"
           title="Logout"
         >
           <LogOut className="w-4 h-4" />
