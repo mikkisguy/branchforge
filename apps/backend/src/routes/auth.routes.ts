@@ -196,11 +196,8 @@ async function logoutHandler(
   request: FastifyRequest,
   reply: FastifyReply
 ): Promise<void> {
-  // Clear the session user
-  delete request.session.user;
-
-  // Reset the session (clears all data)
-  await request.session.regenerate();
+  // Destroy the session completely (removes from database)
+  await request.session.destroy();
 
   reply.status(204).send();
 }
