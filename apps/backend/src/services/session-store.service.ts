@@ -166,6 +166,14 @@ export class DrizzleSessionStore implements SessionStore {
       const db = getDb();
       const { userId, data: cleanData } = sessionToDbData(session);
 
+      // Skip saving sessions without a valid userId (anonymous sessions)
+      // We only persist authenticated sessions to the database
+      // Use a small delay to match async behavior of real DB operations
+      if (!userId) {
+        await new Promise(resolve => setImmediate(resolve));
+        return;
+      }
+
       // Calculate expiration time from cookie maxAge or default to 24 hours
       const maxAge = session.cookie?.maxAge ?? 86400000;
       const expiresAt = new Date(Date.now() + maxAge);

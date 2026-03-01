@@ -71,6 +71,7 @@ export const authApi = {
   async logout(): Promise<void> {
     return request<void>("/logout", {
       method: "POST",
+      body: JSON.stringify({}),
     });
   },
 
