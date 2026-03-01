@@ -20,6 +20,8 @@ export * from './enums.js';
 // User tables
 export * from './tables/users.js';
 export * from './tables/sessions.js';
+export * from './tables/user-settings.js';
+export * from './tables/admin-settings.js';
 
 // Project tables
 export * from './tables/projects.js';

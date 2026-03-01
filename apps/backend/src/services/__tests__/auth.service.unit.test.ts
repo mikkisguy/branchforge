@@ -14,6 +14,11 @@ vi.mock('../../db/index.js', () => ({
   getDb: vi.fn(() => mockDb),
 }));
 
+// Mock the admin settings service
+vi.mock('../admin-settings.service.js', () => ({
+  isSignUpsEnabled: vi.fn(() => Promise.resolve(true)),
+}));
+
 describe('AuthService', () => {
   afterEach(() => {
     vi.clearAllMocks();
@@ -71,36 +76,32 @@ describe('AuthService', () => {
     const mockFrom = vi.fn();
     const mockValues = vi.fn();
     const mockReturning = vi.fn();
+    const mockWhere = vi.fn();
 
     // Create a chained mock that handles both with and without where
-    const createFromMock = (existingUsers: any[] = []) => {
+    const createFromMock = () => {
       const fromResult = {
-        where: vi.fn(() => fromResult),
+        where: mockWhere,
       };
-      // Make the from return itself directly when no where is called
-      const proxy = new Proxy(fromResult, {
-        get(target, prop) {
-          if (prop === 'where') {
-            return vi.fn(() => proxy);
-          }
-          // For non-where calls like in Promise.resolve, return the mock data
-          return (target as any)[prop];
-        },
-      });
-      // Make it a thenable for await
-      (proxy as any).then = (...args: any[]) => Promise.resolve(existingUsers).then(...args);
-      return proxy;
+      return fromResult;
     };
 
     beforeEach(() => {
       mockSelect.mockReturnValue({ from: mockFrom });
-      mockFrom.mockReturnValue(createFromMock([]));
+      mockFrom.mockReturnValue(createFromMock());
+      mockWhere.mockReturnValue({
+        where: mockWhere,
+      });
       mockInsert.mockReturnValue({ values: mockValues });
       mockValues.mockReturnValue({ returning: mockReturning });
       mockReturning.mockResolvedValue([{ id: '123', email: 'test@example.com', role: 'OWNER' }]);
     });
 
-    it('should register first user successfully', async () => {
+    it('should register user successfully when signups are enabled', async () => {
+      const { isSignUpsEnabled } = await import('../admin-settings.service.js');
+      vi.mocked(isSignUpsEnabled).mockResolvedValueOnce(true);
+      mockWhere.mockResolvedValueOnce([]);
+
       const result = await register('test@example.com', 'password123');
       expect(result).toEqual({
         id: '123',
@@ -110,15 +111,18 @@ describe('AuthService', () => {
     });
 
     it('should fail if email is already taken', async () => {
-      mockFrom.mockReturnValue(Promise.resolve([{ email: 'test@example.com' }]));
+      const { isSignUpsEnabled } = await import('../admin-settings.service.js');
+      vi.mocked(isSignUpsEnabled).mockResolvedValueOnce(true);
+      mockWhere.mockResolvedValueOnce([{ email: 'test@example.com' }]);
 
       await expect(register('test@example.com', 'password123')).rejects.toThrow('Email already registered');
     });
 
-    it('should fail if users already exist (single user restriction)', async () => {
-      mockFrom.mockReturnValue(Promise.resolve([{ id: 'existing-id', email: 'other@example.com' }]));
+    it('should fail when signups are disabled', async () => {
+      const { isSignUpsEnabled } = await import('../admin-settings.service.js');
+      vi.mocked(isSignUpsEnabled).mockResolvedValueOnce(false);
 
-      await expect(register('new@example.com', 'password123')).rejects.toThrow('Registration is limited to a single user');
+      await expect(register('new@example.com', 'password123')).rejects.toThrow('Registration is currently disabled');
     });
 
     it('should fail with invalid email format', async () => {
