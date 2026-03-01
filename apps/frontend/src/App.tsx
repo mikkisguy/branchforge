@@ -1,5 +1,5 @@
 import { Routes, Route } from "react-router-dom";
-import HomePageStorybookIDE from "./pages/HomePage.storybook-ide";
+import { HomePageStorybookIDE } from "./pages/home/storybook-ide";
 import { BASE_URL } from "./lib/constants";
 import { ThemeProvider } from "./contexts/ThemeContext";
 
