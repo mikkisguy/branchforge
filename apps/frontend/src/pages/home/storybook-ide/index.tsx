@@ -5,18 +5,17 @@ import { useAuth } from "@/contexts/AuthContext";
 import { themePalettes, BASE_URL } from "@/lib/constants";
 import {
   FloatingParticles,
-  ModeToggle,
-  ThemeSwitcher,
+  TopRightPanel,
 } from "@/components/storybook-ide";
-import { Button } from "@/components/ui/button";
-import { StoryMode } from "./StoryMode";
-import { EditorMode } from "./EditorMode";
+import { Logo } from "@/components/ui/logo";
+import { WriteMode } from "./WriteMode";
+import { ScriptMode } from "./ScriptMode";
 
 export function HomePageStorybookIDE() {
   const { theme, setTheme } = useTheme();
-  const { logout, user } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"story" | "editor">("story");
+  const [mode, setMode] = useState<"write" | "script">("write");
 
   const themeInfo = themePalettes.find((p) => p.key === theme);
 
@@ -29,28 +28,26 @@ export function HomePageStorybookIDE() {
     <div className="min-h-screen relative flex flex-col">
       <FloatingParticles />
 
-      {/* Mode Toggle */}
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
-        <ModeToggle mode={mode} setMode={setMode} />
+      {/* Top left logo */}
+      <div className="absolute top-4 left-6 z-10">
+        <Logo compact />
       </div>
 
-      {/* User info and logout */}
-      <div className="fixed top-4 left-4 z-50 flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">{user?.email}</span>
-        <Button variant="outline" size="sm" onClick={handleLogout}>
-          Logout
-        </Button>
-      </div>
+      {/* Top right control panel */}
+      <TopRightPanel
+        mode={mode}
+        setMode={setMode}
+        theme={theme}
+        setTheme={setTheme}
+        themePalettes={themePalettes}
+        onLogout={handleLogout}
+      />
 
-      {/* Floating theme switcher */}
-      <div className="fixed top-4 right-4 z-50">
-        <ThemeSwitcher theme={theme} setTheme={setTheme} themePalettes={themePalettes} />
-      </div>
 
-      {mode === "story" ? (
-        <StoryMode setMode={setMode} />
+      {mode === "write" ? (
+        <WriteMode setMode={setMode} />
       ) : (
-        <EditorMode themeName={themeInfo?.name || ""} />
+        <ScriptMode themeName={themeInfo?.name || ""} />
       )}
     </div>
   );
