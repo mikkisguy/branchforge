@@ -33,7 +33,7 @@ interface SettingsModalProps {
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<Tab>("user");
   const { user } = useAuth();
-  const { signUpsEnabled, updateSignUpsSetting, isLoading: settingsLoading } = useSettings();
+  const { signUpsEnabled, updateSignUpsSetting, isLoading: settingsLoading, isSaving } = useSettings();
 
   // Filter tabs based on user role - only OWNER can see System Admin tab
   const visibleTabs = useMemo(() => {
@@ -127,7 +127,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                     <Switch
                       checked={signUpsEnabled}
                       onCheckedChange={updateSignUpsSetting}
-                      disabled={settingsLoading}
+                      disabled={settingsLoading || isSaving}
                     />
                   </div>
                 </div>
