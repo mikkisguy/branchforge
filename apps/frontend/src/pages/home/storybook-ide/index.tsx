@@ -7,6 +7,7 @@ import {
   FloatingParticles,
   TopRightPanel,
 } from "@/components/storybook-ide";
+import { Logo } from "@/components/ui/logo";
 import { WriteMode } from "./WriteMode";
 import { ScriptMode } from "./ScriptMode";
 
@@ -26,6 +27,11 @@ export function HomePageStorybookIDE() {
   return (
     <div className="min-h-screen relative flex flex-col">
       <FloatingParticles />
+
+      {/* Top left logo */}
+      <div className="absolute top-4 left-6 z-10">
+        <Logo compact />
+      </div>
 
       {/* Top right control panel */}
       <TopRightPanel
