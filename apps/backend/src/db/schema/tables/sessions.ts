@@ -9,7 +9,7 @@
 import { pgTable, text, uuid, timestamp, jsonb, index } from 'drizzle-orm/pg-core';
 import { users } from './users.js';
 
-export const sessions = pgTable('sessions', {
+export const userSessions = pgTable('user_sessions', {
   // Session ID (the cookie value)
   id: text('id').primaryKey(),
 
@@ -26,10 +26,10 @@ export const sessions = pgTable('sessions', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
-  userIdIdx: index('sessions_user_id_idx').on(table.userId),
-  expiresAtIdx: index('sessions_expires_at_idx').on(table.expiresAt),
+  userIdIdx: index('user_sessions_user_id_idx').on(table.userId),
+  expiresAtIdx: index('user_sessions_expires_at_idx').on(table.expiresAt),
 }));
 
 // Types
-export type Session = typeof sessions.$inferSelect;
-export type NewSession = typeof sessions.$inferInsert;
+export type Session = typeof userSessions.$inferSelect;
+export type NewSession = typeof userSessions.$inferInsert;
