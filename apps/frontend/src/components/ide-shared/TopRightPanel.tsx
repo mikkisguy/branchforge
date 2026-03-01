@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { BookOpen, SquarePen, Palette, Settings, LogOut } from "lucide-react";
 import type { ThemePalette } from "@/contexts/ThemeContext";
+import { SettingsModal } from "./SettingsModal";
 
 export interface ThemePaletteOption {
   name: string;
@@ -26,6 +27,7 @@ export function TopRightPanel({
   onLogout,
 }: TopRightPanelProps) {
   const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -120,6 +122,7 @@ export function TopRightPanel({
 
         {/* Settings */}
         <button
+          onClick={() => setIsSettingsOpen(true)}
           className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
           title="Settings"
         >
@@ -135,6 +138,8 @@ export function TopRightPanel({
           <LogOut className="w-4 h-4" />
         </button>
       </div>
+
+      <SettingsModal open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
     </div>
   );
 }
