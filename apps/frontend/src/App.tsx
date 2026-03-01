@@ -1,16 +1,31 @@
 import { Routes, Route } from "react-router-dom";
 import { HomePageStorybookIDE } from "./pages/home/storybook-ide";
-import { BASE_URL } from "./lib/constants";
+import { LoginPage } from "./pages/auth/login";
+import { RegisterPage } from "./pages/auth/register";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { BASE_URL } from "./lib/constants";
 
 function App() {
   return (
     <ThemeProvider>
-      <div className="app">
-        <Routes>
-          <Route path={BASE_URL} element={<HomePageStorybookIDE />} />
-        </Routes>
-      </div>
+      <AuthProvider>
+        <div className="app">
+          <Routes>
+            <Route path={`${BASE_URL}login`} element={<LoginPage />} />
+            <Route path={`${BASE_URL}register`} element={<RegisterPage />} />
+            <Route
+              path={BASE_URL}
+              element={
+                <ProtectedRoute>
+                  <HomePageStorybookIDE />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </div>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { StoryPanel } from "@/components/storybook-ide";
+import { Logo } from "@/components/ui/logo";
 
 interface StoryModeProps {
   setMode: (mode: "story" | "editor") => void;
@@ -30,18 +31,7 @@ export function StoryMode({ setMode }: StoryModeProps) {
       <div className="max-w-2xl w-full space-y-8">
         {/* Title */}
         <div className="text-center space-y-4">
-          <h1
-            className="font-display text-6xl tracking-wide leading-tight pb-2"
-            style={{
-              background:
-                "linear-gradient(135deg, var(--theme-color) 0%, white 50%, var(--theme-color) 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}
-          >
-            BranchForge
-          </h1>
+          <Logo />
           <p className="text-xl tracking-widest uppercase text-muted-foreground">
             Visual Novel IDE
           </p>
