@@ -4,7 +4,7 @@ interface StorybookEditorProps {
   language: string;
 }
 
-export function StorybookEditor({ content }: StorybookEditorProps) {
+export function StorybookEditor({ content = [] }: StorybookEditorProps) {
   return (
     <div className="font-mono text-sm h-full overflow-auto">
       <div className="flex">
@@ -30,3 +30,4 @@ export function StorybookEditor({ content }: StorybookEditorProps) {
     </div>
   );
 }
+

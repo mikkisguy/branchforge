@@ -31,7 +31,7 @@ export function StorybookFileTree({
           disabled={file.type === "folder"}
           className={`w-full flex items-center gap-2 py-1.5 px-2 rounded text-sm transition-all ${
             file.type === "folder"
-              ? "text-foreground/70 cursor-default"
+              ? "text-foreground/70 cursor-default italic"
               : activeFile === file.name
                 ? "bg-muted/50 text-foreground"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
@@ -44,3 +44,4 @@ export function StorybookFileTree({
     </div>
   );
 }
+
