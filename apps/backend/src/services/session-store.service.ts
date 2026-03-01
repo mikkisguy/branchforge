@@ -14,7 +14,7 @@
 import type { SessionStore } from '@fastify/session';
 import type { Session } from 'fastify';
 import { getDb } from '../db/index.js';
-import { sessions } from '../db/schema/index.js';
+import { userSessions } from '../db/schema/index.js';
 import { eq, lt } from 'drizzle-orm';
 
 type Callback = (err?: any) => void;
@@ -171,7 +171,7 @@ export class DrizzleSessionStore implements SessionStore {
       const expiresAt = new Date(Date.now() + maxAge);
 
       await db
-        .insert(sessions)
+        .insert(userSessions)
         .values({
           id: sessionId,
           userId,
@@ -179,7 +179,7 @@ export class DrizzleSessionStore implements SessionStore {
           expiresAt,
         })
         .onConflictDoUpdate({
-          target: sessions.id,
+          target: userSessions.id,
           set: {
             userId,
             data: cleanData,
@@ -211,8 +211,8 @@ export class DrizzleSessionStore implements SessionStore {
       const db = getDb();
       const result = await db
         .select()
-        .from(sessions)
-        .where(eq(sessions.id, sessionId))
+        .from(userSessions)
+        .where(eq(userSessions.id, sessionId))
         .limit(1);
 
       if (result.length === 0) {
@@ -251,7 +251,7 @@ export class DrizzleSessionStore implements SessionStore {
   private async destroyAsync(sessionId: string): Promise<void> {
     try {
       const db = getDb();
-      await db.delete(sessions).where(eq(sessions.id, sessionId));
+      await db.delete(userSessions).where(eq(userSessions.id, sessionId));
     } catch (error) {
       console.error('Session store destroy error:', error);
       throw error;
@@ -268,9 +268,9 @@ export class DrizzleSessionStore implements SessionStore {
       const now = new Date();
 
       const result = await db
-        .delete(sessions)
-        .where(lt(sessions.expiresAt, now))
-        .returning({ id: sessions.id });
+        .delete(userSessions)
+        .where(lt(userSessions.expiresAt, now))
+        .returning({ id: userSessions.id });
 
       return result.length;
     } catch (error) {
