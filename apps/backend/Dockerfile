@@ -1,5 +1,9 @@
 FROM node:20-alpine AS builder
 
+ARG VERSION=0.0.1
+ARG BUILD_DATE
+ARG VCS_REF
+
 WORKDIR /app
 
 # Install pnpm
@@ -24,6 +28,15 @@ RUN pnpm build
 # Production image
 FROM node:20-alpine
 
+ARG VERSION=0.0.1
+ARG BUILD_DATE
+ARG VCS_REF
+
+LABEL org.label-schema.name="BranchForge Backend"
+LABEL org.label-schema.version=$VERSION
+LABEL org.label-schema.build-date=$BUILD_DATE
+LABEL org.label-schema.vcs-ref=$VCS_REF
+
 WORKDIR /app
 
 # Copy workspace files for production runtime
@@ -38,6 +51,13 @@ COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
 # Install production dependencies only
 RUN pnpm install --prod --frozen-lockfile
 
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodejs -u 1001
+USER nodejs
+
 EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 CMD ["node", "apps/backend/dist/index.js"]
