@@ -8,6 +8,7 @@ import bcrypt from 'bcrypt';
 import { getDb } from '../db/index.js';
 import { users } from '../db/schema/index.js';
 import { eq } from 'drizzle-orm';
+import { isSignUpsEnabled } from './admin-settings.service.js';
 
 // Email regex for basic validation
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -58,15 +59,15 @@ export async function register(email: string, password: string): Promise<PublicU
 
   const db = getDb();
 
-  // Check if any users already exist (single user restriction)
-  const existingUsers = await db.select().from(users);
-  if (existingUsers.length > 0) {
-    // Check if email is already registered
-    const emailExists = existingUsers.some(u => u.email === email);
-    if (emailExists) {
-      throw new Error('Email already registered');
-    }
-    throw new Error('Registration is limited to a single user');
+  // Check if signups are enabled
+  if (!(await isSignUpsEnabled())) {
+    throw new Error('Registration is currently disabled');
+  }
+
+  // Check if email is already registered
+  const emailExists = await db.select().from(users).where(eq(users.email, email));
+  if (emailExists.length > 0) {
+    throw new Error('Email already registered');
   }
 
   // Hash the password

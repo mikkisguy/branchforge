@@ -4,6 +4,7 @@ import { LoginPage } from "./pages/auth/login";
 import { RegisterPage } from "./pages/auth/register";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AuthProvider } from "./contexts/AuthContext";
+import { SettingsProvider } from "./contexts/SettingsContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { BASE_URL } from "./lib/constants";
 
@@ -11,7 +12,8 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <div className="app">
+        <SettingsProvider>
+          <div className="app">
           <Routes>
             <Route path={`${BASE_URL}login`} element={<LoginPage />} />
             <Route path={`${BASE_URL}register`} element={<RegisterPage />} />
@@ -25,9 +27,10 @@ function App() {
             />
           </Routes>
         </div>
-      </AuthProvider>
-    </ThemeProvider>
-  );
+      </SettingsProvider>
+    </AuthProvider>
+  </ThemeProvider>
+);
 }
 
 export default App;

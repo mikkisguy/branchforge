@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { X } from "lucide-react";
 import {
   Dialog,
@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSettings } from "@/contexts/SettingsContext";
 import { cn } from "@/lib/utils";
 import { APP_NAME, APP_VERSION } from "@/lib/version";
 
@@ -32,7 +33,19 @@ interface SettingsModalProps {
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<Tab>("user");
   const { user } = useAuth();
-  const [signUpsEnabled, setSignUpsEnabled] = useState(true);
+  const { signUpsEnabled, updateSignUpsSetting, isLoading: settingsLoading } = useSettings();
+
+  // Filter tabs based on user role - only OWNER can see System Admin tab
+  const visibleTabs = useMemo(() => {
+    return tabs.filter(tab => tab.id !== "system" || user?.role === "OWNER");
+  }, [user?.role]);
+
+  // If the current active tab is no longer visible, switch to the first visible tab
+  useMemo(() => {
+    if (!visibleTabs.find(t => t.id === activeTab) && visibleTabs.length > 0) {
+      setActiveTab(visibleTabs[0].id);
+    }
+  }, [activeTab, visibleTabs]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -51,7 +64,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
           {/* Vertical Tabs */}
           <div className="w-48 border-r border-border/30 p-2 flex flex-col">
             <div className="space-y-1">
-              {tabs.map((tab) => (
+              {visibleTabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
@@ -113,7 +126,8 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                     </div>
                     <Switch
                       checked={signUpsEnabled}
-                      onCheckedChange={setSignUpsEnabled}
+                      onCheckedChange={updateSignUpsSetting}
+                      disabled={settingsLoading}
                     />
                   </div>
                 </div>
