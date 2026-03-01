@@ -9,8 +9,8 @@ export interface ThemePaletteOption {
 }
 
 interface TopRightPanelProps {
-  mode: "story" | "editor";
-  setMode: (mode: "story" | "editor") => void;
+  mode: "write" | "script";
+  setMode: (mode: "write" | "script") => void;
   theme: string;
   setTheme: (theme: ThemePalette) => void;
   themePalettes: ThemePaletteOption[];
@@ -53,28 +53,28 @@ export function TopRightPanel({
         {/* Mode Switcher */}
         <div className="flex bg-muted/50 rounded-md p-0.5">
           <button
-            onClick={() => setMode("story")}
+            onClick={() => setMode("write")}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-              mode === "story"
+              mode === "write"
                 ? "text-white bg-[var(--theme-color)]"
                 : "text-muted-foreground hover:text-foreground"
             }`}
-            title="Story Mode"
+            title="Write Mode"
           >
             <BookOpen className="w-4 h-4" />
-            <span>Story</span>
+            <span>Write</span>
           </button>
           <button
-            onClick={() => setMode("editor")}
+            onClick={() => setMode("script")}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-              mode === "editor"
+              mode === "script"
                 ? "text-white bg-[var(--theme-color)]"
                 : "text-muted-foreground hover:text-foreground"
             }`}
-            title="Editor Mode"
+            title="Script Mode"
           >
             <SquarePen className="w-4 h-4" />
-            <span>Editor</span>
+            <span>Script</span>
           </button>
         </div>
 

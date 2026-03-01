@@ -7,14 +7,14 @@ import {
   FloatingParticles,
   TopRightPanel,
 } from "@/components/storybook-ide";
-import { StoryMode } from "./StoryMode";
-import { EditorMode } from "./EditorMode";
+import { WriteMode } from "./WriteMode";
+import { ScriptMode } from "./ScriptMode";
 
 export function HomePageStorybookIDE() {
   const { theme, setTheme } = useTheme();
-  const { logout, user } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"story" | "editor">("story");
+  const [mode, setMode] = useState<"write" | "script">("write");
 
   const themeInfo = themePalettes.find((p) => p.key === theme);
 
@@ -38,10 +38,10 @@ export function HomePageStorybookIDE() {
       />
 
 
-      {mode === "story" ? (
-        <StoryMode setMode={setMode} />
+      {mode === "write" ? (
+        <WriteMode setMode={setMode} />
       ) : (
-        <EditorMode themeName={themeInfo?.name || ""} />
+        <ScriptMode themeName={themeInfo?.name || ""} />
       )}
     </div>
   );

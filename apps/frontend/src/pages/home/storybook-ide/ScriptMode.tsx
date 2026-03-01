@@ -8,7 +8,7 @@ import {
   type StorybookFile,
 } from "@/components/storybook-ide";
 
-interface EditorModeProps {
+interface ScriptModeProps {
   themeName: string;
 }
 
@@ -40,7 +40,7 @@ const fileContents: Record<string, string[]> = {
   ],
 };
 
-export function EditorMode({ themeName }: EditorModeProps) {
+export function ScriptMode({ themeName }: ScriptModeProps) {
   const [activeFile, setActiveFile] = useState("script.rpy");
 
   return (

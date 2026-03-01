@@ -5,7 +5,6 @@ export type { StorybookFile } from "./StorybookFileTree";
 export { StorybookEditor } from "./StorybookEditor";
 export { BookmarkTab } from "./BookmarkTab";
 export { StorybookStatusBar } from "./StorybookStatusBar";
-export { ModeToggle } from "./ModeToggle";
 export { ThemeSwitcher } from "./ThemeSwitcher";
 export { TopRightPanel } from "./TopRightPanel";
 export type { ThemePaletteOption } from "./ThemeSwitcher";

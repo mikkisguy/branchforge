@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import { StoryPanel } from "@/components/storybook-ide";
 import { Logo } from "@/components/ui/logo";
 
-interface StoryModeProps {
-  setMode: (mode: "story" | "editor") => void;
+interface WriteModeProps {
+  setMode: (mode: "write" | "script") => void;
 }
 
 const welcomeText = "Welcome, writer. Your story awaits...";
 
-export function StoryMode({ setMode }: StoryModeProps) {
+export function WriteMode({ setMode }: WriteModeProps) {
   const [dialogueText, setDialogueText] = useState("");
 
   // Typewriter effect
@@ -50,11 +50,11 @@ export function StoryMode({ setMode }: StoryModeProps) {
         {/* Start Button */}
         <div className="flex justify-center pt-4">
           <button
-            onClick={() => setMode("editor")}
+            onClick={() => setMode("script")}
             className="group relative px-12 py-4 font-display text-lg tracking-widest uppercase transition-all hover:scale-105"
             style={{ background: "var(--theme-color)", color: "white" }}
           >
-            <span className="relative z-10">Begin Your Story</span>
+            <span className="relative z-10">Start Writing</span>
             <div
               className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-30 transition-opacity"
               style={{ background: "white" }}
