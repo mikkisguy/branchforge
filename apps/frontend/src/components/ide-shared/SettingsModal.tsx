@@ -9,6 +9,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { APP_NAME, APP_VERSION } from "@/lib/version";
 
 type Tab = "user" | "gitlab" | "system";
 
@@ -48,21 +49,30 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
         <div className="flex min-h-[400px]">
           {/* Vertical Tabs */}
-          <div className="w-48 border-r border-border/30 p-2 space-y-1">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  "w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                  activeTab === tab.id
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
+          <div className="w-48 border-r border-border/30 p-2 flex flex-col">
+            <div className="space-y-1">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    "w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                    activeTab === tab.id
+                      ? "bg-accent text-accent-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Version */}
+            <div className="mt-auto pt-4 px-3">
+              <p className="text-xs text-muted-foreground">
+                {APP_NAME} v{APP_VERSION}
+              </p>
+            </div>
           </div>
 
           {/* Tab Content */}

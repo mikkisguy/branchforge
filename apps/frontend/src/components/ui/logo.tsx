@@ -1,3 +1,5 @@
+import { APP_NAME, APP_NAME_ABBREVIATED } from "../../lib/version";
+
 interface LogoProps {
   className?: string;
   compact?: boolean;
@@ -16,9 +18,9 @@ export function Logo({ className = "", compact = false }: LogoProps) {
         WebkitTextFillColor: "transparent",
         backgroundClip: "text",
       }}
-      title={compact ? "BranchForge" : ""}
+      title={compact ? APP_NAME : ""}
     >
-      {compact ? "BF" : "BranchForge"}
+      {compact ? APP_NAME_ABBREVIATED : APP_NAME}
     </h1>
   );
 }
