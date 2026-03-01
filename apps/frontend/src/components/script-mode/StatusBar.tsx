@@ -1,15 +1,15 @@
 // Status bar styled like a storybook footer
-interface StorybookStatusBarProps {
+interface StatusBarProps {
   lineCount: number;
   language: string;
   themeName: string;
 }
 
-export function StorybookStatusBar({
+export function StatusBar({
   lineCount,
   language,
   themeName,
-}: StorybookStatusBarProps) {
+}: StatusBarProps) {
   return (
     <div
       className="flex items-center justify-between px-4 py-2 text-xs bg-card/90 backdrop-blur border-t border-dashed"

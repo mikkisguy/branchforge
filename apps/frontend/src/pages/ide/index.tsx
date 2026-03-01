@@ -6,12 +6,12 @@ import { themePalettes, BASE_URL } from "@/lib/constants";
 import {
   FloatingParticles,
   TopRightPanel,
-} from "@/components/storybook-ide";
+} from "@/components/ide-shared";
 import { Logo } from "@/components/ui/logo";
 import { WriteMode } from "./WriteMode";
 import { ScriptMode } from "./ScriptMode";
 
-export function HomePageStorybookIDE() {
+export function HomePageIDE() {
   const { theme, setTheme } = useTheme();
   const { logout } = useAuth();
   const navigate = useNavigate();
