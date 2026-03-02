@@ -7,19 +7,10 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { gitlabApi } from '../gitlab.js';
-import { ToastAction } from '../../contexts/ToastContext.js';
 
 // Mock fetch
 const mockFetch = vi.fn();
 global.fetch = mockFetch as any;
-
-// Mock toast context
-vi.mock('../../contexts/ToastContext.js', () => ({
-  ToastAction: {
-    success: vi.fn(),
-    error: vi.fn(),
-  },
-}));
 
 describe('GitLab API Client', () => {
   beforeEach(() => {

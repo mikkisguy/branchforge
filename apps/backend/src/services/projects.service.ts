@@ -4,10 +4,10 @@
  * Handles project management operations including listing, getting, and creating projects.
  */
 
-import { getDb } from '../db/index.js';
-import { projects, projectUsers } from '../db/schema/index.js';
-import { eq, and } from 'drizzle-orm';
-import type { Project, NewProject } from '../db/schema/tables/projects.js';
+import { getDb } from "../db/index.js";
+import { projects, projectUsers } from "../db/schema/index.js";
+import { eq, and } from "drizzle-orm";
+import type { Project, NewProject } from "../db/schema/tables/projects.js";
 
 /**
  * Public project information (without sensitive data)
@@ -15,11 +15,11 @@ import type { Project, NewProject } from '../db/schema/tables/projects.js';
 export interface PublicProject {
   id: string;
   name: string;
-  type: 'PREQUEL' | 'SEQUEL';
+  type: "PREQUEL" | "SEQUEL";
   description?: string;
   routeLockChapter?: number;
   maxMeterDelta?: number;
-  visibility?: 'OWNER' | 'READER' | 'TESTER';
+  visibility?: "OWNER" | "READER" | "TESTER";
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,7 +29,7 @@ export interface PublicProject {
  */
 export interface CreateProjectBody {
   name: string;
-  type: 'PREQUEL' | 'SEQUEL';
+  type: "PREQUEL" | "SEQUEL";
   description?: string;
   routeLockChapter?: number;
   maxMeterDelta?: number;
@@ -70,7 +70,7 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
   // Combine both lists, removing duplicates
   const allProjects = [...userProjects];
   for (const shared of sharedProjectsResult) {
-    if (!allProjects.find(p => p.id === shared.id)) {
+    if (!allProjects.find((p) => p.id === shared.id)) {
       allProjects.push(shared as Project);
     }
   }
@@ -84,7 +84,10 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
  * @param userId - The user ID making the request (for authorization)
  * @returns The project if found and accessible, null otherwise
  */
-export async function getProject(projectId: string, userId: string): Promise<PublicProject | null> {
+export async function getProject(
+  projectId: string,
+  userId: string,
+): Promise<PublicProject | null> {
   const db = getDb();
 
   // Check if user is the owner
@@ -129,7 +132,10 @@ export async function getProject(projectId: string, userId: string): Promise<Pub
  * @param body - The project data
  * @returns The created project
  */
-export async function createProject(userId: string, body: CreateProjectBody): Promise<PublicProject> {
+export async function createProject(
+  userId: string,
+  body: CreateProjectBody,
+): Promise<PublicProject> {
   const db = getDb();
 
   const newProject: NewProject = {
@@ -144,7 +150,9 @@ export async function createProject(userId: string, body: CreateProjectBody): Pr
   const result = await db.insert(projects).values(newProject).returning();
 
   if (!result || result.length === 0 || !result[0]) {
-    throw new Error('Failed to create project: database insert returned no rows');
+    throw new Error(
+      "Failed to create project: database insert returned no rows",
+    );
   }
 
   return mapToPublicProject(result[0]);
@@ -166,3 +174,4 @@ function mapToPublicProject(project: Project): PublicProject {
     updatedAt: project.updatedAt,
   };
 }
+

@@ -13,7 +13,7 @@ import {
   useEffect,
   ReactNode,
 } from "react";
-import { gitlabApi, GitLabProject, type SyncOperation } from "@/lib/api/gitlab";
+import { gitlabApi, GitLabProject } from "@/lib/api/gitlab";
 
 // ============================================================================
 // Types
@@ -78,7 +78,7 @@ export function GitLabProvider({ children }: GitLabProviderProps) {
   const [linkedRepositories, setLinkedRepositories] = useState<
     Map<string, LinkedRepository>
   >(new Map());
-  const [isLoadingRepositories, setIsLoadingRepositories] = useState(false);
+  const [isLoadingRepositories] = useState(false);
 
   /**
    * Check if user has a GitLab integration stored
