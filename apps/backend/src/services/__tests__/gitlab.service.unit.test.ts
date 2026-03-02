@@ -31,6 +31,7 @@ const testToken = 'glpat-123456789abcdefghijklmn';
 // Mock encryption service
 vi.mock('../encryption.service.js', () => ({
   validateAndGetUsername: vi.fn(),
+  validateGitLabUrl: vi.fn((url?: string) => url || testGitlabUrl),
   encryptPAT: vi.fn((token: string) => `encrypted_${token}`),
   decryptPAT: vi.fn((encrypted: string) => {
     // Return the original token for tests that store encrypted tokens

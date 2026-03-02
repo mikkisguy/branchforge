@@ -260,7 +260,7 @@ export async function validateAndGetUsername(
       return null;
     }
 
-    const data = await response.json();
+    const data = await response.json() as { username?: string } | undefined;
     return data?.username || null;
   } catch (error) {
     // AbortError is thrown when timeout expires

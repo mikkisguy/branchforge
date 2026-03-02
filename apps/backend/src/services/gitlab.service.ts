@@ -191,7 +191,7 @@ export async function listGitlabProjects(userId: string, gitlabUrl?: string): Pr
   }
 
   const token = decryptPAT(integration.encryptedToken);
-  const url = validateGitLabUrl(gitlabUrl || integration.gitlabUrl);
+  const url = validateGitLabUrl(gitlabUrl || integration.gitlabUrl || undefined);
 
   const gitlabProjects: GitlabProject[] = [];
   let page = 1;
@@ -216,7 +216,7 @@ export async function listGitlabProjects(userId: string, gitlabUrl?: string): Pr
       throw new Error(`GitLab API error: ${response.status}`);
     }
 
-    const pageProjects: GitlabProject[] = await response.json();
+    const pageProjects = await response.json() as GitlabProject[];
     gitlabProjects.push(...pageProjects);
 
     // Check pagination headers
@@ -308,7 +308,7 @@ export async function listBranches(
   }
 
   const token = await getDecryptedToken(projectResult[0].userId);
-  const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl);
+  const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
 
   const apiUrl = new URL(
     `/api/v4/projects/${repoLink.gitlabProjectId}/repository/branches`,
@@ -325,7 +325,7 @@ export async function listBranches(
     throw new Error(`GitLab API error: ${response.status}`);
   }
 
-  const branches: GitlabBranch[] = await response.json();
+  const branches = await response.json() as GitlabBranch[];
   return branches.map((b) => b.name);
 }
 
@@ -359,7 +359,7 @@ export async function listRpyFiles(
   }
 
   const token = await getDecryptedToken(projectResult[0].userId);
-  const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl);
+  const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
 
   const rpyFiles: Array<{ name: string; path: string }> = [];
   let page = 1;
@@ -385,7 +385,7 @@ export async function listRpyFiles(
       throw new Error(`GitLab API error: ${response.status}`);
     }
 
-    const items: GitlabTreeItem[] = await response.json();
+    const items = await response.json() as GitlabTreeItem[];
 
     // Filter for .rpy files (blobs, not trees)
     for (const item of items) {
@@ -438,7 +438,7 @@ export async function getFileContent(
   }
 
   const token = await getDecryptedToken(projectResult[0].userId);
-  const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl);
+  const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
 
   const apiUrl = new URL(
     `/api/v4/projects/${repoLink.gitlabProjectId}/repository/files/${encodeURIComponent(filePath)}`,
@@ -460,7 +460,7 @@ export async function getFileContent(
     throw new Error(`GitLab API error: ${response.status}`);
   }
 
-  const fileData: GitlabFile = await response.json();
+  const fileData = await response.json() as GitlabFile;
 
   // GitLab returns base64-encoded content
   return Buffer.from(fileData.content, "base64").toString("utf-8");
@@ -502,7 +502,7 @@ export async function createOrUpdateFile(
   }
 
   const token = await getDecryptedToken(projectResult[0].userId);
-  const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl);
+  const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
 
   const apiUrl = new URL(
     `/api/v4/projects/${repoLink.gitlabProjectId}/repository/files/${encodeURIComponent(filePath)}`,
@@ -578,6 +578,6 @@ export async function createOrUpdateFile(
     throw lastError || new Error("Failed to create or update file");
   }
 
-  return await response.json();
+  return await response.json() as { file_path: string; branch: string };
 }
 
