@@ -16,6 +16,7 @@ import {
   validateAndGetUsername,
   encryptPAT,
   decryptPAT,
+  validateGitLabUrl,
 } from "./encryption.service.js";
 
 const DEFAULT_TIMEOUT_MS = 30000;
@@ -190,7 +191,7 @@ export async function listGitlabProjects(userId: string, gitlabUrl?: string): Pr
   }
 
   const token = decryptPAT(integration.encryptedToken);
-  const url = gitlabUrl || integration.gitlabUrl;
+  const url = validateGitLabUrl(gitlabUrl || integration.gitlabUrl);
 
   const gitlabProjects: GitlabProject[] = [];
   let page = 1;
@@ -307,7 +308,7 @@ export async function listBranches(
   }
 
   const token = await getDecryptedToken(projectResult[0].userId);
-  const url = gitlabUrl || repoLink.gitlabUrl || "https://gitlab.com";
+  const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl);
 
   const apiUrl = new URL(
     `/api/v4/projects/${repoLink.gitlabProjectId}/repository/branches`,
@@ -358,7 +359,7 @@ export async function listRpyFiles(
   }
 
   const token = await getDecryptedToken(projectResult[0].userId);
-  const url = gitlabUrl || repoLink.gitlabUrl || "https://gitlab.com";
+  const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl);
 
   const rpyFiles: Array<{ name: string; path: string }> = [];
   let page = 1;
@@ -437,7 +438,7 @@ export async function getFileContent(
   }
 
   const token = await getDecryptedToken(projectResult[0].userId);
-  const url = gitlabUrl || repoLink.gitlabUrl || "https://gitlab.com";
+  const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl);
 
   const apiUrl = new URL(
     `/api/v4/projects/${repoLink.gitlabProjectId}/repository/files/${encodeURIComponent(filePath)}`,
@@ -501,7 +502,7 @@ export async function createOrUpdateFile(
   }
 
   const token = await getDecryptedToken(projectResult[0].userId);
-  const url = gitlabUrl || repoLink.gitlabUrl || "https://gitlab.com";
+  const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl);
 
   const apiUrl = new URL(
     `/api/v4/projects/${repoLink.gitlabProjectId}/repository/files/${encodeURIComponent(filePath)}`,
@@ -509,40 +510,69 @@ export async function createOrUpdateFile(
   );
   apiUrl.searchParams.set("ref", branch);
 
-  // Check if file exists first
-  const checkResponse = await fetchWithTimeout(apiUrl.toString(), {
-    headers: {
-      "PRIVATE-TOKEN": token,
-    },
-  });
-
-  const fileExists = checkResponse.ok;
-
   // Clear the ref parameter for the create/update request
   apiUrl.searchParams.delete("ref");
 
   // Encode content as base64
   const base64Content = Buffer.from(content).toString("base64");
 
-  const method = fileExists ? "PUT" : "POST";
+  // Try both methods to avoid TOCTOU race condition
+  // First try PUT (update), then POST (create) if needed
+  const methods: Array<"PUT" | "POST"> = ["PUT", "POST"];
+  let lastError: Error | null = null;
+  let response: Response | null = null;
 
-  const response = await fetchWithTimeout(apiUrl.toString(), {
-    method,
-    headers: {
-      "PRIVATE-TOKEN": token,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      branch,
-      content: base64Content,
-      commit_message: commitMessage,
-      encoding: "base64",
-    }),
-  });
+  for (const method of methods) {
+    try {
+      const attemptResponse = await fetchWithTimeout(apiUrl.toString(), {
+        method,
+        headers: {
+          "PRIVATE-TOKEN": token,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          branch,
+          content: base64Content,
+          commit_message: commitMessage,
+          encoding: "base64",
+        }),
+      });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`GitLab API error: ${response.status} - ${errorText}`);
+      // GitLab returns 400 with "file with same name" error when trying to POST to existing file
+      // GitLab returns 404 when trying to PUT to a non-existent file
+      // On success, we return the response
+      if (attemptResponse.ok) {
+        response = attemptResponse;
+        break;
+      }
+
+      const errorText = await attemptResponse.text();
+
+      // If PUT fails with 404, file doesn't exist - try POST next
+      if (method === "PUT" && attemptResponse.status === 404) {
+        lastError = new Error(`GitLab API error: ${attemptResponse.status} - ${errorText}`);
+        continue;
+      }
+
+      // If POST fails with 400 (likely file already exists), try PUT next
+      if (method === "POST" && attemptResponse.status === 400 && errorText.includes("file with same name")) {
+        lastError = new Error(`GitLab API error: ${attemptResponse.status} - ${errorText}`);
+        continue;
+      }
+
+      // For other errors, don't retry - fail immediately
+      throw new Error(`GitLab API error: ${attemptResponse.status} - ${errorText}`);
+    } catch (e) {
+      // Only retry on specific HTTP errors above, not on network/fetch errors
+      if (e instanceof Error) {
+        lastError = e;
+      }
+      throw e;
+    }
+  }
+
+  if (!response) {
+    throw lastError || new Error("Failed to create or update file");
   }
 
   return await response.json();
