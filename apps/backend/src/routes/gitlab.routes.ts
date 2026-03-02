@@ -305,6 +305,49 @@ async function storeIntegrationHandler(
 }
 
 /**
+ * Get GitLab integration
+ *
+ * GET /api/gitlab/integration
+ *
+ * Returns the user's GitLab integration metadata (excluding sensitive data).
+ */
+async function getIntegrationHandler(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const userId = getAuthenticatedUserId(request);
+
+  try {
+    const { getGitlabIntegration } =
+      await import("../services/gitlab.service.js");
+    const integration = await getGitlabIntegration(userId);
+
+    if (!integration) {
+      reply.status(404).send({ error: "GitLab integration not found" });
+      return;
+    }
+
+    // Return only non-sensitive fields
+    reply.send({
+      id: integration.id,
+      username: integration.username,
+      gitlabUrl: integration.gitlabUrl,
+      createdAt: integration.createdAt,
+      updatedAt: integration.updatedAt,
+    });
+  } catch (err) {
+    request.log.error(
+      { err },
+      "getIntegrationHandler: Failed to get GitLab integration",
+    );
+    reply.status(500).send({
+      error: "Failed to get integration",
+      details: err instanceof Error ? err.message : "Unknown error",
+    });
+  }
+}
+
+/**
  * Delete GitLab integration
  *
  * DELETE /api/gitlab/integration
@@ -389,8 +432,28 @@ async function linkRepositoryHandler(
     return;
   }
 
-  await linkRepository(projectId, gitlabProjectId, branch);
-  reply.status(201).send();
+  try {
+    await linkRepository(projectId, gitlabProjectId, branch);
+    reply.status(201).send();
+  } catch (err) {
+    request.log.error(
+      { err },
+      "linkRepositoryHandler: Failed to link repository",
+    );
+
+    if (err instanceof Error && err.message.includes("duplicate key value")) {
+      reply.status(409).send({
+        error: "Repository already linked",
+        details: err.message,
+      });
+      return;
+    }
+
+    reply.status(500).send({
+      error: "Failed to link repository",
+      details: err instanceof Error ? err.message : "Unknown error",
+    });
+  }
 }
 
 /**
@@ -412,8 +475,19 @@ async function unlinkRepositoryHandler(
     return;
   }
 
-  await unlinkRepository(projectId);
-  reply.status(204).send();
+  try {
+    await unlinkRepository(projectId);
+    reply.status(204).send();
+  } catch (err) {
+    request.log.error(
+      { err, projectId },
+      "unlinkRepositoryHandler: Failed to unlink repository",
+    );
+    reply.status(500).send({
+      error: "Failed to unlink repository",
+      details: err instanceof Error ? err.message : "Unknown error",
+    });
+  }
 }
 
 /**
@@ -435,8 +509,37 @@ async function listBranchesHandler(
     return;
   }
 
-  const branches = await listBranches(projectId);
-  reply.send(branches);
+  try {
+    const branches = await listBranches(projectId);
+    reply.send(branches);
+  } catch (err) {
+    request.log.error(
+      { err, projectId },
+      "listBranchesHandler: Failed to list branches",
+    );
+
+    if (
+      err instanceof Error &&
+      (err.message === "GitLab repository not linked" ||
+        err.message === "Project not found")
+    ) {
+      reply.status(404).send({ error: err.message });
+      return;
+    }
+
+    if (err instanceof Error && err.message.startsWith("GitLab API error:")) {
+      reply.status(502).send({
+        error: "Failed to fetch branches from GitLab",
+        details: err.message,
+      });
+      return;
+    }
+
+    reply.status(500).send({
+      error: "Failed to list branches",
+      details: err instanceof Error ? err.message : "Unknown error",
+    });
+  }
 }
 
 /**
@@ -467,8 +570,37 @@ async function listFilesHandler(
     return;
   }
 
-  const files = await listRpyFiles(projectId, branch);
-  reply.send(files);
+  try {
+    const files = await listRpyFiles(projectId, branch);
+    reply.send(files);
+  } catch (err) {
+    request.log.error(
+      { err, projectId, branch },
+      "listFilesHandler: Failed to list RPY files",
+    );
+
+    if (
+      err instanceof Error &&
+      (err.message === "GitLab repository not linked" ||
+        err.message === "Project not found")
+    ) {
+      reply.status(404).send({ error: err.message });
+      return;
+    }
+
+    if (err instanceof Error && err.message.startsWith("GitLab API error:")) {
+      reply.status(502).send({
+        error: "Failed to fetch files from GitLab",
+        details: err.message,
+      });
+      return;
+    }
+
+    reply.status(500).send({
+      error: "Failed to list RPY files",
+      details: err instanceof Error ? err.message : "Unknown error",
+    });
+  }
 }
 
 /**
@@ -584,14 +716,27 @@ async function getOperationHandler(
     return;
   }
 
-  const operation = await getSyncOperation(operationId);
+  try {
+    const operation = await getSyncOperation(operationId);
 
-  if (!operation) {
-    reply.status(404).send({ error: "Not Found", message: "Sync operation not found" });
-    return;
+    if (!operation) {
+      reply
+        .status(404)
+        .send({ error: "Not Found", message: "Sync operation not found" });
+      return;
+    }
+
+    reply.send(operation);
+  } catch (err) {
+    request.log.error(
+      { err, operationId },
+      "getOperationHandler: Failed to get sync operation",
+    );
+    reply.status(500).send({
+      error: "Failed to get sync operation",
+      details: err instanceof Error ? err.message : "Unknown error",
+    });
   }
-
-  reply.send(operation);
 }
 
 /**
@@ -613,8 +758,19 @@ async function listOperationsHandler(
     return;
   }
 
-  const operations = await listSyncOperations(projectId);
-  reply.send(operations);
+  try {
+    const operations = await listSyncOperations(projectId);
+    reply.send(operations);
+  } catch (err) {
+    request.log.error(
+      { err, projectId },
+      "listOperationsHandler: Failed to list sync operations",
+    );
+    reply.status(500).send({
+      error: "Failed to list sync operations",
+      details: err instanceof Error ? err.message : "Unknown error",
+    });
+  }
 }
 
 /**
@@ -642,8 +798,19 @@ async function detectConflictsHandler(
     return;
   }
 
-  const result = await detectConflicts(projectId, branch);
-  reply.send(result);
+  try {
+    const result = await detectConflicts(projectId, branch);
+    reply.send(result);
+  } catch (err) {
+    request.log.error(
+      { err, projectId, branch },
+      "detectConflictsHandler: Failed to detect conflicts",
+    );
+    reply.status(500).send({
+      error: "Failed to detect conflicts",
+      details: err instanceof Error ? err.message : "Unknown error",
+    });
+  }
 }
 
 // ============================================================================
@@ -655,6 +822,14 @@ export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.post("/gitlab/validate", validateTokenHandler);
 
   // Integration management (require auth)
+  fastify.get(
+    "/gitlab/integration",
+    {
+      onRequest: [authenticate],
+    },
+    getIntegrationHandler,
+  );
+
   fastify.post<{ Body: StoreIntegrationBody }>(
     "/gitlab/integration",
     {

@@ -5,8 +5,15 @@
  * Handles user's GitLab integration status and linked projects.
  */
 
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
-import { gitlabApi, GitLabProject, type SyncOperation } from '@/lib/api/gitlab';
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  ReactNode,
+} from "react";
+import { gitlabApi, GitLabProject, type SyncOperation } from "@/lib/api/gitlab";
 
 // ============================================================================
 // Types
@@ -28,7 +35,7 @@ export interface LinkedRepository {
   lastSyncedAt?: string;
 }
 
-interface GitLabContextType {
+export interface GitLabContextType {
   // Integration state
   integration: GitLabIntegration | null;
   hasIntegration: boolean;
@@ -43,7 +50,10 @@ interface GitLabContextType {
   refreshIntegration: () => Promise<void>;
   storeToken: (token: string, gitlabUrl?: string) => Promise<void>;
   removeIntegration: () => Promise<void>;
-  validateToken: (token: string, gitlabUrl?: string) => Promise<{ valid: boolean; username?: string }>;
+  validateToken: (
+    token: string,
+    gitlabUrl?: string,
+  ) => Promise<{ valid: boolean; username?: string }>;
   listProjects: () => Promise<GitLabProject[]>;
   isProjectLinked: (projectId: string) => boolean;
   getLinkedRepository: (projectId: string) => LinkedRepository | undefined;
@@ -60,10 +70,14 @@ interface GitLabProviderProps {
 }
 
 export function GitLabProvider({ children }: GitLabProviderProps) {
-  const [integration, setIntegration] = useState<GitLabIntegration | null>(null);
+  const [integration, setIntegration] = useState<GitLabIntegration | null>(
+    null,
+  );
   const [isLoadingIntegration, setIsLoadingIntegration] = useState(true);
   const [integrationError, setIntegrationError] = useState<string | null>(null);
-  const [linkedRepositories, setLinkedRepositories] = useState<Map<string, LinkedRepository>>(new Map());
+  const [linkedRepositories, setLinkedRepositories] = useState<
+    Map<string, LinkedRepository>
+  >(new Map());
   const [isLoadingRepositories, setIsLoadingRepositories] = useState(false);
 
   /**
@@ -74,19 +88,37 @@ export function GitLabProvider({ children }: GitLabProviderProps) {
     setIsLoadingIntegration(true);
     setIntegrationError(null);
     try {
-      // We can infer the integration status by trying to list projects
-      // If the user has an integration, this will succeed
-      const projects = await gitlabApi.getProjects();
-      // If we got here, user has an integration
-      setIntegration({
-        id: 'current',
-        createdAt: new Date().toISOString(),
-      });
-      setLinkedRepositories(new Map());
+      // Fetch the actual integration metadata from the backend
+      const integrationData = await gitlabApi.getIntegration();
+      if (integrationData) {
+        setIntegration({
+          id: integrationData.id,
+          username: integrationData.username,
+          gitlabUrl: integrationData.gitlabUrl,
+          createdAt: integrationData.createdAt,
+        });
+        setLinkedRepositories(new Map());
+      } else {
+        // No integration found
+        setIntegration(null);
+        setLinkedRepositories(new Map());
+      }
     } catch (error) {
-      // User doesn't have an integration
-      setIntegration(null);
-      setLinkedRepositories(new Map());
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      // Check if this is a definitive "no integration" error (404)
+      // The backend returns 404 with "GitLab integration not found" when no integration exists
+      if (
+        errorMessage.includes("GitLab integration not found") ||
+        errorMessage.includes("404")
+      ) {
+        // User doesn't have an integration - clear state
+        setIntegration(null);
+        setLinkedRepositories(new Map());
+      } else {
+        // Transient or server error - preserve existing state and set error message
+        setIntegrationError(errorMessage);
+      }
     } finally {
       setIsLoadingIntegration(false);
     }
@@ -95,22 +127,24 @@ export function GitLabProvider({ children }: GitLabProviderProps) {
   /**
    * Store a GitLab token
    */
-  const storeToken = useCallback(async (token: string, gitlabUrl?: string) => {
-    setIntegrationError(null);
-    try {
-      await gitlabApi.storeIntegration(token, gitlabUrl);
-      setIntegration({
-        id: 'current',
-        username: undefined, // Will be populated by validation
-        gitlabUrl,
-        createdAt: new Date().toISOString(),
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to store GitLab integration';
-      setIntegrationError(message);
-      throw error;
-    }
-  }, []);
+  const storeToken = useCallback(
+    async (token: string, gitlabUrl?: string) => {
+      setIntegrationError(null);
+      try {
+        await gitlabApi.storeIntegration(token, gitlabUrl);
+        // Refresh to get the real integration data from backend
+        await refreshIntegration();
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Failed to store GitLab integration";
+        setIntegrationError(message);
+        throw error;
+      }
+    },
+    [refreshIntegration],
+  );
 
   /**
    * Remove the GitLab integration
@@ -122,7 +156,10 @@ export function GitLabProvider({ children }: GitLabProviderProps) {
       setIntegration(null);
       setLinkedRepositories(new Map());
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to remove GitLab integration';
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to remove GitLab integration";
       setIntegrationError(message);
       throw error;
     }
@@ -131,9 +168,12 @@ export function GitLabProvider({ children }: GitLabProviderProps) {
   /**
    * Validate a GitLab token
    */
-  const validateToken = useCallback(async (token: string, gitlabUrl?: string) => {
-    return gitlabApi.validateToken(token, gitlabUrl);
-  }, []);
+  const validateToken = useCallback(
+    async (token: string, gitlabUrl?: string) => {
+      return gitlabApi.validateToken(token, gitlabUrl);
+    },
+    [],
+  );
 
   /**
    * List user's GitLab projects
@@ -145,16 +185,22 @@ export function GitLabProvider({ children }: GitLabProviderProps) {
   /**
    * Check if a project is linked to a GitLab repository
    */
-  const isProjectLinked = useCallback((projectId: string): boolean => {
-    return linkedRepositories.has(projectId);
-  }, [linkedRepositories]);
+  const isProjectLinked = useCallback(
+    (projectId: string): boolean => {
+      return linkedRepositories.has(projectId);
+    },
+    [linkedRepositories],
+  );
 
   /**
    * Get the linked repository for a project
    */
-  const getLinkedRepository = useCallback((projectId: string): LinkedRepository | undefined => {
-    return linkedRepositories.get(projectId);
-  }, [linkedRepositories]);
+  const getLinkedRepository = useCallback(
+    (projectId: string): LinkedRepository | undefined => {
+      return linkedRepositories.get(projectId);
+    },
+    [linkedRepositories],
+  );
 
   // Initialize integration state on mount
   useEffect(() => {
@@ -177,7 +223,9 @@ export function GitLabProvider({ children }: GitLabProviderProps) {
     getLinkedRepository,
   };
 
-  return <GitLabContext.Provider value={value}>{children}</GitLabContext.Provider>;
+  return (
+    <GitLabContext.Provider value={value}>{children}</GitLabContext.Provider>
+  );
 }
 
 // ============================================================================
@@ -187,7 +235,8 @@ export function GitLabProvider({ children }: GitLabProviderProps) {
 export function useGitLab(): GitLabContextType {
   const context = useContext(GitLabContext);
   if (!context) {
-    throw new Error('useGitLab must be used within GitLabProvider');
+    throw new Error("useGitLab must be used within GitLabProvider");
   }
   return context;
 }
+

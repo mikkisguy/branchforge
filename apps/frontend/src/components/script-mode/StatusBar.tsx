@@ -1,9 +1,12 @@
-import { useState, useCallback } from 'react';
-import { Download, Upload, GitBranch } from 'lucide-react';
-import { GitLabSyncDialog, SyncOperationType } from '@/components/script-mode/GitLabSyncDialog';
-import { ConflictReviewDialog } from '@/components/script-mode/ConflictReviewDialog';
-import { useGitLab } from '@/contexts/GitLabContext';
-import { cn } from '@/lib/utils';
+import { useState, useCallback } from "react";
+import { Download, Upload, GitBranch } from "lucide-react";
+import {
+  GitLabSyncDialog,
+  SyncOperationType,
+} from "@/components/script-mode/GitLabSyncDialog";
+import { ConflictReviewDialog } from "@/components/script-mode/ConflictReviewDialog";
+import { useGitLab } from "@/contexts/GitLabContext";
+import { cn } from "@/lib/utils";
 
 // Status bar styled like a storybook footer
 interface StatusBarProps {
@@ -19,22 +22,23 @@ export function StatusBar({
   lineCount,
   language,
   themeName,
-  projectId = 'my-project',
-  projectName = 'My Visual Novel',
-  gitlabBranch = 'main',
+  projectId = "my-project",
+  projectName = "My Visual Novel",
+  gitlabBranch = "main",
 }: StatusBarProps) {
   const { hasIntegration, isProjectLinked } = useGitLab();
 
   // Dialog state
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
-  const [syncOperationType, setSyncOperationType] = useState<SyncOperationType>('export');
+  const [syncOperationType, setSyncOperationType] =
+    useState<SyncOperationType>("export");
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
 
   /**
    * Handle export click
    */
   const handleExportClick = useCallback(() => {
-    setSyncOperationType('export');
+    setSyncOperationType("export");
     setSyncDialogOpen(true);
   }, []);
 
@@ -42,15 +46,15 @@ export function StatusBar({
    * Handle import click
    */
   const handleImportClick = useCallback(() => {
-    setSyncOperationType('import');
+    setSyncOperationType("import");
     setSyncDialogOpen(true);
   }, []);
 
   /**
    * Handle conflict resolution from ConflictReviewDialog
    */
-  const handleApplyResolutions = useCallback((resolutions) => {
-    // This would trigger a re-import with the resolved conflicts
+  const handleApplyResolutions = useCallback(() => {
+    // TODO: This would trigger a re-import with the resolved conflicts
     // For now, just close the conflict dialog
     setConflictDialogOpen(false);
   }, []);
@@ -84,7 +88,7 @@ export function StatusBar({
                 onClick={handleImportClick}
                 className={cn(
                   "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
-                  "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+                  "hover:bg-muted/50 text-muted-foreground hover:text-foreground",
                 )}
                 title="Import from GitLab"
               >
@@ -95,7 +99,7 @@ export function StatusBar({
                 onClick={handleExportClick}
                 className={cn(
                   "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
-                  "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+                  "hover:bg-muted/50 text-muted-foreground hover:text-foreground",
                 )}
                 title="Export to GitLab"
               >
@@ -139,3 +143,4 @@ export function StatusBar({
     </>
   );
 }
+

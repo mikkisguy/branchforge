@@ -40,7 +40,6 @@ export function GitLabSettingsContent() {
     validateToken,
     storeToken,
     removeIntegration,
-    listProjects,
   } = useGitLab();
 
   const { success, error } = useToast();
@@ -64,6 +63,7 @@ export function GitLabSettingsContent() {
 
   // Dialog state
   const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [showRemoveConfirmDialog, setShowRemoveConfirmDialog] = useState(false);
 
   /**
    * Validate token
@@ -137,17 +137,17 @@ export function GitLabSettingsContent() {
   ]);
 
   /**
-   * Remove integration
+   * Show remove confirmation dialog
    */
-  const handleRemove = useCallback(async () => {
-    if (
-      !confirm(
-        "Are you sure you want to remove your GitLab integration? This will unlink all repositories.",
-      )
-    ) {
-      return;
-    }
+  const handleRemoveClick = useCallback(() => {
+    setShowRemoveConfirmDialog(true);
+  }, []);
 
+  /**
+   * Remove integration (called after user confirms)
+   */
+  const handleRemoveConfirmed = useCallback(async () => {
+    setShowRemoveConfirmDialog(false);
     setIsRemoving(true);
 
     try {
@@ -162,6 +162,13 @@ export function GitLabSettingsContent() {
       setIsRemoving(false);
     }
   }, [removeIntegration, refreshIntegration, success, error]);
+
+  /**
+   * Cancel removal
+   */
+  const handleRemoveCancelled = useCallback(() => {
+    setShowRemoveConfirmDialog(false);
+  }, []);
 
   /**
    * Load linked projects
@@ -216,7 +223,7 @@ export function GitLabSettingsContent() {
               <Button
                 variant="destructive"
                 size="sm"
-                onClick={handleRemove}
+                onClick={handleRemoveClick}
                 disabled={isRemoving}
               >
                 {isRemoving ? (
@@ -397,6 +404,46 @@ export function GitLabSettingsContent() {
         onOpenChange={setShowLinkDialog}
         onLinkSuccess={loadLinkedProjects}
       />
+
+      {/* Remove Confirmation Dialog */}
+      {showRemoveConfirmDialog ? (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-lg shadow-lg max-w-md w-full">
+            {/* Header */}
+            <div className="p-6 border-b border-border/30">
+              <h2 className="text-lg font-medium">Remove GitLab Integration</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Are you sure you want to remove your GitLab integration? This will unlink all repositories.
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-border/30 flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={handleRemoveCancelled}
+                disabled={isRemoving}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleRemoveConfirmed}
+                disabled={isRemoving}
+              >
+                {isRemoving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Removing...
+                  </>
+                ) : (
+                  "Remove Integration"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

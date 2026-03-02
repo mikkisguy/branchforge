@@ -5,20 +5,20 @@
  * Shows progress and allows configuration of branch and commit message.
  */
 
-import { useState, useCallback } from 'react';
-import { Loader2, X, Download, Upload, CheckCircle2, AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { gitlabApi, type ConflictResolution } from '@/lib/api/gitlab';
-import { useGitLabSync } from '@/hooks/useGitLabSync';
-import { useToast } from '@/contexts/ToastContext';
+import { useState, useCallback } from "react";
+import { X, Download, Upload, CheckCircle2, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { type ConflictResolution } from "@/lib/api/gitlab";
+import { useGitLabSync } from "@/hooks/useGitLabSync";
+import { useToast } from "@/contexts/ToastContext";
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export type SyncOperationType = 'export' | 'import';
+export type SyncOperationType = "export" | "import";
 
 interface GitLabSyncDialogProps {
   open: boolean;
@@ -29,21 +29,25 @@ interface GitLabSyncDialogProps {
   defaultBranch?: string;
 }
 
-const CONFLICT_RESOLUTIONS: Array<{ value: ConflictResolution; label: string; description: string }> = [
+const CONFLICT_RESOLUTIONS: Array<{
+  value: ConflictResolution;
+  label: string;
+  description: string;
+}> = [
   {
-    value: 'branchforge_wins',
-    label: 'BranchForge Wins',
-    description: 'Overwrite GitLab changes with local data',
+    value: "branchforge_wins",
+    label: "BranchForge Wins",
+    description: "Overwrite GitLab changes with local data",
   },
   {
-    value: 'gitlab_wins',
-    label: 'GitLab Wins',
-    description: 'Overwrite local data with GitLab changes',
+    value: "gitlab_wins",
+    label: "GitLab Wins",
+    description: "Overwrite local data with GitLab changes",
   },
   {
-    value: 'manual_review',
-    label: 'Manual Review',
-    description: 'Review conflicts before applying changes',
+    value: "manual_review",
+    label: "Manual Review",
+    description: "Review conflicts before applying changes",
   },
 ];
 
@@ -56,43 +60,64 @@ export function GitLabSyncDialog({
   onOpenChange,
   operationType,
   projectId,
-  projectName = 'project',
-  defaultBranch = 'main',
+  defaultBranch = "main",
 }: GitLabSyncDialogProps) {
   const { state, exportToGitlab, importFromGitlab, reset } = useGitLabSync();
   const { success, error } = useToast();
 
   // Form state
   const [branch, setBranch] = useState(defaultBranch);
-  const [commitMessage, setCommitMessage] = useState(`Sync ${operationType} from BranchForge`);
-  const [conflictResolution, setConflictResolution] = useState<ConflictResolution>('branchforge_wins');
+  const [commitMessage, setCommitMessage] = useState(
+    `Sync ${operationType} from BranchForge`,
+  );
+  const [conflictResolution, setConflictResolution] =
+    useState<ConflictResolution>("branchforge_wins");
 
   /**
    * Handle sync operation
    */
   const handleSync = useCallback(async () => {
     if (!branch.trim()) {
-      error('Branch name is required');
+      error("Branch name is required");
       return;
     }
 
-    if (operationType === 'export') {
-      await exportToGitlab(projectId, branch.trim(), commitMessage.trim() || undefined);
-    } else {
-      await importFromGitlab(projectId, branch.trim(), conflictResolution);
-    }
+    // Capture the operation result directly rather than relying on state.operation
+    // which may be stale due to React's asynchronous state updates
+    const result =
+      operationType === "export"
+        ? await exportToGitlab(
+            projectId,
+            branch.trim(),
+            commitMessage.trim() || undefined,
+          )
+        : await importFromGitlab(projectId, branch.trim(), conflictResolution);
 
-    // Check if operation succeeded
-    if (state.operation?.status === 'completed') {
-      success(`${operationType === 'export' ? 'Export' : 'Import'} completed successfully`);
+    // Use the returned result for toast notifications
+    if (result?.status === "completed") {
+      success(
+        `${operationType === "export" ? "Export" : "Import"} completed successfully`,
+      );
       setTimeout(() => {
         reset();
         onOpenChange(false);
       }, 1000);
-    } else if (state.operation?.status === 'failed') {
-      error(state.operation.errorMessage || 'Operation failed');
+    } else if (result?.status === "failed") {
+      error(result.errorMessage || "Operation failed");
     }
-  }, [branch, commitMessage, conflictResolution, operationType, projectId, exportToGitlab, importFromGitlab, state, reset, onOpenChange, success, error]);
+  }, [
+    branch,
+    commitMessage,
+    conflictResolution,
+    operationType,
+    projectId,
+    exportToGitlab,
+    importFromGitlab,
+    reset,
+    onOpenChange,
+    success,
+    error,
+  ]);
 
   /**
    * Reset and close
@@ -105,7 +130,7 @@ export function GitLabSyncDialog({
   /**
    * Get sync icon
    */
-  const SyncIcon = operationType === 'export' ? Upload : Download;
+  const SyncIcon = operationType === "export" ? Upload : Download;
 
   // ============================================================================
   // Render
@@ -124,12 +149,14 @@ export function GitLabSyncDialog({
             </div>
             <div>
               <h2 className="text-lg font-medium">
-                {operationType === 'export' ? 'Export to GitLab' : 'Import from GitLab'}
+                {operationType === "export"
+                  ? "Export to GitLab"
+                  : "Import from GitLab"}
               </h2>
               <p className="text-sm text-muted-foreground mt-0.5">
-                {operationType === 'export'
-                  ? 'Push your BranchForge scenes to GitLab'
-                  : 'Pull changes from GitLab to BranchForge'}
+                {operationType === "export"
+                  ? "Push your BranchForge scenes to GitLab"
+                  : "Pull changes from GitLab to BranchForge"}
               </p>
             </div>
           </div>
@@ -152,7 +179,8 @@ export function GitLabSyncDialog({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">
-                      {operationType === 'export' ? 'Exporting' : 'Importing'}...
+                      {operationType === "export" ? "Exporting" : "Importing"}
+                      ...
                     </span>
                     <span className="font-medium">{state.progress}%</span>
                   </div>
@@ -167,28 +195,39 @@ export function GitLabSyncDialog({
 
               {/* Status Message */}
               {state.operation && (
-                <div className={state.operation.status === 'completed' ? 'text-green-600' : 'text-amber-600'}>
-                  {state.operation.status === 'completed' && (
+                <div
+                  className={
+                    state.operation.status === "completed"
+                      ? "text-green-600"
+                      : "text-amber-600"
+                  }
+                >
+                  {state.operation.status === "completed" && (
                     <div className="flex items-center gap-2 text-sm">
                       <CheckCircle2 className="w-4 h-4" />
-                      <span>{operationType === 'export' ? 'Export' : 'Import'} completed</span>
+                      <span>
+                        {operationType === "export" ? "Export" : "Import"}{" "}
+                        completed
+                      </span>
                     </div>
                   )}
-                  {state.operation.status === 'failed' && (
+                  {state.operation.status === "failed" && (
                     <div className="flex items-center gap-2 text-sm">
                       <AlertCircle className="w-4 h-4" />
-                      <span>{state.error || 'Operation failed'}</span>
+                      <span>{state.error || "Operation failed"}</span>
                     </div>
                   )}
                 </div>
               )}
 
               {/* Conflict Warning */}
-              {state.operation?.conflictCount && state.operation.conflictCount > 0 && (
-                <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 rounded-md text-sm">
-                  {state.operation.conflictCount} conflict(s) detected. Manual review may be required.
-                </div>
-              )}
+              {state.operation?.conflictCount &&
+                state.operation.conflictCount > 0 && (
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 rounded-md text-sm">
+                    {state.operation.conflictCount} conflict(s) detected. Manual
+                    review may be required.
+                  </div>
+                )}
             </div>
           ) : (
             // Form
@@ -205,12 +244,13 @@ export function GitLabSyncDialog({
                   disabled={state.isProcessing}
                 />
                 <p className="text-xs text-muted-foreground">
-                  The GitLab branch to {operationType === 'export' ? 'push to' : 'pull from'}.
+                  The GitLab branch to{" "}
+                  {operationType === "export" ? "push to" : "pull from"}.
                 </p>
               </div>
 
               {/* Commit Message (export only) */}
-              {operationType === 'export' && (
+              {operationType === "export" && (
                 <div className="space-y-2">
                   <Label htmlFor="commit-message">Commit Message</Label>
                   <Input
@@ -225,7 +265,7 @@ export function GitLabSyncDialog({
               )}
 
               {/* Conflict Resolution (import only) */}
-              {operationType === 'import' && (
+              {operationType === "import" && (
                 <div className="space-y-2">
                   <Label>Conflict Resolution</Label>
                   <div className="space-y-2">
@@ -236,13 +276,15 @@ export function GitLabSyncDialog({
                         onClick={() => setConflictResolution(cr.value)}
                         className={`w-full p-3 text-left rounded-md border transition-colors ${
                           conflictResolution === cr.value
-                            ? 'border-primary bg-primary/10'
-                            : 'border-border/30 hover:bg-muted/50'
+                            ? "border-primary bg-primary/10"
+                            : "border-border/30 hover:bg-muted/50"
                         }`}
                         disabled={state.isProcessing}
                       >
                         <p className="text-sm font-medium">{cr.label}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{cr.description}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {cr.description}
+                        </p>
                       </button>
                     ))}
                   </div>
@@ -267,22 +309,22 @@ export function GitLabSyncDialog({
                 Cancel
               </Button>
               <Button onClick={handleSync} disabled={!branch.trim()}>
-                {operationType === 'export' ? 'Export' : 'Import'}
+                {operationType === "export" ? "Export" : "Import"}
               </Button>
             </>
           )}
-          {(state.isProcessing || state.operation) && state.operation?.status !== 'completed' && (
-            <Button onClick={handleClose} variant="outline">
-              Close
-            </Button>
-          )}
-          {state.operation?.status === 'completed' && (
-            <Button onClick={handleClose}>
-              Done
-            </Button>
+          {(state.isProcessing || state.operation) &&
+            state.operation?.status !== "completed" && (
+              <Button onClick={handleClose} variant="outline">
+                Close
+              </Button>
+            )}
+          {state.operation?.status === "completed" && (
+            <Button onClick={handleClose}>Done</Button>
           )}
         </div>
       </div>
     </div>
   );
 }
+

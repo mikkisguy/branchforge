@@ -5,10 +5,10 @@
  * Shows side-by-side comparison and allows user to choose which version to keep.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { X, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { gitlabApi, type ConflictDetectionResult, type ConflictInfo } from '@/lib/api/gitlab';
+import { gitlabApi, type ConflictDetectionResult, type ConflictInfo, type ContentItem } from '@/lib/api/gitlab';
 import { useToast } from '@/contexts/ToastContext';
 
 // ============================================================================
@@ -20,11 +20,14 @@ interface ConflictResolution {
   choice: 'local' | 'remote' | 'skip';
 }
 
+type UserRole = 'owner' | 'reader' | 'tester';
+
 interface ConflictReviewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;
   branch: string;
+  userRole?: UserRole;
   onApplyResolutions?: (resolutions: ConflictResolution[]) => void;
 }
 
@@ -63,7 +66,7 @@ const MOCK_CONFLICTS: ConflictInfo[] = [
 // Helper Functions
 // ============================================================================
 
-function formatContent(content: any[]): string {
+function formatContent(content: ContentItem[] | undefined): string {
   if (!content || content.length === 0) return 'Empty';
   return content
     .map((line) => {
@@ -99,6 +102,7 @@ export function ConflictReviewDialog({
   onOpenChange,
   projectId,
   branch,
+  userRole,
   onApplyResolutions,
 }: ConflictReviewDialogProps) {
   const { success, error } = useToast();
@@ -107,7 +111,34 @@ export function ConflictReviewDialog({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [resolutions, setResolutions] = useState<Map<string, 'local' | 'remote' | 'skip'>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
-  const [conflicts, setConflicts] = useState<ConflictInfo[]>(MOCK_CONFLICTS);
+  const [conflicts, setConflicts] = useState<ConflictInfo[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  /**
+   * Fetch conflicts when dialog opens
+   */
+  useEffect(() => {
+    if (open && projectId && branch) {
+      setIsLoading(true);
+      setFetchError(null);
+
+      gitlabApi.detectConflicts(projectId, branch)
+        .then((result: ConflictDetectionResult) => {
+          setConflicts(result.conflicts);
+          setCurrentIndex(0);
+          setResolutions(new Map());
+        })
+        .catch((err: Error) => {
+          const message = err.message || 'Failed to fetch conflicts';
+          setFetchError(message);
+          error(message);
+          setConflicts([]);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    }
+  }, [open, projectId, branch, error]);
 
   const currentConflict = conflicts[currentIndex];
   const currentResolution = resolutions.get(currentConflict?.label || '');
@@ -161,16 +192,21 @@ export function ConflictReviewDialog({
   }, [resolutions, onApplyResolutions, onOpenChange, success, error]);
 
   /**
+   * Load mock conflicts (owner only)
+   */
+  const loadMockConflicts = useCallback(() => {
+    setConflicts(MOCK_CONFLICTS);
+    setCurrentIndex(0);
+    setResolutions(new Map());
+    setFetchError(null);
+  }, []);
+
+  /**
    * Reset state when dialog opens
    */
   const handleOpenChange = useCallback((newOpen: boolean) => {
-    if (newOpen && open !== newOpen) {
-      // Dialog opening - reset state
-      setCurrentIndex(0);
-      setResolutions(new Map());
-    }
     onOpenChange(newOpen);
-  }, [open, onOpenChange]);
+  }, [onOpenChange]);
 
   // Calculate progress
   const resolvedCount = resolutions.size;
@@ -188,8 +224,21 @@ export function ConflictReviewDialog({
       <div className="bg-background rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-border/30 flex items-start justify-between">
-          <div>
-            <h2 className="text-lg font-medium">Review Sync Conflicts</h2>
+          <div className="flex-1">
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-medium">Review Sync Conflicts</h2>
+              {userRole === 'owner' && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={loadMockConflicts}
+                  disabled={isLoading}
+                  className="text-xs"
+                >
+                  Load Mock Data
+                </Button>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground mt-1">
               {resolvedCount} of {totalCount} conflicts resolved
             </p>
@@ -205,7 +254,35 @@ export function ConflictReviewDialog({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          {currentConflict ? (
+          {isLoading && conflicts.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
+                <p className="text-sm text-muted-foreground">Detecting conflicts...</p>
+              </div>
+            </div>
+          ) : fetchError && conflicts.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <p className="text-sm text-destructive mb-2">{fetchError}</p>
+                {userRole === 'owner' && (
+                  <Button size="sm" variant="outline" onClick={loadMockConflicts}>
+                    Load Mock Data
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : conflicts.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <CheckCircle2 className="w-12 h-12 mx-auto text-green-500 mb-4" />
+                <h3 className="text-lg font-medium">No Conflicts Detected</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Your BranchForge and GitLab versions are in sync.
+                </p>
+              </div>
+            </div>
+          ) : currentConflict ? (
             <div className="space-y-6">
               {/* Conflict Info */}
               <div className="flex items-center justify-between">

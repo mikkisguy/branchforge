@@ -34,11 +34,11 @@ const tabs: TabOption[] = [
  * @param userRole - The user's role (optional)
  * @returns An object with filtered tabs and the appropriate active tab
  */
-function useVisibleTabs(activeTab: Tab, userRole?: string) {
+function getVisibleTabs(activeTab: Tab, userRole?: string) {
   return useMemo(() => {
     // Filter out system tab for non-OWNER users
     const visibleTabs = tabs.filter(
-      (tab) => tab.id !== "system" || userRole === "OWNER"
+      (tab) => tab.id !== "system" || userRole === "OWNER",
     );
 
     // If current active tab is not visible, switch to first visible tab
@@ -58,10 +58,18 @@ interface SettingsModalProps {
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<Tab>("user");
   const { user } = useAuth();
-  const { signUpsEnabled, updateSignUpsSetting, isLoading: settingsLoading, isSaving } = useSettings();
+  const {
+    signUpsEnabled,
+    updateSignUpsSetting,
+    isLoading: settingsLoading,
+    isSaving,
+  } = useSettings();
 
   // Use helper to get visible tabs and ensure valid active tab
-  const { visibleTabs, activeTab: adjustedActiveTab } = useVisibleTabs(activeTab, user?.role);
+  const { visibleTabs, activeTab: adjustedActiveTab } = getVisibleTabs(
+    activeTab,
+    user?.role,
+  );
 
   // Sync state if active tab was adjusted by helper
   useMemo(() => {

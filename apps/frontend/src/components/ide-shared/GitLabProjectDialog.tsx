@@ -57,11 +57,11 @@ export function GitLabProjectDialog({ open, onOpenChange, onLinkSuccess }: GitLa
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [selectedGitlabProject, setSelectedGitlabProject] = useState<GitLabProject | null>(null);
   const [branch, setBranch] = useState('main');
-  const [commitMessage, setCommitMessage] = useState('');
 
   // GitLab projects state
   const [gitlabProjects, setGitlabProjects] = useState<GitLabProject[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [gitlabLoadError, setGitlabLoadError] = useState<string | null>(null);
   const [projectSearch, setProjectSearch] = useState('');
 
   // Link state
@@ -72,11 +72,14 @@ export function GitLabProjectDialog({ open, onOpenChange, onLinkSuccess }: GitLa
    */
   const loadGitlabProjects = useCallback(async () => {
     setIsLoadingProjects(true);
+    setGitlabLoadError(null);
     try {
       const projects = await listProjects();
       setGitlabProjects(projects);
+      setGitlabLoadError(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load GitLab projects';
+      setGitlabLoadError(message);
       error(message);
     } finally {
       setIsLoadingProjects(false);
@@ -97,8 +100,8 @@ export function GitLabProjectDialog({ open, onOpenChange, onLinkSuccess }: GitLa
     setSelectedProjectId('');
     setSelectedGitlabProject(null);
     setBranch('main');
-    setCommitMessage('');
     setProjectSearch('');
+    setGitlabLoadError(null);
   }, []);
 
   /**
@@ -233,6 +236,22 @@ export function GitLabProjectDialog({ open, onOpenChange, onLinkSuccess }: GitLa
               {isLoadingProjects ? (
                 <div className="p-4 flex items-center justify-center">
                   <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : gitlabLoadError ? (
+                <div className="p-4 flex flex-col items-center gap-3 text-center">
+                  <p className="text-sm text-destructive">{gitlabLoadError}</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadGitlabProjects()}
+                    disabled={isLoadingProjects}
+                  >
+                    {isLoadingProjects ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : null}
+                    Retry
+                  </Button>
                 </div>
               ) : filteredGitlabProjects.length === 0 ? (
                 <div className="p-4 text-center text-sm text-muted-foreground">

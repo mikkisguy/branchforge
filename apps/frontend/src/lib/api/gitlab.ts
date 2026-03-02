@@ -5,13 +5,17 @@
  * Handles token validation, repository linking, and sync operations.
  */
 
-const API_BASE = import.meta.env.VITE_API_ENV === "development" ? "/api/api" : "/api";
+const API_BASE =
+  import.meta.env.VITE_API_ENV === "development" ? "/api/api" : "/api";
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export type ConflictResolution = 'branchforge_wins' | 'gitlab_wins' | 'manual_review';
+export type ConflictResolution =
+  | "branchforge_wins"
+  | "gitlab_wins"
+  | "manual_review";
 
 export interface ValidateTokenResponse {
   valid: boolean;
@@ -28,8 +32,8 @@ export interface GitLabProject {
 export interface SyncOperation {
   id: string;
   projectId: string;
-  operation: 'export' | 'import';
-  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  operation: "export" | "import";
+  status: "pending" | "in_progress" | "completed" | "failed";
   branch: string | null;
   conflictCount: number;
   errorMessage: string | null;
@@ -37,11 +41,20 @@ export interface SyncOperation {
   completedAt: string | null;
 }
 
+export interface ContentItem {
+  speaker: string | null;
+  text: string;
+}
+
 export interface ConflictInfo {
   label: string;
-  type: 'dialogue_mismatch' | 'new_remote_label' | 'deleted_remote_label' | 'choice_mismatch';
-  localContent?: any;
-  remoteContent?: any;
+  type:
+    | "dialogue_mismatch"
+    | "new_remote_label"
+    | "deleted_remote_label"
+    | "choice_mismatch";
+  localContent?: ContentItem[];
+  remoteContent?: ContentItem[];
 }
 
 export interface ConflictDetectionResult {
@@ -64,11 +77,11 @@ export interface ApiError {
 // ============================================================================
 
 const VALIDATION_ERRORS = {
-  TOKEN_REQUIRED: 'Token is required',
-  TOKEN_INVALID_PREFIX: 'Token must start with glpat-',
-  PROJECT_ID_REQUIRED: 'Project ID is required',
-  GITLAB_PROJECT_ID_REQUIRED: 'GitLab Project ID is required',
-  BRANCH_REQUIRED: 'Branch is required',
+  TOKEN_REQUIRED: "Token is required",
+  TOKEN_INVALID_PREFIX: "Token must start with glpat-",
+  PROJECT_ID_REQUIRED: "Project ID is required",
+  GITLAB_PROJECT_ID_REQUIRED: "GitLab Project ID is required",
+  BRANCH_REQUIRED: "Branch is required",
 };
 
 /**
@@ -76,14 +89,14 @@ const VALIDATION_ERRORS = {
  * GitLab PATs start with 'glpat-'
  */
 function isValidTokenFormat(token: string): boolean {
-  return token.startsWith('glpat-');
+  return token.startsWith("glpat-");
 }
 
 /**
  * Validates required string field
  */
 function validateRequired(value: string, fieldName: string): void {
-  if (!value || value.trim() === '') {
+  if (!value || value.trim() === "") {
     throw new Error(`${fieldName} is required`);
   }
 }
@@ -94,7 +107,7 @@ function validateRequired(value: string, fieldName: string): void {
 
 async function request<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
   const response = await fetch(url, {
@@ -107,16 +120,44 @@ async function request<T>(
   });
 
   if (!response.ok) {
-    const error: ApiError = await response.json().catch(() => ({ error: "Unknown error" }));
-    throw new Error(error.error || `Request failed with status ${response.status}`);
-  }
-
-  // For 204 No Content responses
-  if (response.status === 204) {
-    return undefined as T;
+    const error: ApiError = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      error.error || `Request failed with status ${response.status}`,
+    );
   }
 
   return response.json();
+}
+
+/**
+ * Request handler for operations that return no content (204 No Content)
+ */
+async function requestNoContent(
+  endpoint: string,
+  options: RequestInit = {},
+): Promise<void> {
+  const url = `${API_BASE}${endpoint}`;
+  const response = await fetch(url, {
+    ...options,
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    const error: ApiError = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      error.error || `Request failed with status ${response.status}`,
+    );
+  }
+
+  // Expecting 204 No Content, but don't enforce it (some APIs may return 200 with empty body)
 }
 
 // ============================================================================
@@ -127,8 +168,11 @@ export const gitlabApi = {
   /**
    * Validate a GitLab Personal Access Token
    */
-  async validateToken(token: string, gitlabUrl?: string): Promise<ValidateTokenResponse> {
-    validateRequired(token, 'Token');
+  async validateToken(
+    token: string,
+    gitlabUrl?: string,
+  ): Promise<ValidateTokenResponse> {
+    validateRequired(token, "Token");
 
     if (!isValidTokenFormat(token)) {
       throw new Error(VALIDATION_ERRORS.TOKEN_INVALID_PREFIX);
@@ -139,8 +183,8 @@ export const gitlabApi = {
       body.gitlabUrl = gitlabUrl;
     }
 
-    return request<ValidateTokenResponse>('/gitlab/validate', {
-      method: 'POST',
+    return request<ValidateTokenResponse>("/gitlab/validate", {
+      method: "POST",
       body: JSON.stringify(body),
     });
   },
@@ -154,18 +198,47 @@ export const gitlabApi = {
       body.gitlabUrl = gitlabUrl;
     }
 
-    return request<void>('/gitlab/integration', {
-      method: 'POST',
+    return requestNoContent("/gitlab/integration", {
+      method: "POST",
       body: JSON.stringify(body),
     });
+  },
+
+  /**
+   * Get GitLab integration metadata
+   */
+  async getIntegration(): Promise<{
+    id: string;
+    username?: string;
+    gitlabUrl?: string;
+    createdAt: string;
+    updatedAt: string;
+  } | null> {
+    try {
+      return request<{
+        id: string;
+        username?: string;
+        gitlabUrl?: string;
+        createdAt: string;
+        updatedAt: string;
+      }>("/gitlab/integration", {
+        method: "GET",
+      });
+    } catch (error) {
+      // If integration not found (404), return null
+      if (error instanceof Error && error.message.includes("404")) {
+        return null;
+      }
+      throw error;
+    }
   },
 
   /**
    * Delete GitLab integration
    */
   async deleteIntegration(): Promise<void> {
-    return request<void>('/gitlab/integration', {
-      method: 'DELETE',
+    return requestNoContent("/gitlab/integration", {
+      method: "DELETE",
     });
   },
 
@@ -173,8 +246,8 @@ export const gitlabApi = {
    * List user's GitLab projects
    */
   async getProjects(): Promise<GitLabProject[]> {
-    return request<GitLabProject[]>('/gitlab/projects', {
-      method: 'GET',
+    return request<GitLabProject[]>("/gitlab/projects", {
+      method: "GET",
     });
   },
 
@@ -184,12 +257,12 @@ export const gitlabApi = {
   async linkRepository(
     projectId: string,
     gitlabProjectId: number,
-    branch: string = 'main'
+    branch: string = "main",
   ): Promise<void> {
-    validateRequired(projectId, 'Project ID');
+    validateRequired(projectId, "Project ID");
 
-    return request<void>('/gitlab/link', {
-      method: 'POST',
+    return requestNoContent("/gitlab/link", {
+      method: "POST",
       body: JSON.stringify({
         projectId,
         gitlabProjectId,
@@ -202,8 +275,8 @@ export const gitlabApi = {
    * Unlink a GitLab repository from a BranchForge project
    */
   async unlinkRepository(projectId: string): Promise<void> {
-    return request<void>(`/gitlab/unlink/${projectId}`, {
-      method: 'DELETE',
+    return requestNoContent(`/gitlab/unlink/${projectId}`, {
+      method: "DELETE",
     });
   },
 
@@ -218,7 +291,9 @@ export const gitlabApi = {
    * List .rpy files in a GitLab repository
    */
   async getRpyFiles(projectId: string, branch: string): Promise<RpyFile[]> {
-    return request<RpyFile[]>(`/gitlab/files/${projectId}?branch=${branch}`);
+    return request<RpyFile[]>(
+      `/gitlab/files/${projectId}?branch=${encodeURIComponent(branch)}`,
+    );
   },
 
   /**
@@ -227,10 +302,10 @@ export const gitlabApi = {
   async exportToGitlab(
     projectId: string,
     branch?: string,
-    commitMessage?: string
+    commitMessage?: string,
   ): Promise<SyncOperation> {
-    return request<SyncOperation>('/gitlab/export', {
-      method: 'POST',
+    return request<SyncOperation>("/gitlab/export", {
+      method: "POST",
       body: JSON.stringify({
         projectId,
         branch,
@@ -245,10 +320,10 @@ export const gitlabApi = {
   async importFromGitlab(
     projectId: string,
     branch: string,
-    conflictResolution: ConflictResolution
+    conflictResolution: ConflictResolution,
   ): Promise<SyncOperation> {
-    return request<SyncOperation>('/gitlab/import', {
-      method: 'POST',
+    return request<SyncOperation>("/gitlab/import", {
+      method: "POST",
       body: JSON.stringify({
         projectId,
         branch,
@@ -274,9 +349,12 @@ export const gitlabApi = {
   /**
    * Detect conflicts between local and remote versions
    */
-  async detectConflicts(projectId: string, branch: string): Promise<ConflictDetectionResult> {
-    return request<ConflictDetectionResult>('/gitlab/detect-conflicts', {
-      method: 'POST',
+  async detectConflicts(
+    projectId: string,
+    branch: string,
+  ): Promise<ConflictDetectionResult> {
+    return request<ConflictDetectionResult>("/gitlab/detect-conflicts", {
+      method: "POST",
       body: JSON.stringify({
         projectId,
         branch,
@@ -290,7 +368,7 @@ export const gitlabApi = {
   async pollOperation(
     operationId: string,
     onUpdate: (operation: SyncOperation) => void,
-    options: { interval?: number; timeout?: number } = {}
+    options: { interval?: number; timeout?: number } = {},
   ): Promise<SyncOperation> {
     const { interval = 1000, timeout = 60000 } = options;
     const startTime = Date.now();
@@ -298,19 +376,20 @@ export const gitlabApi = {
     while (true) {
       // Check timeout
       if (Date.now() - startTime > timeout) {
-        throw new Error('Operation polling timed out');
+        throw new Error("Operation polling timed out");
       }
 
       const operation = await this.getOperationStatus(operationId);
       onUpdate(operation);
 
       // Stop polling if operation is complete or failed
-      if (operation.status === 'completed' || operation.status === 'failed') {
+      if (operation.status === "completed" || operation.status === "failed") {
         return operation;
       }
 
       // Wait before next poll
-      await new Promise(resolve => setTimeout(resolve, interval));
+      await new Promise((resolve) => setTimeout(resolve, interval));
     }
   },
 };
+
