@@ -55,5 +55,8 @@ export * from './tables/ai-suggestions.js';
 export * from './tables/exports.js';
 export * from './tables/import-logs.js';
 
+// GitLab Integration
+export * from './tables/gitlab-integrations.js';
+
 // Demo features
 export * from './tables/demo-sessions.js';
