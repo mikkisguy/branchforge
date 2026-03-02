@@ -5,14 +5,14 @@
  * Allows users to select a local project and a GitLab repository to link.
  */
 
-import { useState, useCallback, useEffect } from 'react';
-import { Loader2, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { gitlabApi, type GitLabProject } from '@/lib/api/gitlab';
-import { useGitLab } from '@/contexts/GitLabContext';
-import { useToast } from '@/contexts/ToastContext';
+import { useState, useCallback, useEffect } from "react";
+import { Loader2, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { gitlabApi, type GitLabProject } from "@/lib/api/gitlab";
+import { useGitLab } from "@/contexts/GitLabContext";
+import { useToast } from "@/contexts/ToastContext";
 
 // ============================================================================
 // Types
@@ -40,29 +40,34 @@ interface LinkRepositoryRequest {
 // ============================================================================
 
 const MOCK_BRANCHFORGE_PROJECTS: BranchForgeProject[] = [
-  { id: 'my-project', name: 'My Visual Novel' },
-  { id: 'prequel', name: 'Prequel Project' },
-  { id: 'sequel', name: 'Sequel Project' },
+  { id: "my-project", name: "My Visual Novel" },
+  { id: "prequel", name: "Prequel Project" },
+  { id: "sequel", name: "Sequel Project" },
 ];
 
 // ============================================================================
 // Component
 // ============================================================================
 
-export function GitLabProjectDialog({ open, onOpenChange, onLinkSuccess }: GitLabProjectDialogProps) {
+export function GitLabProjectDialog({
+  open,
+  onOpenChange,
+  onLinkSuccess,
+}: GitLabProjectDialogProps) {
   const { listProjects, refreshIntegration } = useGitLab();
   const { success, error } = useToast();
 
   // Form state
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-  const [selectedGitlabProject, setSelectedGitlabProject] = useState<GitLabProject | null>(null);
-  const [branch, setBranch] = useState('main');
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const [selectedGitlabProject, setSelectedGitlabProject] =
+    useState<GitLabProject | null>(null);
+  const [branch, setBranch] = useState("main");
 
   // GitLab projects state
   const [gitlabProjects, setGitlabProjects] = useState<GitLabProject[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [gitlabLoadError, setGitlabLoadError] = useState<string | null>(null);
-  const [projectSearch, setProjectSearch] = useState('');
+  const [projectSearch, setProjectSearch] = useState("");
 
   // Link state
   const [isLinking, setIsLinking] = useState(false);
@@ -78,7 +83,8 @@ export function GitLabProjectDialog({ open, onOpenChange, onLinkSuccess }: GitLa
       setGitlabProjects(projects);
       setGitlabLoadError(null);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load GitLab projects';
+      const message =
+        err instanceof Error ? err.message : "Failed to load GitLab projects";
       setGitlabLoadError(message);
       error(message);
     } finally {
@@ -88,19 +94,19 @@ export function GitLabProjectDialog({ open, onOpenChange, onLinkSuccess }: GitLa
 
   // Load projects when dialog opens
   useEffect(() => {
-    if (open && gitlabProjects.length === 0) {
+    if (open && gitlabProjects.length === 0 && !gitlabLoadError) {
       loadGitlabProjects();
     }
-  }, [open, gitlabProjects.length, loadGitlabProjects]);
+  }, [open, gitlabProjects.length, gitlabLoadError, loadGitlabProjects]);
 
   /**
    * Reset form state
    */
   const reset = useCallback(() => {
-    setSelectedProjectId('');
+    setSelectedProjectId("");
     setSelectedGitlabProject(null);
-    setBranch('main');
-    setProjectSearch('');
+    setBranch("main");
+    setProjectSearch("");
     setGitlabLoadError(null);
   }, []);
 
@@ -117,17 +123,17 @@ export function GitLabProjectDialog({ open, onOpenChange, onLinkSuccess }: GitLa
    */
   const handleLink = useCallback(async () => {
     if (!selectedProjectId) {
-      error('Please select a BranchForge project');
+      error("Please select a BranchForge project");
       return;
     }
 
     if (!selectedGitlabProject) {
-      error('Please select a GitLab repository');
+      error("Please select a GitLab repository");
       return;
     }
 
     if (!branch.trim()) {
-      error('Please enter a branch name');
+      error("Please enter a branch name");
       return;
     }
 
@@ -137,33 +143,48 @@ export function GitLabProjectDialog({ open, onOpenChange, onLinkSuccess }: GitLa
       const request: LinkRepositoryRequest = {
         projectId: selectedProjectId,
         gitlabProjectId: selectedGitlabProject.id,
-        branch: branch.trim() || 'main',
+        branch: branch.trim() || "main",
       };
 
       await gitlabApi.linkRepository(
         request.projectId,
         request.gitlabProjectId,
-        request.branch
+        request.branch,
       );
 
-      success(`Successfully linked "${selectedGitlabProject.name}" to your project`);
+      success(
+        `Successfully linked "${selectedGitlabProject.name}" to your project`,
+      );
       closeDialog();
       onLinkSuccess?.();
       await refreshIntegration();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to link repository';
+      const message =
+        err instanceof Error ? err.message : "Failed to link repository";
       error(message);
     } finally {
       setIsLinking(false);
     }
-  }, [selectedProjectId, selectedGitlabProject, branch, closeDialog, onLinkSuccess, refreshIntegration, success, error]);
+  }, [
+    selectedProjectId,
+    selectedGitlabProject,
+    branch,
+    closeDialog,
+    onLinkSuccess,
+    refreshIntegration,
+    success,
+    error,
+  ]);
 
   /**
    * Filter GitLab projects based on search
    */
-  const filteredGitlabProjects = gitlabProjects.filter(project =>
-    project.name.toLowerCase().includes(projectSearch.toLowerCase()) ||
-    project.path_with_namespace.toLowerCase().includes(projectSearch.toLowerCase())
+  const filteredGitlabProjects = gitlabProjects.filter(
+    (project) =>
+      project.name.toLowerCase().includes(projectSearch.toLowerCase()) ||
+      project.path_with_namespace
+        .toLowerCase()
+        .includes(projectSearch.toLowerCase()),
   );
 
   // ============================================================================
@@ -255,7 +276,9 @@ export function GitLabProjectDialog({ open, onOpenChange, onLinkSuccess }: GitLa
                 </div>
               ) : filteredGitlabProjects.length === 0 ? (
                 <div className="p-4 text-center text-sm text-muted-foreground">
-                  {projectSearch ? 'No matching repositories found' : 'No repositories available'}
+                  {projectSearch
+                    ? "No matching repositories found"
+                    : "No repositories available"}
                 </div>
               ) : (
                 <div className="divide-y divide-border/30">
@@ -265,7 +288,9 @@ export function GitLabProjectDialog({ open, onOpenChange, onLinkSuccess }: GitLa
                       type="button"
                       onClick={() => setSelectedGitlabProject(project)}
                       className={`w-full p-3 text-left hover:bg-muted/50 transition-colors ${
-                        selectedGitlabProject?.id === project.id ? 'bg-muted' : ''
+                        selectedGitlabProject?.id === project.id
+                          ? "bg-muted"
+                          : ""
                       }`}
                     >
                       <p className="text-sm font-medium">{project.name}</p>
@@ -291,18 +316,15 @@ export function GitLabProjectDialog({ open, onOpenChange, onLinkSuccess }: GitLa
               disabled={isLinking}
             />
             <p className="text-xs text-muted-foreground">
-              The branch to sync with. Default is <code className="bg-muted px-1 py-0.5 rounded">main</code>.
+              The branch to sync with. Default is{" "}
+              <code className="bg-muted px-1 py-0.5 rounded">main</code>.
             </p>
           </div>
         </div>
 
         {/* Footer */}
         <div className="p-6 border-t border-border/30 flex justify-end gap-2">
-          <Button
-            variant="outline"
-            onClick={closeDialog}
-            disabled={isLinking}
-          >
+          <Button variant="outline" onClick={closeDialog} disabled={isLinking}>
             Cancel
           </Button>
           <Button
@@ -319,3 +341,4 @@ export function GitLabProjectDialog({ open, onOpenChange, onLinkSuccess }: GitLa
     </div>
   );
 }
+

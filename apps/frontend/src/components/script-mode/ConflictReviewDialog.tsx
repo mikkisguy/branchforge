@@ -5,11 +5,16 @@
  * Shows side-by-side comparison and allows user to choose which version to keep.
  */
 
-import { useState, useCallback, useEffect } from 'react';
-import { X, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { gitlabApi, type ConflictDetectionResult, type ConflictInfo, type ContentItem } from '@/lib/api/gitlab';
-import { useToast } from '@/contexts/ToastContext';
+import { useState, useCallback, useEffect } from "react";
+import { X, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  gitlabApi,
+  type ConflictDetectionResult,
+  type ConflictInfo,
+  type ContentItem,
+} from "@/lib/api/gitlab";
+import { useToast } from "@/contexts/ToastContext";
 
 // ============================================================================
 // Types
@@ -17,10 +22,10 @@ import { useToast } from '@/contexts/ToastContext';
 
 interface ConflictResolution {
   label: string;
-  choice: 'local' | 'remote' | 'skip';
+  choice: "local" | "remote" | "skip";
 }
 
-type UserRole = 'owner' | 'reader' | 'tester';
+type UserRole = "owner" | "reader" | "tester";
 
 interface ConflictReviewDialogProps {
   open: boolean;
@@ -37,27 +42,27 @@ interface ConflictReviewDialogProps {
 
 const MOCK_CONFLICTS: ConflictInfo[] = [
   {
-    label: 'start',
-    type: 'dialogue_mismatch',
+    label: "start",
+    type: "dialogue_mismatch",
     localContent: [
-      { speaker: null, text: 'The story begins in a small village...' },
-      { speaker: 'eileen', text: 'Hello there, traveler!' },
+      { speaker: null, text: "The story begins in a small village..." },
+      { speaker: "eileen", text: "Hello there, traveler!" },
     ],
     remoteContent: [
-      { speaker: null, text: 'The story begins in a bustling city...' },
-      { speaker: 'eileen', text: 'Greetings, weary traveler!' },
+      { speaker: null, text: "The story begins in a bustling city..." },
+      { speaker: "eileen", text: "Greetings, weary traveler!" },
     ],
   },
   {
-    label: 'ending_a',
-    type: 'dialogue_mismatch',
+    label: "ending_a",
+    type: "dialogue_mismatch",
     localContent: [
-      { speaker: 'protagonist', text: 'I choose to follow my heart.' },
-      { speaker: null, text: 'She walked into the sunset, hopeful.' },
+      { speaker: "protagonist", text: "I choose to follow my heart." },
+      { speaker: null, text: "She walked into the sunset, hopeful." },
     ],
     remoteContent: [
-      { speaker: 'protagonist', text: 'I choose to follow my dreams.' },
-      { speaker: null, text: 'She walked into the sunset, determined.' },
+      { speaker: "protagonist", text: "I choose to follow my dreams." },
+      { speaker: null, text: "She walked into the sunset, determined." },
     ],
   },
 ];
@@ -67,7 +72,7 @@ const MOCK_CONFLICTS: ConflictInfo[] = [
 // ============================================================================
 
 function formatContent(content: ContentItem[] | undefined): string {
-  if (!content || content.length === 0) return 'Empty';
+  if (!content || content.length === 0) return "Empty";
   return content
     .map((line) => {
       if (line.speaker) {
@@ -75,21 +80,21 @@ function formatContent(content: ContentItem[] | undefined): string {
       }
       return `"${line.text}"`;
     })
-    .join('\n');
+    .join("\n");
 }
 
-function getConflictTypeLabel(type: ConflictInfo['type']): string {
+function getConflictTypeLabel(type: ConflictInfo["type"]): string {
   switch (type) {
-    case 'dialogue_mismatch':
-      return 'Dialogue differs between versions';
-    case 'new_remote_label':
-      return 'New label in GitLab';
-    case 'deleted_remote_label':
-      return 'Label deleted in GitLab';
-    case 'choice_mismatch':
-      return 'Branching choices differ';
+    case "dialogue_mismatch":
+      return "Dialogue differs between versions";
+    case "new_remote_label":
+      return "New label in GitLab";
+    case "deleted_remote_label":
+      return "Label deleted in GitLab";
+    case "choice_mismatch":
+      return "Branching choices differ";
     default:
-      return 'Unknown conflict type';
+      return "Unknown conflict type";
   }
 }
 
@@ -109,7 +114,9 @@ export function ConflictReviewDialog({
 
   // State
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [resolutions, setResolutions] = useState<Map<string, 'local' | 'remote' | 'skip'>>(new Map());
+  const [resolutions, setResolutions] = useState<
+    Map<string, "local" | "remote" | "skip">
+  >(new Map());
   const [isLoading, setIsLoading] = useState(false);
   const [conflicts, setConflicts] = useState<ConflictInfo[]>([]);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -118,51 +125,69 @@ export function ConflictReviewDialog({
    * Fetch conflicts when dialog opens
    */
   useEffect(() => {
-    if (open && projectId && branch) {
-      setIsLoading(true);
-      setFetchError(null);
-
-      gitlabApi.detectConflicts(projectId, branch)
-        .then((result: ConflictDetectionResult) => {
-          setConflicts(result.conflicts);
-          setCurrentIndex(0);
-          setResolutions(new Map());
-        })
-        .catch((err: Error) => {
-          const message = err.message || 'Failed to fetch conflicts';
-          setFetchError(message);
-          error(message);
-          setConflicts([]);
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
+    if (!open || !projectId || !branch) {
+      return;
     }
+
+    const abortController = new AbortController();
+    const { signal } = abortController;
+
+    setIsLoading(true);
+    setFetchError(null);
+
+    gitlabApi
+      .detectConflicts(projectId, branch, signal)
+      .then((result: ConflictDetectionResult) => {
+        if (signal.aborted) return;
+        setConflicts(result.conflicts);
+        setCurrentIndex(0);
+        setResolutions(new Map());
+      })
+      .catch((err: Error) => {
+        if (signal.aborted) return;
+        const message = err.message || "Failed to fetch conflicts";
+        setFetchError(message);
+        error(message);
+        setConflicts([]);
+      })
+      .finally(() => {
+        if (signal.aborted) return;
+        setIsLoading(false);
+      });
+
+    return () => {
+      abortController.abort();
+    };
   }, [open, projectId, branch, error]);
 
   const currentConflict = conflicts[currentIndex];
-  const currentResolution = resolutions.get(currentConflict?.label || '');
+  const currentResolution = resolutions.get(currentConflict?.label || "");
 
   /**
    * Set resolution for current conflict
    */
-  const setResolution = useCallback((choice: 'local' | 'remote' | 'skip') => {
-    if (!currentConflict) return;
-    setResolutions(prev => new Map(prev).set(currentConflict.label, choice));
-  }, [currentConflict]);
+  const setResolution = useCallback(
+    (choice: "local" | "remote" | "skip") => {
+      if (!currentConflict) return;
+      setResolutions((prev) =>
+        new Map(prev).set(currentConflict.label, choice),
+      );
+    },
+    [currentConflict],
+  );
 
   /**
    * Navigate to previous conflict
    */
   const goPrevious = useCallback(() => {
-    setCurrentIndex(prev => Math.max(0, prev - 1));
+    setCurrentIndex((prev) => Math.max(0, prev - 1));
   }, []);
 
   /**
    * Navigate to next conflict
    */
   const goNext = useCallback(() => {
-    setCurrentIndex(prev => Math.min(conflicts.length - 1, prev + 1));
+    setCurrentIndex((prev) => Math.min(conflicts.length - 1, prev + 1));
   }, [conflicts.length]);
 
   /**
@@ -173,7 +198,9 @@ export function ConflictReviewDialog({
 
     try {
       // Convert resolutions to array
-      const resolutionArray: ConflictResolution[] = Array.from(resolutions.entries()).map(([label, choice]) => ({
+      const resolutionArray: ConflictResolution[] = Array.from(
+        resolutions.entries(),
+      ).map(([label, choice]) => ({
         label,
         choice,
       }));
@@ -184,7 +211,8 @@ export function ConflictReviewDialog({
       success(`Applied ${resolutionArray.length} conflict resolution(s)`);
       onOpenChange(false);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to apply resolutions';
+      const message =
+        err instanceof Error ? err.message : "Failed to apply resolutions";
       error(message);
     } finally {
       setIsLoading(false);
@@ -204,9 +232,12 @@ export function ConflictReviewDialog({
   /**
    * Reset state when dialog opens
    */
-  const handleOpenChange = useCallback((newOpen: boolean) => {
-    onOpenChange(newOpen);
-  }, [onOpenChange]);
+  const handleOpenChange = useCallback(
+    (newOpen: boolean) => {
+      onOpenChange(newOpen);
+    },
+    [onOpenChange],
+  );
 
   // Calculate progress
   const resolvedCount = resolutions.size;
@@ -227,7 +258,7 @@ export function ConflictReviewDialog({
           <div className="flex-1">
             <div className="flex items-center gap-3">
               <h2 className="text-lg font-medium">Review Sync Conflicts</h2>
-              {userRole === 'owner' && (
+              {userRole === "owner" && (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -258,15 +289,21 @@ export function ConflictReviewDialog({
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
-                <p className="text-sm text-muted-foreground">Detecting conflicts...</p>
+                <p className="text-sm text-muted-foreground">
+                  Detecting conflicts...
+                </p>
               </div>
             </div>
           ) : fetchError && conflicts.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <p className="text-sm text-destructive mb-2">{fetchError}</p>
-                {userRole === 'owner' && (
-                  <Button size="sm" variant="outline" onClick={loadMockConflicts}>
+                {userRole === "owner" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={loadMockConflicts}
+                  >
                     Load Mock Data
                   </Button>
                 )}
@@ -287,7 +324,9 @@ export function ConflictReviewDialog({
               {/* Conflict Info */}
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-medium">Label: {currentConflict.label}</h3>
+                  <h3 className="text-lg font-medium">
+                    Label: {currentConflict.label}
+                  </h3>
                   <p className="text-sm text-muted-foreground mt-1">
                     {getConflictTypeLabel(currentConflict.type)}
                   </p>
@@ -300,7 +339,9 @@ export function ConflictReviewDialog({
                   >
                     <ChevronLeft className="w-5 h-5" />
                   </button>
-                  <span>{currentIndex + 1} / {totalCount}</span>
+                  <span>
+                    {currentIndex + 1} / {totalCount}
+                  </span>
                   <button
                     onClick={goNext}
                     disabled={currentIndex === totalCount - 1 || isLoading}
@@ -316,7 +357,13 @@ export function ConflictReviewDialog({
                 <div className="p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200 rounded-md text-sm flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4" />
                   <span>
-                    Will use: {currentResolution === 'local' ? 'BranchForge' : currentResolution === 'remote' ? 'GitLab' : 'Skipped'} version
+                    Will use:{" "}
+                    {currentResolution === "local"
+                      ? "BranchForge"
+                      : currentResolution === "remote"
+                        ? "GitLab"
+                        : "Skipped"}{" "}
+                    version
                   </span>
                 </div>
               )}
@@ -329,11 +376,13 @@ export function ConflictReviewDialog({
                     <h4 className="text-sm font-medium">BranchForge Version</h4>
                     <Button
                       size="sm"
-                      variant={currentResolution === 'local' ? 'default' : 'outline'}
-                      onClick={() => setResolution('local')}
+                      variant={
+                        currentResolution === "local" ? "default" : "outline"
+                      }
+                      onClick={() => setResolution("local")}
                       disabled={isLoading}
                     >
-                      {currentResolution === 'local' ? 'Selected' : 'Use This'}
+                      {currentResolution === "local" ? "Selected" : "Use This"}
                     </Button>
                   </div>
                   <div className="p-4 bg-muted/30 rounded-md border border-border/30">
@@ -349,11 +398,13 @@ export function ConflictReviewDialog({
                     <h4 className="text-sm font-medium">GitLab Version</h4>
                     <Button
                       size="sm"
-                      variant={currentResolution === 'remote' ? 'default' : 'outline'}
-                      onClick={() => setResolution('remote')}
+                      variant={
+                        currentResolution === "remote" ? "default" : "outline"
+                      }
+                      onClick={() => setResolution("remote")}
                       disabled={isLoading}
                     >
-                      {currentResolution === 'remote' ? 'Selected' : 'Use This'}
+                      {currentResolution === "remote" ? "Selected" : "Use This"}
                     </Button>
                   </div>
                   <div className="p-4 bg-muted/30 rounded-md border border-border/30">
@@ -369,9 +420,11 @@ export function ConflictReviewDialog({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setResolution('skip')}
+                  onClick={() => setResolution("skip")}
                   disabled={isLoading}
-                  className={currentResolution === 'skip' ? 'text-muted-foreground' : ''}
+                  className={
+                    currentResolution === "skip" ? "text-muted-foreground" : ""
+                  }
                 >
                   Skip this conflict
                 </Button>
@@ -400,18 +453,11 @@ export function ConflictReviewDialog({
           <div className="flex gap-2">
             {hasUnresolved && (
               <Button variant="ghost" disabled={isLoading}>
-                {hasUnresolved && 'Resolve all conflicts first'}
+                {hasUnresolved && "Resolve all conflicts first"}
               </Button>
             )}
-            <Button
-              onClick={handleApply}
-              disabled={isLoading || hasUnresolved}
-            >
-              {isLoading ? (
-                <>Applying...</>
-              ) : (
-                <>Apply Resolutions</>
-              )}
+            <Button onClick={handleApply} disabled={isLoading || hasUnresolved}>
+              {isLoading ? <>Applying...</> : <>Apply Resolutions</>}
             </Button>
           </div>
         </div>
@@ -419,3 +465,4 @@ export function ConflictReviewDialog({
     </div>
   );
 }
+

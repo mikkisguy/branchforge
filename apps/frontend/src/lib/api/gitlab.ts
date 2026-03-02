@@ -68,8 +68,19 @@ export interface RpyFile {
   path: string;
 }
 
-export interface ApiError {
+export interface ApiErrorPayload {
   error: string;
+}
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly payload: unknown,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
 }
 
 // ============================================================================
@@ -120,11 +131,13 @@ async function request<T>(
   });
 
   if (!response.ok) {
-    const error: ApiError = await response
+    const payload: ApiErrorPayload = await response
       .json()
       .catch(() => ({ error: "Unknown error" }));
-    throw new Error(
-      error.error || `Request failed with status ${response.status}`,
+    throw new ApiError(
+      payload.error || `Request failed with status ${response.status}`,
+      response.status,
+      payload,
     );
   }
 
@@ -149,11 +162,13 @@ async function requestNoContent(
   });
 
   if (!response.ok) {
-    const error: ApiError = await response
+    const payload: ApiErrorPayload = await response
       .json()
       .catch(() => ({ error: "Unknown error" }));
-    throw new Error(
-      error.error || `Request failed with status ${response.status}`,
+    throw new ApiError(
+      payload.error || `Request failed with status ${response.status}`,
+      response.status,
+      payload,
     );
   }
 
@@ -226,7 +241,14 @@ export const gitlabApi = {
       });
     } catch (error) {
       // If integration not found (404), return null
-      if (error instanceof Error && error.message.includes("404")) {
+      if (
+        (error instanceof ApiError && error.status === 404) ||
+        (typeof error === "object" &&
+          error !== null &&
+          "status" in error &&
+          typeof error.status === "number" &&
+          error.status === 404)
+      ) {
         return null;
       }
       throw error;
@@ -352,9 +374,11 @@ export const gitlabApi = {
   async detectConflicts(
     projectId: string,
     branch: string,
+    signal?: AbortSignal,
   ): Promise<ConflictDetectionResult> {
     return request<ConflictDetectionResult>("/gitlab/detect-conflicts", {
       method: "POST",
+      signal,
       body: JSON.stringify({
         projectId,
         branch,

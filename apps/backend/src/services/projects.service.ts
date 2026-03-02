@@ -143,6 +143,10 @@ export async function createProject(userId: string, body: CreateProjectBody): Pr
 
   const result = await db.insert(projects).values(newProject).returning();
 
+  if (!result || result.length === 0 || !result[0]) {
+    throw new Error('Failed to create project: database insert returned no rows');
+  }
+
   return mapToPublicProject(result[0]);
 }
 

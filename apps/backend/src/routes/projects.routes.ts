@@ -108,7 +108,12 @@ async function createProjectHandler(
     return;
   }
 
-  const project = await createProject(user.id, body);
+  const sanitizedBody: CreateProjectBody = {
+    ...body,
+    name: body.name.trim(),
+  };
+
+  const project = await createProject(user.id, sanitizedBody);
 
   reply.status(201).send({ project } as CreateProjectResponse);
 }

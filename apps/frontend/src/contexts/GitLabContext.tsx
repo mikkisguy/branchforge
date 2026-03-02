@@ -97,6 +97,10 @@ export function GitLabProvider({ children }: GitLabProviderProps) {
           gitlabUrl: integrationData.gitlabUrl,
           createdAt: integrationData.createdAt,
         });
+
+        // TODO: Fetch linked repositories from backend
+        // const repos = await gitlabApi.getLinkedRepositories();
+        // setLinkedRepositories(new Map(repos.map(r => [r.projectId, r])));
         setLinkedRepositories(new Map());
       } else {
         // No integration found

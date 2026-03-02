@@ -4,7 +4,7 @@
  * Tests for the projects API routes
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Fastify from 'fastify';
 import { projectsRoutes } from '../projects.routes.js';
 import * as projectsService from '../../services/projects.service.js';
@@ -36,6 +36,12 @@ describe('ProjectsRoutes', () => {
     // Register the routes
     await projectsRoutes(fastify);
     await fastify.ready();
+  });
+
+  afterEach(async () => {
+    if (fastify) {
+      await fastify.close();
+    }
   });
 
   describe('GET /projects', () => {
