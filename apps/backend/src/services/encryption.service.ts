@@ -16,6 +16,133 @@ import crypto from 'node:crypto';
 // GitLab PAT format: glpat- followed by alphanumeric characters and hyphens
 const GITLAB_PAT_REGEX = /^glpat-[a-zA-Z0-9-]+$/;
 
+// Default GitLab URL
+const DEFAULT_GITLAB_URL = 'https://gitlab.com';
+
+// Allowed GitLab hostnames (can be extended with environment variable)
+const ALLOWED_GITLAB_HOSTS = new Set([
+  'gitlab.com',
+  ...(process.env.ALLOWED_GITLAB_HOSTS?.split(',').map(h => h.trim().toLowerCase()) || []),
+]);
+
+// Private/internal IP ranges (in CIDR notation)
+const PRIVATE_IP_RANGES = [
+  { start: '127.0.0.0', end: '127.255.255.255' },    // Loopback
+  { start: '10.0.0.0', end: '10.255.255.255' },      // Private Class A
+  { start: '172.16.0.0', end: '172.31.255.255' },    // Private Class B
+  { start: '192.168.0.0', end: '192.168.255.255' },  // Private Class C
+  { start: '169.254.0.0', end: '169.254.255.255' },  // Link-local
+  { start: '::1', end: '::1' },                      // IPv6 loopback
+  { start: 'fc00::', end: 'fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff' }, // IPv6 private
+  { start: 'fe80::', end: 'fe:ffff:ffff:ffff:ffff:ffff:ffff:ffff' }, // IPv6 link-local
+];
+
+/**
+ * Check if an IP address is within a private/internal range
+ */
+function isPrivateIP(ip: string): boolean {
+  // Check IPv4
+  const ipv4Match = ip.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (ipv4Match) {
+    const ipNum =
+      (parseInt(ipv4Match[1]) << 24) +
+      (parseInt(ipv4Match[2]) << 16) +
+      (parseInt(ipv4Match[3]) << 8) +
+      parseInt(ipv4Match[4]);
+
+    for (const range of PRIVATE_IP_RANGES) {
+      if (range.start.includes('.')) {
+        const startParts = range.start.split('.').map(Number);
+        const endParts = range.end.split('.').map(Number);
+        const startNum =
+          (startParts[0] << 24) + (startParts[1] << 16) + (startParts[2] << 8) + startParts[3];
+        const endNum =
+          (endParts[0] << 24) + (endParts[1] << 16) + (endParts[2] << 8) + endParts[3];
+        if (ipNum >= startNum && ipNum <= endNum) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // For IPv6, check if it matches known private ranges
+  if (ip.includes(':')) {
+    const normalizedIp = ip.toLowerCase();
+    return (
+      normalizedIp === '::1' ||
+      normalizedIp.startsWith('fc') ||
+      normalizedIp.startsWith('fd') ||
+      normalizedIp.startsWith('fe80') ||
+      normalizedIp.startsWith('fe')
+    );
+  }
+
+  return false;
+}
+
+/**
+ * Check if a hostname is an IP address and whether it's private/internal
+ */
+function isPrivateOrLocalHostname(hostname: string): boolean {
+  // Check for literal IP addresses
+  const ipv4Match = hostname.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (ipv4Match) {
+    return isPrivateIP(hostname);
+  }
+
+  // Check for localhost or local domain names
+  const lowerHostname = hostname.toLowerCase();
+  if (
+    lowerHostname === 'localhost' ||
+    lowerHostname.endsWith('.local') ||
+    lowerHostname.endsWith('.localhost')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Validate and sanitize a GitLab URL to prevent SSRF attacks
+ * @param gitlabUrl - The URL to validate
+ * @returns The validated and normalized URL string, or default if invalid
+ */
+export function validateGitLabUrl(gitlabUrl?: string): string {
+  const urlToCheck = gitlabUrl || DEFAULT_GITLAB_URL;
+
+  try {
+    const parsedUrl = new URL(urlToCheck);
+
+    // Only allow http and https schemes
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      return DEFAULT_GITLAB_URL;
+    }
+
+    const hostname = parsedUrl.hostname.toLowerCase();
+
+    // Reject IP addresses that are private/internal
+    if (isPrivateOrLocalHostname(hostname)) {
+      return DEFAULT_GITLAB_URL;
+    }
+
+    // Check if hostname is in the allowlist
+    if (!ALLOWED_GITLAB_HOSTS.has(hostname)) {
+      // Not in allowlist - reject to prevent SSRF
+      // Users can add trusted self-hosted domains via ALLOWED_GITLAB_HOSTS env var
+      return DEFAULT_GITLAB_URL;
+    }
+
+    // Remove username, password, port, and path from URL
+    // Return only protocol + hostname (port 80/443 is implied by protocol)
+    return `${parsedUrl.protocol}//${parsedUrl.hostname}`;
+  } catch {
+    // For URL parsing errors, fall back to default
+    return DEFAULT_GITLAB_URL;
+  }
+}
+
 /**
  * Validate GitLab Personal Access Token format
  * @param token - The token to validate
@@ -116,25 +243,34 @@ export function decryptPAT(encryptedToken: string): string {
  * Validate a GitLab PAT by making an API call to GitLab
  * @param token - The PAT to validate
  * @param gitlabUrl - The GitLab instance URL (default: https://gitlab.com)
+ * @param timeoutMs - Request timeout in milliseconds (default: 10000)
  * @returns The username if valid, null otherwise
  */
 export async function validateAndGetUsername(
   token: string,
-  gitlabUrl: string = 'https://gitlab.com'
+  gitlabUrl: string = DEFAULT_GITLAB_URL,
+  timeoutMs: number = 10000
 ): Promise<string | null> {
   // Validate format first
   if (!isValidPATFormat(token)) {
     return null;
   }
 
+  // Validate and sanitize the GitLab URL to prevent SSRF
+  const validatedUrl = validateGitLabUrl(gitlabUrl);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
-    const url = new URL('/api/v4/user', gitlabUrl);
+    const url = new URL('/api/v4/user', validatedUrl);
 
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
         'PRIVATE-TOKEN': token,
       },
+      signal: controller.signal,
     });
 
     if (!response.ok) {
@@ -143,7 +279,13 @@ export async function validateAndGetUsername(
 
     const data = await response.json();
     return data?.username || null;
-  } catch {
+  } catch (error) {
+    // AbortError is thrown when timeout expires
+    if (error instanceof Error && error.name === 'AbortError') {
+      return null;
+    }
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }

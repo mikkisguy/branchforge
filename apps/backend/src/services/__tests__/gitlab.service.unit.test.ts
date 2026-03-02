@@ -24,6 +24,10 @@ import { gitlabIntegrations, gitlabRepositories } from '../../db/schema/index.js
 import { eq, and } from 'drizzle-orm';
 import * as encryptionService from '../encryption.service.js';
 
+// Test token must be defined before vi.mock since vi.mock is hoisted
+// Use the same value as encryption.service.unit.test.ts for consistency
+const testToken = 'glpat-123456789abcdefghijklmn';
+
 // Mock encryption service
 vi.mock('../encryption.service.js', () => ({
   validateAndGetUsername: vi.fn(),
@@ -71,7 +75,6 @@ vi.mock('../../db/index.js', () => ({
 // Test fixtures
 const testUserId = 'user-123';
 const testProjectId = 'project-123';
-const testToken = 'glpat-test123456789';
 const testGitlabUrl = 'https://gitlab.test';
 const testGitlabProjectId = 12345;
 const testRepositoryName = 'test-repo';

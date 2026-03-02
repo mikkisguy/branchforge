@@ -143,24 +143,95 @@ describe('EncryptionService', () => {
   });
 
   describe('validateAndGetUsername', () => {
-    it('should validate token and return username for valid GitLab PAT', async () => {
-      // This test requires mocking the GitLab API
-      // For now, we'll test the basic structure and assume the API call will be mocked in the implementation
-      const gitlabUrl = testGitlabUrl;
+    const validPat = 'glpat-123456789abcdefghijklmn';
+    const expectedUsername = 'testuser';
 
-      // Mock implementation would test the actual API call
-      // For this unit test, we verify the function exists and has correct signature
-      expect(typeof validateAndGetUsername).toBe('function');
+    beforeEach(() => {
+      // Mock fetch globally
+      global.fetch = vi.fn();
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('should validate token and return username for valid GitLab PAT', async () => {
+      // Mock successful GitLab API response
+      vi.mocked(global.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ username: expectedUsername }),
+      } as Response);
+
+      const result = await validateAndGetUsername(validPat, testGitlabUrl);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        `${testGitlabUrl}/api/v4/user`,
+        expect.objectContaining({
+          method: 'GET',
+          headers: {
+            'PRIVATE-TOKEN': validPat,
+          },
+        })
+      );
+      expect(result).toBe(expectedUsername);
+    });
+
+    it('should return null for invalid PAT (401 unauthorized)', async () => {
+      // Mock unauthorized GitLab API response
+      vi.mocked(global.fetch).mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+      } as Response);
+
+      const result = await validateAndGetUsername(validPat, testGitlabUrl);
+
+      expect(result).toBeNull();
     });
 
     it('should return null for invalid token format', async () => {
       const result = await validateAndGetUsername('invalid-token', testGitlabUrl);
 
       expect(result).toBeNull();
+      // Fetch should not be called for invalid format
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
     it('should return null for empty token', async () => {
       const result = await validateAndGetUsername('', testGitlabUrl);
+
+      expect(result).toBeNull();
+      // Fetch should not be called for empty token
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('should return null when API response lacks username', async () => {
+      // Mock successful response but without username field
+      vi.mocked(global.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: 123, name: 'Test User' }),
+      } as Response);
+
+      const result = await validateAndGetUsername(validPat, testGitlabUrl);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null on network error', async () => {
+      // Mock network error
+      vi.mocked(global.fetch).mockRejectedValueOnce(new Error('Network error'));
+
+      const result = await validateAndGetUsername(validPat, testGitlabUrl);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null on timeout', async () => {
+      // Mock AbortError for timeout
+      const abortError = new Error('Request timeout');
+      abortError.name = 'AbortError';
+      vi.mocked(global.fetch).mockRejectedValueOnce(abortError);
+
+      const result = await validateAndGetUsername(validPat, testGitlabUrl);
 
       expect(result).toBeNull();
     });

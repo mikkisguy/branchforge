@@ -5,10 +5,47 @@
  * and file operations for .rpy file synchronization.
  */
 
-import { getDb } from '../db/index.js';
-import { gitlabIntegrations, gitlabRepositories, projects } from '../db/schema/index.js';
-import { eq, and } from 'drizzle-orm';
-import { validateAndGetUsername, encryptPAT, decryptPAT } from './encryption.service.js';
+import { getDb } from "../db/index.js";
+import {
+  gitlabIntegrations,
+  gitlabRepositories,
+  projects,
+} from "../db/schema/index.js";
+import { eq, and } from "drizzle-orm";
+import {
+  validateAndGetUsername,
+  encryptPAT,
+  decryptPAT,
+} from "./encryption.service.js";
+
+const DEFAULT_TIMEOUT_MS = 30000;
+
+/**
+ * Fetch with timeout helper using AbortController
+ * @param url - The URL to fetch
+ * @param options - Fetch options
+ * @param timeoutMs - Timeout in milliseconds (default: 30000)
+ * @returns The fetch response
+ * @throws Error if timeout occurs or fetch fails
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 // GitLab API response types
 export interface GitlabUser {
@@ -45,7 +82,7 @@ export interface GitlabFile {
 export interface GitlabTreeItem {
   name: string;
   path: string;
-  type: 'blob' | 'tree';
+  type: "blob" | "tree";
 }
 
 /**
@@ -56,7 +93,7 @@ export interface GitlabTreeItem {
  */
 export async function validateGitlabPAT(
   token: string,
-  gitlabUrl: string = 'https://gitlab.com'
+  gitlabUrl: string = "https://gitlab.com",
 ): Promise<string | null> {
   return validateAndGetUsername(token, gitlabUrl);
 }
@@ -87,14 +124,14 @@ export async function getGitlabIntegration(userId: string) {
 export async function storeGitlabIntegration(
   userId: string,
   token: string,
-  gitlabUrl: string = 'https://gitlab.com'
+  gitlabUrl: string = "https://gitlab.com",
 ): Promise<void> {
   const db = getDb();
 
   // Validate token and get username
   const username = await validateGitlabPAT(token, gitlabUrl);
   if (!username) {
-    throw new Error('Invalid GitLab token');
+    throw new Error("Invalid GitLab token");
   }
 
   // Encrypt the token
@@ -127,7 +164,9 @@ export async function storeGitlabIntegration(
  */
 export async function deleteGitlabIntegration(userId: string): Promise<void> {
   const db = getDb();
-  await db.delete(gitlabIntegrations).where(eq(gitlabIntegrations.userId, userId));
+  await db
+    .delete(gitlabIntegrations)
+    .where(eq(gitlabIntegrations.userId, userId));
 }
 
 /**
@@ -139,36 +178,21 @@ export async function deleteGitlabIntegration(userId: string): Promise<void> {
 async function getDecryptedToken(userId: string): Promise<string> {
   const integration = await getGitlabIntegration(userId);
   if (!integration) {
-    throw new Error('GitLab integration not found');
+    throw new Error("GitLab integration not found");
   }
   return decryptPAT(integration.encryptedToken);
 }
 
-/**
- * Get GitLab URL for a user
- * @param userId - The user ID
- * @returns The GitLab URL or null
- * @throws Error if integration not found
- */
-async function getGitlabUrl(userId: string): Promise<string> {
+export async function listGitlabProjects(userId: string, gitlabUrl?: string): Promise<GitlabProject[]> {
   const integration = await getGitlabIntegration(userId);
   if (!integration) {
-    throw new Error('GitLab integration not found');
+    throw new Error("GitLab integration not found");
   }
-  return integration.gitlabUrl || 'https://gitlab.com';
-}
 
-/**
- * List a user's GitLab projects
- * @param userId - The user ID
- * @param gitlabUrl - Optional GitLab URL override
- * @returns Array of GitLab projects
- */
-export async function listGitlabProjects(userId: string, gitlabUrl?: string): Promise<GitlabProject[]> {
-  const token = await getDecryptedToken(userId);
-  const url = gitlabUrl || (await getGitlabUrl(userId));
+  const token = decryptPAT(integration.encryptedToken);
+  const url = gitlabUrl || integration.gitlabUrl;
 
-  const projects: GitlabProject[] = [];
+  const gitlabProjects: GitlabProject[] = [];
   let page = 1;
   const perPage = 100;
 
@@ -178,18 +202,21 @@ export async function listGitlabProjects(userId: string, gitlabUrl?: string): Pr
     apiUrl.searchParams.set('per_page', perPage.toString());
     apiUrl.searchParams.set('page', page.toString());
 
-    const response = await fetch(apiUrl.toString(), {
-      headers: {
-        'PRIVATE-TOKEN': token,
-      },
-    });
+    const response = await fetchWithTimeout(
+      apiUrl.toString(),
+      {
+        headers: {
+          'PRIVATE-TOKEN': token,
+        },
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`GitLab API error: ${response.status}`);
     }
 
     const pageProjects: GitlabProject[] = await response.json();
-    projects.push(...pageProjects);
+    gitlabProjects.push(...pageProjects);
 
     // Check pagination headers
     const totalPages = response.headers.get('x-total-pages');
@@ -200,7 +227,7 @@ export async function listGitlabProjects(userId: string, gitlabUrl?: string): Pr
     }
   } while (true);
 
-  return projects;
+  return gitlabProjects;
 }
 
 /**
@@ -214,7 +241,7 @@ export async function linkRepository(
   projectId: string,
   gitlabProjectId: number,
   repositoryName: string,
-  defaultBranch: string = 'main'
+  defaultBranch: string = "main",
 ): Promise<void> {
   const db = getDb();
   await db.insert(gitlabRepositories).values({
@@ -231,7 +258,9 @@ export async function linkRepository(
  */
 export async function unlinkRepository(projectId: string): Promise<void> {
   const db = getDb();
-  await db.delete(gitlabRepositories).where(eq(gitlabRepositories.projectId, projectId));
+  await db
+    .delete(gitlabRepositories)
+    .where(eq(gitlabRepositories.projectId, projectId));
 }
 
 /**
@@ -256,10 +285,13 @@ export async function getRepositoryLink(projectId: string) {
  * @param gitlabUrl - Optional GitLab URL override
  * @returns Array of branch names
  */
-export async function listBranches(projectId: string, gitlabUrl?: string): Promise<string[]> {
+export async function listBranches(
+  projectId: string,
+  gitlabUrl?: string,
+): Promise<string[]> {
   const repoLink = await getRepositoryLink(projectId);
   if (!repoLink) {
-    throw new Error('GitLab repository not linked');
+    throw new Error("GitLab repository not linked");
   }
 
   // Get user ID from project to fetch integration
@@ -271,17 +303,20 @@ export async function listBranches(projectId: string, gitlabUrl?: string): Promi
     .limit(1);
 
   if (projectResult.length === 0) {
-    throw new Error('Project not found');
+    throw new Error("Project not found");
   }
 
   const token = await getDecryptedToken(projectResult[0].userId);
-  const url = gitlabUrl || repoLink.gitlabUrl || 'https://gitlab.com';
+  const url = gitlabUrl || repoLink.gitlabUrl || "https://gitlab.com";
 
-  const apiUrl = new URL(`/api/v4/projects/${repoLink.gitlabProjectId}/repository/branches`, url);
+  const apiUrl = new URL(
+    `/api/v4/projects/${repoLink.gitlabProjectId}/repository/branches`,
+    url,
+  );
 
-  const response = await fetch(apiUrl.toString(), {
+  const response = await fetchWithTimeout(apiUrl.toString(), {
     headers: {
-      'PRIVATE-TOKEN': token,
+      "PRIVATE-TOKEN": token,
     },
   });
 
@@ -290,7 +325,7 @@ export async function listBranches(projectId: string, gitlabUrl?: string): Promi
   }
 
   const branches: GitlabBranch[] = await response.json();
-  return branches.map(b => b.name);
+  return branches.map((b) => b.name);
 }
 
 /**
@@ -303,11 +338,11 @@ export async function listBranches(projectId: string, gitlabUrl?: string): Promi
 export async function listRpyFiles(
   projectId: string,
   branch: string,
-  gitlabUrl?: string
+  gitlabUrl?: string,
 ): Promise<Array<{ name: string; path: string }>> {
   const repoLink = await getRepositoryLink(projectId);
   if (!repoLink) {
-    throw new Error('GitLab repository not linked');
+    throw new Error("GitLab repository not linked");
   }
 
   // Get user ID from project
@@ -319,26 +354,29 @@ export async function listRpyFiles(
     .limit(1);
 
   if (projectResult.length === 0) {
-    throw new Error('Project not found');
+    throw new Error("Project not found");
   }
 
   const token = await getDecryptedToken(projectResult[0].userId);
-  const url = gitlabUrl || repoLink.gitlabUrl || 'https://gitlab.com';
+  const url = gitlabUrl || repoLink.gitlabUrl || "https://gitlab.com";
 
   const rpyFiles: Array<{ name: string; path: string }> = [];
   let page = 1;
   const perPage = 100;
 
   do {
-    const apiUrl = new URL(`/api/v4/projects/${repoLink.gitlabProjectId}/repository/tree`, url);
-    apiUrl.searchParams.set('ref', branch);
-    apiUrl.searchParams.set('recursive', 'true');
-    apiUrl.searchParams.set('per_page', perPage.toString());
-    apiUrl.searchParams.set('page', page.toString());
+    const apiUrl = new URL(
+      `/api/v4/projects/${repoLink.gitlabProjectId}/repository/tree`,
+      url,
+    );
+    apiUrl.searchParams.set("ref", branch);
+    apiUrl.searchParams.set("recursive", "true");
+    apiUrl.searchParams.set("per_page", perPage.toString());
+    apiUrl.searchParams.set("page", page.toString());
 
-    const response = await fetch(apiUrl.toString(), {
+    const response = await fetchWithTimeout(apiUrl.toString(), {
       headers: {
-        'PRIVATE-TOKEN': token,
+        "PRIVATE-TOKEN": token,
       },
     });
 
@@ -350,13 +388,13 @@ export async function listRpyFiles(
 
     // Filter for .rpy files (blobs, not trees)
     for (const item of items) {
-      if (item.type === 'blob' && item.name.endsWith('.rpy')) {
+      if (item.type === "blob" && item.name.endsWith(".rpy")) {
         rpyFiles.push({ name: item.name, path: item.path });
       }
     }
 
     // Check pagination
-    const totalPages = response.headers.get('x-total-pages');
+    const totalPages = response.headers.get("x-total-pages");
     if (totalPages && parseInt(totalPages) > page) {
       page++;
     } else {
@@ -379,11 +417,11 @@ export async function getFileContent(
   projectId: string,
   filePath: string,
   branch: string,
-  gitlabUrl?: string
+  gitlabUrl?: string,
 ): Promise<string | null> {
   const repoLink = await getRepositoryLink(projectId);
   if (!repoLink) {
-    throw new Error('GitLab repository not linked');
+    throw new Error("GitLab repository not linked");
   }
 
   // Get user ID from project
@@ -395,18 +433,21 @@ export async function getFileContent(
     .limit(1);
 
   if (projectResult.length === 0) {
-    throw new Error('Project not found');
+    throw new Error("Project not found");
   }
 
   const token = await getDecryptedToken(projectResult[0].userId);
-  const url = gitlabUrl || repoLink.gitlabUrl || 'https://gitlab.com';
+  const url = gitlabUrl || repoLink.gitlabUrl || "https://gitlab.com";
 
-  const apiUrl = new URL(`/api/v4/projects/${repoLink.gitlabProjectId}/repository/files/${encodeURIComponent(filePath)}`, url);
-  apiUrl.searchParams.set('ref', branch);
+  const apiUrl = new URL(
+    `/api/v4/projects/${repoLink.gitlabProjectId}/repository/files/${encodeURIComponent(filePath)}`,
+    url,
+  );
+  apiUrl.searchParams.set("ref", branch);
 
-  const response = await fetch(apiUrl.toString(), {
+  const response = await fetchWithTimeout(apiUrl.toString(), {
     headers: {
-      'PRIVATE-TOKEN': token,
+      "PRIVATE-TOKEN": token,
     },
   });
 
@@ -421,7 +462,7 @@ export async function getFileContent(
   const fileData: GitlabFile = await response.json();
 
   // GitLab returns base64-encoded content
-  return Buffer.from(fileData.content, 'base64').toString('utf-8');
+  return Buffer.from(fileData.content, "base64").toString("utf-8");
 }
 
 /**
@@ -440,11 +481,11 @@ export async function createOrUpdateFile(
   filePath: string,
   content: string,
   commitMessage: string,
-  gitlabUrl?: string
+  gitlabUrl?: string,
 ): Promise<{ file_path: string; branch: string }> {
   const repoLink = await getRepositoryLink(projectId);
   if (!repoLink) {
-    throw new Error('GitLab repository not linked');
+    throw new Error("GitLab repository not linked");
   }
 
   // Get user ID from project
@@ -456,28 +497,46 @@ export async function createOrUpdateFile(
     .limit(1);
 
   if (projectResult.length === 0) {
-    throw new Error('Project not found');
+    throw new Error("Project not found");
   }
 
   const token = await getDecryptedToken(projectResult[0].userId);
-  const url = gitlabUrl || repoLink.gitlabUrl || 'https://gitlab.com';
+  const url = gitlabUrl || repoLink.gitlabUrl || "https://gitlab.com";
 
-  const apiUrl = new URL(`/api/v4/projects/${repoLink.gitlabProjectId}/repository/files/${encodeURIComponent(filePath)}`, url);
+  const apiUrl = new URL(
+    `/api/v4/projects/${repoLink.gitlabProjectId}/repository/files/${encodeURIComponent(filePath)}`,
+    url,
+  );
+  apiUrl.searchParams.set("ref", branch);
+
+  // Check if file exists first
+  const checkResponse = await fetchWithTimeout(apiUrl.toString(), {
+    headers: {
+      "PRIVATE-TOKEN": token,
+    },
+  });
+
+  const fileExists = checkResponse.ok;
+
+  // Clear the ref parameter for the create/update request
+  apiUrl.searchParams.delete("ref");
 
   // Encode content as base64
-  const base64Content = Buffer.from(content).toString('base64');
+  const base64Content = Buffer.from(content).toString("base64");
 
-  const response = await fetch(apiUrl.toString(), {
-    method: 'PUT',
+  const method = fileExists ? "PUT" : "POST";
+
+  const response = await fetchWithTimeout(apiUrl.toString(), {
+    method,
     headers: {
-      'PRIVATE-TOKEN': token,
-      'Content-Type': 'application/json',
+      "PRIVATE-TOKEN": token,
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
       branch,
       content: base64Content,
       commit_message: commitMessage,
-      encoding: 'base64',
+      encoding: "base64",
     }),
   });
 
@@ -488,3 +547,4 @@ export async function createOrUpdateFile(
 
   return await response.json();
 }
+
