@@ -5,15 +5,15 @@
  * Handles PAT input, validation, and linked projects management.
  */
 
-import { useState, useCallback, useEffect } from 'react';
-import { Eye, EyeOff, Trash2, Link as LinkIcon, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useGitLab } from '@/contexts/GitLabContext';
-import { useToast } from '@/contexts/ToastContext';
-import { GitLabProjectDialog } from '@/components/ide-shared/GitLabProjectDialog';
-import { cn } from '@/lib/utils';
+import { useState, useCallback, useEffect } from "react";
+import { Eye, EyeOff, Trash2, Link as LinkIcon, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useGitLab } from "@/contexts/GitLabContext";
+import { useToast } from "@/contexts/ToastContext";
+import { GitLabProjectDialog } from "@/components/ide-shared/GitLabProjectDialog";
+import { cn } from "@/lib/utils";
 
 // ============================================================================
 // Types
@@ -46,16 +46,21 @@ export function GitLabSettingsContent() {
   const { success, error } = useToast();
 
   // Form state
-  const [token, setToken] = useState('');
-  const [gitlabUrl, setGitlabUrl] = useState('https://gitlab.com');
+  const [token, setToken] = useState("");
+  const [gitlabUrl, setGitlabUrl] = useState("https://gitlab.com");
   const [showToken, setShowToken] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [isStoring, setIsStoring] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
-  const [validationResult, setValidationResult] = useState<{ valid: boolean; username?: string } | null>(null);
+  const [validationResult, setValidationResult] = useState<{
+    valid: boolean;
+    username?: string;
+  } | null>(null);
 
   // Linked projects display state
-  const [linkedProjects, setLinkedProjects] = useState<LinkedProjectDisplay[]>([]);
+  const [linkedProjects, setLinkedProjects] = useState<LinkedProjectDisplay[]>(
+    [],
+  );
 
   // Dialog state
   const [showLinkDialog, setShowLinkDialog] = useState(false);
@@ -65,7 +70,7 @@ export function GitLabSettingsContent() {
    */
   const handleValidate = useCallback(async () => {
     if (!token.trim()) {
-      error('Token is required');
+      error("Token is required");
       return;
     }
 
@@ -76,12 +81,14 @@ export function GitLabSettingsContent() {
       const result = await validateToken(token, gitlabUrl);
       setValidationResult(result);
       if (result.valid) {
-        success(`Token validated successfully for ${result.username || 'user'}`);
+        success(
+          `Token validated successfully for ${result.username || "user"}`,
+        );
       } else {
-        error('Invalid GitLab token');
+        error("Invalid GitLab token");
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Validation failed';
+      const message = err instanceof Error ? err.message : "Validation failed";
       error(message);
       setValidationResult({ valid: false });
     } finally {
@@ -94,12 +101,12 @@ export function GitLabSettingsContent() {
    */
   const handleStore = useCallback(async () => {
     if (!token.trim()) {
-      error('Token is required');
+      error("Token is required");
       return;
     }
 
     if (validationResult?.valid !== true) {
-      error('Please validate the token first');
+      error("Please validate the token first");
       return;
     }
 
@@ -107,24 +114,37 @@ export function GitLabSettingsContent() {
 
     try {
       await storeToken(token, gitlabUrl);
-      success('GitLab integration saved successfully');
-      setToken('');
-      setGitlabUrl('https://gitlab.com');
+      success("GitLab integration saved successfully");
+      setToken("");
+      setGitlabUrl("https://gitlab.com");
       setValidationResult(null);
       await refreshIntegration();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to store token';
+      const message =
+        err instanceof Error ? err.message : "Failed to store token";
       error(message);
     } finally {
       setIsStoring(false);
     }
-  }, [token, gitlabUrl, validationResult, storeToken, refreshIntegration, success, error]);
+  }, [
+    token,
+    gitlabUrl,
+    validationResult,
+    storeToken,
+    refreshIntegration,
+    success,
+    error,
+  ]);
 
   /**
    * Remove integration
    */
   const handleRemove = useCallback(async () => {
-    if (!confirm('Are you sure you want to remove your GitLab integration? This will unlink all repositories.')) {
+    if (
+      !confirm(
+        "Are you sure you want to remove your GitLab integration? This will unlink all repositories.",
+      )
+    ) {
       return;
     }
 
@@ -132,10 +152,11 @@ export function GitLabSettingsContent() {
 
     try {
       await removeIntegration();
-      success('GitLab integration removed');
+      success("GitLab integration removed");
       await refreshIntegration();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to remove integration';
+      const message =
+        err instanceof Error ? err.message : "Failed to remove integration";
       error(message);
     } finally {
       setIsRemoving(false);
@@ -148,7 +169,9 @@ export function GitLabSettingsContent() {
   const loadLinkedProjects = useCallback(async () => {
     // This will be implemented once we have the backend API to fetch linked projects
     // For now, use the linkedRepositories from context
-    const projects: LinkedProjectDisplay[] = Array.from(linkedRepositories.values()).map(repo => ({
+    const projects: LinkedProjectDisplay[] = Array.from(
+      linkedRepositories.values(),
+    ).map((repo) => ({
       id: repo.id,
       name: `Project ${repo.projectId.substring(0, 8)}`,
       gitlabRepository: repo.repositoryName,
@@ -170,7 +193,8 @@ export function GitLabSettingsContent() {
       <div>
         <h3 className="text-lg font-medium">GitLab Integration</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Connect your GitLab account to enable repository linking and sync operations.
+          Connect your GitLab account to enable repository linking and sync
+          operations.
         </p>
       </div>
 
@@ -225,7 +249,7 @@ export function GitLabSettingsContent() {
                     size="sm"
                     onClick={() => {
                       // TODO: Implement unlink
-                      error('Unlink functionality coming soon');
+                      error("Unlink functionality coming soon");
                     }}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -271,7 +295,8 @@ export function GitLabSettingsContent() {
               disabled={isStoring}
             />
             <p className="text-xs text-muted-foreground">
-              Leave as default for gitlab.com, or enter your self-hosted instance URL.
+              Leave as default for gitlab.com, or enter your self-hosted
+              instance URL.
             </p>
           </div>
 
@@ -280,7 +305,7 @@ export function GitLabSettingsContent() {
             <div className="relative">
               <Input
                 id="token"
-                type={showToken ? 'text' : 'password'}
+                type={showToken ? "text" : "password"}
                 placeholder="glpat-xxxxxxxxxxxxxxxxxxxx"
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
@@ -292,26 +317,40 @@ export function GitLabSettingsContent() {
                 onClick={() => setShowToken(!showToken)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
               >
-                {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showToken ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
               </button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Create a token in GitLab with <code className="bg-muted px-1 py-0.5 rounded">read_api</code>,{' '}
-              <code className="bg-muted px-1 py-0.5 rounded">read_repository</code>, and{' '}
-              <code className="bg-muted px-1 py-0.5 rounded">write_repository</code> scopes.
+              Create a token in GitLab with{" "}
+              <code className="bg-muted px-1 py-0.5 rounded">read_api</code>,{" "}
+              <code className="bg-muted px-1 py-0.5 rounded">
+                read_repository
+              </code>
+              , and{" "}
+              <code className="bg-muted px-1 py-0.5 rounded">
+                write_repository
+              </code>{" "}
+              scopes. Will be stored securely and only used to access your
+              repositories.
             </p>
           </div>
 
           {validationResult && (
-            <div className={cn(
-              "p-3 rounded-md border text-sm",
-              validationResult.valid
-                ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200"
-                : "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200"
-            )}>
+            <div
+              className={cn(
+                "p-3 rounded-md border text-sm",
+                validationResult.valid
+                  ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200"
+                  : "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200",
+              )}
+            >
               {validationResult.valid
-                ? `Validated for ${validationResult.username || 'user'}`
-                : 'Invalid token'}
+                ? `Validated for ${validationResult.username || "user"}`
+                : "Invalid token"}
             </div>
           )}
 
@@ -335,7 +374,12 @@ export function GitLabSettingsContent() {
             </Button>
             <Button
               onClick={handleStore}
-              disabled={!token.trim() || validationResult?.valid !== true || isStoring || isValidating}
+              disabled={
+                !token.trim() ||
+                validationResult?.valid !== true ||
+                isStoring ||
+                isValidating
+              }
               className="flex-1"
             >
               {isStoring ? (
@@ -356,3 +400,4 @@ export function GitLabSettingsContent() {
     </div>
   );
 }
+

@@ -343,9 +343,23 @@ async function listProjectsHandler(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
-  const userId = getAuthenticatedUserId(request);
-  const projects = await listGitlabProjects(userId);
-  reply.send(projects);
+  try {
+    const userId = getAuthenticatedUserId(request);
+    const projects = await listGitlabProjects(userId);
+    reply.send(projects);
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      err.message === "GitLab integration not found"
+    ) {
+      reply.status(404).send({ error: "GitLab integration not found" });
+    } else {
+      reply.status(500).send({
+        error: "Failed to list GitLab projects",
+        details: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
+  }
 }
 
 /**
