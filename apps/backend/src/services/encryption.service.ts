@@ -12,6 +12,7 @@
  */
 
 import crypto from 'node:crypto';
+import ipaddr from 'ipaddr.js';
 
 // GitLab PAT format: glpat- followed by alphanumeric characters and hyphens
 const GITLAB_PAT_REGEX = /^glpat-[a-zA-Z0-9-]+$/;
@@ -25,69 +26,51 @@ const ALLOWED_GITLAB_HOSTS = new Set([
   ...(process.env.ALLOWED_GITLAB_HOSTS?.split(',').map(h => h.trim().toLowerCase()) || []),
 ]);
 
-// Private/internal IP ranges (in CIDR notation)
-const PRIVATE_IP_RANGES = [
-  { start: '127.0.0.0', end: '127.255.255.255' },    // Loopback
-  { start: '10.0.0.0', end: '10.255.255.255' },      // Private Class A
-  { start: '172.16.0.0', end: '172.31.255.255' },    // Private Class B
-  { start: '192.168.0.0', end: '192.168.255.255' },  // Private Class C
-  { start: '169.254.0.0', end: '169.254.255.255' },  // Link-local
-  { start: '::1', end: '::1' },                      // IPv6 loopback
-  { start: 'fc00::', end: 'fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff' }, // IPv6 private
-  { start: 'fe80::', end: 'fe:ffff:ffff:ffff:ffff:ffff:ffff:ffff' }, // IPv6 link-local
-];
-
 /**
- * Check if an IP address is within a private/internal range
+ * Check if an IP address is within a private/internal range using ipaddr.js
+ * Handles both IPv4 and IPv6, including IPv4-mapped IPv6 addresses
  */
 function isPrivateIP(ip: string): boolean {
-  // Check IPv4
-  const ipv4Match = ip.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
-  if (ipv4Match) {
-    const ipNum =
-      (parseInt(ipv4Match[1]) << 24) +
-      (parseInt(ipv4Match[2]) << 16) +
-      (parseInt(ipv4Match[3]) << 8) +
-      parseInt(ipv4Match[4]);
+  try {
+    const addr = ipaddr.parse(ip);
+    let range = addr.range();
 
-    for (const range of PRIVATE_IP_RANGES) {
-      if (range.start.includes('.')) {
-        const startParts = range.start.split('.').map(Number);
-        const endParts = range.end.split('.').map(Number);
-        const startNum =
-          (startParts[0] << 24) + (startParts[1] << 16) + (startParts[2] << 8) + startParts[3];
-        const endNum =
-          (endParts[0] << 24) + (endParts[1] << 16) + (endParts[2] << 8) + endParts[3];
-        if (ipNum >= startNum && ipNum <= endNum) {
-          return true;
-        }
-      }
+    // Handle IPv4-mapped IPv6 addresses (::ffff:x.x.x.x)
+    // These need to be converted to IPv4 and checked
+    if (range === 'ipv4Mapped' && addr instanceof ipaddr.IPv6) {
+      const ipv4 = addr.toIPv4Address();
+      range = ipv4.range();
     }
+
+    // Check for private/reserved ranges
+    return (
+      range === 'loopback' ||
+      range === 'private' ||
+      range === 'linkLocal' ||
+      range === 'reserved' ||
+      range === 'broadcast' ||
+      range === 'carrierGradeNat'
+    );
+  } catch {
+    // Not a valid IP address
     return false;
   }
-
-  // For IPv6, check if it matches known private ranges
-  if (ip.includes(':')) {
-    const normalizedIp = ip.toLowerCase();
-    return (
-      normalizedIp === '::1' ||
-      normalizedIp.startsWith('fc') ||
-      normalizedIp.startsWith('fd') ||
-      normalizedIp.startsWith('fe80') ||
-      normalizedIp.startsWith('fe')
-    );
-  }
-
-  return false;
 }
 
 /**
  * Check if a hostname is an IP address and whether it's private/internal
+ * Handles IPv4 and IPv6 (including bracketed format like [::1])
  */
 function isPrivateOrLocalHostname(hostname: string): boolean {
-  // Check for literal IP addresses
-  const ipv4Match = hostname.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
-  if (ipv4Match) {
+  // Check for IPv6 addresses in URL format (bracketed)
+  // URL.hostname returns [::1] for IPv6 addresses
+  const ipv6InBrackets = hostname.match(/^\[([:0-9a-fA-F]+)\]$/);
+  if (ipv6InBrackets) {
+    return isPrivateIP(ipv6InBrackets[1]);
+  }
+
+  // Check for literal IP addresses (both IPv4 and unbracketed IPv6)
+  if (ipaddr.isValid(hostname)) {
     return isPrivateIP(hostname);
   }
 

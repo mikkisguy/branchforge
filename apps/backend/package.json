@@ -25,6 +25,7 @@
     "bcrypt": "6.0.0",
     "drizzle-orm": "^0.45.0",
     "fastify": "^5.0.0",
+    "ipaddr.js": "^2.3.0",
     "pg": "^8.13.0"
   },
   "devDependencies": {
@@ -41,4 +42,3 @@
     "vitest": "^4.0.0"
   }
 }
-

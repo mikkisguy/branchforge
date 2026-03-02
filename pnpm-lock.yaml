@@ -47,13 +47,13 @@ importers:
       fastify:
         specifier: ^5.0.0
         version: 5.7.4
+      ipaddr.js:
+        specifier: ^2.3.0
+        version: 2.3.0
       pg:
         specifier: ^8.13.0
         version: 8.19.0
     devDependencies:
-      '@types/nock':
-        specifier: ^11.1.0
-        version: 11.1.0
       '@types/node':
         specifier: ^22.10.0
         version: 22.19.13
@@ -1135,10 +1135,6 @@ packages:
 
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
-
-  '@types/nock@11.1.0':
-    resolution: {integrity: sha512-jI/ewavBQ7X5178262JQR0ewicPAcJhXS/iFaNJl0VHLfyosZ/kwSrsa6VNQNSO8i9d8SqdRgOtZSOKJ/+iNMw==}
-    deprecated: This is a stub types definition. nock provides its own type definitions, so you do not need this installed.
 
   '@types/node@12.20.55':
     resolution: {integrity: sha512-J8xLz7q2OFulZ2cyGTLE1TbbZcjpno7FaN6zdJNrgAdrJ+DZzh/uFR6YrTb4C+nXakvud8Q4+rbhoIWlYQbUFQ==}
@@ -3832,10 +3828,6 @@ snapshots:
   '@types/deep-eql@4.0.2': {}
 
   '@types/estree@1.0.8': {}
-
-  '@types/nock@11.1.0':
-    dependencies:
-      nock: 14.0.11
 
   '@types/node@12.20.55': {}
 
