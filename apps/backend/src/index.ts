@@ -5,6 +5,7 @@ import session from '@fastify/session';
 import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { adminSettingsRoutes } from './routes/admin-settings.routes.js';
+import { gitlabRoutes } from './routes/gitlab.routes.js';
 import { createDrizzleSessionStore } from './services/session-store.service.js';
 
 const server = Fastify({
@@ -46,6 +47,7 @@ const basePath = process.env.BASE_PATH ?? (process.env.NODE_ENV === 'production'
 await server.register(healthRoutes, { prefix: basePath });
 await server.register(authRoutes, { prefix: basePath });
 await server.register(adminSettingsRoutes, { prefix: basePath });
+await server.register(gitlabRoutes, { prefix: basePath });
 
 // Start server
 const start = async () => {
