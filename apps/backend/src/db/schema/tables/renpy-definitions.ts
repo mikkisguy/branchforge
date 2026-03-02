@@ -19,9 +19,9 @@ export const renpyDefinitions = pgTable('renpy_definitions', {
   referenceTag: text('reference_tag'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-}, (table) => ({
-  projectIdIdx: index('renpy_definitions_project_id_idx').on(table.projectId),
-}));
+}, (table) => [
+  index('renpy_definitions_project_id_idx').on(table.projectId),
+]);
 
 // Types
 export type RenpyDefinition = typeof renpyDefinitions.$inferSelect;

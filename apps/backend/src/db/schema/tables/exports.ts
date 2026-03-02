@@ -16,9 +16,9 @@ export const exportsTable = pgTable('exports', {
   fileSize: integer('file_size'),
   visualSystemSnapshot: jsonb('visual_system_snapshot'), // Version of pattern used
   createdAt: timestamp('created_at').defaultNow().notNull(),
-}, (table) => ({
-  projectIdIdx: index('exports_project_id_idx').on(table.projectId),
-}));
+}, (table) => [
+  index('exports_project_id_idx').on(table.projectId),
+]);
 
 // Types
 export type Export = typeof exportsTable.$inferSelect;

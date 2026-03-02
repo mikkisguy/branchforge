@@ -15,9 +15,9 @@ export const adminSettings = pgTable('admin_settings', {
   description: text('description'),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
   updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
-}, (table) => ({
-  keyIdx: index('admin_settings_key_idx').on(table.key),
-}));
+}, (table) => [
+  index('admin_settings_key_idx').on(table.key),
+]);
 
 // Types
 export type AdminSetting = typeof adminSettings.$inferSelect;

@@ -23,9 +23,9 @@ export const visualSystems = pgTable('visual_systems', {
   placeholderBaseUrl: text('placeholder_base_url'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-}, (table) => ({
-  projectIdIdx: index('visual_systems_project_id_idx').on(table.projectId),
-}));
+}, (table) => [
+  index('visual_systems_project_id_idx').on(table.projectId),
+]);
 
 // Types
 export type VisualSystem = typeof visualSystems.$inferSelect;

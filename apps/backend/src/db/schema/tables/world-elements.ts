@@ -16,9 +16,9 @@ export const worldElements = pgTable('world_elements', {
   description: text('description'),
   tags: jsonb('tags').notNull().$type<string[]>().default([]),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-}, (table) => ({
-  projectIdIdx: index('world_elements_project_id_idx').on(table.projectId),
-}));
+}, (table) => [
+  index('world_elements_project_id_idx').on(table.projectId),
+]);
 
 // Types
 export type WorldElement = typeof worldElements.$inferSelect;

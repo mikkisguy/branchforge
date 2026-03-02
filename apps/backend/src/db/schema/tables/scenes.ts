@@ -27,10 +27,10 @@ export const scenes = pgTable('scenes', {
   readerNotes: text('reader_notes'), // Beta feedback
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-}, (table) => ({
-  projectIdIdx: index('scenes_project_id_idx').on(table.projectId),
-  duoPairIdIdx: index('scenes_duo_pair_id_idx').on(table.duoPairId),
-}));
+}, (table) => [
+  index('scenes_project_id_idx').on(table.projectId),
+  index('scenes_duo_pair_id_idx').on(table.duoPairId),
+]);
 
 // Types
 export type Scene = typeof scenes.$inferSelect;

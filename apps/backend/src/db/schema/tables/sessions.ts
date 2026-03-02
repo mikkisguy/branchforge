@@ -25,10 +25,10 @@ export const userSessions = pgTable('user_sessions', {
   // Timestamps
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-}, (table) => ({
-  userIdIdx: index('user_sessions_user_id_idx').on(table.userId),
-  expiresAtIdx: index('user_sessions_expires_at_idx').on(table.expiresAt),
-}));
+}, (table) => [
+  index('user_sessions_user_id_idx').on(table.userId),
+  index('user_sessions_expires_at_idx').on(table.expiresAt),
+]);
 
 // Types
 export type Session = typeof userSessions.$inferSelect;

@@ -16,9 +16,9 @@ export const importLogs = pgTable('import_logs', {
   scenesSkipped: integer('scenes_skipped').notNull().default(0), // Duplicates/conflicts
   errors: jsonb('errors').$type<Array<{ message: string; line?: number }>>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-}, (table) => ({
-  projectIdIdx: index('import_logs_project_id_idx').on(table.projectId),
-}));
+}, (table) => [
+  index('import_logs_project_id_idx').on(table.projectId),
+]);
 
 // Types
 export type ImportLog = typeof importLogs.$inferSelect;

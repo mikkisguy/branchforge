@@ -15,9 +15,9 @@ export const sceneCharacters = pgTable('scene_characters', {
   role: characterRoleEnum('role').default('PRIMARY').notNull(),
   emotion: text('emotion'),
   notes: text('notes'),
-}, (table) => ({
-  pk: index('scene_characters_pk').on(table.sceneId, table.characterId),
-}));
+}, (table) => [
+  index('scene_characters_pk').on(table.sceneId, table.characterId),
+]);
 
 // Types
 export type SceneCharacter = typeof sceneCharacters.$inferSelect;

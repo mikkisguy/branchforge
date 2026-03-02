@@ -15,6 +15,13 @@
       "when": 1772403842274,
       "tag": "0001_young_tenebrous",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772479056979,
+      "tag": "0002_wandering_magik",
+      "breakpoints": true
     }
   ]
 }

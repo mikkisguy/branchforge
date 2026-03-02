@@ -14,9 +14,9 @@ export const flags = pgTable('flags', {
   description: text('description'),
   category: text('category'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-}, (table) => ({
-  projectIdIdx: index('flags_project_id_idx').on(table.projectId),
-}));
+}, (table) => [
+  index('flags_project_id_idx').on(table.projectId),
+]);
 
 // Types
 export type Flag = typeof flags.$inferSelect;

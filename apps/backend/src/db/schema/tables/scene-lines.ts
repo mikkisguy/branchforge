@@ -25,10 +25,10 @@ export const sceneLines = pgTable('scene_lines', {
   demoNotes: text('demo_notes'), // "Character enters from left"
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-}, (table) => ({
-  sceneIdIdx: index('scene_lines_scene_id_idx').on(table.sceneId),
-  speakerIdIdx: index('scene_lines_speaker_id_idx').on(table.speakerId),
-}));
+}, (table) => [
+  index('scene_lines_scene_id_idx').on(table.sceneId),
+  index('scene_lines_speaker_id_idx').on(table.speakerId),
+]);
 
 // Types
 export type SceneLine = typeof sceneLines.$inferSelect;

@@ -19,10 +19,10 @@ export const meters = pgTable('meters', {
   description: text('description'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-}, (table) => ({
-  projectIdIdx: index('meters_project_id_idx').on(table.projectId),
-  characterIdIdx: index('meters_character_id_idx').on(table.characterId),
-}));
+}, (table) => [
+  index('meters_project_id_idx').on(table.projectId),
+  index('meters_character_id_idx').on(table.characterId),
+]);
 
 // Types
 export type Meter = typeof meters.$inferSelect;

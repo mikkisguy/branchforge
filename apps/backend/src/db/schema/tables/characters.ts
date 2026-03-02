@@ -21,10 +21,10 @@ export const characters = pgTable('characters', {
   color: text('color').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-}, (table) => ({
-  projectIdIdx: index('characters_project_id_idx').on(table.projectId),
-  pairGroupIdIdx: index('characters_pair_group_id_idx').on(table.pairGroupId),
-}));
+}, (table) => [
+  index('characters_project_id_idx').on(table.projectId),
+  index('characters_pair_group_id_idx').on(table.pairGroupId),
+]);
 
 // Types
 export type Character = typeof characters.$inferSelect;

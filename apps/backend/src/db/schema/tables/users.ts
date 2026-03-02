@@ -14,9 +14,9 @@ export const users = pgTable('users', {
   role: userRoleEnum('role').default('OWNER'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-}, (table) => ({
-  emailIdx: index('users_email_idx').on(table.email),
-}));
+}, (table) => [
+  index('users_email_idx').on(table.email),
+]);
 
 // Types
 export type User = typeof users.$inferSelect;

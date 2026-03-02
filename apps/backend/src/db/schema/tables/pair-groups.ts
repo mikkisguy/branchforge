@@ -17,11 +17,11 @@ export const pairGroups = pgTable('pair_groups', {
   threshold: integer('threshold').default(70).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-}, (table) => ({
-  projectIdIdx: index('pair_groups_project_id_idx').on(table.projectId),
-  characterAIdIdx: index('pair_groups_character_a_id_idx').on(table.characterAId),
-  characterBIdIdx: index('pair_groups_character_b_id_idx').on(table.characterBId),
-}));
+}, (table) => [
+  index('pair_groups_project_id_idx').on(table.projectId),
+  index('pair_groups_character_a_id_idx').on(table.characterAId),
+  index('pair_groups_character_b_id_idx').on(table.characterBId),
+]);
 
 // Types
 export type PairGroup = typeof pairGroups.$inferSelect;

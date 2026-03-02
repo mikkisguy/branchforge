@@ -22,9 +22,9 @@ export const projects = pgTable('projects', {
   visibility: userRoleEnum('visibility').default('OWNER'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-}, (table) => ({
-  userIdIdx: index('projects_user_id_idx').on(table.userId),
-}));
+}, (table) => [
+  index('projects_user_id_idx').on(table.userId),
+]);
 
 /**
  * Project Users - Junction table for beta reader access control
@@ -34,9 +34,9 @@ export const projectUsers = pgTable('project_users', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   role: userRoleEnum('role').notNull(),
   addedAt: timestamp('added_at').defaultNow().notNull(),
-}, (table) => ({
-  pk: index('project_users_pk').on(table.projectId, table.userId),
-}));
+}, (table) => [
+  index('project_users_pk').on(table.projectId, table.userId),
+]);
 
 // Types
 export type Project = typeof projects.$inferSelect;

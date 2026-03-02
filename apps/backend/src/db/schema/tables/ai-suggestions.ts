@@ -23,11 +23,11 @@ export const aiSuggestions = pgTable('ai_suggestions', {
   status: suggestionStatusEnum('status').default('PENDING'),
   appliedAt: timestamp('applied_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-}, (table) => ({
-  projectIdIdx: index('ai_suggestions_project_id_idx').on(table.projectId),
-  sceneIdIdx: index('ai_suggestions_scene_id_idx').on(table.sceneId),
-  characterIdIdx: index('ai_suggestions_character_id_idx').on(table.characterId),
-}));
+}, (table) => [
+  index('ai_suggestions_project_id_idx').on(table.projectId),
+  index('ai_suggestions_scene_id_idx').on(table.sceneId),
+  index('ai_suggestions_character_id_idx').on(table.characterId),
+]);
 
 // Types
 export type AiSuggestion = typeof aiSuggestions.$inferSelect;

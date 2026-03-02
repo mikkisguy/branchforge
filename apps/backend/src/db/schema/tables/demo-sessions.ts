@@ -19,11 +19,11 @@ export const demoSessions = pgTable('demo_sessions', {
   activeMeters: jsonb('active_meters').notNull().$type<Record<string, number>>().default({}),
   routeTaken: text('route_taken'),
   endedAt: timestamp('ended_at'),
-}, (table) => ({
-  projectIdIdx: index('demo_sessions_project_id_idx').on(table.projectId),
-  userIdIdx: index('demo_sessions_user_id_idx').on(table.userId),
-  currentSceneLineIdIdx: index('demo_sessions_current_scene_line_id_idx').on(table.currentSceneLineId),
-}));
+}, (table) => [
+  index('demo_sessions_project_id_idx').on(table.projectId),
+  index('demo_sessions_user_id_idx').on(table.userId),
+  index('demo_sessions_current_scene_line_id_idx').on(table.currentSceneLineId),
+]);
 
 // Types
 export type DemoSession = typeof demoSessions.$inferSelect;

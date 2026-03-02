@@ -21,9 +21,9 @@ export const gitlabIntegrations = pgTable('gitlab_integrations', {
   username: text('username'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-}, (table) => ({
-  userIdIdx: index('gitlab_integrations_user_id_idx').on(table.userId),
-}));
+}, (table) => [
+  index('gitlab_integrations_user_id_idx').on(table.userId),
+]);
 
 /**
  * GitLab Repositories - Project to GitLab repository mapping
@@ -37,10 +37,10 @@ export const gitlabRepositories = pgTable('gitlab_repositories', {
   defaultBranch: text('default_branch').default('main'),
   lastSyncedAt: timestamp('last_synced_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-}, (table) => ({
-  projectIdIdx: index('gitlab_repositories_project_id_idx').on(table.projectId),
-  gitlabProjectIdIdx: index('gitlab_repositories_gitlab_project_id_idx').on(table.gitlabProjectId),
-}));
+}, (table) => [
+  index('gitlab_repositories_project_id_idx').on(table.projectId),
+  index('gitlab_repositories_gitlab_project_id_idx').on(table.gitlabProjectId),
+]);
 
 /**
  * GitLab Sync Operations - Sync operations tracking
@@ -55,10 +55,10 @@ export const gitlabSyncOperations = pgTable('gitlab_sync_operations', {
   errorMessage: text('error_message'),
   startedAt: timestamp('started_at').defaultNow().notNull(),
   completedAt: timestamp('completed_at'),
-}, (table) => ({
-  projectIdIdx: index('gitlab_sync_operations_project_id_idx').on(table.projectId),
-  statusIdx: index('gitlab_sync_operations_status_idx').on(table.status),
-}));
+}, (table) => [
+  index('gitlab_sync_operations_project_id_idx').on(table.projectId),
+  index('gitlab_sync_operations_status_idx').on(table.status),
+]);
 
 // Types
 export type GitlabIntegration = typeof gitlabIntegrations.$inferSelect;

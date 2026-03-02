@@ -16,10 +16,10 @@ export const userSettings = pgTable('user_settings', {
   theme: text('theme').default('light'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-}, (table) => ({
-  userIdIdx: index('user_settings_user_id_idx').on(table.userId),
-  usernameIdx: index('user_settings_username_idx').on(table.username),
-}));
+}, (table) => [
+  index('user_settings_user_id_idx').on(table.userId),
+  index('user_settings_username_idx').on(table.username),
+]);
 
 // Types
 export type UserSetting = typeof userSettings.$inferSelect;
