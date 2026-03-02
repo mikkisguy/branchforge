@@ -5,29 +5,37 @@
  * Handles conflict detection and resolution for bidirectional sync.
  */
 
-import { getDb } from '../db/index.js';
-import { gitlabSyncOperations, scenes, sceneLines } from '../db/schema/index.js';
-import { eq, and, desc } from 'drizzle-orm';
+import { getDb } from "../db/index.js";
+import {
+  gitlabSyncOperations,
+  scenes,
+  sceneLines,
+  characters,
+} from "../db/schema/index.js";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import {
   listRpyFiles,
   getFileContent,
   createOrUpdateFile,
-} from './gitlab.service.js';
+} from "./gitlab.service.js";
 import {
   generateRpyFile,
   parseRPYFile,
   convertToBranchForgeFormat,
   type BranchForgeScene,
-} from './rpy-parser.service.js';
+} from "./rpy-parser.service.js";
 
 // Type definitions
-export type ConflictResolution = 'branchforge_wins' | 'gitlab_wins' | 'manual_review';
+export type ConflictResolution =
+  | "branchforge_wins"
+  | "gitlab_wins"
+  | "manual_review";
 
 export interface SyncOperation {
   id: string;
   projectId: string;
-  operation: 'export' | 'import';
-  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  operation: "export" | "import";
+  status: "pending" | "in_progress" | "completed" | "failed";
   branch: string | null;
   conflictCount: number;
   errorMessage: string | null;
@@ -37,7 +45,11 @@ export interface SyncOperation {
 
 export interface ConflictInfo {
   label: string;
-  type: 'dialogue_mismatch' | 'new_remote_label' | 'deleted_remote_label' | 'choice_mismatch';
+  type:
+    | "dialogue_mismatch"
+    | "new_remote_label"
+    | "deleted_remote_label"
+    | "choice_mismatch";
   localContent?: any;
   remoteContent?: any;
 }
@@ -53,7 +65,7 @@ export interface ConflictDetectionResult {
  */
 async function createSyncOperation(
   projectId: string,
-  operation: 'export' | 'import',
+  operation: "export" | "import",
   branch: string | null,
 ): Promise<SyncOperation> {
   const db = getDb();
@@ -63,7 +75,7 @@ async function createSyncOperation(
     .values({
       projectId,
       operation,
-      status: 'in_progress',
+      status: "in_progress",
       branch,
       conflictCount: 0,
     })
@@ -85,9 +97,10 @@ async function updateSyncOperation(
     .update(gitlabSyncOperations)
     .set({
       ...updates,
-      completedAt: updates.status === 'completed' || updates.status === 'failed'
-        ? new Date()
-        : undefined,
+      completedAt:
+        updates.status === "completed" || updates.status === "failed"
+          ? new Date()
+          : undefined,
     })
     .where(eq(gitlabSyncOperations.id, operationId));
 }
@@ -102,11 +115,16 @@ export async function exportToGitlab(
   commitMessage?: string,
 ): Promise<SyncOperation> {
   const db = getDb();
-  const targetBranch = branch || 'main';
-  const message = commitMessage || `Export from BranchForge - ${new Date().toISOString()}`;
+  const targetBranch = branch || "main";
+  const message =
+    commitMessage || `Export from BranchForge - ${new Date().toISOString()}`;
 
   // Create sync operation
-  const operation = await createSyncOperation(projectId, 'export', targetBranch);
+  const operation = await createSyncOperation(
+    projectId,
+    "export",
+    targetBranch,
+  );
 
   try {
     // Fetch all scenes for the project
@@ -115,13 +133,28 @@ export async function exportToGitlab(
       .from(scenes)
       .where(eq(scenes.projectId, projectId));
 
+    // Fetch all scene lines in a single query using IN clause
+    const sceneIds = projectScenes.map((s) => s.id);
+    const allSceneLines = await db
+      .select()
+      .from(sceneLines)
+      .where(inArray(sceneLines.sceneId, sceneIds));
+
+    // Group lines by sceneId for efficient lookup
+    const linesBySceneId = new Map<string, typeof allSceneLines>();
+    for (const line of allSceneLines) {
+      const existing = linesBySceneId.get(line.sceneId);
+      if (existing) {
+        existing.push(line);
+      } else {
+        linesBySceneId.set(line.sceneId, [line]);
+      }
+    }
+
     // For each scene, generate RPY content and upload to GitLab
     for (const scene of projectScenes) {
-      // Fetch scene lines
-      const lines = await db
-        .select()
-        .from(sceneLines)
-        .where(eq(sceneLines.sceneId, scene.id));
+      // Get lines from the pre-fetched map
+      const lines = linesBySceneId.get(scene.id) || [];
 
       // Convert to BranchForge scene format
       const branchForgeScene: BranchForgeScene = {
@@ -138,31 +171,38 @@ export async function exportToGitlab(
 
       // Upload to GitLab
       const filePath = `game/${scene.title}.rpy`;
-      await createOrUpdateFile(projectId, targetBranch, filePath, rpyContent, message);
+      await createOrUpdateFile(
+        projectId,
+        targetBranch,
+        filePath,
+        rpyContent,
+        message,
+      );
     }
 
     // Mark operation as completed
     await updateSyncOperation(operation.id, {
-      status: 'completed',
+      status: "completed",
       conflictCount: 0,
     });
 
     return {
       ...operation,
-      status: 'completed',
+      status: "completed",
       conflictCount: 0,
     };
   } catch (error) {
     // Mark operation as failed
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     await updateSyncOperation(operation.id, {
-      status: 'failed',
+      status: "failed",
       errorMessage,
     });
 
     return {
       ...operation,
-      status: 'failed',
+      status: "failed",
       errorMessage,
     };
   }
@@ -180,7 +220,7 @@ export async function importFromGitlab(
   const db = getDb();
 
   // Create sync operation
-  const operation = await createSyncOperation(projectId, 'import', branch);
+  const operation = await createSyncOperation(projectId, "import", branch);
 
   try {
     // List RPY files in the repository
@@ -189,13 +229,13 @@ export async function importFromGitlab(
     if (rpyFiles.length === 0) {
       // No files to import - mark as completed
       await updateSyncOperation(operation.id, {
-        status: 'completed',
+        status: "completed",
         conflictCount: 0,
       });
 
       return {
         ...operation,
-        status: 'completed',
+        status: "completed",
         conflictCount: 0,
       };
     }
@@ -220,90 +260,113 @@ export async function importFromGitlab(
         const existingScenes = await db
           .select()
           .from(scenes)
-          .where(
-            and(
-              eq(scenes.projectId, projectId),
-              eq(scenes.title, label),
-            ),
-          );
+          .where(and(eq(scenes.projectId, projectId), eq(scenes.title, label)));
 
         // Convert to BranchForge format
         const sceneData = convertToBranchForgeFormat(parsed, label);
 
-        if (existingScenes.length > 0 && conflictResolution === 'manual_review') {
+        if (
+          existingScenes.length > 0 &&
+          conflictResolution === "manual_review"
+        ) {
           // Count as conflict for manual review
           conflictCount++;
-        } else if (existingScenes.length > 0 && conflictResolution === 'gitlab_wins') {
-          // Update existing scene
+        } else if (
+          existingScenes.length > 0 &&
+          conflictResolution === "gitlab_wins"
+        ) {
+          // Update existing scene within a transaction
           const existingScene = existingScenes[0];
 
-          // Delete existing scene lines
-          await db
-            .delete(sceneLines)
-            .where(eq(sceneLines.sceneId, existingScene.id));
+          await db.transaction(async (tx) => {
+            // Delete existing scene lines
+            await tx
+              .delete(sceneLines)
+              .where(eq(sceneLines.sceneId, existingScene.id));
 
-          // Insert new scene lines
-          for (const entry of sceneData.entries) {
-            // Map RPY parser types to DB content types
-            let dbContentType: 'NARRATION' | 'DIALOGUE' | 'CHOICE' | 'MENU' | 'JUMP';
-            if (entry.type === 'FLAG') {
-              dbContentType = 'JUMP'; // Map FLAG to JUMP for now
-            } else if (entry.type === 'NARRATION' || entry.type === 'DIALOGUE' || entry.type === 'JUMP') {
-              dbContentType = entry.type;
-            } else {
-              dbContentType = 'NARRATION'; // Default fallback
+            // Insert new scene lines
+            for (const entry of sceneData.entries) {
+              // Map RPY parser types to DB content types
+              let dbContentType:
+                | "NARRATION"
+                | "DIALOGUE"
+                | "CHOICE"
+                | "MENU"
+                | "JUMP";
+              if (entry.type === "FLAG") {
+                dbContentType = "JUMP"; // Map FLAG to JUMP for now
+              } else if (
+                entry.type === "NARRATION" ||
+                entry.type === "DIALOGUE" ||
+                entry.type === "JUMP"
+              ) {
+                dbContentType = entry.type;
+              } else {
+                dbContentType = "NARRATION"; // Default fallback
+              }
+
+              const values: any = {
+                sceneId: existingScene.id,
+                contentType: dbContentType,
+                content: entry.text || null,
+              };
+
+              if (entry.target && dbContentType === "JUMP") {
+                values.content = `jump ${entry.target}`;
+              }
+
+              await tx.insert(sceneLines).values(values);
             }
-
-            const values: any = {
-              sceneId: existingScene.id,
-              contentType: dbContentType,
-              content: entry.text || null,
-            };
-
-            if (entry.target && dbContentType === 'JUMP') {
-              values.content = `jump ${entry.target}`;
-            }
-
-            await db.insert(sceneLines).values(values);
-          }
+          });
         } else if (existingScenes.length === 0) {
-          // Create new scene
-          const [newScene] = await db
-            .insert(scenes)
-            .values({
-              projectId,
-              title: label,
-              route: 'COMMON',
-              sceneNumber: parsed.labels.indexOf(label) + 1,
-              prerequisites: {},
-              effects: {},
-            })
-            .returning();
+          // Create new scene within a transaction
+          await db.transaction(async (tx) => {
+            const [newScene] = await tx
+              .insert(scenes)
+              .values({
+                projectId,
+                title: label,
+                route: "COMMON",
+                sceneNumber: parsed.labels.indexOf(label) + 1,
+                prerequisites: {},
+                effects: {},
+              })
+              .returning();
 
-          // Insert scene lines
-          for (const entry of sceneData.entries) {
-            // Map RPY parser types to DB content types
-            let dbContentType: 'NARRATION' | 'DIALOGUE' | 'CHOICE' | 'MENU' | 'JUMP';
-            if (entry.type === 'FLAG') {
-              dbContentType = 'JUMP'; // Map FLAG to JUMP for now
-            } else if (entry.type === 'NARRATION' || entry.type === 'DIALOGUE' || entry.type === 'JUMP') {
-              dbContentType = entry.type;
-            } else {
-              dbContentType = 'NARRATION'; // Default fallback
+            // Insert scene lines
+            for (const entry of sceneData.entries) {
+              // Map RPY parser types to DB content types
+              let dbContentType:
+                | "NARRATION"
+                | "DIALOGUE"
+                | "CHOICE"
+                | "MENU"
+                | "JUMP";
+              if (entry.type === "FLAG") {
+                dbContentType = "JUMP"; // Map FLAG to JUMP for now
+              } else if (
+                entry.type === "NARRATION" ||
+                entry.type === "DIALOGUE" ||
+                entry.type === "JUMP"
+              ) {
+                dbContentType = entry.type;
+              } else {
+                dbContentType = "NARRATION"; // Default fallback
+              }
+
+              const values: any = {
+                sceneId: newScene.id,
+                contentType: dbContentType,
+                content: entry.text || null,
+              };
+
+              if (entry.target && dbContentType === "JUMP") {
+                values.content = `jump ${entry.target}`;
+              }
+
+              await tx.insert(sceneLines).values(values);
             }
-
-            const values: any = {
-              sceneId: newScene.id,
-              contentType: dbContentType,
-              content: entry.text || null,
-            };
-
-            if (entry.target && dbContentType === 'JUMP') {
-              values.content = `jump ${entry.target}`;
-            }
-
-            await db.insert(sceneLines).values(values);
-          }
+          });
         }
         // If branchforge_wins, do nothing (keep local data)
       }
@@ -311,26 +374,27 @@ export async function importFromGitlab(
 
     // Mark operation as completed
     await updateSyncOperation(operation.id, {
-      status: 'completed',
+      status: "completed",
       conflictCount,
     });
 
     return {
       ...operation,
-      status: 'completed',
+      status: "completed",
       conflictCount,
     };
   } catch (error) {
     // Mark operation as failed
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     await updateSyncOperation(operation.id, {
-      status: 'failed',
+      status: "failed",
       errorMessage,
     });
 
     return {
       ...operation,
-      status: 'failed',
+      status: "failed",
       errorMessage,
     };
   }
@@ -415,39 +479,51 @@ export async function detectConflicts(
           // New remote label
           conflicts.push({
             label,
-            type: 'new_remote_label',
+            type: "new_remote_label",
             remoteContent: parsed,
           });
         } else {
           // Compare local and remote content
           const localScene = localScenes.find((s) => s.title === label);
           if (localScene) {
-            // Fetch local scene lines
-            const localLines = await db
-              .select()
+            // Fetch local scene lines with character tags for proper comparison
+            const localLinesWithSpeakers = await db
+              .select({
+                contentType: sceneLines.contentType,
+                speakerTag: characters.renpyTag,
+                content: sceneLines.content,
+              })
               .from(sceneLines)
+              .leftJoin(characters, eq(sceneLines.speakerId, characters.id))
               .where(eq(sceneLines.sceneId, localScene.id));
 
-            const localDialogue = localLines.map((l) => ({
-              speaker: l.speakerId,
-              text: l.content,
-            }));
+            // Normalize local dialogue to use character tags (matching RPY format)
+            const normalizedLocalDialogue = localLinesWithSpeakers
+              .filter(
+                (l) =>
+                  l.contentType === "DIALOGUE" || l.contentType === "NARRATION",
+              )
+              .map((l) => ({
+                speaker: l.speakerTag || null, // Use tag directly, null for narration
+                text: l.content,
+              }));
 
-            const remoteDialogue = parsed.dialogue.map((d) => ({
+            // Remote dialogue already uses character tags from RPY parser
+            const normalizedRemoteDialogue = parsed.dialogue.map((d) => ({
               speaker: d.speaker,
               text: d.text,
             }));
 
-            // Compare dialogue (simplified comparison)
-            const localDialogueStr = JSON.stringify(localDialogue);
-            const remoteDialogueStr = JSON.stringify(remoteDialogue);
+            // Compare normalized dialogue
+            const localDialogueStr = JSON.stringify(normalizedLocalDialogue);
+            const remoteDialogueStr = JSON.stringify(normalizedRemoteDialogue);
 
             if (localDialogueStr !== remoteDialogueStr) {
               conflicts.push({
                 label,
-                type: 'dialogue_mismatch',
-                localContent: localDialogue,
-                remoteContent: remoteDialogue,
+                type: "dialogue_mismatch",
+                localContent: normalizedLocalDialogue,
+                remoteContent: normalizedRemoteDialogue,
               });
             }
           }
@@ -460,7 +536,7 @@ export async function detectConflicts(
       if (!remoteLabels.has(localLabel)) {
         conflicts.push({
           label: localLabel,
-          type: 'deleted_remote_label',
+          type: "deleted_remote_label",
         });
       }
     }
@@ -471,9 +547,10 @@ export async function detectConflicts(
     };
   } catch (error) {
     return {
-      hasConflicts: false,
+      hasConflicts: true,
       conflicts: [],
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }
+
