@@ -169,6 +169,11 @@ export function extractDialogue(
     }
 
     // Try to match dialogue: speaker "text" (handles escaped quotes)
+    // Regex breakdown:
+    // ^([a-zA-Z_][a-zA-Z0-9_]*) - Speaker tag (identifier starting with letter/underscore)
+    // \s+ - Whitespace separator
+    // "((?:[^"\\]|\\.)*)" - Quoted text allowing escaped characters (\")
+    // The (?:[^"\\]|\\.)* pattern matches: non-quote/non-backslash OR escaped char
     const dialogueMatch = trimmed.match(
       /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"((?:[^"\\]|\\.)*)"$/,
     );
@@ -226,9 +231,9 @@ export function extractChoices(
   }> = [];
   const lines = content.split("\n");
 
-  let inMenu = false;
+  // Stack to track nested menu indentation levels
+  const menuStack: number[] = [];
   let currentLabel = "";
-  let menuIndent = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -242,20 +247,21 @@ export function extractChoices(
 
     // Check for menu start
     if (trimmed === "menu:") {
-      inMenu = true;
-      menuIndent = line.search(/\S/);
+      const menuIndent = line.search(/\S/);
+      menuStack.push(menuIndent);
       continue;
     }
 
     // Check for menu end (indentation decreases)
-    // Compare leading whitespace length directly to handle both spaces and tabs
+    // Pop from stack until we find the appropriate menu level
     const lineIndent = line.search(/\S/);
-    if (inMenu && line.trim() && lineIndent <= menuIndent) {
-      inMenu = false;
+    if (menuStack.length > 0 && trimmed && lineIndent < menuStack[menuStack.length - 1]) {
+      menuStack.pop();
     }
 
-    // Look for choice labels inside menu
-    if (inMenu) {
+    // Look for choice labels inside menu (check if we're in any menu)
+    if (menuStack.length > 0) {
+      const menuIndent = menuStack[menuStack.length - 1];
       // More permissive matching: find the text between the first quote and the colon
       // This handles cases where quotes inside the string aren't properly escaped
 
@@ -484,34 +490,119 @@ export function extractJumps(
 /**
  * Extract character definitions from RPY content
  * Format: define s = Character("Name", color="#...")
+ * Handles both single-line and multi-line definitions
  */
 function extractCharacters(
   content: string,
 ): Array<{ tag: string; name: string; color?: string }> {
   const characters: Array<{ tag: string; name: string; color?: string }> = [];
+  const lines = content.split("\n");
 
-  // Match character definitions
-  // Format: define tag = Character("name", options...)
-  // The comma and options portion are optional
-  const charRegex =
-    /define\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\(\s*"([^"]+)"(\s*,\s*([^)]*))?\s*\)/g;
+  // Track multi-line character definitions
+  let pendingCharacter: { tag: string; name?: string; options: string[] } | null = null;
+  let inCharacterDef = false;
+  let parenDepth = 0;
 
-  let match;
-  while ((match = charRegex.exec(content)) !== null) {
-    const tag = match[1];
-    const name = match[2];
-    const options = match[4]; // May be undefined if no options
+  for (const line of lines) {
+    const trimmed = line.trim();
 
-    // Extract color if present (options may be undefined)
-    let color: string | undefined = undefined;
-    if (options) {
-      const colorMatch = options.match(/color\s*=\s*[\"']?([^"')\s]+)/);
-      if (colorMatch) {
-        color = colorMatch[1];
-      }
+    // Skip empty lines and comments
+    if (!trimmed || trimmed.startsWith("#")) {
+      continue;
     }
 
-    characters.push({ tag, name, color });
+    // Check for single-line character definition
+    // Format: define tag = Character("name", options...)
+    const singleLineMatch = trimmed.match(
+      /define\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\(\s*"([^"]+)"(\s*,\s*([^)]*))?\s*\)/
+    );
+    if (singleLineMatch && !trimmed.includes("\n")) {
+      const tag = singleLineMatch[1];
+      const name = singleLineMatch[2];
+      const options = singleLineMatch[4]; // May be undefined if no options
+
+      // Extract color if present
+      let color: string | undefined = undefined;
+      if (options) {
+        const colorMatch = options.match(/color\s*=\s*["']?([^"')\s]+)/);
+        if (colorMatch) {
+          color = colorMatch[1];
+        }
+      }
+
+      characters.push({ tag, name, color });
+      continue;
+    }
+
+    // Check for start of multi-line character definition
+    const multiLineStartMatch = trimmed.match(
+      /define\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\((.*)/
+    );
+    if (multiLineStartMatch) {
+      const tag = multiLineStartMatch[1];
+      const rest = multiLineStartMatch[2];
+
+      // Check if name is on the same line
+      const nameMatch = rest.match(/"([^"]*)"/);
+      const name = nameMatch ? nameMatch[1] : undefined;
+
+      pendingCharacter = { tag, name, options: [] };
+      inCharacterDef = true;
+      parenDepth = (rest.match(/\(/g) || []).length - (rest.match(/\)/g) || []).length;
+
+      // Extract options from the rest of the line (excluding the name we already captured)
+      if (nameMatch) {
+        const optionsPart = rest.substring(rest.indexOf(nameMatch[0]) + nameMatch[0].length).trim();
+        if (optionsPart.startsWith(",")) {
+          pendingCharacter.options.push(optionsPart.substring(1).trim());
+        }
+      } else if (rest.trim()) {
+        pendingCharacter.options.push(rest.trim());
+      }
+      continue;
+    }
+
+    // Continue multi-line character definition
+    if (inCharacterDef && pendingCharacter) {
+      // Track parentheses to find end of definition
+      parenDepth += (line.match(/\(/g) || []).length;
+      parenDepth -= (line.match(/\)/g) || []).length;
+
+      // Capture options
+      if (trimmed && !trimmed.startsWith("#")) {
+        // Check if this line contains the name (if not already found)
+        if (!pendingCharacter.name) {
+          const nameMatch = trimmed.match(/"([^"]+)"/);
+          if (nameMatch) {
+            pendingCharacter.name = nameMatch[1];
+          }
+        }
+        pendingCharacter.options.push(trimmed);
+      }
+
+      // Check if definition is complete
+      if (parenDepth <= 0) {
+        inCharacterDef = false;
+
+        // Extract color from options
+        let color: string | undefined = undefined;
+        const optionsText = pendingCharacter.options.join(" ");
+        const colorMatch = optionsText.match(/color\s*=\s*["']?([^"')\s]+)/);
+        if (colorMatch) {
+          color = colorMatch[1];
+        }
+
+        if (pendingCharacter.name) {
+          characters.push({
+            tag: pendingCharacter.tag,
+            name: pendingCharacter.name,
+            color,
+          });
+        }
+
+        pendingCharacter = null;
+      }
+    }
   }
 
   return characters;
