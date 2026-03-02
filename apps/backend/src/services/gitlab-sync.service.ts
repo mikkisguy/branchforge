@@ -547,7 +547,7 @@ export async function detectConflicts(
     };
   } catch (error) {
     return {
-      hasConflicts: true,
+      hasConflicts: false,
       conflicts: [],
       error: error instanceof Error ? error.message : "Unknown error",
     };

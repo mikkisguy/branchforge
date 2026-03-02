@@ -499,17 +499,19 @@ describe("GitLabSyncService", () => {
         })),
       })) as any;
 
+      // Mock that returns scenes when queried by title (to simulate existing scenes)
+      const existingScene = { id: "scene-1", projectId: testProjectId, title: "start" };
       mockDb.select = vi.fn(() => ({
         from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            orderBy: vi.fn(() => ({
-              limit: vi.fn(() =>
-                Promise.resolve([
-                  { id: "scene-1", projectId: testProjectId, title: "start" },
-                ]),
-              ),
-            })),
-          })),
+          where: vi.fn(() => {
+            // Return a promise that resolves to an array with the existing scene
+            // Also support the orderBy().limit() chain for other query patterns
+            const result = Promise.resolve([existingScene]);
+            (result as any).orderBy = vi.fn(() => ({
+              limit: vi.fn(() => result),
+            }));
+            return result;
+          }),
         })),
       })) as any;
 
@@ -775,18 +777,20 @@ describe("GitLabSyncService", () => {
                 ),
               };
             } else {
-              // sceneLines query - return same content as remote
+              // sceneLines query with leftJoin - return same content as remote
               return {
-                where: vi.fn(() =>
-                  Promise.resolve([
-                    {
-                      sceneId: "scene-1",
-                      contentType: "dialogue",
-                      speakerId: null,
-                      content: "Same content",
-                    },
-                  ]),
-                ),
+                leftJoin: vi.fn(() => ({
+                  where: vi.fn(() =>
+                    Promise.resolve([
+                      {
+                        sceneId: "scene-1",
+                        contentType: "DIALOGUE",
+                        speakerTag: null,
+                        content: "Same content",
+                      },
+                    ]),
+                  ),
+                })),
               };
             }
           }),
@@ -835,18 +839,20 @@ describe("GitLabSyncService", () => {
                 ),
               };
             } else {
-              // sceneLines query - return different content than remote
+              // sceneLines query with leftJoin - return different content than remote
               return {
-                where: vi.fn(() =>
-                  Promise.resolve([
-                    {
-                      sceneId: "scene-1",
-                      contentType: "dialogue",
-                      speakerId: null,
-                      content: "Local content",
-                    },
-                  ]),
-                ),
+                leftJoin: vi.fn(() => ({
+                  where: vi.fn(() =>
+                    Promise.resolve([
+                      {
+                        sceneId: "scene-1",
+                        contentType: "DIALOGUE",
+                        speakerTag: null,
+                        content: "Local content",
+                      },
+                    ]),
+                  ),
+                })),
               };
             }
           }),
@@ -946,18 +952,20 @@ describe("GitLabSyncService", () => {
                 ),
               };
             } else {
-              // sceneLines query - return different content than remote
+              // sceneLines query with leftJoin - return different content than remote
               return {
-                where: vi.fn(() =>
-                  Promise.resolve([
-                    {
-                      sceneId: "scene-1",
-                      contentType: "dialogue",
-                      speakerId: null,
-                      content: "Local content",
-                    },
-                  ]),
-                ),
+                leftJoin: vi.fn(() => ({
+                  where: vi.fn(() =>
+                    Promise.resolve([
+                      {
+                        sceneId: "scene-1",
+                        contentType: "DIALOGUE",
+                        speakerTag: null,
+                        content: "Local content",
+                      },
+                    ]),
+                  ),
+                })),
               };
             }
           }),
