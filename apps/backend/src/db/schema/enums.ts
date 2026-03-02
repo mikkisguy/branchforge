@@ -41,3 +41,9 @@ export const renpyDefinitionCategoryEnum = pgEnum('renpy_definition_category', [
 
 // Scene visibility types
 export const sceneVisibilityEnum = pgEnum('scene_visibility', ['EXCLUSIVE', 'SHARED', 'DUO_PAIR']);
+
+// GitLab sync operation types
+export const syncOperationEnum = pgEnum('sync_operation', ['export', 'import']);
+
+// GitLab sync status types
+export const syncStatusEnum = pgEnum('sync_status', ['pending', 'in_progress', 'completed', 'failed']);
