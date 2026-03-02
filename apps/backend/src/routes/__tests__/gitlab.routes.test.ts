@@ -13,6 +13,7 @@ import session from '@fastify/session';
 import { gitlabRoutes } from '../gitlab.routes.js';
 import * as gitlabService from '../../services/gitlab.service.js';
 import * as gitlabSyncService from '../../services/gitlab-sync.service.js';
+import * as rateLimiter from '../../services/rate-limiter.service.js';
 import * as db from '../../db/index.js';
 
 // Mock drizzle-orm's eq function
@@ -29,9 +30,11 @@ vi.mock('../../db/index.js', () => ({
 vi.mock('../../db/schema/index.js', () => ({
   projects: {
     userId: 'userId',
+    id: 'id',
   },
   gitlabSyncOperations: {
     projectId: 'projectId',
+    id: 'id',
   },
 }));
 
@@ -53,6 +56,11 @@ vi.mock('../../services/gitlab-sync.service.js', () => ({
   getSyncOperation: vi.fn(),
   listSyncOperations: vi.fn(),
   detectConflicts: vi.fn(),
+}));
+
+// Mock the rate limiter service
+vi.mock('../../services/rate-limiter.service.js', () => ({
+  checkRateLimit: vi.fn(),
 }));
 
 // Mock the authenticate middleware
@@ -101,14 +109,34 @@ describe('GitLab Routes', () => {
     });
 
     // Set up database mock for authorization helpers
+    // We need to track which table is being queried to return the correct shape
+    let currentTable: string | null = null;
     const mockSelect = vi.fn(() => ({ from: mockFrom }));
-    const mockFrom = vi.fn(() => ({ where: mockWhere }));
+    const mockFrom = vi.fn((table: any) => {
+      // Track which table we're querying based on the table object
+      if (table && typeof table === 'object' && 'userId' in table) {
+        currentTable = 'projects';
+      } else if (table && typeof table === 'object' && 'projectId' in table) {
+        currentTable = 'gitlabSyncOperations';
+      }
+      return { where: mockWhere };
+    });
     const mockWhere = vi.fn(() => ({ limit: mockLimit }));
-    const mockLimit = vi.fn(() => Promise.resolve([{ userId: testUserId }])); // Default: project belongs to user
+    const mockLimit = vi.fn(() => {
+      // Return different shapes based on which table is being queried
+      if (currentTable === 'gitlabSyncOperations') {
+        return Promise.resolve([{ projectId: testProjectId }]);
+      }
+      // Default: projects table, project belongs to user
+      return Promise.resolve([{ userId: testUserId }]);
+    });
     const mockDb = {
       select: mockSelect,
     };
     vi.mocked(db.getDb).mockReturnValue(mockDb as any);
+
+    // Store mock references for test customization
+    (fastify as any).mockDb = { mockSelect, mockFrom, mockWhere, mockLimit, currentTable: () => currentTable };
 
     // Register GitLab routes
     await fastify.register(gitlabRoutes, { prefix: '/api' });
@@ -126,6 +154,14 @@ describe('GitLab Routes', () => {
   });
 
   describe('POST /api/gitlab/validate', () => {
+    beforeEach(() => {
+      // Reset rate limiter to allow requests by default
+      vi.mocked(rateLimiter.checkRateLimit).mockReturnValue({
+        allowed: true,
+        remainingAttempts: 4,
+      });
+    });
+
     it('should validate a GitLab PAT', async () => {
       vi.spyOn(gitlabService, 'validateGitlabPAT').mockResolvedValue('testuser');
 
@@ -171,6 +207,28 @@ describe('GitLab Routes', () => {
       expect(response.statusCode).toBe(400);
       expect(response.json()).toMatchObject({
         error: 'Invalid GitLab token',
+      });
+    });
+
+    it('should return 429 when rate limited', async () => {
+      vi.mocked(rateLimiter.checkRateLimit).mockReturnValue({
+        allowed: false,
+        remainingAttempts: 0,
+        retryAfter: 900,
+      });
+
+      const response = await fastify.inject({
+        method: 'POST',
+        url: '/api/gitlab/validate',
+        payload: {
+          token: 'glpat-test123',
+        },
+      });
+
+      expect(response.statusCode).toBe(429);
+      expect(response.json()).toMatchObject({
+        error: 'Too many validation attempts. Please try again later.',
+        retryAfter: 900,
       });
     });
   });
@@ -456,7 +514,9 @@ describe('GitLab Routes', () => {
       });
     });
 
-    it('should return 404 if operation not found', async () => {
+    it('should return 404 if operation not found (handler-level getSyncOperation)', async () => {
+      // Note: DB mock ensures authorizeSyncOperationAccess passes, so this tests
+      // the handler-level 404 when getSyncOperation returns null
       vi.spyOn(gitlabSyncService, 'getSyncOperation').mockResolvedValue(null);
 
       const response = await fastify.inject({
@@ -533,6 +593,127 @@ describe('GitLab Routes', () => {
             type: 'dialogue_mismatch',
           },
         ],
+      });
+    });
+  });
+
+  describe('Authorization - Project Access', () => {
+    it('should return 404 when project not found (link repository)', async () => {
+      const mockLimit = (fastify as any).mockDb.mockLimit;
+
+      // Override to return empty array (project not found)
+      mockLimit.mockResolvedValueOnce([]);
+
+      const response = await fastify.inject({
+        method: 'POST',
+        url: '/api/gitlab/link',
+        payload: {
+          projectId: testProjectId,
+          gitlabProjectId: testGitlabProjectId,
+          branch: testBranch,
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({
+        error: 'Not Found',
+        message: 'Project not found',
+      });
+    });
+
+    it('should return 403 when user does not own project (unlink repository)', async () => {
+      const mockLimit = (fastify as any).mockDb.mockLimit;
+
+      // Override to return different userId (user does not own project)
+      mockLimit.mockResolvedValueOnce([{ userId: 'other-user-id' }]);
+
+      const response = await fastify.inject({
+        method: 'DELETE',
+        url: `/api/gitlab/unlink/${testProjectId}`,
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toMatchObject({
+        error: 'Forbidden',
+        message: 'You do not have access to this project',
+      });
+    });
+
+    it('should return 404 when project not found (list operations)', async () => {
+      const mockLimit = (fastify as any).mockDb.mockLimit;
+
+      // Override to return empty array (project not found)
+      mockLimit.mockResolvedValueOnce([]);
+
+      const response = await fastify.inject({
+        method: 'GET',
+        url: `/api/gitlab/projects/${testProjectId}/operations`,
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({
+        error: 'Not Found',
+        message: 'Project not found',
+      });
+    });
+  });
+
+  describe('Authorization - Sync Operation Access', () => {
+    it('should return 404 when sync operation not found', async () => {
+      const mockLimit = (fastify as any).mockDb.mockLimit;
+
+      // First call: gitlabSyncOperations query returns empty (operation not found)
+      mockLimit.mockResolvedValueOnce([]);
+
+      const response = await fastify.inject({
+        method: 'GET',
+        url: `/api/gitlab/operations/${testOperationId}`,
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({
+        error: 'Not Found',
+        message: 'Sync operation not found',
+      });
+    });
+
+    it('should return 404 when operation exists but project not found', async () => {
+      const mockLimit = (fastify as any).mockDb.mockLimit;
+
+      // First call: gitlabSyncOperations query - return operation with projectId
+      mockLimit.mockResolvedValueOnce([{ projectId: testProjectId }]);
+      // Second call: projects query - return empty (project not found)
+      mockLimit.mockResolvedValueOnce([]);
+
+      const response = await fastify.inject({
+        method: 'GET',
+        url: `/api/gitlab/operations/${testOperationId}`,
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({
+        error: 'Not Found',
+        message: 'Project not found',
+      });
+    });
+
+    it('should return 403 when operation exists but user does not own project', async () => {
+      const mockLimit = (fastify as any).mockDb.mockLimit;
+
+      // First call: gitlabSyncOperations query - return operation with projectId
+      mockLimit.mockResolvedValueOnce([{ projectId: testProjectId }]);
+      // Second call: projects query - return different userId (user does not own project)
+      mockLimit.mockResolvedValueOnce([{ userId: 'other-user-id' }]);
+
+      const response = await fastify.inject({
+        method: 'GET',
+        url: `/api/gitlab/operations/${testOperationId}`,
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toMatchObject({
+        error: 'Forbidden',
+        message: 'You do not have access to this project',
       });
     });
   });
