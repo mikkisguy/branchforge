@@ -6,7 +6,20 @@
  */
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { authenticate } from '../middleware/auth.middleware.js';
+import { authenticate, type PublicUser } from '../middleware/auth.middleware.js';
+
+/**
+ * Helper to get the authenticated user ID from a request.
+ * This is used for route handlers protected by the authenticate middleware,
+ * which guarantees that request.user is defined.
+ */
+function getAuthenticatedUserId(request: FastifyRequest): string {
+  // The authenticate middleware guarantees user is set
+  return request.user!.id;
+}
+import { getDb } from '../db/index.js';
+import { projects, gitlabSyncOperations } from '../db/schema/index.js';
+import { eq } from 'drizzle-orm';
 import {
   validateGitlabPAT,
   storeGitlabIntegration,
@@ -73,6 +86,98 @@ interface DetectConflictsBody {
 // ============================================================================
 
 /**
+ * Authorization error response
+ */
+interface AuthzError {
+  error: string;
+  message: string;
+}
+
+/**
+ * Verify that the authenticated user owns the specified project.
+ *
+ * This function checks that:
+ * 1. The project exists
+ * 2. The authenticated user is the owner (projects.userId matches)
+ *
+ * @param projectId - The project ID to verify
+ * @param userId - The authenticated user's ID
+ * @param reply - Fastify reply object for sending error responses
+ * @returns true if authorized, false if an error response was sent
+ */
+async function authorizeProjectAccess(
+  projectId: string,
+  userId: string,
+  reply: FastifyReply
+): Promise<boolean> {
+  const db = getDb();
+
+  const [project] = await db
+    .select({ userId: projects.userId })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+
+  if (!project) {
+    const error: AuthzError = {
+      error: 'Not Found',
+      message: 'Project not found',
+    };
+    reply.status(404).send(error);
+    return false;
+  }
+
+  if (project.userId !== userId) {
+    const error: AuthzError = {
+      error: 'Forbidden',
+      message: 'You do not have access to this project',
+    };
+    reply.status(403).send(error);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Verify that the authenticated user owns the project associated with a sync operation.
+ *
+ * This function checks that:
+ * 1. The sync operation exists
+ * 2. The project associated with the operation exists
+ * 3. The authenticated user is the owner of the project
+ *
+ * @param operationId - The sync operation ID to verify
+ * @param userId - The authenticated user's ID
+ * @param reply - Fastify reply object for sending error responses
+ * @returns true if authorized, false if an error response was sent
+ */
+async function authorizeSyncOperationAccess(
+  operationId: string,
+  userId: string,
+  reply: FastifyReply
+): Promise<boolean> {
+  const db = getDb();
+
+  const [operation] = await db
+    .select({ projectId: gitlabSyncOperations.projectId })
+    .from(gitlabSyncOperations)
+    .where(eq(gitlabSyncOperations.id, operationId))
+    .limit(1);
+
+  if (!operation) {
+    const error: AuthzError = {
+      error: 'Not Found',
+      message: 'Sync operation not found',
+    };
+    reply.status(404).send(error);
+    return false;
+  }
+
+  return authorizeProjectAccess(operation.projectId, userId, reply);
+}
+
+/**
  * Validate GitLab PAT
  *
  * POST /api/gitlab/validate
@@ -91,14 +196,19 @@ async function validateTokenHandler(
     return;
   }
 
-  const username = await validateGitlabPAT(token, gitlabUrl);
+  try {
+    const username = await validateGitlabPAT(token, gitlabUrl);
 
-  if (!username) {
-    reply.status(400).send({ error: 'Invalid GitLab token' });
-    return;
+    if (!username) {
+      reply.status(400).send({ error: 'Invalid GitLab token' });
+      return;
+    }
+
+    reply.send({ valid: true, username });
+  } catch (err) {
+    request.log.error({ err }, 'validateTokenHandler: Failed to validate GitLab token');
+    reply.status(500).send({ error: 'Failed to validate token', details: err instanceof Error ? err.message : 'Unknown error' });
   }
-
-  reply.send({ valid: true, username });
 }
 
 /**
@@ -113,7 +223,7 @@ async function storeIntegrationHandler(
   request: FastifyRequest<{ Body: StoreIntegrationBody }>,
   reply: FastifyReply
 ): Promise<void> {
-  const userId = (request as any).userId;
+  const userId = getAuthenticatedUserId(request);
   const { token, gitlabUrl } = request.body;
 
   if (!token) {
@@ -121,15 +231,20 @@ async function storeIntegrationHandler(
     return;
   }
 
-  // Validate token before storing
-  const username = await validateGitlabPAT(token, gitlabUrl);
-  if (!username) {
-    reply.status(400).send({ error: 'Invalid GitLab token' });
-    return;
-  }
+  try {
+    // Validate token before storing
+    const username = await validateGitlabPAT(token, gitlabUrl);
+    if (!username) {
+      reply.status(400).send({ error: 'Invalid GitLab token' });
+      return;
+    }
 
-  await storeGitlabIntegration(userId, token, gitlabUrl);
-  reply.status(201).send();
+    await storeGitlabIntegration(userId, token, gitlabUrl);
+    reply.status(201).send();
+  } catch (err) {
+    request.log.error({ err }, 'storeIntegrationHandler: Failed to store GitLab integration');
+    reply.status(500).send({ error: 'Failed to store integration', details: err instanceof Error ? err.message : 'Unknown error' });
+  }
 }
 
 /**
@@ -143,7 +258,7 @@ async function deleteIntegrationHandler(
   request: FastifyRequest,
   reply: FastifyReply
 ): Promise<void> {
-  const userId = (request as any).userId;
+  const userId = getAuthenticatedUserId(request);
   await deleteGitlabIntegration(userId);
   reply.status(204).send();
 }
@@ -159,7 +274,7 @@ async function listProjectsHandler(
   request: FastifyRequest,
   reply: FastifyReply
 ): Promise<void> {
-  const userId = (request as any).userId;
+  const userId = getAuthenticatedUserId(request);
   const projects = await listGitlabProjects(userId);
   reply.send(projects);
 }
@@ -176,10 +291,16 @@ async function linkRepositoryHandler(
   request: FastifyRequest<{ Body: LinkRepositoryBody }>,
   reply: FastifyReply
 ): Promise<void> {
+  const userId = getAuthenticatedUserId(request);
   const { projectId, gitlabProjectId, branch = 'main' } = request.body;
 
   if (!projectId || !gitlabProjectId) {
     reply.status(400).send({ error: 'projectId and gitlabProjectId are required' });
+    return;
+  }
+
+  // Verify user owns the project
+  if (!(await authorizeProjectAccess(projectId, userId, reply))) {
     return;
   }
 
@@ -198,7 +319,14 @@ async function unlinkRepositoryHandler(
   request: FastifyRequest<{ Params: { projectId: string } }>,
   reply: FastifyReply
 ): Promise<void> {
+  const userId = getAuthenticatedUserId(request);
   const { projectId } = request.params;
+
+  // Verify user owns the project
+  if (!(await authorizeProjectAccess(projectId, userId, reply))) {
+    return;
+  }
+
   await unlinkRepository(projectId);
   reply.status(204).send();
 }
@@ -214,7 +342,14 @@ async function listBranchesHandler(
   request: FastifyRequest<{ Params: { projectId: string } }>,
   reply: FastifyReply
 ): Promise<void> {
+  const userId = getAuthenticatedUserId(request);
   const { projectId } = request.params;
+
+  // Verify user owns the project
+  if (!(await authorizeProjectAccess(projectId, userId, reply))) {
+    return;
+  }
+
   const branches = await listBranches(projectId);
   reply.send(branches);
 }
@@ -230,11 +365,17 @@ async function listFilesHandler(
   request: FastifyRequest<{ Params: { projectId: string }, Querystring: { branch?: string } }>,
   reply: FastifyReply
 ): Promise<void> {
+  const userId = getAuthenticatedUserId(request);
   const { projectId } = request.params;
   const { branch } = request.query;
 
   if (!branch) {
     reply.status(400).send({ error: 'Branch is required' });
+    return;
+  }
+
+  // Verify user owns the project
+  if (!(await authorizeProjectAccess(projectId, userId, reply))) {
     return;
   }
 
@@ -254,6 +395,7 @@ async function exportHandler(
   request: FastifyRequest<{ Body: ExportBody }>,
   reply: FastifyReply
 ): Promise<void> {
+  const userId = getAuthenticatedUserId(request);
   const { projectId, branch, commitMessage } = request.body;
 
   if (!projectId) {
@@ -261,8 +403,18 @@ async function exportHandler(
     return;
   }
 
-  const operation = await exportToGitlab(projectId, branch, commitMessage);
-  reply.status(202).send(operation);
+  // Verify user owns the project
+  if (!(await authorizeProjectAccess(projectId, userId, reply))) {
+    return;
+  }
+
+  try {
+    const operation = await exportToGitlab(projectId, branch, commitMessage);
+    reply.status(202).send(operation);
+  } catch (err) {
+    request.log.error({ err, projectId }, 'exportHandler: Failed to export to GitLab');
+    reply.status(500).send({ error: 'Failed to export to GitLab', details: err instanceof Error ? err.message : 'Unknown error' });
+  }
 }
 
 /**
@@ -277,6 +429,7 @@ async function importHandler(
   request: FastifyRequest<{ Body: ImportBody }>,
   reply: FastifyReply
 ): Promise<void> {
+  const userId = getAuthenticatedUserId(request);
   const { projectId, branch, conflictResolution } = request.body;
 
   if (!projectId || !branch) {
@@ -290,8 +443,18 @@ async function importHandler(
     return;
   }
 
-  const operation = await importFromGitlab(projectId, branch, conflictResolution);
-  reply.status(202).send(operation);
+  // Verify user owns the project
+  if (!(await authorizeProjectAccess(projectId, userId, reply))) {
+    return;
+  }
+
+  try {
+    const operation = await importFromGitlab(projectId, branch, conflictResolution);
+    reply.status(202).send(operation);
+  } catch (err) {
+    request.log.error({ err, projectId }, 'importHandler: Failed to import from GitLab');
+    reply.status(500).send({ error: 'Failed to import from GitLab', details: err instanceof Error ? err.message : 'Unknown error' });
+  }
 }
 
 /**
@@ -305,7 +468,14 @@ async function getOperationHandler(
   request: FastifyRequest<{ Params: { operationId: string } }>,
   reply: FastifyReply
 ): Promise<void> {
+  const userId = getAuthenticatedUserId(request);
   const { operationId } = request.params;
+
+  // Verify user owns the project associated with this operation
+  if (!(await authorizeSyncOperationAccess(operationId, userId, reply))) {
+    return;
+  }
+
   const operation = await getSyncOperation(operationId);
 
   if (!operation) {
@@ -319,7 +489,7 @@ async function getOperationHandler(
 /**
  * List sync operations
  *
- * GET /api/gitlab/operations/:projectId
+ * GET /api/gitlab/projects/:projectId/operations
  *
  * Returns a list of sync operations for a project.
  */
@@ -327,7 +497,14 @@ async function listOperationsHandler(
   request: FastifyRequest<{ Params: { projectId: string } }>,
   reply: FastifyReply
 ): Promise<void> {
+  const userId = getAuthenticatedUserId(request);
   const { projectId } = request.params;
+
+  // Verify user owns the project
+  if (!(await authorizeProjectAccess(projectId, userId, reply))) {
+    return;
+  }
+
   const operations = await listSyncOperations(projectId);
   reply.send(operations);
 }
@@ -344,10 +521,16 @@ async function detectConflictsHandler(
   request: FastifyRequest<{ Body: DetectConflictsBody }>,
   reply: FastifyReply
 ): Promise<void> {
+  const userId = getAuthenticatedUserId(request);
   const { projectId, branch } = request.body;
 
   if (!projectId || !branch) {
     reply.status(400).send({ error: 'projectId and branch are required' });
+    return;
+  }
+
+  // Verify user owns the project
+  if (!(await authorizeProjectAccess(projectId, userId, reply))) {
     return;
   }
 

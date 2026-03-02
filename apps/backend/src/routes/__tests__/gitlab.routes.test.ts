@@ -13,6 +13,27 @@ import session from '@fastify/session';
 import { gitlabRoutes } from '../gitlab.routes.js';
 import * as gitlabService from '../../services/gitlab.service.js';
 import * as gitlabSyncService from '../../services/gitlab-sync.service.js';
+import * as db from '../../db/index.js';
+
+// Mock drizzle-orm's eq function
+vi.mock('drizzle-orm', () => ({
+  eq: vi.fn(),
+}));
+
+// Mock the database
+vi.mock('../../db/index.js', () => ({
+  getDb: vi.fn(),
+}));
+
+// Mock the database schema - only mock what's used by authorization helpers
+vi.mock('../../db/schema/index.js', () => ({
+  projects: {
+    userId: 'userId',
+  },
+  gitlabSyncOperations: {
+    projectId: 'projectId',
+  },
+}));
 
 // Mock the services
 vi.mock('../../services/gitlab.service.js', () => ({
@@ -44,6 +65,7 @@ vi.mock('../../middleware/auth.middleware.js', () => ({
       role: 'OWNER' as const,
     }};
     request.user = request.session.user;
+    request.userId = request.session.user.id;
   }),
   requireRole: vi.fn(() => vi.fn(async (request: any, reply) => {
     request.user = {
@@ -51,6 +73,7 @@ vi.mock('../../middleware/auth.middleware.js', () => ({
       email: 'test@example.com',
       role: 'OWNER' as const,
     };
+    request.userId = request.user.id;
   })),
 }));
 
@@ -76,6 +99,16 @@ describe('GitLab Routes', () => {
       secret: 'a'.repeat(32),
       cookie: { secure: false },
     });
+
+    // Set up database mock for authorization helpers
+    const mockSelect = vi.fn(() => ({ from: mockFrom }));
+    const mockFrom = vi.fn(() => ({ where: mockWhere }));
+    const mockWhere = vi.fn(() => ({ limit: mockLimit }));
+    const mockLimit = vi.fn(() => Promise.resolve([{ userId: testUserId }])); // Default: project belongs to user
+    const mockDb = {
+      select: mockSelect,
+    };
+    vi.mocked(db.getDb).mockReturnValue(mockDb as any);
 
     // Register GitLab routes
     await fastify.register(gitlabRoutes, { prefix: '/api' });
@@ -157,6 +190,23 @@ describe('GitLab Routes', () => {
       });
 
       expect(response.statusCode).toBe(201);
+    });
+
+    it('should return 400 if token is missing', async () => {
+      const validateSpy = vi.spyOn(gitlabService, 'validateGitlabPAT');
+      const storeSpy = vi.spyOn(gitlabService, 'storeGitlabIntegration');
+
+      const response = await fastify.inject({
+        method: 'POST',
+        url: '/api/gitlab/integration',
+        payload: {
+          gitlabUrl: 'https://gitlab.test',
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(validateSpy).not.toHaveBeenCalled();
+      expect(storeSpy).not.toHaveBeenCalled();
     });
 
     it('should return 400 if validation fails', async () => {
@@ -299,7 +349,7 @@ describe('GitLab Routes', () => {
         id: testOperationId,
         projectId: testProjectId,
         operation: 'export',
-        status: 'completed',
+        status: 'pending',
         branch: testBranch,
         conflictCount: 0,
         startedAt: new Date(),
@@ -319,7 +369,7 @@ describe('GitLab Routes', () => {
       expect(response.json()).toMatchObject({
         id: testOperationId,
         operation: 'export',
-        status: 'completed',
+        status: 'pending',
       });
     });
 
@@ -342,7 +392,7 @@ describe('GitLab Routes', () => {
         id: testOperationId,
         projectId: testProjectId,
         operation: 'import',
-        status: 'completed',
+        status: 'pending',
         branch: testBranch,
         conflictCount: 0,
         startedAt: new Date(),
@@ -362,7 +412,7 @@ describe('GitLab Routes', () => {
       expect(response.json()).toMatchObject({
         id: testOperationId,
         operation: 'import',
-        status: 'completed',
+        status: 'pending',
       });
     });
 
