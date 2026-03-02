@@ -9,6 +9,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
+import { GitLabSettingsContent } from "@/components/ide-shared/GitLabSettingsContent";
 import { cn } from "@/lib/utils";
 import { APP_NAME, APP_VERSION } from "@/lib/version";
 
@@ -124,14 +125,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               </div>
             )}
 
-            {activeTab === "gitlab" && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">GitLab Settings</h3>
-                <p className="text-sm text-muted-foreground">
-                  GitLab integration settings will be available soon.
-                </p>
-              </div>
-            )}
+            {activeTab === "gitlab" && <GitLabSettingsContent />}
 
             {activeTab === "system" && (
               <div className="space-y-4">

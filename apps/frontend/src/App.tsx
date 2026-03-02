@@ -7,6 +7,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { ToastProvider } from "./contexts/ToastContext";
+import { GitLabProvider } from "./contexts/GitLabContext";
 import { BASE_URL } from "./lib/constants";
 
 function App() {
@@ -15,20 +16,22 @@ function App() {
       <AuthProvider>
         <ToastProvider>
           <SettingsProvider>
-            <div className="app">
-            <Routes>
-              <Route path={`${BASE_URL}login`} element={<LoginPage />} />
-              <Route path={`${BASE_URL}register`} element={<RegisterPage />} />
-              <Route
-                path={BASE_URL}
-                element={
-                  <ProtectedRoute>
-                    <HomePageIDE />
-                  </ProtectedRoute>
-                }
-              />
-            </Routes>
-          </div>
+            <GitLabProvider>
+              <div className="app">
+              <Routes>
+                <Route path={`${BASE_URL}login`} element={<LoginPage />} />
+                <Route path={`${BASE_URL}register`} element={<RegisterPage />} />
+                <Route
+                  path={BASE_URL}
+                  element={
+                    <ProtectedRoute>
+                      <HomePageIDE />
+                    </ProtectedRoute>
+                  }
+                />
+              </Routes>
+            </div>
+          </GitLabProvider>
         </SettingsProvider>
       </ToastProvider>
     </AuthProvider>

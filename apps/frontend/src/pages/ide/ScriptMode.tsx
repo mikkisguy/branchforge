@@ -152,6 +152,9 @@ export function ScriptMode({ themeName }: ScriptModeProps) {
         lineCount={fileContents[activeFile]?.length || 0}
         language="Ren'Py"
         themeName={themeName}
+        projectId="my-project"
+        projectName="My Visual Novel"
+        gitlabBranch="main"
       />
     </div>
   );
