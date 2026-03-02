@@ -14,6 +14,10 @@
 | `suggestion_type` | `CONSISTENCY`, `FLAG_SUGGEST`, `METER_SUGGEST`, `DIALOGUE_VARIANT` | |
 | `suggestion_status` | `PENDING`, `ACCEPTED`, `REJECTED` | |
 | `character_role` | `PRIMARY`, `SECONDARY`, `BACKGROUND`, `MENTIONED` | Scene presence |
+| `renpy_definition_category` | `CHARACTER`, `TRANSFORM`, `IMAGE`, `INIT` | Ren'Py definition types |
+| `scene_visibility` | `EXCLUSIVE`, `SHARED`, `DUO_PAIR` | Scene visibility across routes |
+| `sync_operation` | `export`, `import` | GitLab sync operation type |
+| `sync_status` | `pending`, `in_progress`, `completed`, `failed` | GitLab sync status |
 
 ---
 
@@ -30,7 +34,54 @@
 
 ---
 
-### 2. Projects
+### 2. Sessions
+
+Persistent session storage for user authentication (database-backed, replaces in-memory).
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | text PK | Session ID (cookie value) |
+| `user_id` | uuid FK → users | Owner |
+| `data` | jsonb, not null | Session data (user object, etc.) |
+| `expires_at` | timestamp, not null | Session expiration |
+| `created_at` | timestamp | |
+| `updated_at` | timestamp | |
+
+---
+
+### 3. User Settings
+
+Per-user preferences and settings.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid PK | |
+| `user_id` | uuid FK → users | |
+| `avatar_url` | text | Avatar image URL |
+| `username` | text | Display username |
+| `language` | text, default 'en' | UI language |
+| `theme` | text, default 'light' | UI theme preference |
+| `created_at` | timestamp | |
+| `updated_at` | timestamp | |
+
+---
+
+### 4. Admin Settings
+
+Global application settings as key-value pairs.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid PK | |
+| `key` | text, unique, not null | Setting key |
+| `value` | jsonb, not null | Setting value |
+| `description` | text | Setting description |
+| `updated_at` | timestamp | |
+| `updated_by` | uuid FK → users | Last modified by |
+
+---
+
+### 5. Projects
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -47,7 +98,7 @@
 
 ---
 
-### 3. Project Users
+### 6. Project Users
 
 Beta reader access control.
 
@@ -62,7 +113,7 @@ PK: `(project_id, user_id)`
 
 ---
 
-### 4. Visual Systems
+### 7. Visual Systems
 
 Pattern configuration per project.
 
@@ -84,7 +135,7 @@ Pattern configuration per project.
 
 ---
 
-### 5. Ren'Py Definitions
+### 8. Ren'Py Definitions
 
 Character tags, colors, transforms.
 
@@ -101,7 +152,7 @@ Character tags, colors, transforms.
 
 ---
 
-### 6. Characters
+### 9. Characters
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -120,7 +171,7 @@ Character tags, colors, transforms.
 
 ---
 
-### 7. Pair Groups
+### 10. Pair Groups
 
 Sequel duo tracking.
 
@@ -135,7 +186,7 @@ Sequel duo tracking.
 
 ---
 
-### 8. Meters
+### 11. Meters
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -151,7 +202,7 @@ Sequel duo tracking.
 
 ---
 
-### 9. Flags
+### 12. Flags
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -164,7 +215,7 @@ Sequel duo tracking.
 
 ---
 
-### 10. Scenes
+### 13. Scenes
 
 Container for logical scenes; content to `scene_lines`.
 
@@ -190,7 +241,7 @@ Container for logical scenes; content to `scene_lines`.
 
 ---
 
-### 11. Scene Lines
+### 14. Scene Lines
 
 Atomic lines with images.
 
@@ -214,7 +265,7 @@ Atomic lines with images.
 
 ---
 
-### 12. Scene Characters (Junction)
+### 15. Scene Characters (Junction)
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -228,7 +279,7 @@ PK: `(scene_id, character_id)`
 
 ---
 
-### 13. World Elements
+### 16. World Elements
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -242,7 +293,7 @@ PK: `(scene_id, character_id)`
 
 ---
 
-### 14. AI Suggestions
+### 17. AI Suggestions
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -261,7 +312,7 @@ PK: `(scene_id, character_id)`
 
 ---
 
-### 15. Exports
+### 18. Exports
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -276,7 +327,7 @@ PK: `(scene_id, character_id)`
 
 ---
 
-### 16. Import Logs
+### 19. Import Logs
 
 One-time Google Docs migration tracking.
 
@@ -293,7 +344,7 @@ One-time Google Docs migration tracking.
 
 ---
 
-## 17. Demo Sessions
+### 20. Demo Sessions
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -309,12 +360,67 @@ One-time Google Docs migration tracking.
 
 ---
 
+### 21. GitLab Integrations
+
+User-level GitLab integration storing encrypted PAT.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid PK | |
+| `user_id` | uuid FK → users | |
+| `encrypted_token` | text, not null | Encrypted GitLab PAT |
+| `gitlab_url` | text, default 'https://gitlab.com' | GitLab instance URL |
+| `username` | text | GitLab username |
+| `created_at` | timestamp | |
+| `updated_at` | timestamp | |
+
+---
+
+### 22. GitLab Repositories
+
+Project to GitLab repository mapping.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid PK | |
+| `project_id` | uuid FK → projects | |
+| `gitlab_project_id` | integer, not null | GitLab project ID |
+| `repository_name` | text, not null | Repository name |
+| `gitlab_url` | text, default 'https://gitlab.com' | GitLab instance URL |
+| `default_branch` | text, default 'main' | Default branch name |
+| `last_synced_at` | timestamp | Last sync timestamp |
+| `created_at` | timestamp | |
+
+---
+
+### 23. GitLab Sync Operations
+
+Sync operations tracking for export/import.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid PK | |
+| `project_id` | uuid FK → projects | |
+| `operation` | `sync_operation`, not null | `export` or `import` |
+| `status` | `sync_status`, not null | `pending`, `in_progress`, `completed`, `failed` |
+| `branch` | text | Branch name |
+| `conflict_count` | integer, default 0 | Number of conflicts |
+| `error_message` | text | Error details |
+| `started_at` | timestamp | |
+| `completed_at` | timestamp | |
+
+---
+
 ## Relations Overview
 
 ```
 users
-└── projects (as owner)
-└── project_users (as reader/tester)
+├── user_sessions (1:m)
+├── user_settings (1:1)
+├── admin_settings (updated_by)
+├── gitlab_integrations (1:m)
+├── projects (as owner)
+├── project_users (as reader/tester)
 └── demo_sessions (1:m)
 
 projects
@@ -328,6 +434,8 @@ projects
 ├── ai_suggestions (1:m)
 ├── exports (1:m)
 ├── import_logs (1:m)
+├── gitlab_repositories (1:m)
+├── gitlab_sync_operations (1:m)
 └── demo_sessions (1:m)
 
 scenes
@@ -350,4 +458,7 @@ pair_groups
 
 visual_systems
 └── demo_sessions (m:1, implicit via placeholder_base_url usage)
+
+gitlab_repositories
+└── gitlab_sync_operations (1:m)
 ```
