@@ -184,43 +184,45 @@ async function getDecryptedToken(userId: string): Promise<string> {
   return decryptPAT(integration.encryptedToken);
 }
 
-export async function listGitlabProjects(userId: string, gitlabUrl?: string): Promise<GitlabProject[]> {
+export async function listGitlabProjects(
+  userId: string,
+  gitlabUrl?: string,
+): Promise<GitlabProject[]> {
   const integration = await getGitlabIntegration(userId);
   if (!integration) {
     throw new Error("GitLab integration not found");
   }
 
   const token = decryptPAT(integration.encryptedToken);
-  const url = validateGitLabUrl(gitlabUrl || integration.gitlabUrl || undefined);
+  const url = validateGitLabUrl(
+    gitlabUrl || integration.gitlabUrl || undefined,
+  );
 
   const gitlabProjects: GitlabProject[] = [];
   let page = 1;
   const perPage = 100;
 
   do {
-    const apiUrl = new URL('/api/v4/projects', url);
-    apiUrl.searchParams.set('membership', 'true');
-    apiUrl.searchParams.set('per_page', perPage.toString());
-    apiUrl.searchParams.set('page', page.toString());
+    const apiUrl = new URL("/api/v4/projects", url);
+    apiUrl.searchParams.set("membership", "true");
+    apiUrl.searchParams.set("per_page", perPage.toString());
+    apiUrl.searchParams.set("page", page.toString());
 
-    const response = await fetchWithTimeout(
-      apiUrl.toString(),
-      {
-        headers: {
-          'PRIVATE-TOKEN': token,
-        },
-      }
-    );
+    const response = await fetchWithTimeout(apiUrl.toString(), {
+      headers: {
+        "PRIVATE-TOKEN": token,
+      },
+    });
 
     if (!response.ok) {
       throw new Error(`GitLab API error: ${response.status}`);
     }
 
-    const pageProjects = await response.json() as GitlabProject[];
+    const pageProjects = (await response.json()) as GitlabProject[];
     gitlabProjects.push(...pageProjects);
 
     // Check pagination headers
-    const totalPages = response.headers.get('x-total-pages');
+    const totalPages = response.headers.get("x-total-pages");
     if (totalPages && parseInt(totalPages) > page) {
       page++;
     } else {
@@ -325,7 +327,7 @@ export async function listBranches(
     throw new Error(`GitLab API error: ${response.status}`);
   }
 
-  const branches = await response.json() as GitlabBranch[];
+  const branches = (await response.json()) as GitlabBranch[];
   return branches.map((b) => b.name);
 }
 
@@ -385,7 +387,7 @@ export async function listRpyFiles(
       throw new Error(`GitLab API error: ${response.status}`);
     }
 
-    const items = await response.json() as GitlabTreeItem[];
+    const items = (await response.json()) as GitlabTreeItem[];
 
     // Filter for .rpy files (blobs, not trees)
     for (const item of items) {
@@ -460,7 +462,7 @@ export async function getFileContent(
     throw new Error(`GitLab API error: ${response.status}`);
   }
 
-  const fileData = await response.json() as GitlabFile;
+  const fileData = (await response.json()) as GitlabFile;
 
   // GitLab returns base64-encoded content
   return Buffer.from(fileData.content, "base64").toString("utf-8");
@@ -508,10 +510,6 @@ export async function createOrUpdateFile(
     `/api/v4/projects/${repoLink.gitlabProjectId}/repository/files/${encodeURIComponent(filePath)}`,
     url,
   );
-  apiUrl.searchParams.set("ref", branch);
-
-  // Clear the ref parameter for the create/update request
-  apiUrl.searchParams.delete("ref");
 
   // Encode content as base64
   const base64Content = Buffer.from(content).toString("base64");
@@ -552,20 +550,31 @@ export async function createOrUpdateFile(
 
         // If PUT fails with 404, file doesn't exist - try POST next
         if (method === "PUT" && attemptResponse.status === 404) {
-          lastError = new Error(`GitLab API error: ${attemptResponse.status} - ${errorText}`);
+          lastError = new Error(
+            `GitLab API error: ${attemptResponse.status} - ${errorText}`,
+          );
           continue;
         }
 
         // If POST fails with 400 (likely file already exists), retry from PUT
-        if (method === "POST" && attemptResponse.status === 400 && errorText.includes("file with same name")) {
-          lastError = new Error(`GitLab API error: ${attemptResponse.status} - ${errorText}`);
+        if (
+          method === "POST" &&
+          attemptResponse.status === 400 &&
+          errorText.includes("file with same name")
+        ) {
+          lastError = new Error(
+            `GitLab API error: ${attemptResponse.status} - ${errorText}`,
+          );
           break; // Break inner loop to retry from PUT
         }
 
         // For other errors, don't retry - fail immediately
-        throw new Error(`GitLab API error: ${attemptResponse.status} - ${errorText}`);
+        throw new Error(
+          `GitLab API error: ${attemptResponse.status} - ${errorText}`,
+        );
       } catch (e) {
-        // Only retry on specific HTTP errors above, not on network/fetch errors
+        // Re-throw all errors immediately. Retryable cases (PUT 404, POST 400)
+        // are handled above via continue/break without throwing.
         if (e instanceof Error) {
           lastError = e;
         }
@@ -578,6 +587,6 @@ export async function createOrUpdateFile(
     throw lastError || new Error("Failed to create or update file");
   }
 
-  return await response.json() as { file_path: string; branch: string };
+  return (await response.json()) as { file_path: string; branch: string };
 }
 
