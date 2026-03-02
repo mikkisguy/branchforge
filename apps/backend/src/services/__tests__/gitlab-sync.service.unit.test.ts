@@ -71,6 +71,18 @@ const createMockDb = () => ({
   delete: vi.fn(() => ({
     where: vi.fn(() => Promise.resolve(undefined)),
   })),
+  transaction: vi.fn((callback: any) =>
+    callback({
+      insert: vi.fn(() => ({
+        values: vi.fn(() => ({
+          returning: vi.fn(() => Promise.resolve([])),
+        })),
+      })),
+      delete: vi.fn(() => ({
+        where: vi.fn(() => Promise.resolve(undefined)),
+      })),
+    }),
+  ),
 });
 
 describe("GitLabSyncService", () => {
@@ -353,15 +365,33 @@ describe("GitLabSyncService", () => {
         })),
       })) as any;
 
+      // Ensure select chain resolves to empty array
       mockDb.select = vi.fn(() => ({
         from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            orderBy: vi.fn(() => ({
-              limit: vi.fn(() => Promise.resolve([])),
-            })),
-          })),
+          where: vi.fn(() => Promise.resolve([])),
         })),
       })) as any;
+
+      mockDb.transaction = vi.fn((callback: any) =>
+        callback({
+          insert: vi.fn(() => ({
+            values: vi.fn(() => ({
+              returning: vi.fn(() =>
+                Promise.resolve([
+                  {
+                    id: "new-scene-1",
+                    projectId: testProjectId,
+                    title: "start",
+                  },
+                ]),
+              ),
+            })),
+          })),
+          delete: vi.fn(() => ({
+            where: vi.fn(() => Promise.resolve(undefined)),
+          })),
+        }),
+      ) as any;
 
       vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([
         { name: "script.rpy", path: "game/script.rpy" },
@@ -377,14 +407,14 @@ describe("GitLabSyncService", () => {
       vi.spyOn(rpyParserService, "parseRPYFile")
         .mockReturnValueOnce({
           labels: ["start"],
-          dialogue: [{ speaker: null, content: "Hello" }],
+          dialogue: [{ speaker: null, text: "Hello" }],
           choices: [],
           jumps: [],
           characters: [],
         })
         .mockReturnValueOnce({
           labels: ["chapter1"],
-          dialogue: [{ speaker: "s", content: "Chapter 1" }],
+          dialogue: [{ speaker: "s", text: "Chapter 1" }],
           choices: [],
           jumps: [],
           characters: [],
@@ -433,19 +463,29 @@ describe("GitLabSyncService", () => {
         })),
       })) as any;
 
+      // Service code doesn't call orderBy().limit() in importFromGitlab at line 286-290
       mockDb.select = vi.fn(() => ({
         from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            orderBy: vi.fn(() => ({
-              limit: vi.fn(() =>
-                Promise.resolve([
-                  { id: "scene-1", projectId: testProjectId, title: "start" },
-                ]),
-              ),
-            })),
-          })),
+          where: vi.fn(() =>
+            Promise.resolve([
+              { id: "scene-1", projectId: testProjectId, title: "start" },
+            ]),
+          ),
         })),
       })) as any;
+
+      mockDb.transaction = vi.fn((callback: any) =>
+        callback({
+          insert: vi.fn(() => ({
+            values: vi.fn(() => ({
+              returning: vi.fn(() => Promise.resolve([])),
+            })),
+          })),
+          delete: vi.fn(() => ({
+            where: vi.fn(() => Promise.resolve(undefined)),
+          })),
+        }),
+      ) as any;
 
       vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([
         { name: "script.rpy", path: "game/script.rpy" },
@@ -457,7 +497,7 @@ describe("GitLabSyncService", () => {
 
       vi.spyOn(rpyParserService, "parseRPYFile").mockReturnValueOnce({
         labels: ["start"],
-        dialogue: [{ speaker: null, content: "Updated from GitLab" }],
+        dialogue: [{ speaker: null, text: "Updated from GitLab" }],
         choices: [],
         jumps: [],
         characters: [],
@@ -500,18 +540,15 @@ describe("GitLabSyncService", () => {
       })) as any;
 
       // Mock that returns scenes when queried by title (to simulate existing scenes)
-      const existingScene = { id: "scene-1", projectId: testProjectId, title: "start" };
+      const existingScene = {
+        id: "scene-1",
+        projectId: testProjectId,
+        title: "start",
+      };
+      // Service code doesn't call orderBy().limit() when querying existing scenes
       mockDb.select = vi.fn(() => ({
         from: vi.fn(() => ({
-          where: vi.fn(() => {
-            // Return a promise that resolves to an array with the existing scene
-            // Also support the orderBy().limit() chain for other query patterns
-            const result = Promise.resolve([existingScene]);
-            (result as any).orderBy = vi.fn(() => ({
-              limit: vi.fn(() => result),
-            }));
-            return result;
-          }),
+          where: vi.fn(() => Promise.resolve([existingScene])),
         })),
       })) as any;
 
@@ -525,7 +562,7 @@ describe("GitLabSyncService", () => {
 
       vi.spyOn(rpyParserService, "parseRPYFile").mockReturnValueOnce({
         labels: ["start"],
-        dialogue: [{ speaker: null, content: "Conflicting content" }],
+        dialogue: [{ speaker: null, text: "Conflicting content" }],
         choices: [],
         jumps: [],
         characters: [],
@@ -801,11 +838,12 @@ describe("GitLabSyncService", () => {
         { name: "script.rpy", path: "game/script.rpy" },
       ] as any);
 
-      vi.spyOn(gitlabService, "getFileContent").mockResolvedValueOnce(
+      vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
         'label start:\n    "Same content"\n    return',
       );
 
-      vi.spyOn(rpyParserService, "parseRPYFile").mockReturnValueOnce({
+      // Must return "Same content" to match local content for no-conflict scenario
+      vi.spyOn(rpyParserService, "parseRPYFile").mockReturnValue({
         labels: ["start"],
         dialogue: [{ speaker: null, text: "Same content" }],
         choices: [],
@@ -869,7 +907,7 @@ describe("GitLabSyncService", () => {
 
       vi.spyOn(rpyParserService, "parseRPYFile").mockReturnValueOnce({
         labels: ["start"],
-        dialogue: [{ speaker: null, content: "Remote content" }],
+        dialogue: [{ speaker: null, text: "Remote content" }],
         choices: [],
         jumps: [],
         characters: [],
@@ -900,7 +938,7 @@ describe("GitLabSyncService", () => {
 
       vi.spyOn(rpyParserService, "parseRPYFile").mockReturnValueOnce({
         labels: ["chapter2"],
-        dialogue: [{ speaker: null, content: "New chapter" }],
+        dialogue: [{ speaker: null, text: "New chapter" }],
         choices: [],
         jumps: [],
         characters: [],
@@ -984,14 +1022,14 @@ describe("GitLabSyncService", () => {
       vi.spyOn(rpyParserService, "parseRPYFile")
         .mockReturnValueOnce({
           labels: ["start"],
-          dialogue: [{ speaker: null, content: "Remote change" }],
+          dialogue: [{ speaker: null, text: "Remote change" }],
           choices: [],
           jumps: [],
           characters: [],
         })
         .mockReturnValueOnce({
           labels: ["chapter2"],
-          dialogue: [{ speaker: null, content: "New remote" }],
+          dialogue: [{ speaker: null, text: "New remote" }],
           choices: [],
           jumps: [],
           characters: [],

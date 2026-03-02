@@ -50,14 +50,57 @@ export interface ConflictInfo {
     | "new_remote_label"
     | "deleted_remote_label"
     | "choice_mismatch";
-  localContent?: any;
-  remoteContent?: any;
+  localContent?: unknown;
+  remoteContent?: unknown;
 }
 
 export interface ConflictDetectionResult {
   hasConflicts: boolean;
   conflicts: ConflictInfo[];
   error?: string;
+}
+
+// Type for scene line insert values
+interface SceneLineInsertValues {
+  sceneId: string;
+  sequence: number;
+  contentType: "NARRATION" | "DIALOGUE" | "CHOICE" | "MENU" | "JUMP";
+  content: string;
+}
+
+/**
+ * Helper function to map RPY parser entry types to DB content types
+ * Extracted to eliminate code duplication
+ */
+function mapEntryToDbContentType(entry: {
+  type: string;
+  text?: string;
+  target?: string;
+}): {
+  contentType: "NARRATION" | "DIALOGUE" | "CHOICE" | "MENU" | "JUMP";
+  content: string;
+} {
+  let dbContentType: "NARRATION" | "DIALOGUE" | "CHOICE" | "MENU" | "JUMP";
+
+  if (entry.type === "FLAG") {
+    dbContentType = "JUMP"; // Map FLAG to JUMP for now
+  } else if (
+    entry.type === "NARRATION" ||
+    entry.type === "DIALOGUE" ||
+    entry.type === "JUMP"
+  ) {
+    dbContentType = entry.type as "NARRATION" | "DIALOGUE" | "JUMP";
+  } else {
+    dbContentType = "NARRATION"; // Default fallback
+  }
+
+  let content: string = entry.text || "";
+
+  if (entry.target && dbContentType === "JUMP") {
+    content = `jump ${entry.target}`;
+  }
+
+  return { contentType: dbContentType, content };
 }
 
 /**
@@ -160,7 +203,7 @@ export async function exportToGitlab(
       const branchForgeScene: BranchForgeScene = {
         name: scene.title,
         entries: lines.map((line) => ({
-          type: line.contentType as any,
+          type: line.contentType as "DIALOGUE" | "NARRATION" | "FLAG" | "JUMP",
           speaker: line.speakerId || undefined,
           text: line.content || undefined,
         })),
@@ -240,6 +283,21 @@ export async function importFromGitlab(
       };
     }
 
+    // Fetch all existing scenes once to avoid N+1 query problem
+    const allExistingScenes = await db
+      .select()
+      .from(scenes)
+      .where(eq(scenes.projectId, projectId));
+
+    // Create a Map for O(1) lookup by title
+    const existingScenesByTitle = new Map<
+      string,
+      (typeof allExistingScenes)[number]
+    >();
+    for (const scene of allExistingScenes) {
+      existingScenesByTitle.set(scene.title, scene);
+    }
+
     let conflictCount = 0;
 
     // For each RPY file, parse and import to BranchForge
@@ -256,69 +314,41 @@ export async function importFromGitlab(
 
       // Import each label as a scene
       for (const label of parsed.labels) {
-        // Check if scene already exists
-        const existingScenes = await db
-          .select()
-          .from(scenes)
-          .where(and(eq(scenes.projectId, projectId), eq(scenes.title, label)));
+        // Check if scene already exists using cached Map
+        const existingScene = existingScenesByTitle.get(label);
 
         // Convert to BranchForge format
         const sceneData = convertToBranchForgeFormat(parsed, label);
 
-        if (
-          existingScenes.length > 0 &&
-          conflictResolution === "manual_review"
-        ) {
+        if (existingScene && conflictResolution === "manual_review") {
           // Count as conflict for manual review
           conflictCount++;
-        } else if (
-          existingScenes.length > 0 &&
-          conflictResolution === "gitlab_wins"
-        ) {
+        } else if (existingScene && conflictResolution === "gitlab_wins") {
           // Update existing scene within a transaction
-          const existingScene = existingScenes[0];
-
           await db.transaction(async (tx) => {
             // Delete existing scene lines
             await tx
               .delete(sceneLines)
               .where(eq(sceneLines.sceneId, existingScene.id));
 
-            // Insert new scene lines
-            for (const entry of sceneData.entries) {
-              // Map RPY parser types to DB content types
-              let dbContentType:
-                | "NARRATION"
-                | "DIALOGUE"
-                | "CHOICE"
-                | "MENU"
-                | "JUMP";
-              if (entry.type === "FLAG") {
-                dbContentType = "JUMP"; // Map FLAG to JUMP for now
-              } else if (
-                entry.type === "NARRATION" ||
-                entry.type === "DIALOGUE" ||
-                entry.type === "JUMP"
-              ) {
-                dbContentType = entry.type;
-              } else {
-                dbContentType = "NARRATION"; // Default fallback
-              }
+            // Batch insert all new scene lines at once
+            const allValues: SceneLineInsertValues[] = sceneData.entries.map(
+              (entry, index) => {
+                const mapped = mapEntryToDbContentType(entry);
+                return {
+                  sceneId: existingScene.id,
+                  sequence: index + 1, // 1-based sequence
+                  contentType: mapped.contentType,
+                  content: mapped.content,
+                };
+              },
+            );
 
-              const values: any = {
-                sceneId: existingScene.id,
-                contentType: dbContentType,
-                content: entry.text || null,
-              };
-
-              if (entry.target && dbContentType === "JUMP") {
-                values.content = `jump ${entry.target}`;
-              }
-
-              await tx.insert(sceneLines).values(values);
+            if (allValues.length > 0) {
+              await tx.insert(sceneLines).values(allValues);
             }
           });
-        } else if (existingScenes.length === 0) {
+        } else if (!existingScene) {
           // Create new scene within a transaction
           await db.transaction(async (tx) => {
             const [newScene] = await tx
@@ -333,38 +363,21 @@ export async function importFromGitlab(
               })
               .returning();
 
-            // Insert scene lines
-            for (const entry of sceneData.entries) {
-              // Map RPY parser types to DB content types
-              let dbContentType:
-                | "NARRATION"
-                | "DIALOGUE"
-                | "CHOICE"
-                | "MENU"
-                | "JUMP";
-              if (entry.type === "FLAG") {
-                dbContentType = "JUMP"; // Map FLAG to JUMP for now
-              } else if (
-                entry.type === "NARRATION" ||
-                entry.type === "DIALOGUE" ||
-                entry.type === "JUMP"
-              ) {
-                dbContentType = entry.type;
-              } else {
-                dbContentType = "NARRATION"; // Default fallback
-              }
+            // Batch insert all scene lines at once
+            const allValues: SceneLineInsertValues[] = sceneData.entries.map(
+              (entry, index) => {
+                const mapped = mapEntryToDbContentType(entry);
+                return {
+                  sceneId: newScene.id,
+                  sequence: index + 1, // 1-based sequence
+                  contentType: mapped.contentType,
+                  content: mapped.content,
+                };
+              },
+            );
 
-              const values: any = {
-                sceneId: newScene.id,
-                contentType: dbContentType,
-                content: entry.text || null,
-              };
-
-              if (entry.target && dbContentType === "JUMP") {
-                values.content = `jump ${entry.target}`;
-              }
-
-              await tx.insert(sceneLines).values(values);
+            if (allValues.length > 0) {
+              await tx.insert(sceneLines).values(allValues);
             }
           });
         }
@@ -385,6 +398,7 @@ export async function importFromGitlab(
     };
   } catch (error) {
     // Mark operation as failed
+    console.error("DEBUG Import failed:", error);
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
     await updateSyncOperation(operation.id, {
