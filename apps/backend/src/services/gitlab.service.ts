@@ -575,9 +575,6 @@ export async function createOrUpdateFile(
       } catch (e) {
         // Re-throw all errors immediately. Retryable cases (PUT 404, POST 400)
         // are handled above via continue/break without throwing.
-        if (e instanceof Error) {
-          lastError = e;
-        }
         throw e;
       }
     }
