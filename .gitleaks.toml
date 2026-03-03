@@ -3,13 +3,16 @@ title = "Gitleaks Configuration"
 [allowlist]
 description = "Global allowlist"
 paths = [
-  '''\.env\.example$''',
-  '''CHANGELOG\.md$''',
+  '''\.env\.example''',
+  '''CHANGELOG\.md''',
 ]
-# Ignore obviously fake/placeholder tokens
+# Ignore obviously fake/placeholder tokens and credentials
 regexes = [
   '''branchforge:branchforge''',
   '''glpat-(example|test|demo|placeholder)''',
+  '''postgresql://branchforge:branchforge@''',
+  '''sk-or-v1-your-key-here''',
+  '''change-this-to-a-random-string''',
 ]
 
 [[rules.allowlist]]
