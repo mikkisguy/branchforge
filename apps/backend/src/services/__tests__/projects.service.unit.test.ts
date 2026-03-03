@@ -19,15 +19,16 @@ const createMockChain = (resolveValue: any) => ({
   })),
 });
 
-const mockInsert = vi.fn(() => ({
+// Use a function that returns a fresh chain each time
+const createEmptyMockChain = () => createMockChain([]);
+const mockSelect = vi.fn(createEmptyMockChain);
+
+// Mock insert with flexible typing since we override it in tests
+const mockInsert = vi.fn().mockImplementation(() => ({
   values: vi.fn(() => ({
     returning: vi.fn(() => Promise.resolve([])),
   })),
 }));
-
-// Use a function that returns a fresh chain each time
-const createEmptyMockChain = () => createMockChain([]);
-const mockSelect = vi.fn(createEmptyMockChain);
 
 const mockDb = {
   select: mockSelect,
@@ -63,11 +64,11 @@ describe('ProjectsService', () => {
     beforeEach(() => {
       // Reset to default: return empty arrays
       mockSelect.mockImplementation(createEmptyMockChain);
-      mockInsert.mockReturnValue({
+      mockInsert.mockImplementation(() => ({
         values: vi.fn(() => ({
           returning: vi.fn(() => Promise.resolve([])),
         })),
-      });
+      }));
     });
 
     // NOTE: These tests require integration testing due to Drizzle ORM's complex
@@ -188,11 +189,11 @@ describe('ProjectsService', () => {
 
   describe('createProject', () => {
     beforeEach(() => {
-      mockInsert.mockReturnValue({
+      mockInsert.mockImplementation(() => ({
         values: vi.fn(() => ({
           returning: vi.fn(() => Promise.resolve([])),
         })),
-      });
+      }));
     });
 
     it('should create project with valid data', async () => {
@@ -205,11 +206,11 @@ describe('ProjectsService', () => {
       };
 
       const newProject = { ...mockProject, ...body, id: 'new-project-id' };
-      mockInsert.mockReturnValue({
+      mockInsert.mockImplementation(() => ({
         values: vi.fn(() => ({
           returning: vi.fn(() => Promise.resolve([newProject])),
         })),
-      });
+      }));
 
       const project = await createProject(userId, body);
 
@@ -227,11 +228,11 @@ describe('ProjectsService', () => {
       };
 
       const newProject = { ...mockProject, ...body, maxMeterDelta: 10 };
-      mockInsert.mockReturnValue({
+      mockInsert.mockImplementation(() => ({
         values: vi.fn(() => ({
           returning: vi.fn(() => Promise.resolve([newProject])),
         })),
-      });
+      }));
 
       const project = await createProject(userId, body);
 
@@ -251,11 +252,11 @@ describe('ProjectsService', () => {
         routeLockChapter: null,
         maxMeterDelta: 10,
       };
-      mockInsert.mockReturnValue({
+      mockInsert.mockImplementation(() => ({
         values: vi.fn(() => ({
           returning: vi.fn(() => Promise.resolve([newProject])),
         })),
-      });
+      }));
 
       const project = await createProject(userId, body);
 

@@ -2,6 +2,10 @@
  * Integration test setup
  *
  * This file runs before all integration tests.
+ *
+ * Prerequisites:
+ * - DATABASE_URL_TEST environment variable must be set
+ * - Test database must exist and have proper schema
  */
 
 import { beforeAll, afterAll } from 'vitest';
@@ -15,8 +19,7 @@ beforeAll(async () => {
   // Set up test database connection
   const testDbUrl = process.env.DATABASE_URL_TEST;
   if (!testDbUrl) {
-    console.warn('DATABASE_URL_TEST not set, skipping test database setup');
-    return;
+    throw new Error('DATABASE_URL_TEST environment variable is required for integration tests');
   }
 
   pool = new Pool({ connectionString: testDbUrl });
@@ -125,6 +128,6 @@ label route_b:
 };
 
 // Helper to generate test tokens
-export function generateTestToken(userId: string, expiresIn = '1h'): string {
+export function generateTestToken(userId: string): string {
   return `test_token_${userId}`;
 }

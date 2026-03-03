@@ -15,9 +15,22 @@ let db: ReturnType<typeof drizzle> | null = null;
 
 export function getDb() {
   if (!db) {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) {
-      throw new Error('DATABASE_URL environment variable is required');
+    let connectionString: string;
+
+    if (process.env.NODE_ENV === 'test') {
+      // In test environment, use DATABASE_URL_TEST
+      const testUrl = process.env.DATABASE_URL_TEST;
+      if (!testUrl) {
+        throw new Error('DATABASE_URL_TEST environment variable is required in test environment');
+      }
+      connectionString = testUrl;
+    } else {
+      // In development/production, use DATABASE_URL
+      const url = process.env.DATABASE_URL;
+      if (!url) {
+        throw new Error('DATABASE_URL environment variable is required');
+      }
+      connectionString = url;
     }
 
     const pool = new Pool({
