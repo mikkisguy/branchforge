@@ -175,7 +175,7 @@ function consolidateChangelogs() {
   }
 
   // Update root changelog
-  const versionRegex = /## \[?\d+\.\d+\.\d+\]?/;
+  const versionRegex = /## v?\[?\d+\.\d+\.\d+\]?/;
   if (versionRegex.test(rootChangelog)) {
     rootChangelog = rootChangelog.replace(
       versionRegex,
