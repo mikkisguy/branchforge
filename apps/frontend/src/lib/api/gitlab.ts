@@ -72,6 +72,17 @@ export interface ApiErrorPayload {
   error: string;
 }
 
+export interface LinkedRepository {
+  id: string;
+  projectId: string;
+  gitlabProjectId: number;
+  repositoryName: string;
+  gitlabUrl: string;
+  defaultBranch: string;
+  lastSyncedAt: string | null;
+  createdAt: string;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -292,6 +303,15 @@ export const gitlabApi = {
   async unlinkRepository(projectId: string): Promise<void> {
     return requestNoContent(`/gitlab/unlink/${projectId}`, {
       method: "DELETE",
+    });
+  },
+
+  /**
+   * Get all linked repositories for the authenticated user
+   */
+  async getLinkedRepositories(): Promise<LinkedRepository[]> {
+    return request<LinkedRepository[]>("/gitlab/repositories", {
+      method: "GET",
     });
   },
 

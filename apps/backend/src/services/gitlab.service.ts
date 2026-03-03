@@ -234,6 +234,46 @@ export async function listGitlabProjects(
 }
 
 /**
+ * Get a single GitLab project by ID
+ * @param userId - The user ID
+ * @param gitlabProjectId - The GitLab project ID
+ * @returns The GitLab project or null
+ */
+export async function getGitlabProject(
+  userId: string,
+  gitlabProjectId: number,
+  gitlabUrl?: string,
+): Promise<GitlabProject | null> {
+  const integration = await getGitlabIntegration(userId);
+  if (!integration) {
+    throw new Error("GitLab integration not found");
+  }
+
+  const token = decryptPAT(integration.encryptedToken);
+  const url = validateGitLabUrl(
+    gitlabUrl || integration.gitlabUrl || undefined,
+  );
+
+  const apiUrl = new URL(`/api/v4/projects/${gitlabProjectId}`, url);
+
+  const response = await fetchWithTimeout(apiUrl.toString(), {
+    headers: {
+      "PRIVATE-TOKEN": token,
+    },
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`GitLab API error: ${response.status}`);
+  }
+
+  return (await response.json()) as GitlabProject;
+}
+
+/**
  * Link a BranchForge project to a GitLab repository
  * @param projectId - The BranchForge project ID
  * @param gitlabProjectId - The GitLab project ID
@@ -280,6 +320,31 @@ export async function getRepositoryLink(projectId: string) {
     .limit(1);
 
   return result[0] || null;
+}
+
+/**
+ * List all GitLab repository links for a user
+ * @param userId - The user ID
+ * @returns Array of repository links
+ */
+export async function listRepositoryLinks(userId: string) {
+  const db = getDb();
+  const result = await db
+    .select({
+      id: gitlabRepositories.id,
+      projectId: gitlabRepositories.projectId,
+      gitlabProjectId: gitlabRepositories.gitlabProjectId,
+      repositoryName: gitlabRepositories.repositoryName,
+      gitlabUrl: gitlabRepositories.gitlabUrl,
+      defaultBranch: gitlabRepositories.defaultBranch,
+      lastSyncedAt: gitlabRepositories.lastSyncedAt,
+      createdAt: gitlabRepositories.createdAt,
+    })
+    .from(gitlabRepositories)
+    .innerJoin(projects, eq(gitlabRepositories.projectId, projects.id))
+    .where(eq(projects.userId, userId));
+
+  return result;
 }
 
 /**
