@@ -9,6 +9,10 @@ import { useState, useCallback, useEffect } from "react";
 import { X, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+} from "@/components/ui/dialog";
+import {
   gitlabApi,
   type ConflictDetectionResult,
   type ConflictInfo,
@@ -205,9 +209,26 @@ export function ConflictReviewDialog({
         choice,
       }));
 
-      // Call callback if provided
-      onApplyResolutions?.(resolutionArray);
+      // Validate resolution array
+      if (resolutionArray.length === 0) {
+        throw new Error("No resolutions to apply");
+      }
 
+      // Verify all entries are valid ConflictResolution entries
+      const validChoices = ["local", "remote", "skip"] as const;
+      const hasInvalidEntry = resolutionArray.some(
+        (entry) => !validChoices.includes(entry.choice),
+      );
+      if (hasInvalidEntry) {
+        throw new Error("One or more resolutions have invalid choices");
+      }
+
+      // Call callback if provided and await the result
+      if (onApplyResolutions) {
+        await onApplyResolutions(resolutionArray);
+      }
+
+      // Only show success and close dialog after successful application
       success(`Applied ${resolutionArray.length} conflict resolution(s)`);
       onOpenChange(false);
     } catch (err) {
@@ -229,16 +250,6 @@ export function ConflictReviewDialog({
     setFetchError(null);
   }, []);
 
-  /**
-   * Reset state when dialog opens
-   */
-  const handleOpenChange = useCallback(
-    (newOpen: boolean) => {
-      onOpenChange(newOpen);
-    },
-    [onOpenChange],
-  );
-
   // Calculate progress
   const resolvedCount = resolutions.size;
   const totalCount = conflicts.length;
@@ -248,11 +259,9 @@ export function ConflictReviewDialog({
   // Render
   // ============================================================================
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-background rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl w-full max-h-[90vh] p-0 gap-0 flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-border/30 flex items-start justify-between">
           <div className="flex-1">
@@ -275,7 +284,7 @@ export function ConflictReviewDialog({
             </p>
           </div>
           <button
-            onClick={() => handleOpenChange(false)}
+            onClick={() => onOpenChange(false)}
             className="text-muted-foreground hover:text-foreground transition-colors"
             disabled={isLoading}
           >
@@ -445,24 +454,23 @@ export function ConflictReviewDialog({
         <div className="p-6 border-t border-border/30 flex justify-between">
           <Button
             variant="outline"
-            onClick={() => handleOpenChange(false)}
+            onClick={() => onOpenChange(false)}
             disabled={isLoading}
           >
             Cancel
           </Button>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             {hasUnresolved && (
-              <Button variant="ghost" disabled={isLoading}>
-                {hasUnresolved && "Resolve all conflicts first"}
-              </Button>
+              <span className="text-sm text-muted-foreground">
+                Resolve all conflicts first
+              </span>
             )}
             <Button onClick={handleApply} disabled={isLoading || hasUnresolved}>
               {isLoading ? <>Applying...</> : <>Apply Resolutions</>}
             </Button>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
-

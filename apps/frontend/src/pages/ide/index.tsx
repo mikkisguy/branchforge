@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -40,6 +40,13 @@ export function HomePageIDE() {
   // Get GitLab branch for current project (if linked)
   const gitlabRepo = currentProject ? getLinkedRepository(currentProject.id) : null;
   const gitlabBranch = gitlabRepo?.defaultBranch;
+
+  // Auto-select first project when loading completes and no project is selected
+  useEffect(() => {
+    if (!isLoadingProjects && projects.length > 0 && !currentProject) {
+      setCurrentProject(projects[0]);
+    }
+  }, [projects, isLoadingProjects, currentProject, setCurrentProject]);
 
   return (
     <div className="min-h-screen relative flex flex-col">

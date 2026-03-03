@@ -213,7 +213,7 @@ async function getMeHandler(
   reply: FastifyReply
 ): Promise<void> {
   // User is attached to request by authenticate middleware
-  const user = (request as any).user as PublicUser;
+  const user = request.user!;
 
   reply.status(200).send({ user } as SuccessResponse);
 }

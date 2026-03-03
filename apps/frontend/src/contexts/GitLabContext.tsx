@@ -110,19 +110,9 @@ export function GitLabProvider({ children }: GitLabProviderProps) {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      // Check if this is a definitive "no integration" error (404)
-      // The backend returns 404 with "GitLab integration not found" when no integration exists
-      if (
-        errorMessage.includes("GitLab integration not found") ||
-        errorMessage.includes("404")
-      ) {
-        // User doesn't have an integration - clear state
-        setIntegration(null);
-        setLinkedRepositories(new Map());
-      } else {
-        // Transient or server error - preserve existing state and set error message
-        setIntegrationError(errorMessage);
-      }
+      // 404s are already handled by gitlabApi.getIntegration() which returns null
+      // Any error reaching here is a transient or server error
+      setIntegrationError(errorMessage);
     } finally {
       setIsLoadingIntegration(false);
     }

@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { useGitLab } from "@/contexts/GitLabContext";
 import { useToast } from "@/contexts/ToastContext";
 import { GitLabProjectDialog } from "@/components/ide-shared/GitLabProjectDialog";
+import { gitlabApi } from "@/lib/api/gitlab";
 import { cn } from "@/lib/utils";
 
 // ============================================================================
@@ -64,6 +65,11 @@ export function GitLabSettingsContent() {
   // Dialog state
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [showRemoveConfirmDialog, setShowRemoveConfirmDialog] = useState(false);
+
+  // Unlinking state - track which project ID is being unlinked
+  const [unlinkingProjectId, setUnlinkingProjectId] = useState<string | null>(
+    null,
+  );
 
   /**
    * Validate token
@@ -171,10 +177,32 @@ export function GitLabSettingsContent() {
   }, []);
 
   /**
+   * Unlink a GitLab repository from a project
+   */
+  const handleUnlink = useCallback(
+    async (projectId: string) => {
+      setUnlinkingProjectId(projectId);
+
+      try {
+        await gitlabApi.unlinkRepository(projectId);
+        success("GitLab repository unlinked successfully");
+        await refreshIntegration();
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to unlink repository";
+        error(message);
+      } finally {
+        setUnlinkingProjectId(null);
+      }
+    },
+    [refreshIntegration, success, error],
+  );
+
+  /**
    * Load linked projects
    */
   const loadLinkedProjects = useCallback(async () => {
-    // This will be implemented once we have the backend API to fetch linked projects
+    // TODO: This will be implemented once we have the backend API to fetch linked projects
     // For now, use the linkedRepositories from context
     const projects: LinkedProjectDisplay[] = Array.from(
       linkedRepositories.values(),
@@ -254,12 +282,14 @@ export function GitLabSettingsContent() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => {
-                      // TODO: Implement unlink
-                      error("Unlink functionality coming soon");
-                    }}
+                    onClick={() => handleUnlink(project.id)}
+                    disabled={unlinkingProjectId === project.id}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    {unlinkingProjectId === project.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
                   </Button>
                 </div>
               ))}
@@ -413,7 +443,8 @@ export function GitLabSettingsContent() {
             <div className="p-6 border-b border-border/30">
               <h2 className="text-lg font-medium">Remove GitLab Integration</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Are you sure you want to remove your GitLab integration? This will unlink all repositories.
+                Are you sure you want to remove your GitLab integration? This
+                will unlink all repositories.
               </p>
             </div>
 

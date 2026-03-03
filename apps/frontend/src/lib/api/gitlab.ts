@@ -325,9 +325,11 @@ export const gitlabApi = {
     projectId: string,
     branch?: string,
     commitMessage?: string,
+    signal?: AbortSignal,
   ): Promise<SyncOperation> {
     return request<SyncOperation>("/gitlab/export", {
       method: "POST",
+      signal,
       body: JSON.stringify({
         projectId,
         branch,
@@ -343,9 +345,11 @@ export const gitlabApi = {
     projectId: string,
     branch: string,
     conflictResolution: ConflictResolution,
+    signal?: AbortSignal,
   ): Promise<SyncOperation> {
     return request<SyncOperation>("/gitlab/import", {
       method: "POST",
+      signal,
       body: JSON.stringify({
         projectId,
         branch,
@@ -357,8 +361,13 @@ export const gitlabApi = {
   /**
    * Get sync operation status
    */
-  async getOperationStatus(operationId: string): Promise<SyncOperation> {
-    return request<SyncOperation>(`/gitlab/operations/${operationId}`);
+  async getOperationStatus(
+    operationId: string,
+    signal?: AbortSignal,
+  ): Promise<SyncOperation> {
+    return request<SyncOperation>(`/gitlab/operations/${operationId}`, {
+      signal,
+    });
   },
 
   /**
@@ -392,27 +401,72 @@ export const gitlabApi = {
   async pollOperation(
     operationId: string,
     onUpdate: (operation: SyncOperation) => void,
-    options: { interval?: number; timeout?: number } = {},
+    options: { interval?: number; timeout?: number; signal?: AbortSignal } = {},
   ): Promise<SyncOperation> {
-    const { interval = 1000, timeout = 60000 } = options;
+    const { interval = 1000, timeout = 60000, signal } = options;
     const startTime = Date.now();
 
-    while (true) {
-      // Check timeout
-      if (Date.now() - startTime > timeout) {
-        throw new Error("Operation polling timed out");
+    /**
+     * Creates a promise that resolves after a delay or rejects when aborted
+     */
+    const abortableDelay = (ms: number, abortSignal?: AbortSignal) => {
+      return new Promise<void>((resolve, reject) => {
+        if (abortSignal?.aborted) {
+          reject(new DOMException("Polling was cancelled", "AbortError"));
+          return;
+        }
+
+        const timeoutId = setTimeout(() => {
+          cleanup();
+          resolve();
+        }, ms);
+
+        const onAbort = () => {
+          cleanup();
+          reject(new DOMException("Polling was cancelled", "AbortError"));
+        };
+
+        const cleanup = () => {
+          clearTimeout(timeoutId);
+          abortSignal?.removeEventListener("abort", onAbort);
+        };
+
+        abortSignal?.addEventListener("abort", onAbort);
+      });
+    };
+
+    try {
+      while (true) {
+        // Check if aborted before doing any work
+        if (signal?.aborted) {
+          throw new DOMException("Polling was cancelled", "AbortError");
+        }
+
+        // Check timeout
+        if (Date.now() - startTime > timeout) {
+          throw new Error("Operation polling timed out");
+        }
+
+        const operation = await this.getOperationStatus(operationId, signal);
+        onUpdate(operation);
+
+        // Stop polling if operation is complete or failed
+        if (operation.status === "completed" || operation.status === "failed") {
+          return operation;
+        }
+
+        // Wait before next poll (abortable)
+        await abortableDelay(interval, signal);
       }
-
-      const operation = await this.getOperationStatus(operationId);
-      onUpdate(operation);
-
-      // Stop polling if operation is complete or failed
-      if (operation.status === "completed" || operation.status === "failed") {
-        return operation;
+    } catch (error) {
+      // Re-throw AbortError to allow caller to distinguish cancellation
+      if (
+        error instanceof DOMException &&
+        error.name === "AbortError"
+      ) {
+        throw error;
       }
-
-      // Wait before next poll
-      await new Promise((resolve) => setTimeout(resolve, interval));
+      throw error;
     }
   },
 };

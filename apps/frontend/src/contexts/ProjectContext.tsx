@@ -11,6 +11,7 @@ import {
   useState,
   useCallback,
   useEffect,
+  useRef,
   ReactNode,
 } from "react";
 import { projectsApi, type Project } from "@/lib/api/projects";
@@ -48,11 +49,46 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [projectsError, setProjectsError] = useState<string | null>(null);
 
+  // Track if initial load has occurred to avoid stale closure issues
+  const initialLoadRef = useRef(true);
+
+  // Ref to track currentProject for use in refreshProjects without causing dependency issues
+  const currentProjectRef = useRef<Project | null>(null);
+
+  // Keep the ref in sync with currentProject
+  useEffect(() => {
+    currentProjectRef.current = currentProject;
+  }, [currentProject]);
+
   /**
    * Load projects on mount
    */
   useEffect(() => {
-    refreshProjects();
+    if (initialLoadRef.current) {
+      initialLoadRef.current = false;
+      const fetchInitialProjects = async () => {
+        setIsLoadingProjects(true);
+        setProjectsError(null);
+        try {
+          const fetchedProjects = await projectsApi.listProjects();
+          setProjects(fetchedProjects);
+
+          // Auto-select first project if none selected and projects exist
+          if (fetchedProjects.length > 0) {
+            setCurrentProject(fetchedProjects[0]);
+          }
+        } catch (error) {
+          const message =
+            error instanceof Error
+              ? error.message
+              : "Failed to load projects";
+          setProjectsError(message);
+        } finally {
+          setIsLoadingProjects(false);
+        }
+      };
+      fetchInitialProjects();
+    }
   }, []);
 
   /**
@@ -65,16 +101,18 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
       const fetchedProjects = await projectsApi.listProjects();
       setProjects(fetchedProjects);
 
+      const current = currentProjectRef.current;
+
       // If there's a current project, update it from the fresh list
-      if (currentProject) {
-        const updated = fetchedProjects.find(p => p.id === currentProject.id);
+      if (current) {
+        const updated = fetchedProjects.find(p => p.id === current.id);
         if (updated) {
           setCurrentProject(updated);
         }
       }
 
       // Auto-select first project if none selected and projects exist
-      if (!currentProject && fetchedProjects.length > 0) {
+      if (!current && fetchedProjects.length > 0) {
         setCurrentProject(fetchedProjects[0]);
       }
     } catch (error) {
@@ -86,7 +124,7 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
     } finally {
       setIsLoadingProjects(false);
     }
-  }, [currentProject]);
+  }, []); // No dependencies - stable reference
 
   /**
    * Set the current project

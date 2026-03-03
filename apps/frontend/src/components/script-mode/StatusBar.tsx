@@ -22,9 +22,9 @@ export function StatusBar({
   lineCount,
   language,
   themeName,
-  projectId = "my-project",
-  projectName = "My Visual Novel",
-  gitlabBranch = "main",
+  projectId,
+  projectName,
+  gitlabBranch,
 }: StatusBarProps) {
   const { hasIntegration, isProjectLinked } = useGitLab();
 
@@ -62,7 +62,8 @@ export function StatusBar({
   /**
    * Check if GitLab is available for this project
    */
-  const isGitLabAvailable = hasIntegration && isProjectLinked(projectId);
+  const isGitLabAvailable =
+    hasIntegration && projectId !== undefined && isProjectLinked(projectId);
 
   return (
     <>
@@ -76,7 +77,7 @@ export function StatusBar({
           {isGitLabAvailable && (
             <span className="flex items-center gap-1.5 text-muted-foreground">
               <GitBranch className="w-3 h-3" />
-              <span>{gitlabBranch}</span>
+              <span>{gitlabBranch ?? "Unknown"}</span>
             </span>
           )}
         </div>
@@ -123,23 +124,27 @@ export function StatusBar({
       </div>
 
       {/* Sync Dialog */}
-      <GitLabSyncDialog
-        open={syncDialogOpen}
-        onOpenChange={setSyncDialogOpen}
-        operationType={syncOperationType}
-        projectId={projectId}
-        projectName={projectName}
-        defaultBranch={gitlabBranch}
-      />
+      {projectId !== undefined && (
+        <GitLabSyncDialog
+          open={syncDialogOpen}
+          onOpenChange={setSyncDialogOpen}
+          operationType={syncOperationType}
+          projectId={projectId}
+          projectName={projectName}
+          defaultBranch={gitlabBranch}
+        />
+      )}
 
       {/* Conflict Review Dialog */}
-      <ConflictReviewDialog
-        open={conflictDialogOpen}
-        onOpenChange={setConflictDialogOpen}
-        projectId={projectId}
-        branch={gitlabBranch}
-        onApplyResolutions={handleApplyResolutions}
-      />
+      {projectId !== undefined && gitlabBranch !== undefined && (
+        <ConflictReviewDialog
+          open={conflictDialogOpen}
+          onOpenChange={setConflictDialogOpen}
+          projectId={projectId}
+          branch={gitlabBranch}
+          onApplyResolutions={handleApplyResolutions}
+        />
+      )}
     </>
   );
 }

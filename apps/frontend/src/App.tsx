@@ -15,31 +15,34 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <ProjectProvider>
-          <ToastProvider>
-            <SettingsProvider>
+        <ToastProvider>
+          <SettingsProvider>
+            <ProjectProvider>
               <GitLabProvider>
                 <div className="app">
-                <Routes>
-                  <Route path={`${BASE_URL}login`} element={<LoginPage />} />
-                  <Route path={`${BASE_URL}register`} element={<RegisterPage />} />
-                  <Route
-                    path={BASE_URL}
-                    element={
-                      <ProtectedRoute>
-                        <HomePageIDE />
-                      </ProtectedRoute>
-                    }
-                  />
-                </Routes>
-              </div>
-            </GitLabProvider>
+                  <Routes>
+                    <Route path={`${BASE_URL}login`} element={<LoginPage />} />
+                    <Route
+                      path={`${BASE_URL}register`}
+                      element={<RegisterPage />}
+                    />
+                    <Route
+                      path={BASE_URL}
+                      element={
+                        <ProtectedRoute>
+                          <HomePageIDE />
+                        </ProtectedRoute>
+                      }
+                    />
+                  </Routes>
+                </div>
+              </GitLabProvider>
+            </ProjectProvider>
           </SettingsProvider>
         </ToastProvider>
-      </ProjectProvider>
-    </AuthProvider>
-  </ThemeProvider>
-);
+      </AuthProvider>
+    </ThemeProvider>
+  );
 }
 
 export default App;

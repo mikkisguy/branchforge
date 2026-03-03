@@ -10,6 +10,7 @@ import { Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { gitlabApi, type GitLabProject } from "@/lib/api/gitlab";
 import { useGitLab } from "@/contexts/GitLabContext";
 import { useToast } from "@/contexts/ToastContext";
@@ -143,7 +144,7 @@ export function GitLabProjectDialog({
       const request: LinkRepositoryRequest = {
         projectId: selectedProjectId,
         gitlabProjectId: selectedGitlabProject.id,
-        branch: branch.trim() || "main",
+        branch: branch.trim(),
       };
 
       await gitlabApi.linkRepository(
@@ -191,11 +192,9 @@ export function GitLabProjectDialog({
   // Render
   // ============================================================================
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-background rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg w-full max-h-[90vh] p-0 gap-0 flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-border/30 flex items-start justify-between">
           <div>
@@ -337,8 +336,8 @@ export function GitLabProjectDialog({
             Link Repository
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 interface DialogProps {
@@ -10,17 +10,77 @@ interface DialogProps {
 }
 
 export function Dialog({ open, onOpenChange, children, closeOnBackdropClick = true }: DialogProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
-    function handleEscape(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        onOpenChange?.(false);
-      }
+    if (!open || !dialogRef.current) return;
+
+    const dialog = dialogRef.current;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    previouslyFocusedElementRef.current = previouslyFocused;
+
+    // Find all focusable elements within the dialog
+    const getFocusableElements = (): HTMLElement[] => {
+      const focusableSelectors = [
+        'button:not([disabled])',
+        '[href]',
+        'input:not([disabled])',
+        'select:not([disabled])',
+        'textarea:not([disabled])',
+        '[tabindex]:not([tabindex="-1"])',
+      ];
+      return Array.from(
+        dialog.querySelectorAll<HTMLElement>(focusableSelectors.join(','))
+      );
+    };
+
+    // Focus the first focusable element
+    const focusableElements = getFocusableElements();
+    if (focusableElements.length > 0) {
+      focusableElements[0].focus();
     }
 
-    if (open) {
-      document.addEventListener("keydown", handleEscape);
-      return () => document.removeEventListener("keydown", handleEscape);
-    }
+    // Handle Escape key and Tab/Shift+Tab for focus trap
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onOpenChange?.(false);
+        return;
+      }
+
+      // Focus trap for Tab/Shift+Tab
+      if (e.key === 'Tab') {
+        const currentFocusable = getFocusableElements();
+        if (currentFocusable.length === 0) return;
+
+        const firstElement = currentFocusable[0];
+        const lastElement = currentFocusable[currentFocusable.length - 1];
+
+        if (e.shiftKey) {
+          // Shift+Tab: if at first element, wrap to last
+          if (document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          // Tab: if at last element, wrap to first
+          if (document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    // Cleanup: restore focus and remove listener
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (previouslyFocusedElementRef.current) {
+        previouslyFocusedElementRef.current.focus();
+      }
+    };
   }, [open, onOpenChange]);
 
   if (!open) return null;
@@ -33,7 +93,13 @@ export function Dialog({ open, onOpenChange, children, closeOnBackdropClick = tr
         onClick={closeOnBackdropClick ? () => onOpenChange?.(false) : undefined}
       />
       {/* Content */}
-      {children}
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+      >
+        {children}
+      </div>
     </div>
   );
 }

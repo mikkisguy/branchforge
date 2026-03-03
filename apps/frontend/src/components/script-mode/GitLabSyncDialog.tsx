@@ -5,11 +5,15 @@
  * Shows progress and allows configuration of branch and commit message.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { X, Download, Upload, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+} from "@/components/ui/dialog";
 import { type ConflictResolution } from "@/lib/api/gitlab";
 import { useGitLabSync } from "@/hooks/useGitLabSync";
 import { useToast } from "@/contexts/ToastContext";
@@ -73,6 +77,18 @@ export function GitLabSyncDialog({
   const [conflictResolution, setConflictResolution] =
     useState<ConflictResolution>("branchforge_wins");
 
+  // Ref to track the timeout so we can clear it on unmount
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
+  // Clear timeout on unmount to prevent running callbacks after unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
   /**
    * Handle sync operation
    */
@@ -98,7 +114,11 @@ export function GitLabSyncDialog({
       success(
         `${operationType === "export" ? "Export" : "Import"} completed successfully`,
       );
-      setTimeout(() => {
+      // Clear any existing timeout before scheduling a new one
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
         reset();
         onOpenChange(false);
       }, 1000);
@@ -136,11 +156,9 @@ export function GitLabSyncDialog({
   // Render
   // ============================================================================
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-background rounded-lg shadow-lg max-w-md w-full">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md w-full p-0 gap-0">
         {/* Header */}
         <div className="p-6 border-b border-border/30 flex items-start justify-between">
           <div className="flex items-center gap-3">
@@ -323,8 +341,7 @@ export function GitLabSyncDialog({
             <Button onClick={handleClose}>Done</Button>
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
-

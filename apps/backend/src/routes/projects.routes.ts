@@ -54,7 +54,7 @@ async function listProjectsHandler(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
-  const user = (request as any).user as PublicUser;
+  const user = request.user!;
 
   const projects = await listProjects(user.id);
 
@@ -72,7 +72,7 @@ async function getProjectHandler(
   reply: FastifyReply,
 ): Promise<void> {
   const { id } = request.params;
-  const user = (request as any).user as PublicUser;
+  const user = request.user!;
 
   const project = await getProject(id, user.id);
 
@@ -94,7 +94,7 @@ async function createProjectHandler(
   request: FastifyRequest<{ Body: CreateProjectBody }>,
   reply: FastifyReply,
 ): Promise<void> {
-  const user = (request as any).user as PublicUser;
+  const user = request.user!;
   const body = request.body;
 
   // Validate required fields

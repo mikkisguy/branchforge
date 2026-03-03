@@ -25,6 +25,23 @@ export interface PublicProject {
 }
 
 /**
+ * Project fields needed for PublicProject mapping
+ * Used for query results where we only need these specific fields
+ */
+type ProjectForPublic = Pick<
+  Project,
+  | "id"
+  | "name"
+  | "type"
+  | "description"
+  | "routeLockChapter"
+  | "maxMeterDelta"
+  | "visibility"
+  | "createdAt"
+  | "updatedAt"
+>;
+
+/**
  * Create project request body
  */
 export interface CreateProjectBody {
@@ -51,7 +68,7 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
     .orderBy(projects.createdAt);
 
   // Get projects shared with the user via project_users junction table
-  const sharedProjectsResult = await db
+  const sharedProjectsResult: ProjectForPublic[] = await db
     .select({
       id: projects.id,
       name: projects.name,
@@ -65,13 +82,14 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
     })
     .from(projects)
     .innerJoin(projectUsers, eq(projectUsers.projectId, projects.id))
-    .where(eq(projectUsers.userId, userId));
+    .where(eq(projectUsers.userId, userId))
+    .orderBy(projects.createdAt);
 
   // Combine both lists, removing duplicates
-  const allProjects = [...userProjects];
+  const allProjects: ProjectForPublic[] = [...userProjects];
   for (const shared of sharedProjectsResult) {
     if (!allProjects.find((p) => p.id === shared.id)) {
-      allProjects.push(shared as Project);
+      allProjects.push(shared);
     }
   }
 
@@ -120,7 +138,7 @@ export async function getProject(
     .limit(1);
 
   if (sharedProject.length > 0) {
-    return mapToPublicProject(sharedProject[0] as Project);
+    return mapToPublicProject(sharedProject[0]);
   }
 
   return null;
@@ -161,7 +179,7 @@ export async function createProject(
 /**
  * Map a Project to PublicProject (already excludes sensitive data)
  */
-function mapToPublicProject(project: Project): PublicProject {
+function mapToPublicProject(project: ProjectForPublic): PublicProject {
   return {
     id: project.id,
     name: project.name,

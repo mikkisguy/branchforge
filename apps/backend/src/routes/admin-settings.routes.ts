@@ -16,13 +16,17 @@ import { getDb } from '../db/index.js';
 // Types
 // ============================================================================
 
+interface UpdateSettingParams {
+  key: string;
+}
+
 interface UpdateSettingBody {
-  value: any;
+  value: unknown;
 }
 
 interface SettingResponse {
   key: string;
-  value: any;
+  value: unknown;
 }
 
 interface SignUpStatusResponse {
@@ -30,7 +34,7 @@ interface SignUpStatusResponse {
 }
 
 interface AllSettingsResponse {
-  settings: Record<string, any>;
+  settings: Record<string, unknown>;
 }
 
 // ============================================================================
@@ -78,18 +82,18 @@ async function getAllSettingsHandler(
  * Update an admin setting (admin only)
  *
  * PUT /admin/settings/:key
- * Body: { value: any }
+ * Body: { value: unknown }
  *
  * Updates or creates a setting with the given key and value.
  * Requires OWNER role. Tracks which user made the change.
  */
 async function updateSettingHandler(
-  request: any,
-  reply: any
+  request: FastifyRequest<{ Params: UpdateSettingParams; Body: UpdateSettingBody }>,
+  reply: FastifyReply
 ): Promise<void> {
   const { key } = request.params;
   const { value } = request.body;
-  const user = request.user;
+  const user = request.user!;
 
   const { setAdminSetting } = await import('../services/admin-settings.service.js');
   await setAdminSetting(key, value, user.id);
@@ -110,7 +114,7 @@ export async function adminSettingsRoutes(fastify: FastifyInstance): Promise<voi
     onRequest: [authenticate, requireRole('OWNER')],
   }, getAllSettingsHandler);
 
-  fastify.put('/admin/settings/:key', {
+  fastify.put<{ Params: UpdateSettingParams; Body: UpdateSettingBody }>('/admin/settings/:key', {
     onRequest: [authenticate, requireRole('OWNER')],
   }, updateSettingHandler);
 }

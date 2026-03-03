@@ -20,6 +20,7 @@ import {
   unlinkRepository,
   listBranches,
   listRpyFiles,
+  getGitlabIntegration,
 } from "../services/gitlab.service.js";
 import {
   exportToGitlab,
@@ -318,8 +319,6 @@ async function getIntegrationHandler(
   const userId = getAuthenticatedUserId(request);
 
   try {
-    const { getGitlabIntegration } =
-      await import("../services/gitlab.service.js");
     const integration = await getGitlabIntegration(userId);
 
     if (!integration) {
@@ -718,13 +717,6 @@ async function getOperationHandler(
 
   try {
     const operation = await getSyncOperation(operationId);
-
-    if (!operation) {
-      reply
-        .status(404)
-        .send({ error: "Not Found", message: "Sync operation not found" });
-      return;
-    }
 
     reply.send(operation);
   } catch (err) {
