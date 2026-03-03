@@ -130,8 +130,8 @@ async function createProjectHandler(
 
 export async function projectsRoutes(fastify: FastifyInstance): Promise<void> {
   // All routes require authentication
-  fastify.get("/projects", { onRequest: authenticate }, listProjectsHandler as any);
-  fastify.get("/projects/:id", { onRequest: authenticate }, getProjectHandler as any);
-  fastify.post("/projects", { onRequest: authenticate }, createProjectHandler as any);
+  fastify.get("/projects", { onRequest: authenticate }, listProjectsHandler);
+  fastify.get("/projects/:id", { onRequest: authenticate }, getProjectHandler);
+  fastify.post("/projects", { onRequest: authenticate }, createProjectHandler);
 }
 

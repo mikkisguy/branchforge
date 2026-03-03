@@ -214,15 +214,6 @@ export function ConflictReviewDialog({
         throw new Error("No resolutions to apply");
       }
 
-      // Verify all entries are valid ConflictResolution entries
-      const validChoices = ["local", "remote", "skip"] as const;
-      const hasInvalidEntry = resolutionArray.some(
-        (entry) => !validChoices.includes(entry.choice),
-      );
-      if (hasInvalidEntry) {
-        throw new Error("One or more resolutions have invalid choices");
-      }
-
       // Call callback if provided and await the result
       if (onApplyResolutions) {
         await onApplyResolutions(resolutionArray);

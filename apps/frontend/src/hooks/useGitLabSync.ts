@@ -13,6 +13,33 @@ import {
 } from "@/lib/api/gitlab";
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+const POLL_TIMEOUT_MS = 120_000;
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function calculateProgress(
+  status: SyncOperation["status"],
+  pollStartTime: number | null,
+): number {
+  if (status === "completed") {
+    return 100;
+  }
+  if (status === "failed") {
+    return 0;
+  }
+  if (status === "in_progress" && pollStartTime) {
+    const elapsed = Date.now() - pollStartTime;
+    return Math.min(Math.max(10 + Math.round((elapsed / POLL_TIMEOUT_MS) * 80), 10), 90);
+  }
+  return 10;
+}
+
+// ============================================================================
 // Types
 // ============================================================================
 
@@ -132,25 +159,12 @@ export function useGitLabSync(): UseGitLabSyncReturn {
           (updatedOp) => {
             if (abortController.signal.aborted) return;
 
-            let progress: number;
-            if (updatedOp.status === "completed") {
-              progress = 100;
-            } else if (updatedOp.status === "failed") {
-              progress = 0;
-            } else if (updatedOp.status === "in_progress" && pollStartRef.current) {
-              const timeoutMs = 120_000;
-              const elapsed = Date.now() - pollStartRef.current;
-              progress = Math.min(Math.max(10 + Math.round((elapsed / timeoutMs) * 80), 10), 90);
-            } else {
-              progress = 10;
-            }
-
             updateState({
               operation: updatedOp,
-              progress,
+              progress: calculateProgress(updatedOp.status, pollStartRef.current),
             });
           },
-          { interval: 1000, timeout: 120000, signal: abortController.signal },
+          { interval: 1000, timeout: POLL_TIMEOUT_MS, signal: abortController.signal },
         );
 
         if (abortController.signal.aborted) {
@@ -232,25 +246,12 @@ export function useGitLabSync(): UseGitLabSyncReturn {
           (updatedOp) => {
             if (abortController.signal.aborted) return;
 
-            let progress: number;
-            if (updatedOp.status === "completed") {
-              progress = 100;
-            } else if (updatedOp.status === "failed") {
-              progress = 0;
-            } else if (updatedOp.status === "in_progress" && pollStartRef.current) {
-              const timeoutMs = 120_000;
-              const elapsed = Date.now() - pollStartRef.current;
-              progress = Math.min(Math.max(10 + Math.round((elapsed / timeoutMs) * 80), 10), 90);
-            } else {
-              progress = 10;
-            }
-
             updateState({
               operation: updatedOp,
-              progress,
+              progress: calculateProgress(updatedOp.status, pollStartRef.current),
             });
           },
-          { interval: 1000, timeout: 120000, signal: abortController.signal },
+          { interval: 1000, timeout: POLL_TIMEOUT_MS, signal: abortController.signal },
         );
 
         if (abortController.signal.aborted) {

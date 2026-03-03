@@ -241,14 +241,7 @@ export const gitlabApi = {
       });
     } catch (error) {
       // If integration not found (404), return null
-      if (
-        (error instanceof ApiError && error.status === 404) ||
-        (typeof error === "object" &&
-          error !== null &&
-          "status" in error &&
-          typeof error.status === "number" &&
-          error.status === 404)
-      ) {
+      if (error instanceof ApiError && error.status === 404) {
         return null;
       }
       throw error;
@@ -459,13 +452,7 @@ export const gitlabApi = {
         await abortableDelay(interval, signal);
       }
     } catch (error) {
-      // Re-throw AbortError to allow caller to distinguish cancellation
-      if (
-        error instanceof DOMException &&
-        error.name === "AbortError"
-      ) {
-        throw error;
-      }
+      // All errors (including AbortError) are propagated to caller
       throw error;
     }
   },

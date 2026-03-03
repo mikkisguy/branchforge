@@ -66,11 +66,18 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
   useEffect(() => {
     if (initialLoadRef.current) {
       initialLoadRef.current = false;
+
+      let mounted = true;
+
       const fetchInitialProjects = async () => {
+        if (!mounted) return;
         setIsLoadingProjects(true);
         setProjectsError(null);
+
         try {
           const fetchedProjects = await projectsApi.listProjects();
+          if (!mounted) return;
+
           setProjects(fetchedProjects);
 
           // Auto-select first project if none selected and projects exist
@@ -78,16 +85,24 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
             setCurrentProject(fetchedProjects[0]);
           }
         } catch (error) {
+          if (!mounted) return;
           const message =
             error instanceof Error
               ? error.message
               : "Failed to load projects";
           setProjectsError(message);
         } finally {
-          setIsLoadingProjects(false);
+          if (mounted) {
+            setIsLoadingProjects(false);
+          }
         }
       };
+
       fetchInitialProjects();
+
+      return () => {
+        mounted = false;
+      };
     }
   }, []);
 
@@ -103,11 +118,18 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
 
       const current = currentProjectRef.current;
 
-      // If there's a current project, update it from the fresh list
+      // If there's a current project, try to update it from the fresh list
       if (current) {
         const updated = fetchedProjects.find(p => p.id === current.id);
         if (updated) {
           setCurrentProject(updated);
+        } else {
+          // Current project was deleted on server; fallback to first available or clear
+          if (fetchedProjects.length > 0) {
+            setCurrentProject(fetchedProjects[0]);
+          } else {
+            setCurrentProject(null);
+          }
         }
       }
 

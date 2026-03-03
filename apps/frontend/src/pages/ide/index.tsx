@@ -1,14 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useGitLab } from "@/contexts/GitLabContext";
 import { themePalettes, BASE_URL } from "@/lib/constants";
-import {
-  FloatingParticles,
-  TopRightPanel,
-} from "@/components/ide-shared";
+import { FloatingParticles, TopRightPanel } from "@/components/ide-shared";
 import { Logo } from "@/components/ui/logo";
 import { WriteMode } from "./WriteMode";
 import { ScriptMode } from "./ScriptMode";
@@ -20,12 +17,8 @@ export function HomePageIDE() {
   const [mode, setMode] = useState<"write" | "script">("write");
 
   // Project context
-  const {
-    currentProject,
-    projects,
-    setCurrentProject,
-    isLoadingProjects,
-  } = useProject();
+  const { currentProject, projects, setCurrentProject, isLoadingProjects } =
+    useProject();
 
   // GitLab context for getting linked repository info
   const { getLinkedRepository } = useGitLab();
@@ -38,15 +31,10 @@ export function HomePageIDE() {
   };
 
   // Get GitLab branch for current project (if linked)
-  const gitlabRepo = currentProject ? getLinkedRepository(currentProject.id) : null;
+  const gitlabRepo = currentProject
+    ? getLinkedRepository(currentProject.id)
+    : null;
   const gitlabBranch = gitlabRepo?.defaultBranch;
-
-  // Auto-select first project when loading completes and no project is selected
-  useEffect(() => {
-    if (!isLoadingProjects && projects.length > 0 && !currentProject) {
-      setCurrentProject(projects[0]);
-    }
-  }, [projects, isLoadingProjects, currentProject, setCurrentProject]);
 
   return (
     <div className="min-h-screen relative flex flex-col">
@@ -73,7 +61,7 @@ export function HomePageIDE() {
           <select
             value={currentProject?.id || ""}
             onChange={(e) => {
-              const project = projects.find(p => p.id === e.target.value);
+              const project = projects.find((p) => p.id === e.target.value);
               if (project) setCurrentProject(project);
             }}
             disabled={isLoadingProjects}
@@ -95,7 +83,6 @@ export function HomePageIDE() {
         </div>
       )}
 
-
       {mode === "write" ? (
         <WriteMode setMode={setMode} />
       ) : (
@@ -109,3 +96,4 @@ export function HomePageIDE() {
     </div>
   );
 }
+

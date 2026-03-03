@@ -6,11 +6,14 @@
  * Admin endpoints require OWNER role to modify settings.
  */
 
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { authenticate, requireRole } from '../middleware/auth.middleware.js';
-import { getAdminSetting } from '../services/admin-settings.service.js';
-import { adminSettings } from '../db/schema/index.js';
-import { getDb } from '../db/index.js';
+import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { authenticate, requireRole } from "../middleware/auth.middleware.js";
+import {
+  getAdminSetting,
+  setAdminSetting,
+} from "../services/admin-settings.service.js";
+import { adminSettings } from "../db/schema/index.js";
+import { getDb } from "../db/index.js";
 
 // ============================================================================
 // Types
@@ -51,9 +54,9 @@ interface AllSettingsResponse {
  */
 async function getSignUpStatusHandler(
   _request: FastifyRequest,
-  reply: FastifyReply
+  reply: FastifyReply,
 ): Promise<void> {
-  const enabled = await getAdminSetting('sign_ups_enabled');
+  const enabled = await getAdminSetting("sign_ups_enabled");
   reply.send({ enabled: enabled !== false } as SignUpStatusResponse);
 }
 
@@ -67,11 +70,11 @@ async function getSignUpStatusHandler(
  */
 async function getAllSettingsHandler(
   request: FastifyRequest,
-  reply: FastifyReply
+  reply: FastifyReply,
 ): Promise<void> {
   const db = getDb();
   const settings = await db.select().from(adminSettings);
-  const record = settings.reduce((acc: Record<string, any>, s) => {
+  const record = settings.reduce((acc: Record<string, unknown>, s) => {
     acc[s.key] = s.value;
     return acc;
   }, {});
@@ -88,14 +91,16 @@ async function getAllSettingsHandler(
  * Requires OWNER role. Tracks which user made the change.
  */
 async function updateSettingHandler(
-  request: FastifyRequest<{ Params: UpdateSettingParams; Body: UpdateSettingBody }>,
-  reply: FastifyReply
+  request: FastifyRequest<{
+    Params: UpdateSettingParams;
+    Body: UpdateSettingBody;
+  }>,
+  reply: FastifyReply,
 ): Promise<void> {
   const { key } = request.params;
   const { value } = request.body;
   const user = request.user!;
 
-  const { setAdminSetting } = await import('../services/admin-settings.service.js');
   await setAdminSetting(key, value, user.id);
 
   reply.send({ key, value } as SettingResponse);
@@ -105,16 +110,27 @@ async function updateSettingHandler(
 // Routes Registration
 // ============================================================================
 
-export async function adminSettingsRoutes(fastify: FastifyInstance): Promise<void> {
+export async function adminSettingsRoutes(
+  fastify: FastifyInstance,
+): Promise<void> {
   // Public routes
-  fastify.get('/public/settings/signups', getSignUpStatusHandler);
+  fastify.get("/public/settings/signups", getSignUpStatusHandler);
 
   // Admin routes (require OWNER role)
-  fastify.get('/admin/settings', {
-    onRequest: [authenticate, requireRole('OWNER')],
-  }, getAllSettingsHandler);
+  fastify.get(
+    "/admin/settings",
+    {
+      onRequest: [authenticate, requireRole("OWNER")],
+    },
+    getAllSettingsHandler,
+  );
 
-  fastify.put<{ Params: UpdateSettingParams; Body: UpdateSettingBody }>('/admin/settings/:key', {
-    onRequest: [authenticate, requireRole('OWNER')],
-  }, updateSettingHandler);
+  fastify.put<{ Params: UpdateSettingParams; Body: UpdateSettingBody }>(
+    "/admin/settings/:key",
+    {
+      onRequest: [authenticate, requireRole("OWNER")],
+    },
+    updateSettingHandler,
+  );
 }
+
