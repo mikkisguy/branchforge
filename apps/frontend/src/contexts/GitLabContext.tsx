@@ -31,8 +31,10 @@ export interface LinkedRepository {
   projectId: string;
   gitlabProjectId: number;
   repositoryName: string;
+  gitlabUrl: string;
   defaultBranch: string;
-  lastSyncedAt?: string;
+  lastSyncedAt: string | null;
+  createdAt: string;
 }
 
 export interface GitLabContextType {
@@ -44,7 +46,6 @@ export interface GitLabContextType {
 
   // Linked repositories state
   linkedRepositories: Map<string, LinkedRepository>;
-  isLoadingRepositories: boolean;
 
   // Methods
   refreshIntegration: () => Promise<void>;
@@ -78,7 +79,6 @@ export function GitLabProvider({ children }: GitLabProviderProps) {
   const [linkedRepositories, setLinkedRepositories] = useState<
     Map<string, LinkedRepository>
   >(new Map());
-  const [isLoadingRepositories] = useState(false);
 
   /**
    * Check if user has a GitLab integration stored
@@ -98,10 +98,23 @@ export function GitLabProvider({ children }: GitLabProviderProps) {
           createdAt: integrationData.createdAt,
         });
 
-        // TODO: Fetch linked repositories from backend
-        // const repos = await gitlabApi.getLinkedRepositories();
-        // setLinkedRepositories(new Map(repos.map(r => [r.projectId, r])));
-        setLinkedRepositories(new Map());
+        // Fetch linked repositories from backend in a separate try-catch
+        try {
+          const repos = await gitlabApi.getLinkedRepositories();
+          setLinkedRepositories(new Map(repos.map((r) => [r.projectId, r])));
+        } catch (repoError) {
+          const repoErrorMessage =
+            repoError instanceof Error
+              ? repoError.message
+              : "Failed to fetch linked repositories";
+          // Set a repository-specific error message
+          setIntegrationError(
+            `Integration loaded but repositories could not be fetched: ${repoErrorMessage}`,
+          );
+          // Optionally reset integration if you prefer to roll back on repo failure
+          // setIntegration(null);
+          // setLinkedRepositories(new Map());
+        }
       } else {
         // No integration found
         setIntegration(null);
@@ -113,6 +126,8 @@ export function GitLabProvider({ children }: GitLabProviderProps) {
       // 404s are already handled by gitlabApi.getIntegration() which returns null
       // Any error reaching here is a transient or server error
       setIntegrationError(errorMessage);
+      setIntegration(null);
+      setLinkedRepositories(new Map());
     } finally {
       setIsLoadingIntegration(false);
     }
@@ -207,7 +222,6 @@ export function GitLabProvider({ children }: GitLabProviderProps) {
     isLoadingIntegration,
     integrationError,
     linkedRepositories,
-    isLoadingRepositories,
     refreshIntegration,
     storeToken,
     removeIntegration,

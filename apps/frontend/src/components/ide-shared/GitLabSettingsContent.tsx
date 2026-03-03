@@ -386,7 +386,7 @@ export function GitLabSettingsContent() {
             </InlineMessage>
           )}
 
-          {integrationError && (
+          {hasIntegration && integrationError && (
             <InlineMessage variant="error">{integrationError}</InlineMessage>
           )}
 

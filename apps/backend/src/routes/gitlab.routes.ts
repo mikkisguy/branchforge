@@ -16,11 +16,13 @@ import {
   storeGitlabIntegration,
   deleteGitlabIntegration,
   listGitlabProjects,
+  getGitlabProject,
   linkRepository,
   unlinkRepository,
   listBranches,
   listRpyFiles,
   getGitlabIntegration,
+  listRepositoryLinks,
 } from "../services/gitlab.service.js";
 import {
   exportToGitlab,
@@ -432,7 +434,17 @@ async function linkRepositoryHandler(
   }
 
   try {
-    await linkRepository(projectId, gitlabProjectId, branch);
+    // Fetch GitLab project details to get the repository name
+    const gitlabProject = await getGitlabProject(userId, gitlabProjectId);
+    if (!gitlabProject) {
+      reply.status(404).send({ error: "GitLab project not found" });
+      return;
+    }
+
+    // Use path_with_namespace as the repository name (more descriptive)
+    const repositoryName = gitlabProject.path_with_namespace;
+
+    await linkRepository(projectId, gitlabProjectId, repositoryName, branch);
     reply.status(201).send();
   } catch (err) {
     request.log.error(
@@ -484,6 +496,34 @@ async function unlinkRepositoryHandler(
     );
     reply.status(500).send({
       error: "Failed to unlink repository",
+      details: err instanceof Error ? err.message : "Unknown error",
+    });
+  }
+}
+
+/**
+ * List linked repositories
+ *
+ * GET /api/gitlab/repositories
+ *
+ * Returns a list of all GitLab repositories linked to the user's projects.
+ */
+async function listRepositoriesHandler(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const userId = getAuthenticatedUserId(request);
+
+  try {
+    const repositories = await listRepositoryLinks(userId);
+    reply.send(repositories);
+  } catch (err) {
+    request.log.error(
+      { err },
+      "listRepositoriesHandler: Failed to list linked repositories",
+    );
+    reply.status(500).send({
+      error: "Failed to list linked repositories",
       details: err instanceof Error ? err.message : "Unknown error",
     });
   }
@@ -866,6 +906,14 @@ export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
       onRequest: [authenticate],
     },
     unlinkRepositoryHandler,
+  );
+
+  fastify.get(
+    "/gitlab/repositories",
+    {
+      onRequest: [authenticate],
+    },
+    listRepositoriesHandler,
   );
 
   fastify.get<{ Params: { projectId: string } }>(
