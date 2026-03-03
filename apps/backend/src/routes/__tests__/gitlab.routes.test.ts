@@ -44,6 +44,7 @@ vi.mock('../../services/gitlab.service.js', () => ({
   storeGitlabIntegration: vi.fn(),
   deleteGitlabIntegration: vi.fn(),
   listGitlabProjects: vi.fn(),
+  getGitlabProject: vi.fn(),
   linkRepository: vi.fn(),
   unlinkRepository: vi.fn(),
   listBranches: vi.fn(),
@@ -317,6 +318,11 @@ describe('GitLab Routes', () => {
 
   describe('POST /api/gitlab/link', () => {
     it('should link project to GitLab repository', async () => {
+      vi.spyOn(gitlabService, 'getGitlabProject').mockResolvedValue({
+        id: testGitlabProjectId,
+        name: 'test-repo',
+        path_with_namespace: 'user/test-repo',
+      } as any);
       vi.spyOn(gitlabService, 'linkRepository').mockResolvedValue(undefined);
 
       const response = await fastify.inject({
