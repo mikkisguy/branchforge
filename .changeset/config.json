@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@3.0.0/schema.json",
-  "changelog": "@changesets/changelog-git",
+  "changelog": "./.changeset/changelog.js",
   "commit": false,
   "fixed": [
     ["@branchforge/frontend", "@branchforge/backend", "@branchforge/shared"]
