@@ -1,5 +1,14 @@
 # @branchforge/frontend
 
+## 0.1.1
+
+### Patch Changes
+
+- 181d0be: fix: Update versioning process to read version from root package.json and simplify changeset version command
+- a168b14: fix: Update  configuration and add Gitleaks settings; modify test tokens for security, removed false positive report
+- Updated dependencies [181d0be]
+  - @branchforge/shared@0.1.1
+
 ## 0.1.0
 
 ### Minor Changes
