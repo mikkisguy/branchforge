@@ -12,7 +12,7 @@
     "test:integration": "dotenv -e ../../.env -- vitest run --config vitest.integration.config.ts",
     "db:generate": "tsc -p tsconfig.schema.json && drizzle-kit --config=drizzle.config.cjs generate",
     "db:migrate": "drizzle-kit --config=drizzle.config.cjs push",
-    "db:push:test": "NODE_ENV=test dotenv -e ../../.env -- drizzle-kit --config=drizzle.config.cjs push --force",
+    "db:push:test": "tsc -p tsconfig.schema.json && NODE_ENV=test dotenv -e ../../.env -- drizzle-kit --config=drizzle.config.cjs push --force",
     "db:studio": "drizzle-kit --config=drizzle.config.cjs studio",
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
