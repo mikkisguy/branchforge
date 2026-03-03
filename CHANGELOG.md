@@ -19,3 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Updated versioning process to read version from root package.json
 - Updated  configuration and Gitleaks settings
+
+## [0.1.3] - 2026-03-03
+
+### Fixed
+- 01611fe: Fixed changelog handling
+- Updated dependencies [01611fe]
+  - @branchforge/shared@0.1.3
+- f93d106: Fixed missing pnpm
