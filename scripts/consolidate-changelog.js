@@ -132,7 +132,7 @@ function consolidateChangelogs() {
 
   // Only proceed if we found actual changes to consolidate
   if (added.length === 0 && changed.length === 0 && fixed.length === 0 &&
-      removed.length === 0 && other.length === 0) {
+    removed.length === 0 && other.length === 0) {
     console.log(`ℹ️  No changes found to consolidate for v${version}`);
     console.log(`ℹ️  Package CHANGELOG.md files left unchanged for inspection.`);
     process.exit(0);
@@ -147,7 +147,7 @@ function consolidateChangelogs() {
   const dedupedOther = unique(other);
 
   // Build the consolidated changelog entry
-  const lines = [`## [${version}] - ${new Date().toISOString().split("T")[0]}`];
+  const lines = [`## v${version} - ${new Date().toISOString().split("T")[0]}`];
 
   if (dedupedAdded.length > 0) {
     lines.push("\n### Added");
