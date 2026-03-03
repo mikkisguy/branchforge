@@ -246,9 +246,9 @@ describe('EncryptionService', () => {
 
     it('should successfully encrypt and decrypt realistic PATs', () => {
       const realisticPATs = [
-        'glpat-xxxxxxxxxxxxxxxxxxxxxx',
-        'glpat-123456789abcdefghijklmn',
-        'glpat-abcdefghijklmnopqrstuvwxyz123456',
+        'glpat-example-token-replace-with-real-one',
+        'glpat-test123abcdefghijklmnopqrstuvwxyz',
+        'glpat-demo-token-for-testing-only',
       ];
 
       realisticPATs.forEach(pat => {

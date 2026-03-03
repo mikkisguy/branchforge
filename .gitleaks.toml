@@ -1,0 +1,17 @@
+title = "Gitleaks Configuration"
+
+[allowlist]
+description = "Global allowlist"
+paths = [
+  '''\.env\.example$''',
+  '''CHANGELOG\.md$''',
+]
+# Ignore obviously fake/placeholder tokens
+regexes = [
+  '''branchforge:branchforge''',
+  '''glpat-(example|test|demo|placeholder)''',
+]
+
+[[rules.allowlist]]
+commits = [ "^0000000$" ]
+description = "Ignore commits without SHA (e.g., CI scans)"

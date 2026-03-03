@@ -343,7 +343,7 @@ export function GitLabSettingsContent() {
               <Input
                 id="token"
                 type={showToken ? "text" : "password"}
-                placeholder="glpat-xxxxxxxxxxxxxxxxxxxx"
+                placeholder="glpat-example-token-replace-with-real-one"
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
                 disabled={isStoring}
