@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - @branchforge/shared@0.1.3
 - f93d106: Fixed missing pnpm
 
-## Previous changes (< v0.1.3)
+## Previous documented changes (< v0.1.3)
 
 ### Added
 - GitLab integration (parts 1 and 2)
