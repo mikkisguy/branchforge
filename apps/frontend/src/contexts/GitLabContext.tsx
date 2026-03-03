@@ -31,8 +31,10 @@ export interface LinkedRepository {
   projectId: string;
   gitlabProjectId: number;
   repositoryName: string;
+  gitlabUrl?: string;
   defaultBranch: string;
-  lastSyncedAt?: string;
+  lastSyncedAt: string | null;
+  createdAt?: string;
 }
 
 export interface GitLabContextType {
@@ -98,10 +100,9 @@ export function GitLabProvider({ children }: GitLabProviderProps) {
           createdAt: integrationData.createdAt,
         });
 
-        // TODO: Fetch linked repositories from backend
-        // const repos = await gitlabApi.getLinkedRepositories();
-        // setLinkedRepositories(new Map(repos.map(r => [r.projectId, r])));
-        setLinkedRepositories(new Map());
+        // Fetch linked repositories from backend
+        const repos = await gitlabApi.getLinkedRepositories();
+        setLinkedRepositories(new Map(repos.map((r) => [r.projectId, r])));
       } else {
         // No integration found
         setIntegration(null);
