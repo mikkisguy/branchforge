@@ -7,6 +7,9 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.integration.test.ts'],
     setupFiles: ['./test/setup.ts'],
+    env: {
+      NODE_ENV: 'test',
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

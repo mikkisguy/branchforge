@@ -60,7 +60,7 @@ export interface CreateProjectBody {
 export async function listProjects(userId: string): Promise<PublicProject[]> {
   const db = getDb();
 
-  // Get projects owned by the user
+  // Get projects owned by the user (visibility will be set to 'OWNER')
   const userProjects = await db
     .select()
     .from(projects)
@@ -68,7 +68,8 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
     .orderBy(projects.createdAt);
 
   // Get projects shared with the user via project_users junction table
-  const sharedProjectsResult: ProjectForPublic[] = await db
+  // Include the user's role from the junction table
+  const sharedProjectsResult = await db
     .select({
       id: projects.id,
       name: projects.name,
@@ -76,7 +77,7 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
       description: projects.description,
       routeLockChapter: projects.routeLockChapter,
       maxMeterDelta: projects.maxMeterDelta,
-      visibility: projects.visibility,
+      role: projectUsers.role,  // User's role from project_users
       createdAt: projects.createdAt,
       updatedAt: projects.updatedAt,
     })
@@ -86,14 +87,43 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
     .orderBy(projects.createdAt);
 
   // Combine both lists, removing duplicates
-  const allProjects: ProjectForPublic[] = [...userProjects];
+  // Owned projects take priority over shared projects
+  const result: PublicProject[] = [];
+
+  // First add owned projects with 'OWNER' visibility
+  for (const project of userProjects) {
+    result.push({
+      id: project.id,
+      name: project.name,
+      type: project.type,
+      description: project.description ?? undefined,
+      routeLockChapter: project.routeLockChapter ?? undefined,
+      maxMeterDelta: project.maxMeterDelta ?? undefined,
+      visibility: 'OWNER' as const,
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
+    });
+  }
+
+  // Then add shared projects (only if not already added as owned)
+  // Use the user's role from project_users as visibility
   for (const shared of sharedProjectsResult) {
-    if (!allProjects.find((p) => p.id === shared.id)) {
-      allProjects.push(shared);
+    if (!result.find((p) => p.id === shared.id)) {
+      result.push({
+        id: shared.id,
+        name: shared.name,
+        type: shared.type,
+        description: shared.description ?? undefined,
+        routeLockChapter: shared.routeLockChapter ?? undefined,
+        maxMeterDelta: shared.maxMeterDelta ?? undefined,
+        visibility: shared.role as "OWNER" | "READER" | "TESTER",
+        createdAt: shared.createdAt,
+        updatedAt: shared.updatedAt,
+      });
     }
   }
 
-  return allProjects.map(mapToPublicProject);
+  return result;
 }
 
 /**
