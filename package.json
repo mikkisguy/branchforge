@@ -1,6 +1,6 @@
 {
   "name": "branchforge",
-  "version": "0.1.2",
+  "version": "0.1.0",
   "private": true,
   "description": "Visual Novel IDE for Ren'Py",
   "scripts": {
@@ -25,6 +25,7 @@
     "pnpm": ">=9.0.0"
   },
   "devDependencies": {
+    "@changesets/changelog-git": "^0.2.1",
     "@changesets/cli": "^2.29.8",
     "@types/node": "^22.10.0",
     "@typescript-eslint/parser": "^8.0.0",
