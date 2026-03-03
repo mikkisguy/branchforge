@@ -1,0 +1,137 @@
+{
+  "changesets": [
+    {
+      "releases": [
+        {
+          "name": "@branchforge/backend",
+          "type": "patch"
+        }
+      ],
+      "summary": "Added robust session management",
+      "id": "flat-rockets-yell"
+    },
+    {
+      "releases": [
+        {
+          "name": "@branchforge/frontend",
+          "type": "patch"
+        }
+      ],
+      "summary": "Added top-right panel for functions and BF logo",
+      "id": "fluffy-steaks-open"
+    },
+    {
+      "releases": [
+        {
+          "name": "@branchforge/backend",
+          "type": "minor"
+        },
+        {
+          "name": "@branchforge/frontend",
+          "type": "minor"
+        }
+      ],
+      "summary": "GitLab integration part 2",
+      "id": "frank-cameras-type"
+    },
+    {
+      "releases": [
+        {
+          "name": "@branchforge/backend",
+          "type": "minor"
+        },
+        {
+          "name": "@branchforge/frontend",
+          "type": "minor"
+        }
+      ],
+      "summary": "GitLab integration part 1",
+      "id": "frank-onions-guess"
+    },
+    {
+      "releases": [
+        {
+          "name": "@branchforge/frontend",
+          "type": "minor"
+        },
+        {
+          "name": "@branchforge/backend",
+          "type": "minor"
+        }
+      ],
+      "summary": "Created the settings modal with some options",
+      "id": "heavy-experts-fly"
+    },
+    {
+      "releases": [
+        {
+          "name": "@branchforge/frontend",
+          "type": "patch"
+        },
+        {
+          "name": "@branchforge/backend",
+          "type": "patch"
+        },
+        {
+          "name": "@branchforge/shared",
+          "type": "patch"
+        }
+      ],
+      "summary": "Implement Changesets-based unified version numbering system with Docker labels and   integration",
+      "id": "initial-versioning"
+    },
+    {
+      "releases": [
+        {
+          "name": "@branchforge/backend",
+          "type": "minor"
+        },
+        {
+          "name": "@branchforge/frontend",
+          "type": "minor"
+        }
+      ],
+      "summary": "Working signup/login/logout flow",
+      "id": "witty-lands-kiss"
+    }
+  ],
+  "releases": [
+    {
+      "name": "@branchforge/backend",
+      "type": "minor",
+      "oldVersion": "0.0.1",
+      "changesets": [
+        "flat-rockets-yell",
+        "frank-cameras-type",
+        "frank-onions-guess",
+        "heavy-experts-fly",
+        "initial-versioning",
+        "witty-lands-kiss"
+      ],
+      "newVersion": "0.1.0"
+    },
+    {
+      "name": "@branchforge/frontend",
+      "type": "minor",
+      "oldVersion": "0.0.1",
+      "changesets": [
+        "fluffy-steaks-open",
+        "frank-cameras-type",
+        "frank-onions-guess",
+        "heavy-experts-fly",
+        "initial-versioning",
+        "witty-lands-kiss"
+      ],
+      "newVersion": "0.1.0"
+    },
+    {
+      "name": "@branchforge/shared",
+      "type": "minor",
+      "oldVersion": "0.0.1",
+      "changesets": [
+        "initial-versioning"
+      ],
+      "newVersion": "0.1.0"
+    }
+  ]
+}
