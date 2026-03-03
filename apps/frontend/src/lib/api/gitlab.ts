@@ -72,6 +72,17 @@ export interface ApiErrorPayload {
   error: string;
 }
 
+export interface LinkedRepository {
+  id: string;
+  projectId: string;
+  gitlabProjectId: number;
+  repositoryName: string;
+  gitlabUrl: string;
+  defaultBranch: string;
+  lastSyncedAt: string | null;
+  createdAt: string;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -298,30 +309,8 @@ export const gitlabApi = {
   /**
    * Get all linked repositories for the authenticated user
    */
-  async getLinkedRepositories(): Promise<
-    Array<{
-      id: string;
-      projectId: string;
-      gitlabProjectId: number;
-      repositoryName: string;
-      gitlabUrl: string;
-      defaultBranch: string;
-      lastSyncedAt: string | null;
-      createdAt: string;
-    }>
-  > {
-    return request<
-      Array<{
-        id: string;
-        projectId: string;
-        gitlabProjectId: number;
-        repositoryName: string;
-        gitlabUrl: string;
-        defaultBranch: string;
-        lastSyncedAt: string | null;
-        createdAt: string;
-      }>
-    >("/gitlab/repositories", {
+  async getLinkedRepositories(): Promise<LinkedRepository[]> {
+    return request<LinkedRepository[]>("/gitlab/repositories", {
       method: "GET",
     });
   },
