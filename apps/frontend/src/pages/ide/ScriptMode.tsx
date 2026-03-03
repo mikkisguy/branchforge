@@ -10,6 +10,9 @@ import {
 
 interface ScriptModeProps {
   themeName: string;
+  projectId?: string;
+  projectName?: string;
+  gitlabBranch?: string;
 }
 
 const files: File[] = [
@@ -40,7 +43,12 @@ const fileContents: Record<string, string[]> = {
   ],
 };
 
-export function ScriptMode({ themeName }: ScriptModeProps) {
+export function ScriptMode({
+  themeName,
+  projectId,
+  projectName,
+  gitlabBranch,
+}: ScriptModeProps) {
   const [activeFile, setActiveFile] = useState("script.rpy");
 
   return (
@@ -152,6 +160,9 @@ export function ScriptMode({ themeName }: ScriptModeProps) {
         lineCount={fileContents[activeFile]?.length || 0}
         language="Ren'Py"
         themeName={themeName}
+        projectId={projectId}
+        projectName={projectName}
+        gitlabBranch={gitlabBranch}
       />
     </div>
   );

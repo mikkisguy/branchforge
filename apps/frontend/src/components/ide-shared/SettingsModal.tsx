@@ -9,6 +9,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
+import { GitLabSettingsContent } from "@/components/ide-shared/GitLabSettingsContent";
 import { cn } from "@/lib/utils";
 import { APP_NAME, APP_VERSION } from "@/lib/version";
 
@@ -33,11 +34,11 @@ const tabs: TabOption[] = [
  * @param userRole - The user's role (optional)
  * @returns An object with filtered tabs and the appropriate active tab
  */
-function useVisibleTabs(activeTab: Tab, userRole?: string) {
+function getVisibleTabs(activeTab: Tab, userRole?: string) {
   return useMemo(() => {
     // Filter out system tab for non-OWNER users
     const visibleTabs = tabs.filter(
-      (tab) => tab.id !== "system" || userRole === "OWNER"
+      (tab) => tab.id !== "system" || userRole === "OWNER",
     );
 
     // If current active tab is not visible, switch to first visible tab
@@ -57,10 +58,18 @@ interface SettingsModalProps {
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<Tab>("user");
   const { user } = useAuth();
-  const { signUpsEnabled, updateSignUpsSetting, isLoading: settingsLoading, isSaving } = useSettings();
+  const {
+    signUpsEnabled,
+    updateSignUpsSetting,
+    isLoading: settingsLoading,
+    isSaving,
+  } = useSettings();
 
   // Use helper to get visible tabs and ensure valid active tab
-  const { visibleTabs, activeTab: adjustedActiveTab } = useVisibleTabs(activeTab, user?.role);
+  const { visibleTabs, activeTab: adjustedActiveTab } = getVisibleTabs(
+    activeTab,
+    user?.role,
+  );
 
   // Sync state if active tab was adjusted by helper
   useMemo(() => {
@@ -124,14 +133,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               </div>
             )}
 
-            {activeTab === "gitlab" && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">GitLab Settings</h3>
-                <p className="text-sm text-muted-foreground">
-                  GitLab integration settings will be available soon.
-                </p>
-              </div>
-            )}
+            {activeTab === "gitlab" && <GitLabSettingsContent />}
 
             {activeTab === "system" && (
               <div className="space-y-4">

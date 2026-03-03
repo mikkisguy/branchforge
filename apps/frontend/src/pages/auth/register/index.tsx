@@ -14,6 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { InlineMessage } from "@/components/ui/inline-error";
 import { BASE_URL } from "@/lib/constants";
 import { APP_NAME } from "../../../lib/version";
 
@@ -121,11 +122,7 @@ export function RegisterPage() {
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
-              {error && (
-                <div className="p-3 rounded-md bg-destructive/10 text-destructive-muted text-sm">
-                  {error}
-                </div>
-              )}
+              {error && <InlineMessage variant="error">{error}</InlineMessage>}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input

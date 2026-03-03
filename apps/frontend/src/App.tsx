@@ -7,6 +7,8 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { ToastProvider } from "./contexts/ToastContext";
+import { GitLabProvider } from "./contexts/GitLabContext";
+import { ProjectProvider } from "./contexts/ProjectContext";
 import { BASE_URL } from "./lib/constants";
 
 function App() {
@@ -15,25 +17,32 @@ function App() {
       <AuthProvider>
         <ToastProvider>
           <SettingsProvider>
-            <div className="app">
-            <Routes>
-              <Route path={`${BASE_URL}login`} element={<LoginPage />} />
-              <Route path={`${BASE_URL}register`} element={<RegisterPage />} />
-              <Route
-                path={BASE_URL}
-                element={
-                  <ProtectedRoute>
-                    <HomePageIDE />
-                  </ProtectedRoute>
-                }
-              />
-            </Routes>
-          </div>
-        </SettingsProvider>
-      </ToastProvider>
-    </AuthProvider>
-  </ThemeProvider>
-);
+            <ProjectProvider>
+              <GitLabProvider>
+                <div className="app">
+                  <Routes>
+                    <Route path={`${BASE_URL}login`} element={<LoginPage />} />
+                    <Route
+                      path={`${BASE_URL}register`}
+                      element={<RegisterPage />}
+                    />
+                    <Route
+                      path={BASE_URL}
+                      element={
+                        <ProtectedRoute>
+                          <HomePageIDE />
+                        </ProtectedRoute>
+                      }
+                    />
+                  </Routes>
+                </div>
+              </GitLabProvider>
+            </ProjectProvider>
+          </SettingsProvider>
+        </ToastProvider>
+      </AuthProvider>
+    </ThemeProvider>
+  );
 }
 
 export default App;
