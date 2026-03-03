@@ -66,17 +66,10 @@ function updateRootChangelog(newRelease, version) {
   const changelogPath = path.join(__dirname, "../CHANGELOG.md");
   let changelog = fs.readFileSync(changelogPath, "utf-8");
 
-  // Find the Unreleased section or create it
-  const unreleasedRegex = /## Unreleased\n/;
+  // Find the first version section (e.g., ## [0.1.0] or ## 0.1.0)
   const versionRegex = /## \[?\d+\.\d+\.\d+\]?/;
 
-  if (unreleasedRegex.test(changelog)) {
-    // Replace Unreleased with the new version
-    changelog = changelog.replace(
-      unreleasedRegex,
-      `${getVersionLine(version)}\n${newRelease}\n\n## Unreleased\n`
-    );
-  } else if (versionRegex.test(changelog)) {
+  if (versionRegex.test(changelog)) {
     // Insert before the first version
     changelog = changelog.replace(
       versionRegex,
@@ -97,7 +90,7 @@ module.exports = {
   getDefaultChangelog,
   updateRootChangelog,
   // Return empty string for package changelogs - we only want root
-  getChangelog: (changesets, affectedPackages, options) => {
+  getChangelog: (changesets, _affectedPackages, options) => {
     const version = options.package.version;
     const newRelease = getReleaseLine(changesets, options.type);
 
