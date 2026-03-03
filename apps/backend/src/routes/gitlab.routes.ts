@@ -718,6 +718,11 @@ async function getOperationHandler(
   try {
     const operation = await getSyncOperation(operationId);
 
+    if (!operation) {
+      reply.status(404).send({ error: "Not Found", message: "Sync operation not found" });
+      return;
+    }
+
     reply.send(operation);
   } catch (err) {
     request.log.error(
