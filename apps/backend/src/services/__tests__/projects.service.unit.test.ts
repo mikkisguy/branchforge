@@ -1,6 +1,9 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { listProjects, getProject, createProject, type CreateProjectBody } from '../projects.service.js';
-import * as dbModule from '../../db/index.js';
+import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+import {
+  getProject,
+  createProject,
+  type CreateProjectBody,
+} from "../projects.service.js";
 
 // Mock the database with a complete chain builder
 const createMockChain = (resolveValue: any) => ({
@@ -35,124 +38,57 @@ const mockDb = {
   insert: mockInsert,
 };
 
-vi.mock('../../db/index.js', () => ({
+vi.mock("../../db/index.js", () => ({
   getDb: vi.fn(() => mockDb),
 }));
 
-describe('ProjectsService', () => {
-  const userId = 'user-123';
-  const projectId = 'project-123';
+describe("ProjectsService", () => {
+  const userId = "user-123";
+  const projectId = "project-123";
 
   const mockProject = {
     id: projectId,
     userId,
-    name: 'Test Project',
-    type: 'PREQUEL',
-    description: 'A test project',
+    name: "Test Project",
+    type: "PREQUEL",
+    description: "A test project",
     routeLockChapter: 1,
     maxMeterDelta: 10,
-    visibility: 'OWNER',
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
+    visibility: "OWNER",
+    createdAt: new Date("2024-01-01"),
+    updatedAt: new Date("2024-01-01"),
   };
 
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('listProjects', () => {
-    beforeEach(() => {
-      // Reset to default: return empty arrays
-      mockSelect.mockImplementation(createEmptyMockChain);
-      mockInsert.mockImplementation(() => ({
-        values: vi.fn(() => ({
-          returning: vi.fn(() => Promise.resolve([])),
-        })),
-      }));
-    });
+  // listProjects tests moved to integration tests due to complex ORM queries
 
-    // NOTE: These tests require integration testing due to Drizzle ORM's complex
-    // query builder chain when using .select({...}) with specific columns.
-    // The getProject and createProject tests demonstrate that the service
-    // layer works correctly. Integration tests will cover listProjects.
-    it.skip('should return empty array when user has no projects', async () => {
-      const projects = await listProjects(userId);
-      expect(projects).toEqual([]);
-    });
-
-    it.skip('should return list of user-owned projects', async () => {
-      mockSelect.mockImplementation(() => createMockChain([mockProject]));
-
-      const projects = await listProjects(userId);
-
-      expect(projects).toHaveLength(1);
-      expect(projects[0]).toEqual({
-        id: projectId,
-        name: 'Test Project',
-        type: 'PREQUEL',
-        description: 'A test project',
-        routeLockChapter: 1,
-        maxMeterDelta: 10,
-        visibility: 'OWNER',
-        createdAt: mockProject.createdAt,
-        updatedAt: mockProject.updatedAt,
-      });
-    });
-
-    it.skip('should return both owned and shared projects', async () => {
-      const ownedProject = { ...mockProject, id: 'project-1', name: 'Owned Project' };
-      const sharedProject = { ...mockProject, id: 'project-2', name: 'Shared Project' };
-
-      let callCount = 0;
-      mockSelect.mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          return createMockChain([ownedProject]);
-        }
-        return createMockChain([sharedProject]);
-      });
-
-      const projects = await listProjects(userId);
-
-      expect(projects).toHaveLength(2);
-      expect(projects.map(p => p.name)).toContain('Owned Project');
-      expect(projects.map(p => p.name)).toContain('Shared Project');
-    });
-
-    it.skip('should not duplicate projects that are both owned and shared', async () => {
-      mockSelect.mockImplementation(() => createMockChain([mockProject]));
-
-      const projects = await listProjects(userId);
-
-      expect(projects).toHaveLength(1);
-      expect(projects[0].id).toBe(projectId);
-    });
-  });
-
-  describe('getProject', () => {
+  describe("getProject", () => {
     beforeEach(() => {
       mockSelect.mockImplementation(createEmptyMockChain);
     });
 
-    it('should return project owned by user', async () => {
+    it("should return project owned by user", async () => {
       mockSelect.mockImplementation(() => createMockChain([mockProject]));
 
       const project = await getProject(projectId, userId);
 
       expect(project).toEqual({
         id: projectId,
-        name: 'Test Project',
-        type: 'PREQUEL',
-        description: 'A test project',
+        name: "Test Project",
+        type: "PREQUEL",
+        description: "A test project",
         routeLockChapter: 1,
         maxMeterDelta: 10,
-        visibility: 'OWNER',
+        visibility: "OWNER",
         createdAt: mockProject.createdAt,
         updatedAt: mockProject.updatedAt,
       });
     });
 
-    it('should return project shared with user', async () => {
+    it("should return project shared with user", async () => {
       // First call (owner check) returns empty, second call (shared check) returns project
       let callCount = 0;
       mockSelect.mockImplementation(() => {
@@ -169,7 +105,7 @@ describe('ProjectsService', () => {
       expect(project?.id).toBe(projectId);
     });
 
-    it('should return null when project not found or not accessible', async () => {
+    it("should return null when project not found or not accessible", async () => {
       mockSelect.mockImplementation(createEmptyMockChain);
 
       const project = await getProject(projectId, userId);
@@ -177,8 +113,8 @@ describe('ProjectsService', () => {
       expect(project).toBeNull();
     });
 
-    it('should return null for different user', async () => {
-      const otherUserId = 'other-user-456';
+    it("should return null for different user", async () => {
+      const otherUserId = "other-user-456";
       mockSelect.mockImplementation(createEmptyMockChain);
 
       const project = await getProject(projectId, otherUserId);
@@ -187,7 +123,7 @@ describe('ProjectsService', () => {
     });
   });
 
-  describe('createProject', () => {
+  describe("createProject", () => {
     beforeEach(() => {
       mockInsert.mockImplementation(() => ({
         values: vi.fn(() => ({
@@ -196,16 +132,16 @@ describe('ProjectsService', () => {
       }));
     });
 
-    it('should create project with valid data', async () => {
+    it("should create project with valid data", async () => {
       const body: CreateProjectBody = {
-        name: 'New Project',
-        type: 'PREQUEL',
-        description: 'A new project',
+        name: "New Project",
+        type: "PREQUEL",
+        description: "A new project",
         routeLockChapter: 2,
         maxMeterDelta: 15,
       };
 
-      const newProject = { ...mockProject, ...body, id: 'new-project-id' };
+      const newProject = { ...mockProject, ...body, id: "new-project-id" };
       mockInsert.mockImplementation(() => ({
         values: vi.fn(() => ({
           returning: vi.fn(() => Promise.resolve([newProject])),
@@ -214,17 +150,17 @@ describe('ProjectsService', () => {
 
       const project = await createProject(userId, body);
 
-      expect(project.name).toBe('New Project');
-      expect(project.type).toBe('PREQUEL');
-      expect(project.description).toBe('A new project');
+      expect(project.name).toBe("New Project");
+      expect(project.type).toBe("PREQUEL");
+      expect(project.description).toBe("A new project");
       expect(project.routeLockChapter).toBe(2);
       expect(project.maxMeterDelta).toBe(15);
     });
 
-    it('should use default maxMeterDelta when not provided', async () => {
+    it("should use default maxMeterDelta when not provided", async () => {
       const body: CreateProjectBody = {
-        name: 'New Project',
-        type: 'SEQUEL',
+        name: "New Project",
+        type: "SEQUEL",
       };
 
       const newProject = { ...mockProject, ...body, maxMeterDelta: 10 };
@@ -239,15 +175,15 @@ describe('ProjectsService', () => {
       expect(project.maxMeterDelta).toBe(10);
     });
 
-    it('should create project with optional fields undefined', async () => {
+    it("should create project with optional fields undefined", async () => {
       const body: CreateProjectBody = {
-        name: 'Minimal Project',
-        type: 'PREQUEL',
+        name: "Minimal Project",
+        type: "PREQUEL",
       };
 
       const newProject = {
         ...mockProject,
-        name: 'Minimal Project',
+        name: "Minimal Project",
         description: null,
         routeLockChapter: null,
         maxMeterDelta: 10,
@@ -265,3 +201,4 @@ describe('ProjectsService', () => {
     });
   });
 });
+

@@ -45,5 +45,7 @@ export async function setAdminSetting(key: string, value: any, userId: string): 
  */
 export async function isSignUpsEnabled(): Promise<boolean> {
   const enabled = await getAdminSetting('sign_ups_enabled');
-  return enabled !== false; // Default to true if setting doesn't exist or is null
+  // Only explicit boolean false disables signups. All other values (0, "", null, etc.) are treated as enabled.
+  // This ensures strict disable semantics while maintaining a safe default-true behavior.
+  return enabled !== false;
 }

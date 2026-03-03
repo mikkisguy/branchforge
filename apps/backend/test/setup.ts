@@ -5,7 +5,10 @@
  *
  * Prerequisites:
  * - DATABASE_URL_TEST environment variable must be set
- * - Test database must exist and have proper schema
+ * - Test database must exist
+ *
+ * Note: The test schema is automatically pushed to the test database
+ * before running tests using the db:push:test script.
  */
 
 import { beforeAll, afterAll } from 'vitest';

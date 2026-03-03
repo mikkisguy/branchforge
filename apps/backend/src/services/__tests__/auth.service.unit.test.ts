@@ -1,29 +1,5 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import {
-  hashPassword,
-  validatePassword,
-  register,
-  validateCredentials,
-} from "../auth.service.js";
-import * as dbModule from "../../db/index.js";
-import { isSignUpsEnabled } from "../admin-settings.service.js";
-
-// Mock the database
-const mockSelect = vi.fn();
-const mockInsert = vi.fn();
-const mockDb = {
-  select: mockSelect,
-  insert: mockInsert,
-};
-
-vi.mock("../../db/index.js", () => ({
-  getDb: vi.fn(() => mockDb),
-}));
-
-// Mock the admin settings service
-vi.mock("../admin-settings.service.js", () => ({
-  isSignUpsEnabled: vi.fn(() => Promise.resolve(true)),
-}));
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { hashPassword, validatePassword } from "../auth.service.js";
 
 describe("AuthService", () => {
   afterEach(() => {
@@ -38,6 +14,8 @@ describe("AuthService", () => {
       expect(hash).toBeDefined();
       expect(hash).not.toBe(password);
       expect(hash.length).toBeGreaterThan(20);
+      // Bcrypt hashes always start with $2b$ or $2a$
+      expect(hash).toMatch(/^\$2[ab]\$/);
     });
 
     it("should generate different hashes for the same password", async () => {
@@ -51,6 +29,7 @@ describe("AuthService", () => {
     it("should hash an empty string", async () => {
       const hash = await hashPassword("");
       expect(hash).toBeDefined();
+      expect(hash).toMatch(/^\$2[ab]\$/);
     });
   });
 
@@ -78,134 +57,7 @@ describe("AuthService", () => {
     });
   });
 
-  describe("register", () => {
-    const mockFrom = vi.fn();
-    const mockValues = vi.fn();
-    const mockReturning = vi.fn();
-    const mockWhere = vi.fn();
-
-    // Create a chained mock that handles both with and without where
-    const createFromMock = () => {
-      const fromResult = {
-        where: mockWhere,
-      };
-      return fromResult;
-    };
-
-    beforeEach(() => {
-      mockSelect.mockReturnValue({ from: mockFrom });
-      mockFrom.mockReturnValue(createFromMock());
-      mockWhere.mockReturnValue({
-        where: mockWhere,
-      });
-      mockInsert.mockReturnValue({ values: mockValues });
-      mockValues.mockReturnValue({ returning: mockReturning });
-      mockReturning.mockResolvedValue([
-        { id: "123", email: "test@example.com", role: "OWNER" },
-      ]);
-    });
-
-    it("should register user successfully when signups are enabled", async () => {
-      vi.mocked(isSignUpsEnabled).mockResolvedValueOnce(true);
-      mockWhere.mockResolvedValueOnce([]);
-
-      const result = await register("test@example.com", "password123");
-      expect(result).toEqual({
-        id: "123",
-        email: "test@example.com",
-        role: "OWNER",
-      });
-    });
-
-    it("should fail if email is already taken", async () => {
-      vi.mocked(isSignUpsEnabled).mockResolvedValueOnce(true);
-      mockWhere.mockResolvedValueOnce([{ email: "test@example.com" }]);
-
-      await expect(register("test@example.com", "password123")).rejects.toThrow(
-        "Email already registered",
-      );
-    });
-
-    it("should fail when signups are disabled", async () => {
-      vi.mocked(isSignUpsEnabled).mockResolvedValueOnce(false);
-
-      await expect(register("new@example.com", "password123")).rejects.toThrow(
-        "Registration is currently disabled",
-      );
-    });
-
-    it("should fail with invalid email format", async () => {
-      await expect(register("invalid-email", "password123")).rejects.toThrow(
-        "Invalid email format",
-      );
-    });
-
-    it("should fail with weak password", async () => {
-      await expect(register("test@example.com", "123")).rejects.toThrow(
-        "Password must be at least 8 characters",
-      );
-    });
-  });
-
-  describe("validateCredentials", () => {
-    const mockFrom = vi.fn();
-    const mockWhere = vi.fn();
-
-    beforeEach(() => {
-      mockSelect.mockReturnValue({ from: mockFrom });
-      mockFrom.mockReturnValue({ where: mockWhere });
-    });
-
-    it("should return user for valid credentials", async () => {
-      const password = "testPassword123";
-      const hash = await hashPassword(password);
-
-      mockWhere.mockResolvedValueOnce([
-        {
-          id: "123",
-          email: "test@example.com",
-          passwordHash: hash,
-          role: "OWNER",
-        },
-      ]);
-
-      const result = await validateCredentials("test@example.com", password);
-      expect(result).toEqual({
-        id: "123",
-        email: "test@example.com",
-        role: "OWNER",
-      });
-    });
-
-    it("should return null for invalid email", async () => {
-      mockWhere.mockResolvedValueOnce([]);
-
-      const result = await validateCredentials(
-        "nonexistent@example.com",
-        "password",
-      );
-      expect(result).toBeNull();
-    });
-
-    it("should return null for invalid password", async () => {
-      const correctPassword = "correctPassword";
-      const hash = await hashPassword(correctPassword);
-
-      mockWhere.mockResolvedValueOnce([
-        {
-          id: "123",
-          email: "test@example.com",
-          passwordHash: hash,
-          role: "OWNER",
-        },
-      ]);
-
-      const result = await validateCredentials(
-        "test@example.com",
-        "wrongPassword",
-      );
-      expect(result).toBeNull();
-    });
-  });
+  // register and validateCredentials tests moved to integration tests due to database
+  // constraint behavior (email uniqueness) and actual password hashing with bcrypt
 });
 

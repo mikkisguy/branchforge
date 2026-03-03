@@ -9,42 +9,46 @@
  * - Test database must exist and have proper schema
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'vitest';
 import { getDb } from '../../db/index.js';
-import { users, projects, projectUsers } from '../../db/schema/index.js';
+import { users, projects, projectUsers, type NewUser, type NewProject, type NewProjectUser } from '../../db/schema/index.js';
 import { eq } from 'drizzle-orm';
 import { listProjects } from '../projects.service.js';
 
 describe('ProjectsService (Integration)', () => {
-  const db = getDb();
+  let db: ReturnType<typeof getDb>;
+
+  beforeAll(async () => {
+    db = getDb();
+  });
 
   // Test fixtures
   const testUserId = '00000000-0000-0000-0000-000000000001';
   const otherUserId = '00000000-0000-0000-0000-000000000002';
   const thirdUserId = '00000000-0000-0000-0000-000000000003';
 
-  const testUser = {
+  const testUser: NewUser = {
     id: testUserId,
     email: 'owner@test.com',
     passwordHash: 'hashed_password',
     role: 'OWNER',
   };
 
-  const otherUser = {
+  const otherUser: NewUser = {
     id: otherUserId,
     email: 'other@test.com',
     passwordHash: 'hashed_password',
     role: 'OWNER',
   };
 
-  const thirdUser = {
+  const thirdUser: NewUser = {
     id: thirdUserId,
     email: 'third@test.com',
     passwordHash: 'hashed_password',
     role: 'READER',
   };
 
-  const ownedProject = {
+  const ownedProject: NewProject = {
     id: '10000000-0000-0000-0000-000000000001',
     userId: testUserId,
     name: 'Owned Project',
@@ -53,7 +57,7 @@ describe('ProjectsService (Integration)', () => {
     maxMeterDelta: 10,
   };
 
-  const sharedProject = {
+  const sharedProject: NewProject = {
     id: '10000000-0000-0000-0000-000000000002',
     userId: otherUserId,
     name: 'Shared Project',
@@ -64,11 +68,13 @@ describe('ProjectsService (Integration)', () => {
 
   // Helper to clean up all test data including additional users created during tests
   async function cleanupTestData() {
+    const ownedProjectId: string = ownedProject.id!;
+    const sharedProjectId: string = sharedProject.id!;
     await db.delete(projectUsers).where(eq(projectUsers.userId, testUserId));
     await db.delete(projectUsers).where(eq(projectUsers.userId, otherUserId));
     await db.delete(projectUsers).where(eq(projectUsers.userId, thirdUserId));
-    await db.delete(projects).where(eq(projects.id, ownedProject.id));
-    await db.delete(projects).where(eq(projects.id, sharedProject.id));
+    await db.delete(projects).where(eq(projects.id, ownedProjectId));
+    await db.delete(projects).where(eq(projects.id, sharedProjectId));
     await db.delete(users).where(eq(users.id, testUserId));
     await db.delete(users).where(eq(users.id, otherUserId));
     await db.delete(users).where(eq(users.id, thirdUserId));
@@ -93,6 +99,9 @@ describe('ProjectsService (Integration)', () => {
   });
 
   describe('listProjects', () => {
+    const ownedProjectId: string = ownedProject.id!;
+    const sharedProjectId: string = sharedProject.id!;
+
     it('should return empty array when user has no projects', async () => {
       // Clean up the test data to have no projects
       await cleanupTestData();
@@ -110,7 +119,7 @@ describe('ProjectsService (Integration)', () => {
 
       expect(projects).toHaveLength(1);
       expect(projects[0]).toMatchObject({
-        id: ownedProject.id,
+        id: ownedProjectId,
         name: 'Owned Project',
         type: 'PREQUEL',
         description: 'A project owned by the user',
@@ -123,7 +132,7 @@ describe('ProjectsService (Integration)', () => {
     it('should return both owned and shared projects', async () => {
       // Share the other user's project with test user
       await db.insert(projectUsers).values({
-        projectId: sharedProject.id,
+        projectId: sharedProjectId,
         userId: testUserId,
         role: 'READER',
       });
@@ -137,8 +146,8 @@ describe('ProjectsService (Integration)', () => {
       expect(projectNames).toContain('Shared Project');
 
       // Verify visibility is set correctly
-      const owned = projects.find(p => p.id === ownedProject.id);
-      const shared = projects.find(p => p.id === sharedProject.id);
+      const owned = projects.find(p => p.id === ownedProjectId);
+      const shared = projects.find(p => p.id === sharedProjectId);
 
       expect(owned?.visibility).toBe('OWNER');
       expect(shared?.visibility).toBe('READER');
@@ -147,7 +156,7 @@ describe('ProjectsService (Integration)', () => {
     it('should not duplicate projects that are both owned and shared', async () => {
       // Share the owned project with the same user (edge case)
       await db.insert(projectUsers).values({
-        projectId: ownedProject.id,
+        projectId: ownedProjectId,
         userId: testUserId,
         role: 'READER',
       });
@@ -156,7 +165,7 @@ describe('ProjectsService (Integration)', () => {
 
       // Should still only have one project (the owned one)
       expect(projects).toHaveLength(1);
-      expect(projects[0].id).toBe(ownedProject.id);
+      expect(projects[0].id).toBe(ownedProjectId);
       expect(projects[0].visibility).toBe('OWNER'); // Should prioritize owner role
     });
 
@@ -166,7 +175,7 @@ describe('ProjectsService (Integration)', () => {
 
       // Share owned project with third user
       await db.insert(projectUsers).values({
-        projectId: ownedProject.id,
+        projectId: ownedProjectId,
         userId: thirdUserId,
         role: 'READER',
       });
@@ -174,7 +183,7 @@ describe('ProjectsService (Integration)', () => {
       const projects = await listProjects(thirdUserId);
 
       expect(projects).toHaveLength(1);
-      expect(projects[0].id).toBe(ownedProject.id);
+      expect(projects[0].id).toBe(ownedProjectId);
       expect(projects[0].visibility).toBe('READER');
     });
   });
