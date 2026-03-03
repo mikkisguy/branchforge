@@ -55,10 +55,21 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
   // Ref to track currentProject for use in refreshProjects without causing dependency issues
   const currentProjectRef = useRef<Project | null>(null);
 
+  // Track if component is mounted to avoid state updates after unmount
+  const mountedRef = useRef(true);
+
   // Keep the ref in sync with currentProject
   useEffect(() => {
     currentProjectRef.current = currentProject;
   }, [currentProject]);
+
+  // Set up mounted ref with cleanup
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   /**
    * Load projects on mount
@@ -110,10 +121,15 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
    * Refresh the list of projects from the server
    */
   const refreshProjects = useCallback(async () => {
+    if (!mountedRef.current) return;
+
     setIsLoadingProjects(true);
     setProjectsError(null);
+
     try {
       const fetchedProjects = await projectsApi.listProjects();
+      if (!mountedRef.current) return;
+
       setProjects(fetchedProjects);
 
       const current = currentProjectRef.current;
@@ -122,29 +138,32 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
       if (current) {
         const updated = fetchedProjects.find(p => p.id === current.id);
         if (updated) {
-          setCurrentProject(updated);
+          if (mountedRef.current) setCurrentProject(updated);
         } else {
           // Current project was deleted on server; fallback to first available or clear
           if (fetchedProjects.length > 0) {
-            setCurrentProject(fetchedProjects[0]);
+            if (mountedRef.current) setCurrentProject(fetchedProjects[0]);
           } else {
-            setCurrentProject(null);
+            if (mountedRef.current) setCurrentProject(null);
           }
         }
       }
 
       // Auto-select first project if none selected and projects exist
       if (!current && fetchedProjects.length > 0) {
-        setCurrentProject(fetchedProjects[0]);
+        if (mountedRef.current) setCurrentProject(fetchedProjects[0]);
       }
     } catch (error) {
+      if (!mountedRef.current) return;
       const message =
         error instanceof Error
           ? error.message
           : "Failed to load projects";
       setProjectsError(message);
     } finally {
-      setIsLoadingProjects(false);
+      if (mountedRef.current) {
+        setIsLoadingProjects(false);
+      }
     }
   }, []); // No dependencies - stable reference
 
