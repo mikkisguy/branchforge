@@ -1,5 +1,13 @@
 # @branchforge/frontend
 
+## 0.1.2
+
+### Patch Changes
+
+- f6a4733: add GPLv3 license, update Gitleaks configuration and remove secret detection report
+- Updated dependencies [f6a4733]
+  - @branchforge/shared@0.1.2
+
 ## 0.1.1
 
 ### Patch Changes
