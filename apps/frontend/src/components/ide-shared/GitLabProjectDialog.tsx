@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { InlineMessage } from "@/components/ui/inline-error";
 import { gitlabApi, type GitLabProject } from "@/lib/api/gitlab";
 import { useGitLab } from "@/contexts/GitLabContext";
 import { useToast } from "@/contexts/ToastContext";
@@ -259,7 +260,7 @@ export function GitLabProjectDialog({
                 </div>
               ) : gitlabLoadError ? (
                 <div className="p-4 flex flex-col items-center gap-3 text-center">
-                  <p className="text-sm text-destructive">{gitlabLoadError}</p>
+                  <InlineMessage variant="error">{gitlabLoadError}</InlineMessage>
                   <Button
                     type="button"
                     variant="outline"

@@ -10,11 +10,11 @@ import { Eye, EyeOff, Trash2, Link as LinkIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { InlineMessage } from "@/components/ui/inline-error";
 import { useGitLab } from "@/contexts/GitLabContext";
 import { useToast } from "@/contexts/ToastContext";
 import { GitLabProjectDialog } from "@/components/ide-shared/GitLabProjectDialog";
 import { gitlabApi } from "@/lib/api/gitlab";
-import { cn } from "@/lib/utils";
 
 // ============================================================================
 // Types
@@ -377,24 +377,17 @@ export function GitLabSettingsContent() {
           </div>
 
           {validationResult && (
-            <div
-              className={cn(
-                "p-3 rounded-md border text-sm",
-                validationResult.valid
-                  ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200"
-                  : "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200",
-              )}
+            <InlineMessage
+              variant={validationResult.valid ? "success" : "error"}
             >
               {validationResult.valid
                 ? `Validated for ${validationResult.username || "user"}`
                 : "Invalid token"}
-            </div>
+            </InlineMessage>
           )}
 
           {integrationError && (
-            <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 rounded-md text-sm">
-              {integrationError}
-            </div>
+            <InlineMessage variant="error">{integrationError}</InlineMessage>
           )}
 
           <div className="flex gap-2">
