@@ -28,3 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Updated versioning process to read version from root package.json
 - Updated  configuration and Gitleaks settings
+## v0.2.0 - 2026-03-03
+
+### Added
+- 0ad737c: Added scene functionality to backend, created integration tests for projects
+- 3934293: Converted brittle unit tests to integration tests, updated test handling
+
+### Fixed
+- @branchforge/shared@0.2.0
