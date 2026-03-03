@@ -40,6 +40,9 @@ LABEL org.label-schema.vcs-ref=$VCS_REF
 
 WORKDIR /app
 
+# Install pnpm
+RUN npm install -g pnpm
+
 # Copy workspace files for production runtime
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY packages/shared ./packages/shared
