@@ -5,6 +5,16 @@ All notable changes to BranchForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.4.0 - 2026-03-05
+
+### Added
+- 9cdac7a: Migrated to TanStack Query for better data fetching and handling
+
+### Fixed
+- 4d51360: Reduced type duplication across the codebase
+- Updated dependencies [4d51360]
+  - @branchforge/shared@0.4.0
+
 ## v0.3.1 - 2026-03-05
 
 ### Fixed
