@@ -12,6 +12,7 @@ import * as schema from './schema/index.js';
 const { Pool } = pg;
 
 let db: ReturnType<typeof drizzle> | null = null;
+let pool: pg.Pool | null = null;
 
 export function getDb() {
   if (!db) {
@@ -33,7 +34,7 @@ export function getDb() {
       connectionString = url;
     }
 
-    const pool = new Pool({
+    pool = new Pool({
       connectionString,
       max: 20,
     });
@@ -44,10 +45,36 @@ export function getDb() {
   return db;
 }
 
-// For test cleanup
-export async function closeDb() {
-  if (db) {
-    // Pool will be closed when the process exits
+/**
+ * Close the database connection pool
+ * Should be called during graceful shutdown
+ *
+ * @returns Promise that resolves when the pool is closed
+ */
+export async function closeDb(): Promise<void> {
+  if (pool) {
+    try {
+      await pool.end();
+      pool = null;
+      db = null;
+    } catch (error) {
+      console.error('Error closing database pool:', error);
+      // Still clear references even if close fails
+      pool = null;
+      db = null;
+      throw error;
+    }
+  } else {
+    // If db exists but pool doesn't, just clear db
     db = null;
   }
+}
+
+/**
+ * Check if the database connection is open
+ *
+ * @returns true if the database is connected
+ */
+export function isDbConnected(): boolean {
+  return db !== null && pool !== null;
 }

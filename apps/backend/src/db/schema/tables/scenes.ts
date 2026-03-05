@@ -28,8 +28,16 @@ export const scenes = pgTable('scenes', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => [
-  index('scenes_project_id_idx').on(table.projectId),
   index('scenes_duo_pair_id_idx').on(table.duoPairId),
+  // Composite indexes for common query patterns
+  // Used by listScenes when filtering by route
+  index('scenes_project_route_idx').on(table.projectId, table.route),
+  // Used by listScenes when filtering by status
+  index('scenes_project_status_idx').on(table.projectId, table.status),
+  // Used for ordering scenes within a project
+  index('scenes_project_sequence_idx').on(table.projectId, table.sequenceOrder),
+  // Used for ordering by scene number within a project
+  index('scenes_project_scene_number_idx').on(table.projectId, table.sceneNumber),
 ]);
 
 // Types

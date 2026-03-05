@@ -15,16 +15,19 @@ import {
   type ListScenesFilters,
 } from "../services/scenes.service.js";
 import { authenticate } from "../middleware/auth.middleware.js";
+import {
+  validateQuery,
+  validateParams,
+} from "../middleware/validation.middleware.js";
+import {
+  listScenesQuerySchema,
+  sceneIdParamsSchema,
+  type ListScenesQuery,
+} from "../lib/validation.js";
 
 // ============================================================================
 // Types
 // ============================================================================
-
-interface ListScenesQuery {
-  projectId: string;
-  route?: string;
-  status?: "DRAFT" | "REVIEW" | "FINAL";
-}
 
 interface ListScenesResponse {
   scenes: PublicScene[];
@@ -59,18 +62,12 @@ async function listScenesHandler(
   const user = request.user!;
   const { projectId, route, status } = request.query;
 
-  // Validate required projectId
-  if (!projectId || projectId.trim() === "") {
-    reply.status(400).send({ error: "Project ID is required" } as ErrorResponse);
-    return;
-  }
-
   // Build filters
   const filters: ListScenesFilters = {};
-  if (route && route.trim() !== "") {
+  if (route) {
     filters.route = route;
   }
-  if (status && ["DRAFT", "REVIEW", "FINAL"].includes(status)) {
+  if (status) {
     filters.status = status;
   }
 
@@ -96,12 +93,6 @@ async function getSceneHandler(
   const { sceneId } = request.params;
   const user = request.user!;
 
-  // Validate sceneId
-  if (!sceneId || sceneId.trim() === "") {
-    reply.status(400).send({ error: "Scene ID is required" } as ErrorResponse);
-    return;
-  }
-
   try {
     const scene = await getScene(sceneId, user.id);
 
@@ -125,12 +116,19 @@ export async function scenesRoutes(fastify: FastifyInstance): Promise<void> {
   // All routes require authentication
   fastify.get<{ Querystring: ListScenesQuery }>(
     "/scenes",
-    { onRequest: authenticate },
+    {
+      onRequest: authenticate,
+      preValidation: validateQuery(listScenesQuerySchema),
+    },
     listScenesHandler,
   );
   fastify.get<{ Params: GetSceneParams }>(
     "/scenes/:sceneId",
-    { onRequest: authenticate },
+    {
+      onRequest: authenticate,
+      preValidation: validateParams(sceneIdParamsSchema),
+    },
     getSceneHandler,
   );
 }
+

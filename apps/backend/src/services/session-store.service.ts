@@ -275,12 +275,13 @@ export class DrizzleSessionStore implements SessionStore {
       const db = getDb();
       const now = new Date();
 
+      // Use delete without returning() for better performance
+      // We only need the count, not the actual deleted rows
       const result = await db
         .delete(userSessions)
-        .where(lt(userSessions.expiresAt, now))
-        .returning({ id: userSessions.id });
+        .where(lt(userSessions.expiresAt, now));
 
-      return result.length;
+      return result.rowCount ?? 0;
     } catch (error) {
       console.error('Session store cleanup error:', error);
       return 0;
@@ -296,9 +297,11 @@ export class DrizzleSessionStore implements SessionStore {
     }
 
     this.cleanupInterval = setInterval(async () => {
+      const startTime = Date.now();
       const count = await this.cleanExpiredSessions();
+      const duration = Date.now() - startTime;
       if (count > 0) {
-        console.log(`Session store: Cleaned up ${count} expired sessions`);
+        console.log(`Session store: Cleaned up ${count} expired sessions (${duration}ms)`);
       }
     }, this.cleanupIntervalMs);
 

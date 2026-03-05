@@ -22,6 +22,20 @@
       "when": 1772479056979,
       "tag": "0002_wandering_magik",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1772712617695,
+      "tag": "0003_third_falcon",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1772715636242,
+      "tag": "0004_closed_dazzler",
+      "breakpoints": true
     }
   ]
 }

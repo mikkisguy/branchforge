@@ -10,11 +10,18 @@ import {
   listProjects,
   getProject,
   createProject,
-  type CreateProjectBody,
   type PublicProject,
 } from "../services/projects.service.js";
 import { authenticate } from "../middleware/auth.middleware.js";
-import type { PublicUser } from "../middleware/auth.middleware.js";
+import {
+  validateBody,
+  validateParams,
+} from "../middleware/validation.middleware.js";
+import {
+  createProjectSchema,
+  projectIdParamsSchema,
+  type CreateProjectInput,
+} from "../lib/validation.js";
 
 // ============================================================================
 // Types
@@ -91,35 +98,13 @@ async function getProjectHandler(
  * Requires authentication
  */
 async function createProjectHandler(
-  request: FastifyRequest<{ Body: CreateProjectBody }>,
+  request: FastifyRequest<{ Body: CreateProjectInput }>,
   reply: FastifyReply,
 ): Promise<void> {
   const user = request.user!;
   const body = request.body;
 
-  // Validate required fields
-  if (!body.name || body.name.trim() === "") {
-    reply
-      .status(400)
-      .send({ error: "Project name is required" } as ErrorResponse);
-    return;
-  }
-
-  if (!body.type || !["PREQUEL", "SEQUEL"].includes(body.type)) {
-    reply
-      .status(400)
-      .send({
-        error: "Project type must be PREQUEL or SEQUEL",
-      } as ErrorResponse);
-    return;
-  }
-
-  const sanitizedBody: CreateProjectBody = {
-    ...body,
-    name: body.name.trim(),
-  };
-
-  const project = await createProject(user.id, sanitizedBody);
+  const project = await createProject(user.id, body);
 
   reply.status(201).send({ project } as CreateProjectResponse);
 }
@@ -133,12 +118,18 @@ export async function projectsRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get("/projects", { onRequest: authenticate }, listProjectsHandler);
   fastify.get<{ Params: GetProjectParams }>(
     "/projects/:id",
-    { onRequest: authenticate },
+    {
+      onRequest: authenticate,
+      preValidation: validateParams(projectIdParamsSchema),
+    },
     getProjectHandler,
   );
-  fastify.post<{ Body: CreateProjectBody }>(
+  fastify.post<{ Body: CreateProjectInput }>(
     "/projects",
-    { onRequest: authenticate },
+    {
+      onRequest: authenticate,
+      preValidation: validateBody(createProjectSchema),
+    },
     createProjectHandler,
   );
 }

@@ -9,6 +9,8 @@ import { gitlabRoutes } from './routes/gitlab.routes.js';
 import { projectsRoutes } from './routes/projects.routes.js';
 import { scenesRoutes } from './routes/scenes.routes.js';
 import { createDrizzleSessionStore } from './services/session-store.service.js';
+import { setupShutdownHandlers } from './lib/shutdown.js';
+import { globalErrorHandler } from './middleware/error-handler.middleware.js';
 
 const server = Fastify({
   logger: true,
@@ -56,9 +58,15 @@ await server.register(scenesRoutes, { prefix: basePath });
 // Start server
 const start = async () => {
   try {
+    // Register global error handler before listening
+    server.setErrorHandler(globalErrorHandler);
+
     const port = parseInt(process.env.PORT ?? '3000', 10);
     await server.listen({ port, host: '0.0.0.0' });
     console.log(`Server listening on port ${port}`);
+
+    // Setup graceful shutdown handlers after server is ready
+    setupShutdownHandlers(server, sessionStore);
   } catch (err) {
     server.log.error(err);
     process.exit(1);
