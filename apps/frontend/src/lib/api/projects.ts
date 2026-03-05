@@ -1,10 +1,13 @@
+import type { ProjectType, UserRole } from "@branchforge/shared";
+
 /**
  * Projects API Client
  *
  * Client for project management operations.
  */
 
-const API_BASE = import.meta.env.VITE_API_ENV === "development" ? "/api/api" : "/api";
+const API_BASE =
+  import.meta.env.VITE_API_ENV === "development" ? "/api/api" : "/api";
 
 export interface ApiError {
   error: string;
@@ -16,7 +19,7 @@ export interface ApiError {
 
 async function request<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
   const response = await fetch(url, {
@@ -29,8 +32,12 @@ async function request<T>(
   });
 
   if (!response.ok) {
-    const error: ApiError = await response.json().catch(() => ({ error: "Unknown error" }));
-    throw new Error(error.error || `Request failed with status ${response.status}`);
+    const error: ApiError = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      error.error || `Request failed with status ${response.status}`,
+    );
   }
 
   // For 204 No Content responses
@@ -44,9 +51,6 @@ async function request<T>(
 // ============================================================================
 // Types
 // ============================================================================
-
-export type ProjectType = 'PREQUEL' | 'SEQUEL';
-export type UserRole = 'OWNER' | 'READER' | 'TESTER';
 
 export interface Project {
   id: string;
@@ -95,9 +99,12 @@ export const projectsApi = {
    * Get a single project by ID
    */
   async getProject(projectId: string): Promise<Project> {
-    const response = await request<GetProjectResponse>(`/projects/${projectId}`, {
-      method: "GET",
-    });
+    const response = await request<GetProjectResponse>(
+      `/projects/${projectId}`,
+      {
+        method: "GET",
+      },
+    );
     return response.project;
   },
 
@@ -112,3 +119,4 @@ export const projectsApi = {
     return response.project;
   },
 };
+

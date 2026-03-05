@@ -14,7 +14,7 @@
 import { z } from "zod";
 import { ValidationError } from "../middleware/error-handler.middleware.js";
 import { isIP } from "node:net";
-import { VALID_ROUTES, VALID_STATUSES } from "../services/scenes.service.js";
+import { ProjectType, RouteType, SceneStatus, UserRole } from "@branchforge/shared";
 
 // ============================================================================
 // Common Schemas
@@ -129,28 +129,40 @@ export const intStringSchema = z
 /**
  * Project type enum
  */
-export const projectTypeSchema = z.enum(["PREQUEL", "SEQUEL"], {
+export const projectTypeSchema = z.enum(Object.values(ProjectType), {
   message: "Project type must be PREQUEL or SEQUEL",
 });
 
 /**
  * User role enum
  */
-export const userRoleSchema = z.enum(["OWNER", "READER", "TESTER"], {
+export const userRoleSchema = z.enum(Object.values(UserRole), {
   message: "Role must be OWNER, READER, or TESTER",
 });
 
 /**
  * Scene status enum
  */
-export const sceneStatusSchema = z.enum(VALID_STATUSES, {
+export const sceneStatusSchema = z.enum([
+  SceneStatus.DRAFT,
+  SceneStatus.REVIEW,
+  SceneStatus.FINAL,
+], {
   message: "Status must be DRAFT, REVIEW, or FINAL",
 });
 
 /**
  * Route type enum
  */
-export const routeTypeSchema = z.enum(VALID_ROUTES, {
+export const routeTypeSchema = z.enum([
+  RouteType.EILEEN,
+  RouteType.LUCAS,
+  RouteType.SHARED,
+  RouteType.FEMALE,
+  RouteType.MALE,
+  RouteType.COMBINED,
+  RouteType.COMMON,
+], {
   message:
     "Route must be EILEEN, LUCAS, SHARED, FEMALE, MALE, COMBINED, or COMMON",
 });

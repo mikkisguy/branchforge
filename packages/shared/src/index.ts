@@ -1,57 +1,73 @@
 /**
  * Shared types and utilities for BranchForge
+ *
+ * This package is the single source of truth for all types shared between
+ * the frontend and backend. When adding types that could be used by both apps:
+ * 1. Add them here
+ * 2. Import as: `import type { YourType } from '@branchforge/shared'`
  */
 
 // ============================================================================
-// Enums
+// Core Enums
 // ============================================================================
 
-export enum ProjectType {
-  PREQUEL = 'PREQUEL',
-  SEQUEL = 'SEQUEL',
-}
+/**
+ * User role enumeration
+ */
+export type UserRole = 'OWNER' | 'READER' | 'TESTER';
+export const UserRole = {
+  OWNER: 'OWNER',
+  READER: 'READER',
+  TESTER: 'TESTER',
+} as const;
 
-export enum UserRole {
-  OWNER = 'OWNER',
-  READER = 'READER',
-  TESTER = 'TESTER',
-}
+/**
+ * Project type enumeration
+ */
+export type ProjectType = 'PREQUEL' | 'SEQUEL';
+export const ProjectType = {
+  PREQUEL: 'PREQUEL',
+  SEQUEL: 'SEQUEL',
+} as const;
 
-export enum SceneStatus {
-  DRAFT = 'DRAFT',
-  REVIEW = 'REVIEW',
-  FINAL = 'FINAL',
-}
+/**
+ * Scene status enumeration
+ */
+export type SceneStatus = 'DRAFT' | 'REVIEW' | 'FINAL';
+export const SceneStatus = {
+  DRAFT: 'DRAFT',
+  REVIEW: 'REVIEW',
+  FINAL: 'FINAL',
+} as const;
 
-export enum RouteType {
-  EILEEN = 'EILEEN',
-  LUCAS = 'LUCAS',
-  SHARED = 'SHARED',
-  FEMALE = 'FEMALE',
-  MALE = 'MALE',
-  COMBINED = 'COMBINED',
-  COMMON = 'COMMON',
-}
+/**
+ * Route type enumeration
+ * Prequel: EILEEN, LUCAS, SHARED
+ * Sequel: FEMALE, MALE, COMBINED, COMMON
+ */
+export type RouteType = 'EILEEN' | 'LUCAS' | 'SHARED' | 'FEMALE' | 'MALE' | 'COMBINED' | 'COMMON';
+export const RouteType = {
+  EILEEN: 'EILEEN',
+  LUCAS: 'LUCAS',
+  SHARED: 'SHARED',
+  FEMALE: 'FEMALE',
+  MALE: 'MALE',
+  COMBINED: 'COMBINED',
+  COMMON: 'COMMON',
+} as const;
 
-export enum ContentType {
-  NARRATION = 'NARRATION',
-  DIALOGUE = 'DIALOGUE',
-  CHOICE = 'CHOICE',
-  MENU = 'MENU',
-  JUMP = 'JUMP',
-}
+// ============================================================================
+// Public User Interface
+// ============================================================================
 
-export enum VisualType {
-  GENERATED = 'GENERATED',
-  BLACK = 'BLACK',
-  CUSTOM = 'CUSTOM',
-}
-
-export enum ElementType {
-  LOCATION = 'LOCATION',
-  ITEM = 'ITEM',
-  CONCEPT = 'CONCEPT',
-  EVENT = 'EVENT',
+/**
+ * Public user information (without sensitive data)
+ * This interface is used for API responses and session data
+ */
+export interface PublicUser {
+  id: string;
+  email: string;
+  role: UserRole;
 }
 
 // ============================================================================

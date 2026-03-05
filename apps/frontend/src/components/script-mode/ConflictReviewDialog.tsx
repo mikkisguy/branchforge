@@ -19,6 +19,7 @@ import {
   type ContentItem,
 } from "@/lib/api/gitlab";
 import { useToast } from "@/contexts/ToastContext";
+import type { UserRole } from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -28,8 +29,6 @@ interface ConflictResolution {
   label: string;
   choice: "local" | "remote" | "skip";
 }
-
-type UserRole = "owner" | "reader" | "tester";
 
 interface ConflictReviewDialogProps {
   open: boolean;
@@ -258,7 +257,7 @@ export function ConflictReviewDialog({
           <div className="flex-1">
             <div className="flex items-center gap-3">
               <h2 className="text-lg font-medium">Review Sync Conflicts</h2>
-              {userRole === "owner" && (
+              {userRole === "OWNER" && (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -298,7 +297,7 @@ export function ConflictReviewDialog({
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <p className="text-sm text-destructive mb-2">{fetchError}</p>
-                {userRole === "owner" && (
+                {userRole === "OWNER" && (
                   <Button
                     size="sm"
                     variant="outline"

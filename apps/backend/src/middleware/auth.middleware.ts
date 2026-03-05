@@ -7,15 +7,9 @@
  */
 
 import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { PublicUser, UserRole } from '@branchforge/shared';
 
-/**
- * Public user information (without sensitive data)
- */
-export interface PublicUser {
-  id: string;
-  email: string;
-  role: 'OWNER' | 'READER' | 'TESTER';
-}
+export type { PublicUser };
 
 /**
  * Extend the Fastify Session type to include user data
@@ -175,7 +169,7 @@ export async function optionalAuth(
  * - Returns 403 if user lacks required role
  * - Returns 500 on unexpected errors
  */
-export function requireRole(...allowedRoles: Array<'OWNER' | 'READER' | 'TESTER'>) {
+export function requireRole(...allowedRoles: UserRole[]) {
   return async function roleAuth(
     request: FastifyRequest,
     reply: FastifyReply
