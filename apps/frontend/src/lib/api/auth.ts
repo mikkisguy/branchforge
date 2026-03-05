@@ -1,16 +1,12 @@
 const API_BASE = import.meta.env.VITE_API_ENV === "development" ? "/api/api" : "/api";
 
-export type UserRole = "OWNER" | "READER" | "TESTER";
+import type { PublicUser } from "@branchforge/shared";
 
 export interface AuthResponse {
   user: PublicUser;
 }
 
-export interface PublicUser {
-  id: string;
-  email: string;
-  role: UserRole;
-}
+export type { PublicUser };
 
 export interface LoginCredentials {
   email: string;

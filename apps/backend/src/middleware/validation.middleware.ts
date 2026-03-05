@@ -16,15 +16,6 @@ import { z } from "zod";
 import { ValidationError } from "./error-handler.middleware.js";
 
 // ============================================================================
-// Type Utilities
-// ============================================================================
-
-/**
- * Extract the inferred type from a Zod schema
- */
-export type InferSchema<T extends z.ZodTypeAny> = z.infer<T>;
-
-// ============================================================================
 // Validation Middleware
 // ============================================================================
 

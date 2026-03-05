@@ -18,35 +18,38 @@ import { sceneCharacters as sceneCharactersTable } from "../db/schema/tables/sce
 import { eq, and, asc, or } from "drizzle-orm";
 import type { Scene, SceneLine, Character } from "../db/schema/index.js";
 import type { SceneCharacter as SceneCharacterType } from "../db/schema/tables/scene-characters.js";
+import { RouteType, SceneStatus } from "@branchforge/shared";
 
 // ============================================================================
 // Type Guards for Enum Values
 // ============================================================================
 
 /**
- * Valid route type values
- */
-export const VALID_ROUTES = ['EILEEN', 'LUCAS', 'SHARED', 'FEMALE', 'MALE', 'COMBINED', 'COMMON'] as const;
-export type RouteType = typeof VALID_ROUTES[number];
-
-/**
  * Type guard to check if a value is a valid route type
  */
 export function isValidRoute(value: string | null | undefined): value is RouteType {
-  return value !== null && value !== undefined && VALID_ROUTES.includes(value as RouteType);
+  const validRoutes: RouteType[] = [
+    RouteType.EILEEN,
+    RouteType.LUCAS,
+    RouteType.SHARED,
+    RouteType.FEMALE,
+    RouteType.MALE,
+    RouteType.COMBINED,
+    RouteType.COMMON,
+  ];
+  return value !== null && value !== undefined && validRoutes.includes(value as RouteType);
 }
-
-/**
- * Valid scene status values
- */
-export const VALID_STATUSES = ['DRAFT', 'REVIEW', 'FINAL'] as const;
-export type SceneStatus = typeof VALID_STATUSES[number];
 
 /**
  * Type guard to check if a value is a valid scene status
  */
 export function isValidSceneStatus(value: string | null | undefined): value is SceneStatus {
-  return value !== null && value !== undefined && VALID_STATUSES.includes(value as SceneStatus);
+  const validStatuses: SceneStatus[] = [
+    SceneStatus.DRAFT,
+    SceneStatus.REVIEW,
+    SceneStatus.FINAL,
+  ];
+  return value !== null && value !== undefined && validStatuses.includes(value as SceneStatus);
 }
 
 // ============================================================================

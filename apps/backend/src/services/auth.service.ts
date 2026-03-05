@@ -9,21 +9,15 @@ import { getDb } from '../db/index.js';
 import { users } from '../db/schema/index.js';
 import { eq } from 'drizzle-orm';
 import { isSignUpsEnabled } from './admin-settings.service.js';
+import type { PublicUser } from '@branchforge/shared';
+
+export type { PublicUser };
 
 // Email regex for basic validation
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Minimum password length
 const MIN_PASSWORD_LENGTH = 8;
-
-/**
- * Public user information (without sensitive data)
- */
-export interface PublicUser {
-  id: string;
-  email: string;
-  role: 'OWNER' | 'READER' | 'TESTER';
-}
 
 /**
  * Hash a password using bcrypt
