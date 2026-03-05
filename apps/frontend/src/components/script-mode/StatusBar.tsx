@@ -5,7 +5,7 @@ import {
   SyncOperationType,
 } from "@/components/script-mode/GitLabSyncDialog";
 import { ConflictReviewDialog } from "@/components/script-mode/ConflictReviewDialog";
-import { useGitLab } from "@/contexts/GitLabContext";
+import { useGitLab } from "@/hooks/useGitLab";
 import { cn } from "@/lib/utils";
 
 // Status bar styled like a storybook footer

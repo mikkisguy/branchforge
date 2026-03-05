@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { InlineMessage } from "@/components/ui/inline-error";
 import { gitlabApi, type GitLabProject } from "@/lib/api/gitlab";
-import { useGitLab } from "@/contexts/GitLabContext";
+import { useGitLab } from "@/hooks/useGitLab";
 import { useToast } from "@/contexts/ToastContext";
 
 // ============================================================================

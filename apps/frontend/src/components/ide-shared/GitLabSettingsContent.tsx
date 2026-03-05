@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { InlineMessage } from "@/components/ui/inline-error";
-import { useGitLab } from "@/contexts/GitLabContext";
+import { useGitLab } from "@/hooks/useGitLab";
 import { useToast } from "@/contexts/ToastContext";
 import { GitLabProjectDialog } from "@/components/ide-shared/GitLabProjectDialog";
 import { gitlabApi } from "@/lib/api/gitlab";
@@ -387,7 +387,7 @@ export function GitLabSettingsContent() {
           )}
 
           {hasIntegration && integrationError && (
-            <InlineMessage variant="error">{integrationError}</InlineMessage>
+            <InlineMessage variant="error">{integrationError.message || String(integrationError)}</InlineMessage>
           )}
 
           <div className="flex gap-2">
