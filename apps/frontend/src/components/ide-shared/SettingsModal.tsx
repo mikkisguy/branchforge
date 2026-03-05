@@ -80,7 +80,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl p-0 gap-0">
+      <DialogContent className="w-[700px] max-w-[95vw] p-0 gap-0">
         <DialogHeader className="p-6 pb-4 flex-row items-center justify-between border-b border-border/30">
           <DialogTitle>Settings</DialogTitle>
           <button
@@ -91,7 +91,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
           </button>
         </DialogHeader>
 
-        <div className="flex min-h-[400px]">
+        <div className="flex h-[500px]">
           {/* Vertical Tabs */}
           <div className="w-48 border-r border-border/30 p-2 flex flex-col">
             <div className="space-y-1">

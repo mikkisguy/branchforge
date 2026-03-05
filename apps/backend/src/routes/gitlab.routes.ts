@@ -313,6 +313,7 @@ async function storeIntegrationHandler(
  * GET /api/gitlab/integration
  *
  * Returns the user's GitLab integration metadata (excluding sensitive data).
+ * Returns 204 No Content if integration is not configured.
  */
 async function getIntegrationHandler(
   request: FastifyRequest,
@@ -324,7 +325,7 @@ async function getIntegrationHandler(
     const integration = await getGitlabIntegration(userId);
 
     if (!integration) {
-      reply.status(404).send({ error: "GitLab integration not found" });
+      reply.status(204).send();
       return;
     }
 
@@ -382,6 +383,7 @@ async function deleteIntegrationHandler(
  * GET /api/gitlab/projects
  *
  * Returns a list of GitLab projects accessible to the user.
+ * Returns an empty array if GitLab integration is not configured.
  */
 async function listProjectsHandler(
   request: FastifyRequest,
@@ -392,17 +394,24 @@ async function listProjectsHandler(
     const projects = await listGitlabProjects(userId);
     reply.send(projects);
   } catch (err) {
+    // Return empty array if integration not set up (normal state, not an error)
     if (
       err instanceof Error &&
       err.message === "GitLab integration not found"
     ) {
-      reply.status(404).send({ error: "GitLab integration not found" });
-    } else {
-      reply.status(500).send({
-        error: "Failed to list GitLab projects",
-        details: err instanceof Error ? err.message : "Unknown error",
-      });
+      reply.send([]);
+      return;
     }
+
+    request.log.error(
+      { err },
+      "listProjectsHandler: Failed to list GitLab projects",
+    );
+
+    reply.status(500).send({
+      error: "Failed to list GitLab projects",
+      details: err instanceof Error ? err.message : "Unknown error",
+    });
   }
 }
 
@@ -507,6 +516,7 @@ async function unlinkRepositoryHandler(
  * GET /api/gitlab/repositories
  *
  * Returns a list of all GitLab repositories linked to the user's projects.
+ * Returns an empty array if no repositories are linked or integration not set up.
  */
 async function listRepositoriesHandler(
   request: FastifyRequest,
@@ -518,6 +528,14 @@ async function listRepositoriesHandler(
     const repositories = await listRepositoryLinks(userId);
     reply.send(repositories);
   } catch (err) {
+    // Return empty array if integration not set up (normal state, not an error)
+    if (
+      err instanceof Error &&
+      err.message === "GitLab integration not found"
+    ) {
+      reply.send([]);
+      return;
+    }
     request.log.error(
       { err },
       "listRepositoriesHandler: Failed to list linked repositories",
@@ -535,6 +553,7 @@ async function listRepositoriesHandler(
  * GET /api/gitlab/branches/:projectId
  *
  * Returns a list of branches in the linked GitLab repository.
+ * Returns an empty array if the repository is not linked.
  */
 async function listBranchesHandler(
   request: FastifyRequest<{ Params: { projectId: string } }>,
@@ -552,19 +571,20 @@ async function listBranchesHandler(
     const branches = await listBranches(projectId);
     reply.send(branches);
   } catch (err) {
-    request.log.error(
-      { err, projectId },
-      "listBranchesHandler: Failed to list branches",
-    );
-
+    // Return empty array if repository not linked (normal state, not an error)
     if (
       err instanceof Error &&
       (err.message === "GitLab repository not linked" ||
         err.message === "Project not found")
     ) {
-      reply.status(404).send({ error: err.message });
+      reply.send([]);
       return;
     }
+
+    request.log.error(
+      { err, projectId },
+      "listBranchesHandler: Failed to list branches",
+    );
 
     if (err instanceof Error && err.message.startsWith("GitLab API error:")) {
       reply.status(502).send({
@@ -587,6 +607,7 @@ async function listBranchesHandler(
  * GET /api/gitlab/files/:projectId?branch=xxx
  *
  * Returns a list of .rpy files in the linked GitLab repository.
+ * Returns an empty array if the repository is not linked.
  */
 async function listFilesHandler(
   request: FastifyRequest<{
@@ -613,19 +634,20 @@ async function listFilesHandler(
     const files = await listRpyFiles(projectId, branch);
     reply.send(files);
   } catch (err) {
-    request.log.error(
-      { err, projectId, branch },
-      "listFilesHandler: Failed to list RPY files",
-    );
-
+    // Return empty array if repository not linked (normal state, not an error)
     if (
       err instanceof Error &&
       (err.message === "GitLab repository not linked" ||
         err.message === "Project not found")
     ) {
-      reply.status(404).send({ error: err.message });
+      reply.send([]);
       return;
     }
+
+    request.log.error(
+      { err, projectId, branch },
+      "listFilesHandler: Failed to list RPY files",
+    );
 
     if (err instanceof Error && err.message.startsWith("GitLab API error:")) {
       reply.status(502).send({
@@ -759,7 +781,9 @@ async function getOperationHandler(
     const operation = await getSyncOperation(operationId);
 
     if (!operation) {
-      reply.status(404).send({ error: "Not Found", message: "Sync operation not found" });
+      reply
+        .status(404)
+        .send({ error: "Not Found", message: "Sync operation not found" });
       return;
     }
 
