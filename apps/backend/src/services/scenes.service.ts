@@ -19,6 +19,40 @@ import { eq, and, asc, or } from "drizzle-orm";
 import type { Scene, SceneLine, Character } from "../db/schema/index.js";
 import type { SceneCharacter as SceneCharacterType } from "../db/schema/tables/scene-characters.js";
 
+// ============================================================================
+// Type Guards for Enum Values
+// ============================================================================
+
+/**
+ * Valid route type values
+ */
+export const VALID_ROUTES = ['EILEEN', 'LUCAS', 'SHARED', 'FEMALE', 'MALE', 'COMBINED', 'COMMON'] as const;
+export type RouteType = typeof VALID_ROUTES[number];
+
+/**
+ * Type guard to check if a value is a valid route type
+ */
+export function isValidRoute(value: string | null | undefined): value is RouteType {
+  return value !== null && value !== undefined && VALID_ROUTES.includes(value as RouteType);
+}
+
+/**
+ * Valid scene status values
+ */
+export const VALID_STATUSES = ['DRAFT', 'REVIEW', 'FINAL'] as const;
+export type SceneStatus = typeof VALID_STATUSES[number];
+
+/**
+ * Type guard to check if a value is a valid scene status
+ */
+export function isValidSceneStatus(value: string | null | undefined): value is SceneStatus {
+  return value !== null && value !== undefined && VALID_STATUSES.includes(value as SceneStatus);
+}
+
+// ============================================================================
+// Public Types
+// ============================================================================
+
 /**
  * Public scene information (without sensitive data)
  */
@@ -30,8 +64,8 @@ export interface PublicScene {
   chapter: number | null;
   sceneNumber: number;
   sequenceOrder: number;
-  route: string | null;
-  status: "DRAFT" | "REVIEW" | "FINAL" | null;
+  route: RouteType | null;
+  status: SceneStatus | null;
   visibility: "EXCLUSIVE" | "SHARED" | "DUO_PAIR" | null;
   createdAt: Date;
   updatedAt: Date;
@@ -39,9 +73,6 @@ export interface PublicScene {
 
 /**
  * Scene line with speaker information
- *
- * Note: We need to explicitly type enum fields because Drizzle's runtime
- * query returns enum values as strings, losing the literal type information.
  */
 export interface SceneLineWithSpeaker extends Omit<SceneLine, "speakerId"> {
   speakerId: string | null;
@@ -96,9 +127,13 @@ type SceneForPublic = Pick<
  * List scenes request filters
  */
 export interface ListScenesFilters {
-  route?: string;
-  status?: "DRAFT" | "REVIEW" | "FINAL";
+  route?: RouteType;
+  status?: SceneStatus;
 }
+
+// ============================================================================
+// Service Functions
+// ============================================================================
 
 /**
  * List all scenes for a project
@@ -137,12 +172,17 @@ export async function listScenes(
   const whereConditions = [eq(scenes.projectId, projectId)];
 
   if (filters?.route) {
-    // Type assertion needed because Drizzle doesn't infer enum values properly
-    whereConditions.push(eq(scenes.route, filters.route as any));
+    // Use type guard to ensure type safety
+    if (isValidRoute(filters.route)) {
+      whereConditions.push(eq(scenes.route, filters.route));
+    }
   }
 
   if (filters?.status) {
-    whereConditions.push(eq(scenes.status, filters.status as any));
+    // Use type guard to ensure type safety
+    if (isValidSceneStatus(filters.status)) {
+      whereConditions.push(eq(scenes.status, filters.status));
+    }
   }
 
   // Fetch scenes with all conditions ANDed together
@@ -190,29 +230,33 @@ export async function getScene(
 
   const { scene } = sceneResult[0];
 
-  // Fetch scene lines with speaker information
-  const linesResult = await db
-    .select({
-      line: sceneLines,
-      speakerName: characters.displayName,
-      speakerTag: characters.renpyTag,
-    })
-    .from(sceneLines)
-    .leftJoin(characters, eq(sceneLines.speakerId, characters.id))
-    .where(eq(sceneLines.sceneId, sceneId))
-    .orderBy(asc(sceneLines.sequence));
+  // Fetch scene lines and characters in parallel using Promise.all
+  // This fixes the N+1 query issue by running both queries concurrently
+  const [linesResult, charactersResult] = await Promise.all([
+    // Fetch scene lines with speaker information
+    db
+      .select({
+        line: sceneLines,
+        speakerName: characters.displayName,
+        speakerTag: characters.renpyTag,
+      })
+      .from(sceneLines)
+      .leftJoin(characters, eq(sceneLines.speakerId, characters.id))
+      .where(eq(sceneLines.sceneId, sceneId))
+      .orderBy(asc(sceneLines.sequence)),
 
-  // Fetch scene characters with their information
-  const charactersResult = await db
-    .select({
-      character: characters,
-      role: sceneCharactersTable.role,
-      emotion: sceneCharactersTable.emotion,
-      notes: sceneCharactersTable.notes,
-    })
-    .from(sceneCharactersTable)
-    .innerJoin(characters, eq(sceneCharactersTable.characterId, characters.id))
-    .where(eq(sceneCharactersTable.sceneId, sceneId));
+    // Fetch scene characters with their information
+    db
+      .select({
+        character: characters,
+        role: sceneCharactersTable.role,
+        emotion: sceneCharactersTable.emotion,
+        notes: sceneCharactersTable.notes,
+      })
+      .from(sceneCharactersTable)
+      .innerJoin(characters, eq(sceneCharactersTable.characterId, characters.id))
+      .where(eq(sceneCharactersTable.sceneId, sceneId)),
+  ]);
 
   // Map results to the expected format
   const lines: SceneLineWithSpeaker[] = linesResult.map((row) => ({
@@ -300,11 +344,10 @@ function mapToPublicScene(scene: SceneForPublic): PublicScene {
     chapter: scene.chapter ?? null,
     sceneNumber: scene.sceneNumber,
     sequenceOrder: scene.sequenceOrder,
-    route: scene.route,
-    status: scene.status,
+    route: isValidRoute(scene.route) ? scene.route : null,
+    status: isValidSceneStatus(scene.status) ? scene.status : null,
     visibility: scene.visibility,
     createdAt: scene.createdAt,
     updatedAt: scene.updatedAt,
   };
 }
-

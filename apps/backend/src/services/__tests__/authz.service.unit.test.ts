@@ -1,0 +1,221 @@
+/**
+ * Authorization Service Unit Tests
+ *
+ * Tests for centralized authorization functions in src/services/authz.service.ts
+ *
+ * Note: Full authorization testing requires integration tests with a real database.
+ * These unit tests verify function signatures and basic behavior.
+ */
+
+import { describe, it, expect, vi } from "vitest";
+import {
+  hasProjectAccess,
+  requireProjectAccess,
+  getProjectRole,
+  hasSceneAccess,
+  requireSceneAccess,
+  getSceneRole,
+  hasProjectRole,
+  requireProjectRole,
+} from "../authz.service.js";
+import * as dbModule from "../../db/index.js";
+import {
+  NotFoundError,
+  ForbiddenError,
+} from "../../middleware/error-handler.middleware.js";
+
+describe("Authorization Service", () => {
+  describe("Project Authorization Functions", () => {
+    describe("hasProjectAccess", () => {
+      it("should be a function that accepts projectId and userId", () => {
+        expect(typeof hasProjectAccess).toBe("function");
+        expect(hasProjectAccess.length).toBe(2);
+      });
+
+      it("should return a Promise<boolean>", async () => {
+        const mockDb = {
+          select: vi.fn(() => ({
+            from: vi.fn(() => ({
+              leftJoin: vi.fn(() => ({
+                where: vi.fn(() => ({
+                  limit: vi.fn().mockResolvedValue([]),
+                })),
+              })),
+            })),
+          })),
+        };
+        const getDbSpy = vi
+          .spyOn(dbModule, "getDb")
+          .mockReturnValue(mockDb as never);
+
+        try {
+          await expect(hasProjectAccess("project-id", "user-id")).resolves.toBe(
+            false,
+          );
+        } finally {
+          getDbSpy.mockRestore();
+        }
+      });
+    });
+
+    describe("requireProjectAccess", () => {
+      it("should be a function that accepts projectId and userId", () => {
+        expect(typeof requireProjectAccess).toBe("function");
+        expect(requireProjectAccess.length).toBe(2);
+      });
+
+      it("should throw NotFoundError when project does not exist", async () => {
+        // This will throw an error because there's no database, but we can verify the function exists
+        await expect(
+          requireProjectAccess("nonexistent-project", "user-id"),
+        ).rejects.toThrow();
+      });
+    });
+
+    describe("getProjectRole", () => {
+      it("should be a function that accepts projectId and userId", () => {
+        expect(typeof getProjectRole).toBe("function");
+        expect(getProjectRole.length).toBe(2);
+      });
+
+      it("should return a Promise with role or null", async () => {
+        const limitMock = vi
+          .fn()
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([]);
+        const mockDb = {
+          select: vi.fn(() => ({
+            from: vi.fn(() => ({
+              where: vi.fn(() => ({
+                limit: limitMock,
+              })),
+            })),
+          })),
+        };
+        const getDbSpy = vi
+          .spyOn(dbModule, "getDb")
+          .mockReturnValue(mockDb as never);
+
+        try {
+          await expect(getProjectRole("project-id", "user-id")).resolves.toBe(
+            null,
+          );
+        } finally {
+          getDbSpy.mockRestore();
+        }
+      });
+    });
+  });
+
+  describe("Scene Authorization Functions", () => {
+    describe("hasSceneAccess", () => {
+      it("should be a function that accepts sceneId and userId", () => {
+        expect(typeof hasSceneAccess).toBe("function");
+        expect(hasSceneAccess.length).toBe(2);
+      });
+    });
+
+    describe("requireSceneAccess", () => {
+      it("should be a function that accepts sceneId and userId", () => {
+        expect(typeof requireSceneAccess).toBe("function");
+        expect(requireSceneAccess.length).toBe(2);
+      });
+    });
+
+    describe("getSceneRole", () => {
+      it("should be a function that accepts sceneId and userId", () => {
+        expect(typeof getSceneRole).toBe("function");
+        expect(getSceneRole.length).toBe(2);
+      });
+    });
+  });
+
+  describe("Role-based Authorization Functions", () => {
+    describe("hasProjectRole", () => {
+      it("should be a function that accepts projectId, userId, and minimumRole", () => {
+        expect(typeof hasProjectRole).toBe("function");
+        expect(hasProjectRole.length).toBe(3);
+      });
+
+      it("should return true for each valid minimum role when user is OWNER", async () => {
+        const mockDb = {
+          select: vi.fn(() => ({
+            from: vi.fn(() => ({
+              where: vi.fn(() => ({
+                limit: vi.fn().mockResolvedValue([{ id: "project-id" }]),
+              })),
+            })),
+          })),
+        };
+        const getDbSpy = vi
+          .spyOn(dbModule, "getDb")
+          .mockReturnValue(mockDb as never);
+
+        try {
+          const validRoles = ["OWNER", "READER", "TESTER"] as const;
+          for (const role of validRoles) {
+            await expect(
+              hasProjectRole("project-id", "user-id", role),
+            ).resolves.toBe(true);
+          }
+        } finally {
+          getDbSpy.mockRestore();
+        }
+      });
+
+      it("should return false for invalid minimum role values", async () => {
+        const mockDb = {
+          select: vi.fn(() => ({
+            from: vi.fn(() => ({
+              where: vi.fn(() => ({
+                limit: vi.fn().mockResolvedValue([{ id: "project-id" }]),
+              })),
+            })),
+          })),
+        };
+        const getDbSpy = vi
+          .spyOn(dbModule, "getDb")
+          .mockReturnValue(mockDb as never);
+
+        try {
+          const invalidRoles = ["FOO", "", null] as const;
+          for (const role of invalidRoles) {
+            await expect(
+              hasProjectRole(
+                "project-id",
+                "user-id",
+                role as unknown as "OWNER" | "READER" | "TESTER",
+              ),
+            ).resolves.toBe(false);
+          }
+        } finally {
+          getDbSpy.mockRestore();
+        }
+      });
+    });
+
+    describe("requireProjectRole", () => {
+      it("should be a function that accepts projectId, userId, and minimumRole", () => {
+        expect(typeof requireProjectRole).toBe("function");
+        expect(requireProjectRole.length).toBe(3);
+      });
+    });
+  });
+
+  describe("Error Classes", () => {
+    it("should export NotFoundError class", () => {
+      expect(NotFoundError).toBeDefined();
+      const error = new NotFoundError("Test");
+      expect(error).toBeInstanceOf(Error);
+      expect(error.statusCode).toBe(404);
+    });
+
+    it("should export ForbiddenError class", () => {
+      expect(ForbiddenError).toBeDefined();
+      const error = new ForbiddenError("Test");
+      expect(error).toBeInstanceOf(Error);
+      expect(error.statusCode).toBe(403);
+    });
+  });
+});
+

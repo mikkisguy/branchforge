@@ -248,4 +248,83 @@ describe('ScenesService', () => {
 
   // authorizeSceneAccess tests moved to integration tests due to complex ORM queries with joins
   // (scenes → projects → projectUsers)
+
+  describe('mapToPublicScene (via listScenes)', () => {
+    beforeEach(() => {
+      mockSelect.mockImplementation(createEmptyMockChain);
+    });
+
+    it('should return null for route when DB contains invalid route value', async () => {
+      const sceneWithInvalidRoute = {
+        ...mockScene,
+        route: 'INVALID_ROUTE' as any, // Simulate corrupted DB
+      };
+      mockSelect.mockImplementation(() => createMockChain([sceneWithInvalidRoute]));
+
+      const scenes = await listScenes(projectId, userId);
+
+      expect(scenes).toHaveLength(1);
+      expect(scenes[0].route).toBeNull(); // Invalid route falls back to null
+      expect(scenes[0].status).toBe('DRAFT'); // Valid status preserved
+    });
+
+    it('should return null for status when DB contains invalid status value', async () => {
+      const sceneWithInvalidStatus = {
+        ...mockScene,
+        status: 'INVALID_STATUS' as any, // Simulate corrupted DB
+      };
+      mockSelect.mockImplementation(() => createMockChain([sceneWithInvalidStatus]));
+
+      const scenes = await listScenes(projectId, userId);
+
+      expect(scenes).toHaveLength(1);
+      expect(scenes[0].status).toBeNull(); // Invalid status falls back to null
+      expect(scenes[0].route).toBe('COMMON'); // Valid route preserved
+    });
+
+    it('should return null for both route and status when both are invalid', async () => {
+      const sceneWithInvalidValues = {
+        ...mockScene,
+        route: 'BOGUS_ROUTE' as any,
+        status: 'BOGUS_STATUS' as any,
+      };
+      mockSelect.mockImplementation(() => createMockChain([sceneWithInvalidValues]));
+
+      const scenes = await listScenes(projectId, userId);
+
+      expect(scenes).toHaveLength(1);
+      expect(scenes[0].route).toBeNull();
+      expect(scenes[0].status).toBeNull();
+    });
+
+    it('should preserve valid route and status values', async () => {
+      const sceneWithValidValues = {
+        ...mockScene,
+        route: 'LUCAS',
+        status: 'REVIEW',
+      };
+      mockSelect.mockImplementation(() => createMockChain([sceneWithValidValues]));
+
+      const scenes = await listScenes(projectId, userId);
+
+      expect(scenes).toHaveLength(1);
+      expect(scenes[0].route).toBe('LUCAS');
+      expect(scenes[0].status).toBe('REVIEW');
+    });
+
+    it('should handle null route and status values', async () => {
+      const sceneWithNullValues = {
+        ...mockScene,
+        route: null,
+        status: null,
+      };
+      mockSelect.mockImplementation(() => createMockChain([sceneWithNullValues]));
+
+      const scenes = await listScenes(projectId, userId);
+
+      expect(scenes).toHaveLength(1);
+      expect(scenes[0].route).toBeNull();
+      expect(scenes[0].status).toBeNull();
+    });
+  });
 });

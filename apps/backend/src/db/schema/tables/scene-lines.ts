@@ -26,8 +26,10 @@ export const sceneLines = pgTable('scene_lines', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => [
-  index('scene_lines_scene_id_idx').on(table.sceneId),
   index('scene_lines_speaker_id_idx').on(table.speakerId),
+  // Composite index for scene lines ordered by sequence (common query pattern)
+  // Leftmost prefix (sceneId) serves queries filtering by sceneId alone
+  index('scene_lines_scene_sequence_idx').on(table.sceneId, table.sequence),
 ]);
 
 // Types
