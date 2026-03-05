@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useAuth } from "@/contexts/AuthContext";
-import { useProject } from "@/contexts/ProjectContext";
-import { useGitLab } from "@/contexts/GitLabContext";
+import { useAuth } from "@/hooks/useAuth";
+import { useProject } from "@/hooks/useProject";
+import { useGitLab } from "@/hooks/useGitLab";
 import { themePalettes, BASE_URL } from "@/lib/constants";
 import { FloatingParticles, TopRightPanel } from "@/components/ide-shared";
 import { Logo } from "@/components/ui/logo";
