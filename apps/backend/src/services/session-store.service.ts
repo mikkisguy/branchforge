@@ -29,6 +29,71 @@ const ALLOWED_SESSION_KEYS = new Set([
   // Add other allowed keys as needed
 ]);
 
+// Retry configuration for session store operations
+interface RetryOptions {
+  maxRetries: number;
+  baseDelayMs: number;
+  maxDelayMs: number;
+}
+
+const DEFAULT_RETRY_OPTIONS: RetryOptions = {
+  maxRetries: 3,
+  baseDelayMs: 100,
+  maxDelayMs: 2000,
+};
+
+// Alert callback for dead letter events
+export type DeadLetterAlertCallback = (entry: DeadLetterEntry) => void;
+
+// Dead-letter queue for failed session operations
+interface DeadLetterEntry {
+  sessionId: string;
+  operation: 'set' | 'destroy';
+  sessionData?: Session;
+  timestamp: Date;
+  lastError: string;
+  retryCount: number;
+}
+
+class DeadLetterQueue {
+  private queue: DeadLetterEntry[] = [];
+  private maxSize: number = 1000;
+  private alertCallback?: DeadLetterAlertCallback;
+
+  constructor(alertCallback?: DeadLetterAlertCallback) {
+    this.alertCallback = alertCallback;
+  }
+
+  add(entry: DeadLetterEntry): void {
+    this.queue.push(entry);
+    if (this.queue.length > this.maxSize) {
+      // Remove oldest entry
+      this.queue.shift();
+    }
+    // Trigger alert callback if provided
+    if (this.alertCallback) {
+      try {
+        this.alertCallback(entry);
+      } catch (err) {
+        // Log but don't throw - alert callback failures shouldn't disrupt session flow
+        console.error('DeadLetterQueue alert callback error:', err);
+      }
+    }
+  }
+
+  getEntries(): DeadLetterEntry[] {
+    return [...this.queue];
+  }
+
+  size(): number {
+    return this.queue.length;
+  }
+
+  clear(): void {
+    this.queue = [];
+  }
+}
+
 /**
  * Validate and sanitize session data before storage
  */
@@ -136,26 +201,84 @@ function dbDataToSession(row: SessionRow): Session {
 }
 
 /**
+ * Retry with exponential backoff
+ */
+async function retryWithBackoff<T>(
+  operation: () => Promise<T>,
+  options: RetryOptions = DEFAULT_RETRY_OPTIONS
+): Promise<T> {
+  let lastError: Error | undefined;
+  const { maxRetries, baseDelayMs, maxDelayMs } = options;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      if (attempt < maxRetries) {
+        // Calculate exponential backoff delay with jitter
+        const exponentialDelay = Math.min(baseDelayMs * 2 ** attempt, maxDelayMs);
+        const jitter = Math.random() * 0.3 * exponentialDelay; // Add up to 30% jitter
+        const delay = exponentialDelay + jitter;
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+/**
  * Drizzle-based session store implementation
  * Implements the callback-based SessionStore interface from @fastify/session
  */
 export class DrizzleSessionStore implements SessionStore {
   private cleanupInterval: NodeJS.Timeout | null = null;
   private readonly cleanupIntervalMs: number;
+  private readonly retryOptions: RetryOptions;
+  private readonly deadLetterQueue: DeadLetterQueue;
 
-  constructor(options: { cleanupInterval?: number } = {}) {
+  constructor(options: {
+    cleanupInterval?: number;
+    retryOptions?: Partial<RetryOptions>;
+    onDeadLetterEntry?: DeadLetterAlertCallback;
+  } = {}) {
     this.cleanupIntervalMs = options.cleanupInterval ?? 60 * 60 * 1000; // Default: 1 hour
+    this.retryOptions = { ...DEFAULT_RETRY_OPTIONS, ...options.retryOptions };
+    this.deadLetterQueue = new DeadLetterQueue(options.onDeadLetterEntry);
     this.startCleanup();
   }
 
   /**
    * Set a session (callback-based API)
+   *
+   * IMPORTANT: The callback is called immediately because @fastify/session
+   * invokes set() from an onSend hook (after response is prepared).
+   * Awaiting the DB write would cause "headers already sent" errors.
+   *
+   * The actual DB write with retry logic runs in the background.
+   * Failures are logged and added to the dead-letter queue.
    */
   set(sessionId: string, session: Session, callback: Callback): void {
-    // Convert to Promise-based then call the callback
-    this.setAsync(sessionId, session)
-      .then(() => callback())
-      .catch((err) => callback(err));
+    // Call callback immediately - the response may already be sent
+    callback();
+
+    // Run DB write with retries in the background
+    retryWithBackoff(() => this.setAsync(sessionId, session), this.retryOptions)
+      .catch((err) => {
+        // All retries exhausted - add to dead-letter queue
+        this.deadLetterQueue.add({
+          sessionId,
+          operation: 'set',
+          sessionData: session,
+          timestamp: new Date(),
+          lastError: err.message || String(err),
+          retryCount: this.retryOptions.maxRetries,
+        });
+
+        console.error(`Session store: Failed to save session "${sessionId}" after ${this.retryOptions.maxRetries} retries:`, err);
+      });
   }
 
   /**
@@ -203,12 +326,20 @@ export class DrizzleSessionStore implements SessionStore {
 
   /**
    * Get a session by ID (callback-based API)
+   *
+   * Note: get() is called early in the request lifecycle (onRequest hook),
+   * so it completes before the response is sent. We use the async pattern
+   * here to ensure the session data is available before the handler runs.
    */
   get(sessionId: string, callback: CallbackSession): void {
     // Convert to Promise-based then call the callback
     this.getAsync(sessionId)
       .then((session) => callback(null, session))
-      .catch((err) => callback(err));
+      .catch((err) => {
+        console.error('Session store get error:', err);
+        // Return null on error - session will be treated as not found
+        callback(null, null);
+      });
   }
 
   /**
@@ -245,12 +376,32 @@ export class DrizzleSessionStore implements SessionStore {
 
   /**
    * Destroy a session (callback-based API)
+   *
+   * IMPORTANT: The callback is called immediately because @fastify/session
+   * may invoke this after the response is prepared.
+   * Awaiting the DB delete would cause "headers already sent" errors.
+   *
+   * The actual DB delete with retry logic runs in the background.
+   * Failures are logged and added to the dead-letter queue.
    */
   destroy(sessionId: string, callback: Callback): void {
-    // Convert to Promise-based then call the callback
-    this.destroyAsync(sessionId)
-      .then(() => callback())
-      .catch((err) => callback(err));
+    // Call callback immediately - the response may already be sent
+    callback();
+
+    // Run DB delete with retries in the background
+    retryWithBackoff(() => this.destroyAsync(sessionId), this.retryOptions)
+      .catch((err) => {
+        // All retries exhausted - add to dead-letter queue
+        this.deadLetterQueue.add({
+          sessionId,
+          operation: 'destroy',
+          timestamp: new Date(),
+          lastError: err.message || String(err),
+          retryCount: this.retryOptions.maxRetries,
+        });
+
+        console.error(`Session store: Failed to destroy session "${sessionId}" after ${this.retryOptions.maxRetries} retries:`, err);
+      });
   }
 
   /**
@@ -322,16 +473,42 @@ export class DrizzleSessionStore implements SessionStore {
   }
 
   /**
+   * Get dead letter queue entries for monitoring
+   */
+  getDeadLetterQueue(): DeadLetterEntry[] {
+    return this.deadLetterQueue.getEntries();
+  }
+
+  /**
+   * Get dead letter queue size
+   */
+  getDeadLetterQueueSize(): number {
+    return this.deadLetterQueue.size();
+  }
+
+  /**
+   * Clear dead letter queue (useful for testing or manual cleanup)
+   */
+  clearDeadLetterQueue(): void {
+    this.deadLetterQueue.clear();
+  }
+
+  /**
    * Clean up resources when the store is destroyed
    */
   cleanup(): void {
     this.stopCleanup();
+    this.clearDeadLetterQueue();
   }
 }
 
 /**
  * Create a new Drizzle session store instance
  */
-export function createDrizzleSessionStore(options?: { cleanupInterval?: number }): DrizzleSessionStore {
+export function createDrizzleSessionStore(options?: {
+  cleanupInterval?: number;
+  retryOptions?: Partial<RetryOptions>;
+  onDeadLetterEntry?: DeadLetterAlertCallback;
+}): DrizzleSessionStore {
   return new DrizzleSessionStore(options);
 }

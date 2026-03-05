@@ -49,9 +49,6 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [projectsError, setProjectsError] = useState<string | null>(null);
 
-  // Track if initial load has occurred to avoid stale closure issues
-  const initialLoadRef = useRef(true);
-
   // Ref to track currentProject for use in refreshProjects without causing dependency issues
   const currentProjectRef = useRef<Project | null>(null);
 
@@ -75,46 +72,42 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
    * Load projects on mount
    */
   useEffect(() => {
-    if (initialLoadRef.current) {
-      initialLoadRef.current = false;
+    let mounted = true;
 
-      let mounted = true;
+    const fetchInitialProjects = async () => {
+      if (!mounted) return;
+      setIsLoadingProjects(true);
+      setProjectsError(null);
 
-      const fetchInitialProjects = async () => {
+      try {
+        const fetchedProjects = await projectsApi.listProjects();
         if (!mounted) return;
-        setIsLoadingProjects(true);
-        setProjectsError(null);
 
-        try {
-          const fetchedProjects = await projectsApi.listProjects();
-          if (!mounted) return;
+        setProjects(fetchedProjects);
 
-          setProjects(fetchedProjects);
-
-          // Auto-select first project if none selected and projects exist
-          if (fetchedProjects.length > 0) {
-            setCurrentProject(fetchedProjects[0]);
-          }
-        } catch (error) {
-          if (!mounted) return;
-          const message =
-            error instanceof Error
-              ? error.message
-              : "Failed to load projects";
-          setProjectsError(message);
-        } finally {
-          if (mounted) {
-            setIsLoadingProjects(false);
-          }
+        // Auto-select first project if none selected and projects exist
+        if (fetchedProjects.length > 0) {
+          setCurrentProject(fetchedProjects[0]);
         }
-      };
+      } catch (error) {
+        if (!mounted) return;
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Failed to load projects";
+        setProjectsError(message);
+      } finally {
+        if (mounted) {
+          setIsLoadingProjects(false);
+        }
+      }
+    };
 
-      fetchInitialProjects();
+    fetchInitialProjects();
 
-      return () => {
-        mounted = false;
-      };
-    }
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   /**
