@@ -5,7 +5,8 @@
  * Replaces the GitLabContext with a more efficient query-based approach.
  */
 
-import { useMemo, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { gitlabApi, type GitLabProject } from '@/lib/api/gitlab';
 import { gitlabKeys } from '@/lib/query-keys';
 
