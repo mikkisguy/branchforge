@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { InlineMessage } from "@/components/ui/inline-error";
 import { useGitLab } from "@/hooks/useGitLab";
+import { useProject } from "@/hooks/useProject";
 import { useToast } from "@/contexts/ToastContext";
 import { gitlabApi } from "@/lib/api/gitlab";
 import { GitLabRepositoryLinkingDialog } from "./GitLabRepositoryLinkingDialog";
@@ -42,6 +43,7 @@ export function GitLabSettingsContent() {
     storeToken,
     removeIntegration,
   } = useGitLab();
+  const { projects } = useProject();
 
   const { success, error } = useToast();
 
@@ -201,19 +203,23 @@ export function GitLabSettingsContent() {
   /**
    * Load linked projects
    */
-  const loadLinkedProjects = useCallback(async () => {
-    // TODO: This will be implemented once we have the backend API to fetch linked projects
-    // For now, use the linkedRepositories from context
-    const projects: LinkedProjectDisplay[] = Array.from(
+  const loadLinkedProjects = useCallback(() => {
+    // Create a map of project IDs to project names for efficient lookup
+    const projectMap = new Map(projects.map((p) => [p.id, p.name]));
+
+    // Map linked repositories with actual project names
+    const linkedProjectsList: LinkedProjectDisplay[] = Array.from(
       linkedRepositories.values(),
     ).map((repo) => ({
       id: repo.id,
-      name: `Project ${repo.projectId.substring(0, 8)}`,
+      name:
+        projectMap.get(repo.projectId) ||
+        `Unknown Project (${repo.projectId.substring(0, 8)})`,
       gitlabRepository: repo.repositoryName,
       defaultBranch: repo.defaultBranch,
     }));
-    setLinkedProjects(projects);
-  }, [linkedRepositories]);
+    setLinkedProjects(linkedProjectsList);
+  }, [linkedRepositories, projects]);
 
   useEffect(() => {
     loadLinkedProjects();

@@ -10,10 +10,7 @@ import { X, Download, Upload, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { type ConflictResolution } from "@/lib/api/gitlab";
 import { useGitLabSync } from "@/hooks/useGitLabSync";
 import { useToast } from "@/contexts/ToastContext";
@@ -69,7 +66,10 @@ export function GitLabSyncDialog({
 }: GitLabSyncDialogProps) {
   const { state, exportToGitlab, importFromGitlab, reset } = useGitLabSync();
   const { success, error } = useToast();
-  const { invalidateScenes } = useScenes();
+  const { invalidateScenes, scenes, isLoadingScenes } = useScenes();
+
+  // Check if this is a first sync (no local scenes)
+  const isFirstSync = !isLoadingScenes && scenes.length === 0;
 
   // Form state
   const [branch, setBranch] = useState(defaultBranch);
@@ -100,6 +100,10 @@ export function GitLabSyncDialog({
       return;
     }
 
+    // For first sync, use gitlab_wins as the conflict resolution
+    // (there's no local data to preserve anyway)
+    const resolution = isFirstSync ? "gitlab_wins" : conflictResolution;
+
     // Capture the operation result directly rather than relying on state.operation
     // which may be stale due to React's asynchronous state updates
     const result =
@@ -109,7 +113,7 @@ export function GitLabSyncDialog({
             branch.trim(),
             commitMessage.trim() || undefined,
           )
-        : await importFromGitlab(projectId, branch.trim(), conflictResolution);
+        : await importFromGitlab(projectId, branch.trim(), resolution);
 
     // Use the returned result for toast notifications
     if (result?.status === "completed") {
@@ -144,6 +148,7 @@ export function GitLabSyncDialog({
     success,
     error,
     invalidateScenes,
+    isFirstSync,
   ]);
 
   /**
@@ -292,27 +297,39 @@ export function GitLabSyncDialog({
               {/* Conflict Resolution (import only) */}
               {operationType === "import" && (
                 <div className="space-y-2">
-                  <Label>Conflict Resolution</Label>
-                  <div className="space-y-2">
-                    {CONFLICT_RESOLUTIONS.map((cr) => (
-                      <button
-                        key={cr.value}
-                        type="button"
-                        onClick={() => setConflictResolution(cr.value)}
-                        className={`w-full p-3 text-left rounded-md border transition-colors ${
-                          conflictResolution === cr.value
-                            ? "border-primary bg-primary/10"
-                            : "border-border/30 hover:bg-muted/50"
-                        }`}
-                        disabled={state.isProcessing}
-                      >
-                        <p className="text-sm font-medium">{cr.label}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {cr.description}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
+                  {isFirstSync ? (
+                    // First sync - simple message
+                    <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        This will import all scenes from GitLab.
+                      </p>
+                    </div>
+                  ) : (
+                    // Existing data - show conflict resolution options
+                    <>
+                      <Label>Conflict Resolution</Label>
+                      <div className="space-y-2">
+                        {CONFLICT_RESOLUTIONS.map((cr) => (
+                          <button
+                            key={cr.value}
+                            type="button"
+                            onClick={() => setConflictResolution(cr.value)}
+                            className={`w-full p-3 text-left rounded-md border transition-colors ${
+                              conflictResolution === cr.value
+                                ? "border-primary bg-primary/10"
+                                : "border-border/30 hover:bg-muted/50"
+                            }`}
+                            disabled={state.isProcessing}
+                          >
+                            <p className="text-sm font-medium">{cr.label}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {cr.description}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -352,3 +369,4 @@ export function GitLabSyncDialog({
     </Dialog>
   );
 }
+

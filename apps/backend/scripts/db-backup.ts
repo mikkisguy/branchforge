@@ -49,29 +49,59 @@ async function createBackup() {
     statements.push('BEGIN;');
     statements.push('-- Disable foreign key checks for faster import');
     statements.push('SET CONSTRAINTS ALL DEFERRED;');
+    statements.push('-- Disable all triggers and FK checks during restore');
+    statements.push('SET session_replication_role = \'replica\';');
+    statements.push('');
+    statements.push('-- Truncate all tables first (to handle foreign key constraints)');
+
+    // First, add TRUNCATE statements for ALL tables
+    for (const table of tables) {
+      statements.push(`TRUNCATE TABLE "public"."${table}" CASCADE;`);
+    }
     statements.push('');
 
-    // Backup each table
+    // Store table data to insert later
+    const tableData: Array<{ table: string; rows: unknown[]; jsonbColumns: Set<string> }> = [];
+
+    // Collect data from all tables
     for (const table of tables) {
       console.log(`Backing up table: ${table}`);
-      statements.push(`-- Table: ${table}`);
+
+      // Get column types for this table (to handle jsonb columns correctly)
+      const columnTypesResult = await client.query(`
+        SELECT column_name, data_type
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+        AND table_name = $1
+        ORDER BY ordinal_position;
+      `, [table]);
+
+      const jsonbColumns = new Set(
+        columnTypesResult.rows
+          .filter((row) => row.data_type === 'jsonb' || row.data_type === 'json')
+          .map((row) => row.column_name)
+      );
 
       // Get all rows from the table
       const { rows } = await client.query(`SELECT * FROM "public"."${table}"`);
 
       if (rows.length === 0) {
-        statements.push(`-- Table ${table} is empty`);
-        statements.push('');
+        console.log(`   Table ${table} is empty`);
         continue;
       }
 
-      statements.push(`-- ${rows.length} rows`);
-      statements.push(`TRUNCATE TABLE "public"."${table}" CASCADE;`);
+      console.log(`   Table ${table}: ${rows.length} rows`);
+      tableData.push({ table, rows, jsonbColumns });
+    }
+
+    // Generate INSERT statements for all tables with data
+    for (const { table, rows, jsonbColumns } of tableData) {
+      statements.push(`-- Table: ${table} (${rows.length} row${rows.length === 1 ? '' : 's'})`);
 
       // Generate INSERT statements
       for (const row of rows) {
         const columns = Object.keys(row);
-        const values = columns.map((col) => escapeValue(row[col]));
+        const values = columns.map((col) => escapeValue(row[col], jsonbColumns.has(col)));
 
         const columnsStr = columns.map((c) => `"${c}"`).join(', ');
         const valuesStr = values.join(', ');
@@ -81,6 +111,11 @@ async function createBackup() {
 
       statements.push('');
     }
+
+    // Re-enable foreign key checks before committing
+    statements.push('-- Re-enable foreign key checks');
+    statements.push('SET session_replication_role = \'origin\';');
+    statements.push('');
 
     statements.push('COMMIT;');
     statements.push('-- Backup completed successfully');
@@ -105,10 +140,21 @@ async function createBackup() {
 
 /**
  * Escapes a value for SQL INSERT statement
+ * @param value - The value to escape
+ * @param isJsonbColumn - Whether this value is from a jsonb/json column
  */
-function escapeValue(value: unknown): string {
+function escapeValue(value: unknown, isJsonbColumn = false): string {
   if (value === null || value === undefined) {
     return 'NULL';
+  }
+
+  // JSONB columns always need stringified JSON
+  if (isJsonbColumn) {
+    const jsonStr = typeof value === 'object' || typeof value === 'boolean'
+      ? JSON.stringify(value)
+      : String(value);
+    const escaped = jsonStr.replace(/'/g, "''");
+    return `'${escaped}'`;
   }
 
   if (typeof value === 'boolean') {
