@@ -5,6 +5,17 @@ All notable changes to BranchForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.4.1 - 2026-03-06
+
+### Fixed
+- a39e621: Integrated scenes with ScriptMode UI, added RPY generator, and added refresh for scenes after GitLab sync
+- 8057951: Enhanced GitLab integration
+- 57be3dc: Updated GitLab PAT handling and testing, renamed GitLab endpoint for clarity
+- 5b5e312: Added TanStack Query-based scenes integration with API client, query keys, useScenes hook, and shared types
+- Updated dependencies [a39e621]
+- Updated dependencies [5b5e312]
+  - @branchforge/shared@0.4.1
+
 ## v0.4.0 - 2026-03-05
 
 ### Added
