@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { Download } from "lucide-react";
 import { StoryPanel } from "@/components/ide-shared";
 import {
   FileTree,
@@ -7,7 +8,10 @@ import {
   ScriptEditor,
 } from "@/components/script-mode";
 import { useScenes } from "@/hooks/useScenes";
+import { useGitLab } from "@/hooks/useGitLab";
 import { generateRpyContent, generateFileTree } from "@/lib/rpy-generator";
+import { GitLabSyncDialog } from "@/components/script-mode/GitLabSyncDialog";
+import { Button } from "@/components/ui/button";
 
 interface ScriptModeProps {
   themeName: string;
@@ -29,6 +33,11 @@ export function ScriptMode({
     setActiveSceneId,
     isLoadingScenes,
   } = useScenes();
+
+  const { isProjectLinked, getLinkedRepository } = useGitLab();
+
+  // Sync dialog state
+  const [showSyncDialog, setShowSyncDialog] = useState(false);
 
   // Generate file tree from scenes
   const { flatFiles: files, fileNameToSceneId } = useMemo(() => {
@@ -100,6 +109,9 @@ export function ScriptMode({
 
   // No scenes state
   if (!scenes.length) {
+    const isLinked = projectId ? isProjectLinked(projectId) : false;
+    const linkedRepo = projectId ? getLinkedRepository(projectId) : null;
+
     return (
       <div className="flex-1 flex flex-col pt-16">
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
@@ -109,7 +121,29 @@ export function ScriptMode({
           <p className="text-sm text-muted-foreground">
             Create scenes in Write Mode or import from GitLab
           </p>
+          {isLinked && (
+            <Button
+              variant="outline"
+              onClick={() => setShowSyncDialog(true)}
+              className="mt-2"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Import from GitLab
+            </Button>
+          )}
         </div>
+
+        {/* Sync Dialog */}
+        {projectId && isLinked && linkedRepo && (
+          <GitLabSyncDialog
+            open={showSyncDialog}
+            onOpenChange={setShowSyncDialog}
+            operationType="import"
+            projectId={projectId}
+            projectName={projectName}
+            defaultBranch={linkedRepo.defaultBranch}
+          />
+        )}
       </div>
     );
   }
