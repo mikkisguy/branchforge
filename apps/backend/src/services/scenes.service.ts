@@ -16,9 +16,12 @@ import {
 } from "../db/schema/index.js";
 import { sceneCharacters as sceneCharactersTable } from "../db/schema/tables/scene-characters.js";
 import { eq, and, asc, or } from "drizzle-orm";
-import type { Scene, SceneLine, Character } from "../db/schema/index.js";
-import type { SceneCharacter as SceneCharacterType } from "../db/schema/tables/scene-characters.js";
+import type { Scene, SceneLine } from "../db/schema/index.js";
+import type { PublicScene } from "@branchforge/shared";
 import { RouteType, SceneStatus } from "@branchforge/shared";
+
+// Re-export PublicScene from shared for route handlers
+export type { PublicScene };
 
 // ============================================================================
 // Type Guards for Enum Values
@@ -27,7 +30,9 @@ import { RouteType, SceneStatus } from "@branchforge/shared";
 /**
  * Type guard to check if a value is a valid route type
  */
-export function isValidRoute(value: string | null | undefined): value is RouteType {
+export function isValidRoute(
+  value: string | null | undefined,
+): value is RouteType {
   const validRoutes: RouteType[] = [
     RouteType.EILEEN,
     RouteType.LUCAS,
@@ -37,19 +42,29 @@ export function isValidRoute(value: string | null | undefined): value is RouteTy
     RouteType.COMBINED,
     RouteType.COMMON,
   ];
-  return value !== null && value !== undefined && validRoutes.includes(value as RouteType);
+  return (
+    value !== null &&
+    value !== undefined &&
+    validRoutes.includes(value as RouteType)
+  );
 }
 
 /**
  * Type guard to check if a value is a valid scene status
  */
-export function isValidSceneStatus(value: string | null | undefined): value is SceneStatus {
+export function isValidSceneStatus(
+  value: string | null | undefined,
+): value is SceneStatus {
   const validStatuses: SceneStatus[] = [
     SceneStatus.DRAFT,
     SceneStatus.REVIEW,
     SceneStatus.FINAL,
   ];
-  return value !== null && value !== undefined && validStatuses.includes(value as SceneStatus);
+  return (
+    value !== null &&
+    value !== undefined &&
+    validStatuses.includes(value as SceneStatus)
+  );
 }
 
 // ============================================================================
@@ -57,33 +72,21 @@ export function isValidSceneStatus(value: string | null | undefined): value is S
 // ============================================================================
 
 /**
- * Public scene information (without sensitive data)
- */
-export interface PublicScene {
-  id: string;
-  projectId: string;
-  title: string;
-  act: string | null;
-  chapter: number | null;
-  sceneNumber: number;
-  sequenceOrder: number;
-  route: RouteType | null;
-  status: SceneStatus | null;
-  visibility: "EXCLUSIVE" | "SHARED" | "DUO_PAIR" | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-/**
  * Scene line with speaker information
  */
-export interface SceneLineWithSpeaker extends Omit<SceneLine, "speakerId"> {
+export interface SceneLineWithSpeaker extends Omit<
+  SceneLine,
+  "speakerId" | "createdAt" | "updatedAt"
+> {
   speakerId: string | null;
   speakerName: string | null; // From characters.displayName
   speakerTag: string | null; // From characters.renpyTag
   // Explicitly type enum fields to preserve literal types
   contentType: "DIALOGUE" | "NARRATION" | "CHOICE" | "MENU" | "JUMP";
   visualType: "GENERATED" | "BLACK" | "CUSTOM";
+  // Date fields as ISO strings for JSON serialization
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
@@ -257,7 +260,10 @@ export async function getScene(
         notes: sceneCharactersTable.notes,
       })
       .from(sceneCharactersTable)
-      .innerJoin(characters, eq(sceneCharactersTable.characterId, characters.id))
+      .innerJoin(
+        characters,
+        eq(sceneCharactersTable.characterId, characters.id),
+      )
       .where(eq(sceneCharactersTable.sceneId, sceneId)),
   ]);
 
@@ -266,6 +272,8 @@ export async function getScene(
     ...row.line,
     speakerName: row.speakerName ?? null,
     speakerTag: row.speakerTag ?? null,
+    createdAt: row.line.createdAt.toISOString(),
+    updatedAt: row.line.updatedAt.toISOString(),
   }));
 
   const sceneCharactersWithInfo: SceneCharacterWithInfo[] =
@@ -350,7 +358,8 @@ function mapToPublicScene(scene: SceneForPublic): PublicScene {
     route: isValidRoute(scene.route) ? scene.route : null,
     status: isValidSceneStatus(scene.status) ? scene.status : null,
     visibility: scene.visibility,
-    createdAt: scene.createdAt,
-    updatedAt: scene.updatedAt,
+    createdAt: scene.createdAt.toISOString(),
+    updatedAt: scene.updatedAt.toISOString(),
   };
 }
+

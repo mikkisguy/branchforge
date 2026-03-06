@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { StoryPanel } from "@/components/ide-shared";
 import {
   FileTree,
   BookmarkTab,
   StatusBar,
-  type File,
   ScriptEditor,
 } from "@/components/script-mode";
+import { useScenes } from "@/hooks/useScenes";
+import { generateRpyContent, generateFileTree } from "@/lib/rpy-generator";
 
 interface ScriptModeProps {
   themeName: string;
@@ -15,41 +16,103 @@ interface ScriptModeProps {
   gitlabBranch?: string;
 }
 
-const files: File[] = [
-  { name: "my-project", type: "folder", icon: "" },
-  { name: "script.rpy", type: "file" },
-  { name: "characters.rpy", type: "file" },
-  { name: "choices.rpy", type: "file" },
-];
-
-const fileContents: Record<string, string[]> = {
-  "script.rpy": [
-    '<span class="text-purple-400">label</span> <span class="text-blue-400">start</span><span class="text-muted-foreground">:</span>',
-    '    <span class="text-green-400">"The story begins here..."</span>',
-    '    <span class="text-purple-400">menu</span><span class="text-muted-foreground">:</span>',
-    '        <span class="text-green-400">"Follow my heart"</span><span class="text-muted-foreground">:</span>',
-    '            <span class="text-purple-400">jump</span> <span class="text-blue-400">ending_a</span>',
-  ],
-  "characters.rpy": [
-    '<span class="text-purple-400">define</span> <span class="text-blue-400">e</span> <span class="text-muted-foreground">=</span> <span class="text-purple-400">Character</span><span class="text-muted-foreground">(</span><span class="text-green-400">"Eileen"</span><span class="text-muted-foreground">)</span>',
-    "",
-    '<span class="text-purple-400">define</span> <span class="text-blue-400">p</span> <span class="text-muted-foreground">=</span> <span class="text-purple-400">Character</span><span class="text-muted-foreground">(</span><span class="text-green-400">"Protagonist"</span><span class="text-muted-foreground">)</span>',
-  ],
-  "choices.rpy": [
-    '<span class="text-muted-foreground"># Branching logic</span>',
-    '<span class="text-purple-400">label</span> <span class="text-blue-400">ending_a</span><span class="text-muted-foreground">:</span>',
-    '    <span class="text-green-400">"She chose with her heart."</span>',
-    '    <span class="text-purple-400">return</span>',
-  ],
-};
-
 export function ScriptMode({
   themeName,
   projectId,
   projectName,
   gitlabBranch,
 }: ScriptModeProps) {
-  const [activeFile, setActiveFile] = useState("script.rpy");
+  const {
+    scenes,
+    activeScene,
+    activeSceneId,
+    setActiveSceneId,
+    isLoadingScenes,
+  } = useScenes();
+
+  // Generate file tree from scenes
+  const { flatFiles: files, fileNameToSceneId } = useMemo(() => {
+    const fileTree = generateFileTree(scenes);
+
+    // Build flat file list with folder separators and scene ID mapping
+    const flatFiles: { name: string; type: "file" | "folder" }[] = [];
+    const fileNameToSceneId = new Map<string, string>();
+
+    for (const folder of fileTree) {
+      flatFiles.push({ name: folder.name, type: "folder" });
+      for (const file of folder.children || []) {
+        flatFiles.push({ name: file.name, type: "file" });
+        if (file.sceneId) {
+          fileNameToSceneId.set(file.name, file.sceneId);
+        }
+      }
+    }
+
+    return { flatFiles, fileNameToSceneId };
+  }, [scenes]);
+
+  // Generate RPY content for active scene
+  const activeFileContent = useMemo(() => {
+    if (!activeScene) return [];
+    return generateRpyContent(activeScene);
+  }, [activeScene]);
+
+  // Track active file (scene)
+  const [activeFile, setActiveFile] = useState<string | null>(null);
+
+  // Sync active file with active scene ID
+  useEffect(() => {
+    if (activeSceneId) {
+      const fileEntry = Array.from(fileNameToSceneId.entries()).find(
+        ([, sceneId]) => sceneId === activeSceneId,
+      );
+      if (fileEntry) {
+        setActiveFile(fileEntry[0]);
+      }
+    } else {
+      setActiveFile(null);
+    }
+  }, [activeSceneId, fileNameToSceneId]);
+
+  // Handle file selection (matches FileTree's onSelectFile signature)
+  const handleFileSelect = (fileName: string) => {
+    const sceneId = fileNameToSceneId.get(fileName);
+    if (sceneId) {
+      setActiveSceneId(sceneId);
+    }
+  };
+
+  // Character panel data
+  const characters = useMemo(() => {
+    return activeScene?.characters ?? [];
+  }, [activeScene]);
+
+  // Loading state
+  if (isLoadingScenes) {
+    return (
+      <div className="flex-1 flex flex-col pt-16">
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-muted-foreground">Loading scenes...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // No scenes state
+  if (!scenes.length) {
+    return (
+      <div className="flex-1 flex flex-col pt-16">
+        <div className="flex-1 flex flex-col items-center justify-center gap-4">
+          <p className="text-muted-foreground">
+            No scenes found in this project
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Create scenes in Write Mode or import from GitLab
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col pt-16">
@@ -67,8 +130,8 @@ export function ScriptMode({
 
             <FileTree
               files={files}
-              activeFile={activeFile}
-              onSelectFile={setActiveFile}
+              activeFile={activeFile ?? ""}
+              onSelectFile={handleFileSelect}
             />
           </StoryPanel>
         </div>
@@ -77,57 +140,60 @@ export function ScriptMode({
         <div className="flex-1 flex flex-col">
           {/* Tabs */}
           <div className="flex items-end mb-0">
-            <BookmarkTab
-              name="script.rpy"
-              isActive={activeFile === "script.rpy"}
-              onClick={() => setActiveFile("script.rpy")}
-            />
-            <BookmarkTab
-              name="characters.rpy"
-              isActive={activeFile === "characters.rpy"}
-              onClick={() => setActiveFile("characters.rpy")}
-            />
-            <BookmarkTab
-              name="choices.rpy"
-              isActive={activeFile === "choices.rpy"}
-              onClick={() => setActiveFile("choices.rpy")}
-            />
+            {activeFile && (
+              <BookmarkTab
+                name={activeFile}
+                isActive={true}
+                onClick={() => {}}
+              />
+            )}
           </div>
 
           {/* Editor */}
           <StoryPanel className="flex-1 !mt-0">
-            <ScriptEditor
-              content={fileContents[activeFile] || []}
-              language="Ren'Py"
-            />
+            {activeScene ? (
+              <ScriptEditor content={activeFileContent} language="Ren'Py" />
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                Select a scene to view its content
+              </div>
+            )}
           </StoryPanel>
         </div>
 
         {/* Right Panel - Character Reference */}
         <div className="w-64">
           <StoryPanel className="h-full">
-            <div className="space-y-4">
-              <div
-                className="text-center p-4 rounded-lg border border-dashed"
-                style={{ borderColor: "var(--theme-border-subtle)" }}
-              >
-                <div className="text-4xl mb-2"></div>
-                <p className="text-sm font-medium">Protagonist</p>
-                <p className="text-xs text-muted-foreground">
-                  The writer of their own fate
-                </p>
+            {characters.length > 0 ? (
+              <div className="space-y-4">
+                {characters.map((character) => (
+                  <div
+                    key={character.id}
+                    className="text-center p-4 rounded-lg border border-dashed"
+                    style={{ borderColor: "var(--theme-border-subtle)" }}
+                  >
+                    <div className="text-4xl mb-2">
+                      {character.displayName[0] || "???"}
+                    </div>
+                    <p className="text-sm font-medium">
+                      {character.displayName}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {character.role.toLowerCase()}
+                    </p>
+                    {character.emotion && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Emotion: {character.emotion}
+                      </p>
+                    )}
+                  </div>
+                ))}
               </div>
-              <div
-                className="text-center p-4 rounded-lg border border-dashed"
-                style={{ borderColor: "var(--theme-border-subtle)" }}
-              >
-                <div className="text-4xl mb-2"></div>
-                <p className="text-sm font-medium">Eileen</p>
-                <p className="text-xs text-muted-foreground">
-                  A mysterious guide
-                </p>
+            ) : (
+              <div className="text-center p-4 text-muted-foreground">
+                No characters in this scene
               </div>
-            </div>
+            )}
 
             {/* Branching visualization */}
             <div
@@ -135,7 +201,7 @@ export function ScriptMode({
               style={{ borderColor: "var(--theme-border-subtle)" }}
             >
               <p className="text-s font-display tracking-wider text-muted-foreground mb-3">
-                Story Branches
+                Scene Info
               </p>
               <div className="space-y-2 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground">
@@ -143,12 +209,26 @@ export function ScriptMode({
                     className="w-2 h-2 rounded-full"
                     style={{ background: "var(--theme-color)" }}
                   />
-                  <span>ending_a</span>
+                  <span>Status: {activeScene?.status ?? "Unknown"}</span>
                 </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
-                  <span>ending_b</span>
-                </div>
+                {activeScene?.route && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
+                    <span>Route: {activeScene.route}</span>
+                  </div>
+                )}
+                {activeScene?.act && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
+                    <span>Act: {activeScene.act}</span>
+                  </div>
+                )}
+                {activeScene?.chapter && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
+                    <span>Chapter: {activeScene.chapter}</span>
+                  </div>
+                )}
               </div>
             </div>
           </StoryPanel>
@@ -157,7 +237,7 @@ export function ScriptMode({
 
       {/* Status Bar */}
       <StatusBar
-        lineCount={fileContents[activeFile]?.length || 0}
+        lineCount={activeFileContent.length || 0}
         language="Ren'Py"
         themeName={themeName}
         projectId={projectId}

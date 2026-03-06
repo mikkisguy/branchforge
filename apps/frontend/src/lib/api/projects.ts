@@ -1,52 +1,11 @@
 import type { ProjectType, UserRole } from "@branchforge/shared";
+import { request } from "./client";
 
 /**
  * Projects API Client
  *
  * Client for project management operations.
  */
-
-const API_BASE =
-  import.meta.env.VITE_API_ENV === "development" ? "/api/api" : "/api";
-
-export interface ApiError {
-  error: string;
-}
-
-// ============================================================================
-// API Request Handler
-// ============================================================================
-
-async function request<T>(
-  endpoint: string,
-  options: RequestInit = {},
-): Promise<T> {
-  const url = `${API_BASE}${endpoint}`;
-  const response = await fetch(url, {
-    ...options,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
-
-  if (!response.ok) {
-    const error: ApiError = await response
-      .json()
-      .catch(() => ({ error: "Unknown error" }));
-    throw new Error(
-      error.error || `Request failed with status ${response.status}`,
-    );
-  }
-
-  // For 204 No Content responses
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return response.json();
-}
 
 // ============================================================================
 // Types
@@ -100,7 +59,7 @@ export const projectsApi = {
    */
   async getProject(projectId: string): Promise<Project> {
     const response = await request<GetProjectResponse>(
-      `/projects/${projectId}`,
+      `/projects/${encodeURIComponent(projectId)}`,
       {
         method: "GET",
       },

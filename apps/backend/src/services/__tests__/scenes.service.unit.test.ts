@@ -119,8 +119,8 @@ describe('ScenesService', () => {
     wordCount: null,
     demoPlaceholderColor: null,
     demoNotes: null,
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
+    createdAt: new Date('2024-01-01').toISOString(),
+    updatedAt: new Date('2024-01-01').toISOString(),
   };
 
   afterEach(() => {
@@ -154,8 +154,8 @@ describe('ScenesService', () => {
         route: 'COMMON',
         status: 'DRAFT',
         visibility: 'EXCLUSIVE',
-        createdAt: mockScene.createdAt,
-        updatedAt: mockScene.updatedAt,
+        createdAt: mockScene.createdAt.toISOString(),
+        updatedAt: mockScene.updatedAt.toISOString(),
       });
     });
 
@@ -179,6 +179,12 @@ describe('ScenesService', () => {
     it('should return scene with lines and characters when found', async () => {
       // Mock scene query
       let callCount = 0;
+      const mockDbSceneLine = {
+        ...mockSceneLine,
+        createdAt: new Date('2024-01-01'),
+        updatedAt: new Date('2024-01-01'),
+      };
+
       mockSelect.mockImplementation(() => {
         callCount++;
         if (callCount === 1) {
@@ -190,7 +196,7 @@ describe('ScenesService', () => {
         } else if (callCount === 2) {
           // Second call: get scene lines with speakers
           return createMockChain([{
-            line: mockSceneLine,
+            line: mockDbSceneLine,
             speakerName: 'Eileen',
             speakerTag: 'a',
           }]);

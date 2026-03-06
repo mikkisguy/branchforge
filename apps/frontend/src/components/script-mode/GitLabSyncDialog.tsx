@@ -17,6 +17,7 @@ import {
 import { type ConflictResolution } from "@/lib/api/gitlab";
 import { useGitLabSync } from "@/hooks/useGitLabSync";
 import { useToast } from "@/contexts/ToastContext";
+import { useScenes } from "@/hooks/useScenes";
 
 // ============================================================================
 // Types
@@ -68,6 +69,7 @@ export function GitLabSyncDialog({
 }: GitLabSyncDialogProps) {
   const { state, exportToGitlab, importFromGitlab, reset } = useGitLabSync();
   const { success, error } = useToast();
+  const { invalidateScenes } = useScenes();
 
   // Form state
   const [branch, setBranch] = useState(defaultBranch);
@@ -114,6 +116,10 @@ export function GitLabSyncDialog({
       success(
         `${operationType === "export" ? "Export" : "Import"} completed successfully`,
       );
+
+      // Refresh scene list after successful sync
+      await invalidateScenes();
+
       // Clear any existing timeout before scheduling a new one
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -137,6 +143,7 @@ export function GitLabSyncDialog({
     onOpenChange,
     success,
     error,
+    invalidateScenes,
   ]);
 
   /**

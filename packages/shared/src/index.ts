@@ -56,6 +56,16 @@ export const RouteType = {
   COMMON: 'COMMON',
 } as const;
 
+/**
+ * Scene visibility enumeration
+ */
+export type SceneVisibility = 'EXCLUSIVE' | 'SHARED' | 'DUO_PAIR';
+export const SceneVisibility = {
+  EXCLUSIVE: 'EXCLUSIVE',
+  SHARED: 'SHARED',
+  DUO_PAIR: 'DUO_PAIR',
+} as const;
+
 // ============================================================================
 // Public User Interface
 // ============================================================================
@@ -202,4 +212,81 @@ export interface Scene {
   route?: RouteType;
   status: SceneStatus;
   createdAt: Date;
+}
+
+// ============================================================================
+// Scene Types (for frontend-backend communication)
+// ============================================================================
+
+/**
+ * Public scene information (without sensitive data)
+ * This matches the backend's PublicScene interface
+ */
+export interface PublicScene {
+  id: string;
+  projectId: string;
+  title: string;
+  act: string | null;
+  chapter: number | null;
+  sceneNumber: number;
+  sequenceOrder: number;
+  route: RouteType | null;
+  status: SceneStatus | null;
+  visibility: SceneVisibility | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Scene line content type enumeration
+ */
+export type SceneLineContentType = "DIALOGUE" | "NARRATION" | "CHOICE" | "MENU" | "JUMP";
+
+/**
+ * Scene visual type enumeration
+ */
+export type SceneVisualType = "GENERATED" | "BLACK" | "CUSTOM";
+
+/**
+ * Scene line with speaker information
+ */
+export interface SceneLine {
+  id: string;
+  sceneId: string;
+  sequence: number;
+  contentType: SceneLineContentType;
+  content: string;
+  visualType: SceneVisualType;
+  visualPrompt: string | null;
+  speakerId: string | null;
+  speakerName: string | null;
+  speakerTag: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Scene character role enumeration
+ */
+export type SceneCharacterRole = "PRIMARY" | "SECONDARY" | "BACKGROUND" | "MENTIONED";
+
+/**
+ * Character in a scene with role information
+ */
+export interface SceneCharacter {
+  id: string;
+  name: string;
+  displayName: string;
+  renpyTag: string;
+  role: SceneCharacterRole;
+  emotion: string | null;
+  notes: string | null;
+}
+
+/**
+ * Detailed scene information with lines and characters
+ */
+export interface SceneDetail extends PublicScene {
+  lines: SceneLine[];
+  characters: SceneCharacter[];
 }

@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useProject } from "@/hooks/useProject";
 import { useGitLab } from "@/hooks/useGitLab";
+import { useScenes } from "@/hooks/useScenes";
 import { themePalettes, BASE_URL } from "@/lib/constants";
 import { FloatingParticles, TopRightPanel } from "@/components/ide-shared";
 import { Logo } from "@/components/ui/logo";
@@ -22,6 +23,14 @@ export function HomePageIDE() {
 
   // GitLab context for getting linked repository info
   const { getLinkedRepository } = useGitLab();
+
+  // Scenes context - clear active scene when project changes
+  const { setActiveSceneId } = useScenes();
+
+  // Clear active scene when project changes
+  useEffect(() => {
+    setActiveSceneId(null);
+  }, [currentProject?.id, setActiveSceneId]);
 
   const themeInfo = themePalettes.find((p) => p.key === theme);
 

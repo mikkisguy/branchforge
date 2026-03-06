@@ -10,13 +10,34 @@
  * - Test database must exist and have proper schema
  */
 
-import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'vitest';
-import { getDb } from '../../db/index.js';
-import { users, projects, projectUsers, scenes as scenesTable, characters, sceneLines, sceneCharacters } from '../../db/schema/index.js';
-import { eq } from 'drizzle-orm';
-import { authorizeSceneAccess, listScenes, getScene } from '../scenes.service.js';
+import { describe, it, expect, beforeEach, afterEach, beforeAll } from "vitest";
+import { getDb } from "../../db/index.js";
+import {
+  users,
+  projects,
+  projectUsers,
+  scenes as scenesTable,
+  characters,
+  sceneLines,
+  sceneCharacters,
+} from "../../db/schema/index.js";
+import { eq } from "drizzle-orm";
+import {
+  authorizeSceneAccess,
+  listScenes,
+  getScene,
+} from "../scenes.service.js";
+import type {
+  NewUser,
+  NewProject,
+  NewScene,
+  NewCharacter,
+  NewSceneLine,
+  NewSceneCharacter,
+  NewProjectUser,
+} from "../../db/schema/index.js";
 
-describe('ScenesService (Integration)', () => {
+describe("ScenesService (Integration)", () => {
   let db: ReturnType<typeof getDb>;
 
   beforeAll(async () => {
@@ -24,102 +45,106 @@ describe('ScenesService (Integration)', () => {
   });
 
   // Test fixtures with hardcoded UUIDs
-  const testUserId = '00000000-0000-0000-0000-000000000001';
-  const otherUserId = '00000000-0000-0000-0000-000000000002';
-  const thirdUserId = '00000000-0000-0000-0000-000000000003';
+  const testUserId = "00000000-0000-0000-0000-000000000001";
+  const otherUserId = "00000000-0000-0000-0000-000000000002";
+  const thirdUserId = "00000000-0000-0000-0000-000000000003";
 
-  const testUser = {
+  const testUser: NewUser = {
     id: testUserId,
-    email: 'owner@test.com',
-    passwordHash: 'hashed_password',
-    role: 'OWNER',
+    email: "owner@test.com",
+    passwordHash: "hashed_password",
+    role: "OWNER",
   };
 
-  const otherUser = {
+  const otherUser: NewUser = {
     id: otherUserId,
-    email: 'other@test.com',
-    passwordHash: 'hashed_password',
-    role: 'OWNER',
+    email: "other@test.com",
+    passwordHash: "hashed_password",
+    role: "OWNER",
   };
 
-  const thirdUser = {
+  const thirdUser: NewUser = {
     id: thirdUserId,
-    email: 'third@test.com',
-    passwordHash: 'hashed_password',
-    role: 'READER',
+    email: "third@test.com",
+    passwordHash: "hashed_password",
+    role: "READER",
   };
 
-  const ownedProject = {
-    id: '10000000-0000-0000-0000-000000000001',
+  const ownedProject: NewProject = {
+    id: "10000000-0000-0000-0000-000000000001",
     userId: testUserId,
-    name: 'Owned Project',
-    type: 'PREQUEL',
-    description: 'A project owned by the user',
+    name: "Owned Project",
+    type: "PREQUEL",
+    description: "A project owned by the user",
     maxMeterDelta: 10,
   };
 
-  const sharedProject = {
-    id: '10000000-0000-0000-0000-000000000002',
+  const sharedProject: NewProject = {
+    id: "10000000-0000-0000-0000-000000000002",
     userId: otherUserId,
-    name: 'Shared Project',
-    type: 'SEQUEL',
-    description: 'A project shared with the user',
+    name: "Shared Project",
+    type: "SEQUEL",
+    description: "A project shared with the user",
     maxMeterDelta: 15,
   };
 
-  const ownedScene = {
-    id: '20000000-0000-0000-0000-000000000001',
-    projectId: ownedProject.id,
-    title: 'chapter1_scene1',
-    act: 'I',
+  const ownedScene: NewScene = {
+    id: "20000000-0000-0000-0000-000000000001",
+    projectId: ownedProject.id!,
+    title: "chapter1_scene1",
+    act: "I",
     chapter: 1,
     sceneNumber: 1,
     sequenceOrder: 0,
-    route: 'EILEEN',
-    status: 'DRAFT',
+    route: "EILEEN",
+    status: "DRAFT",
     prerequisites: {},
     effects: {},
   };
 
-  const sharedScene = {
-    id: '20000000-0000-0000-0000-000000000002',
-    projectId: sharedProject.id,
-    title: 'chapter1_scene2',
-    act: 'I',
+  const sharedScene: NewScene = {
+    id: "20000000-0000-0000-0000-000000000002",
+    projectId: sharedProject.id!,
+    title: "chapter1_scene2",
+    act: "I",
     chapter: 1,
     sceneNumber: 2,
     sequenceOrder: 1,
-    route: 'LUCAS',
-    status: 'DRAFT',
+    route: "LUCAS",
+    status: "DRAFT",
     prerequisites: {},
     effects: {},
   };
 
-  const testCharacter = {
-    id: '30000000-0000-0000-0000-000000000001',
-    projectId: ownedProject.id,
-    name: 'Eileen',
-    displayName: 'Eileen',
-    renpyTag: 'a',
-    routeAffiliation: 'EILEEN',
+  const testCharacter: NewCharacter = {
+    id: "30000000-0000-0000-0000-000000000001",
+    projectId: ownedProject.id!,
+    name: "Eileen",
+    displayName: "Eileen",
+    renpyTag: "a",
+    routeAffiliation: "EILEEN",
     isLoveInterest: true,
-    color: '#FF5733',
+    color: "#FF5733",
   };
 
   // Helper to clean up all test data
   async function cleanupTestData() {
-    await db.delete(sceneCharacters).where(eq(sceneCharacters.sceneId, ownedScene.id));
-    await db.delete(sceneCharacters).where(eq(sceneCharacters.sceneId, sharedScene.id));
-    await db.delete(sceneLines).where(eq(sceneLines.sceneId, ownedScene.id));
-    await db.delete(sceneLines).where(eq(sceneLines.sceneId, sharedScene.id));
-    await db.delete(scenesTable).where(eq(scenesTable.id, ownedScene.id));
-    await db.delete(scenesTable).where(eq(scenesTable.id, sharedScene.id));
-    await db.delete(characters).where(eq(characters.id, testCharacter.id));
+    await db
+      .delete(sceneCharacters)
+      .where(eq(sceneCharacters.sceneId, ownedScene.id!));
+    await db
+      .delete(sceneCharacters)
+      .where(eq(sceneCharacters.sceneId, sharedScene.id!));
+    await db.delete(sceneLines).where(eq(sceneLines.sceneId, ownedScene.id!));
+    await db.delete(sceneLines).where(eq(sceneLines.sceneId, sharedScene.id!));
+    await db.delete(scenesTable).where(eq(scenesTable.id, ownedScene.id!));
+    await db.delete(scenesTable).where(eq(scenesTable.id, sharedScene.id!));
+    await db.delete(characters).where(eq(characters.id, testCharacter.id!));
     await db.delete(projectUsers).where(eq(projectUsers.userId, testUserId));
     await db.delete(projectUsers).where(eq(projectUsers.userId, otherUserId));
     await db.delete(projectUsers).where(eq(projectUsers.userId, thirdUserId));
-    await db.delete(projects).where(eq(projects.id, ownedProject.id));
-    await db.delete(projects).where(eq(projects.id, sharedProject.id));
+    await db.delete(projects).where(eq(projects.id, ownedProject.id!));
+    await db.delete(projects).where(eq(projects.id, sharedProject.id!));
     await db.delete(users).where(eq(users.id, testUserId));
     await db.delete(users).where(eq(users.id, otherUserId));
     await db.delete(users).where(eq(users.id, thirdUserId));
@@ -146,272 +171,286 @@ describe('ScenesService (Integration)', () => {
     await cleanupTestData();
   });
 
-  describe('authorizeSceneAccess', () => {
-    it('should return true when user owns the project containing the scene', async () => {
-      const authorized = await authorizeSceneAccess(ownedScene.id, testUserId);
+  describe("authorizeSceneAccess", () => {
+    it("should return true when user owns the project containing the scene", async () => {
+      const authorized = await authorizeSceneAccess(ownedScene.id!, testUserId);
 
       expect(authorized).toBe(true);
     });
 
-    it('should return false when scene does not exist', async () => {
-      const nonExistentSceneId = '20000000-0000-0000-0000-999999999999';
-      const authorized = await authorizeSceneAccess(nonExistentSceneId, testUserId);
+    it("should return false when scene does not exist", async () => {
+      const nonExistentSceneId = "20000000-0000-0000-0000-999999999999";
+      const authorized = await authorizeSceneAccess(
+        nonExistentSceneId,
+        testUserId,
+      );
 
       expect(authorized).toBe(false);
     });
 
-    it('should return false when user does not have access to the project', async () => {
+    it("should return false when user does not have access to the project", async () => {
       // Third user has no access to either project
       await db.insert(users).values(thirdUser);
 
-      const authorized = await authorizeSceneAccess(ownedScene.id, thirdUserId);
+      const authorized = await authorizeSceneAccess(
+        ownedScene.id!,
+        thirdUserId,
+      );
 
       expect(authorized).toBe(false);
     });
 
-    it('should return true when user has shared access via projectUsers', async () => {
+    it("should return true when user has shared access via projectUsers", async () => {
       // Share the other user's project with test user
       await db.insert(projectUsers).values({
-        projectId: sharedProject.id,
+        projectId: sharedProject.id!,
         userId: testUserId,
-        role: 'READER',
+        role: "READER",
       });
 
-      const authorized = await authorizeSceneAccess(sharedScene.id, testUserId);
+      const authorized = await authorizeSceneAccess(
+        sharedScene.id!,
+        testUserId,
+      );
 
       expect(authorized).toBe(true);
     });
 
-    it('should return true for owner even when also shared as READER', async () => {
+    it("should return true for owner even when also shared as READER", async () => {
       // Share the owned project with the same user (edge case)
       await db.insert(projectUsers).values({
-        projectId: ownedProject.id,
+        projectId: ownedProject.id!,
         userId: testUserId,
-        role: 'READER',
+        role: "READER",
       });
 
-      const authorized = await authorizeSceneAccess(ownedScene.id, testUserId);
+      const authorized = await authorizeSceneAccess(ownedScene.id!, testUserId);
 
       expect(authorized).toBe(true);
     });
 
-    it('should prioritize owner access over shared access', async () => {
+    it("should prioritize owner access over shared access", async () => {
       // Owner should have access regardless of projectUsers entry
       await db.insert(projectUsers).values({
-        projectId: ownedProject.id,
+        projectId: ownedProject.id!,
         userId: testUserId,
-        role: 'TESTER',
+        role: "TESTER",
       });
 
-      const authorized = await authorizeSceneAccess(ownedScene.id, testUserId);
+      const authorized = await authorizeSceneAccess(ownedScene.id!, testUserId);
 
       expect(authorized).toBe(true);
     });
   });
 
-  describe('listScenes', () => {
-    it('should return empty array when project has no scenes', async () => {
+  describe("listScenes", () => {
+    it("should return empty array when project has no scenes", async () => {
       // Create a project with no scenes
-      const emptyProject = {
-        id: '10000000-0000-0000-0000-000000000003',
+      const emptyProject: NewProject = {
+        id: "10000000-0000-0000-0000-000000000003",
         userId: testUserId,
-        name: 'Empty Project',
-        type: 'PREQUEL',
+        name: "Empty Project",
+        type: "PREQUEL",
         maxMeterDelta: 10,
       };
       await db.insert(projects).values(emptyProject);
 
-      const scenes = await listScenes(emptyProject.id, testUserId);
+      const scenes = await listScenes(emptyProject.id!, testUserId);
 
       expect(scenes).toEqual([]);
 
       // Cleanup
-      await db.delete(projects).where(eq(projects.id, emptyProject.id));
+      await db.delete(projects).where(eq(projects.id, emptyProject.id!));
     });
 
-    it('should return list of scenes for owned project', async () => {
-      const scenes = await listScenes(ownedProject.id, testUserId);
+    it("should return list of scenes for owned project", async () => {
+      const scenes = await listScenes(ownedProject.id!, testUserId);
 
       expect(scenes).toHaveLength(1);
       expect(scenes[0]).toMatchObject({
-        id: ownedScene.id,
-        projectId: ownedProject.id,
-        title: 'chapter1_scene1',
-        act: 'I',
+        id: ownedScene.id!,
+        projectId: ownedProject.id!,
+        title: "chapter1_scene1",
+        act: "I",
         chapter: 1,
         sceneNumber: 1,
         sequenceOrder: 0,
-        route: 'EILEEN',
-        status: 'DRAFT',
+        route: "EILEEN",
+        status: "DRAFT",
       });
-      expect(scenes[0].createdAt).toBeInstanceOf(Date);
-      expect(scenes[0].updatedAt).toBeInstanceOf(Date);
+      expect(typeof scenes[0].createdAt).toBe("string");
+      expect(typeof scenes[0].updatedAt).toBe("string");
     });
 
-    it('should return list of scenes for shared project', async () => {
+    it("should return list of scenes for shared project", async () => {
       // Share the other user's project with test user
       await db.insert(projectUsers).values({
-        projectId: sharedProject.id,
+        projectId: sharedProject.id!,
         userId: testUserId,
-        role: 'READER',
+        role: "READER",
       });
 
-      const scenes = await listScenes(sharedProject.id, testUserId);
+      const scenes = await listScenes(sharedProject.id!, testUserId);
 
       expect(scenes).toHaveLength(1);
       expect(scenes[0]).toMatchObject({
-        id: sharedScene.id,
-        projectId: sharedProject.id,
-        title: 'chapter1_scene2',
-        route: 'LUCAS',
+        id: sharedScene.id!,
+        projectId: sharedProject.id!,
+        title: "chapter1_scene2",
+        route: "LUCAS",
       });
     });
 
-    it('should return empty array when user has no access to project', async () => {
+    it("should return empty array when user has no access to project", async () => {
       await db.insert(users).values(thirdUser);
 
-      const scenes = await listScenes(ownedProject.id, thirdUserId);
+      const scenes = await listScenes(ownedProject.id!, thirdUserId);
 
       expect(scenes).toEqual([]);
     });
 
-    it('should filter scenes by route', async () => {
+    it("should filter scenes by route", async () => {
       // Add a second scene with different route
-      const secondScene = {
-        id: '20000000-0000-0000-0000-000000000003',
-        projectId: ownedProject.id,
-        title: 'chapter1_scene2',
-        act: 'I',
+      const secondScene: NewScene = {
+        id: "20000000-0000-0000-0000-000000000003",
+        projectId: ownedProject.id!,
+        title: "chapter1_scene2",
+        act: "I",
         chapter: 1,
         sceneNumber: 2,
         sequenceOrder: 1,
-        route: 'LUCAS',
-        status: 'DRAFT',
+        route: "LUCAS",
+        status: "DRAFT",
         prerequisites: {},
         effects: {},
       };
       await db.insert(scenesTable).values(secondScene);
 
-      const scenes = await listScenes(ownedProject.id, testUserId, { route: 'EILEEN' });
+      const scenes = await listScenes(ownedProject.id!, testUserId, {
+        route: "EILEEN",
+      });
 
       expect(scenes).toHaveLength(1);
       expect(scenes[0].id).toBe(ownedScene.id);
-      expect(scenes[0].route).toBe('EILEEN');
+      expect(scenes[0].route).toBe("EILEEN");
 
       // Cleanup
-      await db.delete(scenesTable).where(eq(scenesTable.id, secondScene.id));
+      await db.delete(scenesTable).where(eq(scenesTable.id, secondScene.id!));
     });
 
-    it('should filter scenes by status', async () => {
+    it("should filter scenes by status", async () => {
       // Add a scene with different status
-      const reviewScene = {
-        id: '20000000-0000-0000-0000-000000000004',
-        projectId: ownedProject.id,
-        title: 'chapter1_scene3',
-        act: 'I',
+      const reviewScene: NewScene = {
+        id: "20000000-0000-0000-0000-000000000004",
+        projectId: ownedProject.id!,
+        title: "chapter1_scene3",
+        act: "I",
         chapter: 1,
         sceneNumber: 3,
         sequenceOrder: 2,
-        route: 'EILEEN',
-        status: 'REVIEW',
+        route: "EILEEN",
+        status: "REVIEW",
         prerequisites: {},
         effects: {},
       };
       await db.insert(scenesTable).values(reviewScene);
 
-      const scenes = await listScenes(ownedProject.id, testUserId, { status: 'DRAFT' });
+      const scenes = await listScenes(ownedProject.id!, testUserId, {
+        status: "DRAFT",
+      });
 
       expect(scenes).toHaveLength(1);
       expect(scenes[0].id).toBe(ownedScene.id);
-      expect(scenes[0].status).toBe('DRAFT');
+      expect(scenes[0].status).toBe("DRAFT");
 
       // Cleanup
-      await db.delete(scenesTable).where(eq(scenesTable.id, reviewScene.id));
+      await db.delete(scenesTable).where(eq(scenesTable.id, reviewScene.id!));
     });
   });
 
-  describe('getScene', () => {
-    it('should return scene with empty arrays when no lines or characters exist', async () => {
-      const scene = await getScene(ownedScene.id, testUserId);
+  describe("getScene", () => {
+    it("should return scene with empty arrays when no lines or characters exist", async () => {
+      const scene = await getScene(ownedScene.id!, testUserId);
 
       expect(scene).not.toBeNull();
       expect(scene?.id).toBe(ownedScene.id);
-      expect(scene?.title).toBe('chapter1_scene1');
+      expect(scene?.title).toBe("chapter1_scene1");
       expect(scene?.lines).toEqual([]);
       expect(scene?.characters).toEqual([]);
     });
 
-    it('should return null when scene does not exist', async () => {
-      const nonExistentSceneId = '20000000-0000-0000-0000-999999999999';
+    it("should return null when scene does not exist", async () => {
+      const nonExistentSceneId = "20000000-0000-0000-0000-999999999999";
       const scene = await getScene(nonExistentSceneId, testUserId);
 
       expect(scene).toBeNull();
     });
 
-    it('should return null when user has no access to scene', async () => {
+    it("should return null when user has no access to scene", async () => {
       await db.insert(users).values(thirdUser);
 
-      const scene = await getScene(ownedScene.id, thirdUserId);
+      const scene = await getScene(ownedScene.id!, thirdUserId);
 
       expect(scene).toBeNull();
     });
 
-    it('should return scene with lines and characters', async () => {
+    it("should return scene with lines and characters", async () => {
       // Add a character
       await db.insert(characters).values(testCharacter);
 
       // Add scene lines
-      const testLine = {
-        id: '40000000-0000-0000-0000-000000000001',
-        sceneId: ownedScene.id,
+      const testLine: NewSceneLine = {
+        id: "40000000-0000-0000-0000-000000000001",
+        sceneId: ownedScene.id!,
         sequence: 1,
-        contentType: 'DIALOGUE',
-        content: 'Hello world!',
-        speakerId: testCharacter.id,
-        visualType: 'GENERATED',
+        contentType: "DIALOGUE",
+        content: "Hello world!",
+        speakerId: testCharacter.id!,
+        visualType: "GENERATED",
       };
       await db.insert(sceneLines).values(testLine);
 
       // Add scene character
       await db.insert(sceneCharacters).values({
-        sceneId: ownedScene.id,
-        characterId: testCharacter.id,
-        role: 'PRIMARY',
+        sceneId: ownedScene.id!,
+        characterId: testCharacter.id!,
+        role: "PRIMARY",
       });
 
-      const scene = await getScene(ownedScene.id, testUserId);
+      const scene = await getScene(ownedScene.id!, testUserId);
 
       expect(scene).not.toBeNull();
       expect(scene?.lines).toHaveLength(1);
       expect(scene?.lines[0]).toMatchObject({
-        content: 'Hello world!',
-        contentType: 'DIALOGUE',
+        content: "Hello world!",
+        contentType: "DIALOGUE",
         speakerId: testCharacter.id,
-        speakerName: 'Eileen',
-        speakerTag: 'a',
+        speakerName: "Eileen",
+        speakerTag: "a",
       });
       expect(scene?.characters).toHaveLength(1);
       expect(scene?.characters[0]).toMatchObject({
-        id: testCharacter.id,
-        name: 'Eileen',
-        displayName: 'Eileen',
-        role: 'PRIMARY',
+        id: testCharacter.id!,
+        name: "Eileen",
+        displayName: "Eileen",
+        role: "PRIMARY",
       });
     });
 
-    it('should return scene for user with shared access', async () => {
+    it("should return scene for user with shared access", async () => {
       // Share the other user's project with test user
       await db.insert(projectUsers).values({
-        projectId: sharedProject.id,
+        projectId: sharedProject.id!,
         userId: testUserId,
-        role: 'READER',
+        role: "READER",
       });
 
-      const scene = await getScene(sharedScene.id, testUserId);
+      const scene = await getScene(sharedScene.id!, testUserId);
 
       expect(scene).not.toBeNull();
       expect(scene?.id).toBe(sharedScene.id);
-      expect(scene?.title).toBe('chapter1_scene2');
+      expect(scene?.title).toBe("chapter1_scene2");
     });
   });
 });
+
