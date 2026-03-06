@@ -19,6 +19,7 @@ build/
 # Database
 *.db
 *.db-journal
+apps/backups/*.sql
 
 # IDE
 .vscode/

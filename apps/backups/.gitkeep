@@ -1,0 +1,2 @@
+# This directory stores database backups created by pnpm db:backup
+# Backup files are not tracked in git (see .gitignore)

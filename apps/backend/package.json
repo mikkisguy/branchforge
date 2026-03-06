@@ -14,6 +14,9 @@
     "db:migrate": "drizzle-kit --config=drizzle.config.cjs push",
     "db:push:test": "tsc -p tsconfig.schema.json && NODE_ENV=test dotenv -e ../../.env -- drizzle-kit --config=drizzle.config.cjs push --force",
     "db:studio": "drizzle-kit --config=drizzle.config.cjs studio",
+    "db:backup": "dotenv -e ../../.env -- tsx scripts/db-backup.ts",
+    "db:restore": "dotenv -e ../../.env -- tsx scripts/db-restore.ts",
+    "db:list": "dotenv -e ../../.env -- tsx scripts/db-list.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
   },
