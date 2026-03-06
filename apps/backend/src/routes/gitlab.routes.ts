@@ -15,7 +15,7 @@ import {
   validateGitlabPAT,
   storeGitlabIntegration,
   deleteGitlabIntegration,
-  listGitlabProjects,
+  listGitlabRepositories,
   getGitlabProject,
   linkRepository,
   unlinkRepository,
@@ -378,11 +378,11 @@ async function deleteIntegrationHandler(
 }
 
 /**
- * List GitLab projects
+ * List GitLab repositories
  *
- * GET /api/gitlab/projects
+ * GET /api/gitlab/repositories
  *
- * Returns a list of GitLab projects accessible to the user.
+ * Returns a list of GitLab repositories accessible to the user.
  * Returns an empty array if GitLab integration is not configured.
  */
 async function listProjectsHandler(
@@ -391,7 +391,7 @@ async function listProjectsHandler(
 ): Promise<void> {
   try {
     const userId = getAuthenticatedUserId(request);
-    const projects = await listGitlabProjects(userId);
+    const projects = await listGitlabRepositories(userId);
     reply.send(projects);
   } catch (err) {
     // Return empty array if integration not set up (normal state, not an error)
@@ -405,11 +405,11 @@ async function listProjectsHandler(
 
     request.log.error(
       { err },
-      "listProjectsHandler: Failed to list GitLab projects",
+      "listProjectsHandler: Failed to list GitLab repositories",
     );
 
     reply.status(500).send({
-      error: "Failed to list GitLab projects",
+      error: "Failed to list GitLab repositories",
       details: err instanceof Error ? err.message : "Unknown error",
     });
   }
@@ -513,7 +513,7 @@ async function unlinkRepositoryHandler(
 /**
  * List linked repositories
  *
- * GET /api/gitlab/repositories
+ * GET /api/gitlab/linked-repositories
  *
  * Returns a list of all GitLab repositories linked to the user's projects.
  * Returns an empty array if no repositories are linked or integration not set up.
@@ -908,7 +908,7 @@ export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
   );
 
   fastify.get(
-    "/gitlab/projects",
+    "/gitlab/repositories",
     {
       onRequest: [authenticate],
     },
@@ -933,7 +933,7 @@ export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
   );
 
   fastify.get(
-    "/gitlab/repositories",
+    "/gitlab/linked-repositories",
     {
       onRequest: [authenticate],
     },

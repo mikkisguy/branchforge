@@ -56,12 +56,20 @@ export interface GitlabUser {
   email: string;
 }
 
-export interface GitlabProject {
+// Full GitLab repository data (from API)
+export interface GitlabRepositoryFull {
   id: number;
   name: string;
   path_with_namespace: string;
   default_branch: string;
   http_url_to_repo?: string;
+}
+
+// Lightweight repository data for repository selection UI
+export interface GitlabRepository {
+  id: number;
+  name: string;
+  path_with_namespace: string;
 }
 
 export interface GitlabBranch {
@@ -184,10 +192,10 @@ async function getDecryptedToken(userId: string): Promise<string> {
   return decryptPAT(integration.encryptedToken);
 }
 
-export async function listGitlabProjects(
+export async function listGitlabRepositories(
   userId: string,
   gitlabUrl?: string,
-): Promise<GitlabProject[]> {
+): Promise<GitlabRepository[]> {
   const integration = await getGitlabIntegration(userId);
   if (!integration) {
     throw new Error("GitLab integration not found");
@@ -198,7 +206,7 @@ export async function listGitlabProjects(
     gitlabUrl || integration.gitlabUrl || undefined,
   );
 
-  const gitlabProjects: GitlabProject[] = [];
+  const gitlabRepositories: GitlabRepository[] = [];
   let page = 1;
   const perPage = 100;
 
@@ -218,8 +226,15 @@ export async function listGitlabProjects(
       throw new Error(`GitLab API error: ${response.status}`);
     }
 
-    const pageProjects = (await response.json()) as GitlabProject[];
-    gitlabProjects.push(...pageProjects);
+    const pageProjects = (await response.json()) as GitlabRepositoryFull[];
+    // Extract only fields needed for repository selection UI
+    gitlabRepositories.push(
+      ...pageProjects.map((p) => ({
+        id: p.id,
+        name: p.name,
+        path_with_namespace: p.path_with_namespace,
+      })),
+    );
 
     // Check pagination headers
     const totalPages = response.headers.get("x-total-pages");
@@ -230,7 +245,7 @@ export async function listGitlabProjects(
     }
   } while (true);
 
-  return gitlabProjects;
+  return gitlabRepositories;
 }
 
 /**
@@ -243,7 +258,7 @@ export async function getGitlabProject(
   userId: string,
   gitlabProjectId: number,
   gitlabUrl?: string,
-): Promise<GitlabProject | null> {
+): Promise<GitlabRepository | null> {
   const integration = await getGitlabIntegration(userId);
   if (!integration) {
     throw new Error("GitLab integration not found");
@@ -270,7 +285,13 @@ export async function getGitlabProject(
     throw new Error(`GitLab API error: ${response.status}`);
   }
 
-  return (await response.json()) as GitlabProject;
+  const projectData = (await response.json()) as GitlabRepositoryFull;
+  // Return only fields needed for repository selection UI (same shape as listGitlabRepositories)
+  return {
+    id: projectData.id,
+    name: projectData.name,
+    path_with_namespace: projectData.path_with_namespace,
+  };
 }
 
 /**
@@ -287,12 +308,20 @@ export async function linkRepository(
   defaultBranch: string = "main",
 ): Promise<void> {
   const db = getDb();
-  await db.insert(gitlabRepositories).values({
-    projectId,
-    gitlabProjectId,
-    repositoryName,
-    defaultBranch,
-  });
+  await db
+    .insert(gitlabRepositories)
+    .values({
+      projectId,
+      gitlabProjectId,
+      repositoryName,
+      defaultBranch,
+    })
+    .onConflictDoNothing({
+      target: [
+        gitlabRepositories.projectId,
+        gitlabRepositories.gitlabProjectId,
+      ],
+    });
 }
 
 /**

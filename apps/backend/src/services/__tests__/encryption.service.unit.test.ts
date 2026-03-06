@@ -36,6 +36,9 @@ describe('EncryptionService', () => {
     it('should handle edge cases', () => {
       expect(isValidPATFormat('glpat-')).toBe(false);
       expect(isValidPATFormat('glpat-123-456')).toBe(true); // hyphens in token are allowed
+      expect(isValidPATFormat('glpat-test_token_with.underscores.and.dots')).toBe(true); // underscores and dots are allowed
+      expect(isValidPATFormat('glpat-test_token')).toBe(true); // underscores in token are allowed
+      expect(isValidPATFormat('glpat-test.token')).toBe(true); // dots in token are allowed
       expect(isValidPATFormat(null as any)).toBe(false);
       expect(isValidPATFormat(undefined as any)).toBe(false);
     });

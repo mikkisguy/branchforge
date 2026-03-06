@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { InlineMessage } from "@/components/ui/inline-error";
-import { gitlabApi, type GitLabProject } from "@/lib/api/gitlab";
+import { gitlabApi, type GitLabRepository } from "@/lib/api/gitlab";
 import { useGitLab } from "@/hooks/useGitLab";
 import { useToast } from "@/contexts/ToastContext";
 
@@ -25,7 +25,7 @@ interface BranchForgeProject {
   name: string;
 }
 
-interface GitLabProjectDialogProps {
+interface GitLabRepositoryLinkingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onLinkSuccess?: () => void;
@@ -51,22 +51,24 @@ const MOCK_BRANCHFORGE_PROJECTS: BranchForgeProject[] = [
 // Component
 // ============================================================================
 
-export function GitLabProjectDialog({
+export function GitLabRepositoryLinkingDialog({
   open,
   onOpenChange,
   onLinkSuccess,
-}: GitLabProjectDialogProps) {
-  const { listProjects, refreshIntegration } = useGitLab();
+}: GitLabRepositoryLinkingDialogProps) {
+  const { listRepositories, refreshIntegration } = useGitLab();
   const { success, error } = useToast();
 
   // Form state
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [selectedGitlabProject, setSelectedGitlabProject] =
-    useState<GitLabProject | null>(null);
+    useState<GitLabRepository | null>(null);
   const [branch, setBranch] = useState("main");
 
-  // GitLab projects state
-  const [gitlabProjects, setGitlabProjects] = useState<GitLabProject[]>([]);
+  // GitLab repositories state
+  const [gitlabRepositories, setGitlabRepositories] = useState<
+    GitLabRepository[]
+  >([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [gitlabLoadError, setGitlabLoadError] = useState<string | null>(null);
   const [projectSearch, setProjectSearch] = useState("");
@@ -75,31 +77,38 @@ export function GitLabProjectDialog({
   const [isLinking, setIsLinking] = useState(false);
 
   /**
-   * Load GitLab projects
+   * Load GitLab repositories
    */
-  const loadGitlabProjects = useCallback(async () => {
+  const loadGitlabRepositories = useCallback(async () => {
     setIsLoadingProjects(true);
     setGitlabLoadError(null);
     try {
-      const projects = await listProjects();
-      setGitlabProjects(projects);
+      const projects = await listRepositories();
+      setGitlabRepositories(projects);
       setGitlabLoadError(null);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Failed to load GitLab projects";
+        err instanceof Error
+          ? err.message
+          : "Failed to load GitLab repositories";
       setGitlabLoadError(message);
       error(message);
     } finally {
       setIsLoadingProjects(false);
     }
-  }, [listProjects, error]);
+  }, [listRepositories, error]);
 
   // Load projects when dialog opens
   useEffect(() => {
-    if (open && gitlabProjects.length === 0 && !gitlabLoadError) {
-      loadGitlabProjects();
+    if (open && gitlabRepositories.length === 0 && !gitlabLoadError) {
+      loadGitlabRepositories();
     }
-  }, [open, gitlabProjects.length, gitlabLoadError, loadGitlabProjects]);
+  }, [
+    open,
+    gitlabRepositories.length,
+    gitlabLoadError,
+    loadGitlabRepositories,
+  ]);
 
   /**
    * Reset form state
@@ -179,9 +188,9 @@ export function GitLabProjectDialog({
   ]);
 
   /**
-   * Filter GitLab projects based on search
+   * Filter GitLab repositories based on search
    */
-  const filteredGitlabProjects = gitlabProjects.filter(
+  const filteredGitlabRepositories = gitlabRepositories.filter(
     (project) =>
       project.name.toLowerCase().includes(projectSearch.toLowerCase()) ||
       project.path_with_namespace
@@ -260,12 +269,14 @@ export function GitLabProjectDialog({
                 </div>
               ) : gitlabLoadError ? (
                 <div className="p-4 flex flex-col items-center gap-3 text-center">
-                  <InlineMessage variant="error">{gitlabLoadError}</InlineMessage>
+                  <InlineMessage variant="error">
+                    {gitlabLoadError}
+                  </InlineMessage>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => loadGitlabProjects()}
+                    onClick={() => loadGitlabRepositories()}
                     disabled={isLoadingProjects}
                   >
                     {isLoadingProjects ? (
@@ -274,7 +285,7 @@ export function GitLabProjectDialog({
                     Retry
                   </Button>
                 </div>
-              ) : filteredGitlabProjects.length === 0 ? (
+              ) : filteredGitlabRepositories.length === 0 ? (
                 <div className="p-4 text-center text-sm text-muted-foreground">
                   {projectSearch
                     ? "No matching repositories found"
@@ -282,7 +293,7 @@ export function GitLabProjectDialog({
                 </div>
               ) : (
                 <div className="divide-y divide-border/30">
-                  {filteredGitlabProjects.map((project) => (
+                  {filteredGitlabRepositories.map((project) => (
                     <button
                       key={project.id}
                       type="button"
