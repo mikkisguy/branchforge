@@ -3,5 +3,6 @@ export { StoryPanel } from "./StoryPanel";
 export { ThemeSwitcher } from "./ThemeSwitcher";
 export { TopRightPanel } from "./TopRightPanel";
 export { GitLabSettingsContent } from "./GitLabSettingsContent";
-export { GitLabProjectDialog } from "./GitLabProjectDialog";
+export { GitLabRepositoryLinkingDialog } from "./GitLabRepositoryLinkingDialog";
 export type { ThemePaletteOption } from "./ThemeSwitcher";
+

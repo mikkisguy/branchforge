@@ -13,8 +13,8 @@ import { Label } from "@/components/ui/label";
 import { InlineMessage } from "@/components/ui/inline-error";
 import { useGitLab } from "@/hooks/useGitLab";
 import { useToast } from "@/contexts/ToastContext";
-import { GitLabProjectDialog } from "@/components/ide-shared/GitLabProjectDialog";
 import { gitlabApi } from "@/lib/api/gitlab";
+import { GitLabRepositoryLinkingDialog } from "./GitLabRepositoryLinkingDialog";
 
 // ============================================================================
 // Types
@@ -386,8 +386,10 @@ export function GitLabSettingsContent() {
             </InlineMessage>
           )}
 
-          {hasIntegration && integrationError && (
-            <InlineMessage variant="error">{integrationError.message || String(integrationError)}</InlineMessage>
+          {integrationError && (
+            <InlineMessage variant="error">
+              {integrationError.message || String(integrationError)}
+            </InlineMessage>
           )}
 
           <div className="flex gap-2">
@@ -422,7 +424,7 @@ export function GitLabSettingsContent() {
       )}
 
       {/* Link Project Dialog */}
-      <GitLabProjectDialog
+      <GitLabRepositoryLinkingDialog
         open={showLinkDialog}
         onOpenChange={setShowLinkDialog}
         onLinkSuccess={loadLinkedProjects}

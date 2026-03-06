@@ -14,8 +14,8 @@
 import crypto from 'node:crypto';
 import ipaddr from 'ipaddr.js';
 
-// GitLab PAT format: glpat- followed by alphanumeric characters and hyphens
-const GITLAB_PAT_REGEX = /^glpat-[a-zA-Z0-9-]+$/;
+// GitLab PAT format: glpat- followed by alphanumeric characters, hyphens, underscores, and dots
+const GITLAB_PAT_REGEX = /^glpat-[a-zA-Z0-9_.-]+$/;
 
 // Default GitLab URL
 const DEFAULT_GITLAB_URL = 'https://gitlab.com';

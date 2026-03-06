@@ -22,7 +22,7 @@ export interface ValidateTokenResponse {
   username?: string;
 }
 
-export interface GitLabProject {
+export interface GitLabRepository {
   id: number;
   name: string;
   path_with_namespace: string;
@@ -269,10 +269,10 @@ export const gitlabApi = {
   },
 
   /**
-   * List user's GitLab projects
+   * List GitLab repositories available to link
    */
-  async getProjects(): Promise<GitLabProject[]> {
-    return request<GitLabProject[]>("/gitlab/projects", {
+  async getRepositories(): Promise<GitLabRepository[]> {
+    return request<GitLabRepository[]>("/gitlab/repositories", {
       method: "GET",
     });
   },
@@ -310,7 +310,7 @@ export const gitlabApi = {
    * Get all linked repositories for the authenticated user
    */
   async getLinkedRepositories(): Promise<LinkedRepository[]> {
-    return request<LinkedRepository[]>("/gitlab/repositories", {
+    return request<LinkedRepository[]>("/gitlab/linked-repositories", {
       method: "GET",
     });
   },

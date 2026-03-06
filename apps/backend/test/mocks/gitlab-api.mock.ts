@@ -68,29 +68,29 @@ export function mockProjectsList(
 export function mockPaginatedProjectsList(
   token: string = testFixtures.gitlab.validToken,
   page1Projects: any[] = [],
-  page2Projects: any[] = []
+  page2Projects: any[] = [],
 ) {
   const scope1 = nock(GITLAB_API_BASE)
-    .get('/projects')
-    .matchHeader('private-token', token)
-    .query({ membership: 'true', page: '1', per_page: '20' })
+    .get("/projects")
+    .matchHeader("private-token", token)
+    .query({ membership: "true", page: "1", per_page: "20" })
     .reply(200, page1Projects, {
-      'X-Total': '2',
-      'X-Total-Pages': '2',
-      'X-Per-Page': '20',
-      'X-Page': '1',
-      'X-Next-Page': '2',
+      "X-Total": "2",
+      "X-Total-Pages": "2",
+      "X-Per-Page": "20",
+      "X-Page": "1",
+      "X-Next-Page": "2",
     });
 
   const scope2 = nock(GITLAB_API_BASE)
-    .get('/projects')
-    .matchHeader('private-token', token)
-    .query({ membership: 'true', page: '2', per_page: '20' })
+    .get("/projects")
+    .matchHeader("private-token", token)
+    .query({ membership: "true", page: "2", per_page: "20" })
     .reply(200, page2Projects, {
-      'X-Total': '2',
-      'X-Total-Pages': '2',
-      'X-Per-Page': '20',
-      'X-Page': '2',
+      "X-Total": "2",
+      "X-Total-Pages": "2",
+      "X-Per-Page": "20",
+      "X-Page": "2",
     });
 
   return { scope1, scope2 };

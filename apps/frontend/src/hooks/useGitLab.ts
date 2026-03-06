@@ -5,10 +5,10 @@
  * Replaces the GitLabContext with a more efficient query-based approach.
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo } from 'react';
-import { gitlabApi, type GitLabProject } from '@/lib/api/gitlab';
-import { gitlabKeys } from '@/lib/query-keys';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
+import { gitlabApi, type GitLabRepository } from "@/lib/api/gitlab";
+import { gitlabKeys } from "@/lib/query-keys";
 
 // ============================================================================
 // Types
@@ -50,7 +50,7 @@ export interface UseGitLabReturn {
     token: string,
     gitlabUrl?: string,
   ) => Promise<{ valid: boolean; username?: string }>;
-  listProjects: () => Promise<GitLabProject[]>;
+  listRepositories: () => Promise<GitLabRepository[]>;
   isProjectLinked: (projectId: string) => boolean;
   getLinkedRepository: (projectId: string) => LinkedRepository | undefined;
 }
@@ -79,22 +79,27 @@ export function useGitLab(): UseGitLabReturn {
   });
 
   // Conditional query for linked repositories (only when integration exists)
-  const {
-    data: linkedRepositories = [],
-    isLoading: isLoadingRepos,
-  } = useQuery({
-    queryKey: gitlabKeys.repositories(),
-    queryFn: async () => {
-      return gitlabApi.getLinkedRepositories();
+  const { data: linkedRepositories = [], isLoading: isLoadingRepos } = useQuery(
+    {
+      queryKey: gitlabKeys.repositories(),
+      queryFn: async () => {
+        return gitlabApi.getLinkedRepositories();
+      },
+      enabled: !!integration, // Only fetch when integration exists
+      retry: false,
+      staleTime: 2 * 60 * 1000, // 2 minutes
     },
-    enabled: !!integration, // Only fetch when integration exists
-    retry: false,
-    staleTime: 2 * 60 * 1000, // 2 minutes
-  });
+  );
 
   // Store token mutation
   const storeTokenMutation = useMutation({
-    mutationFn: async ({ token, gitlabUrl }: { token: string; gitlabUrl?: string }) => {
+    mutationFn: async ({
+      token,
+      gitlabUrl,
+    }: {
+      token: string;
+      gitlabUrl?: string;
+    }) => {
       await gitlabApi.storeIntegration(token, gitlabUrl);
     },
     onSuccess: () => {
@@ -130,9 +135,9 @@ export function useGitLab(): UseGitLabReturn {
     return gitlabApi.validateToken(token, gitlabUrl);
   };
 
-  // Helper: List projects (no mutation, direct API call)
-  const listProjects = async (): Promise<GitLabProject[]> => {
-    return gitlabApi.getProjects();
+  // Helper: List repositories (no mutation, direct API call)
+  const listRepositories = async (): Promise<GitLabRepository[]> => {
+    return gitlabApi.getRepositories();
   };
 
   // Helper: Check if project is linked
@@ -141,7 +146,9 @@ export function useGitLab(): UseGitLabReturn {
   };
 
   // Helper: Get linked repository for a project
-  const getLinkedRepository = (projectId: string): LinkedRepository | undefined => {
+  const getLinkedRepository = (
+    projectId: string,
+  ): LinkedRepository | undefined => {
     return linkedReposMap.get(projectId);
   };
 
@@ -170,8 +177,9 @@ export function useGitLab(): UseGitLabReturn {
     storeToken,
     removeIntegration,
     validateToken,
-    listProjects,
+    listRepositories,
     isProjectLinked,
     getLinkedRepository,
   };
 }
+
