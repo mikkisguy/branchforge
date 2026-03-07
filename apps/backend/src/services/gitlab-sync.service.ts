@@ -8,11 +8,12 @@
 import { getDb } from "../db/index.js";
 import {
   gitlabSyncOperations,
+  gitlabFiles,
   scenes,
   sceneLines,
   characters,
 } from "../db/schema/index.js";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, asc } from "drizzle-orm";
 import {
   listRpyFiles,
   getFileContent,
@@ -20,10 +21,39 @@ import {
 } from "./gitlab.service.js";
 import {
   generateRpyFile,
-  parseRPYFile,
-  convertToBranchForgeFormat,
+  parseRPYFileWithLabels,
+  convertToBranchForgeFormatFromLabels,
+  reconstructRPYFile,
   type BranchForgeScene,
+  type ParsedRPYFileWithLabels,
+  type ReconstructedFileOptions,
 } from "./rpy-parser.service.js";
+
+/**
+ * Simple concurrency limiter for parallel async operations
+ * Limits the number of concurrent promises to avoid overwhelming external APIs
+ */
+class ConcurrencyLimiter {
+  private running = 0;
+  private queue: Array<() => void> = [];
+
+  constructor(private concurrency: number) {}
+
+  async run<T>(fn: () => Promise<T>): Promise<T> {
+    while (this.running >= this.concurrency) {
+      await new Promise<void>((resolve) => this.queue.push(resolve));
+    }
+
+    this.running++;
+    try {
+      return await fn();
+    } finally {
+      this.running--;
+      const next = this.queue.shift();
+      if (next) next();
+    }
+  }
+}
 
 // Type definitions
 export type ConflictResolution =
@@ -150,7 +180,8 @@ async function updateSyncOperation(
 
 /**
  * Export scenes from BranchForge to GitLab
- * Creates RPY files from scene data and pushes them to the repository
+ * Uses stored full content from gitlabFiles table for Script Mode
+ * Each file's stored content is pushed directly to GitLab
  */
 export async function exportToGitlab(
   projectId: string,
@@ -170,57 +201,24 @@ export async function exportToGitlab(
   );
 
   try {
-    // Fetch all scenes for the project
-    const projectScenes = await db
+    // Get all gitlab_files for this project
+    const projectFiles = await db
       .select()
-      .from(scenes)
-      .where(eq(scenes.projectId, projectId));
+      .from(gitlabFiles)
+      .where(eq(gitlabFiles.projectId, projectId));
 
-    // Fetch all scene lines in a single query using IN clause
-    const sceneIds = projectScenes.map((s) => s.id);
-    const allSceneLines = await db
-      .select()
-      .from(sceneLines)
-      .where(inArray(sceneLines.sceneId, sceneIds));
-
-    // Group lines by sceneId for efficient lookup
-    const linesBySceneId = new Map<string, typeof allSceneLines>();
-    for (const line of allSceneLines) {
-      const existing = linesBySceneId.get(line.sceneId);
-      if (existing) {
-        existing.push(line);
-      } else {
-        linesBySceneId.set(line.sceneId, [line]);
+    // Export each file - Script Mode uses stored content directly
+    for (const file of projectFiles) {
+      if (file.content) {
+        // Use stored full content for Script Mode files
+        await createOrUpdateFile(
+          projectId,
+          targetBranch,
+          file.filePath,
+          file.content,
+          message,
+        );
       }
-    }
-
-    // For each scene, generate RPY content and upload to GitLab
-    for (const scene of projectScenes) {
-      // Get lines from the pre-fetched map
-      const lines = linesBySceneId.get(scene.id) || [];
-
-      // Convert to BranchForge scene format
-      const branchForgeScene: BranchForgeScene = {
-        name: scene.title,
-        entries: lines.map((line) => ({
-          type: line.contentType as "DIALOGUE" | "NARRATION" | "FLAG" | "JUMP",
-          speaker: line.speakerId || undefined,
-          text: line.content || undefined,
-        })),
-      };
-
-      // Generate RPY content
-      const rpyContent = generateRpyFile(branchForgeScene);
-
-      // Upload to GitLab
-      const filePath = `game/${scene.title}.rpy`;
-      await createOrUpdateFile(
-        projectId,
-        targetBranch,
-        filePath,
-        rpyContent,
-        message,
-      );
     }
 
     // Mark operation as completed
@@ -254,6 +252,7 @@ export async function exportToGitlab(
 /**
  * Import RPY files from GitLab to BranchForge
  * Fetches RPY files from the repository and imports them as scenes
+ * Uses file-based architecture - stores full content for Script Mode
  */
 export async function importFromGitlab(
   projectId: string,
@@ -283,105 +282,141 @@ export async function importFromGitlab(
       };
     }
 
-    // Fetch all existing scenes once to avoid N+1 query problem
-    const allExistingScenes = await db
-      .select()
-      .from(scenes)
-      .where(eq(scenes.projectId, projectId));
-
-    // Create a Map for O(1) lookup by title
-    const existingScenesByTitle = new Map<
-      string,
-      (typeof allExistingScenes)[number]
-    >();
-    for (const scene of allExistingScenes) {
-      existingScenesByTitle.set(scene.title, scene);
-    }
-
     let conflictCount = 0;
 
-    // For each RPY file, parse and import to BranchForge
-    for (const file of rpyFiles) {
-      // Get file content from GitLab
-      const content = await getFileContent(projectId, file.path, branch);
+    // Fetch file contents in parallel with concurrency limit
+    const limiter = new ConcurrencyLimiter(5); // Limit to 5 concurrent requests
+    const fileFetchResults = await Promise.allSettled(
+      rpyFiles.map((file) =>
+        limiter.run(async () => {
+          const content = await getFileContent(projectId, file.path, branch);
+          return { file, content };
+        })
+      )
+    );
 
-      if (!content) {
-        continue; // Skip files that can't be fetched
+    // Process fetched results, handling errors per-file
+    for (const result of fileFetchResults) {
+      if (result.status === "rejected" || !result.value.content) {
+        // Skip files that failed to fetch or have no content
+        continue;
       }
 
-      // Parse RPY content
-      const parsed = parseRPYFile(content);
+      const { file, content } = result.value;
 
-      // Import each label as a scene
-      for (const label of parsed.labels) {
-        // Check if scene already exists using cached Map
-        const existingScene = existingScenesByTitle.get(label);
+      // Parse with new label-aware parser
+      const parsed = parseRPYFileWithLabels(content);
 
-        // Convert to BranchForge format
-        const sceneData = convertToBranchForgeFormat(parsed, label);
+      // Create or update gitlab_files record with full content for Script Mode
+      const [gitlabFile] = await db
+        .insert(gitlabFiles)
+        .values({
+          projectId,
+          filePath: file.path,
+          fileType: parsed.fileType,
+          content: content, // Store full RPY content for Script Mode
+          lastSyncedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: [gitlabFiles.projectId, gitlabFiles.filePath],
+          set: {
+            content: content, // Update full content on sync
+            lastSyncedAt: new Date(),
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
 
-        if (existingScene && conflictResolution === "manual_review") {
-          // Count as conflict for manual review
-          conflictCount++;
-        } else if (existingScene && conflictResolution === "gitlab_wins") {
-          // Update existing scene within a transaction
-          await db.transaction(async (tx) => {
-            // Delete existing scene lines
-            await tx
-              .delete(sceneLines)
-              .where(eq(sceneLines.sceneId, existingScene.id));
+      // For STORY files, import labels as scenes
+      if (parsed.fileType === "STORY") {
+        for (let i = 0; i < parsed.labels.length; i++) {
+          const label = parsed.labels[i];
 
-            // Batch insert all new scene lines at once
-            const allValues: SceneLineInsertValues[] = sceneData.entries.map(
-              (entry, index) => {
-                const mapped = mapEntryToDbContentType(entry);
-                return {
-                  sceneId: existingScene.id,
-                  sequence: index + 1, // 1-based sequence
-                  contentType: mapped.contentType,
-                  content: mapped.content,
-                };
-              },
-            );
+          // Check if scene already exists for this file+label
+          const [existingScene] = await db
+            .select()
+            .from(scenes)
+            .where(
+              and(
+                eq(scenes.gitlabFileId, gitlabFile.id),
+                eq(scenes.labelName, label.label),
+              ),
+            )
+            .limit(1);
 
-            if (allValues.length > 0) {
-              await tx.insert(sceneLines).values(allValues);
-            }
-          });
-        } else if (!existingScene) {
-          // Create new scene within a transaction
-          await db.transaction(async (tx) => {
-            const [newScene] = await tx
-              .insert(scenes)
-              .values({
-                projectId,
-                title: label,
-                route: "COMMON",
-                sceneNumber: parsed.labels.indexOf(label) + 1,
-                prerequisites: {},
-                effects: {},
-              })
-              .returning();
+          const labelData = convertToBranchForgeFormatFromLabels(
+            parsed,
+            label.label,
+          );
 
-            // Batch insert all scene lines at once
-            const allValues: SceneLineInsertValues[] = sceneData.entries.map(
-              (entry, index) => {
-                const mapped = mapEntryToDbContentType(entry);
-                return {
-                  sceneId: newScene.id,
-                  sequence: index + 1, // 1-based sequence
-                  contentType: mapped.contentType,
-                  content: mapped.content,
-                };
-              },
-            );
+          if (existingScene && conflictResolution === "manual_review") {
+            // Count as conflict for manual review
+            conflictCount++;
+          } else if (
+            existingScene &&
+            conflictResolution === "gitlab_wins"
+          ) {
+            // Update existing scene
+            await db.transaction(async (tx) => {
+              await tx
+                .delete(sceneLines)
+                .where(eq(sceneLines.sceneId, existingScene.id));
 
-            if (allValues.length > 0) {
-              await tx.insert(sceneLines).values(allValues);
-            }
-          });
+              const allValues: SceneLineInsertValues[] = labelData.entries.map(
+                (entry, index) => {
+                  const mapped = mapEntryToDbContentType(entry);
+                  return {
+                    sceneId: existingScene.id,
+                    sequence: index + 1,
+                    contentType: mapped.contentType,
+                    content: mapped.content,
+                  };
+                },
+              );
+
+              if (allValues.length > 0) {
+                await tx.insert(sceneLines).values(allValues);
+              }
+            });
+          } else if (!existingScene) {
+            // Create new scene with proper file linkage
+            await db.transaction(async (tx) => {
+              const [newScene] = await tx
+                .insert(scenes)
+                .values({
+                  projectId,
+                  title: label.label,
+                  gitlabFileId: gitlabFile.id,
+                  labelName: label.label,
+                  labelPosition: i,
+                  sequenceOrder: i,
+                  route: "COMMON",
+                  sceneNumber: i + 1,
+                  status: "DRAFT",
+                  prerequisites: {},
+                  effects: {},
+                })
+                .returning();
+
+              const allValues: SceneLineInsertValues[] = labelData.entries.map(
+                (entry, index) => {
+                  const mapped = mapEntryToDbContentType(entry);
+                  return {
+                    sceneId: newScene.id,
+                    sequence: index + 1,
+                    contentType: mapped.contentType,
+                    content: mapped.content,
+                  };
+                },
+              );
+
+              if (allValues.length > 0) {
+                await tx.insert(sceneLines).values(allValues);
+              }
+            });
+          }
+          // If branchforge_wins, do nothing (keep local data)
         }
-        // If branchforge_wins, do nothing (keep local data)
       }
     }
 
@@ -398,7 +433,6 @@ export async function importFromGitlab(
     };
   } catch (error) {
     // Mark operation as failed
-    console.error("DEBUG Import failed:", error);
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
     await updateSyncOperation(operation.id, {
@@ -463,53 +497,102 @@ export async function detectConflicts(
   try {
     const db = getDb();
 
-    // Get all local scenes
+    // Get all local scenes that are linked to GitLab files
     const localScenes = await db
       .select()
       .from(scenes)
       .where(eq(scenes.projectId, projectId));
 
-    const localLabels = new Set(localScenes.map((s) => s.title));
+    // Filter to only scenes with gitlabFileId (imported from GitLab)
+    const gitlabScenes = localScenes.filter((s) => s.gitlabFileId);
+    const localLabelsByFile = new Map<string, Set<string>>();
+    const gitlabSceneIds = new Set<string>();
+    for (const scene of gitlabScenes) {
+      if (scene.gitlabFileId && scene.labelName) {
+        const existing = localLabelsByFile.get(scene.gitlabFileId);
+        if (existing) {
+          existing.add(scene.labelName);
+        } else {
+          localLabelsByFile.set(scene.gitlabFileId, new Set([scene.labelName]));
+        }
+        gitlabSceneIds.add(scene.id);
+      }
+    }
 
-    // List RPY files in GitLab
-    const rpyFiles = await listRpyFiles(projectId, branch);
+    // Fetch all scene lines for gitlab-linked scenes in a single query (avoid N+1)
+    const allLocalLinesWithSpeakers = await db
+      .select({
+        sceneId: sceneLines.sceneId,
+        contentType: sceneLines.contentType,
+        speakerTag: characters.renpyTag,
+        content: sceneLines.content,
+      })
+      .from(sceneLines)
+      .leftJoin(characters, eq(sceneLines.speakerId, characters.id))
+      .where(inArray(sceneLines.sceneId, Array.from(gitlabSceneIds)));
 
-    const remoteLabels = new Set<string>();
+    // Build a map of sceneId -> lines for efficient lookup
+    const localLinesBySceneId = new Map<string, Array<typeof allLocalLinesWithSpeakers[0]>>();
+    for (const line of allLocalLinesWithSpeakers) {
+      const existing = localLinesBySceneId.get(line.sceneId);
+      if (existing) {
+        existing.push(line);
+      } else {
+        localLinesBySceneId.set(line.sceneId, [line]);
+      }
+    }
 
-    // Process each remote file
-    for (const file of rpyFiles) {
-      const content = await getFileContent(projectId, file.path, branch);
+    // Get all gitlab_files for this project
+    const projectFiles = await db
+      .select()
+      .from(gitlabFiles)
+      .where(eq(gitlabFiles.projectId, projectId));
 
-      if (!content) {
+    // Fetch file contents in parallel with concurrency limit
+    const limiter = new ConcurrencyLimiter(5); // Limit to 5 concurrent requests
+    const fileFetchResults = await Promise.allSettled(
+      projectFiles.map((gitlabFile) =>
+        limiter.run(async () => {
+          const content = await getFileContent(
+            projectId,
+            gitlabFile.filePath,
+            branch,
+          );
+          return { gitlabFile, content };
+        })
+      )
+    );
+
+    // Process fetched results, handling errors per-file
+    for (const result of fileFetchResults) {
+      if (result.status === "rejected" || !result.value.content) {
+        // Skip files that failed to fetch or have no content
         continue;
       }
 
-      const parsed = parseRPYFile(content);
+      const { gitlabFile, content } = result.value;
 
+      // Parse with new label-aware parser
+      const parsed = parseRPYFileWithLabels(content);
+      const remoteLabels = new Set(parsed.labels.map((l) => l.label));
+      const localLabels = localLabelsByFile.get(gitlabFile.id) || new Set();
+
+      // Check for new remote labels
       for (const label of parsed.labels) {
-        remoteLabels.add(label);
-
-        if (!localLabels.has(label)) {
-          // New remote label
+        if (!localLabels.has(label.label)) {
           conflicts.push({
-            label,
+            label: label.label,
             type: "new_remote_label",
             remoteContent: parsed,
           });
         } else {
           // Compare local and remote content
-          const localScene = localScenes.find((s) => s.title === label);
+          const localScene = localScenes.find(
+            (s) => s.gitlabFileId === gitlabFile.id && s.labelName === label.label,
+          );
           if (localScene) {
-            // Fetch local scene lines with character tags for proper comparison
-            const localLinesWithSpeakers = await db
-              .select({
-                contentType: sceneLines.contentType,
-                speakerTag: characters.renpyTag,
-                content: sceneLines.content,
-              })
-              .from(sceneLines)
-              .leftJoin(characters, eq(sceneLines.speakerId, characters.id))
-              .where(eq(sceneLines.sceneId, localScene.id));
+            // Use pre-fetched scene lines from map to avoid N+1 queries
+            const localLinesWithSpeakers = localLinesBySceneId.get(localScene.id) || [];
 
             // Normalize local dialogue to use character tags (matching RPY format)
             const normalizedLocalDialogue = localLinesWithSpeakers
@@ -522,8 +605,8 @@ export async function detectConflicts(
                 text: l.content,
               }));
 
-            // Remote dialogue already uses character tags from RPY parser
-            const normalizedRemoteDialogue = parsed.dialogue.map((d) => ({
+            // Remote dialogue from label-aware parser (only this label's dialogue)
+            const normalizedRemoteDialogue = label.dialogue.map((d) => ({
               speaker: d.speaker,
               text: d.text,
             }));
@@ -534,7 +617,7 @@ export async function detectConflicts(
 
             if (localDialogueStr !== remoteDialogueStr) {
               conflicts.push({
-                label,
+                label: label.label,
                 type: "dialogue_mismatch",
                 localContent: normalizedLocalDialogue,
                 remoteContent: normalizedRemoteDialogue,
@@ -543,15 +626,15 @@ export async function detectConflicts(
           }
         }
       }
-    }
 
-    // Check for deleted remote labels
-    for (const localLabel of localLabels) {
-      if (!remoteLabels.has(localLabel)) {
-        conflicts.push({
-          label: localLabel,
-          type: "deleted_remote_label",
-        });
+      // Check for deleted remote labels
+      for (const localLabel of localLabels) {
+        if (!remoteLabels.has(localLabel)) {
+          conflicts.push({
+            label: localLabel,
+            type: "deleted_remote_label",
+          });
+        }
       }
     }
 

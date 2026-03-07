@@ -14,7 +14,7 @@ import {
   index,
   unique,
 } from "drizzle-orm/pg-core";
-import { syncOperationEnum, syncStatusEnum } from "../enums.js";
+import { syncOperationEnum, syncStatusEnum, gitlabFileTypeEnum, syncStateEnum } from "../enums.js";
 import { users } from "./users.js";
 import { projects } from "./projects.js";
 
@@ -35,6 +35,60 @@ export const gitlabIntegrations = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [unique("gitlab_integrations_user_id_unique").on(table.userId)],
+);
+
+/**
+ * GitLab Files - File tracking for GitLab integration
+ *
+ * Stores full RPY file content for Script Mode editing and links to scenes.
+ * Files can be STORY (labels/*.rpy with dialogue) or SETTINGS (gui/*.rpy, etc.).
+ */
+export const gitlabFiles = pgTable(
+  "gitlab_files",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    filePath: text("file_path").notNull(), // e.g., "labels/act_i.rpy" or "gui/screens.rpy"
+    fileType: gitlabFileTypeEnum("file_type").notNull(),
+    content: text("content").notNull(), // Full RPY file content for Script Mode
+    lastSyncedAt: timestamp("last_synced_at"),
+    lastCommitSha: text("last_commit_sha"),
+    contentHash: text("content_hash"), // SHA-256 hash for idempotency
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("gitlab_files_project_id_idx").on(table.projectId),
+    unique("gitlab_files_project_file_uidx").on(table.projectId, table.filePath),
+  ],
+);
+
+/**
+ * GitLab File Sync State - Track sync operations for individual files
+ *
+ * Prevents concurrent syncs, enables idempotent retry, provides audit trail.
+ */
+export const gitlabFileSyncState = pgTable(
+  "gitlab_file_sync_state",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    gitlabFileId: uuid("gitlab_file_id")
+      .notNull()
+      .references(() => gitlabFiles.id, { onDelete: "cascade" }),
+    contentHash: text("content_hash").notNull(), // SHA-256 for idempotency
+    status: syncStateEnum("status").notNull(), // 'pending', 'in_progress', 'completed', 'failed'
+    startedAt: timestamp("started_at").defaultNow().notNull(),
+    completedAt: timestamp("completed_at"),
+    errorMessage: text("error_message"),
+    labelCount: integer("label_count"),
+    sceneCount: integer("scene_count"),
+  },
+  (table) => [
+    index("gitlab_file_sync_state_gitlab_file_id_idx").on(table.gitlabFileId),
+    index("gitlab_file_sync_state_status_idx").on(table.status),
+  ],
 );
 
 /**
@@ -99,4 +153,10 @@ export type NewGitlabRepository = typeof gitlabRepositories.$inferInsert;
 
 export type GitlabSyncOperation = typeof gitlabSyncOperations.$inferSelect;
 export type NewGitlabSyncOperation = typeof gitlabSyncOperations.$inferInsert;
+
+export type GitlabFile = typeof gitlabFiles.$inferSelect;
+export type NewGitlabFile = typeof gitlabFiles.$inferInsert;
+
+export type GitlabFileSyncState = typeof gitlabFileSyncState.$inferSelect;
+export type NewGitlabFileSyncState = typeof gitlabFileSyncState.$inferInsert;
 

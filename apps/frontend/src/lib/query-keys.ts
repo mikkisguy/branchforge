@@ -37,6 +37,8 @@ export const gitlabKeys = {
   projects: () => ['gitlab', 'projects'] as const,
   branches: (projectId: string) => ['gitlab', 'branches', projectId] as const,
   files: (projectId: string, branch: string) => ['gitlab', 'files', projectId, branch] as const,
+  importedFiles: (projectId: string) => ['gitlab', 'imported-files', projectId] as const,
+  file: (fileId: string) => ['gitlab', 'file', fileId] as const,
   operations: (projectId: string) => ['gitlab', 'operations', projectId] as const,
   operation: (operationId: string) => ['gitlab', 'operations', operationId] as const,
 } as const;

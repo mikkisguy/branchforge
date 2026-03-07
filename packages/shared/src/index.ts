@@ -271,6 +271,31 @@ export interface SceneLine {
 export type SceneCharacterRole = "PRIMARY" | "SECONDARY" | "BACKGROUND" | "MENTIONED";
 
 /**
+ * GitLab file type enumeration
+ */
+export type GitLabFileType = "STORY" | "SETTINGS";
+export const GitLabFileType = {
+  STORY: "STORY",
+  SETTINGS: "SETTINGS",
+} as const;
+
+/**
+ * GitLab file information
+ * Represents a GitLab file tracked in the system
+ */
+export interface GitLabFile {
+  id: string;
+  projectId: string;
+  filePath: string; // e.g., "labels/act_i.rpy" or "gui/screens.rpy"
+  fileType: GitLabFileType;
+  content: string; // Full RPY content for Script Mode
+  lastSyncedAt: string | null;
+  lastCommitSha: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
  * Character in a scene with role information
  */
 export interface SceneCharacter {

@@ -47,3 +47,9 @@ export const syncOperationEnum = pgEnum('sync_operation', ['export', 'import']);
 
 // GitLab sync status types
 export const syncStatusEnum = pgEnum('sync_status', ['pending', 'in_progress', 'completed', 'failed']);
+
+// GitLab file types
+export const gitlabFileTypeEnum = pgEnum('gitlab_file_type', ['STORY', 'SETTINGS']);
+
+// GitLab file sync state types
+export const syncStateEnum = pgEnum('sync_state', ['pending', 'in_progress', 'completed', 'failed']);

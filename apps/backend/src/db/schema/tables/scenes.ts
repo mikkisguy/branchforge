@@ -8,6 +8,7 @@ import { pgTable, uuid, text, timestamp, integer, jsonb, index } from 'drizzle-o
 import { sceneStatusEnum, routeTypeEnum, sceneVisibilityEnum } from '../enums.js';
 import { projects } from './projects.js';
 import { pairGroups } from './pair-groups.js';
+import { gitlabFiles } from './gitlab-integrations.js';
 
 export const scenes = pgTable('scenes', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -25,10 +26,15 @@ export const scenes = pgTable('scenes', {
   effects: jsonb('effects').notNull().$type<{ flagsSet?: string[]; flagsUnset?: string[]; meters?: Record<string, number> }>(), // {flagsSet: [], flagsUnset: [], meters: {}}
   crossRouteContext: text('cross_route_context'), // Prequel: "Lucas_Friend_Mode"
   readerNotes: text('reader_notes'), // Beta feedback
+  // GitLab integration fields
+  gitlabFileId: uuid('gitlab_file_id').references(() => gitlabFiles.id, { onDelete: 'set null' }),
+  labelName: text('label_name'), // The actual label name in the RPY file
+  labelPosition: integer('label_position'), // Position of this label within the file
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => [
   index('scenes_duo_pair_id_idx').on(table.duoPairId),
+  index('scenes_gitlab_file_id_idx').on(table.gitlabFileId),
   // Composite indexes for common query patterns
   // Used by listScenes when filtering by route
   index('scenes_project_route_idx').on(table.projectId, table.route),
