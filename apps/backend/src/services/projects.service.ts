@@ -15,7 +15,7 @@ import type { Project, NewProject } from "../db/schema/tables/projects.js";
 export interface PublicProject {
   id: string;
   name: string;
-  type: "PREQUEL" | "SEQUEL";
+  type: "ACT_BASED" | "CHAPTER_BASED";
   description?: string;
   routeLockChapter?: number;
   maxMeterDelta?: number;
@@ -46,7 +46,7 @@ type ProjectForPublic = Pick<
  */
 export interface CreateProjectBody {
   name: string;
-  type: "PREQUEL" | "SEQUEL";
+  type: "ACT_BASED" | "CHAPTER_BASED";
   description?: string;
   routeLockChapter?: number;
   maxMeterDelta?: number;

@@ -18,7 +18,7 @@ import { sceneCharacters as sceneCharactersTable } from "../db/schema/tables/sce
 import { eq, and, asc, or } from "drizzle-orm";
 import type { Scene, SceneLine } from "../db/schema/index.js";
 import type { PublicScene } from "@branchforge/shared";
-import { RouteType, SceneStatus } from "@branchforge/shared";
+import { SceneStatus } from "@branchforge/shared";
 
 // Re-export PublicScene from shared for route handlers
 export type { PublicScene };
@@ -26,28 +26,6 @@ export type { PublicScene };
 // ============================================================================
 // Type Guards for Enum Values
 // ============================================================================
-
-/**
- * Type guard to check if a value is a valid route type
- */
-export function isValidRoute(
-  value: string | null | undefined,
-): value is RouteType {
-  const validRoutes: RouteType[] = [
-    RouteType.EILEEN,
-    RouteType.LUCAS,
-    RouteType.SHARED,
-    RouteType.FEMALE,
-    RouteType.MALE,
-    RouteType.COMBINED,
-    RouteType.COMMON,
-  ];
-  return (
-    value !== null &&
-    value !== undefined &&
-    validRoutes.includes(value as RouteType)
-  );
-}
 
 /**
  * Type guard to check if a value is a valid scene status
@@ -133,7 +111,7 @@ type SceneForPublic = Pick<
  * List scenes request filters
  */
 export interface ListScenesFilters {
-  route?: RouteType;
+  routeKey?: string;
   status?: SceneStatus;
 }
 
@@ -177,11 +155,8 @@ export async function listScenes(
   // Build where conditions for filters
   const whereConditions = [eq(scenes.projectId, projectId)];
 
-  if (filters?.route) {
-    // Use type guard to ensure type safety
-    if (isValidRoute(filters.route)) {
-      whereConditions.push(eq(scenes.route, filters.route));
-    }
+  if (filters?.routeKey) {
+    whereConditions.push(eq(scenes.route, filters.routeKey));
   }
 
   if (filters?.status) {
@@ -355,7 +330,7 @@ function mapToPublicScene(scene: SceneForPublic): PublicScene {
     chapter: scene.chapter ?? null,
     sceneNumber: scene.sceneNumber,
     sequenceOrder: scene.sequenceOrder,
-    route: isValidRoute(scene.route) ? scene.route : null,
+    routeKey: scene.route ?? null,
     status: isValidSceneStatus(scene.status) ? scene.status : null,
     visibility: scene.visibility,
     createdAt: scene.createdAt.toISOString(),

@@ -104,12 +104,12 @@ async function listScenesHandler(
   reply: FastifyReply,
 ): Promise<void> {
   const user = request.user!;
-  const { projectId, route, status } = request.query;
+  const { projectId, routeKey, status } = request.query;
 
   // Build filters
   const filters: ListScenesFilters = {};
-  if (route) {
-    filters.route = route;
+  if (routeKey) {
+    filters.routeKey = routeKey;
   }
   if (status) {
     filters.status = status;

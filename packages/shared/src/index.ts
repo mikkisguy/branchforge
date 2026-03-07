@@ -24,10 +24,10 @@ export const UserRole = {
 /**
  * Project type enumeration
  */
-export type ProjectType = 'PREQUEL' | 'SEQUEL';
+export type ProjectType = 'ACT_BASED' | 'CHAPTER_BASED';
 export const ProjectType = {
-  PREQUEL: 'PREQUEL',
-  SEQUEL: 'SEQUEL',
+  ACT_BASED: 'ACT_BASED',
+  CHAPTER_BASED: 'CHAPTER_BASED',
 } as const;
 
 /**
@@ -41,22 +41,6 @@ export const SceneStatus = {
 } as const;
 
 /**
- * Route type enumeration
- * Prequel: EILEEN, LUCAS, SHARED
- * Sequel: FEMALE, MALE, COMBINED, COMMON
- */
-export type RouteType = 'EILEEN' | 'LUCAS' | 'SHARED' | 'FEMALE' | 'MALE' | 'COMBINED' | 'COMMON';
-export const RouteType = {
-  EILEEN: 'EILEEN',
-  LUCAS: 'LUCAS',
-  SHARED: 'SHARED',
-  FEMALE: 'FEMALE',
-  MALE: 'MALE',
-  COMBINED: 'COMBINED',
-  COMMON: 'COMMON',
-} as const;
-
-/**
  * Scene visibility enumeration
  */
 export type SceneVisibility = 'EXCLUSIVE' | 'SHARED' | 'DUO_PAIR';
@@ -65,6 +49,24 @@ export const SceneVisibility = {
   SHARED: 'SHARED',
   DUO_PAIR: 'DUO_PAIR',
 } as const;
+
+// ============================================================================
+// Route Configuration
+// ============================================================================
+
+/**
+ * Route configuration for a project
+ * Routes are user-defined entities that replace hardcoded route enums
+ */
+export interface RouteConfig {
+  id: string;
+  projectId: string;
+  routeKey: string;
+  routeName: string;
+  jumpPrefix: string;
+  sortOrder: number;
+  isShared: boolean;
+}
 
 // ============================================================================
 // Public User Interface
@@ -93,10 +95,6 @@ export interface VisualSystemConfig {
   scenePadding: 1 | 2;
   counterPadding: 1 | 2;
   jumpPrefixShared: string;
-  jumpPrefixRouteA: string;
-  jumpPrefixRouteB: string;
-  routeAName: string;
-  routeBName: string;
   placeholderBaseUrl?: string;
 }
 
@@ -152,34 +150,25 @@ export function generateVisualName(
 }
 
 /**
- * Generates a jump label for Ren'Py based on route and scene info.
+ * Generates a jump label for Ren'Py based on route configuration and scene info.
  *
- * @param config - The visual system configuration
- * @param route - The route type
+ * @param routeConfig - The route configuration (null for shared scenes)
  * @param sceneNumber - The scene number
+ * @param scenePadding - The padding for scene numbers (1 or 2)
  * @returns The generated jump label
  */
 export function generateJumpLabel(
-  config: VisualSystemConfig,
-  route: RouteType | null,
+  routeConfig: RouteConfig | null,
   sceneNumber: number,
+  scenePadding: 1 | 2,
 ): string {
-  const sceneNum = String(sceneNumber).padStart(config.scenePadding, '0');
+  const sceneNum = String(sceneNumber).padStart(scenePadding, '0');
 
-  if (!route || route === RouteType.SHARED || route === RouteType.COMMON) {
-    return `${config.jumpPrefixShared}${sceneNum}`;
+  if (!routeConfig || routeConfig.isShared) {
+    return sceneNum;
   }
 
-  if (route === RouteType.LUCAS || route === RouteType.MALE) {
-    return `${config.jumpPrefixRouteA}${sceneNum}`;
-  }
-
-  if (route === RouteType.EILEEN || route === RouteType.FEMALE) {
-    return `${config.jumpPrefixRouteB}${sceneNum}`;
-  }
-
-  // Fallback for other routes
-  return `${route.toLowerCase()}_${sceneNum}`;
+  return `${routeConfig.jumpPrefix}${sceneNum}`;
 }
 
 // ============================================================================
@@ -209,7 +198,7 @@ export interface Scene {
   act?: string;
   chapter?: number;
   sceneNumber: number;
-  route?: RouteType;
+  routeKey?: string;
   status: SceneStatus;
   createdAt: Date;
 }
@@ -230,7 +219,7 @@ export interface PublicScene {
   chapter: number | null;
   sceneNumber: number;
   sequenceOrder: number;
-  route: RouteType | null;
+  routeKey: string | null;
   status: SceneStatus | null;
   visibility: SceneVisibility | null;
   createdAt: string;

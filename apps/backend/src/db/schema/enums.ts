@@ -7,7 +7,7 @@
 import { pgEnum } from 'drizzle-orm/pg-core';
 
 // Project types
-export const projectTypeEnum = pgEnum('project_type', ['PREQUEL', 'SEQUEL']);
+export const projectTypeEnum = pgEnum('project_type', ['ACT_BASED', 'CHAPTER_BASED']);
 
 // User roles (owner, beta reader, tester)
 export const userRoleEnum = pgEnum('user_role', ['OWNER', 'READER', 'TESTER']);

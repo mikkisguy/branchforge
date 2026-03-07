@@ -5,7 +5,7 @@
  */
 
 import { pgTable, uuid, text, timestamp, integer, jsonb, index } from 'drizzle-orm/pg-core';
-import { sceneStatusEnum, routeTypeEnum, sceneVisibilityEnum } from '../enums.js';
+import { sceneStatusEnum, sceneVisibilityEnum } from '../enums.js';
 import { projects } from './projects.js';
 import { pairGroups } from './pair-groups.js';
 import { gitlabFiles } from './gitlab-integrations.js';
@@ -18,7 +18,7 @@ export const scenes = pgTable('scenes', {
   chapter: integer('chapter'), // 1, 2, 3... or null
   sceneNumber: integer('scene_number').notNull(),
   sequenceOrder: integer('sequence_order').default(0).notNull(),
-  route: routeTypeEnum('route'),
+  route: text('route'), // User-defined route key (references route_configs.route_key)
   visibility: sceneVisibilityEnum('visibility').default('EXCLUSIVE'),
   duoPairId: uuid('duo_pair_id').references(() => pairGroups.id, { onDelete: 'set null' }),
   status: sceneStatusEnum('status').default('DRAFT'),

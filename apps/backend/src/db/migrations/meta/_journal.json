@@ -1,5 +1,27 @@
 {
   "version": "7",
   "dialect": "postgresql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1772908659573,
+      "tag": "0000_silky_lilith",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1772909063826,
+      "tag": "0001_shallow_swarm",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772909810727,
+      "tag": "0002_redundant_skreet",
+      "breakpoints": true
+    }
+  ]
 }
