@@ -2,13 +2,10 @@
  * useScenes Hook
  *
  * Provides scene state and operations using TanStack Query.
- * Follows the established patterns from useProject and useGitLab.
- *
- * Active scene ID is stored separately in the query cache to enable
- * cache-based scene selection while avoiding closure issues.
+ * Simplified with stable query keys and proper refetch behavior.
  */
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { sceneKeys } from "@/lib/query-keys";
 import { scenesApi } from "@/lib/api/scenes";
@@ -46,56 +43,36 @@ export function useScenes(): UseScenesReturn {
   const { currentProject } = useProject();
 
   // Query for all scenes in the current project
-  const {
-    data: scenes = [],
-    isLoading: isLoadingScenes,
-  } = useQuery({
-    queryKey: currentProject ? sceneKeys.lists(currentProject.id) : ["scenes", "none"],
+  // Always runs with the project ID from useProject, refetches on mount
+  const { data: scenes = [], isLoading: isLoadingScenes } = useQuery({
+    queryKey: sceneKeys.lists(currentProject?.id ?? ""),
     queryFn: () => scenesApi.listScenes({ projectId: currentProject!.id }),
-    enabled: !!currentProject,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!currentProject?.id,
+    refetchOnMount: "always",
+    staleTime: 30 * 1000, // 30 seconds (reduced from 5 min for better reload UX)
   });
 
-  // Query for active scene ID from cache (reactive subscription)
-  const {
-    data: activeSceneIdFromCache = null,
-  } = useQuery<string | null>({
-    queryKey: currentProject ? sceneKeys.activeSceneId(currentProject.id) : ['activeSceneId', 'none'],
-    queryFn: () => {
-      // This reads from cache - the actual subscription is maintained by useQuery
+  // Local state for active scene ID
+  // Initialize from query cache on mount to persist across navigation
+  const [localActiveSceneId, setLocalActiveSceneId] = useState<string | null>(
+    () => {
+      if (!currentProject?.id) return null;
       const cached = queryClient.getQueryData<string | null>(
-        sceneKeys.activeSceneId(currentProject!.id),
+        sceneKeys.activeSceneId(currentProject.id),
       );
       return cached ?? null;
     },
-    enabled: !!currentProject,
-    staleTime: Infinity, // This is client-side state, never goes stale
-  });
-
-  // Local state for active scene ID (synced with cache)
-  const [localActiveSceneId, setLocalActiveSceneId] = useState<string | null>(
-    activeSceneIdFromCache ?? null,
   );
 
-  // Sync local state with cache changes
-  useEffect(() => {
-    if (activeSceneIdFromCache !== localActiveSceneId) {
-      setLocalActiveSceneId(activeSceneIdFromCache ?? null);
-    }
-  }, [activeSceneIdFromCache]);
-
   // Query for active scene detail
-  const {
-    data: activeScene,
-    isLoading: isLoadingScene,
-  } = useQuery({
-    queryKey:
-      localActiveSceneId && currentProject
-        ? sceneKeys.detail(currentProject.id, localActiveSceneId)
-        : ["scenes", "detail", "none"],
+  const { data: activeScene, isLoading: isLoadingScene } = useQuery({
+    queryKey: sceneKeys.detail(
+      currentProject?.id ?? "",
+      localActiveSceneId ?? "",
+    ),
     queryFn: () => scenesApi.getScene(localActiveSceneId!),
-    enabled: !!localActiveSceneId && !!currentProject,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!localActiveSceneId && !!currentProject?.id,
+    staleTime: 5 * 60 * 1000,
   });
 
   // Memoized map for efficient lookups (like useProject pattern)
@@ -138,3 +115,4 @@ export function useScenes(): UseScenesReturn {
     invalidateScenes,
   };
 }
+

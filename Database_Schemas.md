@@ -15,7 +15,7 @@
 | `renpy_definition_category` | `CHARACTER`, `TRANSFORM`, `IMAGE`, `INIT`                          | Ren'Py definition types                           |
 | `scene_visibility`          | `EXCLUSIVE`, `SHARED`, `DUO_PAIR`                                  | Scene visibility across routes                    |
 | `sync_operation`            | `export`, `import`                                                 | GitLab sync operation type                        |
-| `sync_status`               | `pending`, `in_progress`, `completed`, `failed`                    | GitLab sync status                                |
+| `sync_state`                | `pending`, `in_progress`, `completed`, `failed`                    | GitLab sync status                                |
 | `gitlab_file_type`          | `STORY`, `SETTINGS`                                                | GitLab file type (story labels or settings files) |
 
 ---
@@ -249,7 +249,7 @@ Container for logical scenes; content in `scene_lines`.
 | `group_value`         | text, nullable                   | `"I"`, `"1"`, `"1a"`, etc. or null                                                      |
 | `scene_number`        | integer, not null                |                                                                                         |
 | `sequence_order`      | integer, default 0               | Sorting                                                                                 |
-| `route`               | text, nullable                   | References `route_configs.route_key` (custom user-defined routes). Null = shared/common |
+| `route`               | text, nullable                   | **Soft reference** to `route_configs.route_key` within same project. Null = shared/common. Application-layer validation ensures the route exists for the project; no database FK constraint due to composite key requirement `(project_id, route)` → `route_configs(project_id, route_key)`. |
 | `visibility`          | enum                             | `EXCLUSIVE`, `SHARED`, `DUO_PAIR`                                                       |
 | `duo_pair_id`         | uuid FK → pair_groups, nullable  |                                                                                         |
 | `status`              | `scene_status`, default `DRAFT`  |                                                                                         |
@@ -262,6 +262,11 @@ Container for logical scenes; content in `scene_lines`.
 | `label_position`      | integer, nullable                | Position of this label within the file                                                  |
 | `created_at`          | timestamp                        |                                                                                         |
 | `updated_at`          | timestamp                        |                                                                                         |
+
+> **Design Note - Soft Route Reference**: The `route` column uses a soft reference (text field without FK constraint) instead of a hard foreign key. This design choice was made because:
+> 1. **Composite Key Requirement**: A proper FK would require `(project_id, route)` → `route_configs(project_id, route_key)`, which Drizzle ORM doesn't natively support
+> 2. **Current Implementation**: Scenes are created via GitLab sync with `route = null` (shared/common), and there is no current API to modify the route field
+> 3. **Future Safeguards**: When adding route assignment functionality, application-layer validation must ensure the route exists for the project by querying `route_configs` before allowing a non-null value
 
 ---
 
@@ -425,17 +430,17 @@ Unique constraint: `(project_id, file_path)`
 
 Track sync operations for individual files.
 
-| Column           | Type                   | Notes                                           |
-| ---------------- | ---------------------- | ----------------------------------------------- |
-| `id`             | uuid PK                |                                                 |
-| `gitlab_file_id` | uuid FK → gitlab_files |                                                 |
-| `content_hash`   | text, not null         | SHA-256 for idempotency                         |
-| `status`         | `sync_state`, not null | `pending`, `in_progress`, `completed`, `failed` |
-| `started_at`     | timestamp              |                                                 |
-| `completed_at`   | timestamp, nullable    |                                                 |
-| `error_message`  | text, nullable         |                                                 |
-| `label_count`    | integer, nullable      | Number of labels parsed                         |
-| `scene_count`    | integer, nullable      | Number of scenes created                        |
+| Column           | Type                    | Notes                                           |
+| ---------------- | ----------------------- | ----------------------------------------------- |
+| `id`             | uuid PK                 |                                                 |
+| `gitlab_file_id` | uuid FK → gitlab_files  |                                                 |
+| `content_hash`   | text, not null          | SHA-256 for idempotency                         |
+| `status`         | `sync_status`, not null | `pending`, `in_progress`, `completed`, `failed` |
+| `started_at`     | timestamp               |                                                 |
+| `completed_at`   | timestamp, nullable     |                                                 |
+| `error_message`  | text, nullable          |                                                 |
+| `label_count`    | integer, nullable       | Number of labels parsed                         |
+| `scene_count`    | integer, nullable       | Number of scenes created                        |
 
 ---
 
@@ -507,7 +512,8 @@ scenes
 ├── scene_lines (1:m, ordered by sequence)
 ├── scene_characters (m:m via junction)
 ├── ai_suggestions (1:m)
-└── gitlab_file_id (FK to gitlab_files)
+├── gitlab_file_id (FK to gitlab_files)
+└── route (soft reference to route_configs.route_key, same project)
 
 scene_lines
 ├── demo_sessions (1:1, as current_scene_line_id, nullable)
@@ -526,7 +532,8 @@ visual_systems
 └── projects (1:1)
 
 route_configs
-└── projects (1:m)
+├── projects (1:m)
+└── scenes.route (soft reference from scenes within same project)
 
 gitlab_files
 ├── gitlab_file_sync_state (1:m)

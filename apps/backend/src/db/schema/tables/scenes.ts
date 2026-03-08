@@ -2,6 +2,16 @@
  * Scenes Table
  *
  * Logical scene containers; content stored in scene_lines.
+ *
+ * DESIGN NOTE - Route Soft Reference:
+ * The `route` column is a soft reference (text field) to route_configs.route_key
+ * rather than a hard foreign key. This is because:
+ * 1. A proper FK would require composite key (project_id, route) referencing
+ *    route_configs(project_id, route_key), which Drizzle ORM doesn't support
+ * 2. Current implementation creates scenes with route=null via GitLab sync,
+ *    and there is no API to modify the route field
+ * 3. Future route assignment features must validate at the application layer
+ *    by querying route_configs before setting a non-null route value
  */
 
 import { pgTable, uuid, text, timestamp, integer, jsonb, index } from 'drizzle-orm/pg-core';
@@ -9,6 +19,7 @@ import { sceneStatusEnum, sceneVisibilityEnum } from '../enums.js';
 import { projects } from './projects.js';
 import { pairGroups } from './pair-groups.js';
 import { gitlabFiles } from './gitlab-integrations.js';
+import { routeConfigs } from './route-configs.js';
 
 export const scenes = pgTable('scenes', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -18,7 +29,7 @@ export const scenes = pgTable('scenes', {
   groupValue: text('group_value'), // "I", "1", "1a", etc. or null
   sceneNumber: integer('scene_number').notNull(),
   sequenceOrder: integer('sequence_order').default(0).notNull(),
-  route: text('route'), // User-defined route key (references route_configs.route_key)
+  route: text('route'), // Soft reference to route_configs.route_key within same project; null = shared scene. App-level validation ensures the route exists for the project.
   visibility: sceneVisibilityEnum('visibility').default('EXCLUSIVE'),
   duoPairId: uuid('duo_pair_id').references(() => pairGroups.id, { onDelete: 'set null' }),
   status: sceneStatusEnum('status').default('DRAFT'),

@@ -5,7 +5,6 @@ import { RegisterPage } from "./pages/auth/register";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { ToastProvider } from "./contexts/ToastContext";
-import { AutoSelectProject } from "./components/AutoSelectProject";
 import { BASE_URL } from "./lib/constants";
 
 function App() {
@@ -13,13 +12,9 @@ function App() {
     <ThemeProvider>
       <ToastProvider>
         <div className="app">
-          <AutoSelectProject />
           <Routes>
             <Route path={`${BASE_URL}login`} element={<LoginPage />} />
-            <Route
-              path={`${BASE_URL}register`}
-              element={<RegisterPage />}
-            />
+            <Route path={`${BASE_URL}register`} element={<RegisterPage />} />
             <Route
               path={BASE_URL}
               element={

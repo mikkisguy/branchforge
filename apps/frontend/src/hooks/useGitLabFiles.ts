@@ -2,7 +2,7 @@
  * useGitLabFiles Hook
  *
  * Provides GitLab file management operations using TanStack Query.
- * Fetches and manages GitLab files stored in the database for Script Mode.
+ * Simplified with stable query keys and proper refetch behavior.
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -45,19 +45,22 @@ export function useGitLabFiles(
 ): UseGitLabFilesReturn {
   const queryClient = useQueryClient();
 
-  // Query for GitLab files
+  // Query for GitLab files with stable key and refetch on mount
   const {
     data: files = [],
     isLoading: isLoadingFiles,
     error: filesError,
     refetch: refreshFiles,
   } = useQuery({
-    queryKey: gitlabKeys.importedFiles(projectId ?? "__disabled__"),
+    queryKey: projectId
+      ? gitlabKeys.importedFiles(projectId)
+      : ["gitlab", "files", "__disabled__"],
     queryFn: async () => {
       return gitlabApi.getGitLabFiles(projectId!);
     },
     enabled: !!projectId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnMount: "always",
+    staleTime: 30 * 1000, // 30 seconds (reduced for better reload UX)
   });
 
   // Update file content mutation
