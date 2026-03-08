@@ -157,9 +157,7 @@ export function GitLabRepositoryLinkingDialog({
 
       setIsCreatingProject(true);
       try {
-        const newProject = await createProject(
-          newProjectName.trim(),
-        );
+        const newProject = await createProject(newProjectName.trim());
         projectId = newProject.id;
         setLinkedProjectName(newProject.name);
       } catch (err) {
@@ -502,7 +500,7 @@ export function GitLabRepositoryLinkingDialog({
                   setShowSyncDialog(true);
                 }}
               >
-                Import Scenes
+                Continue
               </Button>
             </div>
           </div>

@@ -9,11 +9,13 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import { useSettings } from "@/hooks/useSettings";
+import { useProject } from "@/hooks/useProject";
 import { GitLabSettingsContent } from "@/components/ide-shared/GitLabSettingsContent";
+import { RouteConfigDialog } from "@/components/RouteConfigDialog";
 import { cn } from "@/lib/utils";
 import { APP_NAME, APP_VERSION } from "@/lib/version";
 
-type Tab = "user" | "gitlab" | "system";
+type Tab = "user" | "gitlab" | "routes" | "system";
 
 interface TabOption {
   id: Tab;
@@ -23,22 +25,28 @@ interface TabOption {
 const tabs: TabOption[] = [
   { id: "user", label: "User" },
   { id: "gitlab", label: "GitLab" },
+  { id: "routes", label: "Routes" },
   { id: "system", label: "System Admin" },
 ];
 
 /**
  * Helper function to filter tabs based on user role and ensure a valid active tab.
  * Only users with OWNER role can see the System Admin tab.
+ * Routes tab only shows when a project is selected.
  *
  * @param activeTab - The currently active tab
  * @param userRole - The user's role (optional)
+ * @param hasProject - Whether a project is selected
  * @returns An object with filtered tabs and the appropriate active tab
  */
-function getVisibleTabs(activeTab: Tab, userRole?: string) {
+function getVisibleTabs(activeTab: Tab, userRole?: string, hasProject?: boolean) {
   return useMemo(() => {
     // Filter out system tab for non-OWNER users
+    // Filter out routes tab when no project is selected
     const visibleTabs = tabs.filter(
-      (tab) => tab.id !== "system" || userRole === "OWNER",
+      (tab) =>
+        (tab.id !== "system" || userRole === "OWNER") &&
+        (tab.id !== "routes" || hasProject),
     );
 
     // If current active tab is not visible, switch to first visible tab
@@ -47,7 +55,7 @@ function getVisibleTabs(activeTab: Tab, userRole?: string) {
       : visibleTabs[0]?.id || activeTab;
 
     return { visibleTabs, activeTab: adjustedActiveTab };
-  }, [activeTab, userRole]);
+  }, [activeTab, userRole, hasProject]);
 }
 
 interface SettingsModalProps {
@@ -57,7 +65,9 @@ interface SettingsModalProps {
 
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<Tab>("user");
+  const [isRouteConfigOpen, setIsRouteConfigOpen] = useState(false);
   const { user } = useAuth();
+  const { currentProject } = useProject();
   const {
     signUpsEnabled,
     updateSignUpsSetting,
@@ -69,6 +79,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const { visibleTabs, activeTab: adjustedActiveTab } = getVisibleTabs(
     activeTab,
     user?.role,
+    !!currentProject?.id,
   );
 
   // Sync state if active tab was adjusted by helper
@@ -135,6 +146,30 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
             {activeTab === "gitlab" && <GitLabSettingsContent />}
 
+            {activeTab === "routes" && (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-medium">Route Configuration</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Define the routes for your visual novel project. Routes
+                    determine character paths and story branching.
+                  </p>
+                </div>
+                <div className="p-6 border border-dashed border-border/30 rounded-md text-center">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Configure route keys, names, jump prefixes, and shared
+                    route settings for your project.
+                  </p>
+                  <button
+                    onClick={() => setIsRouteConfigOpen(true)}
+                    className="px-4 py-2 bg-[var(--theme-color)] text-white rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
+                  >
+                    Open Route Configuration
+                  </button>
+                </div>
+              </div>
+            )}
+
             {activeTab === "system" && (
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">System Administration</h3>
@@ -160,6 +195,15 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
           </div>
         </div>
       </DialogContent>
+
+      {/* Route Config Dialog */}
+      {currentProject?.id && (
+        <RouteConfigDialog
+          open={isRouteConfigOpen}
+          onOpenChange={setIsRouteConfigOpen}
+          projectId={currentProject.id}
+        />
+      )}
     </Dialog>
   );
 }
