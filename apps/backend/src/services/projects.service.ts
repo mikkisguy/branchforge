@@ -37,9 +37,17 @@ type ProjectRow = {
 };
 
 /**
+ * Shared project row type from database queries (role is always present due to inner join)
+ */
+type SharedProjectRow = ProjectRow & { role: UserRole };
+
+/**
  * Convert a database project row to a PublicProject with the given visibility
  */
-function toPublicProject(project: ProjectRow, visibility: UserRole): PublicProject {
+function toPublicProject(
+  project: ProjectRow,
+  visibility: UserRole,
+): PublicProject {
   return {
     id: project.id,
     name: project.name,
@@ -83,14 +91,14 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
       name: projects.name,
       description: projects.description,
       maxMeterDelta: projects.maxMeterDelta,
-      role: projectUsers.role,  // User's role from project_users
+      role: projectUsers.role, // User's role from project_users
       createdAt: projects.createdAt,
       updatedAt: projects.updatedAt,
     })
     .from(projects)
     .innerJoin(projectUsers, eq(projectUsers.projectId, projects.id))
     .where(eq(projectUsers.userId, userId))
-    .orderBy(projects.createdAt);
+    .orderBy(projects.createdAt) as SharedProjectRow[];
 
   // Combine both lists, removing duplicates
   // Owned projects take priority over shared projects
@@ -98,14 +106,20 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
 
   // First add owned projects with 'OWNER' visibility
   for (const project of userProjects) {
-    result.push(toPublicProject(project, 'OWNER'));
+    result.push(toPublicProject(project, "OWNER"));
   }
 
   // Then add shared projects (only if not already added as owned)
   // Use the user's role from project_users as visibility
   for (const shared of sharedProjectsResult) {
     if (!result.find((p) => p.id === shared.id)) {
-      result.push(toPublicProject(shared, shared.role!));
+      // Runtime guard: role should always be present due to inner join
+      if (shared.role == null) {
+        throw new Error(
+          `Shared project ${shared.id} is missing role in project_users junction table`,
+        );
+      }
+      result.push(toPublicProject(shared, shared.role));
     }
   }
 
@@ -139,7 +153,7 @@ export async function getProject(
     .limit(1);
 
   if (ownerProject.length > 0) {
-    return toPublicProject(ownerProject[0]!, 'OWNER');
+    return toPublicProject(ownerProject[0]!, "OWNER");
   }
 
   // Check if user has access via project_users
@@ -159,7 +173,8 @@ export async function getProject(
     .limit(1);
 
   if (sharedProject.length > 0) {
-    return toPublicProject(sharedProject[0]!, sharedProject[0]!.role!);
+    const project = sharedProject[0]!;
+    return toPublicProject(project, project.role ?? "READER");
   }
 
   return null;
@@ -192,5 +207,6 @@ export async function createProject(
     );
   }
 
-  return toPublicProject(result[0]!, 'OWNER');
+  return toPublicProject(result[0]!, "OWNER");
 }
+

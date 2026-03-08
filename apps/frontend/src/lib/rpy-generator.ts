@@ -92,7 +92,7 @@ function escapeHtml(text: string): string {
 
 /**
  * Generate file tree structure from scenes
- * Groups scenes by act/chapter for hierarchical display
+ * Groups scenes by groupType/groupValue for hierarchical display
  */
 export interface FileItem {
   name: string;
@@ -108,9 +108,10 @@ export function generateFileTree(scenes: PublicScene[]): FileItem[] {
   const grouped = scenes.reduce(
     (acc, scene) => {
       // Use group value if available, otherwise "Main"
-      const key = (scene.groupType && scene.groupValue)
-        ? `${scene.groupType} ${scene.groupValue}`
-        : "Main";
+      const key =
+        scene.groupType && scene.groupValue
+          ? `${scene.groupType} ${scene.groupValue}`
+          : "Main";
       if (!acc[key]) {
         acc[key] = [];
       }

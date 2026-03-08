@@ -39,14 +39,17 @@ class ConcurrencyLimiter {
 
   constructor(private concurrency: number) {}
 
-  async run<T>(fn: () => Promise<T>): Promise<T> {
+  async run<T>(fn: () => Promise<T>, timeoutMs: number = 30000): Promise<T> {
     while (this.running >= this.concurrency) {
       await new Promise<void>((resolve) => this.queue.push(resolve));
     }
 
     this.running++;
     try {
-      return await fn();
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Task timeout')), timeoutMs);
+      });
+      return await Promise.race([fn(), timeoutPromise]);
     } finally {
       this.running--;
       const next = this.queue.shift();
@@ -344,20 +347,25 @@ export async function importFromGitlab(
 
       // For STORY files, import labels as scenes
       if (parsed.fileType === "STORY") {
+        // Fetch all scenes for this file once to avoid N+1 queries
+        const fileScenes = await db
+          .select()
+          .from(scenes)
+          .where(eq(scenes.gitlabFileId, gitlabFile.id));
+
+        // Build a Map keyed by labelName for O(1) lookups
+        const scenesByLabel = new Map<string, typeof fileScenes[0]>();
+        for (const scene of fileScenes) {
+          if (scene.labelName) {
+            scenesByLabel.set(scene.labelName, scene);
+          }
+        }
+
         for (let i = 0; i < parsed.labels.length; i++) {
           const label = parsed.labels[i];
 
-          // Check if scene already exists for this file+label
-          const [existingScene] = await db
-            .select()
-            .from(scenes)
-            .where(
-              and(
-                eq(scenes.gitlabFileId, gitlabFile.id),
-                eq(scenes.labelName, label.label),
-              ),
-            )
-            .limit(1);
+          // Check if scene already exists for this file+label (Map lookup)
+          const existingScene = scenesByLabel.get(label.label);
 
           const labelData = convertToBranchForgeFormatFromLabels(
             parsed,

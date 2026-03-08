@@ -22,6 +22,13 @@
       "when": 1772909810727,
       "tag": "0002_redundant_skreet",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1772971144704,
+      "tag": "0003_noisy_synch",
+      "breakpoints": true
     }
   ]
 }

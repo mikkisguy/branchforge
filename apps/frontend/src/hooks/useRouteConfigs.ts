@@ -8,6 +8,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { routeConfigsApi } from "@/lib/api/route-configs";
 import { routeConfigKeys } from "@/lib/query-keys";
+import { useToast } from "@/contexts/ToastContext";
 import type { RouteConfig } from "@branchforge/shared";
 
 // ============================================================================
@@ -57,6 +58,7 @@ export interface UseRouteConfigsReturn {
 
 export function useRouteConfigs(projectId: string): UseRouteConfigsReturn {
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   // Query for route configurations (only when projectId is provided)
   const {
@@ -81,6 +83,10 @@ export function useRouteConfigs(projectId: string): UseRouteConfigsReturn {
     onSuccess: () => {
       // Invalidate and refetch route configs list
       queryClient.invalidateQueries({ queryKey: routeConfigKeys.lists(projectId) });
+      toast.success('Route configuration created successfully', 'Success');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to create route configuration: ${error.message}`, 'Error');
     },
   });
 
@@ -92,6 +98,10 @@ export function useRouteConfigs(projectId: string): UseRouteConfigsReturn {
     onSuccess: () => {
       // Invalidate and refetch route configs list
       queryClient.invalidateQueries({ queryKey: routeConfigKeys.lists(projectId) });
+      toast.success('Route configuration updated successfully', 'Success');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update route configuration: ${error.message}`, 'Error');
     },
   });
 
@@ -103,6 +113,10 @@ export function useRouteConfigs(projectId: string): UseRouteConfigsReturn {
     onSuccess: () => {
       // Invalidate and refetch route configs list
       queryClient.invalidateQueries({ queryKey: routeConfigKeys.lists(projectId) });
+      toast.success('Route configuration deleted successfully', 'Success');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete route configuration: ${error.message}`, 'Error');
     },
   });
 

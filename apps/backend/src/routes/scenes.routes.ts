@@ -34,7 +34,7 @@ import {
   sceneLines,
   gitlabFiles,
 } from "../db/schema/index.js";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, inArray } from "drizzle-orm";
 import { reconstructRPYFile } from "../services/rpy-parser.service.js";
 
 // ============================================================================
@@ -247,20 +247,41 @@ async function updateSceneDialogueHandler(
       string,
       Array<{ speaker: string | null; text: string }>
     >();
+
+    // Batch fetch all scene lines for all scenes (avoiding N+1 query)
+    const allSceneLines = await db
+      .select({
+        sceneId: sceneLines.sceneId,
+        demoNotes: sceneLines.demoNotes,
+        content: sceneLines.content,
+        sequence: sceneLines.sequence,
+      })
+      .from(sceneLines)
+      .where(inArray(sceneLines.sceneId, allScenes.map((s) => s.id)))
+      .orderBy(asc(sceneLines.sequence));
+
+    // Group lines by sceneId in-memory
+    const linesBySceneId = new Map<
+      string,
+      Array<{ demoNotes: string | null; content: string }>
+    >();
+    for (const line of allSceneLines) {
+      if (!linesBySceneId.has(line.sceneId)) {
+        linesBySceneId.set(line.sceneId, []);
+      }
+      linesBySceneId.get(line.sceneId)!.push({
+        demoNotes: line.demoNotes,
+        content: line.content,
+      });
+    }
+
+    // Build dialogue map from grouped lines
     for (const s of allScenes) {
       const labelName = s.labelName || s.title;
-      // Get lines for this scene
-      const sceneLinesData = await db
-        .select({
-          demoNotes: sceneLines.demoNotes,
-          content: sceneLines.content,
-        })
-        .from(sceneLines)
-        .where(eq(sceneLines.sceneId, s.id))
-        .orderBy(asc(sceneLines.sequence));
+      const sceneLinesData = linesBySceneId.get(s.id) || [];
 
       const sceneDialogue = sceneLinesData.map((l) => ({
-        speaker: l.demoNotes || null, // demoNotes contains the raw speaker tag
+        speaker: l.demoNotes || null,
         text: l.content,
       }));
       updatedDialogue.set(labelName, sceneDialogue);

@@ -78,6 +78,11 @@ export function ScriptMode({
 
   // Get active file content directly for Script Mode editing
   const activeFileContent = activeGitLabFile?.content || "";
+  // Memoize file lines to avoid repeated split operations
+  const activeFileLines = useMemo(
+    () => activeFileContent.split("\n"),
+    [activeFileContent],
+  );
 
   // Track active file (scene) - for non-GitLab scenes
   const [activeFile, setActiveFile] = useState<string | null>(null);
@@ -232,7 +237,7 @@ export function ScriptMode({
           <StoryPanel className="flex-1 !mt-0">
             {activeGitLabFile ? (
               <ScriptEditor
-                content={activeFileContent.split("\n")}
+                content={activeFileLines}
                 language="Ren'Py"
               />
             ) : activeScene ? (
@@ -319,7 +324,7 @@ export function ScriptMode({
       <StatusBar
         lineCount={
           activeGitLabFile
-            ? activeFileContent.split("\n").length
+            ? activeFileLines.length
             : activeScene
               ? activeSceneContent.length || 0
               : 0

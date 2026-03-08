@@ -40,7 +40,9 @@ export interface UseGitLabFilesReturn {
 // Hook
 // ============================================================================
 
-export function useGitLabFiles(projectId: string | undefined): UseGitLabFilesReturn {
+export function useGitLabFiles(
+  projectId: string | undefined,
+): UseGitLabFilesReturn {
   const queryClient = useQueryClient();
 
   // Query for GitLab files
@@ -50,7 +52,7 @@ export function useGitLabFiles(projectId: string | undefined): UseGitLabFilesRet
     error: filesError,
     refetch: refreshFiles,
   } = useQuery({
-    queryKey: gitlabKeys.importedFiles(projectId || ""),
+    queryKey: gitlabKeys.importedFiles(projectId ?? "__disabled__"),
     queryFn: async () => {
       if (!projectId) return [];
       return gitlabApi.getGitLabFiles(projectId);
@@ -61,13 +63,21 @@ export function useGitLabFiles(projectId: string | undefined): UseGitLabFilesRet
 
   // Update file content mutation
   const updateFileMutation = useMutation({
-    mutationFn: async ({ fileId, content }: { fileId: string; content: string }) => {
+    mutationFn: async ({
+      fileId,
+      content,
+    }: {
+      fileId: string;
+      content: string;
+    }) => {
       await gitlabApi.updateGitLabFile(fileId, content);
     },
     onSuccess: () => {
       // Invalidate files queries
       if (projectId) {
-        queryClient.invalidateQueries({ queryKey: gitlabKeys.importedFiles(projectId) });
+        queryClient.invalidateQueries({
+          queryKey: gitlabKeys.importedFiles(projectId),
+        });
       }
     },
   });
@@ -86,3 +96,4 @@ export function useGitLabFiles(projectId: string | undefined): UseGitLabFilesRet
     isUpdatingFile: updateFileMutation.isPending,
   };
 }
+

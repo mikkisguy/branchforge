@@ -20,16 +20,10 @@ import {
   NotFoundError,
   ForbiddenError,
 } from "../middleware/error-handler.middleware.js";
-import { UserRole } from "@branchforge/shared";
+import { UserRole, isValidUserRole, ROLE_HIERARCHY } from "@branchforge/shared";
 
 // ============================================================================
-// Constants
-// ============================================================================
-
-function isValidRole(value: string): value is UserRole {
-  return value === "OWNER" || value === "READER" || value === "TESTER";
-}
-
+// Project Authorization
 // ============================================================================
 // Project Authorization
 // ============================================================================
@@ -152,7 +146,7 @@ export async function getProjectRole(
 
   if (sharedAccess.length > 0) {
     const role = sharedAccess[0].role;
-    if (isValidRole(role)) {
+    if (isValidUserRole(role)) {
       return role;
     }
     // Log unexpected role value and treat as no access
@@ -322,7 +316,7 @@ export async function getSceneRole(
 
   if (sharedAccess.length > 0) {
     const role = sharedAccess[0].role;
-    if (isValidRole(role)) {
+    if (isValidUserRole(role)) {
       return role;
     }
     // Log unexpected role value and treat as no access
@@ -359,9 +353,8 @@ export async function hasProjectRole(
     return false;
   }
 
-  // Role hierarchy: OWNER > READER > TESTER
-  const roleHierarchy = { OWNER: 3, READER: 2, TESTER: 1 };
-  return roleHierarchy[role] >= roleHierarchy[minimumRole];
+  // Use shared ROLE_HIERARCHY for permission checks
+  return ROLE_HIERARCHY[role] >= ROLE_HIERARCHY[minimumRole];
 }
 
 /**

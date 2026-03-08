@@ -22,6 +22,26 @@ export const UserRole = {
 } as const;
 
 /**
+ * Validates that a value is a valid UserRole.
+ * @param value - The value to validate
+ * @returns true if the value is a valid UserRole
+ */
+export function isValidUserRole(value: string): value is UserRole {
+  return value === "OWNER" || value === "READER" || value === "TESTER";
+}
+
+/**
+ * Role hierarchy mapping for permission checks.
+ * Higher numeric values indicate higher privileges.
+ * Hierarchy: OWNER (3) > READER (2) > TESTER (1)
+ */
+export const ROLE_HIERARCHY = {
+  OWNER: 3,
+  READER: 2,
+  TESTER: 1,
+} as const;
+
+/**
  * Scene status enumeration
  */
 export type SceneStatus = "DRAFT" | "REVIEW" | "FINAL";
@@ -116,29 +136,41 @@ export function generateVisualName(
 
   // Replace {route}
   if (components.routeKey) {
-    const routePrefix = components.routeKey ? components.routeKey + "_" : "";
-    result = result.replace('{route}', routePrefix);
+    const routePrefix = components.routeKey + "_";
+    result = result.replace("{route}", routePrefix);
   } else {
-    result = result.replace('{route}', '');
+    result = result.replace("{route}", "");
   }
 
   // Replace {group} - look up prefix if available
-  if (components.groupType && components.groupValue && config.groupPrefixes?.[components.groupType]) {
-    const prefix = config.groupPrefixes[components.groupType][components.groupValue] || components.groupValue;
-    result = result.replace('{group}', prefix);
+  if (
+    components.groupType &&
+    components.groupValue &&
+    config.groupPrefixes?.[components.groupType]
+  ) {
+    const prefix =
+      config.groupPrefixes[components.groupType][components.groupValue] ||
+      components.groupValue;
+    result = result.replace("{group}", prefix);
   } else if (components.groupValue) {
-    result = result.replace('{group}', components.groupValue);
+    result = result.replace("{group}", components.groupValue);
   } else {
-    result = result.replace('{group}', '');
+    result = result.replace("{group}", "");
   }
 
   // Replace {scene}, {counter}, {slug}
-  result = result.replace('{scene}', String(components.sceneNumber).padStart(config.scenePadding, '0'));
-  result = result.replace('{counter}', String(components.counter).padStart(config.counterPadding, '0'));
-  result = result.replace('{slug}', components.slug);
+  result = result.replace(
+    "{scene}",
+    String(components.sceneNumber).padStart(config.scenePadding, "0"),
+  );
+  result = result.replace(
+    "{counter}",
+    String(components.counter).padStart(config.counterPadding, "0"),
+  );
+  result = result.replace("{slug}", components.slug);
 
   // Clean up double underscores and trim
-  return result.replace(/_+/g, '_').replace(/^_|_$/g, '');
+  return result.replace(/_+/g, "_").replace(/^_|_$/g, "");
 }
 
 /**
@@ -186,8 +218,8 @@ export interface Scene {
   id: string;
   projectId: string;
   title: string;
-  groupType?: string;   // e.g., "act", "chapter", "episode"
-  groupValue?: string;  // e.g., "I", "1", "1a"
+  groupType?: string; // e.g., "act", "chapter", "episode"
+  groupValue?: string; // e.g., "I", "1", "1a"
   sceneNumber: number;
   routeKey?: string; // References route_configs.route_key (custom user-defined routes)
   status: SceneStatus;
@@ -206,7 +238,7 @@ export interface PublicScene {
   id: string;
   projectId: string;
   title: string;
-  groupType: string | null;  // e.g., "act", "chapter", "episode" or null
+  groupType: string | null; // e.g., "act", "chapter", "episode" or null
   groupValue: string | null; // e.g., "I", "1", "1a" or null
   sceneNumber: number;
   sequenceOrder: number;

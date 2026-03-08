@@ -35,7 +35,7 @@ import {
   type NewScene,
   type NewCharacter,
 } from "../../db/schema/index.js";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { testEmail } from "../../utils/test-ids.js";
 
 describe("ScenesRoutes (Integration)", () => {
@@ -127,28 +127,35 @@ describe("ScenesRoutes (Integration)", () => {
 
   // Helper to clean up all test data
   async function cleanupTestData() {
-    await db
-      .delete(sceneCharacters)
-      .where(eq(sceneCharacters.sceneId, ownedScene.id!));
-    await db
-      .delete(sceneCharacters)
-      .where(eq(sceneCharacters.sceneId, sharedScene.id!));
-    await db.delete(sceneLines).where(eq(sceneLines.sceneId, ownedScene.id!));
-    await db.delete(sceneLines).where(eq(sceneLines.sceneId, sharedScene.id!));
-    await db.delete(scenesTable).where(eq(scenesTable.id, ownedScene.id!));
-    await db.delete(scenesTable).where(eq(scenesTable.id, sharedScene.id!));
-    await db.delete(characters).where(eq(characters.id, testCharacter.id!));
-    await db.delete(projectUsers).where(eq(projectUsers.userId, testUserId));
-    await db.delete(projectUsers).where(eq(projectUsers.userId, otherUserId));
-    await db.delete(projectUsers).where(eq(projectUsers.userId, thirdUserId));
-    await db.delete(projects).where(eq(projects.id, ownedProject.id!));
-    await db.delete(projects).where(eq(projects.id, sharedProject.id!));
-    await db.delete(userSessions).where(eq(userSessions.userId, testUserId));
-    await db.delete(userSessions).where(eq(userSessions.userId, otherUserId));
-    await db.delete(userSessions).where(eq(userSessions.userId, thirdUserId));
-    await db.delete(users).where(eq(users.id, testUserId));
-    await db.delete(users).where(eq(users.id, otherUserId));
-    await db.delete(users).where(eq(users.id, thirdUserId));
+    const testUserIds = [testUserId, otherUserId, thirdUserId];
+    const sceneIds = [ownedScene.id!, sharedScene.id!];
+    const projectIds = [ownedProject.id!, sharedProject.id!];
+
+    await db.transaction(async (tx) => {
+      // Delete scene-related data for both scenes in parallel
+      await Promise.all([
+        tx.delete(sceneCharacters).where(inArray(sceneCharacters.sceneId, sceneIds)),
+        tx.delete(sceneLines).where(inArray(sceneLines.sceneId, sceneIds)),
+      ]);
+
+      // Delete scenes and characters in parallel
+      await Promise.all([
+        tx.delete(scenesTable).where(inArray(scenesTable.id, sceneIds)),
+        tx.delete(characters).where(eq(characters.id, testCharacter.id!)),
+      ]);
+
+      // Delete project users and user sessions in parallel
+      await Promise.all([
+        tx.delete(projectUsers).where(inArray(projectUsers.userId, testUserIds)),
+        tx.delete(userSessions).where(inArray(userSessions.userId, testUserIds)),
+      ]);
+
+      // Delete projects
+      await tx.delete(projects).where(inArray(projects.id, projectIds));
+
+      // Delete users last (due to foreign key constraints)
+      await tx.delete(users).where(inArray(users.id, testUserIds));
+    });
   }
 
   // Helper to set up test data

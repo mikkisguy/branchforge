@@ -11,9 +11,6 @@ import {
   listSyncOperations,
 } from "../gitlab-sync.service.js";
 
-// Import schema for proper mocking
-import { gitlabSyncOperations } from "../../db/schema/index.js";
-
 // Mock the database at module level
 vi.mock("../../db/index.js", () => ({
   getDb: vi.fn(),
@@ -195,3 +192,4 @@ describe("GitLabSyncService", () => {
    * with real database and external service mocking provide better confidence.
    */
 });
+

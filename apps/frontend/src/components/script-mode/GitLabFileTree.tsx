@@ -1,23 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ChevronRight, ChevronDown, File, Folder } from "lucide-react";
-
-/**
- * GitLab File with associated scenes
- */
-export interface GitLabFileScene {
-  id: string;
-  labelName: string | null;
-  title: string;
-}
-
-export interface GitLabFileNode {
-  id: string;
-  filePath: string;
-  fileType: "STORY" | "SETTINGS";
-  content: string;
-  lastSyncedAt: string | null;
-  scenes: GitLabFileScene[];
-}
+import type { GitLabFileNode } from "@/hooks/useGitLabFiles";
 
 interface GitLabFileTreeProps {
   files: GitLabFileNode[];
@@ -31,7 +14,9 @@ interface GitLabFileTreeProps {
 /**
  * Group files by folder structure
  */
-function groupFilesByFolder(files: GitLabFileNode[]): Map<string, GitLabFileNode[]> {
+function groupFilesByFolder(
+  files: GitLabFileNode[],
+): Map<string, GitLabFileNode[]> {
   const grouped = new Map<string, GitLabFileNode[]>();
 
   for (const file of files) {
@@ -91,7 +76,7 @@ export function GitLabFileTree({
     });
   };
 
-  const groupedFiles = groupFilesByFolder(files);
+  const groupedFiles = useMemo(() => groupFilesByFolder(files), [files]);
 
   return (
     <div className="space-y-1">
@@ -190,3 +175,4 @@ export function GitLabFileTree({
     </div>
   );
 }
+

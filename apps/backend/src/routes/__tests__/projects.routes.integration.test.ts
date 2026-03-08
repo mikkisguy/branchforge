@@ -110,9 +110,12 @@ describe("ProjectsRoutes (Integration)", () => {
       payload: { userId },
     });
 
-    const sessionId = loginResponse.cookies.find(
-      (cookie: { name: string; value: string }) =>
-        cookie.name === SESSION_COOKIE_NAME || cookie.name === "connect.sid",
+    // First try to find the canonical session cookie, then fall back to legacy name
+    const sessionCookie = loginResponse.cookies.find(
+      (cookie: { name: string; value: string }) => cookie.name === SESSION_COOKIE_NAME,
+    );
+    const sessionId = sessionCookie?.value ?? loginResponse.cookies.find(
+      (cookie: { name: string; value: string }) => cookie.name === "connect.sid",
     )?.value;
     if (!sessionId) {
       throw new Error("Failed to create session cookie");

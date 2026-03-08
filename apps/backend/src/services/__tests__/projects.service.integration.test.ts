@@ -19,7 +19,7 @@ import {
   type NewProject,
   type NewProjectUser,
 } from "../../db/schema/index.js";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import {
   listProjects,
   getProject,
@@ -79,17 +79,18 @@ describe("ProjectsService (Integration)", () => {
   };
 
   // Helper to clean up all test data including additional users created during tests
+  // Cleans up ALL projects owned by test users, not just the fixture projects
   async function cleanupTestData() {
-    const ownedProjectId: string = ownedProject.id!;
-    const sharedProjectId: string = sharedProject.id!;
-    await db.delete(projectUsers).where(eq(projectUsers.userId, testUserId));
-    await db.delete(projectUsers).where(eq(projectUsers.userId, otherUserId));
-    await db.delete(projectUsers).where(eq(projectUsers.userId, thirdUserId));
-    await db.delete(projects).where(eq(projects.id, ownedProjectId));
-    await db.delete(projects).where(eq(projects.id, sharedProjectId));
-    await db.delete(users).where(eq(users.id, testUserId));
-    await db.delete(users).where(eq(users.id, otherUserId));
-    await db.delete(users).where(eq(users.id, thirdUserId));
+    const testUserIds = [testUserId, otherUserId, thirdUserId];
+
+    // Delete all projectUsers entries for test users
+    await db.delete(projectUsers).where(inArray(projectUsers.userId, testUserIds));
+
+    // Delete ALL projects owned by test users (covers fixture projects + any created during tests)
+    await db.delete(projects).where(inArray(projects.userId, testUserIds));
+
+    // Delete the test users
+    await db.delete(users).where(inArray(users.id, testUserIds));
   }
 
   // Helper to set up test data

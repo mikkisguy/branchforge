@@ -13,7 +13,7 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll } from "vitest";
 import { getDb } from "../../db/index.js";
 import { users, adminSettings } from "../../db/schema/index.js";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import {
   getAdminSetting,
   setAdminSetting,
@@ -33,20 +33,20 @@ describe("AdminSettingsService (Integration)", () => {
 
   // Helper to clean up all test data
   async function cleanupTestData() {
-    await db.delete(adminSettings).where(eq(adminSettings.key, "test_key"));
-    await db.delete(adminSettings).where(eq(adminSettings.key, "new_key"));
-    await db.delete(adminSettings).where(eq(adminSettings.key, "existing_key"));
-    await db
-      .delete(adminSettings)
-      .where(eq(adminSettings.key, "sign_ups_enabled"));
-    await db.delete(adminSettings).where(eq(adminSettings.key, "complex_key"));
-    await db.delete(adminSettings).where(eq(adminSettings.key, "config"));
-    await db.delete(adminSettings).where(eq(adminSettings.key, "some_key"));
-    await db
-      .delete(adminSettings)
-      .where(eq(adminSettings.key, "max_upload_size"));
-    await db.delete(adminSettings).where(eq(adminSettings.key, "deep_setting"));
-    await db.delete(adminSettings).where(eq(adminSettings.key, "special_key"));
+    const testKeys = [
+      "test_key",
+      "new_key",
+      "existing_key",
+      "sign_ups_enabled",
+      "complex_key",
+      "config",
+      "some_key",
+      "max_upload_size",
+      "deep_setting",
+      "special_key",
+    ];
+
+    await db.delete(adminSettings).where(inArray(adminSettings.key, testKeys));
     await db.delete(users).where(eq(users.id, testUserId));
   }
 
