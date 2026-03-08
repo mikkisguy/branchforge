@@ -18,6 +18,7 @@ import { useGitLab } from "@/hooks/useGitLab";
 import { useProject } from "@/hooks/useProject";
 import { useToast } from "@/contexts/ToastContext";
 import { GitLabSyncDialog } from "@/components/script-mode/GitLabSyncDialog";
+import { ProjectType } from "@branchforge/shared";
 
 interface GitLabRepositoryLinkingDialogProps {
   open: boolean;
@@ -36,8 +37,8 @@ interface LinkRepositoryRequest {
 // ============================================================================
 
 const PROJECT_TYPES = [
-  { value: "PREQUEL", label: "Prequel" },
-  { value: "SEQUEL", label: "Sequel" },
+  { value: "ACT_BASED", label: "Act-Based (Multi-part story)" },
+  { value: "CHAPTER_BASED", label: "Chapter-Based (Continuous narrative)" },
 ] as const;
 
 // ============================================================================
@@ -64,9 +65,8 @@ export function GitLabRepositoryLinkingDialog({
 
   // New project form state
   const [newProjectName, setNewProjectName] = useState("");
-  const [newProjectType, setNewProjectType] = useState<"PREQUEL" | "SEQUEL">(
-    "PREQUEL",
-  );
+  const [newProjectType, setNewProjectType] =
+    useState<ProjectType>("ACT_BASED");
   const [isCreatingProject, setIsCreatingProject] = useState(false);
 
   // GitLab repositories state
@@ -133,7 +133,7 @@ export function GitLabRepositoryLinkingDialog({
     setProjectSearch("");
     setGitlabLoadError(null);
     setNewProjectName("");
-    setNewProjectType("PREQUEL");
+    setNewProjectType("ACT_BASED");
   }, []);
 
   /**
@@ -325,9 +325,7 @@ export function GitLabRepositoryLinkingDialog({
                       id="new-project-type"
                       value={newProjectType}
                       onChange={(e) =>
-                        setNewProjectType(
-                          e.target.value as "PREQUEL" | "SEQUEL",
-                        )
+                        setNewProjectType(e.target.value as ProjectType)
                       }
                       disabled={isCreatingProject || isLinking}
                       className="w-full px-3 py-2 rounded-md border border-border/30 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"

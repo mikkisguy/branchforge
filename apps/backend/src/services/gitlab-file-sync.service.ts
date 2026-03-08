@@ -389,7 +389,7 @@ export async function syncScenesFromGitLabFile(
                   labelName: label.label,
                   labelPosition: i,
                   sequenceOrder: i,
-                  route: "COMMON",
+                  route: null, // User will assign route later
                   sceneNumber: i + 1,
                   status: "DRAFT",
                   prerequisites: {},

@@ -9,13 +9,25 @@
  * - Test database must exist and have proper schema
  */
 
-import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'vitest';
-import { getDb } from '../../db/index.js';
-import { users, projects, projectUsers, type NewUser, type NewProject, type NewProjectUser } from '../../db/schema/index.js';
-import { eq } from 'drizzle-orm';
-import { listProjects } from '../projects.service.js';
+import { describe, it, expect, beforeEach, afterEach, beforeAll } from "vitest";
+import { getDb } from "../../db/index.js";
+import {
+  users,
+  projects,
+  projectUsers,
+  type NewUser,
+  type NewProject,
+  type NewProjectUser,
+} from "../../db/schema/index.js";
+import { eq, and } from "drizzle-orm";
+import {
+  listProjects,
+  getProject,
+  createProject,
+} from "../projects.service.js";
+import { testEmail, testUuid } from "../../utils/test-ids.js";
 
-describe('ProjectsService (Integration)', () => {
+describe("ProjectsService (Integration)", () => {
   let db: ReturnType<typeof getDb>;
 
   beforeAll(async () => {
@@ -23,46 +35,46 @@ describe('ProjectsService (Integration)', () => {
   });
 
   // Test fixtures
-  const testUserId = '00000000-0000-0000-0000-000000000001';
-  const otherUserId = '00000000-0000-0000-0000-000000000002';
-  const thirdUserId = '00000000-0000-0000-0000-000000000003';
+  const testUserId = testUuid("02000000", 1);
+  const otherUserId = testUuid("02000000", 2);
+  const thirdUserId = testUuid("02000000", 3);
 
   const testUser: NewUser = {
     id: testUserId,
-    email: 'owner@test.com',
-    passwordHash: 'hashed_password',
-    role: 'OWNER',
+    email: testEmail("projects-service", "owner"),
+    passwordHash: "hashed_password",
+    role: "OWNER",
   };
 
   const otherUser: NewUser = {
     id: otherUserId,
-    email: 'other@test.com',
-    passwordHash: 'hashed_password',
-    role: 'OWNER',
+    email: testEmail("projects-service", "other"),
+    passwordHash: "hashed_password",
+    role: "OWNER",
   };
 
   const thirdUser: NewUser = {
     id: thirdUserId,
-    email: 'third@test.com',
-    passwordHash: 'hashed_password',
-    role: 'READER',
+    email: testEmail("projects-service", "third"),
+    passwordHash: "hashed_password",
+    role: "READER",
   };
 
   const ownedProject: NewProject = {
-    id: '10000000-0000-0000-0000-000000000001',
+    id: testUuid("12000000", 1),
     userId: testUserId,
-    name: 'Owned Project',
-    type: 'PREQUEL',
-    description: 'A project owned by the user',
+    name: "Owned Project",
+    type: "ACT_BASED",
+    description: "A project owned by the user",
     maxMeterDelta: 10,
   };
 
   const sharedProject: NewProject = {
-    id: '10000000-0000-0000-0000-000000000002',
+    id: testUuid("12000000", 2),
     userId: otherUserId,
-    name: 'Shared Project',
-    type: 'SEQUEL',
-    description: 'A project shared with the user',
+    name: "Shared Project",
+    type: "CHAPTER_BASED",
+    description: "A project shared with the user",
     maxMeterDelta: 15,
   };
 
@@ -98,11 +110,11 @@ describe('ProjectsService (Integration)', () => {
     await cleanupTestData();
   });
 
-  describe('listProjects', () => {
+  describe("listProjects", () => {
     const ownedProjectId: string = ownedProject.id!;
     const sharedProjectId: string = sharedProject.id!;
 
-    it('should return empty array when user has no projects', async () => {
+    it("should return empty array when user has no projects", async () => {
       // Clean up the test data to have no projects
       await cleanupTestData();
 
@@ -114,51 +126,51 @@ describe('ProjectsService (Integration)', () => {
       expect(projects).toEqual([]);
     });
 
-    it('should return list of user-owned projects', async () => {
+    it("should return list of user-owned projects", async () => {
       const projects = await listProjects(testUserId);
 
       expect(projects).toHaveLength(1);
       expect(projects[0]).toMatchObject({
         id: ownedProjectId,
-        name: 'Owned Project',
-        type: 'PREQUEL',
-        description: 'A project owned by the user',
+        name: "Owned Project",
+        type: "ACT_BASED",
+        description: "A project owned by the user",
         maxMeterDelta: 10,
       });
       expect(projects[0].createdAt).toBeInstanceOf(Date);
       expect(projects[0].updatedAt).toBeInstanceOf(Date);
     });
 
-    it('should return both owned and shared projects', async () => {
+    it("should return both owned and shared projects", async () => {
       // Share the other user's project with test user
       await db.insert(projectUsers).values({
         projectId: sharedProjectId,
         userId: testUserId,
-        role: 'READER',
+        role: "READER",
       });
 
       const projects = await listProjects(testUserId);
 
       expect(projects).toHaveLength(2);
 
-      const projectNames = projects.map(p => p.name);
-      expect(projectNames).toContain('Owned Project');
-      expect(projectNames).toContain('Shared Project');
+      const projectNames = projects.map((p) => p.name);
+      expect(projectNames).toContain("Owned Project");
+      expect(projectNames).toContain("Shared Project");
 
       // Verify visibility is set correctly
-      const owned = projects.find(p => p.id === ownedProjectId);
-      const shared = projects.find(p => p.id === sharedProjectId);
+      const owned = projects.find((p) => p.id === ownedProjectId);
+      const shared = projects.find((p) => p.id === sharedProjectId);
 
-      expect(owned?.visibility).toBe('OWNER');
-      expect(shared?.visibility).toBe('READER');
+      expect(owned?.visibility).toBe("OWNER");
+      expect(shared?.visibility).toBe("READER");
     });
 
-    it('should not duplicate projects that are both owned and shared', async () => {
+    it("should not duplicate projects that are both owned and shared", async () => {
       // Share the owned project with the same user (edge case)
       await db.insert(projectUsers).values({
         projectId: ownedProjectId,
         userId: testUserId,
-        role: 'READER',
+        role: "READER",
       });
 
       const projects = await listProjects(testUserId);
@@ -166,10 +178,10 @@ describe('ProjectsService (Integration)', () => {
       // Should still only have one project (the owned one)
       expect(projects).toHaveLength(1);
       expect(projects[0].id).toBe(ownedProjectId);
-      expect(projects[0].visibility).toBe('OWNER'); // Should prioritize owner role
+      expect(projects[0].visibility).toBe("OWNER"); // Should prioritize owner role
     });
 
-    it('should return only shared projects when user owns none', async () => {
+    it("should return only shared projects when user owns none", async () => {
       // Create third user who only has shared access
       await db.insert(users).values(thirdUser);
 
@@ -177,14 +189,238 @@ describe('ProjectsService (Integration)', () => {
       await db.insert(projectUsers).values({
         projectId: ownedProjectId,
         userId: thirdUserId,
-        role: 'READER',
+        role: "READER",
       });
 
       const projects = await listProjects(thirdUserId);
 
       expect(projects).toHaveLength(1);
       expect(projects[0].id).toBe(ownedProjectId);
-      expect(projects[0].visibility).toBe('READER');
+      expect(projects[0].visibility).toBe("READER");
+    });
+  });
+
+  describe("getProject", () => {
+    it("should return null when project does not exist", async () => {
+      const nonExistentProjectId = testUuid("12000000", 999999999999);
+      const project = await getProject(nonExistentProjectId, testUserId);
+
+      expect(project).toBeNull();
+    });
+
+    it("should return project when user is the owner", async () => {
+      const project = await getProject(ownedProject.id!, testUserId);
+
+      expect(project).not.toBeNull();
+      expect(project).toMatchObject({
+        id: ownedProject.id,
+        name: "Owned Project",
+        type: "ACT_BASED",
+        description: "A project owned by the user",
+        maxMeterDelta: 10,
+        visibility: "OWNER",
+      });
+      expect(project?.createdAt).toBeInstanceOf(Date);
+      expect(project?.updatedAt).toBeInstanceOf(Date);
+    });
+
+    it("should return project when user has shared access", async () => {
+      // Share the other user's project with test user
+      await db.insert(projectUsers).values({
+        projectId: sharedProject.id!,
+        userId: testUserId,
+        role: "READER",
+      });
+
+      const project = await getProject(sharedProject.id!, testUserId);
+
+      expect(project).not.toBeNull();
+      expect(project).toMatchObject({
+        id: sharedProject.id,
+        name: "Shared Project",
+        type: "CHAPTER_BASED",
+        description: "A project shared with the user",
+        maxMeterDelta: 15,
+        visibility: "READER",
+      });
+    });
+
+    it("should return null when user does not have access to project", async () => {
+      // Third user has no access to either project
+      await db.insert(users).values(thirdUser);
+
+      const project = await getProject(ownedProject.id!, thirdUserId);
+
+      expect(project).toBeNull();
+    });
+
+    it("should prioritize owner access over shared access", async () => {
+      // Share the owned project with the same user (edge case)
+      await db.insert(projectUsers).values({
+        projectId: ownedProject.id!,
+        userId: testUserId,
+        role: "TESTER",
+      });
+
+      const project = await getProject(ownedProject.id!, testUserId);
+
+      expect(project).not.toBeNull();
+      expect(project?.visibility).toBe("OWNER");
+    });
+
+    it("should return correct visibility for shared project with different roles", async () => {
+      // Test with READER role
+      await db.insert(projectUsers).values({
+        projectId: sharedProject.id!,
+        userId: testUserId,
+        role: "READER",
+      });
+
+      let project = await getProject(sharedProject.id!, testUserId);
+      expect(project?.visibility).toBe("READER");
+
+      // Update to TESTER role
+      await db
+        .delete(projectUsers)
+        .where(
+          and(
+            eq(projectUsers.projectId, sharedProject.id!),
+            eq(projectUsers.userId, testUserId),
+          ),
+        );
+      await db.insert(projectUsers).values({
+        projectId: sharedProject.id!,
+        userId: testUserId,
+        role: "TESTER",
+      });
+
+      project = await getProject(sharedProject.id!, testUserId);
+      expect(project?.visibility).toBe("TESTER");
+    });
+  });
+
+  describe("createProject", () => {
+    const createdProjectIds: string[] = [];
+
+    afterEach(async () => {
+      for (const id of createdProjectIds) {
+        await db.delete(projects).where(eq(projects.id, id));
+      }
+      createdProjectIds.length = 0;
+    });
+
+    it("should create project with valid data", async () => {
+      const newProjectData = {
+        name: "New Test Project",
+        type: "ACT_BASED" as const,
+        description: "A newly created test project",
+        routeLockChapter: 2,
+        maxMeterDelta: 15,
+      };
+
+      const project = await createProject(testUserId, newProjectData);
+      createdProjectIds.push(project.id);
+
+      expect(project).toMatchObject({
+        name: "New Test Project",
+        type: "ACT_BASED",
+        description: "A newly created test project",
+        routeLockChapter: 2,
+        maxMeterDelta: 15,
+        visibility: "OWNER",
+      });
+      expect(project.id).toBeDefined();
+      expect(project.createdAt).toBeInstanceOf(Date);
+      expect(project.updatedAt).toBeInstanceOf(Date);
+
+      // Verify project was actually created in database
+      const [dbProject] = await db
+        .select()
+        .from(projects)
+        .where(eq(projects.id, project.id))
+        .limit(1);
+      expect(dbProject).toBeDefined();
+      expect(dbProject.name).toBe("New Test Project");
+      expect(dbProject.userId).toBe(testUserId);
+    });
+
+    it("should create project with minimal data", async () => {
+      const minimalProjectData = {
+        name: "Minimal Project",
+        type: "CHAPTER_BASED" as const,
+      };
+
+      const project = await createProject(testUserId, minimalProjectData);
+      createdProjectIds.push(project.id);
+
+      expect(project).toMatchObject({
+        name: "Minimal Project",
+        type: "CHAPTER_BASED",
+        maxMeterDelta: 10, // Default value
+        visibility: "OWNER",
+      });
+      expect(project.description).toBeUndefined();
+      expect(project.routeLockChapter).toBeUndefined();
+    });
+
+    it("should create project with custom maxMeterDelta", async () => {
+      const customProjectData = {
+        name: "Custom Delta Project",
+        type: "ACT_BASED" as const,
+        maxMeterDelta: 25,
+      };
+
+      const project = await createProject(testUserId, customProjectData);
+      createdProjectIds.push(project.id);
+
+      expect(project.maxMeterDelta).toBe(25);
+    });
+
+    it("should assign correct userId to created project", async () => {
+      const projectData = {
+        name: "User Assignment Test",
+        type: "ACT_BASED" as const,
+      };
+
+      const project = await createProject(otherUserId, projectData);
+      createdProjectIds.push(project.id);
+
+      // Verify the project has the correct userId
+      const [dbProject] = await db
+        .select()
+        .from(projects)
+        .where(eq(projects.id, project.id))
+        .limit(1);
+
+      expect(dbProject.userId).toBe(otherUserId);
+    });
+
+    it("should set createdAt and updatedAt timestamps", async () => {
+      const projectData = {
+        name: "Timestamp Test",
+        type: "ACT_BASED" as const,
+      };
+
+      const beforeCreate = new Date();
+      const project = await createProject(testUserId, projectData);
+      createdProjectIds.push(project.id);
+      const afterCreate = new Date();
+
+      expect(project.createdAt).toBeInstanceOf(Date);
+      expect(project.updatedAt).toBeInstanceOf(Date);
+      expect(project.createdAt.getTime()).toBeGreaterThanOrEqual(
+        beforeCreate.getTime(),
+      );
+      expect(project.createdAt.getTime()).toBeLessThanOrEqual(
+        afterCreate.getTime(),
+      );
+      expect(project.updatedAt.getTime()).toBeGreaterThanOrEqual(
+        beforeCreate.getTime(),
+      );
+      expect(project.updatedAt.getTime()).toBeLessThanOrEqual(
+        afterCreate.getTime(),
+      );
     });
   });
 });
+

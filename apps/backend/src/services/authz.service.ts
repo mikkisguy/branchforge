@@ -20,16 +20,14 @@ import {
   NotFoundError,
   ForbiddenError,
 } from "../middleware/error-handler.middleware.js";
+import { UserRole } from "@branchforge/shared";
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-const VALID_ROLES = ["OWNER", "READER", "TESTER"] as const;
-type ValidRole = (typeof VALID_ROLES)[number];
-
-function isValidRole(value: string): value is ValidRole {
-  return VALID_ROLES.includes(value as ValidRole);
+function isValidRole(value: string): value is UserRole {
+  return value === "OWNER" || value === "READER" || value === "TESTER";
 }
 
 // ============================================================================
@@ -126,7 +124,7 @@ export async function requireProjectAccess(
 export async function getProjectRole(
   projectId: string,
   userId: string,
-): Promise<"OWNER" | "READER" | "TESTER" | null> {
+): Promise<UserRole | null> {
   const db = getDb();
 
   // Check if user is the owner
@@ -285,7 +283,7 @@ export async function requireSceneAccess(
 export async function getSceneRole(
   sceneId: string,
   userId: string,
-): Promise<"OWNER" | "READER" | "TESTER" | null> {
+): Promise<UserRole | null> {
   const db = getDb();
 
   // Get the scene with its project owner
@@ -353,7 +351,7 @@ export async function getSceneRole(
 export async function hasProjectRole(
   projectId: string,
   userId: string,
-  minimumRole: "OWNER" | "READER" | "TESTER",
+  minimumRole: UserRole,
 ): Promise<boolean> {
   const role = await getProjectRole(projectId, userId);
 
@@ -378,7 +376,7 @@ export async function hasProjectRole(
 export async function requireProjectRole(
   projectId: string,
   userId: string,
-  minimumRole: "OWNER" | "READER" | "TESTER",
+  minimumRole: UserRole,
 ): Promise<void> {
   const hasAccess = await hasProjectRole(projectId, userId, minimumRole);
 

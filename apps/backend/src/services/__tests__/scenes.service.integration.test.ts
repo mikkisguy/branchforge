@@ -22,6 +22,7 @@ import {
   sceneCharacters,
 } from "../../db/schema/index.js";
 import { eq } from "drizzle-orm";
+import { testEmail, testUuid } from "../../utils/test-ids.js";
 import {
   authorizeSceneAccess,
   listScenes,
@@ -33,8 +34,6 @@ import type {
   NewScene,
   NewCharacter,
   NewSceneLine,
-  NewSceneCharacter,
-  NewProjectUser,
 } from "../../db/schema/index.js";
 
 describe("ScenesService (Integration)", () => {
@@ -45,51 +44,51 @@ describe("ScenesService (Integration)", () => {
   });
 
   // Test fixtures with hardcoded UUIDs
-  const testUserId = "00000000-0000-0000-0000-000000000001";
-  const otherUserId = "00000000-0000-0000-0000-000000000002";
-  const thirdUserId = "00000000-0000-0000-0000-000000000003";
+  const testUserId = testUuid("05000000", 1);
+  const otherUserId = testUuid("05000000", 2);
+  const thirdUserId = testUuid("05000000", 3);
 
   const testUser: NewUser = {
     id: testUserId,
-    email: "owner@test.com",
+    email: testEmail("scenes-service", "owner"),
     passwordHash: "hashed_password",
     role: "OWNER",
   };
 
   const otherUser: NewUser = {
     id: otherUserId,
-    email: "other@test.com",
+    email: testEmail("scenes-service", "other"),
     passwordHash: "hashed_password",
     role: "OWNER",
   };
 
   const thirdUser: NewUser = {
     id: thirdUserId,
-    email: "third@test.com",
+    email: testEmail("scenes-service", "third"),
     passwordHash: "hashed_password",
     role: "READER",
   };
 
   const ownedProject: NewProject = {
-    id: "10000000-0000-0000-0000-000000000001",
+    id: testUuid("15000000", 1),
     userId: testUserId,
     name: "Owned Project",
-    type: "PREQUEL",
+    type: "ACT_BASED",
     description: "A project owned by the user",
     maxMeterDelta: 10,
   };
 
   const sharedProject: NewProject = {
-    id: "10000000-0000-0000-0000-000000000002",
+    id: testUuid("15000000", 2),
     userId: otherUserId,
     name: "Shared Project",
-    type: "SEQUEL",
+    type: "CHAPTER_BASED",
     description: "A project shared with the user",
     maxMeterDelta: 15,
   };
 
   const ownedScene: NewScene = {
-    id: "20000000-0000-0000-0000-000000000001",
+    id: testUuid("25000000", 1),
     projectId: ownedProject.id!,
     title: "chapter1_scene1",
     act: "I",
@@ -103,7 +102,7 @@ describe("ScenesService (Integration)", () => {
   };
 
   const sharedScene: NewScene = {
-    id: "20000000-0000-0000-0000-000000000002",
+    id: testUuid("25000000", 2),
     projectId: sharedProject.id!,
     title: "chapter1_scene2",
     act: "I",
@@ -117,7 +116,7 @@ describe("ScenesService (Integration)", () => {
   };
 
   const testCharacter: NewCharacter = {
-    id: "30000000-0000-0000-0000-000000000001",
+    id: testUuid("35000000", 1),
     projectId: ownedProject.id!,
     name: "Eileen",
     displayName: "Eileen",
@@ -179,7 +178,7 @@ describe("ScenesService (Integration)", () => {
     });
 
     it("should return false when scene does not exist", async () => {
-      const nonExistentSceneId = "20000000-0000-0000-0000-999999999999";
+      const nonExistentSceneId = testUuid("25000000", 999999999999);
       const authorized = await authorizeSceneAccess(
         nonExistentSceneId,
         testUserId,
@@ -247,10 +246,10 @@ describe("ScenesService (Integration)", () => {
     it("should return empty array when project has no scenes", async () => {
       // Create a project with no scenes
       const emptyProject: NewProject = {
-        id: "10000000-0000-0000-0000-000000000003",
+        id: testUuid("15000000", 3),
         userId: testUserId,
         name: "Empty Project",
-        type: "PREQUEL",
+        type: "ACT_BASED",
         maxMeterDelta: 10,
       };
       await db.insert(projects).values(emptyProject);
@@ -275,7 +274,7 @@ describe("ScenesService (Integration)", () => {
         chapter: 1,
         sceneNumber: 1,
         sequenceOrder: 0,
-        route: "EILEEN",
+        routeKey: "EILEEN",
         status: "DRAFT",
       });
       expect(typeof scenes[0].createdAt).toBe("string");
@@ -297,7 +296,7 @@ describe("ScenesService (Integration)", () => {
         id: sharedScene.id!,
         projectId: sharedProject.id!,
         title: "chapter1_scene2",
-        route: "LUCAS",
+        routeKey: "LUCAS",
       });
     });
 
@@ -312,7 +311,7 @@ describe("ScenesService (Integration)", () => {
     it("should filter scenes by route", async () => {
       // Add a second scene with different route
       const secondScene: NewScene = {
-        id: "20000000-0000-0000-0000-000000000003",
+        id: testUuid("25000000", 3),
         projectId: ownedProject.id!,
         title: "chapter1_scene2",
         act: "I",
@@ -327,12 +326,12 @@ describe("ScenesService (Integration)", () => {
       await db.insert(scenesTable).values(secondScene);
 
       const scenes = await listScenes(ownedProject.id!, testUserId, {
-        route: "EILEEN",
+        routeKey: "EILEEN",
       });
 
       expect(scenes).toHaveLength(1);
       expect(scenes[0].id).toBe(ownedScene.id);
-      expect(scenes[0].route).toBe("EILEEN");
+      expect(scenes[0].routeKey).toBe("EILEEN");
 
       // Cleanup
       await db.delete(scenesTable).where(eq(scenesTable.id, secondScene.id!));
@@ -341,7 +340,7 @@ describe("ScenesService (Integration)", () => {
     it("should filter scenes by status", async () => {
       // Add a scene with different status
       const reviewScene: NewScene = {
-        id: "20000000-0000-0000-0000-000000000004",
+        id: testUuid("25000000", 4),
         projectId: ownedProject.id!,
         title: "chapter1_scene3",
         act: "I",
@@ -380,7 +379,7 @@ describe("ScenesService (Integration)", () => {
     });
 
     it("should return null when scene does not exist", async () => {
-      const nonExistentSceneId = "20000000-0000-0000-0000-999999999999";
+      const nonExistentSceneId = testUuid("25000000", 999999999999);
       const scene = await getScene(nonExistentSceneId, testUserId);
 
       expect(scene).toBeNull();
@@ -400,7 +399,7 @@ describe("ScenesService (Integration)", () => {
 
       // Add scene lines
       const testLine: NewSceneLine = {
-        id: "40000000-0000-0000-0000-000000000001",
+        id: testUuid("45000000", 1),
         sceneId: ownedScene.id!,
         sequence: 1,
         contentType: "DIALOGUE",

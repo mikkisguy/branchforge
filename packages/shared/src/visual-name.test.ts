@@ -4,7 +4,7 @@ import {
   generateJumpLabel,
   type VisualSystemConfig,
   type VisualNameComponents,
-  RouteType,
+  type RouteConfig,
 } from './index.js';
 
 describe('generateVisualName', () => {
@@ -19,10 +19,6 @@ describe('generateVisualName', () => {
       scenePadding: 2,
       counterPadding: 2,
       jumpPrefixShared: '',
-      jumpPrefixRouteA: 'lucas_',
-      jumpPrefixRouteB: 'eileen_',
-      routeAName: 'Lucas',
-      routeBName: 'Eileen',
     };
 
     it('generates name with act prefix', () => {
@@ -78,10 +74,6 @@ describe('generateVisualName', () => {
       scenePadding: 2,
       counterPadding: 2,
       jumpPrefixShared: '',
-      jumpPrefixRouteA: 'lucas_',
-      jumpPrefixRouteB: 'eileen_',
-      routeAName: 'Lucas',
-      routeBName: 'Eileen',
     };
 
     it('generates name with chapter prefix', () => {
@@ -109,39 +101,64 @@ describe('generateVisualName', () => {
 });
 
 describe('generateJumpLabel', () => {
-  const config: VisualSystemConfig = {
-    pattern: 'ACT_SCENE_SLUG_COUNTER',
-    scenePadding: 2,
-    counterPadding: 2,
-    jumpPrefixShared: '',
-    jumpPrefixRouteA: 'lucas_',
-    jumpPrefixRouteB: 'eileen_',
-    routeAName: 'Lucas',
-    routeBName: 'Eileen',
+  // Mock route configurations
+  const lucasRoute: RouteConfig = {
+    id: '1',
+    projectId: 'proj-1',
+    routeKey: 'lucas',
+    routeName: "Lucas's Route",
+    jumpPrefix: 'lucas_',
+    sortOrder: 1,
+    isShared: false,
+  };
+
+  const eileenRoute: RouteConfig = {
+    id: '2',
+    projectId: 'proj-1',
+    routeKey: 'eileen',
+    routeName: "Eileen's Route",
+    jumpPrefix: 'eileen_',
+    sortOrder: 2,
+    isShared: false,
+  };
+
+  const sharedRoute: RouteConfig = {
+    id: '3',
+    projectId: 'proj-1',
+    routeKey: 'shared',
+    routeName: 'Shared Route',
+    jumpPrefix: '',
+    sortOrder: 0,
+    isShared: true,
   };
 
   it('generates shared route jump label', () => {
-    const result = generateJumpLabel(config, RouteType.SHARED, 5);
+    const result = generateJumpLabel(sharedRoute, 5, 2);
     expect(result).toBe('05');
   });
 
   it('generates Lucas route jump label', () => {
-    const result = generateJumpLabel(config, RouteType.LUCAS, 3);
+    const result = generateJumpLabel(lucasRoute, 3, 2);
     expect(result).toBe('lucas_03');
   });
 
   it('generates Eileen route jump label', () => {
-    const result = generateJumpLabel(config, RouteType.EILEEN, 7);
+    const result = generateJumpLabel(eileenRoute, 7, 2);
     expect(result).toBe('eileen_07');
   });
 
   it('generates label for null route (shared/common)', () => {
-    const result = generateJumpLabel(config, null, 1);
+    const result = generateJumpLabel(null, 1, 2);
     expect(result).toBe('01');
   });
 
   it('pads scene number correctly', () => {
-    const result = generateJumpLabel(config, RouteType.SHARED, 1);
+    const result = generateJumpLabel(sharedRoute, 1, 2);
     expect(result).toBe('01');
+  });
+
+  it('uses scenePadding of 1', () => {
+    const result = generateJumpLabel(lucasRoute, 5, 1);
+    expect(result).toBe('lucas_5');
   });
 });

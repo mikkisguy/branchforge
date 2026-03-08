@@ -291,16 +291,31 @@ export async function importFromGitlab(
         limiter.run(async () => {
           const content = await getFileContent(projectId, file.path, branch);
           return { file, content };
-        })
-      )
+        }),
+      ),
     );
+
+    // Track if any file fetch succeeded and capture first error
+    let anySuccess = false;
+    let firstError: Error | null = null;
 
     // Process fetched results, handling errors per-file
     for (const result of fileFetchResults) {
-      if (result.status === "rejected" || !result.value.content) {
-        // Skip files that failed to fetch or have no content
+      if (result.status === "rejected") {
+        // Capture the first error for reporting
+        if (!firstError) {
+          firstError =
+            result.reason instanceof Error
+              ? result.reason
+              : new Error(String(result.reason));
+        }
         continue;
       }
+      if (!result.value.content) {
+        // Skip files with no content
+        continue;
+      }
+      anySuccess = true;
 
       const { file, content } = result.value;
 
@@ -352,10 +367,7 @@ export async function importFromGitlab(
           if (existingScene && conflictResolution === "manual_review") {
             // Count as conflict for manual review
             conflictCount++;
-          } else if (
-            existingScene &&
-            conflictResolution === "gitlab_wins"
-          ) {
+          } else if (existingScene && conflictResolution === "gitlab_wins") {
             // Update existing scene
             await db.transaction(async (tx) => {
               await tx
@@ -390,7 +402,7 @@ export async function importFromGitlab(
                   labelName: label.label,
                   labelPosition: i,
                   sequenceOrder: i,
-                  route: "COMMON",
+                  route: null, // User will assign route later
                   sceneNumber: i + 1,
                   status: "DRAFT",
                   prerequisites: {},
@@ -418,6 +430,21 @@ export async function importFromGitlab(
           // If branchforge_wins, do nothing (keep local data)
         }
       }
+    }
+
+    // If all file fetches failed, mark operation as failed
+    if (!anySuccess && rpyFiles.length > 0) {
+      const errorMessage = firstError?.message || "All file fetches failed";
+      await updateSyncOperation(operation.id, {
+        status: "failed",
+        errorMessage,
+      });
+
+      return {
+        ...operation,
+        status: "failed",
+        errorMessage,
+      };
     }
 
     // Mark operation as completed
@@ -532,7 +559,10 @@ export async function detectConflicts(
       .where(inArray(sceneLines.sceneId, Array.from(gitlabSceneIds)));
 
     // Build a map of sceneId -> lines for efficient lookup
-    const localLinesBySceneId = new Map<string, Array<typeof allLocalLinesWithSpeakers[0]>>();
+    const localLinesBySceneId = new Map<
+      string,
+      Array<(typeof allLocalLinesWithSpeakers)[0]>
+    >();
     for (const line of allLocalLinesWithSpeakers) {
       const existing = localLinesBySceneId.get(line.sceneId);
       if (existing) {
@@ -559,16 +589,31 @@ export async function detectConflicts(
             branch,
           );
           return { gitlabFile, content };
-        })
-      )
+        }),
+      ),
     );
+
+    // Track if any file fetch succeeded and capture first error
+    let anySuccess = false;
+    let firstError: Error | null = null;
 
     // Process fetched results, handling errors per-file
     for (const result of fileFetchResults) {
-      if (result.status === "rejected" || !result.value.content) {
-        // Skip files that failed to fetch or have no content
+      if (result.status === "rejected") {
+        // Capture the first error for reporting
+        if (!firstError) {
+          firstError =
+            result.reason instanceof Error
+              ? result.reason
+              : new Error(String(result.reason));
+        }
         continue;
       }
+      if (!result.value.content) {
+        // Skip files with no content
+        continue;
+      }
+      anySuccess = true;
 
       const { gitlabFile, content } = result.value;
 
@@ -588,11 +633,13 @@ export async function detectConflicts(
         } else {
           // Compare local and remote content
           const localScene = localScenes.find(
-            (s) => s.gitlabFileId === gitlabFile.id && s.labelName === label.label,
+            (s) =>
+              s.gitlabFileId === gitlabFile.id && s.labelName === label.label,
           );
           if (localScene) {
             // Use pre-fetched scene lines from map to avoid N+1 queries
-            const localLinesWithSpeakers = localLinesBySceneId.get(localScene.id) || [];
+            const localLinesWithSpeakers =
+              localLinesBySceneId.get(localScene.id) || [];
 
             // Normalize local dialogue to use character tags (matching RPY format)
             const normalizedLocalDialogue = localLinesWithSpeakers
@@ -636,6 +683,15 @@ export async function detectConflicts(
           });
         }
       }
+    }
+
+    // If all file fetches failed, return an error
+    if (!anySuccess && firstError) {
+      return {
+        hasConflicts: false,
+        conflicts: [],
+        error: firstError.message,
+      };
     }
 
     return {

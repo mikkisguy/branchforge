@@ -8,7 +8,15 @@
  * - Test database must exist and have proper schema
  */
 
-import { describe, it, expect, beforeEach, afterEach, beforeAll, vi } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  beforeAll,
+  vi,
+} from "vitest";
 import { getDb } from "../../db/index.js";
 import {
   users,
@@ -28,12 +36,9 @@ import {
   checkContentAlreadySynced,
   createSyncState,
   completeSyncState,
-  type SyncScenesResult,
 } from "../gitlab-file-sync.service.js";
-import {
-  parseRPYFileWithLabels,
-  type ParsedRPYFileWithLabels,
-} from "../rpy-parser.service.js";
+import { parseRPYFileWithLabels } from "../rpy-parser.service.js";
+import { testEmail, testUuid } from "../../utils/test-ids.js";
 
 describe("GitLabFileSyncService (Integration)", () => {
   let db: ReturnType<typeof getDb>;
@@ -43,23 +48,23 @@ describe("GitLabFileSyncService (Integration)", () => {
   });
 
   // Test fixtures with hardcoded UUIDs
-  const testUserId = "00000000-0000-0000-0000-000000000001";
-  const testProjectId = "10000000-0000-0000-0000-000000000001";
-  const testGitlabFileId = "50000000-0000-0000-0000-000000000001";
+  const testUserId = testUuid("07000000", 1);
+  const testProjectId = testUuid("17000000", 1);
+  const testGitlabFileId = testUuid("57000000", 1);
   const testBranch = "main";
 
   const testUser = {
     id: testUserId,
-    email: "owner@test.com",
+    email: testEmail("gitlab-file-sync-service", "owner"),
     passwordHash: "hashed_password",
-    role: "OWNER",
+    role: "OWNER" as const,
   };
 
   const testProject = {
     id: testProjectId,
     userId: testUserId,
     name: "Test Project",
-    type: "PREQUEL",
+    type: "ACT_BASED" as const,
     description: "A test project",
     maxMeterDelta: 10,
   };
@@ -75,7 +80,9 @@ describe("GitLabFileSyncService (Integration)", () => {
 
   // Helper to clean up all test data
   async function cleanupTestData() {
-    await db.delete(gitlabFileSyncState).where(eq(gitlabFileSyncState.gitlabFileId, testGitlabFileId));
+    await db
+      .delete(gitlabFileSyncState)
+      .where(eq(gitlabFileSyncState.gitlabFileId, testGitlabFileId));
     await db.delete(sceneLines);
     await db.delete(scenesTable);
     // Delete and reinsert gitlab file to ensure clean state
@@ -122,8 +129,12 @@ describe("GitLabFileSyncService (Integration)", () => {
     });
 
     it("should calculate different hash for different content", () => {
-      const hash1 = calculateContentHash("label start:\n    'Hello'\n    return");
-      const hash2 = calculateContentHash("label start:\n    'World'\n    return");
+      const hash1 = calculateContentHash(
+        "label start:\n    'Hello'\n    return",
+      );
+      const hash2 = calculateContentHash(
+        "label start:\n    'World'\n    return",
+      );
 
       expect(hash1).not.toBe(hash2);
     });
@@ -165,7 +176,8 @@ describe("GitLabFileSyncService (Integration)", () => {
     });
 
     it("should throw error for duplicate labels", () => {
-      const content = 'label start:\n    "First"\nlabel start:\n    "Second"\n    return';
+      const content =
+        'label start:\n    "First"\nlabel start:\n    "Second"\n    return';
       const parsed = parseRPYFileWithLabels(content);
 
       expect(() => validateRPYContent(content, parsed)).toThrow(
@@ -174,7 +186,8 @@ describe("GitLabFileSyncService (Integration)", () => {
     });
 
     it("should detect case-insensitive duplicate labels", () => {
-      const content = 'label start:\n    "First"\nlabel START:\n    "Second"\n    return';
+      const content =
+        'label start:\n    "First"\nlabel START:\n    "Second"\n    return';
       const parsed = parseRPYFileWithLabels(content);
 
       expect(() => validateRPYContent(content, parsed)).toThrow(
@@ -203,7 +216,7 @@ describe("GitLabFileSyncService (Integration)", () => {
 
     it("should return true when sync is in progress", async () => {
       await db.insert(gitlabFileSyncState).values({
-        id: "60000000-0000-0000-0000-000000000001",
+        id: testUuid("67000000", 1),
         gitlabFileId: testGitlabFileId,
         contentHash: "hash123",
         status: "in_progress",
@@ -221,7 +234,7 @@ describe("GitLabFileSyncService (Integration)", () => {
 
     it("should return false when sync is completed", async () => {
       await db.insert(gitlabFileSyncState).values({
-        id: "60000000-0000-0000-0000-000000000001",
+        id: testUuid("67000000", 1),
         gitlabFileId: testGitlabFileId,
         contentHash: "hash123",
         status: "completed",
@@ -252,7 +265,7 @@ describe("GitLabFileSyncService (Integration)", () => {
     it("should return false when only failed sync exists", async () => {
       const contentHash = "hash123";
       await db.insert(gitlabFileSyncState).values({
-        id: "60000000-0000-0000-0000-000000000001",
+        id: testUuid("67000000", 1),
         gitlabFileId: testGitlabFileId,
         contentHash,
         status: "failed",
@@ -276,7 +289,7 @@ describe("GitLabFileSyncService (Integration)", () => {
     it("should return true when content was already synced", async () => {
       const contentHash = "hash123";
       await db.insert(gitlabFileSyncState).values({
-        id: "60000000-0000-0000-0000-000000000001",
+        id: testUuid("67000000", 1),
         gitlabFileId: testGitlabFileId,
         contentHash,
         status: "completed",
@@ -298,7 +311,7 @@ describe("GitLabFileSyncService (Integration)", () => {
 
     it("should return false for different content hash", async () => {
       await db.insert(gitlabFileSyncState).values({
-        id: "60000000-0000-0000-0000-000000000001",
+        id: testUuid("67000000", 1),
         gitlabFileId: testGitlabFileId,
         contentHash: "hash123",
         status: "completed",
@@ -355,7 +368,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       const [syncState] = await db
         .insert(gitlabFileSyncState)
         .values({
-          id: "60000000-0000-0000-0000-000000000001",
+          id: testUuid("67000000", 1),
           gitlabFileId: testGitlabFileId,
           contentHash: "hash123",
           status: "in_progress",
@@ -386,7 +399,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       const [syncState] = await db
         .insert(gitlabFileSyncState)
         .values({
-          id: "60000000-0000-0000-0000-000000000001",
+          id: testUuid("67000000", 1),
           gitlabFileId: testGitlabFileId,
           contentHash: "hash123",
           status: "in_progress",
@@ -395,12 +408,7 @@ describe("GitLabFileSyncService (Integration)", () => {
         })
         .returning();
 
-      await completeSyncState(
-        syncState.id,
-        false,
-        undefined,
-        "Sync failed",
-      );
+      await completeSyncState(syncState.id, false, undefined, "Sync failed");
 
       const [updated] = await db
         .select()
@@ -477,7 +485,10 @@ describe("GitLabFileSyncService (Integration)", () => {
         .where(eq(scenesTable.gitlabFileId, testGitlabFileId));
 
       expect(scenes).toHaveLength(2);
-      expect(scenes.map((s) => s.labelName).sort()).toEqual(["chapter1", "start"]);
+      expect(scenes.map((s) => s.labelName).sort()).toEqual([
+        "chapter1",
+        "start",
+      ]);
     });
 
     it("should update existing scenes", async () => {
@@ -498,7 +509,8 @@ describe("GitLabFileSyncService (Integration)", () => {
         .limit(1);
 
       // Update content
-      const content2 = 'label start:\n    "Updated"\n    "Second line"\n    return';
+      const content2 =
+        'label start:\n    "Updated"\n    "Second line"\n    return';
 
       const result2 = await syncScenesFromGitLabFile(
         testGitlabFileId,
@@ -526,20 +538,14 @@ describe("GitLabFileSyncService (Integration)", () => {
     it("should skip sync if content already synced", async () => {
       const content = 'label start:\n    "Content"\n    return';
 
-      const result1 = await syncScenesFromGitLabFile(
-        testGitlabFileId,
-        content,
-      );
+      const result1 = await syncScenesFromGitLabFile(testGitlabFileId, content);
 
       expect(result1.success).toBe(true);
       expect(result1.skipped).toBe(false);
       expect(result1.scenesCreated).toBe(1);
 
       // Second sync with same content should be skipped
-      const result2 = await syncScenesFromGitLabFile(
-        testGitlabFileId,
-        content,
-      );
+      const result2 = await syncScenesFromGitLabFile(testGitlabFileId, content);
 
       expect(result2.success).toBe(true);
       expect(result2.skipped).toBe(true);
@@ -575,7 +581,7 @@ describe("GitLabFileSyncService (Integration)", () => {
     it("should return error when sync is already in progress", async () => {
       // Create an in-progress sync state
       await db.insert(gitlabFileSyncState).values({
-        id: "60000000-0000-0000-0000-000000000001",
+        id: testUuid("67000000", 1),
         gitlabFileId: testGitlabFileId,
         contentHash: "hash123",
         status: "in_progress",
@@ -585,10 +591,7 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       const content = 'label start:\n    "Content"\n    return';
 
-      const result = await syncScenesFromGitLabFile(
-        testGitlabFileId,
-        content,
-      );
+      const result = await syncScenesFromGitLabFile(testGitlabFileId, content);
 
       expect(result.success).toBe(false);
       expect(result.errors).toHaveLength(1);
@@ -676,10 +679,7 @@ describe("GitLabFileSyncService (Integration)", () => {
 
   describe("syncScenesFromGitLabFile - Error Handling", () => {
     it("should return error for empty content", async () => {
-      const result = await syncScenesFromGitLabFile(
-        testGitlabFileId,
-        "",
-      );
+      const result = await syncScenesFromGitLabFile(testGitlabFileId, "");
 
       expect(result.success).toBe(false);
       expect(result.errors).toHaveLength(1);
@@ -689,22 +689,17 @@ describe("GitLabFileSyncService (Integration)", () => {
     it("should return error for content with no labels", async () => {
       const content = "# Just comments\n# No labels";
 
-      const result = await syncScenesFromGitLabFile(
-        testGitlabFileId,
-        content,
-      );
+      const result = await syncScenesFromGitLabFile(testGitlabFileId, content);
 
       expect(result.success).toBe(false);
       expect(result.errors[0].error).toContain("No labels found");
     });
 
     it("should return error for duplicate labels", async () => {
-      const content = 'label start:\n    "First"\nlabel start:\n    "Second"\n    return';
+      const content =
+        'label start:\n    "First"\nlabel start:\n    "Second"\n    return';
 
-      const result = await syncScenesFromGitLabFile(
-        testGitlabFileId,
-        content,
-      );
+      const result = await syncScenesFromGitLabFile(testGitlabFileId, content);
 
       expect(result.success).toBe(false);
       expect(result.errors[0].error).toContain("Duplicate labels");
@@ -719,10 +714,7 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       const content = 'label start:\n    "Content"\n    return';
 
-      const result = await syncScenesFromGitLabFile(
-        testGitlabFileId,
-        content,
-      );
+      const result = await syncScenesFromGitLabFile(testGitlabFileId, content);
 
       expect(result.success).toBe(false);
       expect(result.errors.length).toBeGreaterThanOrEqual(1);
@@ -752,10 +744,7 @@ describe("GitLabFileSyncService (Integration)", () => {
         .where(eq(scenesTable.gitlabFileId, testGitlabFileId));
 
       // Now try to sync with empty content (should fail)
-      const result2 = await syncScenesFromGitLabFile(
-        testGitlabFileId,
-        "",
-      );
+      const result2 = await syncScenesFromGitLabFile(testGitlabFileId, "");
 
       expect(result2.success).toBe(false);
 
@@ -792,12 +781,10 @@ describe("GitLabFileSyncService (Integration)", () => {
       // Create a scenario where sync fails after sync state is created
       // Use invalid content that passes validation but causes other issues
       // Duplicate labels will fail validation after parsing and sync state creation
-      const content = 'label start:\n    "First"\nlabel start:\n    "Second"\n    return';
+      const content =
+        'label start:\n    "First"\nlabel start:\n    "Second"\n    return';
 
-      const result = await syncScenesFromGitLabFile(
-        testGitlabFileId,
-        content,
-      );
+      const result = await syncScenesFromGitLabFile(testGitlabFileId, content);
 
       expect(result.success).toBe(false);
 
@@ -818,10 +805,7 @@ describe("GitLabFileSyncService (Integration)", () => {
     it("should handle single label file", async () => {
       const content = 'label start:\n    "Only label"\n    return';
 
-      const result = await syncScenesFromGitLabFile(
-        testGitlabFileId,
-        content,
-      );
+      const result = await syncScenesFromGitLabFile(testGitlabFileId, content);
 
       expect(result.success).toBe(true);
       expect(result.scenesCreated).toBe(1);
@@ -830,10 +814,7 @@ describe("GitLabFileSyncService (Integration)", () => {
     it("should handle label with no dialogue", async () => {
       const content = "label start:\n    return";
 
-      const result = await syncScenesFromGitLabFile(
-        testGitlabFileId,
-        content,
-      );
+      const result = await syncScenesFromGitLabFile(testGitlabFileId, content);
 
       expect(result.success).toBe(true);
       expect(result.scenesCreated).toBe(1);
@@ -845,13 +826,11 @@ describe("GitLabFileSyncService (Integration)", () => {
       const fakeFileId = "99999999-9999-9999-9999-999999999999";
       const content = 'label start:\n    "Content"\n    return';
 
-      const result = await syncScenesFromGitLabFile(
-        fakeFileId,
-        content,
-      );
+      const result = await syncScenesFromGitLabFile(fakeFileId, content);
 
       expect(result.success).toBe(false);
       expect(result.errors.length).toBeGreaterThanOrEqual(1);
     });
   });
 });
+

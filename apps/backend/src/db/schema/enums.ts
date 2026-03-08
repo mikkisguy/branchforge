@@ -15,8 +15,6 @@ export const userRoleEnum = pgEnum('user_role', ['OWNER', 'READER', 'TESTER']);
 // Scene workflow status
 export const sceneStatusEnum = pgEnum('scene_status', ['DRAFT', 'REVIEW', 'FINAL']);
 
-// Route types for prequel and sequel
-export const routeTypeEnum = pgEnum('route_type', ['EILEEN', 'LUCAS', 'SHARED', 'FEMALE', 'MALE', 'COMBINED', 'COMMON']);
 
 // Content line types for export logic
 export const contentTypeEnum = pgEnum('content_type', ['NARRATION', 'DIALOGUE', 'CHOICE', 'MENU', 'JUMP']);

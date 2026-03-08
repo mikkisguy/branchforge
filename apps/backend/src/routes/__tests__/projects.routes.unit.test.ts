@@ -137,7 +137,7 @@ describe("ProjectsRoutes", () => {
     it("should create project with valid data", async () => {
       const requestBody = {
         name: "New Project",
-        type: "PREQUEL",
+        type: "ACT_BASED",
         description: "A new project",
         routeLockChapter: 2,
         maxMeterDelta: 15,
@@ -168,7 +168,7 @@ describe("ProjectsRoutes", () => {
     it("should return 400 when name is missing", async () => {
       const requestBody = {
         name: "",
-        type: "PREQUEL",
+        type: "ACT_BASED",
       };
 
       const response = await fastify.inject({

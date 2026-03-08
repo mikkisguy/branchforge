@@ -12,7 +12,6 @@ import {
   passwordSchema,
   projectTypeSchema,
   sceneStatusSchema,
-  routeTypeSchema,
   booleanStringSchema,
   intStringSchema,
   registerSchema,
@@ -149,7 +148,7 @@ describe("Common Schemas", () => {
 describe("Enum Schemas", () => {
   describe("projectTypeSchema", () => {
     it("should accept valid project types", () => {
-      const validTypes = ["PREQUEL", "SEQUEL"];
+      const validTypes = ["ACT_BASED", "CHAPTER_BASED"];
 
       for (const type of validTypes) {
         const result = projectTypeSchema.safeParse(type);
@@ -175,30 +174,6 @@ describe("Enum Schemas", () => {
 
     it("should reject invalid scene statuses", () => {
       const result = sceneStatusSchema.safeParse("INVALID");
-      expect(result.success).toBe(false);
-    });
-  });
-
-  describe("routeTypeSchema", () => {
-    it("should accept valid route types", () => {
-      const validRoutes = [
-        "EILEEN",
-        "LUCAS",
-        "SHARED",
-        "FEMALE",
-        "MALE",
-        "COMBINED",
-        "COMMON",
-      ];
-
-      for (const route of validRoutes) {
-        const result = routeTypeSchema.safeParse(route);
-        expect(result.success).toBe(true);
-      }
-    });
-
-    it("should reject invalid route types", () => {
-      const result = routeTypeSchema.safeParse("INVALID");
       expect(result.success).toBe(false);
     });
   });
@@ -587,7 +562,7 @@ describe("Project Schemas", () => {
     it("should accept valid project data", () => {
       const validData = {
         name: "Test Project",
-        type: "PREQUEL",
+        type: "ACT_BASED",
         description: "A test project",
       };
 
@@ -608,7 +583,7 @@ describe("Project Schemas", () => {
     it("should reject empty project name", () => {
       const invalidData = {
         name: "   ",
-        type: "PREQUEL",
+        type: "ACT_BASED",
       };
 
       const result = createProjectSchema.safeParse(invalidData);
@@ -658,7 +633,7 @@ describe("Scene Schemas", () => {
     it("should accept valid query parameters", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        route: "EILEEN",
+        routeKey: "eileen",
         status: "DRAFT",
       };
 
@@ -702,17 +677,17 @@ describe("Create Scene Schema", () => {
     it("should accept valid minimal scene payload", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        route: "EILEEN",
+        routeKey: "eileen",
       };
 
       const result = createSceneSchema.safeParse(validData);
       expect(result.success).toBe(true);
     });
 
-    it("should accept valid full scene payload for PREQUEL project", () => {
+    it("should accept valid full scene payload for ACT_BASED project", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        route: "LUCAS",
+        routeKey: "lucas",
         act: 1,
         scene: 42,
         status: "DRAFT",
@@ -725,10 +700,10 @@ describe("Create Scene Schema", () => {
       expect(result.success).toBe(true);
     });
 
-    it("should accept valid full scene payload for SEQUEL project", () => {
+    it("should accept valid full scene payload for CHAPTER_BASED project", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        route: "FEMALE",
+        routeKey: "female",
         chapter: 5,
         scene: 10,
         status: "REVIEW",
@@ -744,7 +719,7 @@ describe("Create Scene Schema", () => {
     it("should accept valid sequenceOrder for linear sequencing", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        route: "COMMON",
+        routeKey: "common",
         sequenceOrder: 100,
       };
 
@@ -754,46 +729,46 @@ describe("Create Scene Schema", () => {
 
     it("should reject missing required field: projectId", () => {
       const invalidData = {
-        route: "EILEEN",
+        routeKey: "eileen",
       };
 
       const result = createSceneSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
 
-    it("should reject missing required field: route", () => {
-      const invalidData = {
+    it("should accept scene without routeKey (optional field)", () => {
+      const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
       };
 
-      const result = createSceneSchema.safeParse(invalidData);
-      expect(result.success).toBe(false);
+      const result = createSceneSchema.safeParse(validData);
+      expect(result.success).toBe(true);
     });
 
     it("should reject invalid UUID for projectId", () => {
       const invalidData = {
         projectId: "not-a-uuid",
-        route: "EILEEN",
+        routeKey: "eileen",
       };
 
       const result = createSceneSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
 
-    it("should reject invalid route enum value", () => {
-      const invalidData = {
+    it("should accept any string value for routeKey", () => {
+      const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        route: "INVALID_ROUTE",
+        routeKey: "my_custom_route",
       };
 
-      const result = createSceneSchema.safeParse(invalidData);
-      expect(result.success).toBe(false);
+      const result = createSceneSchema.safeParse(validData);
+      expect(result.success).toBe(true);
     });
 
     it("should reject invalid status enum value", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        route: "EILEEN",
+        routeKey: "eileen",
         status: "INVALID_STATUS",
       };
 
@@ -804,7 +779,7 @@ describe("Create Scene Schema", () => {
     it("should reject invalid visibility enum value", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        route: "EILEEN",
+        routeKey: "eileen",
         visibility: "INVALID_VISIBILITY",
       };
 
@@ -815,7 +790,7 @@ describe("Create Scene Schema", () => {
     it("should reject act value below minimum (1)", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        route: "EILEEN",
+        routeKey: "eileen",
         act: 0,
       };
 
@@ -826,7 +801,7 @@ describe("Create Scene Schema", () => {
     it("should reject act value above maximum (99)", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        route: "EILEEN",
+        routeKey: "eileen",
         act: 100,
       };
 
@@ -837,7 +812,7 @@ describe("Create Scene Schema", () => {
     it("should reject non-integer act value", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        route: "EILEEN",
+        routeKey: "eileen",
         act: 1.5,
       };
 
@@ -848,7 +823,7 @@ describe("Create Scene Schema", () => {
     it("should reject scene value below minimum (1)", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        route: "EILEEN",
+        routeKey: "eileen",
         scene: 0,
       };
 
@@ -859,7 +834,7 @@ describe("Create Scene Schema", () => {
     it("should reject scene value above maximum (999)", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        route: "EILEEN",
+        routeKey: "eileen",
         scene: 1000,
       };
 
@@ -870,7 +845,7 @@ describe("Create Scene Schema", () => {
     it("should reject chapter value below minimum (1)", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        route: "FEMALE",
+        routeKey: "female",
         chapter: 0,
       };
 
@@ -881,7 +856,7 @@ describe("Create Scene Schema", () => {
     it("should reject chapter value above maximum (99)", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        route: "FEMALE",
+        routeKey: "female",
         chapter: 100,
       };
 
@@ -892,7 +867,7 @@ describe("Create Scene Schema", () => {
     it("should reject negative sequenceOrder value", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        route: "COMMON",
+        routeKey: "common",
         sequenceOrder: -1,
       };
 
@@ -903,7 +878,7 @@ describe("Create Scene Schema", () => {
     it("should reject non-integer scene value", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        route: "EILEEN",
+        routeKey: "eileen",
         scene: 1.5,
       };
 

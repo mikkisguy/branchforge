@@ -29,9 +29,9 @@ export function generateRpyContent(scene: SceneDetail): string[] {
       `<span class="text-muted-foreground"># Chapter: ${escapeHtml(scene.chapter.toString())}</span>`,
     );
   }
-  if (scene.route) {
+  if (scene.routeKey) {
     lines.push(
-      `<span class="text-muted-foreground"># Route: ${escapeHtml(scene.route)}</span>`,
+      `<span class="text-muted-foreground"># Route: ${escapeHtml(scene.routeKey)}</span>`,
     );
   }
   lines.push("");

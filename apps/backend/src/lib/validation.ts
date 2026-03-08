@@ -143,13 +143,12 @@ export const userRoleSchema = z.enum(Object.values(UserRole), {
 /**
  * Scene status enum
  */
-export const sceneStatusSchema = z.enum([
-  SceneStatus.DRAFT,
-  SceneStatus.REVIEW,
-  SceneStatus.FINAL,
-], {
-  message: "Status must be DRAFT, REVIEW, or FINAL",
-});
+export const sceneStatusSchema = z.enum(
+  [SceneStatus.DRAFT, SceneStatus.REVIEW, SceneStatus.FINAL],
+  {
+    message: "Status must be DRAFT, REVIEW, or FINAL",
+  },
+);
 
 /**
  * Route configuration key schema
@@ -159,7 +158,10 @@ export const routeConfigKeySchema = z
   .string()
   .min(1, "Route key is required")
   .max(50, "Route key is too long")
-  .regex(/^[a-zA-Z0-9_-]+$/, "Route key must contain only letters, numbers, underscores, and hyphens");
+  .regex(
+    /^[a-zA-Z0-9_-]+$/,
+    "Route key must contain only letters, numbers, underscores, and hyphens",
+  );
 
 /**
  * Content type enum
@@ -368,7 +370,10 @@ export const createRouteConfigSchema = z
       .string()
       .min(1, "Jump prefix is required")
       .max(50, "Jump prefix is too long")
-      .regex(/^[a-zA-Z0-9_-]+$/, "Jump prefix must contain only letters, numbers, underscores, and hyphens"),
+      .regex(
+        /^[a-zA-Z0-9_-]+$/,
+        "Jump prefix must contain only letters, numbers, underscores, and hyphens",
+      ),
     sortOrder: z.number().int().min(0).max(9999).optional(),
     isShared: z.boolean().optional(),
   })
@@ -385,7 +390,10 @@ export const updateRouteConfigSchema = z
       .string()
       .min(1, "Jump prefix is required")
       .max(50, "Jump prefix is too long")
-      .regex(/^[a-zA-Z0-9_-]+$/, "Jump prefix must contain only letters, numbers, underscores, and hyphens")
+      .regex(
+        /^[a-zA-Z0-9_-]+$/,
+        "Jump prefix must contain only letters, numbers, underscores, and hyphens",
+      )
       .optional(),
     sortOrder: z.number().int().min(0).max(9999).optional(),
     isShared: z.boolean().optional(),

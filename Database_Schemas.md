@@ -4,10 +4,9 @@
 
 | Enum | Values | Notes |
 |------|--------|-------|
-| `project_type` | `PREQUEL`, `SEQUEL` | |
+| `project_type` | `ACT_BASED`, `CHAPTER_BASED` | Prequel uses acts (I, II, III), Sequel uses chapters (1, 2, 3) |
 | `user_role` | `OWNER`, `READER`, `TESTER` | Beta reader support |
 | `scene_status` | `DRAFT`, `REVIEW`, `FINAL` | |
-| `route_type` | `EILEEN`, `LUCAS`, `SHARED`, `FEMALE`, `MALE`, `COMBINED`, `COMMON` | Prequel routes + Sequel routes |
 | `content_type` | `NARRATION`, `DIALOGUE`, `CHOICE`, `MENU`, `JUMP` | For line-level export logic |
 | `visual_type` | `GENERATED`, `BLACK`, `CUSTOM` | Image handling per line |
 | `element_type` | `LOCATION`, `ITEM`, `CONCEPT`, `EVENT` | World bible |
@@ -135,6 +134,26 @@ Pattern configuration per project.
 
 ---
 
+### 7.1. Route Configurations
+
+User-defined routes per project. Replaces hardcoded route enums.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid PK | |
+| `project_id` | uuid FK → projects | |
+| `route_key` | text, not null | `"hero"`, `"villain"` - unique per project |
+| `route_name` | text, not null | `"Hero's Route"` - display name |
+| `jump_prefix` | text, not null | `"hero_"` - for Ren'Py labels |
+| `sort_order` | integer, default 0 | Display order |
+| `is_shared` | boolean, default false | Whether this is a shared route |
+| `created_at` | timestamp | |
+| `updated_at` | timestamp | |
+
+Unique constraint: `(project_id, route_key)`
+
+---
+
 ### 8. Ren'Py Definitions
 
 Character tags, colors, transforms.
@@ -228,7 +247,7 @@ Container for logical scenes; content to `scene_lines`.
 | `chapter` | integer, nullable | 1, 2, 3... or null |
 | `scene_number` | integer, not null | |
 | `sequence_order` | integer, default 0 | Sorting |
-| `route` | `route_type`, nullable | Null = shared/common |
+| `route` | text, nullable | References `route_configs.route_key` (custom user-defined routes). Null = shared/common |
 | `visibility` | enum | `EXCLUSIVE`, `SHARED`, `DUO_PAIR` |
 | `duo_pair_id` | uuid FK → pair_groups, nullable | |
 | `status` | `scene_status`, default `DRAFT` | |

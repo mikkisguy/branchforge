@@ -14,40 +14,40 @@
 /**
  * User role enumeration
  */
-export type UserRole = 'OWNER' | 'READER' | 'TESTER';
+export type UserRole = "OWNER" | "READER" | "TESTER";
 export const UserRole = {
-  OWNER: 'OWNER',
-  READER: 'READER',
-  TESTER: 'TESTER',
+  OWNER: "OWNER",
+  READER: "READER",
+  TESTER: "TESTER",
 } as const;
 
 /**
  * Project type enumeration
  */
-export type ProjectType = 'ACT_BASED' | 'CHAPTER_BASED';
+export type ProjectType = "ACT_BASED" | "CHAPTER_BASED";
 export const ProjectType = {
-  ACT_BASED: 'ACT_BASED',
-  CHAPTER_BASED: 'CHAPTER_BASED',
+  ACT_BASED: "ACT_BASED",
+  CHAPTER_BASED: "CHAPTER_BASED",
 } as const;
 
 /**
  * Scene status enumeration
  */
-export type SceneStatus = 'DRAFT' | 'REVIEW' | 'FINAL';
+export type SceneStatus = "DRAFT" | "REVIEW" | "FINAL";
 export const SceneStatus = {
-  DRAFT: 'DRAFT',
-  REVIEW: 'REVIEW',
-  FINAL: 'FINAL',
+  DRAFT: "DRAFT",
+  REVIEW: "REVIEW",
+  FINAL: "FINAL",
 } as const;
 
 /**
  * Scene visibility enumeration
  */
-export type SceneVisibility = 'EXCLUSIVE' | 'SHARED' | 'DUO_PAIR';
+export type SceneVisibility = "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
 export const SceneVisibility = {
-  EXCLUSIVE: 'EXCLUSIVE',
-  SHARED: 'SHARED',
-  DUO_PAIR: 'DUO_PAIR',
+  EXCLUSIVE: "EXCLUSIVE",
+  SHARED: "SHARED",
+  DUO_PAIR: "DUO_PAIR",
 } as const;
 
 // ============================================================================
@@ -86,7 +86,9 @@ export interface PublicUser {
 // Visual Name Pattern Types
 // ============================================================================
 
-export type VisualPattern = 'ACT_SCENE_SLUG_COUNTER' | 'CHAPTER_SCENE_SLUG_COUNTER';
+export type VisualPattern =
+  | "ACT_SCENE_SLUG_COUNTER"
+  | "CHAPTER_SCENE_SLUG_COUNTER";
 
 export interface VisualSystemConfig {
   pattern: VisualPattern;
@@ -124,29 +126,46 @@ export function generateVisualName(
 ): string {
   const parts: string[] = [];
 
-  if (config.pattern === 'ACT_SCENE_SLUG_COUNTER') {
+  if (config.pattern === "ACT_SCENE_SLUG_COUNTER") {
     // Prequel pattern: {act_prefix}{scene}_{counter}_{slug}
-    const actPrefix = components.act && config.actPrefixes
-      ? config.actPrefixes[components.act]
-      : '';
+    const actPrefix =
+      components.act && config.actPrefixes
+        ? config.actPrefixes[components.act]
+        : "";
 
-    const sceneNum = String(components.sceneNumber).padStart(config.scenePadding, '0');
-    const counter = String(components.counter).padStart(config.counterPadding, '0');
+    const sceneNum = String(components.sceneNumber).padStart(
+      config.scenePadding,
+      "0",
+    );
+    const counter = String(components.counter).padStart(
+      config.counterPadding,
+      "0",
+    );
 
     if (actPrefix) parts.push(actPrefix);
     parts.push(sceneNum, counter, components.slug);
-
   } else {
     // Sequel pattern: {chapter_prefix}{chapter}_{scene}_{counter}_{slug}
-    const chapterPrefix = config.chapterPrefix || 'ch';
-    const chapter = String(components.chapter).padStart(1, '0');
-    const sceneNum = String(components.sceneNumber).padStart(config.scenePadding, '0');
-    const counter = String(components.counter).padStart(config.counterPadding, '0');
+    const chapterPrefix = config.chapterPrefix || "ch";
+    const chapter = String(components.chapter).padStart(1, "0");
+    const sceneNum = String(components.sceneNumber).padStart(
+      config.scenePadding,
+      "0",
+    );
+    const counter = String(components.counter).padStart(
+      config.counterPadding,
+      "0",
+    );
 
-    parts.push(`${chapterPrefix}${chapter}`, sceneNum, counter, components.slug);
+    parts.push(
+      `${chapterPrefix}${chapter}`,
+      sceneNum,
+      counter,
+      components.slug,
+    );
   }
 
-  return parts.join('_');
+  return parts.join("_");
 }
 
 /**
@@ -162,7 +181,7 @@ export function generateJumpLabel(
   sceneNumber: number,
   scenePadding: 1 | 2,
 ): string {
-  const sceneNum = String(sceneNumber).padStart(scenePadding, '0');
+  const sceneNum = String(sceneNumber).padStart(scenePadding, "0");
 
   if (!routeConfig || routeConfig.isShared) {
     return sceneNum;
@@ -198,7 +217,7 @@ export interface Scene {
   act?: string;
   chapter?: number;
   sceneNumber: number;
-  routeKey?: string;
+  routeKey?: string; // References route_configs.route_key (custom user-defined routes)
   status: SceneStatus;
   createdAt: Date;
 }
@@ -229,7 +248,12 @@ export interface PublicScene {
 /**
  * Scene line content type enumeration
  */
-export type SceneLineContentType = "DIALOGUE" | "NARRATION" | "CHOICE" | "MENU" | "JUMP";
+export type SceneLineContentType =
+  | "DIALOGUE"
+  | "NARRATION"
+  | "CHOICE"
+  | "MENU"
+  | "JUMP";
 
 /**
  * Scene visual type enumeration
@@ -257,7 +281,11 @@ export interface SceneLine {
 /**
  * Scene character role enumeration
  */
-export type SceneCharacterRole = "PRIMARY" | "SECONDARY" | "BACKGROUND" | "MENTIONED";
+export type SceneCharacterRole =
+  | "PRIMARY"
+  | "SECONDARY"
+  | "BACKGROUND"
+  | "MENTIONED";
 
 /**
  * GitLab file type enumeration
@@ -304,3 +332,4 @@ export interface SceneDetail extends PublicScene {
   lines: SceneLine[];
   characters: SceneCharacter[];
 }
+
