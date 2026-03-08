@@ -8,6 +8,7 @@ import { getDb } from "../db/index.js";
 import { projects, projectUsers } from "../db/schema/index.js";
 import { eq, and } from "drizzle-orm";
 import type { Project, NewProject } from "../db/schema/tables/projects.js";
+import type { UserRole } from "@branchforge/shared";
 
 /**
  * Public project information (without sensitive data)
@@ -15,40 +16,55 @@ import type { Project, NewProject } from "../db/schema/tables/projects.js";
 export interface PublicProject {
   id: string;
   name: string;
-  type: "PREQUEL" | "SEQUEL";
   description?: string;
-  routeLockChapter?: number;
   maxMeterDelta?: number;
-  visibility?: "OWNER" | "READER" | "TESTER";
+  visibility?: UserRole;
   createdAt: Date;
   updatedAt: Date;
 }
 
 /**
- * Project fields needed for PublicProject mapping
- * Used for query results where we only need these specific fields
+ * Project row type from database queries (with optional role for shared projects)
  */
-type ProjectForPublic = Pick<
-  Project,
-  | "id"
-  | "name"
-  | "type"
-  | "description"
-  | "routeLockChapter"
-  | "maxMeterDelta"
-  | "visibility"
-  | "createdAt"
-  | "updatedAt"
->;
+type ProjectRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  maxMeterDelta: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+  role?: UserRole;
+};
+
+/**
+ * Shared project row type from database queries (role is always present due to inner join)
+ */
+type SharedProjectRow = ProjectRow & { role: UserRole };
+
+/**
+ * Convert a database project row to a PublicProject with the given visibility
+ */
+function toPublicProject(
+  project: ProjectRow,
+  visibility: UserRole,
+): PublicProject {
+  return {
+    id: project.id,
+    name: project.name,
+    description: project.description ?? undefined,
+    maxMeterDelta: project.maxMeterDelta ?? undefined,
+    visibility,
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
+  };
+}
 
 /**
  * Create project request body
  */
 export interface CreateProjectBody {
   name: string;
-  type: "PREQUEL" | "SEQUEL";
   description?: string;
-  routeLockChapter?: number;
   maxMeterDelta?: number;
 }
 
@@ -73,18 +89,16 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
     .select({
       id: projects.id,
       name: projects.name,
-      type: projects.type,
       description: projects.description,
-      routeLockChapter: projects.routeLockChapter,
       maxMeterDelta: projects.maxMeterDelta,
-      role: projectUsers.role,  // User's role from project_users
+      role: projectUsers.role, // User's role from project_users
       createdAt: projects.createdAt,
       updatedAt: projects.updatedAt,
     })
     .from(projects)
     .innerJoin(projectUsers, eq(projectUsers.projectId, projects.id))
     .where(eq(projectUsers.userId, userId))
-    .orderBy(projects.createdAt);
+    .orderBy(projects.createdAt) as SharedProjectRow[];
 
   // Combine both lists, removing duplicates
   // Owned projects take priority over shared projects
@@ -92,34 +106,20 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
 
   // First add owned projects with 'OWNER' visibility
   for (const project of userProjects) {
-    result.push({
-      id: project.id,
-      name: project.name,
-      type: project.type,
-      description: project.description ?? undefined,
-      routeLockChapter: project.routeLockChapter ?? undefined,
-      maxMeterDelta: project.maxMeterDelta ?? undefined,
-      visibility: 'OWNER' as const,
-      createdAt: project.createdAt,
-      updatedAt: project.updatedAt,
-    });
+    result.push(toPublicProject(project, "OWNER"));
   }
 
   // Then add shared projects (only if not already added as owned)
   // Use the user's role from project_users as visibility
   for (const shared of sharedProjectsResult) {
     if (!result.find((p) => p.id === shared.id)) {
-      result.push({
-        id: shared.id,
-        name: shared.name,
-        type: shared.type,
-        description: shared.description ?? undefined,
-        routeLockChapter: shared.routeLockChapter ?? undefined,
-        maxMeterDelta: shared.maxMeterDelta ?? undefined,
-        visibility: shared.role as "OWNER" | "READER" | "TESTER",
-        createdAt: shared.createdAt,
-        updatedAt: shared.updatedAt,
-      });
+      // Runtime guard: role should always be present due to inner join
+      if (shared.role == null) {
+        throw new Error(
+          `Shared project ${shared.id} is missing role in project_users junction table`,
+        );
+      }
+      result.push(toPublicProject(shared, shared.role));
     }
   }
 
@@ -140,13 +140,20 @@ export async function getProject(
 
   // Check if user is the owner
   const ownerProject = await db
-    .select()
+    .select({
+      id: projects.id,
+      name: projects.name,
+      description: projects.description,
+      maxMeterDelta: projects.maxMeterDelta,
+      createdAt: projects.createdAt,
+      updatedAt: projects.updatedAt,
+    })
     .from(projects)
     .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
     .limit(1);
 
   if (ownerProject.length > 0) {
-    return mapToPublicProject(ownerProject[0]);
+    return toPublicProject(ownerProject[0]!, "OWNER");
   }
 
   // Check if user has access via project_users
@@ -154,11 +161,9 @@ export async function getProject(
     .select({
       id: projects.id,
       name: projects.name,
-      type: projects.type,
       description: projects.description,
-      routeLockChapter: projects.routeLockChapter,
       maxMeterDelta: projects.maxMeterDelta,
-      visibility: projects.visibility,
+      role: projectUsers.role,
       createdAt: projects.createdAt,
       updatedAt: projects.updatedAt,
     })
@@ -168,7 +173,8 @@ export async function getProject(
     .limit(1);
 
   if (sharedProject.length > 0) {
-    return mapToPublicProject(sharedProject[0]);
+    const project = sharedProject[0]!;
+    return toPublicProject(project, project.role ?? "READER");
   }
 
   return null;
@@ -189,9 +195,7 @@ export async function createProject(
   const newProject: NewProject = {
     userId,
     name: body.name,
-    type: body.type,
     description: body.description,
-    routeLockChapter: body.routeLockChapter,
     maxMeterDelta: body.maxMeterDelta ?? 10,
   };
 
@@ -203,23 +207,6 @@ export async function createProject(
     );
   }
 
-  return mapToPublicProject(result[0]);
-}
-
-/**
- * Map a Project to PublicProject (already excludes sensitive data)
- */
-function mapToPublicProject(project: ProjectForPublic): PublicProject {
-  return {
-    id: project.id,
-    name: project.name,
-    type: project.type,
-    description: project.description ?? undefined,
-    routeLockChapter: project.routeLockChapter ?? undefined,
-    maxMeterDelta: project.maxMeterDelta ?? undefined,
-    visibility: project.visibility ?? undefined,
-    createdAt: project.createdAt,
-    updatedAt: project.updatedAt,
-  };
+  return toPublicProject(result[0]!, "OWNER");
 }
 

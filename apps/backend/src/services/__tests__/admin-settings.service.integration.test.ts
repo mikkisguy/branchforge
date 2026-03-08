@@ -10,13 +10,18 @@
  * - Test database must exist and have proper schema
  */
 
-import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'vitest';
-import { getDb } from '../../db/index.js';
-import { users, adminSettings } from '../../db/schema/index.js';
-import { eq } from 'drizzle-orm';
-import { getAdminSetting, setAdminSetting, isSignUpsEnabled } from '../admin-settings.service.js';
+import { describe, it, expect, beforeEach, afterEach, beforeAll } from "vitest";
+import { getDb } from "../../db/index.js";
+import { users, adminSettings } from "../../db/schema/index.js";
+import { eq, inArray } from "drizzle-orm";
+import {
+  getAdminSetting,
+  setAdminSetting,
+  isSignUpsEnabled,
+} from "../admin-settings.service.js";
+import { testEmail, testUuid } from "../../utils/test-ids.js";
 
-describe('AdminSettingsService (Integration)', () => {
+describe("AdminSettingsService (Integration)", () => {
   let db: ReturnType<typeof getDb>;
 
   beforeAll(async () => {
@@ -24,20 +29,23 @@ describe('AdminSettingsService (Integration)', () => {
   });
 
   // Test user ID for tracking who made changes
-  const testUserId = '00000000-0000-0000-0000-000000000001';
+  const testUserId = testUuid("03000000", 1);
 
   // Helper to clean up all test data
   async function cleanupTestData() {
-    await db.delete(adminSettings).where(eq(adminSettings.key, 'test_key'));
-    await db.delete(adminSettings).where(eq(adminSettings.key, 'new_key'));
-    await db.delete(adminSettings).where(eq(adminSettings.key, 'existing_key'));
-    await db.delete(adminSettings).where(eq(adminSettings.key, 'sign_ups_enabled'));
-    await db.delete(adminSettings).where(eq(adminSettings.key, 'complex_key'));
-    await db.delete(adminSettings).where(eq(adminSettings.key, 'config'));
-    await db.delete(adminSettings).where(eq(adminSettings.key, 'some_key'));
-    await db.delete(adminSettings).where(eq(adminSettings.key, 'max_upload_size'));
-    await db.delete(adminSettings).where(eq(adminSettings.key, 'deep_setting'));
-    await db.delete(adminSettings).where(eq(adminSettings.key, 'special_key'));
+    const testKeys = [
+      "test_key",
+      "new_key",
+      "existing_key",
+      "sign_ups_enabled",
+      "complex_key",
+      "config",
+      "max_upload_size",
+      "deep_setting",
+      "special_key",
+    ];
+
+    await db.delete(adminSettings).where(inArray(adminSettings.key, testKeys));
     await db.delete(users).where(eq(users.id, testUserId));
   }
 
@@ -46,9 +54,9 @@ describe('AdminSettingsService (Integration)', () => {
     // Create a test user for setting updates
     await db.insert(users).values({
       id: testUserId,
-      email: 'admin@test.com',
-      passwordHash: 'hashed_password',
-      role: 'OWNER',
+      email: testEmail("admin-settings-service", "admin"),
+      passwordHash: "hashed_password",
+      role: "OWNER",
     });
   }
 
@@ -61,132 +69,146 @@ describe('AdminSettingsService (Integration)', () => {
     await cleanupTestData();
   });
 
-  describe('getAdminSetting', () => {
-    it('should return null when setting does not exist', async () => {
-      const result = await getAdminSetting('nonexistent_key');
+  describe("getAdminSetting", () => {
+    it("should return null when setting does not exist", async () => {
+      const result = await getAdminSetting("nonexistent_key");
       expect(result).toBeNull();
     });
 
-    it('should return the value even if it is false', async () => {
+    it("should return the value even if it is false", async () => {
       await db.insert(adminSettings).values({
-        key: 'test_key',
+        key: "test_key",
         value: false,
         updatedBy: testUserId,
       });
 
-      const result = await getAdminSetting('test_key');
+      const result = await getAdminSetting("test_key");
       expect(result).toBe(false);
     });
 
-    it('should return string values', async () => {
+    it("should return string values", async () => {
       await db.insert(adminSettings).values({
-        key: 'test_key',
-        value: 'test_value',
+        key: "test_key",
+        value: "test_value",
         updatedBy: testUserId,
       });
 
-      const result = await getAdminSetting('test_key');
-      expect(result).toBe('test_value');
+      const result = await getAdminSetting("test_key");
+      expect(result).toBe("test_value");
     });
 
-    it('should return complex JSON values', async () => {
-      const mockValue = { foo: 'bar', nested: { count: 42 } };
+    it("should return complex JSON values", async () => {
+      const mockValue = { foo: "bar", nested: { count: 42 } };
       await db.insert(adminSettings).values({
-        key: 'complex_key',
+        key: "complex_key",
         value: mockValue,
         updatedBy: testUserId,
       });
 
-      const result = await getAdminSetting('complex_key');
+      const result = await getAdminSetting("complex_key");
       expect(result).toEqual(mockValue);
     });
 
-    it('should return array values', async () => {
-      const mockValue = ['item1', 'item2', { key: 'value' }];
+    it("should return array values", async () => {
+      const mockValue = ["item1", "item2", { key: "value" }];
       await db.insert(adminSettings).values({
-        key: 'test_key',
+        key: "test_key",
         value: mockValue,
         updatedBy: testUserId,
       });
 
-      const result = await getAdminSetting('test_key');
+      const result = await getAdminSetting("test_key");
       expect(result).toEqual(mockValue);
     });
   });
 
-  describe('setAdminSetting', () => {
-    it('should insert a new setting', async () => {
-      await setAdminSetting('new_key', 'new_value', testUserId);
+  describe("setAdminSetting", () => {
+    it("should insert a new setting", async () => {
+      await setAdminSetting("new_key", "new_value", testUserId);
 
-      const result = await getAdminSetting('new_key');
-      expect(result).toBe('new_value');
+      const result = await getAdminSetting("new_key");
+      expect(result).toBe("new_value");
     });
 
-    it('should update an existing setting (upsert behavior)', async () => {
+    it("should update an existing setting (upsert behavior)", async () => {
       // Insert initial value
-      await setAdminSetting('existing_key', 'initial_value', testUserId);
+      await setAdminSetting("existing_key", "initial_value", testUserId);
 
       // Update to new value
-      await setAdminSetting('existing_key', 'updated_value', testUserId);
+      await setAdminSetting("existing_key", "updated_value", testUserId);
 
-      const result = await getAdminSetting('existing_key');
-      expect(result).toBe('updated_value');
+      const result = await getAdminSetting("existing_key");
+      expect(result).toBe("updated_value");
 
       // Verify only one record exists
-      const dbResult = await db.select().from(adminSettings).where(eq(adminSettings.key, 'existing_key'));
+      const dbResult = await db
+        .select()
+        .from(adminSettings)
+        .where(eq(adminSettings.key, "existing_key"));
       expect(dbResult).toHaveLength(1);
     });
 
-    it('should handle boolean values', async () => {
-      await setAdminSetting('test_key', false, testUserId);
+    it("should handle boolean values", async () => {
+      await setAdminSetting("test_key", false, testUserId);
 
-      const result = await getAdminSetting('test_key');
+      const result = await getAdminSetting("test_key");
       expect(result).toBe(false);
     });
 
-    it('should handle complex JSON values', async () => {
+    it("should handle complex JSON values", async () => {
       const complexValue = { featureFlags: { alpha: true, beta: false } };
-      await setAdminSetting('config', complexValue, testUserId);
+      await setAdminSetting("config", complexValue, testUserId);
 
-      const result = await getAdminSetting('config');
+      const result = await getAdminSetting("config");
       expect(result).toEqual(complexValue);
     });
 
-    it('should update the updatedAt timestamp on upsert', async () => {
+    it("should update the updatedAt timestamp on upsert", async () => {
       // Insert initial value
-      await setAdminSetting('test_key', 'initial', testUserId);
+      await setAdminSetting("test_key", "initial", testUserId);
 
-      const firstResult = await db.select().from(adminSettings).where(eq(adminSettings.key, 'test_key'));
+      const firstResult = await db
+        .select()
+        .from(adminSettings)
+        .where(eq(adminSettings.key, "test_key"));
       const firstUpdatedAt = firstResult[0].updatedAt;
 
       // Wait a bit to ensure timestamp difference
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       // Update the value
-      await setAdminSetting('test_key', 'updated', testUserId);
+      await setAdminSetting("test_key", "updated", testUserId);
 
-      const secondResult = await db.select().from(adminSettings).where(eq(adminSettings.key, 'test_key'));
+      const secondResult = await db
+        .select()
+        .from(adminSettings)
+        .where(eq(adminSettings.key, "test_key"));
       const secondUpdatedAt = secondResult[0].updatedAt;
 
-      expect(secondUpdatedAt.getTime()).toBeGreaterThanOrEqual(firstUpdatedAt.getTime());
+      expect(secondUpdatedAt.getTime()).toBeGreaterThanOrEqual(
+        firstUpdatedAt.getTime(),
+      );
     });
 
-    it('should update the updatedBy field on upsert', async () => {
+    it("should update the updatedBy field on upsert", async () => {
       // Insert with one user
-      const otherUserId = '00000000-0000-0000-0000-000000000002';
+      const otherUserId = testUuid("03000000", 2);
       await db.insert(users).values({
         id: otherUserId,
-        email: 'other@test.com',
-        passwordHash: 'hashed_password',
-        role: 'OWNER',
+        email: testEmail("admin-settings-service", "other"),
+        passwordHash: "hashed_password",
+        role: "OWNER",
       });
 
-      await setAdminSetting('test_key', 'initial', otherUserId);
+      await setAdminSetting("test_key", "initial", otherUserId);
 
       // Update with different user
-      await setAdminSetting('test_key', 'updated', testUserId);
+      await setAdminSetting("test_key", "updated", testUserId);
 
-      const result = await db.select().from(adminSettings).where(eq(adminSettings.key, 'test_key'));
+      const result = await db
+        .select()
+        .from(adminSettings)
+        .where(eq(adminSettings.key, "test_key"));
       expect(result[0].updatedBy).toBe(testUserId);
 
       // Cleanup
@@ -194,15 +216,15 @@ describe('AdminSettingsService (Integration)', () => {
     });
   });
 
-  describe('isSignUpsEnabled', () => {
-    it('should return true (default) when setting does not exist', async () => {
+  describe("isSignUpsEnabled", () => {
+    it("should return true (default) when setting does not exist", async () => {
       const result = await isSignUpsEnabled();
       expect(result).toBe(true);
     });
 
-    it('should return false when setting is explicitly false', async () => {
+    it("should return false when setting is explicitly false", async () => {
       await db.insert(adminSettings).values({
-        key: 'sign_ups_enabled',
+        key: "sign_ups_enabled",
         value: false,
         updatedBy: testUserId,
       });
@@ -211,9 +233,9 @@ describe('AdminSettingsService (Integration)', () => {
       expect(result).toBe(false);
     });
 
-    it('should return true when setting is true', async () => {
+    it("should return true when setting is true", async () => {
       await db.insert(adminSettings).values({
-        key: 'sign_ups_enabled',
+        key: "sign_ups_enabled",
         value: true,
         updatedBy: testUserId,
       });
@@ -222,14 +244,16 @@ describe('AdminSettingsService (Integration)', () => {
       expect(result).toBe(true);
     });
 
-    it('should return true (default) when setting is null', async () => {
+    it("should return true (default) when setting is null", async () => {
       // Note: The database schema has value as NOT NULL, so we can't insert null.
       // The behavior where null returns true (default) is already tested by
       // the "should return true (default) when setting does not exist" test.
       // We'll verify that the service uses the default behavior correctly.
 
       // Delete any existing sign_ups_enabled setting to simulate "null" behavior
-      await db.delete(adminSettings).where(eq(adminSettings.key, 'sign_ups_enabled'));
+      await db
+        .delete(adminSettings)
+        .where(eq(adminSettings.key, "sign_ups_enabled"));
 
       const result = await isSignUpsEnabled();
       expect(result).toBe(true);
@@ -237,8 +261,8 @@ describe('AdminSettingsService (Integration)', () => {
 
     it('should return true for any truthy value (string "yes")', async () => {
       await db.insert(adminSettings).values({
-        key: 'sign_ups_enabled',
-        value: 'yes',
+        key: "sign_ups_enabled",
+        value: "yes",
         updatedBy: testUserId,
       });
 
@@ -251,9 +275,9 @@ describe('AdminSettingsService (Integration)', () => {
     // treated as enabled. This ensures strict disable semantics with safe default-true behavior.
     // See: admin-settings.service.ts isSignUpsEnabled implementation
 
-    it('should return true for 0 (number)', async () => {
+    it("should return true for 0 (number)", async () => {
       await db.insert(adminSettings).values({
-        key: 'sign_ups_enabled',
+        key: "sign_ups_enabled",
         value: 0,
         updatedBy: testUserId,
       });
@@ -262,10 +286,10 @@ describe('AdminSettingsService (Integration)', () => {
       expect(result).toBe(true);
     });
 
-    it('should return true for empty string', async () => {
+    it("should return true for empty string", async () => {
       await db.insert(adminSettings).values({
-        key: 'sign_ups_enabled',
-        value: '',
+        key: "sign_ups_enabled",
+        value: "",
         updatedBy: testUserId,
       });
 
@@ -274,39 +298,40 @@ describe('AdminSettingsService (Integration)', () => {
     });
   });
 
-  describe('settings persistence and retrieval', () => {
-    it('should persist and retrieve numeric values', async () => {
-      await setAdminSetting('max_upload_size', 10485760, testUserId);
+  describe("settings persistence and retrieval", () => {
+    it("should persist and retrieve numeric values", async () => {
+      await setAdminSetting("max_upload_size", 10485760, testUserId);
 
-      const result = await getAdminSetting('max_upload_size');
+      const result = await getAdminSetting("max_upload_size");
       expect(result).toBe(10485760);
-      expect(typeof result).toBe('number');
+      expect(typeof result).toBe("number");
     });
 
-    it('should persist and retrieve deeply nested JSON', async () => {
+    it("should persist and retrieve deeply nested JSON", async () => {
       const deepNested = {
         level1: {
           level2: {
             level3: {
-              value: 'deep',
+              value: "deep",
               array: [1, 2, 3],
             },
           },
         },
       };
 
-      await setAdminSetting('deep_setting', deepNested, testUserId);
+      await setAdminSetting("deep_setting", deepNested, testUserId);
 
-      const result = await getAdminSetting('deep_setting');
+      const result = await getAdminSetting("deep_setting");
       expect(result).toEqual(deepNested);
     });
 
-    it('should handle special characters in values', async () => {
+    it("should handle special characters in values", async () => {
       const specialValue = 'Hello "World" \n New line \t Tab';
-      await setAdminSetting('special_key', specialValue, testUserId);
+      await setAdminSetting("special_key", specialValue, testUserId);
 
-      const result = await getAdminSetting('special_key');
+      const result = await getAdminSetting("special_key");
       expect(result).toBe(specialValue);
     });
   });
 });
+

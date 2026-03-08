@@ -7,8 +7,10 @@ import {
   StatusBar,
   ScriptEditor,
 } from "@/components/script-mode";
+import { GitLabFileTree } from "@/components/script-mode/GitLabFileTree";
 import { useScenes } from "@/hooks/useScenes";
 import { useGitLab } from "@/hooks/useGitLab";
+import { useGitLabFiles } from "@/hooks/useGitLabFiles";
 import { generateRpyContent, generateFileTree } from "@/lib/rpy-generator";
 import { GitLabSyncDialog } from "@/components/script-mode/GitLabSyncDialog";
 import { Button } from "@/components/ui/button";
@@ -35,9 +37,17 @@ export function ScriptMode({
   } = useScenes();
 
   const { isProjectLinked, getLinkedRepository } = useGitLab();
+  const { files: gitLabFiles, isLoadingFiles } = useGitLabFiles(projectId);
 
   // Sync dialog state
   const [showSyncDialog, setShowSyncDialog] = useState(false);
+
+  // Track active file for Script Mode
+  const [activeFileId, setActiveFileId] = useState<string | null>(null);
+  const activeGitLabFile = useMemo(
+    () => gitLabFiles.find((f) => f.id === activeFileId) || null,
+    [gitLabFiles, activeFileId],
+  );
 
   // Generate file tree from scenes
   const { flatFiles: files, fileNameToSceneId } = useMemo(() => {
@@ -61,12 +71,20 @@ export function ScriptMode({
   }, [scenes]);
 
   // Generate RPY content for active scene
-  const activeFileContent = useMemo(() => {
+  const activeSceneContent = useMemo(() => {
     if (!activeScene) return [];
     return generateRpyContent(activeScene);
   }, [activeScene]);
 
-  // Track active file (scene)
+  // Get active file content directly for Script Mode editing
+  const activeFileContent = activeGitLabFile?.content || "";
+  // Memoize file lines to avoid repeated split operations
+  const activeFileLines = useMemo(
+    () => activeFileContent.split("\n"),
+    [activeFileContent],
+  );
+
+  // Track active file (scene) - for non-GitLab scenes
   const [activeFile, setActiveFile] = useState<string | null>(null);
 
   // Sync active file with active scene ID
@@ -91,13 +109,25 @@ export function ScriptMode({
     }
   };
 
+  // Handle GitLab file selection
+  const handleGitLabFileSelect = (fileId: string) => {
+    setActiveFileId(fileId);
+    // Also clear the active scene since we're now in file mode
+    setActiveSceneId(null);
+  };
+
+  // Handle GitLab scene selection (label within a file)
+  const handleGitLabSceneSelect = (sceneId: string) => {
+    setActiveSceneId(sceneId);
+  };
+
   // Character panel data
   const characters = useMemo(() => {
     return activeScene?.characters ?? [];
   }, [activeScene]);
 
   // Loading state
-  if (isLoadingScenes) {
+  if (isLoadingScenes || isLoadingFiles) {
     return (
       <div className="flex-1 flex flex-col pt-16">
         <div className="flex-1 flex items-center justify-center">
@@ -108,7 +138,7 @@ export function ScriptMode({
   }
 
   // No scenes state
-  if (!scenes.length) {
+  if (!scenes.length && !gitLabFiles.length) {
     const isLinked = projectId ? isProjectLinked(projectId) : false;
     const linkedRepo = projectId ? getLinkedRepository(projectId) : null;
 
@@ -162,11 +192,21 @@ export function ScriptMode({
               + New Chapter
             </button>
 
-            <FileTree
-              files={files}
-              activeFile={activeFile ?? ""}
-              onSelectFile={handleFileSelect}
-            />
+            {gitLabFiles.length > 0 ? (
+              <GitLabFileTree
+                files={gitLabFiles}
+                activeFileId={activeFileId ?? undefined}
+                activeSceneId={activeSceneId ?? undefined}
+                onFileSelect={handleGitLabFileSelect}
+                onSceneSelect={handleGitLabSceneSelect}
+              />
+            ) : (
+              <FileTree
+                files={files}
+                activeFile={activeFile ?? ""}
+                onSelectFile={handleFileSelect}
+              />
+            )}
           </StoryPanel>
         </div>
 
@@ -174,7 +214,17 @@ export function ScriptMode({
         <div className="flex-1 flex flex-col">
           {/* Tabs */}
           <div className="flex items-end mb-0">
-            {activeFile && (
+            {activeGitLabFile && (
+              <BookmarkTab
+                name={
+                  activeGitLabFile.filePath.split("/").pop() ||
+                  activeGitLabFile.filePath
+                }
+                isActive={true}
+                onClick={() => {}}
+              />
+            )}
+            {!activeGitLabFile && activeFile && (
               <BookmarkTab
                 name={activeFile}
                 isActive={true}
@@ -185,11 +235,18 @@ export function ScriptMode({
 
           {/* Editor */}
           <StoryPanel className="flex-1 !mt-0">
-            {activeScene ? (
-              <ScriptEditor content={activeFileContent} language="Ren'Py" />
+            {activeGitLabFile ? (
+              <ScriptEditor
+                content={activeFileLines}
+                language="Ren'Py"
+              />
+            ) : activeScene ? (
+              <ScriptEditor content={activeSceneContent} language="Ren'Py" />
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
-                Select a scene to view its content
+                {gitLabFiles.length > 0
+                  ? "Select a file or scene to view its content"
+                  : "Select a scene to view its content"}
               </div>
             )}
           </StoryPanel>
@@ -245,22 +302,16 @@ export function ScriptMode({
                   />
                   <span>Status: {activeScene?.status ?? "Unknown"}</span>
                 </div>
-                {activeScene?.route && (
+                {activeScene?.routeKey && (
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
-                    <span>Route: {activeScene.route}</span>
+                    <span>Route: {activeScene.routeKey}</span>
                   </div>
                 )}
-                {activeScene?.act && (
+                {activeScene?.groupType && activeScene?.groupValue && (
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
-                    <span>Act: {activeScene.act}</span>
-                  </div>
-                )}
-                {activeScene?.chapter && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
-                    <span>Chapter: {activeScene.chapter}</span>
+                    <span>{activeScene.groupType}: {activeScene.groupValue}</span>
                   </div>
                 )}
               </div>
@@ -271,7 +322,13 @@ export function ScriptMode({
 
       {/* Status Bar */}
       <StatusBar
-        lineCount={activeFileContent.length || 0}
+        lineCount={
+          activeGitLabFile
+            ? activeFileLines.length
+            : activeScene
+              ? activeSceneContent.length || 0
+              : 0
+        }
         language="Ren'Py"
         themeName={themeName}
         projectId={projectId}

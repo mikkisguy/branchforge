@@ -18,7 +18,7 @@ import type {
 
 export interface ListScenesParams {
   projectId: string;
-  route?: string;
+  routeKey?: string;
   status?: string;
 }
 
@@ -41,7 +41,7 @@ export const scenesApi = {
   async listScenes(params: ListScenesParams): Promise<PublicScene[]> {
     const searchParams = new URLSearchParams();
     searchParams.set("projectId", params.projectId);
-    if (params.route) searchParams.set("route", params.route);
+    if (params.routeKey) searchParams.set("routeKey", params.routeKey);
     if (params.status) searchParams.set("status", params.status);
 
     const response = await request<ListScenesResponse>(

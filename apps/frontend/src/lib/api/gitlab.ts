@@ -332,6 +332,56 @@ export const gitlabApi = {
   },
 
   /**
+   * Get GitLab files for a project (from database)
+   * Returns files with their associated scenes
+   */
+  async getGitLabFiles(projectId: string): Promise<
+    Array<{
+      id: string;
+      projectId: string;
+      filePath: string;
+      fileType: "STORY" | "SETTINGS";
+      content: string;
+      lastSyncedAt: string | null;
+      lastCommitSha: string | null;
+      createdAt: string;
+      updatedAt: string;
+      scenes: Array<{
+        id: string;
+        labelName: string | null;
+        title: string;
+      }>;
+    }>
+  > {
+    return request<Array<{
+      id: string;
+      projectId: string;
+      filePath: string;
+      fileType: "STORY" | "SETTINGS";
+      content: string;
+      lastSyncedAt: string | null;
+      lastCommitSha: string | null;
+      createdAt: string;
+      updatedAt: string;
+      scenes: Array<{
+        id: string;
+        labelName: string | null;
+        title: string;
+      }>;
+    }>>(`/gitlab/files/stored/${projectId}`);
+  },
+
+  /**
+   * Update GitLab file content (Script Mode)
+   */
+  async updateGitLabFile(fileId: string, content: string): Promise<{ success: boolean }> {
+    return request<{ success: boolean }>(`/gitlab/files/${fileId}`, {
+      method: "PUT",
+      body: JSON.stringify({ content }),
+    });
+  },
+
+  /**
    * Export scenes to GitLab
    */
   async exportToGitlab(

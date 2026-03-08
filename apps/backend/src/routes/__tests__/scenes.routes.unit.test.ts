@@ -75,11 +75,11 @@ describe("ScenesRoutes", () => {
           id: "scene-1",
           projectId: PROJECT_ID,
           title: "chapter1_scene1",
-          act: "I",
-          chapter: 1,
+          groupType: "act",
+          groupValue: "I",
           sceneNumber: 1,
           sequenceOrder: 0,
-          route: "COMMON",
+          routeKey: "common",
           status: "DRAFT" as const,
           visibility: "EXCLUSIVE" as const,
           createdAt: new Date("2024-01-01"),
@@ -101,17 +101,17 @@ describe("ScenesRoutes", () => {
       expect(json.scenes[0].title).toBe("chapter1_scene1");
     });
 
-    it("should filter by route when provided", async () => {
+    it("should filter by routeKey when provided", async () => {
       const mockScenes = [
         {
           id: "scene-1",
           projectId: PROJECT_ID,
           title: "chapter1_scene1",
-          act: "I",
-          chapter: 1,
+          groupType: "act",
+          groupValue: "I",
           sceneNumber: 1,
           sequenceOrder: 0,
-          route: "EILEEN",
+          routeKey: "eileen",
           status: "DRAFT" as const,
           visibility: "EXCLUSIVE" as const,
           createdAt: new Date("2024-01-01"),
@@ -123,12 +123,12 @@ describe("ScenesRoutes", () => {
 
       const response = await fastify.inject({
         method: "GET",
-        url: `/scenes?projectId=${PROJECT_ID}&route=EILEEN`,
+        url: `/scenes?projectId=${PROJECT_ID}&routeKey=eileen`,
       });
 
       expect(response.statusCode).toBe(200);
       const json = response.json();
-      expect(json.scenes[0].route).toBe("EILEEN");
+      expect(json.scenes[0].routeKey).toBe("eileen");
     });
 
     it("should filter by status when provided", async () => {
@@ -137,11 +137,11 @@ describe("ScenesRoutes", () => {
           id: "scene-1",
           projectId: PROJECT_ID,
           title: "chapter1_scene1",
-          act: "I",
-          chapter: 1,
+          groupType: "act",
+          groupValue: "I",
           sceneNumber: 1,
           sequenceOrder: 0,
-          route: "COMMON",
+          routeKey: "common",
           status: "FINAL" as const,
           visibility: "EXCLUSIVE" as const,
           createdAt: new Date("2024-01-01"),
@@ -173,18 +173,18 @@ describe("ScenesRoutes", () => {
       });
     });
 
-    it("should pass route and status filters to listScenes", async () => {
+    it("should pass routeKey and status filters to listScenes", async () => {
       vi.mocked(scenesService.listScenes).mockResolvedValue([]);
 
       await fastify.inject({
         method: "GET",
-        url: `/scenes?projectId=${PROJECT_ID}&route=EILEEN&status=FINAL`,
+        url: `/scenes?projectId=${PROJECT_ID}&routeKey=eileen&status=FINAL`,
       });
 
       expect(scenesService.listScenes).toHaveBeenCalledWith(
         PROJECT_ID,
         "user-123",
-        { route: "EILEEN", status: "FINAL" },
+        { routeKey: "eileen", status: "FINAL" },
       );
     });
   });

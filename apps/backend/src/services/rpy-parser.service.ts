@@ -67,6 +67,52 @@ export interface BranchForgeScene {
 }
 
 /**
+ * Labeled dialogue with proper label boundary tracking
+ * Used for Write Mode parsing where each label has its own dialogue
+ */
+export interface LabeledDialogue {
+  label: string;
+  lineNumber: number;
+  dialogue: Array<{
+    speaker: string | null;
+    text: string;
+    lineNumber: number;
+  }>;
+  choices: Array<{
+    label: string;
+    target: string | null;
+    lineNumber: number;
+  }>;
+  jumps: Array<{
+    to: string;
+    lineNumber: number;
+  }>;
+}
+
+/**
+ * Parsed RPY file with label-aware structure
+ * Distinguishes between STORY files (labels/*.rpy with dialogue) and SETTINGS files
+ */
+export interface ParsedRPYFileWithLabels {
+  labels: LabeledDialogue[];
+  characters: Array<{
+    tag: string;
+    name: string;
+    color?: string;
+  }>;
+  fileType: "STORY" | "SETTINGS";
+}
+
+/**
+ * Options for reconstructing RPY file with updated dialogue
+ * Used for Write Mode saves to merge dialogue changes with original keywords
+ */
+export interface ReconstructedFileOptions {
+  originalContent: string;
+  updatedDialogue: Map<string, Array<{ speaker: string | null; text: string }>>; // label -> dialogue
+}
+
+/**
  * Extract all label definitions from RPY content
  * Labels are entry points: label label_name:
  */
@@ -255,7 +301,11 @@ export function extractChoices(
     // Check for menu end (indentation decreases)
     // Pop from stack until we find the appropriate menu level
     const lineIndent = line.search(/\S/);
-    if (menuStack.length > 0 && trimmed && lineIndent < menuStack[menuStack.length - 1]) {
+    if (
+      menuStack.length > 0 &&
+      trimmed &&
+      lineIndent < menuStack[menuStack.length - 1]
+    ) {
       menuStack.pop();
     }
 
@@ -283,15 +333,24 @@ export function extractChoices(
           const nextTrimmed = nextLine.trim();
 
           const nextLineIndent = nextLine.search(/\S/);
-          if (nextTrimmed && nextLineIndent <= menuIndent) {
-            break;
+
+          // Skip empty/whitespace-only lines
+          if (!nextTrimmed) {
+            j++;
+            continue;
           }
 
+          // Check for jump statement before breaking on indentation
           const jumpMatch = nextTrimmed.match(
             /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/,
           );
           if (jumpMatch) {
             target = jumpMatch[1];
+            break;
+          }
+
+          // Exit choice block if indentation decreased to menu level or above
+          if (nextLineIndent <= menuIndent) {
             break;
           }
 
@@ -323,15 +382,24 @@ export function extractChoices(
           const nextTrimmed = nextLine.trim();
 
           const nextLineIndent = nextLine.search(/\S/);
-          if (nextTrimmed && nextLineIndent <= menuIndent) {
-            break;
+
+          // Skip empty/whitespace-only lines
+          if (!nextTrimmed) {
+            j++;
+            continue;
           }
 
+          // Check for jump statement before breaking on indentation
           const jumpMatch = nextTrimmed.match(
             /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/,
           );
           if (jumpMatch) {
             target = jumpMatch[1];
+            break;
+          }
+
+          // Exit choice block if indentation decreased to menu level or above
+          if (nextLineIndent <= menuIndent) {
             break;
           }
 
@@ -499,7 +567,11 @@ function extractCharacters(
   const lines = content.split("\n");
 
   // Track multi-line character definitions
-  let pendingCharacter: { tag: string; name?: string; options: string[] } | null = null;
+  let pendingCharacter: {
+    tag: string;
+    name?: string;
+    options: string[];
+  } | null = null;
   let inCharacterDef = false;
   let parenDepth = 0;
 
@@ -514,7 +586,7 @@ function extractCharacters(
     // Check for single-line character definition
     // Format: define tag = Character("name", options...)
     const singleLineMatch = trimmed.match(
-      /define\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\(\s*"([^"]+)"(\s*,\s*([^)]*))?\s*\)/
+      /define\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\(\s*"([^"]+)"(\s*,\s*([^)]*))?\s*\)/,
     );
     if (singleLineMatch && !trimmed.includes("\n")) {
       const tag = singleLineMatch[1];
@@ -536,7 +608,7 @@ function extractCharacters(
 
     // Check for start of multi-line character definition
     const multiLineStartMatch = trimmed.match(
-      /define\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\((.*)/
+      /define\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\((.*)/,
     );
     if (multiLineStartMatch) {
       const tag = multiLineStartMatch[1];
@@ -548,11 +620,14 @@ function extractCharacters(
 
       pendingCharacter = { tag, name, options: [] };
       inCharacterDef = true;
-      parenDepth = (rest.match(/\(/g) || []).length - (rest.match(/\)/g) || []).length;
+      parenDepth =
+        (rest.match(/\(/g) || []).length - (rest.match(/\)/g) || []).length;
 
       // Extract options from the rest of the line (excluding the name we already captured)
       if (nameMatch) {
-        const optionsPart = rest.substring(rest.indexOf(nameMatch[0]) + nameMatch[0].length).trim();
+        const optionsPart = rest
+          .substring(rest.indexOf(nameMatch[0]) + nameMatch[0].length)
+          .trim();
         if (optionsPart.startsWith(",")) {
           pendingCharacter.options.push(optionsPart.substring(1).trim());
         }
@@ -609,7 +684,333 @@ function extractCharacters(
 }
 
 /**
- * Parse RPY content into structured data
+ * Parse RPY file with proper label boundary tracking
+ * This function correctly assigns dialogue to each label, fixing the bug where
+ * all dialogue was returned for each label.
+ *
+ * For Script Mode: Full file content is used directly without parsing
+ * For Write Mode: This function provides label-specific dialogue for editing
+ */
+export function parseRPYFileWithLabels(
+  content: string,
+): ParsedRPYFileWithLabels {
+  const lines = content.split("\n");
+  const result: ParsedRPYFileWithLabels = {
+    labels: [],
+    characters: [],
+    fileType: "STORY",
+  };
+
+  // Detect file type by checking for character definitions, screens, or labels
+  const hasCharacterDefinitions = /define\s+\w+\s*=\s*Character/.test(content);
+  const hasScreenDefinitions = /^\s*screen\s+\w+/m.test(content);
+  const hasLabelDefinitions = /^\s*label\s+/m.test(content);
+
+  if (hasCharacterDefinitions || hasScreenDefinitions) {
+    // If file has characters/screens but no labels, it's a SETTINGS file
+    // If it has both, we'll treat it as SETTINGS but still parse labels if present
+    if (!hasLabelDefinitions) {
+      result.fileType = "SETTINGS";
+    } else {
+      // Files with both labels and character definitions (like game scripts)
+      // are still STORY files since they contain dialogue
+      result.fileType = "STORY";
+    }
+  } else if (!hasLabelDefinitions) {
+    // No labels at all - likely a SETTINGS file
+    result.fileType = "SETTINGS";
+  }
+
+  // Extract characters for both file types
+  result.characters = extractCharacters(content);
+
+  // Only parse labels for STORY files
+  if (result.fileType === "STORY") {
+    let currentLabel: string | null = null;
+    let currentLabelData: LabeledDialogue | null = null;
+    let labelStartLine = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      // Check for label definition
+      const labelMatch = line.match(/^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+      if (labelMatch) {
+        // Save previous label
+        if (currentLabel && currentLabelData) {
+          result.labels.push(currentLabelData);
+        }
+
+        // Start new label
+        currentLabel = labelMatch[1];
+        labelStartLine = i + 1;
+        currentLabelData = {
+          label: currentLabel,
+          lineNumber: labelStartLine,
+          dialogue: [],
+          choices: [],
+          jumps: [],
+        };
+        continue;
+      }
+
+      // Skip if not in a label
+      if (!currentLabel || !currentLabelData) continue;
+
+      // Skip non-dialogue lines (we're only extracting dialogue for Write Mode)
+      if (
+        !trimmed ||
+        trimmed.startsWith("#") ||
+        trimmed.startsWith("label ") ||
+        trimmed.startsWith("menu:") ||
+        trimmed.startsWith("jump ") ||
+        trimmed.startsWith("call ") ||
+        trimmed.startsWith("return") ||
+        trimmed.startsWith("if ") ||
+        trimmed.startsWith("else:") ||
+        trimmed.startsWith("elif ") ||
+        trimmed.startsWith("define ") ||
+        trimmed.startsWith("image ") ||
+        trimmed.startsWith("screen ") ||
+        trimmed.startsWith("init ") ||
+        trimmed.startsWith("scene ") ||
+        trimmed.startsWith("show ") ||
+        trimmed.startsWith("hide ") ||
+        trimmed.startsWith("play ") ||
+        trimmed.startsWith("stop ") ||
+        trimmed.startsWith("with ")
+      ) {
+        continue;
+      }
+
+      // Extract dialogue
+      const dialogueMatch = trimmed.match(
+        /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"((?:[^"\\]|\\.)*)"$/,
+      );
+      if (dialogueMatch) {
+        currentLabelData.dialogue.push({
+          speaker: dialogueMatch[1],
+          text: dialogueMatch[2],
+          lineNumber: i + 1,
+        });
+        continue;
+      }
+
+      const narrationMatch = trimmed.match(/^"(.*)"$/);
+      if (narrationMatch) {
+        currentLabelData.dialogue.push({
+          speaker: null,
+          text: narrationMatch[1],
+          lineNumber: i + 1,
+        });
+      }
+    }
+
+    // Don't forget the last label
+    if (currentLabel && currentLabelData) {
+      result.labels.push(currentLabelData);
+    }
+
+    // Now extract choices and jumps for each label
+    // We need to track which label we're in and associate choices/jumps with it
+    let currentLabelForTracking = "";
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      // Track current label
+      const labelMatch = line.match(/^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+      if (labelMatch) {
+        currentLabelForTracking = labelMatch[1];
+      }
+
+      // Find the label data for this label
+      const labelData = result.labels.find(
+        (l) => l.label === currentLabelForTracking,
+      );
+      if (!labelData) continue;
+
+      // Check for menu start
+      if (trimmed === "menu:") {
+        const menuIndent = line.search(/\S/);
+        // Look ahead for choice labels inside this menu
+        for (let j = i + 1; j < lines.length && j < i + 20; j++) {
+          const choiceLine = lines[j];
+          const choiceTrimmed = choiceLine.trim();
+          const choiceIndent = choiceLine.search(/\S/);
+
+          // Exit if we're no longer in the menu (indentation decreased)
+          // Empty lines are skipped, not treated as exit conditions
+          if (choiceTrimmed && choiceIndent <= menuIndent) {
+            break;
+          }
+
+          // Try double-quoted choice
+          const doubleQuoteMatch = choiceTrimmed.match(/^"(.+)":/);
+          if (doubleQuoteMatch) {
+            let choiceLabel = doubleQuoteMatch[1];
+            choiceLabel = choiceLabel
+              .replace(/"+$/, "")
+              .replace(/\\"/g, '"')
+              .replace(/""/g, '"');
+            let target: string | null = null;
+
+            // Look ahead for jump statement in this choice block
+            for (let k = j + 1; k < lines.length && k < j + 10; k++) {
+              const jumpLine = lines[k];
+              const jumpTrimmed = jumpLine.trim();
+              const jumpIndent = jumpLine.search(/\S/);
+
+              // Skip empty/whitespace-only lines
+              if (!jumpTrimmed) {
+                continue;
+              }
+
+              // Check for jump statement before breaking on indentation
+              const jumpMatch = jumpTrimmed.match(
+                /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/,
+              );
+              if (jumpMatch) {
+                target = jumpMatch[1];
+                break;
+              }
+
+              // Exit choice block if indentation decreased to menu level or above
+              if (jumpIndent <= menuIndent) {
+                break;
+              }
+            }
+
+            labelData.choices.push({
+              label: choiceLabel,
+              target,
+              lineNumber: j + 1,
+            });
+          }
+        }
+      }
+
+      // Check for jump statement
+      const jumpMatch = trimmed.match(/^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+      if (jumpMatch) {
+        labelData.jumps.push({
+          to: jumpMatch[1],
+          lineNumber: i + 1,
+        });
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Reconstruct RPY file content with updated dialogue while preserving keywords.
+ * Used when Write Mode saves dialogue changes - the original keywords (show, scene, play, etc.)
+ * are preserved, only dialogue lines are updated.
+ *
+ * @param options - The original content and updated dialogue map
+ * @returns Reconstructed RPY file content
+ */
+export function reconstructRPYFile(options: ReconstructedFileOptions): string {
+  const { originalContent, updatedDialogue } = options;
+  const lines = originalContent.split("\n");
+  const result: string[] = [];
+
+  let currentLabel: string | null = null;
+  let dialogueIndex = 0;
+
+  // Track original dialogue count per label and extra entries to append
+  const originalDialogueCounts = new Map<string, number>();
+  const labelIndentation = new Map<string, string>(); // Track last indent for appending
+  let lastDialogueIndent = "    "; // Default RPY indentation
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Track current label
+    const labelMatch = line.match(/^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+    if (labelMatch) {
+      currentLabel = labelMatch[1];
+      dialogueIndex = 0;
+      result.push(line);
+      continue;
+    }
+
+    // Check if this is a dialogue line
+    const dialogueMatch = trimmed.match(
+      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"((?:[^"\\]|\\.)*)"$/,
+    );
+    const narrationMatch = trimmed.match(/^"(.*)"$/);
+
+    if (
+      (dialogueMatch || narrationMatch) &&
+      currentLabel &&
+      updatedDialogue.has(currentLabel)
+    ) {
+      const labelDialogue = updatedDialogue.get(currentLabel)!;
+
+      // Track original dialogue count (every dialogue line counts, even if replaced)
+      originalDialogueCounts.set(
+        currentLabel,
+        (originalDialogueCounts.get(currentLabel) || 0) + 1,
+      );
+
+      // Track indentation for appending extra entries later
+      const indent = line.match(/^(\s*)/)?.[1] || "";
+      if (indent) {
+        lastDialogueIndent = indent;
+        // Set label-specific indentation the first time we see dialogue for this label
+        if (currentLabel && !labelIndentation.has(currentLabel)) {
+          labelIndentation.set(currentLabel, indent);
+        }
+      }
+
+      if (dialogueIndex < labelDialogue.length) {
+        const newDialogue = labelDialogue[dialogueIndex];
+        dialogueIndex++;
+
+        // Reconstruct dialogue line with original indentation
+        if (newDialogue.speaker) {
+          result.push(`${indent}${newDialogue.speaker} "${newDialogue.text}"`);
+        } else {
+          result.push(`${indent}"${newDialogue.text}"`);
+        }
+        continue;
+      }
+
+      // Original dialogue line is preserved because updatedDialogue has fewer entries.
+      // This ensures we don't lose any original content when updates are partial.
+      // The line will be added by the fall-through below.
+    }
+
+    // Keep all other lines as-is (keywords, etc.) - includes preserved original dialogue lines
+    result.push(line);
+  }
+
+  // After processing all lines, append any extra updated dialogue entries that weren't consumed.
+  // This handles the case where updatedDialogue has more entries than the original file.
+  for (const [label, labelDialogue] of updatedDialogue.entries()) {
+    const originalCount = originalDialogueCounts.get(label) ?? 0;
+    if (labelDialogue.length > originalCount) {
+      const extraEntries = labelDialogue.slice(originalCount);
+      const indent = labelIndentation.get(label) || lastDialogueIndent;
+      for (const entry of extraEntries) {
+        if (entry.speaker) {
+          result.push(`${indent}${entry.speaker} "${entry.text}"`);
+        } else {
+          result.push(`${indent}"${entry.text}"`);
+        }
+      }
+    }
+  }
+
+  return result.join("\n");
+}
+
+/**
+ * Parse RPY content into structured data (legacy function for backward compatibility)
  */
 export function parseRPYContent(content: string): RPYParsedData {
   if (!content || content.trim() === "") {
@@ -639,7 +1040,11 @@ export function parseRPYFile(content: string): RPYParsedData {
 }
 
 /**
- * Convert parsed RPY data to BranchForge scene format
+ * Convert parsed RPY data to BranchForge scene format (legacy function)
+ * NOTE: This function has a bug - it returns ALL dialogue for each label.
+ * Use parseRPYFileWithLabels() and convertToBranchForgeFormatFromLabels() instead.
+ *
+ * @deprecated Use parseRPYFileWithLabels() for proper label boundary tracking
  */
 export function convertToBranchForgeFormat(
   parsed: RPYParsedData,
@@ -680,6 +1085,71 @@ export function convertToBranchForgeFormat(
   // Extract unique characters from dialogue
   const characterSet = new Set<string>();
   for (const d of parsed.dialogue) {
+    if (d.speaker) {
+      characterSet.add(d.speaker);
+    }
+  }
+
+  const characters = Array.from(characterSet).map((tag) => {
+    const charDef = parsed.characters.find((c) => c.tag === tag);
+    return {
+      tag,
+      name: charDef?.name || tag,
+    };
+  });
+
+  return {
+    name: labelName,
+    entries,
+    characters: characters.length > 0 ? characters : undefined,
+  };
+}
+
+/**
+ * Convert label-aware parsed data to BranchForge scene format
+ * This is the fixed version that only returns dialogue for the specific label.
+ *
+ * @param parsed - The parsed RPY file with label boundaries
+ * @param labelName - The label name to convert
+ * @returns BranchForge scene with only this label's dialogue
+ */
+export function convertToBranchForgeFormatFromLabels(
+  parsed: ParsedRPYFileWithLabels,
+  labelName: string,
+): BranchForgeScene {
+  const labelData = parsed.labels.find((l) => l.label === labelName);
+
+  if (!labelData) {
+    return {
+      name: labelName,
+      entries: [],
+      characters: [],
+    };
+  }
+
+  const entries: BranchForgeScene["entries"] = [];
+
+  // Add dialogue entries for THIS label only
+  for (const d of labelData.dialogue) {
+    entries.push({
+      type: d.speaker ? "DIALOGUE" : "NARRATION",
+      speaker: d.speaker || undefined,
+      text: d.text,
+    });
+  }
+
+  // Add choice entries (as flags) for THIS label only
+  for (const c of labelData.choices) {
+    entries.push({
+      type: "FLAG",
+      text: c.label,
+      target: c.target || undefined,
+    });
+  }
+
+  // Extract unique characters from this label's dialogue
+  const characterSet = new Set<string>();
+  for (const d of labelData.dialogue) {
     if (d.speaker) {
       characterSet.add(d.speaker);
     }

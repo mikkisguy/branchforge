@@ -1,24 +1,15 @@
 /**
- * GitLab Sync Service Tests
+ * GitLab Sync Service Unit Tests
  *
- * Unit tests for GitLab sync orchestration service.
- * Tests are written before implementation (TDD approach).
+ * Unit tests for simple query operations.
+ * Complex operations (exportToGitlab, importFromGitlab, detectConflicts) are covered by integration tests.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import nock from "nock";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
-  exportToGitlab,
-  importFromGitlab,
   getSyncOperation,
   listSyncOperations,
-  detectConflicts,
 } from "../gitlab-sync.service.js";
-import * as gitlabService from "../gitlab.service.js";
-import * as rpyParserService from "../rpy-parser.service.js";
-
-// Import schema for proper mocking
-import { scenes, sceneLines } from "../../db/schema/index.js";
 
 // Mock the database at module level
 vi.mock("../../db/index.js", () => ({
@@ -29,635 +20,29 @@ import { getDb } from "../../db/index.js";
 
 // Test fixtures
 const testProjectId = "project-123";
-const testBranch = "main";
 const testOperationId = "operation-123";
+const testBranch = "main";
 
 // Helper to create default mock db
 const createMockDb = () => ({
-  select: vi.fn(function (this: any) {
-    // Capture the 'from' table to return appropriate data
-    let fromTable: any = null;
-    return {
-      from: vi.fn((table: any) => {
-        fromTable = table;
-        return {
-          where: vi.fn(() => ({
-            orderBy: vi.fn(() => ({
-              limit: vi.fn(() => {
-                // Return different data based on table being queried
-                if (fromTable === scenes) {
-                  return Promise.resolve([]);
-                } else if (fromTable === sceneLines) {
-                  return Promise.resolve([]);
-                }
-                return Promise.resolve([]);
-              }),
-            })),
-          })),
-        };
-      }),
-    };
-  }),
-  insert: vi.fn(() => ({
-    values: vi.fn(() => ({
-      returning: vi.fn(() => Promise.resolve([])),
-    })),
-  })),
-  update: vi.fn(() => ({
-    set: vi.fn(() => ({
-      where: vi.fn(() => Promise.resolve(undefined)),
-    })),
-  })),
-  delete: vi.fn(() => ({
-    where: vi.fn(() => Promise.resolve(undefined)),
-  })),
-  transaction: vi.fn((callback: any) =>
-    callback({
-      insert: vi.fn(() => ({
-        values: vi.fn(() => ({
-          returning: vi.fn(() => Promise.resolve([])),
+  select: vi.fn(() => ({
+    from: vi.fn(() => ({
+      where: vi.fn(() => ({
+        orderBy: vi.fn(() => ({
+          limit: vi.fn(() => Promise.resolve([])),
         })),
+        limit: vi.fn(() => Promise.resolve([])),
       })),
-      delete: vi.fn(() => ({
-        where: vi.fn(() => Promise.resolve(undefined)),
-      })),
-    }),
-  ),
+    })),
+  })),
 });
 
 describe("GitLabSyncService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    nock.cleanAll();
-    nock.disableNetConnect();
 
     // Set up getDb mock with proper chaining
     vi.mocked(getDb).mockReturnValue(createMockDb() as any);
-  });
-
-  afterEach(() => {
-    nock.cleanAll();
-    nock.enableNetConnect();
-  });
-
-  describe("exportToGitlab", () => {
-    it("should create a sync operation and export scenes to GitLab", async () => {
-      // Mock database operations
-      const mockDb = vi.mocked(getDb)();
-
-      // First call to insert (createSyncOperation)
-      mockDb.insert = vi.fn(() => ({
-        values: vi.fn(() => ({
-          returning: vi.fn(() =>
-            Promise.resolve([
-              {
-                id: testOperationId,
-                projectId: testProjectId,
-                operation: "export",
-                status: "in_progress",
-                branch: testBranch,
-                conflictCount: 0,
-                startedAt: new Date(),
-              },
-            ]),
-          ),
-        })),
-      })) as any;
-
-      // Second call to update (updateSyncOperation)
-      mockDb.update = vi.fn(() => ({
-        set: vi.fn(() => ({
-          where: vi.fn(() => Promise.resolve(undefined)),
-        })),
-      })) as any;
-
-      // Mock select for scenes
-      mockDb.select = vi.fn(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            orderBy: vi.fn(() => ({
-              limit: vi.fn(() =>
-                Promise.resolve([
-                  {
-                    id: "scene-1",
-                    projectId: testProjectId,
-                    title: "start",
-                    route: "COMMON",
-                    sceneNumber: 1,
-                  },
-                  {
-                    id: "scene-2",
-                    projectId: testProjectId,
-                    title: "chapter1",
-                    route: "EILEEN",
-                    sceneNumber: 2,
-                  },
-                ]),
-              ),
-            })),
-          })),
-        })),
-      })) as any;
-
-      // Mock generateRpyFile
-      vi.spyOn(rpyParserService, "generateRpyFile")
-        .mockReturnValueOnce(
-          'label start:\n    "Hello world"\n    s "Welcome!"\n    return',
-        )
-        .mockReturnValueOnce('label chapter1:\n    s "Chapter 1"\n    return');
-
-      // Mock createOrUpdateFile
-      vi.spyOn(gitlabService, "createOrUpdateFile")
-        .mockResolvedValueOnce({
-          file_path: "game/start.rpy",
-          branch: testBranch,
-        } as any)
-        .mockResolvedValueOnce({
-          file_path: "game/chapter1.rpy",
-          branch: testBranch,
-        } as any);
-
-      const result = await exportToGitlab(
-        testProjectId,
-        testBranch,
-        "Export scenes",
-      );
-
-      expect(result).toMatchObject({
-        id: testOperationId,
-        projectId: testProjectId,
-        operation: "export",
-        branch: testBranch,
-        conflictCount: 0,
-      });
-    });
-
-    it("should use default branch when not provided", async () => {
-      const mockDb = vi.mocked(getDb)();
-
-      mockDb.insert = vi.fn(() => ({
-        values: vi.fn(() => ({
-          returning: vi.fn(() =>
-            Promise.resolve([
-              {
-                id: testOperationId,
-                projectId: testProjectId,
-                operation: "export",
-                status: "in_progress",
-                branch: "main",
-                conflictCount: 0,
-                startedAt: new Date(),
-              },
-            ]),
-          ),
-        })),
-      })) as any;
-
-      mockDb.update = vi.fn(() => ({
-        set: vi.fn(() => ({
-          where: vi.fn(() => Promise.resolve(undefined)),
-        })),
-      })) as any;
-
-      mockDb.select = vi.fn(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            orderBy: vi.fn(() => ({
-              limit: vi.fn(() => Promise.resolve([])),
-            })),
-          })),
-        })),
-      })) as any;
-
-      vi.spyOn(rpyParserService, "generateRpyFile").mockReturnValue("");
-
-      const result = await exportToGitlab(testProjectId);
-
-      expect(result.id).toBe(testOperationId);
-    });
-
-    it("should handle export errors and mark operation as failed", async () => {
-      const mockDb = vi.mocked(getDb)();
-
-      mockDb.insert = vi.fn(() => ({
-        values: vi.fn(() => ({
-          returning: vi.fn(() =>
-            Promise.resolve([
-              {
-                id: testOperationId,
-                projectId: testProjectId,
-                operation: "export",
-                status: "in_progress",
-                branch: testBranch,
-                conflictCount: 0,
-                startedAt: new Date(),
-              },
-            ]),
-          ),
-        })),
-      })) as any;
-
-      mockDb.update = vi.fn(() => ({
-        set: vi.fn(() => ({
-          where: vi.fn(() => Promise.resolve(undefined)),
-        })),
-      })) as any;
-
-      mockDb.select = vi.fn(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            orderBy: vi.fn(() => ({
-              limit: vi.fn(() =>
-                Promise.resolve([
-                  { id: "scene-1", projectId: testProjectId, title: "start" },
-                ]),
-              ),
-            })),
-          })),
-        })),
-      })) as any;
-
-      vi.spyOn(rpyParserService, "generateRpyFile").mockReturnValue("");
-
-      vi.spyOn(gitlabService, "createOrUpdateFile").mockRejectedValue(
-        new Error("API Error"),
-      );
-
-      const result = await exportToGitlab(
-        testProjectId,
-        testBranch,
-        "Export scenes",
-      );
-
-      expect(result.status).toBe("failed");
-    });
-
-    it("should generate commit message when not provided", async () => {
-      const mockDb = vi.mocked(getDb)();
-
-      mockDb.insert = vi.fn(() => ({
-        values: vi.fn(() => ({
-          returning: vi.fn(() =>
-            Promise.resolve([
-              {
-                id: testOperationId,
-                projectId: testProjectId,
-                operation: "export",
-                status: "in_progress",
-                branch: testBranch,
-                conflictCount: 0,
-                startedAt: new Date(),
-              },
-            ]),
-          ),
-        })),
-      })) as any;
-
-      mockDb.update = vi.fn(() => ({
-        set: vi.fn(() => ({
-          where: vi.fn(() => Promise.resolve(undefined)),
-        })),
-      })) as any;
-
-      mockDb.select = vi.fn(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            orderBy: vi.fn(() => ({
-              limit: vi.fn(() => Promise.resolve([])),
-            })),
-          })),
-        })),
-      })) as any;
-
-      vi.spyOn(rpyParserService, "generateRpyFile").mockReturnValue("");
-
-      const result = await exportToGitlab(testProjectId, testBranch);
-
-      expect(result.id).toBe(testOperationId);
-    });
-  });
-
-  describe("importFromGitlab", () => {
-    it("should import RPY files from GitLab and update database", async () => {
-      const mockDb = vi.mocked(getDb)();
-
-      mockDb.insert = vi.fn(() => ({
-        values: vi.fn(() => ({
-          returning: vi.fn(() =>
-            Promise.resolve([
-              {
-                id: testOperationId,
-                projectId: testProjectId,
-                operation: "import",
-                status: "in_progress",
-                branch: testBranch,
-                conflictCount: 0,
-                startedAt: new Date(),
-              },
-            ]),
-          ),
-        })),
-      })) as any;
-
-      mockDb.update = vi.fn(() => ({
-        set: vi.fn(() => ({
-          where: vi.fn(() => Promise.resolve(undefined)),
-        })),
-      })) as any;
-
-      // Ensure select chain resolves to empty array
-      mockDb.select = vi.fn(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => Promise.resolve([])),
-        })),
-      })) as any;
-
-      mockDb.transaction = vi.fn((callback: any) =>
-        callback({
-          insert: vi.fn(() => ({
-            values: vi.fn(() => ({
-              returning: vi.fn(() =>
-                Promise.resolve([
-                  {
-                    id: "new-scene-1",
-                    projectId: testProjectId,
-                    title: "start",
-                  },
-                ]),
-              ),
-            })),
-          })),
-          delete: vi.fn(() => ({
-            where: vi.fn(() => Promise.resolve(undefined)),
-          })),
-        }),
-      ) as any;
-
-      vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([
-        { name: "script.rpy", path: "game/script.rpy" },
-        { name: "chapter1.rpy", path: "game/chapter1.rpy" },
-      ] as any);
-
-      vi.spyOn(gitlabService, "getFileContent")
-        .mockResolvedValueOnce('label start:\n    "Hello"\n    return')
-        .mockResolvedValueOnce(
-          'label chapter1:\n    s "Chapter 1"\n    return',
-        );
-
-      vi.spyOn(rpyParserService, "parseRPYFile")
-        .mockReturnValueOnce({
-          labels: ["start"],
-          dialogue: [{ speaker: null, text: "Hello" }],
-          choices: [],
-          jumps: [],
-          characters: [],
-        })
-        .mockReturnValueOnce({
-          labels: ["chapter1"],
-          dialogue: [{ speaker: "s", text: "Chapter 1" }],
-          choices: [],
-          jumps: [],
-          characters: [],
-        });
-
-      const result = await importFromGitlab(
-        testProjectId,
-        testBranch,
-        "branchforge_wins",
-      );
-
-      expect(result).toMatchObject({
-        id: testOperationId,
-        projectId: testProjectId,
-        operation: "import",
-        status: "completed",
-        branch: testBranch,
-        conflictCount: 0,
-      });
-    });
-
-    it("should handle gitlab_wins conflict resolution", async () => {
-      const mockDb = vi.mocked(getDb)();
-
-      mockDb.insert = vi.fn(() => ({
-        values: vi.fn(() => ({
-          returning: vi.fn(() =>
-            Promise.resolve([
-              {
-                id: testOperationId,
-                projectId: testProjectId,
-                operation: "import",
-                status: "in_progress",
-                branch: testBranch,
-                conflictCount: 0,
-                startedAt: new Date(),
-              },
-            ]),
-          ),
-        })),
-      })) as any;
-
-      mockDb.update = vi.fn(() => ({
-        set: vi.fn(() => ({
-          where: vi.fn(() => Promise.resolve(undefined)),
-        })),
-      })) as any;
-
-      // Service code doesn't call orderBy().limit() in importFromGitlab at line 286-290
-      mockDb.select = vi.fn(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() =>
-            Promise.resolve([
-              { id: "scene-1", projectId: testProjectId, title: "start" },
-            ]),
-          ),
-        })),
-      })) as any;
-
-      mockDb.transaction = vi.fn((callback: any) =>
-        callback({
-          insert: vi.fn(() => ({
-            values: vi.fn(() => ({
-              returning: vi.fn(() => Promise.resolve([])),
-            })),
-          })),
-          delete: vi.fn(() => ({
-            where: vi.fn(() => Promise.resolve(undefined)),
-          })),
-        }),
-      ) as any;
-
-      vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([
-        { name: "script.rpy", path: "game/script.rpy" },
-      ] as any);
-
-      vi.spyOn(gitlabService, "getFileContent").mockResolvedValueOnce(
-        'label start:\n    "Updated from GitLab"\n    return',
-      );
-
-      vi.spyOn(rpyParserService, "parseRPYFile").mockReturnValueOnce({
-        labels: ["start"],
-        dialogue: [{ speaker: null, text: "Updated from GitLab" }],
-        choices: [],
-        jumps: [],
-        characters: [],
-      });
-
-      const result = await importFromGitlab(
-        testProjectId,
-        testBranch,
-        "gitlab_wins",
-      );
-
-      expect(result.status).toBe("completed");
-    });
-
-    it("should handle manual_review conflict resolution", async () => {
-      const mockDb = vi.mocked(getDb)();
-
-      mockDb.insert = vi.fn(() => ({
-        values: vi.fn(() => ({
-          returning: vi.fn(() =>
-            Promise.resolve([
-              {
-                id: testOperationId,
-                projectId: testProjectId,
-                operation: "import",
-                status: "in_progress",
-                branch: testBranch,
-                conflictCount: 0,
-                startedAt: new Date(),
-              },
-            ]),
-          ),
-        })),
-      })) as any;
-
-      mockDb.update = vi.fn(() => ({
-        set: vi.fn(() => ({
-          where: vi.fn(() => Promise.resolve(undefined)),
-        })),
-      })) as any;
-
-      // Mock that returns scenes when queried by title (to simulate existing scenes)
-      const existingScene = {
-        id: "scene-1",
-        projectId: testProjectId,
-        title: "start",
-      };
-      // Service code doesn't call orderBy().limit() when querying existing scenes
-      mockDb.select = vi.fn(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => Promise.resolve([existingScene])),
-        })),
-      })) as any;
-
-      vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([
-        { name: "script.rpy", path: "game/script.rpy" },
-      ] as any);
-
-      vi.spyOn(gitlabService, "getFileContent").mockResolvedValueOnce(
-        'label start:\n    "Conflicting content"\n    return',
-      );
-
-      vi.spyOn(rpyParserService, "parseRPYFile").mockReturnValueOnce({
-        labels: ["start"],
-        dialogue: [{ speaker: null, text: "Conflicting content" }],
-        choices: [],
-        jumps: [],
-        characters: [],
-      });
-
-      const result = await importFromGitlab(
-        testProjectId,
-        testBranch,
-        "manual_review",
-      );
-
-      expect(result.status).toBe("completed");
-      expect(result.conflictCount).toBeGreaterThanOrEqual(1);
-    });
-
-    it("should handle import errors and mark operation as failed", async () => {
-      const mockDb = vi.mocked(getDb)();
-
-      mockDb.insert = vi.fn(() => ({
-        values: vi.fn(() => ({
-          returning: vi.fn(() =>
-            Promise.resolve([
-              {
-                id: testOperationId,
-                projectId: testProjectId,
-                operation: "import",
-                status: "in_progress",
-                branch: testBranch,
-                conflictCount: 0,
-                startedAt: new Date(),
-              },
-            ]),
-          ),
-        })),
-      })) as any;
-
-      mockDb.update = vi.fn(() => ({
-        set: vi.fn(() => ({
-          where: vi.fn(() => Promise.resolve(undefined)),
-        })),
-      })) as any;
-
-      vi.spyOn(gitlabService, "listRpyFiles").mockRejectedValue(
-        new Error("API Error"),
-      );
-
-      const result = await importFromGitlab(
-        testProjectId,
-        testBranch,
-        "branchforge_wins",
-      );
-
-      expect(result.status).toBe("failed");
-    });
-
-    it("should handle empty repository (no RPY files)", async () => {
-      const mockDb = vi.mocked(getDb)();
-
-      mockDb.insert = vi.fn(() => ({
-        values: vi.fn(() => ({
-          returning: vi.fn(() =>
-            Promise.resolve([
-              {
-                id: testOperationId,
-                projectId: testProjectId,
-                operation: "import",
-                status: "in_progress",
-                branch: testBranch,
-                conflictCount: 0,
-                startedAt: new Date(),
-              },
-            ]),
-          ),
-        })),
-      })) as any;
-
-      mockDb.update = vi.fn(() => ({
-        set: vi.fn(() => ({
-          where: vi.fn(() => Promise.resolve(undefined)),
-        })),
-      })) as any;
-
-      vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([]);
-
-      const result = await importFromGitlab(
-        testProjectId,
-        testBranch,
-        "branchforge_wins",
-      );
-
-      expect(result).toMatchObject({
-        status: "completed",
-        conflictCount: 0,
-      });
-    });
   });
 
   describe("getSyncOperation", () => {
@@ -665,8 +50,8 @@ describe("GitLabSyncService", () => {
       const mockOperation = {
         id: testOperationId,
         projectId: testProjectId,
-        operation: "export",
-        status: "completed",
+        operation: "export" as const,
+        status: "completed" as const,
         branch: testBranch,
         conflictCount: 0,
         startedAt: new Date(),
@@ -711,8 +96,8 @@ describe("GitLabSyncService", () => {
         {
           id: "op-1",
           projectId: testProjectId,
-          operation: "export",
-          status: "completed",
+          operation: "export" as const,
+          status: "completed" as const,
           branch: testBranch,
           conflictCount: 0,
           startedAt: new Date(),
@@ -720,8 +105,8 @@ describe("GitLabSyncService", () => {
         {
           id: "op-2",
           projectId: testProjectId,
-          operation: "import",
-          status: "completed",
+          operation: "import" as const,
+          status: "completed" as const,
           branch: "develop",
           conflictCount: 0,
           startedAt: new Date(),
@@ -766,8 +151,8 @@ describe("GitLabSyncService", () => {
         {
           id: "op-1",
           projectId: testProjectId,
-          operation: "export",
-          status: "completed",
+          operation: "export" as const,
+          status: "completed" as const,
           branch: testBranch,
           conflictCount: 0,
           startedAt: new Date(),
@@ -795,7 +180,16 @@ describe("GitLabSyncService", () => {
     });
   });
 
-  // detectConflicts tests moved to integration tests due to complex ORM queries with joins
-  // (sceneLines leftJoin characters for speaker data, conflict detection logic)
+  /*
+   * Complex operations are covered by integration tests:
+   *
+   * - exportToGitlab: Tests reading from gitlabFiles table and pushing to GitLab API
+   * - importFromGitlab: Tests creating gitlabFiles records and linked scenes
+   * - detectConflicts: Tests querying gitlabFiles and comparing with remote content
+   *
+   * These operations involve complex database queries and external service calls,
+   * making unit tests with mocks more fragile than valuable. Integration tests
+   * with real database and external service mocking provide better confidence.
+   */
 });
 

@@ -6,13 +6,18 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useMutation, useQuery, type Query } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type Query,
+} from "@tanstack/react-query";
 import {
   gitlabApi,
   type SyncOperation,
   type ConflictResolution,
 } from "@/lib/api/gitlab";
-import { gitlabKeys } from "@/lib/query-keys";
+import { gitlabKeys, sceneKeys } from "@/lib/query-keys";
 
 // ============================================================================
 // Constants
@@ -88,11 +93,14 @@ interface UseGitLabSyncReturn {
 // ============================================================================
 
 export function useGitLabSync(): UseGitLabSyncReturn {
+  const queryClient = useQueryClient();
   const [pollStartTime, setPollStartTime] = useState<number | null>(null);
   const [activeOperationId, setActiveOperationId] = useState<string | null>(
     null,
   );
   const activeOperationIdRef = useRef<string | null>(null);
+  // Store projectId for cache invalidation when operation completes
+  const activeProjectIdRef = useRef<string | null>(null);
   const [syncState, setSyncState] = useState<SyncState>({
     operation: null,
     isProcessing: false,
@@ -143,16 +151,29 @@ export function useGitLabSync(): UseGitLabSyncReturn {
         op.status === "failed" ? (op.errorMessage ?? "Operation failed") : null,
     }));
 
-    // Stop polling on completion
+    // Stop polling on completion and invalidate caches
     if (op.status === "completed" || op.status === "failed") {
+      const projectId = activeProjectIdRef.current;
       updateActiveOperationId(null);
       setPollStartTime(null);
+      activeProjectIdRef.current = null;
+
+      // Invalidate caches on successful completion
+      if (op.status === "completed" && projectId) {
+        queryClient.invalidateQueries({
+          queryKey: sceneKeys.lists(projectId),
+        });
+        queryClient.invalidateQueries({
+          queryKey: gitlabKeys.importedFiles(projectId),
+        });
+      }
     }
-  }, [operation, pollStartTime]);
+  }, [operation, pollStartTime, queryClient]);
 
   // Reset state function
   const reset = useCallback(() => {
     activeOperationIdRef.current = null;
+    activeProjectIdRef.current = null;
     updateActiveOperationId(null);
     setPollStartTime(null);
     setSyncState({
@@ -174,6 +195,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
       branch?: string;
       commitMessage?: string;
     }) => {
+      activeProjectIdRef.current = projectId;
       return gitlabApi.exportToGitlab(projectId, branch, commitMessage);
     },
     onMutate: () => {
@@ -217,6 +239,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
       branch: string;
       conflictResolution: ConflictResolution;
     }) => {
+      activeProjectIdRef.current = projectId;
       return gitlabApi.importFromGitlab(projectId, branch, conflictResolution);
     },
     onMutate: () => {
@@ -271,33 +294,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
 
-      // Get final operation state
-      if (activeOperationIdRef.current) {
-        const finalOp = await gitlabApi.getOperationStatus(
-          activeOperationIdRef.current,
-        );
-        updateActiveOperationId(null);
-        setPollStartTime(null);
-
-        if (finalOp.status === "failed") {
-          setSyncState({
-            operation: finalOp,
-            isProcessing: false,
-            progress: 0,
-            error: finalOp.errorMessage || "Export failed",
-          });
-          return finalOp;
-        }
-
-        setSyncState({
-          operation: finalOp,
-          isProcessing: false,
-          progress: 100,
-          error: null,
-        });
-        return finalOp;
-      }
-
+      // Return result - the polling effect handles state updates and cache invalidation
       return result;
     } catch {
       return null;
@@ -326,47 +323,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
 
-      // Get final operation state
-      if (activeOperationIdRef.current) {
-        const finalOp = await gitlabApi.getOperationStatus(
-          activeOperationIdRef.current,
-        );
-        updateActiveOperationId(null);
-        setPollStartTime(null);
-
-        if (finalOp.status === "failed") {
-          setSyncState({
-            operation: finalOp,
-            isProcessing: false,
-            progress: 0,
-            error: finalOp.errorMessage || "Import failed",
-          });
-          return finalOp;
-        }
-
-        // Check for conflicts
-        if (
-          finalOp.conflictCount > 0 &&
-          conflictResolution === "manual_review"
-        ) {
-          // Conflicts need manual review - don't mark as complete
-          setSyncState({
-            operation: finalOp,
-            isProcessing: false,
-            progress: 90,
-            error: null,
-          });
-        } else {
-          setSyncState({
-            operation: finalOp,
-            isProcessing: false,
-            progress: 100,
-            error: null,
-          });
-        }
-        return finalOp;
-      }
-
+      // Return result - the polling effect handles state updates and cache invalidation
       return result;
     } catch {
       return null;

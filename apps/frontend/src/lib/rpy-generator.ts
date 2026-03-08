@@ -19,19 +19,14 @@ export function generateRpyContent(scene: SceneDetail): string[] {
   lines.push(
     `<span class="text-muted-foreground"># Scene: ${escapeHtml(scene.title)}</span>`,
   );
-  if (scene.act) {
+  if (scene.groupType && scene.groupValue) {
     lines.push(
-      `<span class="text-muted-foreground"># Act: ${escapeHtml(scene.act)}</span>`,
+      `<span class="text-muted-foreground"># ${scene.groupType}: ${escapeHtml(scene.groupValue)}</span>`,
     );
   }
-  if (scene.chapter) {
+  if (scene.routeKey) {
     lines.push(
-      `<span class="text-muted-foreground"># Chapter: ${escapeHtml(scene.chapter.toString())}</span>`,
-    );
-  }
-  if (scene.route) {
-    lines.push(
-      `<span class="text-muted-foreground"># Route: ${escapeHtml(scene.route)}</span>`,
+      `<span class="text-muted-foreground"># Route: ${escapeHtml(scene.routeKey)}</span>`,
     );
   }
   lines.push("");
@@ -97,7 +92,7 @@ function escapeHtml(text: string): string {
 
 /**
  * Generate file tree structure from scenes
- * Groups scenes by act/chapter for hierarchical display
+ * Groups scenes by groupType/groupValue for hierarchical display
  */
 export interface FileItem {
   name: string;
@@ -109,11 +104,14 @@ export interface FileItem {
 export function generateFileTree(scenes: PublicScene[]): FileItem[] {
   if (!scenes.length) return [];
 
-  // Group by act/chapter for hierarchical display
+  // Group by groupType/groupValue for hierarchical display
   const grouped = scenes.reduce(
     (acc, scene) => {
-      // For prequel: use act, for sequel: use chapter
-      const key = scene.act || `Chapter ${scene.chapter || "Main"}`;
+      // Use group value if available, otherwise "Main"
+      const key =
+        scene.groupType && scene.groupValue
+          ? `${scene.groupType} ${scene.groupValue}`
+          : "Main";
       if (!acc[key]) {
         acc[key] = [];
       }
@@ -125,10 +123,10 @@ export function generateFileTree(scenes: PublicScene[]): FileItem[] {
 
   // Convert to file tree structure
   return Object.entries(grouped)
-    .map(([act, actScenes]) => ({
-      name: act,
+    .map(([groupName, groupScenes]) => ({
+      name: groupName,
       type: "folder" as const,
-      children: actScenes.map((scene) => ({
+      children: groupScenes.map((scene) => ({
         name: `${scene.title}.rpy`,
         type: "file" as const,
         sceneId: scene.id,

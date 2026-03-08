@@ -14,57 +14,70 @@
 /**
  * User role enumeration
  */
-export type UserRole = 'OWNER' | 'READER' | 'TESTER';
+export type UserRole = "OWNER" | "READER" | "TESTER";
 export const UserRole = {
-  OWNER: 'OWNER',
-  READER: 'READER',
-  TESTER: 'TESTER',
+  OWNER: "OWNER",
+  READER: "READER",
+  TESTER: "TESTER",
 } as const;
 
 /**
- * Project type enumeration
+ * Validates that a value is a valid UserRole.
+ * @param value - The value to validate
+ * @returns true if the value is a valid UserRole
  */
-export type ProjectType = 'PREQUEL' | 'SEQUEL';
-export const ProjectType = {
-  PREQUEL: 'PREQUEL',
-  SEQUEL: 'SEQUEL',
+export function isValidUserRole(value: string): value is UserRole {
+  return value === "OWNER" || value === "READER" || value === "TESTER";
+}
+
+/**
+ * Role hierarchy mapping for permission checks.
+ * Higher numeric values indicate higher privileges.
+ * Hierarchy: OWNER (3) > READER (2) > TESTER (1)
+ */
+export const ROLE_HIERARCHY = {
+  OWNER: 3,
+  READER: 2,
+  TESTER: 1,
 } as const;
 
 /**
  * Scene status enumeration
  */
-export type SceneStatus = 'DRAFT' | 'REVIEW' | 'FINAL';
+export type SceneStatus = "DRAFT" | "REVIEW" | "FINAL";
 export const SceneStatus = {
-  DRAFT: 'DRAFT',
-  REVIEW: 'REVIEW',
-  FINAL: 'FINAL',
-} as const;
-
-/**
- * Route type enumeration
- * Prequel: EILEEN, LUCAS, SHARED
- * Sequel: FEMALE, MALE, COMBINED, COMMON
- */
-export type RouteType = 'EILEEN' | 'LUCAS' | 'SHARED' | 'FEMALE' | 'MALE' | 'COMBINED' | 'COMMON';
-export const RouteType = {
-  EILEEN: 'EILEEN',
-  LUCAS: 'LUCAS',
-  SHARED: 'SHARED',
-  FEMALE: 'FEMALE',
-  MALE: 'MALE',
-  COMBINED: 'COMBINED',
-  COMMON: 'COMMON',
+  DRAFT: "DRAFT",
+  REVIEW: "REVIEW",
+  FINAL: "FINAL",
 } as const;
 
 /**
  * Scene visibility enumeration
  */
-export type SceneVisibility = 'EXCLUSIVE' | 'SHARED' | 'DUO_PAIR';
+export type SceneVisibility = "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
 export const SceneVisibility = {
-  EXCLUSIVE: 'EXCLUSIVE',
-  SHARED: 'SHARED',
-  DUO_PAIR: 'DUO_PAIR',
+  EXCLUSIVE: "EXCLUSIVE",
+  SHARED: "SHARED",
+  DUO_PAIR: "DUO_PAIR",
 } as const;
+
+// ============================================================================
+// Route Configuration
+// ============================================================================
+
+/**
+ * Route configuration for a project
+ * Routes are user-defined entities that replace hardcoded route enums
+ */
+export interface RouteConfig {
+  id: string;
+  projectId: string;
+  routeKey: string;
+  routeName: string;
+  jumpPrefix: string;
+  sortOrder: number;
+  isShared: boolean;
+}
 
 // ============================================================================
 // Public User Interface
@@ -84,25 +97,20 @@ export interface PublicUser {
 // Visual Name Pattern Types
 // ============================================================================
 
-export type VisualPattern = 'ACT_SCENE_SLUG_COUNTER' | 'CHAPTER_SCENE_SLUG_COUNTER';
-
 export interface VisualSystemConfig {
-  pattern: VisualPattern;
-  actPrefixes?: Record<string, string>;
-  chapterPrefix?: string;
+  namingTemplate: string; // e.g., "{route}{group}_{scene}_{counter}_{slug}"
+  groupPrefixes?: Record<string, Record<string, string>>; // { "act": { "I": "ai" }, "chapter": { "1": "ch1" } }
+  defaultGroupType?: string; // "act", "chapter", etc.
   scenePadding: 1 | 2;
   counterPadding: 1 | 2;
   jumpPrefixShared: string;
-  jumpPrefixRouteA: string;
-  jumpPrefixRouteB: string;
-  routeAName: string;
-  routeBName: string;
   placeholderBaseUrl?: string;
 }
 
 export interface VisualNameComponents {
-  act?: string;
-  chapter?: number;
+  groupType?: string; // "act", "chapter", etc.
+  groupValue?: string; // "I", "1", etc.
+  routeKey?: string;
   sceneNumber: number;
   counter: number;
   slug: string;
@@ -113,7 +121,7 @@ export interface VisualNameComponents {
 // ============================================================================
 
 /**
- * Generates a visual label/filename based on the visual system pattern.
+ * Generates a visual label/filename based on the visual system template.
  * This is used for auto-generating image filenames like "ai_01_02_cafe_01.png"
  *
  * @param config - The visual system configuration
@@ -124,62 +132,67 @@ export function generateVisualName(
   config: VisualSystemConfig,
   components: VisualNameComponents,
 ): string {
-  const parts: string[] = [];
+  let result = config.namingTemplate;
 
-  if (config.pattern === 'ACT_SCENE_SLUG_COUNTER') {
-    // Prequel pattern: {act_prefix}{scene}_{counter}_{slug}
-    const actPrefix = components.act && config.actPrefixes
-      ? config.actPrefixes[components.act]
-      : '';
-
-    const sceneNum = String(components.sceneNumber).padStart(config.scenePadding, '0');
-    const counter = String(components.counter).padStart(config.counterPadding, '0');
-
-    if (actPrefix) parts.push(actPrefix);
-    parts.push(sceneNum, counter, components.slug);
-
+  // Replace {route}
+  if (components.routeKey) {
+    const routePrefix = components.routeKey + "_";
+    result = result.replace("{route}", routePrefix);
   } else {
-    // Sequel pattern: {chapter_prefix}{chapter}_{scene}_{counter}_{slug}
-    const chapterPrefix = config.chapterPrefix || 'ch';
-    const chapter = String(components.chapter).padStart(1, '0');
-    const sceneNum = String(components.sceneNumber).padStart(config.scenePadding, '0');
-    const counter = String(components.counter).padStart(config.counterPadding, '0');
-
-    parts.push(`${chapterPrefix}${chapter}`, sceneNum, counter, components.slug);
+    result = result.replace("{route}", "");
   }
 
-  return parts.join('_');
+  // Replace {group} - look up prefix if available
+  if (
+    components.groupType &&
+    components.groupValue &&
+    config.groupPrefixes?.[components.groupType]
+  ) {
+    const prefix =
+      config.groupPrefixes[components.groupType][components.groupValue] ||
+      components.groupValue;
+    result = result.replace("{group}", prefix);
+  } else if (components.groupValue) {
+    result = result.replace("{group}", components.groupValue);
+  } else {
+    result = result.replace("{group}", "");
+  }
+
+  // Replace {scene}, {counter}, {slug}
+  result = result.replace(
+    "{scene}",
+    String(components.sceneNumber).padStart(config.scenePadding, "0"),
+  );
+  result = result.replace(
+    "{counter}",
+    String(components.counter).padStart(config.counterPadding, "0"),
+  );
+  result = result.replace("{slug}", components.slug);
+
+  // Clean up double underscores and trim
+  return result.replace(/_+/g, "_").replace(/^_|_$/g, "");
 }
 
 /**
- * Generates a jump label for Ren'Py based on route and scene info.
+ * Generates a jump label for Ren'Py based on route configuration and scene info.
  *
- * @param config - The visual system configuration
- * @param route - The route type
+ * @param routeConfig - The route configuration (null for shared scenes)
  * @param sceneNumber - The scene number
+ * @param scenePadding - The padding for scene numbers (1 or 2)
  * @returns The generated jump label
  */
 export function generateJumpLabel(
-  config: VisualSystemConfig,
-  route: RouteType | null,
+  routeConfig: RouteConfig | null,
   sceneNumber: number,
+  scenePadding: 1 | 2,
 ): string {
-  const sceneNum = String(sceneNumber).padStart(config.scenePadding, '0');
+  const sceneNum = String(sceneNumber).padStart(scenePadding, "0");
 
-  if (!route || route === RouteType.SHARED || route === RouteType.COMMON) {
-    return `${config.jumpPrefixShared}${sceneNum}`;
+  if (!routeConfig || routeConfig.isShared) {
+    return sceneNum;
   }
 
-  if (route === RouteType.LUCAS || route === RouteType.MALE) {
-    return `${config.jumpPrefixRouteA}${sceneNum}`;
-  }
-
-  if (route === RouteType.EILEEN || route === RouteType.FEMALE) {
-    return `${config.jumpPrefixRouteB}${sceneNum}`;
-  }
-
-  // Fallback for other routes
-  return `${route.toLowerCase()}_${sceneNum}`;
+  return `${routeConfig.jumpPrefix}${sceneNum}`;
 }
 
 // ============================================================================
@@ -197,7 +210,6 @@ export interface Project {
   id: string;
   userId: string;
   name: string;
-  type: ProjectType;
   description?: string;
   createdAt: Date;
 }
@@ -206,10 +218,10 @@ export interface Scene {
   id: string;
   projectId: string;
   title: string;
-  act?: string;
-  chapter?: number;
+  groupType?: string; // e.g., "act", "chapter", "episode"
+  groupValue?: string; // e.g., "I", "1", "1a"
   sceneNumber: number;
-  route?: RouteType;
+  routeKey?: string; // References route_configs.route_key (custom user-defined routes)
   status: SceneStatus;
   createdAt: Date;
 }
@@ -226,11 +238,11 @@ export interface PublicScene {
   id: string;
   projectId: string;
   title: string;
-  act: string | null;
-  chapter: number | null;
+  groupType: string | null; // e.g., "act", "chapter", "episode" or null
+  groupValue: string | null; // e.g., "I", "1", "1a" or null
   sceneNumber: number;
   sequenceOrder: number;
-  route: RouteType | null;
+  routeKey: string | null;
   status: SceneStatus | null;
   visibility: SceneVisibility | null;
   createdAt: string;
@@ -240,7 +252,12 @@ export interface PublicScene {
 /**
  * Scene line content type enumeration
  */
-export type SceneLineContentType = "DIALOGUE" | "NARRATION" | "CHOICE" | "MENU" | "JUMP";
+export type SceneLineContentType =
+  | "DIALOGUE"
+  | "NARRATION"
+  | "CHOICE"
+  | "MENU"
+  | "JUMP";
 
 /**
  * Scene visual type enumeration
@@ -268,7 +285,82 @@ export interface SceneLine {
 /**
  * Scene character role enumeration
  */
-export type SceneCharacterRole = "PRIMARY" | "SECONDARY" | "BACKGROUND" | "MENTIONED";
+export type SceneCharacterRole =
+  | "PRIMARY"
+  | "SECONDARY"
+  | "BACKGROUND"
+  | "MENTIONED";
+
+// ============================================================================
+// Validation Helpers (Shared Patterns for Frontend & Backend)
+// ============================================================================
+
+/**
+ * Regular expression for route configuration keys.
+ * Allows letters, numbers, underscores, and hyphens.
+ * @example
+ * isValidRouteKey("hero_01") // true
+ * isValidRouteKey("hero-route") // true
+ * isValidRouteKey("hero route") // false
+ */
+export const ROUTE_KEY_REGEX = /^[a-zA-Z0-9_-]+$/;
+
+/**
+ * Regular expression for jump prefixes.
+ * Allows letters, numbers, underscores, and hyphens.
+ * @example
+ * isValidJumpPrefix("hero_") // true
+ * isValidJumpPrefix("hero-chapter_") // true
+ * isValidJumpPrefix("hero chapter") // false
+ */
+export const JUMP_PREFIX_REGEX = /^[a-zA-Z0-9_-]+$/;
+
+/**
+ * Validates a route configuration key.
+ * Route keys must contain only letters, numbers, underscores, and hyphens.
+ *
+ * @param value - The value to validate
+ * @returns true if valid, false otherwise
+ */
+export function isValidRouteKey(value: string): boolean {
+  return ROUTE_KEY_REGEX.test(value);
+}
+
+/**
+ * Validates a jump prefix.
+ * Jump prefixes must contain only letters, numbers, underscores, and hyphens.
+ *
+ * @param value - The value to validate
+ * @returns true if valid, false otherwise
+ */
+export function isValidJumpPrefix(value: string): boolean {
+  return JUMP_PREFIX_REGEX.test(value);
+}
+
+/**
+ * GitLab file type enumeration
+ */
+export type GitLabFileType = "STORY" | "SETTINGS";
+export const GitLabFileType = {
+  STORY: "STORY",
+  SETTINGS: "SETTINGS",
+} as const;
+
+/**
+ * GitLab file information
+ * Represents a GitLab file tracked in the system
+ */
+export interface GitLabFile {
+  id: string;
+  projectId: string;
+  filePath: string; // e.g., "labels/act_i.rpy" or "gui/screens.rpy"
+  fileType: GitLabFileType;
+  content: string; // Full RPY content for Script Mode
+  lastSyncedAt: string | null;
+  lastCommitSha: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 /**
  * Character in a scene with role information
@@ -290,3 +382,4 @@ export interface SceneDetail extends PublicScene {
   lines: SceneLine[];
   characters: SceneCharacter[];
 }
+

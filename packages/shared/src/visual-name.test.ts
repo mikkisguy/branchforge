@@ -4,30 +4,29 @@ import {
   generateJumpLabel,
   type VisualSystemConfig,
   type VisualNameComponents,
-  RouteType,
+  type RouteConfig,
 } from './index.js';
 
 describe('generateVisualName', () => {
-  describe('Prequel pattern (ACT_SCENE_SLUG_COUNTER)', () => {
+  describe('Prequel pattern with act-based grouping', () => {
     const prequelConfig: VisualSystemConfig = {
-      pattern: 'ACT_SCENE_SLUG_COUNTER',
-      actPrefixes: {
-        I: 'ai',
-        II: 'aii',
-        III: 'aiii',
+      namingTemplate: '{group}_{scene}_{counter}_{slug}',
+      groupPrefixes: {
+        act: {
+          I: 'ai',
+          II: 'aii',
+          III: 'aiii',
+        },
       },
       scenePadding: 2,
       counterPadding: 2,
       jumpPrefixShared: '',
-      jumpPrefixRouteA: 'lucas_',
-      jumpPrefixRouteB: 'eileen_',
-      routeAName: 'Lucas',
-      routeBName: 'Eileen',
     };
 
     it('generates name with act prefix', () => {
       const components: VisualNameComponents = {
-        act: 'I',
+        groupType: 'act',
+        groupValue: 'I',
         sceneNumber: 1,
         counter: 1,
         slug: 'cafe',
@@ -38,7 +37,8 @@ describe('generateVisualName', () => {
 
     it('generates name for Act II', () => {
       const components: VisualNameComponents = {
-        act: 'II',
+        groupType: 'act',
+        groupValue: 'II',
         sceneNumber: 5,
         counter: 2,
         slug: 'bedroom',
@@ -50,7 +50,8 @@ describe('generateVisualName', () => {
     it('handles single digit padding', () => {
       const config = { ...prequelConfig, scenePadding: 1, counterPadding: 1 };
       const components: VisualNameComponents = {
-        act: 'I',
+        groupType: 'act',
+        groupValue: 'I',
         sceneNumber: 1,
         counter: 1,
         slug: 'cafe',
@@ -61,7 +62,18 @@ describe('generateVisualName', () => {
 
     it('handles missing act prefix gracefully', () => {
       const components: VisualNameComponents = {
-        act: 'IV', // Not in config
+        groupType: 'act',
+        groupValue: 'IV', // Not in config
+        sceneNumber: 1,
+        counter: 1,
+        slug: 'cafe',
+      };
+      const result = generateVisualName(prequelConfig, components);
+      expect(result).toBe('IV_01_01_cafe');
+    });
+
+    it('handles missing groupType gracefully', () => {
+      const components: VisualNameComponents = {
         sceneNumber: 1,
         counter: 1,
         slug: 'cafe',
@@ -71,22 +83,27 @@ describe('generateVisualName', () => {
     });
   });
 
-  describe('Sequel pattern (CHAPTER_SCENE_SLUG_COUNTER)', () => {
+  describe('Sequel pattern with chapter-based grouping', () => {
     const sequelConfig: VisualSystemConfig = {
-      pattern: 'CHAPTER_SCENE_SLUG_COUNTER',
-      chapterPrefix: 'ch',
+      namingTemplate: '{group}_{scene}_{counter}_{slug}',
+      groupPrefixes: {
+        chapter: {
+          '1': 'ch1',
+          '2': 'ch2',
+          '3': 'ch3',
+          '4': 'ch4',
+          '5': 'ch5',
+        },
+      },
       scenePadding: 2,
       counterPadding: 2,
       jumpPrefixShared: '',
-      jumpPrefixRouteA: 'lucas_',
-      jumpPrefixRouteB: 'eileen_',
-      routeAName: 'Lucas',
-      routeBName: 'Eileen',
     };
 
     it('generates name with chapter prefix', () => {
       const components: VisualNameComponents = {
-        chapter: 1,
+        groupType: 'chapter',
+        groupValue: '1',
         sceneNumber: 1,
         counter: 1,
         slug: 'cafe',
@@ -97,7 +114,8 @@ describe('generateVisualName', () => {
 
     it('generates name for later chapter', () => {
       const components: VisualNameComponents = {
-        chapter: 5,
+        groupType: 'chapter',
+        groupValue: '5',
         sceneNumber: 10,
         counter: 3,
         slug: 'garden',
@@ -106,42 +124,108 @@ describe('generateVisualName', () => {
       expect(result).toBe('ch5_10_03_garden');
     });
   });
+
+  describe('Route-based naming', () => {
+    const routeConfig: VisualSystemConfig = {
+      namingTemplate: '{route}{group}_{scene}_{counter}_{slug}',
+      groupPrefixes: {
+        act: {
+          I: 'ai',
+          II: 'aii',
+          III: 'aiii',
+        },
+      },
+      scenePadding: 2,
+      counterPadding: 2,
+      jumpPrefixShared: '',
+    };
+
+    it('includes route prefix when provided', () => {
+      const components: VisualNameComponents = {
+        routeKey: 'eileen',
+        groupType: 'act',
+        groupValue: 'I',
+        sceneNumber: 1,
+        counter: 1,
+        slug: 'cafe',
+      };
+      const result = generateVisualName(routeConfig, components);
+      expect(result).toBe('eileen_ai_01_01_cafe');
+    });
+
+    it('omits route prefix when not provided', () => {
+      const components: VisualNameComponents = {
+        groupType: 'act',
+        groupValue: 'I',
+        sceneNumber: 1,
+        counter: 1,
+        slug: 'cafe',
+      };
+      const result = generateVisualName(routeConfig, components);
+      expect(result).toBe('ai_01_01_cafe');
+    });
+  });
 });
 
 describe('generateJumpLabel', () => {
-  const config: VisualSystemConfig = {
-    pattern: 'ACT_SCENE_SLUG_COUNTER',
-    scenePadding: 2,
-    counterPadding: 2,
-    jumpPrefixShared: '',
-    jumpPrefixRouteA: 'lucas_',
-    jumpPrefixRouteB: 'eileen_',
-    routeAName: 'Lucas',
-    routeBName: 'Eileen',
+  // Mock route configurations
+  const lucasRoute: RouteConfig = {
+    id: '1',
+    projectId: 'proj-1',
+    routeKey: 'lucas',
+    routeName: "Lucas's Route",
+    jumpPrefix: 'lucas_',
+    sortOrder: 1,
+    isShared: false,
+  };
+
+  const eileenRoute: RouteConfig = {
+    id: '2',
+    projectId: 'proj-1',
+    routeKey: 'eileen',
+    routeName: "Eileen's Route",
+    jumpPrefix: 'eileen_',
+    sortOrder: 2,
+    isShared: false,
+  };
+
+  const sharedRoute: RouteConfig = {
+    id: '3',
+    projectId: 'proj-1',
+    routeKey: 'shared',
+    routeName: 'Shared Route',
+    jumpPrefix: '',
+    sortOrder: 0,
+    isShared: true,
   };
 
   it('generates shared route jump label', () => {
-    const result = generateJumpLabel(config, RouteType.SHARED, 5);
+    const result = generateJumpLabel(sharedRoute, 5, 2);
     expect(result).toBe('05');
   });
 
   it('generates Lucas route jump label', () => {
-    const result = generateJumpLabel(config, RouteType.LUCAS, 3);
+    const result = generateJumpLabel(lucasRoute, 3, 2);
     expect(result).toBe('lucas_03');
   });
 
   it('generates Eileen route jump label', () => {
-    const result = generateJumpLabel(config, RouteType.EILEEN, 7);
+    const result = generateJumpLabel(eileenRoute, 7, 2);
     expect(result).toBe('eileen_07');
   });
 
   it('generates label for null route (shared/common)', () => {
-    const result = generateJumpLabel(config, null, 1);
+    const result = generateJumpLabel(null, 1, 2);
     expect(result).toBe('01');
   });
 
   it('pads scene number correctly', () => {
-    const result = generateJumpLabel(config, RouteType.SHARED, 1);
+    const result = generateJumpLabel(sharedRoute, 1, 2);
     expect(result).toBe('01');
+  });
+
+  it('uses scenePadding of 1', () => {
+    const result = generateJumpLabel(lucasRoute, 5, 1);
+    expect(result).toBe('lucas_5');
   });
 });

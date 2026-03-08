@@ -5,18 +5,18 @@
  * Tests listing scenes, getting scene details, and authorization.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import * as dbModule from '../../db/index.js';
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import * as dbModule from "../../db/index.js";
 
 // Mock the scene-characters schema table before importing the service
 // This prevents circular dependency issues in the test environment
-vi.mock('../../db/schema/tables/scene-characters.js', () => ({
+vi.mock("../../db/schema/tables/scene-characters.js", () => ({
   sceneCharacters: {
-    role: 'role',
-    emotion: 'emotion',
-    notes: 'notes',
-    sceneId: 'sceneId',
-    characterId: 'characterId',
+    role: "role",
+    emotion: "emotion",
+    notes: "notes",
+    sceneId: "sceneId",
+    characterId: "characterId",
   },
 }));
 
@@ -27,7 +27,7 @@ import {
   authorizeSceneAccess,
   type SceneDetail,
   type SceneLineWithSpeaker,
-} from '../scenes.service.js';
+} from "../scenes.service.js";
 
 // Mock the database with a complete chain builder
 const createMockChain = (resolveValue: any) => {
@@ -35,10 +35,12 @@ const createMockChain = (resolveValue: any) => {
 
   // Helper to create chain methods that preserve join capability
   const createJoinMethods = () => ({
-    where: vi.fn(() => Object.assign(result, {
-      orderBy: vi.fn(() => result),
-      limit: vi.fn(() => result),
-    })),
+    where: vi.fn(() =>
+      Object.assign(result, {
+        orderBy: vi.fn(() => result),
+        limit: vi.fn(() => result),
+      }),
+    ),
     orderBy: vi.fn(() => result),
     limit: vi.fn(() => result),
     innerJoin: vi.fn(() => createJoinMethods()),
@@ -58,86 +60,86 @@ const mockDb = {
   select: mockSelect,
 };
 
-vi.mock('../../db/index.js', () => ({
+vi.mock("../../db/index.js", () => ({
   getDb: vi.fn(() => mockDb),
 }));
 
-describe('ScenesService', () => {
-  const userId = 'user-123';
-  const projectId = 'project-123';
-  const sceneId = 'scene-123';
+describe("ScenesService", () => {
+  const userId = "user-123";
+  const projectId = "project-123";
+  const sceneId = "scene-123";
 
   const mockScene = {
     id: sceneId,
     projectId,
-    title: 'chapter1_scene1',
-    act: 'I',
-    chapter: 1,
+    title: "chapter1_scene1",
+    groupType: "act",
+    groupValue: "I",
     sceneNumber: 1,
     sequenceOrder: 0,
-    route: 'COMMON',
-    visibility: 'EXCLUSIVE',
-    status: 'DRAFT',
+    route: "common",
+    visibility: "EXCLUSIVE",
+    status: "DRAFT",
     prerequisites: {},
     effects: {},
     crossRouteContext: null,
     readerNotes: null,
     duoPairId: null,
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
+    createdAt: new Date("2024-01-01"),
+    updatedAt: new Date("2024-01-01"),
   };
 
   const mockCharacter = {
-    id: 'char-1',
+    id: "char-1",
     projectId,
-    name: 'Eileen',
-    displayName: 'Eileen',
-    renpyTag: 'a',
-    routeAffiliation: 'EILEEN',
+    name: "Eileen",
+    displayName: "Eileen",
+    renpyTag: "a",
+    routeAffiliation: "EILEEN",
     isLoveInterest: true,
     pairGroupId: null,
     dialogueStyle: null,
     conditionalPrefix: null,
-    color: '#FF5733',
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
+    color: "#FF5733",
+    createdAt: new Date("2024-01-01"),
+    updatedAt: new Date("2024-01-01"),
   };
 
   const mockSceneLine: SceneLineWithSpeaker = {
-    id: 'line-1',
+    id: "line-1",
     sceneId,
     sequence: 1,
-    contentType: 'DIALOGUE',
-    content: 'Hello world!',
-    speakerId: 'char-1',
-    speakerName: 'Eileen',
-    speakerTag: 'a',
-    visualType: 'GENERATED',
+    contentType: "DIALOGUE",
+    content: "Hello world!",
+    speakerId: "char-1",
+    speakerName: "Eileen",
+    speakerTag: "a",
+    visualType: "GENERATED",
     visualSlugOverride: null,
     customVisualName: null,
     menuOptions: null,
     wordCount: null,
     demoPlaceholderColor: null,
     demoNotes: null,
-    createdAt: new Date('2024-01-01').toISOString(),
-    updatedAt: new Date('2024-01-01').toISOString(),
+    createdAt: new Date("2024-01-01").toISOString(),
+    updatedAt: new Date("2024-01-01").toISOString(),
   };
 
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('listScenes', () => {
+  describe("listScenes", () => {
     beforeEach(() => {
       mockSelect.mockImplementation(createEmptyMockChain);
     });
 
-    it('should return empty array when project has no scenes', async () => {
+    it("should return empty array when project has no scenes", async () => {
       const scenes = await listScenes(projectId, userId);
       expect(scenes).toEqual([]);
     });
 
-    it('should return list of scenes for a project', async () => {
+    it("should return list of scenes for a project", async () => {
       mockSelect.mockImplementation(() => createMockChain([mockScene]));
 
       const scenes = await listScenes(projectId, userId);
@@ -146,21 +148,26 @@ describe('ScenesService', () => {
       expect(scenes[0]).toEqual({
         id: sceneId,
         projectId,
-        title: 'chapter1_scene1',
-        act: 'I',
-        chapter: 1,
+        title: "chapter1_scene1",
+        groupType: "act",
+        groupValue: "I",
         sceneNumber: 1,
         sequenceOrder: 0,
-        route: 'COMMON',
-        status: 'DRAFT',
-        visibility: 'EXCLUSIVE',
+        routeKey: "common",
+        status: "DRAFT",
+        visibility: "EXCLUSIVE",
         createdAt: mockScene.createdAt.toISOString(),
         updatedAt: mockScene.updatedAt.toISOString(),
       });
     });
 
-    it('should return multiple scenes ordered by sequence', async () => {
-      const scene2 = { ...mockScene, id: 'scene-2', sceneNumber: 2, sequenceOrder: 1 };
+    it("should return multiple scenes ordered by sequence", async () => {
+      const scene2 = {
+        ...mockScene,
+        id: "scene-2",
+        sceneNumber: 2,
+        sequenceOrder: 1,
+      };
       mockSelect.mockImplementation(() => createMockChain([mockScene, scene2]));
 
       const scenes = await listScenes(projectId, userId);
@@ -171,43 +178,49 @@ describe('ScenesService', () => {
     });
   });
 
-  describe('getScene', () => {
+  describe("getScene", () => {
     beforeEach(() => {
       mockSelect.mockImplementation(createEmptyMockChain);
     });
 
-    it('should return scene with lines and characters when found', async () => {
+    it("should return scene with lines and characters when found", async () => {
       // Mock scene query
       let callCount = 0;
       const mockDbSceneLine = {
         ...mockSceneLine,
-        createdAt: new Date('2024-01-01'),
-        updatedAt: new Date('2024-01-01'),
+        createdAt: new Date("2024-01-01"),
+        updatedAt: new Date("2024-01-01"),
       };
 
       mockSelect.mockImplementation(() => {
         callCount++;
         if (callCount === 1) {
           // First call: get scene with project owner
-          return createMockChain([{
-            scene: mockScene,
-            projectOwnerId: userId,
-          }]);
+          return createMockChain([
+            {
+              scene: mockScene,
+              projectOwnerId: userId,
+            },
+          ]);
         } else if (callCount === 2) {
           // Second call: get scene lines with speakers
-          return createMockChain([{
-            line: mockDbSceneLine,
-            speakerName: 'Eileen',
-            speakerTag: 'a',
-          }]);
+          return createMockChain([
+            {
+              line: mockDbSceneLine,
+              speakerName: "Eileen",
+              speakerTag: "a",
+            },
+          ]);
         } else {
           // Third call: get scene characters
-          return createMockChain([{
-            character: mockCharacter,
-            role: 'PRIMARY',
-            emotion: null,
-            notes: null,
-          }]);
+          return createMockChain([
+            {
+              character: mockCharacter,
+              role: "PRIMARY",
+              emotion: null,
+              notes: null,
+            },
+          ]);
         }
       });
 
@@ -215,14 +228,14 @@ describe('ScenesService', () => {
 
       expect(scene).not.toBeNull();
       expect(scene?.id).toBe(sceneId);
-      expect(scene?.title).toBe('chapter1_scene1');
+      expect(scene?.title).toBe("chapter1_scene1");
       expect(scene?.lines).toHaveLength(1);
-      expect(scene?.lines[0].content).toBe('Hello world!');
+      expect(scene?.lines[0].content).toBe("Hello world!");
       expect(scene?.characters).toHaveLength(1);
-      expect(scene?.characters[0].name).toBe('Eileen');
+      expect(scene?.characters[0].name).toBe("Eileen");
     });
 
-    it('should return null when scene not found', async () => {
+    it("should return null when scene not found", async () => {
       mockSelect.mockImplementation(createEmptyMockChain);
 
       const scene = await getScene(sceneId, userId);
@@ -230,16 +243,18 @@ describe('ScenesService', () => {
       expect(scene).toBeNull();
     });
 
-    it('should return scene with empty lines array when no lines exist', async () => {
+    it("should return scene with empty lines array when no lines exist", async () => {
       let callCount = 0;
       mockSelect.mockImplementation(() => {
         callCount++;
         if (callCount === 1) {
           // First call: get scene with project owner
-          return createMockChain([{
-            scene: mockScene,
-            projectOwnerId: userId,
-          }]);
+          return createMockChain([
+            {
+              scene: mockScene,
+              projectOwnerId: userId,
+            },
+          ]);
         }
         // All subsequent calls return empty
         return createMockChain([]);
@@ -255,81 +270,72 @@ describe('ScenesService', () => {
   // authorizeSceneAccess tests moved to integration tests due to complex ORM queries with joins
   // (scenes → projects → projectUsers)
 
-  describe('mapToPublicScene (via listScenes)', () => {
+  describe("mapToPublicScene (via listScenes)", () => {
     beforeEach(() => {
       mockSelect.mockImplementation(createEmptyMockChain);
     });
 
-    it('should return null for route when DB contains invalid route value', async () => {
-      const sceneWithInvalidRoute = {
+    it("should return routeKey value as string", async () => {
+      const sceneWithRoute = {
         ...mockScene,
-        route: 'INVALID_ROUTE' as any, // Simulate corrupted DB
+        route: "custom_route",
       };
-      mockSelect.mockImplementation(() => createMockChain([sceneWithInvalidRoute]));
+      mockSelect.mockImplementation(() => createMockChain([sceneWithRoute]));
 
       const scenes = await listScenes(projectId, userId);
 
       expect(scenes).toHaveLength(1);
-      expect(scenes[0].route).toBeNull(); // Invalid route falls back to null
-      expect(scenes[0].status).toBe('DRAFT'); // Valid status preserved
+      expect(scenes[0].routeKey).toBe("custom_route");
+      expect(scenes[0].status).toBe("DRAFT");
     });
 
-    it('should return null for status when DB contains invalid status value', async () => {
+    it("should return null for status when DB contains invalid status value", async () => {
       const sceneWithInvalidStatus = {
         ...mockScene,
-        status: 'INVALID_STATUS' as any, // Simulate corrupted DB
+        status: "INVALID_STATUS" as any, // Simulate corrupted DB
       };
-      mockSelect.mockImplementation(() => createMockChain([sceneWithInvalidStatus]));
+      mockSelect.mockImplementation(() =>
+        createMockChain([sceneWithInvalidStatus]),
+      );
 
       const scenes = await listScenes(projectId, userId);
 
       expect(scenes).toHaveLength(1);
       expect(scenes[0].status).toBeNull(); // Invalid status falls back to null
-      expect(scenes[0].route).toBe('COMMON'); // Valid route preserved
+      expect(scenes[0].routeKey).toBe("common"); // Valid routeKey preserved
     });
 
-    it('should return null for both route and status when both are invalid', async () => {
-      const sceneWithInvalidValues = {
-        ...mockScene,
-        route: 'BOGUS_ROUTE' as any,
-        status: 'BOGUS_STATUS' as any,
-      };
-      mockSelect.mockImplementation(() => createMockChain([sceneWithInvalidValues]));
-
-      const scenes = await listScenes(projectId, userId);
-
-      expect(scenes).toHaveLength(1);
-      expect(scenes[0].route).toBeNull();
-      expect(scenes[0].status).toBeNull();
-    });
-
-    it('should preserve valid route and status values', async () => {
+    it("should preserve valid routeKey and status values", async () => {
       const sceneWithValidValues = {
         ...mockScene,
-        route: 'LUCAS',
-        status: 'REVIEW',
+        route: "lucas",
+        status: "REVIEW",
       };
-      mockSelect.mockImplementation(() => createMockChain([sceneWithValidValues]));
+      mockSelect.mockImplementation(() =>
+        createMockChain([sceneWithValidValues]),
+      );
 
       const scenes = await listScenes(projectId, userId);
 
       expect(scenes).toHaveLength(1);
-      expect(scenes[0].route).toBe('LUCAS');
-      expect(scenes[0].status).toBe('REVIEW');
+      expect(scenes[0].routeKey).toBe("lucas");
+      expect(scenes[0].status).toBe("REVIEW");
     });
 
-    it('should handle null route and status values', async () => {
+    it("should handle null routeKey and status values", async () => {
       const sceneWithNullValues = {
         ...mockScene,
         route: null,
         status: null,
       };
-      mockSelect.mockImplementation(() => createMockChain([sceneWithNullValues]));
+      mockSelect.mockImplementation(() =>
+        createMockChain([sceneWithNullValues]),
+      );
 
       const scenes = await listScenes(projectId, userId);
 
       expect(scenes).toHaveLength(1);
-      expect(scenes[0].route).toBeNull();
+      expect(scenes[0].routeKey).toBeNull();
       expect(scenes[0].status).toBeNull();
     });
   });

@@ -23,6 +23,7 @@ import {
   NotFoundError,
   ForbiddenError,
 } from "../../middleware/error-handler.middleware.js";
+import { UserRole } from "@branchforge/shared";
 
 describe("Authorization Service", () => {
   describe("Project Authorization Functions", () => {
@@ -184,7 +185,7 @@ describe("Authorization Service", () => {
               hasProjectRole(
                 "project-id",
                 "user-id",
-                role as unknown as "OWNER" | "READER" | "TESTER",
+                role as unknown as UserRole,
               ),
             ).resolves.toBe(false);
           }

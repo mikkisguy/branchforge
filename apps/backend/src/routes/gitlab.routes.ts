@@ -9,8 +9,13 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { checkRateLimit } from "../services/rate-limiter.service.js";
 import { getDb } from "../db/index.js";
-import { projects, gitlabSyncOperations } from "../db/schema/index.js";
-import { eq } from "drizzle-orm";
+import {
+  projects,
+  gitlabSyncOperations,
+  gitlabFiles,
+  scenes,
+} from "../db/schema/index.js";
+import { eq, inArray } from "drizzle-orm";
 import {
   validateGitlabPAT,
   storeGitlabIntegration,
@@ -32,6 +37,7 @@ import {
   detectConflicts,
   type ConflictResolution,
 } from "../services/gitlab-sync.service.js";
+import { syncScenesFromGitLabFile } from "../services/gitlab-file-sync.service.js";
 
 /**
  * Helper to get the authenticated user ID from a request.
@@ -111,6 +117,10 @@ interface ExportBody {
 interface DetectConflictsBody {
   projectId: string;
   branch: string;
+}
+
+interface UpdateFileContentBody {
+  content: string;
 }
 
 // ============================================================================
@@ -874,6 +884,199 @@ async function detectConflictsHandler(
   }
 }
 
+/**
+ * Get GitLab files for a project
+ *
+ * GET /api/gitlab/files/stored/:projectId
+ *
+ * Returns all GitLab files with their associated scenes for the project.
+ * This returns the stored files from the database, not the remote GitLab files.
+ */
+async function getGitLabFilesHandler(
+  request: FastifyRequest<{ Params: { projectId: string } }>,
+  reply: FastifyReply,
+): Promise<void> {
+  const userId = getAuthenticatedUserId(request);
+  const { projectId } = request.params;
+
+  // Verify user owns the project
+  if (!(await authorizeProjectAccess(projectId, userId, reply))) {
+    return;
+  }
+
+  try {
+    const db = getDb();
+
+    // Get all GitLab files for the project
+    const files = await db
+      .select()
+      .from(gitlabFiles)
+      .where(eq(gitlabFiles.projectId, projectId));
+
+    // Batch fetch all scenes for all files at once to avoid N+1 queries
+    const fileIds = files.map((f) => f.id);
+
+    // Define the scene type for the lookup
+    type SceneWithFileId = {
+      id: string;
+      labelName: string | null;
+      title: string;
+      gitlabFileId: string | null;
+    };
+
+    const allScenes: SceneWithFileId[] =
+      fileIds.length > 0
+        ? await db
+            .select({
+              id: scenes.id,
+              labelName: scenes.labelName,
+              title: scenes.title,
+              gitlabFileId: scenes.gitlabFileId,
+            })
+            .from(scenes)
+            .where(inArray(scenes.gitlabFileId, fileIds))
+        : [];
+
+    // Create a lookup keyed by gitlabFileId
+    const scenesByFileId = new Map<string, SceneWithFileId[]>();
+    for (const scene of allScenes) {
+      // Skip scenes without a gitlabFileId (defensive check)
+      if (!scene.gitlabFileId) {
+        continue;
+      }
+      if (!scenesByFileId.has(scene.gitlabFileId)) {
+        scenesByFileId.set(scene.gitlabFileId, []);
+      }
+      scenesByFileId.get(scene.gitlabFileId)!.push(scene);
+    }
+
+    // Attach scenes to each file using the lookup
+    const filesWithScenes = files.map((file) => ({
+      ...file,
+      scenes: scenesByFileId.get(file.id) ?? [],
+    }));
+
+    reply.send(filesWithScenes);
+  } catch (err) {
+    request.log.error(
+      { err, projectId },
+      "getGitLabFilesHandler: Failed to get GitLab files",
+    );
+    reply.status(500).send({
+      error: "Failed to get GitLab files",
+      details: err instanceof Error ? err.message : "Unknown error",
+    });
+  }
+}
+
+/**
+ * Update GitLab file content
+ *
+ * PUT /api/gitlab/files/:fileId
+ * Body: { content: string }
+ *
+ * Updates file content (Script Mode editing)
+ * Also re-parses the content to update associated scenes
+ *
+ * Uses gitlab-file-sync.service for reliable sync with:
+ * - Atomic transactions
+ * - Idempotency (same content skipped)
+ * - Concurrent sync prevention
+ * - Validation
+ */
+async function updateGitLabFileHandler(
+  request: FastifyRequest<{
+    Params: { fileId: string };
+    Body: UpdateFileContentBody;
+  }>,
+  reply: FastifyReply,
+): Promise<void> {
+  const userId = getAuthenticatedUserId(request);
+  const { fileId } = request.params;
+  const { content } = request.body;
+
+  if (!content) {
+    reply.status(400).send({ error: "Content is required" });
+    return;
+  }
+
+  try {
+    const db = getDb();
+
+    // Get file to check project access
+    const [file] = await db
+      .select()
+      .from(gitlabFiles)
+      .where(eq(gitlabFiles.id, fileId))
+      .limit(1);
+
+    if (!file) {
+      reply.status(404).send({ error: "File not found" });
+      return;
+    }
+
+    // Verify user owns the project
+    if (!(await authorizeProjectAccess(file.projectId, userId, reply))) {
+      return;
+    }
+
+    // Update file content directly (Script Mode)
+    await db
+      .update(gitlabFiles)
+      .set({
+        content,
+        updatedAt: new Date(),
+      })
+      .where(eq(gitlabFiles.id, fileId));
+
+    const syncResult = await syncScenesFromGitLabFile(fileId, content);
+
+    if (!syncResult.success && syncResult.errors.length > 0) {
+      // Check if it's a concurrent sync error
+      const concurrentError = syncResult.errors.find((e) =>
+        e.error.includes("already in progress"),
+      );
+
+      if (concurrentError) {
+        reply.status(409).send({
+          error: "Sync already in progress",
+          message: concurrentError.error,
+        });
+        return;
+      }
+
+      // Other sync errors - still return success for file update
+      // but include sync errors in response
+      request.log.warn(
+        { errors: syncResult.errors },
+        "updateGitLabFileHandler: Scene sync had errors",
+      );
+    }
+
+    // Return success with sync details
+    reply.send({
+      success: true,
+      sync: {
+        skipped: syncResult.skipped,
+        scenesCreated: syncResult.scenesCreated,
+        scenesUpdated: syncResult.scenesUpdated,
+        scenesDeleted: syncResult.scenesDeleted,
+        linesProcessed: syncResult.linesProcessed,
+        errors: syncResult.errors,
+      },
+    });
+  } catch (err) {
+    request.log.error(
+      { err, fileId },
+      "updateGitLabFileHandler: Failed to update GitLab file",
+    );
+    reply.status(500).send({
+      error: "Failed to update GitLab file",
+      details: err instanceof Error ? err.message : "Unknown error",
+    });
+  }
+}
+
 // ============================================================================
 // Routes Registration
 // ============================================================================
@@ -998,6 +1201,24 @@ export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
       onRequest: [authenticate],
     },
     detectConflictsHandler,
+  );
+
+  // GitLab files management (require auth)
+  // Get stored GitLab files from database (with associated scenes)
+  fastify.get<{ Params: { projectId: string } }>(
+    "/gitlab/files/stored/:projectId",
+    {
+      onRequest: [authenticate],
+    },
+    getGitLabFilesHandler,
+  );
+
+  fastify.put<{ Params: { fileId: string }; Body: UpdateFileContentBody }>(
+    "/gitlab/files/:fileId",
+    {
+      onRequest: [authenticate],
+    },
+    updateGitLabFileHandler,
   );
 }
 

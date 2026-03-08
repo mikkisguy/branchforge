@@ -20,17 +20,7 @@ import {
   NotFoundError,
   ForbiddenError,
 } from "../middleware/error-handler.middleware.js";
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-const VALID_ROLES = ["OWNER", "READER", "TESTER"] as const;
-type ValidRole = (typeof VALID_ROLES)[number];
-
-function isValidRole(value: string): value is ValidRole {
-  return VALID_ROLES.includes(value as ValidRole);
-}
+import { UserRole, isValidUserRole, ROLE_HIERARCHY } from "@branchforge/shared";
 
 // ============================================================================
 // Project Authorization
@@ -126,7 +116,7 @@ export async function requireProjectAccess(
 export async function getProjectRole(
   projectId: string,
   userId: string,
-): Promise<"OWNER" | "READER" | "TESTER" | null> {
+): Promise<UserRole | null> {
   const db = getDb();
 
   // Check if user is the owner
@@ -154,7 +144,7 @@ export async function getProjectRole(
 
   if (sharedAccess.length > 0) {
     const role = sharedAccess[0].role;
-    if (isValidRole(role)) {
+    if (isValidUserRole(role)) {
       return role;
     }
     // Log unexpected role value and treat as no access
@@ -285,7 +275,7 @@ export async function requireSceneAccess(
 export async function getSceneRole(
   sceneId: string,
   userId: string,
-): Promise<"OWNER" | "READER" | "TESTER" | null> {
+): Promise<UserRole | null> {
   const db = getDb();
 
   // Get the scene with its project owner
@@ -324,7 +314,7 @@ export async function getSceneRole(
 
   if (sharedAccess.length > 0) {
     const role = sharedAccess[0].role;
-    if (isValidRole(role)) {
+    if (isValidUserRole(role)) {
       return role;
     }
     // Log unexpected role value and treat as no access
@@ -353,7 +343,7 @@ export async function getSceneRole(
 export async function hasProjectRole(
   projectId: string,
   userId: string,
-  minimumRole: "OWNER" | "READER" | "TESTER",
+  minimumRole: UserRole,
 ): Promise<boolean> {
   const role = await getProjectRole(projectId, userId);
 
@@ -361,9 +351,8 @@ export async function hasProjectRole(
     return false;
   }
 
-  // Role hierarchy: OWNER > READER > TESTER
-  const roleHierarchy = { OWNER: 3, READER: 2, TESTER: 1 };
-  return roleHierarchy[role] >= roleHierarchy[minimumRole];
+  // Use shared ROLE_HIERARCHY for permission checks
+  return ROLE_HIERARCHY[role] >= ROLE_HIERARCHY[minimumRole];
 }
 
 /**
@@ -378,7 +367,7 @@ export async function hasProjectRole(
 export async function requireProjectRole(
   projectId: string,
   userId: string,
-  minimumRole: "OWNER" | "READER" | "TESTER",
+  minimumRole: UserRole,
 ): Promise<void> {
   const hasAccess = await hasProjectRole(projectId, userId, minimumRole);
 

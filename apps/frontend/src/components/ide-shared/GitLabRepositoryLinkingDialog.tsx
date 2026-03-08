@@ -32,15 +32,6 @@ interface LinkRepositoryRequest {
 }
 
 // ============================================================================
-// Constants
-// ============================================================================
-
-const PROJECT_TYPES = [
-  { value: "PREQUEL", label: "Prequel" },
-  { value: "SEQUEL", label: "Sequel" },
-] as const;
-
-// ============================================================================
 // Component
 // ============================================================================
 
@@ -64,9 +55,6 @@ export function GitLabRepositoryLinkingDialog({
 
   // New project form state
   const [newProjectName, setNewProjectName] = useState("");
-  const [newProjectType, setNewProjectType] = useState<"PREQUEL" | "SEQUEL">(
-    "PREQUEL",
-  );
   const [isCreatingProject, setIsCreatingProject] = useState(false);
 
   // GitLab repositories state
@@ -133,7 +121,6 @@ export function GitLabRepositoryLinkingDialog({
     setProjectSearch("");
     setGitlabLoadError(null);
     setNewProjectName("");
-    setNewProjectType("PREQUEL");
   }, []);
 
   /**
@@ -172,7 +159,6 @@ export function GitLabRepositoryLinkingDialog({
       try {
         const newProject = await createProject(
           newProjectName.trim(),
-          newProjectType,
         );
         projectId = newProject.id;
         setLinkedProjectName(newProject.name);
@@ -242,7 +228,6 @@ export function GitLabRepositoryLinkingDialog({
     branch,
     isCreatingNewProject,
     newProjectName,
-    newProjectType,
     projects,
     closeDialog,
     onLinkSuccess,
@@ -317,27 +302,6 @@ export function GitLabRepositoryLinkingDialog({
                       onChange={(e) => setNewProjectName(e.target.value)}
                       disabled={isCreatingProject || isLinking}
                     />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="new-project-type">Project Type</Label>
-                    <select
-                      id="new-project-type"
-                      value={newProjectType}
-                      onChange={(e) =>
-                        setNewProjectType(
-                          e.target.value as "PREQUEL" | "SEQUEL",
-                        )
-                      }
-                      disabled={isCreatingProject || isLinking}
-                      className="w-full px-3 py-2 rounded-md border border-border/30 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-                    >
-                      {PROJECT_TYPES.map((type) => (
-                        <option key={type.value} value={type.value}>
-                          {type.label}
-                        </option>
-                      ))}
-                    </select>
                   </div>
 
                   <p className="text-xs text-muted-foreground">

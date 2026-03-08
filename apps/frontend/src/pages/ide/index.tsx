@@ -11,11 +11,30 @@ import { Logo } from "@/components/ui/logo";
 import { WriteMode } from "./WriteMode";
 import { ScriptMode } from "./ScriptMode";
 
+const MODE_STORAGE_KEY = "branchforge_ide_mode";
+
+function getStoredMode(): "write" | "script" {
+  try {
+    const stored = localStorage.getItem(MODE_STORAGE_KEY);
+    return (stored === "write" || stored === "script") ? stored : "write";
+  } catch {
+    return "write";
+  }
+}
+
+function setStoredMode(mode: "write" | "script") {
+  try {
+    localStorage.setItem(MODE_STORAGE_KEY, mode);
+  } catch {
+    // Ignore storage errors (e.g., private browsing)
+  }
+}
+
 export function HomePageIDE() {
   const { theme, setTheme } = useTheme();
   const { logout } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"write" | "script">("write");
+  const [mode, setMode] = useState<"write" | "script">(getStoredMode);
 
   // Project context
   const { currentProject, projects, setCurrentProject, isLoadingProjects } =
@@ -39,6 +58,12 @@ export function HomePageIDE() {
     navigate(`${BASE_URL}login`);
   };
 
+  // Wrap setMode to persist to localStorage
+  const handleSetMode = (newMode: "write" | "script") => {
+    setMode(newMode);
+    setStoredMode(newMode);
+  };
+
   // Get GitLab branch for current project (if linked)
   const gitlabRepo = currentProject
     ? getLinkedRepository(currentProject.id)
@@ -57,7 +82,7 @@ export function HomePageIDE() {
       {/* Top right control panel */}
       <TopRightPanel
         mode={mode}
-        setMode={setMode}
+        setMode={handleSetMode}
         theme={theme}
         setTheme={setTheme}
         themePalettes={themePalettes}

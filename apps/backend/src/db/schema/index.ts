@@ -28,6 +28,7 @@ export * from './tables/projects.js';
 
 // Visual system tables
 export * from './tables/visual-systems.js';
+export * from './tables/route-configs.js';
 
 // Ren'Py definitions
 export * from './tables/renpy-definitions.js';
