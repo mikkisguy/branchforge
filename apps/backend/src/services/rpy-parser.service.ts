@@ -104,6 +104,26 @@ export interface ParsedRPYFileWithLabels {
 }
 
 /**
+ * Check if a label is valid for scene extraction
+ * Excludes internal/private labels that start with underscore
+ */
+function isValidLabel(label: string): boolean {
+  // Skip underscore (internal Ren'Py label)
+  if (label === "_") {
+    return false;
+  }
+  // Skip labels starting with underscore (private/internal convention)
+  if (label.startsWith("_")) {
+    return false;
+  }
+  // Skip single-character labels (likely internal shortcuts)
+  if (label.length === 1) {
+    return false;
+  }
+  return true;
+}
+
+/**
  * Options for reconstructing RPY file with updated dialogue
  * Used for Write Mode saves to merge dialogue changes with original keywords
  */
@@ -737,13 +757,15 @@ export function parseRPYFileWithLabels(
       // Check for label definition
       const labelMatch = line.match(/^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
       if (labelMatch) {
-        // Save previous label
-        if (currentLabel && currentLabelData) {
+        const matchedLabel = labelMatch[1];
+
+        // Save previous label if valid
+        if (currentLabel && currentLabelData && isValidLabel(currentLabel)) {
           result.labels.push(currentLabelData);
         }
 
-        // Start new label
-        currentLabel = labelMatch[1];
+        // Start new label (but skip if invalid)
+        currentLabel = matchedLabel;
         labelStartLine = i + 1;
         currentLabelData = {
           label: currentLabel,
@@ -779,7 +801,13 @@ export function parseRPYFileWithLabels(
         trimmed.startsWith("hide ") ||
         trimmed.startsWith("play ") ||
         trimmed.startsWith("stop ") ||
-        trimmed.startsWith("with ")
+        trimmed.startsWith("with ") ||
+        trimmed.startsWith("window ") ||
+        trimmed.startsWith("pause ") ||
+        trimmed.startsWith("python:") ||
+        trimmed.startsWith("$ ") ||
+        trimmed.startsWith("pass") ||
+        trimmed.startsWith("transform ")
       ) {
         continue;
       }
@@ -807,8 +835,8 @@ export function parseRPYFileWithLabels(
       }
     }
 
-    // Don't forget the last label
-    if (currentLabel && currentLabelData) {
+    // Don't forget the last label (if valid)
+    if (currentLabel && currentLabelData && isValidLabel(currentLabel)) {
       result.labels.push(currentLabelData);
     }
 
@@ -1131,6 +1159,10 @@ export function convertToBranchForgeFormatFromLabels(
 
   // Add dialogue entries for THIS label only
   for (const d of labelData.dialogue) {
+    // Skip empty dialogue text
+    if (!d.text || d.text.trim().length === 0) {
+      continue;
+    }
     entries.push({
       type: d.speaker ? "DIALOGUE" : "NARRATION",
       speaker: d.speaker || undefined,

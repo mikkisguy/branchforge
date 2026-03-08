@@ -217,7 +217,9 @@ function mapEntryToDbType(entry: {
   ) {
     return entry.type as "NARRATION" | "DIALOGUE" | "JUMP";
   }
-  return "NARRATION";
+  // Don't default to NARRATION - skip unrecognized types
+  // This prevents non-dialogue entries from becoming scene_lines
+  throw new Error(`Unrecognized entry type: ${entry.type}`);
 }
 
 /**
