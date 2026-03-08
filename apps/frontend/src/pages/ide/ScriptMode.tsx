@@ -303,16 +303,10 @@ export function ScriptMode({
                     <span>Route: {activeScene.routeKey}</span>
                   </div>
                 )}
-                {activeScene?.act && (
+                {activeScene?.groupType && activeScene?.groupValue && (
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
-                    <span>Act: {activeScene.act}</span>
-                  </div>
-                )}
-                {activeScene?.chapter && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
-                    <span>Chapter: {activeScene.chapter}</span>
+                    <span>{activeScene.groupType}: {activeScene.groupValue}</span>
                   </div>
                 )}
               </div>

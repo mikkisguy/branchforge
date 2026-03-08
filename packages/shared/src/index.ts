@@ -22,15 +22,6 @@ export const UserRole = {
 } as const;
 
 /**
- * Project type enumeration
- */
-export type ProjectType = "ACT_BASED" | "CHAPTER_BASED";
-export const ProjectType = {
-  ACT_BASED: "ACT_BASED",
-  CHAPTER_BASED: "CHAPTER_BASED",
-} as const;
-
-/**
  * Scene status enumeration
  */
 export type SceneStatus = "DRAFT" | "REVIEW" | "FINAL";
@@ -86,14 +77,10 @@ export interface PublicUser {
 // Visual Name Pattern Types
 // ============================================================================
 
-export type VisualPattern =
-  | "ACT_SCENE_SLUG_COUNTER"
-  | "CHAPTER_SCENE_SLUG_COUNTER";
-
 export interface VisualSystemConfig {
-  pattern: VisualPattern;
-  actPrefixes?: Record<string, string>;
-  chapterPrefix?: string;
+  namingTemplate: string; // e.g., "{route}{group}_{scene}_{counter}_{slug}"
+  groupPrefixes?: Record<string, Record<string, string>>; // { "act": { "I": "ai" }, "chapter": { "1": "ch1" } }
+  defaultGroupType?: string; // "act", "chapter", etc.
   scenePadding: 1 | 2;
   counterPadding: 1 | 2;
   jumpPrefixShared: string;
@@ -101,8 +88,9 @@ export interface VisualSystemConfig {
 }
 
 export interface VisualNameComponents {
-  act?: string;
-  chapter?: number;
+  groupType?: string; // "act", "chapter", etc.
+  groupValue?: string; // "I", "1", etc.
+  routeKey?: string;
   sceneNumber: number;
   counter: number;
   slug: string;
@@ -113,7 +101,7 @@ export interface VisualNameComponents {
 // ============================================================================
 
 /**
- * Generates a visual label/filename based on the visual system pattern.
+ * Generates a visual label/filename based on the visual system template.
  * This is used for auto-generating image filenames like "ai_01_02_cafe_01.png"
  *
  * @param config - The visual system configuration
@@ -124,48 +112,33 @@ export function generateVisualName(
   config: VisualSystemConfig,
   components: VisualNameComponents,
 ): string {
-  const parts: string[] = [];
+  let result = config.namingTemplate;
 
-  if (config.pattern === "ACT_SCENE_SLUG_COUNTER") {
-    // Prequel pattern: {act_prefix}{scene}_{counter}_{slug}
-    const actPrefix =
-      components.act && config.actPrefixes
-        ? config.actPrefixes[components.act]
-        : "";
-
-    const sceneNum = String(components.sceneNumber).padStart(
-      config.scenePadding,
-      "0",
-    );
-    const counter = String(components.counter).padStart(
-      config.counterPadding,
-      "0",
-    );
-
-    if (actPrefix) parts.push(actPrefix);
-    parts.push(sceneNum, counter, components.slug);
+  // Replace {route}
+  if (components.routeKey) {
+    const routePrefix = components.routeKey ? components.routeKey + "_" : "";
+    result = result.replace('{route}', routePrefix);
   } else {
-    // Sequel pattern: {chapter_prefix}{chapter}_{scene}_{counter}_{slug}
-    const chapterPrefix = config.chapterPrefix || "ch";
-    const chapter = String(components.chapter).padStart(1, "0");
-    const sceneNum = String(components.sceneNumber).padStart(
-      config.scenePadding,
-      "0",
-    );
-    const counter = String(components.counter).padStart(
-      config.counterPadding,
-      "0",
-    );
-
-    parts.push(
-      `${chapterPrefix}${chapter}`,
-      sceneNum,
-      counter,
-      components.slug,
-    );
+    result = result.replace('{route}', '');
   }
 
-  return parts.join("_");
+  // Replace {group} - look up prefix if available
+  if (components.groupType && components.groupValue && config.groupPrefixes?.[components.groupType]) {
+    const prefix = config.groupPrefixes[components.groupType][components.groupValue] || components.groupValue;
+    result = result.replace('{group}', prefix);
+  } else if (components.groupValue) {
+    result = result.replace('{group}', components.groupValue);
+  } else {
+    result = result.replace('{group}', '');
+  }
+
+  // Replace {scene}, {counter}, {slug}
+  result = result.replace('{scene}', String(components.sceneNumber).padStart(config.scenePadding, '0'));
+  result = result.replace('{counter}', String(components.counter).padStart(config.counterPadding, '0'));
+  result = result.replace('{slug}', components.slug);
+
+  // Clean up double underscores and trim
+  return result.replace(/_+/g, '_').replace(/^_|_$/g, '');
 }
 
 /**
@@ -205,7 +178,6 @@ export interface Project {
   id: string;
   userId: string;
   name: string;
-  type: ProjectType;
   description?: string;
   createdAt: Date;
 }
@@ -214,8 +186,8 @@ export interface Scene {
   id: string;
   projectId: string;
   title: string;
-  act?: string;
-  chapter?: number;
+  groupType?: string;   // e.g., "act", "chapter", "episode"
+  groupValue?: string;  // e.g., "I", "1", "1a"
   sceneNumber: number;
   routeKey?: string; // References route_configs.route_key (custom user-defined routes)
   status: SceneStatus;
@@ -234,8 +206,8 @@ export interface PublicScene {
   id: string;
   projectId: string;
   title: string;
-  act: string | null;
-  chapter: number | null;
+  groupType: string | null;  // e.g., "act", "chapter", "episode" or null
+  groupValue: string | null; // e.g., "I", "1", "1a" or null
   sceneNumber: number;
   sequenceOrder: number;
   routeKey: string | null;

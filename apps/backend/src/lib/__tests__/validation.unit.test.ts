@@ -10,7 +10,6 @@ import {
   emailSchema,
   nonEmptyStringSchema,
   passwordSchema,
-  projectTypeSchema,
   sceneStatusSchema,
   booleanStringSchema,
   intStringSchema,
@@ -146,22 +145,6 @@ describe("Common Schemas", () => {
 });
 
 describe("Enum Schemas", () => {
-  describe("projectTypeSchema", () => {
-    it("should accept valid project types", () => {
-      const validTypes = ["ACT_BASED", "CHAPTER_BASED"];
-
-      for (const type of validTypes) {
-        const result = projectTypeSchema.safeParse(type);
-        expect(result.success).toBe(true);
-      }
-    });
-
-    it("should reject invalid project types", () => {
-      const result = projectTypeSchema.safeParse("INVALID");
-      expect(result.success).toBe(false);
-    });
-  });
-
   describe("sceneStatusSchema", () => {
     it("should accept valid scene statuses", () => {
       const validStatuses = ["DRAFT", "REVIEW", "FINAL"];
@@ -562,7 +545,6 @@ describe("Project Schemas", () => {
     it("should accept valid project data", () => {
       const validData = {
         name: "Test Project",
-        type: "ACT_BASED",
         description: "A test project",
       };
 
@@ -570,20 +552,9 @@ describe("Project Schemas", () => {
       expect(result.success).toBe(true);
     });
 
-    it("should reject invalid project type", () => {
-      const invalidData = {
-        name: "Test Project",
-        type: "INVALID",
-      };
-
-      const result = createProjectSchema.safeParse(invalidData);
-      expect(result.success).toBe(false);
-    });
-
     it("should reject empty project name", () => {
       const invalidData = {
         name: "   ",
-        type: "ACT_BASED",
       };
 
       const result = createProjectSchema.safeParse(invalidData);
@@ -678,18 +649,20 @@ describe("Create Scene Schema", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         routeKey: "eileen",
+        sceneNumber: 1,
       };
 
       const result = createSceneSchema.safeParse(validData);
       expect(result.success).toBe(true);
     });
 
-    it("should accept valid full scene payload for ACT_BASED project", () => {
+    it("should accept valid full scene payload with grouping", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         routeKey: "lucas",
-        act: 1,
-        scene: 42,
+        groupType: "act",
+        groupValue: "I",
+        sceneNumber: 42,
         status: "DRAFT",
         visibility: "EXCLUSIVE",
         title: "Scene Title",
@@ -700,12 +673,13 @@ describe("Create Scene Schema", () => {
       expect(result.success).toBe(true);
     });
 
-    it("should accept valid full scene payload for CHAPTER_BASED project", () => {
+    it("should accept valid full scene payload with chapter grouping", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         routeKey: "female",
-        chapter: 5,
-        scene: 10,
+        groupType: "chapter",
+        groupValue: "5",
+        sceneNumber: 10,
         status: "REVIEW",
         visibility: "SHARED",
         title: "Chapter Scene",
@@ -720,6 +694,7 @@ describe("Create Scene Schema", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         routeKey: "common",
+        sceneNumber: 1,
         sequenceOrder: 100,
       };
 
@@ -730,6 +705,7 @@ describe("Create Scene Schema", () => {
     it("should reject missing required field: projectId", () => {
       const invalidData = {
         routeKey: "eileen",
+        sceneNumber: 1,
       };
 
       const result = createSceneSchema.safeParse(invalidData);
@@ -739,6 +715,7 @@ describe("Create Scene Schema", () => {
     it("should accept scene without routeKey (optional field)", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
+        sceneNumber: 1,
       };
 
       const result = createSceneSchema.safeParse(validData);
@@ -749,6 +726,7 @@ describe("Create Scene Schema", () => {
       const invalidData = {
         projectId: "not-a-uuid",
         routeKey: "eileen",
+        sceneNumber: 1,
       };
 
       const result = createSceneSchema.safeParse(invalidData);
@@ -759,6 +737,7 @@ describe("Create Scene Schema", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         routeKey: "my_custom_route",
+        sceneNumber: 1,
       };
 
       const result = createSceneSchema.safeParse(validData);
@@ -769,6 +748,7 @@ describe("Create Scene Schema", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         routeKey: "eileen",
+        sceneNumber: 1,
         status: "INVALID_STATUS",
       };
 
@@ -780,6 +760,7 @@ describe("Create Scene Schema", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         routeKey: "eileen",
+        sceneNumber: 1,
         visibility: "INVALID_VISIBILITY",
       };
 

@@ -65,7 +65,6 @@ describe("ProjectsRoutes (Integration)", () => {
     id: testUuid("11000000", 1),
     userId: testUserId,
     name: "Owned Project",
-    type: "ACT_BASED",
     description: "A project owned by the user",
     maxMeterDelta: 10,
   };
@@ -74,7 +73,6 @@ describe("ProjectsRoutes (Integration)", () => {
     id: testUuid("11000000", 2),
     userId: otherUserId,
     name: "Shared Project",
-    type: "CHAPTER_BASED",
     description: "A project shared with the user",
     maxMeterDelta: 15,
   };
@@ -233,7 +231,6 @@ describe("ProjectsRoutes (Integration)", () => {
       expect(json.projects[0]).toMatchObject({
         id: ownedProject.id,
         name: "Owned Project",
-        type: "ACT_BASED",
         description: "A project owned by the user",
         maxMeterDelta: 10,
         visibility: "OWNER",
@@ -319,7 +316,6 @@ describe("ProjectsRoutes (Integration)", () => {
       expect(json.project).toMatchObject({
         id: ownedProject.id,
         name: "Owned Project",
-        type: "ACT_BASED",
         description: "A project owned by the user",
         maxMeterDelta: 10,
         visibility: "OWNER",
@@ -365,9 +361,7 @@ describe("ProjectsRoutes (Integration)", () => {
         url: "/projects",
         payload: {
           name: "New Project",
-          type: "ACT_BASED",
           description: "A new project",
-          routeLockChapter: 2,
           maxMeterDelta: 15,
         },
       });
@@ -381,9 +375,7 @@ describe("ProjectsRoutes (Integration)", () => {
 
       const requestBody = {
         name: "New Project",
-        type: "ACT_BASED",
         description: "A new project",
-        routeLockChapter: 2,
         maxMeterDelta: 15,
       };
 
@@ -403,9 +395,7 @@ describe("ProjectsRoutes (Integration)", () => {
 
         expect(json.project).toMatchObject({
           name: "New Project",
-          type: "ACT_BASED",
           description: "A new project",
-          routeLockChapter: 2,
           maxMeterDelta: 15,
           visibility: "OWNER",
         });
@@ -433,30 +423,6 @@ describe("ProjectsRoutes (Integration)", () => {
 
       const requestBody = {
         name: "",
-        type: "ACT_BASED",
-      };
-
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/projects",
-        payload: requestBody,
-        cookies: {
-          [SESSION_COOKIE_NAME]: auth.sessionId,
-        },
-      });
-
-      expect(response.statusCode).toBe(400);
-      expect(response.json()).toMatchObject({
-        message: "Invalid request data",
-      });
-    });
-
-    it("should return 400 when type is invalid", async () => {
-      const auth = await createAuthenticatedRequest(testUserId);
-
-      const requestBody = {
-        name: "New Project",
-        type: "INVALID_TYPE",
       };
 
       const response = await fastify.inject({
@@ -480,7 +446,6 @@ describe("ProjectsRoutes (Integration)", () => {
 
       const requestBody = {
         name: "New Project",
-        type: "ACT_BASED",
         maxMeterDelta: -5,
       };
 
@@ -500,7 +465,6 @@ describe("ProjectsRoutes (Integration)", () => {
 
         expect(json.project).toMatchObject({
           name: "New Project",
-          type: "ACT_BASED",
           maxMeterDelta: -5,
           visibility: "OWNER",
         });

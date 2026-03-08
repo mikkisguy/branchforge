@@ -11,7 +11,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { projectsApi, type Project } from '@/lib/api/projects';
 import { projectKeys } from '@/lib/query-keys';
-import type { ProjectType } from '@branchforge/shared';
 
 // ============================================================================
 // Constants
@@ -32,7 +31,7 @@ export interface UseProjectReturn {
   // Methods
   refreshProjects: () => Promise<void>;
   setCurrentProject: (project: Project | null) => void;
-  createProject: (name: string, type: ProjectType) => Promise<Project>;
+  createProject: (name: string) => Promise<Project>;
 }
 
 // ============================================================================
@@ -63,8 +62,8 @@ export function useProject(): UseProjectReturn {
 
   // Create project mutation
   const createProjectMutation = useMutation({
-    mutationFn: async ({ name, type }: { name: string; type: ProjectType }) => {
-      return projectsApi.createProject({ name, type });
+    mutationFn: async (name: string) => {
+      return projectsApi.createProject({ name });
     },
     onSuccess: async (newProject) => {
       // Invalidate and refetch projects list
@@ -86,8 +85,8 @@ export function useProject(): UseProjectReturn {
   };
 
   // Create project method
-  const createProject = async (name: string, type: ProjectType): Promise<Project> => {
-    return createProjectMutation.mutateAsync({ name, type });
+  const createProject = async (name: string): Promise<Project> => {
+    return createProjectMutation.mutateAsync(name);
   };
 
   return {

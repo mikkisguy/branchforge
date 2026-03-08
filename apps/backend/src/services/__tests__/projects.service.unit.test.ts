@@ -50,9 +50,7 @@ describe("ProjectsService", () => {
     id: projectId,
     userId,
     name: "Test Project",
-    type: "PREQUEL",
     description: "A test project",
-    routeLockChapter: 1,
     maxMeterDelta: 10,
     visibility: "OWNER",
     createdAt: new Date("2024-01-01"),
@@ -78,9 +76,7 @@ describe("ProjectsService", () => {
       expect(project).toEqual({
         id: projectId,
         name: "Test Project",
-        type: "PREQUEL",
         description: "A test project",
-        routeLockChapter: 1,
         maxMeterDelta: 10,
         visibility: "OWNER",
         createdAt: mockProject.createdAt,
@@ -135,9 +131,7 @@ describe("ProjectsService", () => {
     it("should create project with valid data", async () => {
       const body: CreateProjectBody = {
         name: "New Project",
-        type: "PREQUEL",
         description: "A new project",
-        routeLockChapter: 2,
         maxMeterDelta: 15,
       };
 
@@ -151,16 +145,13 @@ describe("ProjectsService", () => {
       const project = await createProject(userId, body);
 
       expect(project.name).toBe("New Project");
-      expect(project.type).toBe("PREQUEL");
       expect(project.description).toBe("A new project");
-      expect(project.routeLockChapter).toBe(2);
       expect(project.maxMeterDelta).toBe(15);
     });
 
     it("should use default maxMeterDelta when not provided", async () => {
       const body: CreateProjectBody = {
         name: "New Project",
-        type: "SEQUEL",
       };
 
       const newProject = { ...mockProject, ...body, maxMeterDelta: 10 };
@@ -178,7 +169,6 @@ describe("ProjectsService", () => {
     it("should create project with optional fields undefined", async () => {
       const body: CreateProjectBody = {
         name: "Minimal Project",
-        type: "PREQUEL",
       };
 
       const newProject = {

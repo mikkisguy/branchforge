@@ -14,7 +14,7 @@
 import { z } from "zod";
 import { ValidationError } from "../middleware/error-handler.middleware.js";
 import { isIP } from "node:net";
-import { ProjectType, SceneStatus, UserRole } from "@branchforge/shared";
+import { SceneStatus, UserRole } from "@branchforge/shared";
 
 // ============================================================================
 // Common Schemas
@@ -125,13 +125,6 @@ export const intStringSchema = z
 // ============================================================================
 // Enum Schemas (from database)
 // ============================================================================
-
-/**
- * Project type enum
- */
-export const projectTypeSchema = z.enum(Object.values(ProjectType), {
-  message: "Project type must be ACT_BASED or CHAPTER_BASED",
-});
 
 /**
  * User role enum
@@ -279,9 +272,7 @@ export const loginSchema = z.object({
 export const createProjectSchema = z
   .object({
     name: requiredString(200, "Project name is too long"),
-    type: projectTypeSchema,
     description: optionalString(2000, "Description is too long"),
-    routeLockChapter: z.number().int().optional(),
     maxMeterDelta: z.number().int().optional(),
   })
   .strict();
@@ -314,8 +305,8 @@ export const listScenesQuerySchema = z.object({
   projectId: uuidSchema,
   routeKey: routeConfigKeySchema.optional(),
   status: sceneStatusSchema.optional(),
-  act: intStringSchema,
-  chapter: intStringSchema,
+  groupType: z.string().optional(),
+  groupValue: z.string().optional(),
 });
 
 /**
@@ -332,9 +323,9 @@ export const createSceneSchema = z
   .object({
     projectId: uuidSchema,
     routeKey: routeConfigKeySchema.optional(),
-    act: z.number().int().min(1).max(99).optional(),
-    scene: z.number().int().min(1).max(999).optional(),
-    chapter: z.number().int().min(1).max(99).optional(),
+    groupType: z.string().max(50).optional(),
+    groupValue: z.string().max(50).optional(),
+    sceneNumber: z.number().int().min(1).max(999),
     sequenceOrder: z.number().int().min(1).optional(),
     status: sceneStatusSchema.optional(),
     visibility: sceneVisibilitySchema.optional(),

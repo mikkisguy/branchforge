@@ -68,9 +68,7 @@ describe("ProjectsRoutes", () => {
         {
           id: "project-1",
           name: "Test Project",
-          type: "PREQUEL" as const,
           description: "A test project",
-          routeLockChapter: 1,
           maxMeterDelta: 10,
           visibility: "OWNER" as const,
           createdAt: new Date("2024-01-01"),
@@ -98,9 +96,7 @@ describe("ProjectsRoutes", () => {
       const mockProject = {
         id: PROJECT_ID,
         name: "Test Project",
-        type: "PREQUEL" as const,
         description: "A test project",
-        routeLockChapter: 1,
         maxMeterDelta: 10,
         visibility: "OWNER" as const,
         createdAt: new Date("2024-01-01"),
@@ -137,9 +133,7 @@ describe("ProjectsRoutes", () => {
     it("should create project with valid data", async () => {
       const requestBody = {
         name: "New Project",
-        type: "ACT_BASED",
         description: "A new project",
-        routeLockChapter: 2,
         maxMeterDelta: 15,
       };
 
@@ -168,25 +162,6 @@ describe("ProjectsRoutes", () => {
     it("should return 400 when name is missing", async () => {
       const requestBody = {
         name: "",
-        type: "ACT_BASED",
-      };
-
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/projects",
-        payload: requestBody,
-      });
-
-      expect(response.statusCode).toBe(400);
-      expect(response.json()).toMatchObject({
-        message: "Invalid request data",
-      });
-    });
-
-    it("should return 400 when type is invalid", async () => {
-      const requestBody = {
-        name: "New Project",
-        type: "INVALID",
       };
 
       const response = await fastify.inject({
