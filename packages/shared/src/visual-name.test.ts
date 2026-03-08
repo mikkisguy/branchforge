@@ -8,13 +8,15 @@ import {
 } from './index.js';
 
 describe('generateVisualName', () => {
-  describe('Prequel pattern (ACT_SCENE_SLUG_COUNTER)', () => {
+  describe('Prequel pattern with act-based grouping', () => {
     const prequelConfig: VisualSystemConfig = {
-      pattern: 'ACT_SCENE_SLUG_COUNTER',
-      actPrefixes: {
-        I: 'ai',
-        II: 'aii',
-        III: 'aiii',
+      namingTemplate: '{group}_{scene}_{counter}_{slug}',
+      groupPrefixes: {
+        act: {
+          I: 'ai',
+          II: 'aii',
+          III: 'aiii',
+        },
       },
       scenePadding: 2,
       counterPadding: 2,
@@ -23,7 +25,8 @@ describe('generateVisualName', () => {
 
     it('generates name with act prefix', () => {
       const components: VisualNameComponents = {
-        act: 'I',
+        groupType: 'act',
+        groupValue: 'I',
         sceneNumber: 1,
         counter: 1,
         slug: 'cafe',
@@ -34,7 +37,8 @@ describe('generateVisualName', () => {
 
     it('generates name for Act II', () => {
       const components: VisualNameComponents = {
-        act: 'II',
+        groupType: 'act',
+        groupValue: 'II',
         sceneNumber: 5,
         counter: 2,
         slug: 'bedroom',
@@ -46,7 +50,8 @@ describe('generateVisualName', () => {
     it('handles single digit padding', () => {
       const config = { ...prequelConfig, scenePadding: 1, counterPadding: 1 };
       const components: VisualNameComponents = {
-        act: 'I',
+        groupType: 'act',
+        groupValue: 'I',
         sceneNumber: 1,
         counter: 1,
         slug: 'cafe',
@@ -57,7 +62,18 @@ describe('generateVisualName', () => {
 
     it('handles missing act prefix gracefully', () => {
       const components: VisualNameComponents = {
-        act: 'IV', // Not in config
+        groupType: 'act',
+        groupValue: 'IV', // Not in config
+        sceneNumber: 1,
+        counter: 1,
+        slug: 'cafe',
+      };
+      const result = generateVisualName(prequelConfig, components);
+      expect(result).toBe('IV_01_01_cafe');
+    });
+
+    it('handles missing groupType gracefully', () => {
+      const components: VisualNameComponents = {
         sceneNumber: 1,
         counter: 1,
         slug: 'cafe',
@@ -67,10 +83,18 @@ describe('generateVisualName', () => {
     });
   });
 
-  describe('Sequel pattern (CHAPTER_SCENE_SLUG_COUNTER)', () => {
+  describe('Sequel pattern with chapter-based grouping', () => {
     const sequelConfig: VisualSystemConfig = {
-      pattern: 'CHAPTER_SCENE_SLUG_COUNTER',
-      chapterPrefix: 'ch',
+      namingTemplate: '{group}_{scene}_{counter}_{slug}',
+      groupPrefixes: {
+        chapter: {
+          '1': 'ch1',
+          '2': 'ch2',
+          '3': 'ch3',
+          '4': 'ch4',
+          '5': 'ch5',
+        },
+      },
       scenePadding: 2,
       counterPadding: 2,
       jumpPrefixShared: '',
@@ -78,7 +102,8 @@ describe('generateVisualName', () => {
 
     it('generates name with chapter prefix', () => {
       const components: VisualNameComponents = {
-        chapter: 1,
+        groupType: 'chapter',
+        groupValue: '1',
         sceneNumber: 1,
         counter: 1,
         slug: 'cafe',
@@ -89,13 +114,55 @@ describe('generateVisualName', () => {
 
     it('generates name for later chapter', () => {
       const components: VisualNameComponents = {
-        chapter: 5,
+        groupType: 'chapter',
+        groupValue: '5',
         sceneNumber: 10,
         counter: 3,
         slug: 'garden',
       };
       const result = generateVisualName(sequelConfig, components);
       expect(result).toBe('ch5_10_03_garden');
+    });
+  });
+
+  describe('Route-based naming', () => {
+    const routeConfig: VisualSystemConfig = {
+      namingTemplate: '{route}{group}_{scene}_{counter}_{slug}',
+      groupPrefixes: {
+        act: {
+          I: 'ai',
+          II: 'aii',
+          III: 'aiii',
+        },
+      },
+      scenePadding: 2,
+      counterPadding: 2,
+      jumpPrefixShared: '',
+    };
+
+    it('includes route prefix when provided', () => {
+      const components: VisualNameComponents = {
+        routeKey: 'eileen',
+        groupType: 'act',
+        groupValue: 'I',
+        sceneNumber: 1,
+        counter: 1,
+        slug: 'cafe',
+      };
+      const result = generateVisualName(routeConfig, components);
+      expect(result).toBe('eileen_ai_01_01_cafe');
+    });
+
+    it('omits route prefix when not provided', () => {
+      const components: VisualNameComponents = {
+        groupType: 'act',
+        groupValue: 'I',
+        sceneNumber: 1,
+        counter: 1,
+        slug: 'cafe',
+      };
+      const result = generateVisualName(routeConfig, components);
+      expect(result).toBe('ai_01_01_cafe');
     });
   });
 });

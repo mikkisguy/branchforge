@@ -72,7 +72,6 @@ describe("ScenesRoutes (Integration)", () => {
     id: testUuid("14000000", 1),
     userId: testUserId,
     name: "Owned Project",
-    type: "ACT_BASED",
     description: "A project owned by the user",
     maxMeterDelta: 10,
   };
@@ -81,7 +80,6 @@ describe("ScenesRoutes (Integration)", () => {
     id: testUuid("14000000", 2),
     userId: otherUserId,
     name: "Shared Project",
-    type: "CHAPTER_BASED",
     description: "A project shared with the user",
     maxMeterDelta: 15,
   };
@@ -90,8 +88,8 @@ describe("ScenesRoutes (Integration)", () => {
     id: testUuid("24000000", 1),
     projectId: ownedProject.id!,
     title: "chapter1_scene1",
-    act: "I",
-    chapter: 1,
+    groupType: "act",
+    groupValue: "I",
     sceneNumber: 1,
     sequenceOrder: 0,
     route: "EILEEN",
@@ -104,8 +102,8 @@ describe("ScenesRoutes (Integration)", () => {
     id: testUuid("24000000", 2),
     projectId: sharedProject.id!,
     title: "chapter1_scene2",
-    act: "I",
-    chapter: 1,
+    groupType: "act",
+    groupValue: "I",
     sceneNumber: 2,
     sequenceOrder: 1,
     route: "LUCAS",
@@ -339,8 +337,8 @@ describe("ScenesRoutes (Integration)", () => {
         id: ownedScene.id,
         projectId: ownedProject.id,
         title: "chapter1_scene1",
-        act: "I",
-        chapter: 1,
+        groupType: "act",
+        groupValue: "I",
         sceneNumber: 1,
         sequenceOrder: 0,
         routeKey: "EILEEN",
@@ -359,8 +357,8 @@ describe("ScenesRoutes (Integration)", () => {
           id: testUuid("24000000", 3),
           projectId: ownedProject.id!,
           title: "chapter1_scene2",
-          act: "I",
-          chapter: 1,
+          groupType: "act",
+          groupValue: "I",
           sceneNumber: 2,
           sequenceOrder: 1,
           route: "LUCAS",
@@ -398,8 +396,8 @@ describe("ScenesRoutes (Integration)", () => {
           id: testUuid("24000000", 4),
           projectId: ownedProject.id!,
           title: "chapter1_scene3",
-          act: "I",
-          chapter: 1,
+          groupType: "act",
+          groupValue: "I",
           sceneNumber: 3,
           sequenceOrder: 2,
           route: "EILEEN",
@@ -678,7 +676,12 @@ describe("ScenesRoutes (Integration)", () => {
       });
 
       expect(response.statusCode).toBe(400);
-      expect(response.json()).toEqual({ error: "Dialogue is required" });
+      const json = response.json();
+      expect(json).toMatchObject({
+        statusCode: 400,
+        error: "Bad Request",
+      });
+      expect(json.message).toBeDefined();
     });
 
     it("should return 403 when user does not own the project", async () => {

@@ -360,7 +360,7 @@ export const updateSceneDialogueBodySchema = z
       .array(
         z.object({
           speaker: z.string().nullable(),
-          text: z.string(),
+          text: z.string().min(1, "Dialogue text cannot be empty"),
         }),
       )
       .min(1, "At least one dialogue entry is required"),

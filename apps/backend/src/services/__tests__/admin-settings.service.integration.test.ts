@@ -40,7 +40,6 @@ describe("AdminSettingsService (Integration)", () => {
       "sign_ups_enabled",
       "complex_key",
       "config",
-      "some_key",
       "max_upload_size",
       "deep_setting",
       "special_key",

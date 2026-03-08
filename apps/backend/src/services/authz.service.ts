@@ -25,8 +25,6 @@ import { UserRole, isValidUserRole, ROLE_HIERARCHY } from "@branchforge/shared";
 // ============================================================================
 // Project Authorization
 // ============================================================================
-// Project Authorization
-// ============================================================================
 
 /**
  * Check if a user has access to a project

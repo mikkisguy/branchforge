@@ -565,10 +565,12 @@ export async function detectConflicts(
               contentType: sceneLines.contentType,
               speakerTag: characters.renpyTag,
               content: sceneLines.content,
+              sequence: sceneLines.sequence,
             })
             .from(sceneLines)
             .leftJoin(characters, eq(sceneLines.speakerId, characters.id))
-            .where(inArray(sceneLines.sceneId, Array.from(gitlabSceneIds)));
+            .where(inArray(sceneLines.sceneId, Array.from(gitlabSceneIds)))
+            .orderBy(asc(sceneLines.sequence));
 
     // Build a map of sceneId -> lines for efficient lookup
     const localLinesBySceneId = new Map<

@@ -64,7 +64,6 @@ describe("ProjectsService (Integration)", () => {
     id: testUuid("12000000", 1),
     userId: testUserId,
     name: "Owned Project",
-    type: "ACT_BASED",
     description: "A project owned by the user",
     maxMeterDelta: 10,
   };
@@ -73,7 +72,6 @@ describe("ProjectsService (Integration)", () => {
     id: testUuid("12000000", 2),
     userId: otherUserId,
     name: "Shared Project",
-    type: "CHAPTER_BASED",
     description: "A project shared with the user",
     maxMeterDelta: 15,
   };
@@ -134,7 +132,6 @@ describe("ProjectsService (Integration)", () => {
       expect(projects[0]).toMatchObject({
         id: ownedProjectId,
         name: "Owned Project",
-        type: "ACT_BASED",
         description: "A project owned by the user",
         maxMeterDelta: 10,
       });
@@ -216,7 +213,6 @@ describe("ProjectsService (Integration)", () => {
       expect(project).toMatchObject({
         id: ownedProject.id,
         name: "Owned Project",
-        type: "ACT_BASED",
         description: "A project owned by the user",
         maxMeterDelta: 10,
         visibility: "OWNER",
@@ -239,7 +235,6 @@ describe("ProjectsService (Integration)", () => {
       expect(project).toMatchObject({
         id: sharedProject.id,
         name: "Shared Project",
-        type: "CHAPTER_BASED",
         description: "A project shared with the user",
         maxMeterDelta: 15,
         visibility: "READER",
@@ -313,9 +308,7 @@ describe("ProjectsService (Integration)", () => {
     it("should create project with valid data", async () => {
       const newProjectData = {
         name: "New Test Project",
-        type: "ACT_BASED" as const,
         description: "A newly created test project",
-        routeLockChapter: 2,
         maxMeterDelta: 15,
       };
 
@@ -324,9 +317,7 @@ describe("ProjectsService (Integration)", () => {
 
       expect(project).toMatchObject({
         name: "New Test Project",
-        type: "ACT_BASED",
         description: "A newly created test project",
-        routeLockChapter: 2,
         maxMeterDelta: 15,
         visibility: "OWNER",
       });
@@ -348,7 +339,6 @@ describe("ProjectsService (Integration)", () => {
     it("should create project with minimal data", async () => {
       const minimalProjectData = {
         name: "Minimal Project",
-        type: "CHAPTER_BASED" as const,
       };
 
       const project = await createProject(testUserId, minimalProjectData);
@@ -356,18 +346,15 @@ describe("ProjectsService (Integration)", () => {
 
       expect(project).toMatchObject({
         name: "Minimal Project",
-        type: "CHAPTER_BASED",
         maxMeterDelta: 10, // Default value
         visibility: "OWNER",
       });
       expect(project.description).toBeUndefined();
-      expect(project.routeLockChapter).toBeUndefined();
     });
 
     it("should create project with custom maxMeterDelta", async () => {
       const customProjectData = {
         name: "Custom Delta Project",
-        type: "ACT_BASED" as const,
         maxMeterDelta: 25,
       };
 
@@ -380,7 +367,6 @@ describe("ProjectsService (Integration)", () => {
     it("should assign correct userId to created project", async () => {
       const projectData = {
         name: "User Assignment Test",
-        type: "ACT_BASED" as const,
       };
 
       const project = await createProject(otherUserId, projectData);
@@ -399,7 +385,6 @@ describe("ProjectsService (Integration)", () => {
     it("should set createdAt and updatedAt timestamps", async () => {
       const projectData = {
         name: "Timestamp Test",
-        type: "ACT_BASED" as const,
       };
 
       const beforeCreate = new Date();

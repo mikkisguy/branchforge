@@ -54,8 +54,7 @@ export function useGitLabFiles(
   } = useQuery({
     queryKey: gitlabKeys.importedFiles(projectId ?? "__disabled__"),
     queryFn: async () => {
-      if (!projectId) return [];
-      return gitlabApi.getGitLabFiles(projectId);
+      return gitlabApi.getGitLabFiles(projectId!);
     },
     enabled: !!projectId,
     staleTime: 5 * 60 * 1000, // 5 minutes
