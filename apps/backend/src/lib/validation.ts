@@ -588,7 +588,9 @@ export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type ListScenesQuery = z.infer<typeof listScenesQuerySchema>;
 export type CreateSceneInput = z.infer<typeof createSceneSchema>;
 export type UpdateSceneInput = z.infer<typeof updateSceneSchema>;
-export type UpdateSceneDialogueInput = z.infer<typeof updateSceneDialogueBodySchema>;
+export type UpdateSceneDialogueInput = z.infer<
+  typeof updateSceneDialogueBodySchema
+>;
 export type CreateCharacterInput = z.infer<typeof createCharacterSchema>;
 export type CreateGitLabIntegrationInput = z.infer<
   typeof createGitLabIntegrationSchema
