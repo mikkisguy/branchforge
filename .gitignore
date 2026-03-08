@@ -20,7 +20,6 @@ build/
 *.db
 *.db-journal
 apps/backups/*.sql
-apps/backend/src/db/migrations/
 
 # IDE
 .vscode/

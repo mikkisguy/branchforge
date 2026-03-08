@@ -14,8 +14,8 @@ export const scenes = pgTable('scenes', {
   id: uuid('id').primaryKey().defaultRandom(),
   projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
-  act: text('act'), // "I", "II", "III" or null
-  chapter: integer('chapter'), // 1, 2, 3... or null
+  groupType: text('group_type'), // "act", "chapter", "episode", etc. or null
+  groupValue: text('group_value'), // "I", "1", "1a", etc. or null
   sceneNumber: integer('scene_number').notNull(),
   sequenceOrder: integer('sequence_order').default(0).notNull(),
   route: text('route'), // User-defined route key (references route_configs.route_key)

@@ -1,0 +1,1 @@
+ALTER TABLE "scenes" ALTER COLUMN "route" SET DATA TYPE text;

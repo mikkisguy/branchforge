@@ -43,7 +43,6 @@ export interface SyncScenesResult {
 }
 
 export interface SyncScenesOptions {
-  dryRun?: boolean;
   skipCleanup?: boolean;
 }
 
@@ -235,7 +234,7 @@ function mapEntryToDbType(entry: {
  *
  * @param gitlabFileId - The GitLab file ID to sync
  * @param rpyContent - The RPY file content
- * @param options - Sync options (dryRun, skipCleanup)
+ * @param options - Sync options (skipCleanup)
  * @returns Sync result with statistics
  */
 export async function syncScenesFromGitLabFile(
@@ -244,7 +243,6 @@ export async function syncScenesFromGitLabFile(
   options?: SyncScenesOptions,
 ): Promise<SyncScenesResult> {
   const db = getDb();
-  const dryRun = options?.dryRun ?? false;
   const skipCleanup = options?.skipCleanup ?? false;
 
   const result: SyncScenesResult = {

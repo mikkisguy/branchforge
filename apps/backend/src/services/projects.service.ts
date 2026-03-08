@@ -16,9 +16,7 @@ import type { UserRole } from "@branchforge/shared";
 export interface PublicProject {
   id: string;
   name: string;
-  type: "ACT_BASED" | "CHAPTER_BASED";
   description?: string;
-  routeLockChapter?: number;
   maxMeterDelta?: number;
   visibility?: UserRole;
   createdAt: Date;
@@ -31,9 +29,7 @@ export interface PublicProject {
 type ProjectRow = {
   id: string;
   name: string;
-  type: "ACT_BASED" | "CHAPTER_BASED";
   description: string | null;
-  routeLockChapter: number | null;
   maxMeterDelta: number | null;
   createdAt: Date;
   updatedAt: Date;
@@ -47,9 +43,7 @@ function toPublicProject(project: ProjectRow, visibility: UserRole): PublicProje
   return {
     id: project.id,
     name: project.name,
-    type: project.type,
     description: project.description ?? undefined,
-    routeLockChapter: project.routeLockChapter ?? undefined,
     maxMeterDelta: project.maxMeterDelta ?? undefined,
     visibility,
     createdAt: project.createdAt,
@@ -62,9 +56,7 @@ function toPublicProject(project: ProjectRow, visibility: UserRole): PublicProje
  */
 export interface CreateProjectBody {
   name: string;
-  type: "ACT_BASED" | "CHAPTER_BASED";
   description?: string;
-  routeLockChapter?: number;
   maxMeterDelta?: number;
 }
 
@@ -89,9 +81,7 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
     .select({
       id: projects.id,
       name: projects.name,
-      type: projects.type,
       description: projects.description,
-      routeLockChapter: projects.routeLockChapter,
       maxMeterDelta: projects.maxMeterDelta,
       role: projectUsers.role,  // User's role from project_users
       createdAt: projects.createdAt,
@@ -139,9 +129,7 @@ export async function getProject(
     .select({
       id: projects.id,
       name: projects.name,
-      type: projects.type,
       description: projects.description,
-      routeLockChapter: projects.routeLockChapter,
       maxMeterDelta: projects.maxMeterDelta,
       createdAt: projects.createdAt,
       updatedAt: projects.updatedAt,
@@ -159,9 +147,7 @@ export async function getProject(
     .select({
       id: projects.id,
       name: projects.name,
-      type: projects.type,
       description: projects.description,
-      routeLockChapter: projects.routeLockChapter,
       maxMeterDelta: projects.maxMeterDelta,
       role: projectUsers.role,
       createdAt: projects.createdAt,
@@ -194,9 +180,7 @@ export async function createProject(
   const newProject: NewProject = {
     userId,
     name: body.name,
-    type: body.type,
     description: body.description,
-    routeLockChapter: body.routeLockChapter,
     maxMeterDelta: body.maxMeterDelta ?? 10,
   };
 

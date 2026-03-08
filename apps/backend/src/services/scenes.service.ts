@@ -96,8 +96,8 @@ type SceneForPublic = Pick<
   | "id"
   | "projectId"
   | "title"
-  | "act"
-  | "chapter"
+  | "groupType"      // was: act
+  | "groupValue"     // was: chapter
   | "sceneNumber"
   | "sequenceOrder"
   | "route"
@@ -326,8 +326,8 @@ function mapToPublicScene(scene: SceneForPublic): PublicScene {
     id: scene.id,
     projectId: scene.projectId,
     title: scene.title,
-    act: scene.act ?? null,
-    chapter: scene.chapter ?? null,
+    groupType: scene.groupType ?? null,
+    groupValue: scene.groupValue ?? null,
     sceneNumber: scene.sceneNumber,
     sequenceOrder: scene.sequenceOrder,
     routeKey: scene.route ?? null,

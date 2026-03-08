@@ -18,11 +18,14 @@ import { authenticate } from "../middleware/auth.middleware.js";
 import {
   validateQuery,
   validateParams,
+  validateBody,
 } from "../middleware/validation.middleware.js";
 import {
   listScenesQuerySchema,
   sceneIdParamsSchema,
+  updateSceneDialogueBodySchema,
   type ListScenesQuery,
+  type UpdateSceneDialogueInput,
 } from "../lib/validation.js";
 import { getDb } from "../db/index.js";
 import {
@@ -54,9 +57,7 @@ interface ErrorResponse {
   error: string;
 }
 
-interface UpdateSceneDialogueBody {
-  dialogue: Array<{ speaker: string | null; text: string }>;
-}
+// UpdateSceneDialogueBody is now imported from validation.ts as UpdateSceneDialogueInput
 
 interface UpdateSceneDialogueResponse {
   success: boolean;
@@ -164,18 +165,13 @@ async function getSceneHandler(
 async function updateSceneDialogueHandler(
   request: FastifyRequest<{
     Params: GetSceneParams;
-    Body: UpdateSceneDialogueBody;
+    Body: UpdateSceneDialogueInput;
   }>,
   reply: FastifyReply,
 ): Promise<void> {
   const { sceneId } = request.params;
   const { dialogue } = request.body;
   const user = request.user!;
-
-  if (!dialogue || !Array.isArray(dialogue)) {
-    reply.status(400).send({ error: "Dialogue is required" } as ErrorResponse);
-    return;
-  }
 
   try {
     const db = getDb();
@@ -314,11 +310,14 @@ export async function scenesRoutes(fastify: FastifyInstance): Promise<void> {
     },
     getSceneHandler,
   );
-  fastify.put<{ Params: GetSceneParams; Body: UpdateSceneDialogueBody }>(
+  fastify.put<{ Params: GetSceneParams; Body: UpdateSceneDialogueInput }>(
     "/scenes/:sceneId/dialogue",
     {
       onRequest: authenticate,
-      preValidation: validateParams(sceneIdParamsSchema),
+      preValidation: [
+        validateParams(sceneIdParamsSchema),
+        validateBody(updateSceneDialogueBodySchema),
+      ],
     },
     updateSceneDialogueHandler,
   );

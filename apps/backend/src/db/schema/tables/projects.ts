@@ -5,7 +5,7 @@
  */
 
 import { pgTable, uuid, text, timestamp, integer, index } from 'drizzle-orm/pg-core';
-import { projectTypeEnum, userRoleEnum } from '../enums.js';
+import { userRoleEnum } from '../enums.js';
 import { users } from './users.js';
 
 /**
@@ -15,9 +15,7 @@ export const projects = pgTable('projects', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
-  type: projectTypeEnum('type').notNull(),
   description: text('description'),
-  routeLockChapter: integer('route_lock_chapter'),
   maxMeterDelta: integer('max_meter_delta').default(10),
   visibility: userRoleEnum('visibility').default('OWNER'),
   createdAt: timestamp('created_at').defaultNow().notNull(),

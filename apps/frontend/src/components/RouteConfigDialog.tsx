@@ -14,6 +14,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { InlineMessage } from "@/components/ui/inline-error";
 import { useRouteConfigs } from "@/hooks/useRouteConfigs";
 import { useToast } from "@/contexts/ToastContext";
+import { isValidRouteKey, isValidJumpPrefix } from "@branchforge/shared";
 
 interface RouteConfigDialogProps {
   open: boolean;
@@ -154,8 +155,8 @@ export function RouteConfigDialog({
       if (!route.routeKey.trim()) {
         return `Route ${i + 1}: Route key is required`;
       }
-      if (!route.routeKey.match(/^[a-zA-Z0-9_]+$/)) {
-        return `Route ${i + 1}: Route key can only contain letters, numbers, and underscores`;
+      if (!isValidRouteKey(route.routeKey)) {
+        return `Route ${i + 1}: Route key can only contain letters, numbers, underscores, and hyphens`;
       }
       if (!route.routeName.trim()) {
         return `Route ${i + 1}: Route name is required`;
@@ -163,8 +164,8 @@ export function RouteConfigDialog({
       if (!route.jumpPrefix.trim()) {
         return `Route ${i + 1}: Jump prefix is required`;
       }
-      if (!route.jumpPrefix.match(/^[a-zA-Z0-9_]+$/)) {
-        return `Route ${i + 1}: Jump prefix can only contain letters, numbers, and underscores`;
+      if (!isValidJumpPrefix(route.jumpPrefix)) {
+        return `Route ${i + 1}: Jump prefix can only contain letters, numbers, underscores, and hyphens`;
       }
 
       // Check for duplicate route keys

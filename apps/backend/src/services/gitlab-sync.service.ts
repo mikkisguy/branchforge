@@ -547,16 +547,20 @@ export async function detectConflicts(
     }
 
     // Fetch all scene lines for gitlab-linked scenes in a single query (avoid N+1)
-    const allLocalLinesWithSpeakers = await db
-      .select({
-        sceneId: sceneLines.sceneId,
-        contentType: sceneLines.contentType,
-        speakerTag: characters.renpyTag,
-        content: sceneLines.content,
-      })
-      .from(sceneLines)
-      .leftJoin(characters, eq(sceneLines.speakerId, characters.id))
-      .where(inArray(sceneLines.sceneId, Array.from(gitlabSceneIds)));
+    // Guard against empty gitlabSceneIds to avoid invalid SQL: WHERE sceneId IN ()
+    const allLocalLinesWithSpeakers =
+      gitlabSceneIds.size === 0
+        ? []
+        : await db
+            .select({
+              sceneId: sceneLines.sceneId,
+              contentType: sceneLines.contentType,
+              speakerTag: characters.renpyTag,
+              content: sceneLines.content,
+            })
+            .from(sceneLines)
+            .leftJoin(characters, eq(sceneLines.speakerId, characters.id))
+            .where(inArray(sceneLines.sceneId, Array.from(gitlabSceneIds)));
 
     // Build a map of sceneId -> lines for efficient lookup
     const localLinesBySceneId = new Map<

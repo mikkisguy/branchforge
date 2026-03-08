@@ -333,15 +333,24 @@ export function extractChoices(
           const nextTrimmed = nextLine.trim();
 
           const nextLineIndent = nextLine.search(/\S/);
-          if (nextTrimmed && nextLineIndent <= menuIndent) {
-            break;
+
+          // Skip empty/whitespace-only lines
+          if (!nextTrimmed) {
+            j++;
+            continue;
           }
 
+          // Check for jump statement before breaking on indentation
           const jumpMatch = nextTrimmed.match(
             /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/,
           );
           if (jumpMatch) {
             target = jumpMatch[1];
+            break;
+          }
+
+          // Exit choice block if indentation decreased to menu level or above
+          if (nextLineIndent <= menuIndent) {
             break;
           }
 
@@ -373,15 +382,24 @@ export function extractChoices(
           const nextTrimmed = nextLine.trim();
 
           const nextLineIndent = nextLine.search(/\S/);
-          if (nextTrimmed && nextLineIndent <= menuIndent) {
-            break;
+
+          // Skip empty/whitespace-only lines
+          if (!nextTrimmed) {
+            j++;
+            continue;
           }
 
+          // Check for jump statement before breaking on indentation
           const jumpMatch = nextTrimmed.match(
             /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/,
           );
           if (jumpMatch) {
             target = jumpMatch[1];
+            break;
+          }
+
+          // Exit choice block if indentation decreased to menu level or above
+          if (nextLineIndent <= menuIndent) {
             break;
           }
 
@@ -822,8 +840,9 @@ export function parseRPYFileWithLabels(
           const choiceTrimmed = choiceLine.trim();
           const choiceIndent = choiceLine.search(/\S/);
 
-          // Exit if we're no longer in the menu (indentation decreased or empty line)
-          if (!choiceTrimmed || choiceIndent <= menuIndent) {
+          // Exit if we're no longer in the menu (indentation decreased)
+          // Empty lines are skipped, not treated as exit conditions
+          if (choiceTrimmed && choiceIndent <= menuIndent) {
             break;
           }
 
@@ -843,15 +862,22 @@ export function parseRPYFileWithLabels(
               const jumpTrimmed = jumpLine.trim();
               const jumpIndent = jumpLine.search(/\S/);
 
-              if (!jumpTrimmed || jumpIndent <= menuIndent) {
-                break;
+              // Skip empty/whitespace-only lines
+              if (!jumpTrimmed) {
+                continue;
               }
 
+              // Check for jump statement before breaking on indentation
               const jumpMatch = jumpTrimmed.match(
                 /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/,
               );
               if (jumpMatch) {
                 target = jumpMatch[1];
+                break;
+              }
+
+              // Exit choice block if indentation decreased to menu level or above
+              if (jumpIndent <= menuIndent) {
                 break;
               }
             }
@@ -935,6 +961,10 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
       const indent = line.match(/^(\s*)/)?.[1] || "";
       if (indent) {
         lastDialogueIndent = indent;
+        // Set label-specific indentation the first time we see dialogue for this label
+        if (currentLabel && !labelIndentation.has(currentLabel)) {
+          labelIndentation.set(currentLabel, indent);
+        }
       }
 
       if (dialogueIndex < labelDialogue.length) {

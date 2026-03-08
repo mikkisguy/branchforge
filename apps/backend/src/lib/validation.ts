@@ -14,7 +14,12 @@
 import { z } from "zod";
 import { ValidationError } from "../middleware/error-handler.middleware.js";
 import { isIP } from "node:net";
-import { ProjectType, SceneStatus, UserRole } from "@branchforge/shared";
+import {
+  SceneStatus,
+  UserRole,
+  ROUTE_KEY_REGEX,
+  JUMP_PREFIX_REGEX,
+} from "@branchforge/shared";
 
 // ============================================================================
 // Common Schemas
@@ -127,13 +132,6 @@ export const intStringSchema = z
 // ============================================================================
 
 /**
- * Project type enum
- */
-export const projectTypeSchema = z.enum(Object.values(ProjectType), {
-  message: "Project type must be ACT_BASED or CHAPTER_BASED",
-});
-
-/**
  * User role enum
  */
 export const userRoleSchema = z.enum(Object.values(UserRole), {
@@ -159,7 +157,7 @@ export const routeConfigKeySchema = z
   .min(1, "Route key is required")
   .max(50, "Route key is too long")
   .regex(
-    /^[a-zA-Z0-9_-]+$/,
+    ROUTE_KEY_REGEX,
     "Route key must contain only letters, numbers, underscores, and hyphens",
   );
 
@@ -279,9 +277,7 @@ export const loginSchema = z.object({
 export const createProjectSchema = z
   .object({
     name: requiredString(200, "Project name is too long"),
-    type: projectTypeSchema,
     description: optionalString(2000, "Description is too long"),
-    routeLockChapter: z.number().int().optional(),
     maxMeterDelta: z.number().int().optional(),
   })
   .strict();
@@ -314,8 +310,8 @@ export const listScenesQuerySchema = z.object({
   projectId: uuidSchema,
   routeKey: routeConfigKeySchema.optional(),
   status: sceneStatusSchema.optional(),
-  act: intStringSchema,
-  chapter: intStringSchema,
+  groupType: z.string().optional(),
+  groupValue: z.string().optional(),
 });
 
 /**
@@ -332,9 +328,9 @@ export const createSceneSchema = z
   .object({
     projectId: uuidSchema,
     routeKey: routeConfigKeySchema.optional(),
-    act: z.number().int().min(1).max(99).optional(),
-    scene: z.number().int().min(1).max(999).optional(),
-    chapter: z.number().int().min(1).max(99).optional(),
+    groupType: z.string().max(50).optional(),
+    groupValue: z.string().max(50).optional(),
+    sceneNumber: z.number().int().min(1).max(999),
     sequenceOrder: z.number().int().min(1).optional(),
     status: sceneStatusSchema.optional(),
     visibility: sceneVisibilitySchema.optional(),
@@ -355,6 +351,22 @@ export const updateSceneSchema = z
   .strict()
   .partial();
 
+/**
+ * Update scene dialogue request validation
+ */
+export const updateSceneDialogueBodySchema = z
+  .object({
+    dialogue: z
+      .array(
+        z.object({
+          speaker: z.string().nullable(),
+          text: z.string(),
+        }),
+      )
+      .min(1, "At least one dialogue entry is required"),
+  })
+  .strict();
+
 // ============================================================================
 // Route Configuration Schemas
 // ============================================================================
@@ -371,7 +383,7 @@ export const createRouteConfigSchema = z
       .min(1, "Jump prefix is required")
       .max(50, "Jump prefix is too long")
       .regex(
-        /^[a-zA-Z0-9_-]+$/,
+        JUMP_PREFIX_REGEX,
         "Jump prefix must contain only letters, numbers, underscores, and hyphens",
       ),
     sortOrder: z.number().int().min(0).max(9999).optional(),
@@ -391,7 +403,7 @@ export const updateRouteConfigSchema = z
       .min(1, "Jump prefix is required")
       .max(50, "Jump prefix is too long")
       .regex(
-        /^[a-zA-Z0-9_-]+$/,
+        JUMP_PREFIX_REGEX,
         "Jump prefix must contain only letters, numbers, underscores, and hyphens",
       )
       .optional(),
@@ -576,6 +588,7 @@ export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type ListScenesQuery = z.infer<typeof listScenesQuerySchema>;
 export type CreateSceneInput = z.infer<typeof createSceneSchema>;
 export type UpdateSceneInput = z.infer<typeof updateSceneSchema>;
+export type UpdateSceneDialogueInput = z.infer<typeof updateSceneDialogueBodySchema>;
 export type CreateCharacterInput = z.infer<typeof createCharacterSchema>;
 export type CreateGitLabIntegrationInput = z.infer<
   typeof createGitLabIntegrationSchema
