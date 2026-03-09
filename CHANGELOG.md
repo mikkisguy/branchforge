@@ -5,6 +5,22 @@ All notable changes to BranchForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.5.0 - 2026-03-09
+
+### Added
+- 3dfc713: Changed scene terminology tyo be consistent with Renpy
+- 2e58af9: General refactor: Add route configuration dialog and API integration, other edits
+- 187b3b0: General refactor: Implement route configuration management with CRUD operations and update project types
+- 567d601: Dynamic story structure: First pass
+
+### Fixed
+- 8274a8e: Added route settings dialog
+- Updated dependencies [3dfc713]
+- Updated dependencies [2e58af9]
+- Updated dependencies [187b3b0]
+- Updated dependencies [567d601]
+  - @branchforge/shared@0.5.0
+
 ## v0.4.1 - 2026-03-06
 
 ### Fixed
