@@ -1,39 +1,39 @@
 /**
  * RPY Content Generator
  *
- * Converts SceneDetail to syntax-highlighted display format for the ScriptEditor.
+ * Converts LabelDetail to syntax-highlighted display format for the ScriptEditor.
  * Produces HTML fragments compatible with the existing ScriptEditor component.
  */
 
-import type { SceneDetail, PublicScene } from "@branchforge/shared";
+import type { LabelDetail, PublicLabel } from "@branchforge/shared";
 
 /**
  * Generate RPY content as HTML fragments with syntax highlighting
- * @param scene - The scene detail to convert
+ * @param label - The label detail to convert
  * @returns Array of HTML strings with syntax highlighting classes
  */
-export function generateRpyContent(scene: SceneDetail): string[] {
+export function generateRpyContent(label: LabelDetail): string[] {
   const lines: string[] = [];
 
   // Header comments
   lines.push(
-    `<span class="text-muted-foreground"># Scene: ${escapeHtml(scene.title)}</span>`,
+    `<span class="text-muted-foreground"># Label: ${escapeHtml(label.title)}</span>`,
   );
-  if (scene.groupType && scene.groupValue) {
+  if (label.groupType && label.groupValue) {
     lines.push(
-      `<span class="text-muted-foreground"># ${scene.groupType}: ${escapeHtml(scene.groupValue)}</span>`,
+      `<span class="text-muted-foreground"># ${label.groupType}: ${escapeHtml(label.groupValue)}</span>`,
     );
   }
-  if (scene.routeKey) {
+  if (label.routeKey) {
     lines.push(
-      `<span class="text-muted-foreground"># Route: ${escapeHtml(scene.routeKey)}</span>`,
+      `<span class="text-muted-foreground"># Route: ${escapeHtml(label.routeKey)}</span>`,
     );
   }
   lines.push("");
 
   // Label definition (convert title to valid Ren'Py label)
   // Sanitize: only allow [a-z0-9_], replace invalid chars with underscore
-  const labelName = scene.title
+  const labelName = label.title
     .toLowerCase()
     .replace(/[^a-z0-9_]+/g, "_")
     .replace(/^_+|_+$/g, ""); // Trim leading/trailing underscores
@@ -42,8 +42,8 @@ export function generateRpyContent(scene: SceneDetail): string[] {
   );
   lines.push("");
 
-  // Scene lines
-  for (const line of scene.lines) {
+  // Label lines
+  for (const line of label.lines) {
     if (line.contentType === "DIALOGUE" && line.speakerTag) {
       // Dialogue line: e "Hello"
       lines.push(
@@ -91,45 +91,45 @@ function escapeHtml(text: string): string {
 }
 
 /**
- * Generate file tree structure from scenes
- * Groups scenes by groupType/groupValue for hierarchical display
+ * Generate file tree structure from labels
+ * Groups labels by groupType/groupValue for hierarchical display
  */
 export interface FileItem {
   name: string;
   type: "folder" | "file";
-  sceneId?: string;
+  labelId?: string;
   children?: FileItem[];
 }
 
-export function generateFileTree(scenes: PublicScene[]): FileItem[] {
-  if (!scenes.length) return [];
+export function generateFileTree(labels: PublicLabel[]): FileItem[] {
+  if (!labels.length) return [];
 
   // Group by groupType/groupValue for hierarchical display
-  const grouped = scenes.reduce(
-    (acc, scene) => {
+  const grouped = labels.reduce(
+    (acc, label) => {
       // Use group value if available, otherwise "Main"
       const key =
-        scene.groupType && scene.groupValue
-          ? `${scene.groupType} ${scene.groupValue}`
+        label.groupType && label.groupValue
+          ? `${label.groupType} ${label.groupValue}`
           : "Main";
       if (!acc[key]) {
         acc[key] = [];
       }
-      acc[key].push(scene);
+      acc[key].push(label);
       return acc;
     },
-    {} as Record<string, PublicScene[]>,
+    {} as Record<string, PublicLabel[]>,
   );
 
   // Convert to file tree structure
   return Object.entries(grouped)
-    .map(([groupName, groupScenes]) => ({
+    .map(([groupName, groupLabels]) => ({
       name: groupName,
       type: "folder" as const,
-      children: groupScenes.map((scene) => ({
-        name: `${scene.title}.rpy`,
+      children: groupLabels.map((label) => ({
+        name: `${label.title}.rpy`,
         type: "file" as const,
-        sceneId: scene.id,
+        labelId: label.id,
       })),
     }))
     .sort((a, b) => a.name.localeCompare(b.name));

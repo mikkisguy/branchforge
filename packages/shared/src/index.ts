@@ -42,20 +42,20 @@ export const ROLE_HIERARCHY = {
 } as const;
 
 /**
- * Scene status enumeration
+ * Label status enumeration
  */
-export type SceneStatus = "DRAFT" | "REVIEW" | "FINAL";
-export const SceneStatus = {
+export type LabelStatus = "DRAFT" | "REVIEW" | "FINAL";
+export const LabelStatus = {
   DRAFT: "DRAFT",
   REVIEW: "REVIEW",
   FINAL: "FINAL",
 } as const;
 
 /**
- * Scene visibility enumeration
+ * Label visibility enumeration
  */
-export type SceneVisibility = "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
-export const SceneVisibility = {
+export type LabelVisibility = "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
+export const LabelVisibility = {
   EXCLUSIVE: "EXCLUSIVE",
   SHARED: "SHARED",
   DUO_PAIR: "DUO_PAIR",
@@ -98,10 +98,10 @@ export interface PublicUser {
 // ============================================================================
 
 export interface VisualSystemConfig {
-  namingTemplate: string; // e.g., "{route}{group}_{scene}_{counter}_{slug}"
+  namingTemplate: string; // e.g., "{route}{group}_{label}_{counter}_{slug}"
   groupPrefixes?: Record<string, Record<string, string>>; // { "act": { "I": "ai" }, "chapter": { "1": "ch1" } }
   defaultGroupType?: string; // "act", "chapter", etc.
-  scenePadding: 1 | 2;
+  labelPadding: 1 | 2;
   counterPadding: 1 | 2;
   jumpPrefixShared: string;
   placeholderBaseUrl?: string;
@@ -111,7 +111,7 @@ export interface VisualNameComponents {
   groupType?: string; // "act", "chapter", etc.
   groupValue?: string; // "I", "1", etc.
   routeKey?: string;
-  sceneNumber: number;
+  labelNumber: number;
   counter: number;
   slug: string;
 }
@@ -158,10 +158,16 @@ export function generateVisualName(
     result = result.replace("{group}", "");
   }
 
-  // Replace {scene}, {counter}, {slug}
+  // Replace {label}, {counter}, {slug}
+  result = result.replace(
+    "{label}",
+    String(components.labelNumber).padStart(config.labelPadding, "0"),
+  );
+
+  // Deprecated: {scene} fallback for compatibility
   result = result.replace(
     "{scene}",
-    String(components.sceneNumber).padStart(config.scenePadding, "0"),
+    String(components.labelNumber).padStart(config.labelPadding, "0"),
   );
   result = result.replace(
     "{counter}",
@@ -174,25 +180,25 @@ export function generateVisualName(
 }
 
 /**
- * Generates a jump label for Ren'Py based on route configuration and scene info.
+ * Generates a jump label for Ren'Py based on route configuration and label info.
  *
- * @param routeConfig - The route configuration (null for shared scenes)
- * @param sceneNumber - The scene number
- * @param scenePadding - The padding for scene numbers (1 or 2)
+ * @param routeConfig - The route configuration (null for shared labels)
+ * @param labelNumber - The label number
+ * @param labelPadding - The padding for label numbers (1 or 2)
  * @returns The generated jump label
  */
 export function generateJumpLabel(
   routeConfig: RouteConfig | null,
-  sceneNumber: number,
-  scenePadding: 1 | 2,
+  labelNumber: number,
+  labelPadding: 1 | 2,
 ): string {
-  const sceneNum = String(sceneNumber).padStart(scenePadding, "0");
+  const labelNum = String(labelNumber).padStart(labelPadding, "0");
 
   if (!routeConfig || routeConfig.isShared) {
-    return sceneNum;
+    return labelNum;
   }
 
-  return `${routeConfig.jumpPrefix}${sceneNum}`;
+  return `${routeConfig.jumpPrefix}${labelNum}`;
 }
 
 // ============================================================================
@@ -214,45 +220,45 @@ export interface Project {
   createdAt: Date;
 }
 
-export interface Scene {
+export interface Label {
   id: string;
   projectId: string;
   title: string;
   groupType?: string; // e.g., "act", "chapter", "episode"
   groupValue?: string; // e.g., "I", "1", "1a"
-  sceneNumber: number;
+  labelNumber: number;
   routeKey?: string; // References route_configs.route_key (custom user-defined routes)
-  status: SceneStatus;
+  status: LabelStatus;
   createdAt: Date;
 }
 
 // ============================================================================
-// Scene Types (for frontend-backend communication)
+// Label Types (for frontend-backend communication)
 // ============================================================================
 
 /**
- * Public scene information (without sensitive data)
- * This matches the backend's PublicScene interface
+ * Public label information (without sensitive data)
+ * This matches the backend's PublicLabel interface
  */
-export interface PublicScene {
+export interface PublicLabel {
   id: string;
   projectId: string;
   title: string;
   groupType: string | null; // e.g., "act", "chapter", "episode" or null
   groupValue: string | null; // e.g., "I", "1", "1a" or null
-  sceneNumber: number;
+  labelNumber: number;
   sequenceOrder: number;
   routeKey: string | null;
-  status: SceneStatus | null;
-  visibility: SceneVisibility | null;
+  status: LabelStatus | null;
+  visibility: LabelVisibility | null;
   createdAt: string;
   updatedAt: string;
 }
 
 /**
- * Scene line content type enumeration
+ * Label line content type enumeration
  */
-export type SceneLineContentType =
+export type LabelLineContentType =
   | "DIALOGUE"
   | "NARRATION"
   | "CHOICE"
@@ -260,20 +266,20 @@ export type SceneLineContentType =
   | "JUMP";
 
 /**
- * Scene visual type enumeration
+ * Label visual type enumeration
  */
-export type SceneVisualType = "GENERATED" | "BLACK" | "CUSTOM";
+export type LabelVisualType = "GENERATED" | "BLACK" | "CUSTOM";
 
 /**
- * Scene line with speaker information
+ * Label line with speaker information
  */
-export interface SceneLine {
+export interface LabelLine {
   id: string;
-  sceneId: string;
+  labelId: string;
   sequence: number;
-  contentType: SceneLineContentType;
+  contentType: LabelLineContentType;
   content: string;
-  visualType: SceneVisualType;
+  visualType: LabelVisualType;
   visualPrompt: string | null;
   speakerId: string | null;
   speakerName: string | null;
@@ -283,9 +289,9 @@ export interface SceneLine {
 }
 
 /**
- * Scene character role enumeration
+ * Label character role enumeration
  */
-export type SceneCharacterRole =
+export type LabelCharacterRole =
   | "PRIMARY"
   | "SECONDARY"
   | "BACKGROUND"
@@ -363,23 +369,23 @@ export interface GitLabFile {
 }
 
 /**
- * Character in a scene with role information
+ * Character in a label with role information
  */
-export interface SceneCharacter {
+export interface LabelCharacter {
   id: string;
   name: string;
   displayName: string;
   renpyTag: string;
-  role: SceneCharacterRole;
+  role: LabelCharacterRole;
   emotion: string | null;
   notes: string | null;
 }
 
 /**
- * Detailed scene information with lines and characters
+ * Detailed label information with lines and characters
  */
-export interface SceneDetail extends PublicScene {
-  lines: SceneLine[];
-  characters: SceneCharacter[];
+export interface LabelDetail extends PublicLabel {
+  lines: LabelLine[];
+  characters: LabelCharacter[];
 }
 

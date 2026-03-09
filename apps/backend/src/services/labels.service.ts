@@ -1,47 +1,47 @@
 /**
- * Scenes Service
+ * Labels Service
  *
- * Handles scene management operations including listing scenes for a project,
- * getting detailed scene information with lines and characters, and
- * authorization checks for scene access.
+ * Handles label management operations including listing labels for a project,
+ * getting detailed label information with lines and characters, and
+ * authorization checks for label access.
  */
 
 import { getDb } from "../db/index.js";
 import {
-  scenes,
-  sceneLines,
+  labels,
+  labelLines,
   characters,
   projects,
   projectUsers,
 } from "../db/schema/index.js";
-import { sceneCharacters as sceneCharactersTable } from "../db/schema/tables/scene-characters.js";
+import { labelCharacters as labelCharactersTable } from "../db/schema/tables/label-characters.js";
 import { eq, and, asc, or } from "drizzle-orm";
-import type { Scene, SceneLine } from "../db/schema/index.js";
-import type { PublicScene } from "@branchforge/shared";
-import { SceneStatus } from "@branchforge/shared";
+import type { Label, LabelLine } from "../db/schema/index.js";
+import type { PublicLabel } from "@branchforge/shared";
+import { LabelStatus } from "@branchforge/shared";
 
-// Re-export PublicScene from shared for route handlers
-export type { PublicScene };
+// Re-export PublicLabel from shared for route handlers
+export type { PublicLabel };
 
 // ============================================================================
 // Type Guards for Enum Values
 // ============================================================================
 
 /**
- * Type guard to check if a value is a valid scene status
+ * Type guard to check if a value is a valid label status
  */
-export function isValidSceneStatus(
+export function isValidLabelStatus(
   value: string | null | undefined,
-): value is SceneStatus {
-  const validStatuses: SceneStatus[] = [
-    SceneStatus.DRAFT,
-    SceneStatus.REVIEW,
-    SceneStatus.FINAL,
+): value is LabelStatus {
+  const validStatuses: LabelStatus[] = [
+    LabelStatus.DRAFT,
+    LabelStatus.REVIEW,
+    LabelStatus.FINAL,
   ];
   return (
     value !== null &&
     value !== undefined &&
-    validStatuses.includes(value as SceneStatus)
+    validStatuses.includes(value as LabelStatus)
   );
 }
 
@@ -50,10 +50,10 @@ export function isValidSceneStatus(
 // ============================================================================
 
 /**
- * Scene line with speaker information
+ * Label line with speaker information
  */
-export interface SceneLineWithSpeaker extends Omit<
-  SceneLine,
+export interface LabelLineWithSpeaker extends Omit<
+  LabelLine,
   "speakerId" | "createdAt" | "updatedAt"
 > {
   speakerId: string | null;
@@ -68,9 +68,9 @@ export interface SceneLineWithSpeaker extends Omit<
 }
 
 /**
- * Character in a scene with role information
+ * Character in a label with role information
  */
-export interface SceneCharacterWithInfo {
+export interface LabelCharacterWithInfo {
   id: string;
   name: string;
   displayName: string;
@@ -81,24 +81,24 @@ export interface SceneCharacterWithInfo {
 }
 
 /**
- * Detailed scene information with lines and characters
+ * Detailed label information with lines and characters
  */
-export interface SceneDetail extends PublicScene {
-  lines: SceneLineWithSpeaker[];
-  characters: SceneCharacterWithInfo[];
+export interface LabelDetail extends PublicLabel {
+  lines: LabelLineWithSpeaker[];
+  characters: LabelCharacterWithInfo[];
 }
 
 /**
- * Scene fields needed for PublicScene mapping
+ * Label fields needed for PublicLabel mapping
  */
-type SceneForPublic = Pick<
-  Scene,
+type LabelForPublic = Pick<
+  Label,
   | "id"
   | "projectId"
   | "title"
   | "groupType"      // was: act
   | "groupValue"     // was: chapter
-  | "sceneNumber"
+  | "labelNumber"
   | "sequenceOrder"
   | "route"
   | "status"
@@ -108,11 +108,11 @@ type SceneForPublic = Pick<
 >;
 
 /**
- * List scenes request filters
+ * List labels request filters
  */
-export interface ListScenesFilters {
+export interface ListLabelsFilters {
   routeKey?: string;
-  status?: SceneStatus;
+  status?: LabelStatus;
 }
 
 // ============================================================================
@@ -120,17 +120,17 @@ export interface ListScenesFilters {
 // ============================================================================
 
 /**
- * List all scenes for a project
- * @param projectId - The project ID to fetch scenes for
+ * List all labels for a project
+ * @param projectId - The project ID to fetch labels for
  * @param userId - The user ID making the request (for authorization)
  * @param filters - Optional filters for route and status
- * @returns Array of public scenes
+ * @returns Array of public labels
  */
-export async function listScenes(
+export async function listLabels(
   projectId: string,
   userId: string,
-  filters?: ListScenesFilters,
-): Promise<PublicScene[]> {
+  filters?: ListLabelsFilters,
+): Promise<PublicLabel[]> {
   const db = getDb();
 
   // Verify user has access to the project in a single query
@@ -153,97 +153,97 @@ export async function listScenes(
   }
 
   // Build where conditions for filters
-  const whereConditions = [eq(scenes.projectId, projectId)];
+  const whereConditions = [eq(labels.projectId, projectId)];
 
   if (filters?.routeKey) {
-    whereConditions.push(eq(scenes.route, filters.routeKey));
+    whereConditions.push(eq(labels.route, filters.routeKey));
   }
 
   if (filters?.status) {
     // Use type guard to ensure type safety
-    if (isValidSceneStatus(filters.status)) {
-      whereConditions.push(eq(scenes.status, filters.status));
+    if (isValidLabelStatus(filters.status)) {
+      whereConditions.push(eq(labels.status, filters.status));
     }
   }
 
-  // Fetch scenes with all conditions ANDed together
+  // Fetch labels with all conditions ANDed together
   const result = await db
     .select()
-    .from(scenes)
+    .from(labels)
     .where(and(...whereConditions))
-    .orderBy(asc(scenes.sequenceOrder), asc(scenes.sceneNumber));
+    .orderBy(asc(labels.sequenceOrder), asc(labels.labelNumber));
 
-  return result.map(mapToPublicScene);
+  return result.map(mapToPublicLabel);
 }
 
 /**
- * Get a single scene by ID with full details
- * @param sceneId - The scene ID to fetch
+ * Get a single label by ID with full details
+ * @param labelId - The label ID to fetch
  * @param userId - The user ID making the request (for authorization)
- * @returns The scene detail with lines and characters if found and accessible, null otherwise
+ * @returns The label detail with lines and characters if found and accessible, null otherwise
  */
-export async function getScene(
-  sceneId: string,
+export async function getLabel(
+  labelId: string,
   userId: string,
-): Promise<SceneDetail | null> {
+): Promise<LabelDetail | null> {
   const db = getDb();
 
-  // Get the scene and verify user has access in a single query
-  // A row exists if the scene's project exists AND (user is owner OR user has shared access)
-  const sceneResult = await db
+  // Get the label and verify user has access in a single query
+  // A row exists if the label's project exists AND (user is owner OR user has shared access)
+  const labelResult = await db
     .select({
-      scene: scenes,
+      label: labels,
     })
-    .from(scenes)
-    .innerJoin(projects, eq(scenes.projectId, projects.id))
+    .from(labels)
+    .innerJoin(projects, eq(labels.projectId, projects.id))
     .leftJoin(projectUsers, eq(projectUsers.projectId, projects.id))
     .where(
       and(
-        eq(scenes.id, sceneId),
+        eq(labels.id, labelId),
         or(eq(projects.userId, userId), eq(projectUsers.userId, userId)),
       ),
     )
     .limit(1);
 
-  if (sceneResult.length === 0) {
+  if (labelResult.length === 0) {
     return null;
   }
 
-  const { scene } = sceneResult[0];
+  const { label } = labelResult[0];
 
-  // Fetch scene lines and characters in parallel using Promise.all
+  // Fetch label lines and characters in parallel using Promise.all
   // This fixes the N+1 query issue by running both queries concurrently
   const [linesResult, charactersResult] = await Promise.all([
-    // Fetch scene lines with speaker information
+    // Fetch label lines with speaker information
     db
       .select({
-        line: sceneLines,
+        line: labelLines,
         speakerName: characters.displayName,
         speakerTag: characters.renpyTag,
       })
-      .from(sceneLines)
-      .leftJoin(characters, eq(sceneLines.speakerId, characters.id))
-      .where(eq(sceneLines.sceneId, sceneId))
-      .orderBy(asc(sceneLines.sequence)),
+      .from(labelLines)
+      .leftJoin(characters, eq(labelLines.speakerId, characters.id))
+      .where(eq(labelLines.labelId, labelId))
+      .orderBy(asc(labelLines.sequence)),
 
-    // Fetch scene characters with their information
+    // Fetch label characters with their information
     db
       .select({
         character: characters,
-        role: sceneCharactersTable.role,
-        emotion: sceneCharactersTable.emotion,
-        notes: sceneCharactersTable.notes,
+        role: labelCharactersTable.role,
+        emotion: labelCharactersTable.emotion,
+        notes: labelCharactersTable.notes,
       })
-      .from(sceneCharactersTable)
+      .from(labelCharactersTable)
       .innerJoin(
         characters,
-        eq(sceneCharactersTable.characterId, characters.id),
+        eq(labelCharactersTable.characterId, characters.id),
       )
-      .where(eq(sceneCharactersTable.sceneId, sceneId)),
+      .where(eq(labelCharactersTable.labelId, labelId)),
   ]);
 
   // Map results to the expected format
-  const lines: SceneLineWithSpeaker[] = linesResult.map((row) => ({
+  const lines: LabelLineWithSpeaker[] = linesResult.map((row) => ({
     ...row.line,
     speakerName: row.speakerName ?? null,
     speakerTag: row.speakerTag ?? null,
@@ -251,7 +251,7 @@ export async function getScene(
     updatedAt: row.line.updatedAt.toISOString(),
   }));
 
-  const sceneCharactersWithInfo: SceneCharacterWithInfo[] =
+  const labelCharactersWithInfo: LabelCharacterWithInfo[] =
     charactersResult.map((row) => ({
       id: row.character.id,
       name: row.character.name,
@@ -263,40 +263,40 @@ export async function getScene(
     }));
 
   return {
-    ...mapToPublicScene(scene),
+    ...mapToPublicLabel(label),
     lines,
-    characters: sceneCharactersWithInfo,
+    characters: labelCharactersWithInfo,
   };
 }
 
 /**
- * Check if a user has access to a scene via its project
- * @param sceneId - The scene ID to check access for
+ * Check if a user has access to a label via its project
+ * @param labelId - The label ID to check access for
  * @param userId - The user ID to check
  * @returns True if the user has access, false otherwise
  */
-export async function authorizeSceneAccess(
-  sceneId: string,
+export async function authorizeLabelAccess(
+  labelId: string,
   userId: string,
 ): Promise<boolean> {
   const db = getDb();
 
-  // Get the scene with its project owner
-  const sceneResult = await db
+  // Get the label with its project owner
+  const labelResult = await db
     .select({
       projectOwnerId: projects.userId,
       projectId: projects.id,
     })
-    .from(scenes)
-    .innerJoin(projects, eq(scenes.projectId, projects.id))
-    .where(eq(scenes.id, sceneId))
+    .from(labels)
+    .innerJoin(projects, eq(labels.projectId, projects.id))
+    .where(eq(labels.id, labelId))
     .limit(1);
 
-  if (sceneResult.length === 0) {
+  if (labelResult.length === 0) {
     return false;
   }
 
-  const { projectOwnerId, projectId } = sceneResult[0];
+  const { projectOwnerId, projectId } = labelResult[0];
 
   // Check if user is the owner
   if (projectOwnerId === userId) {
@@ -319,22 +319,21 @@ export async function authorizeSceneAccess(
 }
 
 /**
- * Map a Scene to PublicScene (already excludes sensitive data)
+ * Map a Label to PublicLabel (already excludes sensitive data)
  */
-function mapToPublicScene(scene: SceneForPublic): PublicScene {
+function mapToPublicLabel(label: LabelForPublic): PublicLabel {
   return {
-    id: scene.id,
-    projectId: scene.projectId,
-    title: scene.title,
-    groupType: scene.groupType ?? null,
-    groupValue: scene.groupValue ?? null,
-    sceneNumber: scene.sceneNumber,
-    sequenceOrder: scene.sequenceOrder,
-    routeKey: scene.route ?? null,
-    status: isValidSceneStatus(scene.status) ? scene.status : null,
-    visibility: scene.visibility,
-    createdAt: scene.createdAt.toISOString(),
-    updatedAt: scene.updatedAt.toISOString(),
+    id: label.id,
+    projectId: label.projectId,
+    title: label.title,
+    groupType: label.groupType ?? null,
+    groupValue: label.groupValue ?? null,
+    labelNumber: label.labelNumber,
+    sequenceOrder: label.sequenceOrder,
+    routeKey: label.route ?? null,
+    status: isValidLabelStatus(label.status) ? label.status : null,
+    visibility: label.visibility,
+    createdAt: label.createdAt.toISOString(),
+    updatedAt: label.updatedAt.toISOString(),
   };
 }
-

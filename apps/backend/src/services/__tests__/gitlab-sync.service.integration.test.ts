@@ -25,8 +25,8 @@ import { getDb } from "../../db/index.js";
 import {
   users,
   projects,
-  scenes as scenesTable,
-  sceneLines,
+  labels as labelsTable,
+  labelLines,
   characters,
   gitlabFiles,
   gitlabSyncOperations,
@@ -83,7 +83,7 @@ describe("GitLabSyncService (Integration)", () => {
     title: "start",
     groupType: null,
     groupValue: null,
-    sceneNumber: 1,
+    labelNumber: 1,
     sequenceOrder: 0,
     route: "COMMON" as const,
     status: "DRAFT" as const,
@@ -107,8 +107,8 @@ describe("GitLabSyncService (Integration)", () => {
 
   // Helper to clean up all test data
   async function cleanupTestData() {
-    await db.delete(sceneLines).where(eq(sceneLines.sceneId, testScene.id));
-    await db.delete(scenesTable).where(eq(scenesTable.id, testScene.id));
+    await db.delete(labelLines).where(eq(labelLines.labelId, testScene.id));
+    await db.delete(labelsTable).where(eq(labelsTable.id, testScene.id));
     await db.delete(characters).where(eq(characters.id, testCharacter.id));
     await db
       .delete(gitlabFiles)
@@ -121,10 +121,10 @@ describe("GitLabSyncService (Integration)", () => {
   }
 
   // Helper to clean up additional test data (for multi-scene tests)
-  async function cleanupAdditionalData(sceneIds: string[]) {
-    for (const sceneId of sceneIds) {
-      await db.delete(sceneLines).where(eq(sceneLines.sceneId, sceneId));
-      await db.delete(scenesTable).where(eq(scenesTable.id, sceneId));
+  async function cleanupAdditionalData(labelIds: string[]) {
+    for (const labelId of labelIds) {
+      await db.delete(labelLines).where(eq(labelLines.labelId, labelId));
+      await db.delete(labelsTable).where(eq(labelsTable.id, labelId));
     }
   }
 
@@ -155,12 +155,12 @@ describe("GitLabSyncService (Integration)", () => {
   describe("detectConflicts", () => {
     it("should detect no conflicts when local and remote are in sync", async () => {
       // Set up local scene with lines
-      await db.insert(scenesTable).values(testScene);
+      await db.insert(labelsTable).values(testScene);
 
       // Insert a line with the same content as remote
-      await db.insert(sceneLines).values({
+      await db.insert(labelLines).values({
         id: testUuid("46000000", 1),
-        sceneId: testScene.id,
+        labelId: testScene.id,
         sequence: 1,
         contentType: "NARRATION" as const,
         content: "Same content",
@@ -196,12 +196,12 @@ describe("GitLabSyncService (Integration)", () => {
 
     it("should detect conflicts when local and remote content differs", async () => {
       // Set up local scene with lines
-      await db.insert(scenesTable).values(testScene);
+      await db.insert(labelsTable).values(testScene);
 
       // Insert a line with different content than remote
-      await db.insert(sceneLines).values({
+      await db.insert(labelLines).values({
         id: testUuid("46000000", 1),
-        sceneId: testScene.id,
+        labelId: testScene.id,
         sequence: 1,
         contentType: "NARRATION" as const,
         content: "Local content",
@@ -289,7 +289,7 @@ describe("GitLabSyncService (Integration)", () => {
 
     it("should detect deleted remote labels", async () => {
       // Set up local scene
-      await db.insert(scenesTable).values(testScene);
+      await db.insert(labelsTable).values(testScene);
 
       // Mock GitLab API to return empty content (file deleted or label removed)
       // We need to mock the getFileContent to return a file with different labels
@@ -337,14 +337,14 @@ describe("GitLabSyncService (Integration)", () => {
 
     it("should detect conflicts when dialogue with speakers differs", async () => {
       // Set up local scene with character
-      await db.insert(scenesTable).values(testScene);
+      await db.insert(labelsTable).values(testScene);
       await db.insert(characters).values(testCharacter);
 
       // Insert dialogue lines with speaker
-      await db.insert(sceneLines).values([
+      await db.insert(labelLines).values([
         {
           id: testUuid("46000000", 1),
-          sceneId: testScene.id,
+          labelId: testScene.id,
           sequence: 1,
           contentType: "DIALOGUE" as const,
           content: "Local dialogue",
@@ -386,14 +386,14 @@ describe("GitLabSyncService (Integration)", () => {
 
     it("should detect no conflicts when dialogue with speakers matches", async () => {
       // Set up local scene with character
-      await db.insert(scenesTable).values(testScene);
+      await db.insert(labelsTable).values(testScene);
       await db.insert(characters).values(testCharacter);
 
       // Insert dialogue lines with speaker matching remote
-      await db.insert(sceneLines).values([
+      await db.insert(labelLines).values([
         {
           id: testUuid("46000000", 1),
-          sceneId: testScene.id,
+          labelId: testScene.id,
           sequence: 1,
           contentType: "DIALOGUE" as const,
           content: "Same dialogue",
@@ -431,11 +431,11 @@ describe("GitLabSyncService (Integration)", () => {
 
     it("should handle multiple conflict types simultaneously", async () => {
       // Set up local scene with lines
-      await db.insert(scenesTable).values(testScene);
+      await db.insert(labelsTable).values(testScene);
 
-      await db.insert(sceneLines).values({
+      await db.insert(labelLines).values({
         id: testUuid("46000000", 1),
-        sceneId: testScene.id,
+        labelId: testScene.id,
         sequence: 1,
         contentType: "NARRATION" as const,
         content: "Local content",
@@ -506,7 +506,7 @@ describe("GitLabSyncService (Integration)", () => {
 
     it("should handle API errors gracefully", async () => {
       // Set up local scene
-      await db.insert(scenesTable).values(testScene);
+      await db.insert(labelsTable).values(testScene);
 
       // Mock GitLab API to throw error
       vi.spyOn(gitlabService, "getFileContent").mockRejectedValue(
@@ -540,7 +540,7 @@ describe("GitLabSyncService (Integration)", () => {
         title: "chapter1",
         groupType: null,
         groupValue: null,
-        sceneNumber: 2,
+        labelNumber: 2,
         sequenceOrder: 1,
         route: "COMMON" as const,
         status: "DRAFT" as const,
@@ -551,12 +551,12 @@ describe("GitLabSyncService (Integration)", () => {
         labelPosition: 0,
       };
 
-      await db.insert(scenesTable).values([testScene, testScene2]);
+      await db.insert(labelsTable).values([testScene, testScene2]);
 
-      await db.insert(sceneLines).values([
+      await db.insert(labelLines).values([
         {
           id: testUuid("46000000", 1),
-          sceneId: testScene.id,
+          labelId: testScene.id,
           sequence: 1,
           contentType: "NARRATION" as const,
           content: "Line 1",
@@ -564,7 +564,7 @@ describe("GitLabSyncService (Integration)", () => {
         },
         {
           id: testUuid("46000000", 2),
-          sceneId: testScene.id,
+          labelId: testScene.id,
           sequence: 2,
           contentType: "NARRATION" as const,
           content: "Line 2",
@@ -572,7 +572,7 @@ describe("GitLabSyncService (Integration)", () => {
         },
         {
           id: testUuid("46000000", 3),
-          sceneId: testScene2.id,
+          labelId: testScene2.id,
           sequence: 1,
           contentType: "NARRATION" as const,
           content: "Chapter 1 Line 1",
@@ -631,8 +631,8 @@ describe("GitLabSyncService (Integration)", () => {
       });
 
       // Cleanup
-      await db.delete(sceneLines).where(eq(sceneLines.sceneId, testScene2.id));
-      await db.delete(scenesTable).where(eq(scenesTable.id, testScene2.id));
+      await db.delete(labelLines).where(eq(labelLines.labelId, testScene2.id));
+      await db.delete(labelsTable).where(eq(labelsTable.id, testScene2.id));
       await db
         .delete(gitlabFiles)
         .where(eq(gitlabFiles.id, testGitlabFile2.id));
@@ -826,16 +826,16 @@ describe("GitLabSyncService (Integration)", () => {
       // Verify scene was created with linkage
       const [scene] = await db
         .select()
-        .from(scenesTable)
-        .where(eq(scenesTable.title, "start"));
+        .from(labelsTable)
+        .where(eq(labelsTable.title, "start"));
       expect(scene).toBeDefined();
       expect(scene?.gitlabFileId).toBe(gitlabFile?.id);
       expect(scene?.labelName).toBe("start");
 
       // Cleanup
       if (scene) {
-        await db.delete(sceneLines).where(eq(sceneLines.sceneId, scene.id));
-        await db.delete(scenesTable).where(eq(scenesTable.id, scene.id));
+        await db.delete(labelLines).where(eq(labelLines.labelId, scene.id));
+        await db.delete(labelsTable).where(eq(labelsTable.id, scene.id));
       }
       if (gitlabFile) {
         await db.delete(gitlabFiles).where(eq(gitlabFiles.id, gitlabFile.id));
@@ -859,7 +859,7 @@ describe("GitLabSyncService (Integration)", () => {
 
     it("should handle gitlab_wins conflict resolution", async () => {
       // Create an existing scene
-      await db.insert(scenesTable).values(testScene);
+      await db.insert(labelsTable).values(testScene);
 
       vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([
         { name: "script.rpy", path: "game/script.rpy" } as any,
@@ -897,7 +897,7 @@ describe("GitLabSyncService (Integration)", () => {
 
     it("should handle manual_review conflict resolution", async () => {
       // Create an existing scene
-      await db.insert(scenesTable).values(testScene);
+      await db.insert(labelsTable).values(testScene);
 
       vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([
         { name: "script.rpy", path: "game/script.rpy" } as any,

@@ -4,7 +4,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useProject } from "@/hooks/useProject";
 import { useGitLab } from "@/hooks/useGitLab";
-import { useScenes } from "@/hooks/useScenes";
+import { useLabels } from "@/hooks/useLabels";
 import { themePalettes, BASE_URL } from "@/lib/constants";
 import { FloatingParticles, TopRightPanel } from "@/components/ide-shared";
 import { Logo } from "@/components/ui/logo";
@@ -43,13 +43,13 @@ export function HomePageIDE() {
   // GitLab context for getting linked repository info
   const { getLinkedRepository } = useGitLab();
 
-  // Scenes context - clear active scene when project changes
-  const { setActiveSceneId } = useScenes();
+  // Labels context - clear active label when project changes
+  const { setActiveLabelId } = useLabels();
 
-  // Clear active scene when project changes
+  // Clear active label when project changes
   useEffect(() => {
-    setActiveSceneId(null);
-  }, [currentProject?.id, setActiveSceneId]);
+    setActiveLabelId(null);
+  }, [currentProject?.id, setActiveLabelId]);
 
   const themeInfo = themePalettes.find((p) => p.key === theme);
 

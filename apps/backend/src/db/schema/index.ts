@@ -42,9 +42,9 @@ export * from './tables/meters.js';
 export * from './tables/flags.js';
 
 // Content tables
-export * from './tables/scenes.js';
-export * from './tables/scene-lines.js';
-export * from './tables/scene-characters.js';
+export * from './tables/labels.js';
+export * from './tables/label-lines.js';
+export * from './tables/label-characters.js';
 
 // World building
 export * from './tables/world-elements.js';

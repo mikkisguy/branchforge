@@ -20,7 +20,6 @@ import {
   extractChoices,
   extractJumps,
   parseRPYFile,
-  convertToBranchForgeFormat,
 } from "../rpy-parser.service.js";
 
 describe("RPYParserService", () => {
@@ -446,50 +445,6 @@ label next:
       expect(result.dialogue.length).toBeGreaterThan(0);
       expect(result.choices.length).toBeGreaterThan(0);
       expect(result.jumps.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe("convertToBranchForgeFormat", () => {
-    it("should convert parsed RPY to BranchForge scene format", () => {
-      const parsed = parseRPYFile(sampleRPY);
-      const converted = convertToBranchForgeFormat(parsed, "chapter1");
-
-      expect(converted).toMatchObject({
-        name: expect.any(String),
-        entries: expect.any(Array),
-      });
-    });
-
-    it("should map dialogue to scene lines", () => {
-      const parsed = parseRPYFile(sampleRPY);
-      const converted = convertToBranchForgeFormat(parsed, "chapter1");
-
-      expect(converted.entries.length).toBeGreaterThan(0);
-    });
-
-    it("should map choices to flags", () => {
-      const parsed = parseRPYFile(sampleRPY);
-      const converted = convertToBranchForgeFormat(parsed, "chapter1");
-
-      // Choices should create flag points
-      expect(converted.entries.some((e) => e.type === "FLAG")).toBe(true);
-    });
-
-    it("should handle labels without corresponding scene", () => {
-      const parsed = parseRPYFile(sampleRPY);
-      const converted = convertToBranchForgeFormat(parsed, "nonexistent");
-
-      // Should return a valid structure even if label not found
-      expect(converted).toBeDefined();
-      expect(converted.entries).toEqual([]);
-    });
-
-    it("should preserve character information", () => {
-      const parsed = parseRPYFile(complexRPY);
-      const converted = convertToBranchForgeFormat(parsed, "first_label");
-
-      // Character definitions should be extracted
-      expect(converted.characters).toEqual(expect.any(Array));
     });
   });
 

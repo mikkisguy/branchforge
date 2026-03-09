@@ -82,8 +82,8 @@ export const gitlabFileSyncState = pgTable(
     startedAt: timestamp("started_at").defaultNow().notNull(),
     completedAt: timestamp("completed_at"),
     errorMessage: text("error_message"),
-    labelCount: integer("label_count"),
-    sceneCount: integer("scene_count"),
+    rpyLabelCount: integer("rpy_label_count"),
+    dbLabelCount: integer("db_label_count"),
   },
   (table) => [
     index("gitlab_file_sync_state_gitlab_file_id_idx").on(table.gitlabFileId),

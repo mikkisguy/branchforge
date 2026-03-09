@@ -4,7 +4,7 @@
  * Top-level container for visual novel projects and beta reader access control.
  */
 
-import { pgTable, uuid, text, timestamp, integer, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, integer, index, primaryKey } from 'drizzle-orm/pg-core';
 import { userRoleEnum } from '../enums.js';
 import { users } from './users.js';
 
@@ -32,9 +32,9 @@ export const projectUsers = pgTable('project_users', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   role: userRoleEnum('role').notNull(),
   addedAt: timestamp('added_at').defaultNow().notNull(),
-}, (table) => [
-  index('project_users_pk').on(table.projectId, table.userId),
-]);
+}, (table) => ({
+  pk: primaryKey({ columns: [table.projectId, table.userId] }),
+}));
 
 // Types
 export type Project = typeof projects.$inferSelect;

@@ -17,7 +17,7 @@ import {
   type SyncOperation,
   type ConflictResolution,
 } from "@/lib/api/gitlab";
-import { gitlabKeys, sceneKeys } from "@/lib/query-keys";
+import { gitlabKeys, labelKeys } from "@/lib/query-keys";
 
 // ============================================================================
 // Constants
@@ -161,7 +161,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
       // Invalidate caches on successful completion
       if (op.status === "completed" && projectId) {
         queryClient.invalidateQueries({
-          queryKey: sceneKeys.lists(projectId),
+          queryKey: labelKeys.lists(projectId),
         });
         queryClient.invalidateQueries({
           queryKey: gitlabKeys.importedFiles(projectId),

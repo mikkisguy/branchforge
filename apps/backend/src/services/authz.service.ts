@@ -7,14 +7,14 @@
  * Functions:
  * - hasProjectAccess(projectId, userId) - Check if user has access to a project
  * - requireProjectAccess(projectId, userId) - Throw if no access
- * - hasSceneAccess(sceneId, userId) - Check if user has access to a scene
- * - requireSceneAccess(sceneId, userId) - Throw if no access
+ * - hasLabelAccess(labelId, userId) - Check if user has access to a label
+ * - requireLabelAccess(labelId, userId) - Throw if no access
  *
  * Uses error classes from error-handler.middleware.ts for consistent error responses.
  */
 
 import { getDb } from "../db/index.js";
-import { projects, projectUsers, scenes } from "../db/schema/index.js";
+import { projects, projectUsers, labels } from "../db/schema/index.js";
 import { eq, and, or } from "drizzle-orm";
 import {
   NotFoundError,
@@ -158,39 +158,39 @@ export async function getProjectRole(
 }
 
 // ============================================================================
-// Scene Authorization
+// Label Authorization
 // ============================================================================
 
 /**
- * Check if a user has access to a scene via its project
- * Access is granted if the user has access to the scene's project
+ * Check if a user has access to a label via its project
+ * Access is granted if the user has access to the label's project
  *
- * @param sceneId - The scene ID to check access for
+ * @param labelId - The label ID to check access for
  * @param userId - The user ID to check
  * @returns true if the user has access, false otherwise
  */
-export async function hasSceneAccess(
-  sceneId: string,
+export async function hasLabelAccess(
+  labelId: string,
   userId: string,
 ): Promise<boolean> {
   const db = getDb();
 
-  // Get the scene with its project owner in a single query
-  const sceneResult = await db
+  // Get the label with its project owner in a single query
+  const labelResult = await db
     .select({
       projectOwnerId: projects.userId,
       projectId: projects.id,
     })
-    .from(scenes)
-    .innerJoin(projects, eq(scenes.projectId, projects.id))
-    .where(eq(scenes.id, sceneId))
+    .from(labels)
+    .innerJoin(projects, eq(labels.projectId, projects.id))
+    .where(eq(labels.id, labelId))
     .limit(1);
 
-  if (sceneResult.length === 0) {
+  if (labelResult.length === 0) {
     return false;
   }
 
-  const { projectOwnerId, projectId } = sceneResult[0];
+  const { projectOwnerId, projectId } = labelResult[0];
 
   // Check if user is the owner
   if (projectOwnerId === userId) {
@@ -213,87 +213,87 @@ export async function hasSceneAccess(
 }
 
 /**
- * Require that a user has access to a scene
- * Throws NotFoundError if the scene doesn't exist
+ * Require that a user has access to a label
+ * Throws NotFoundError if the label doesn't exist
  * Throws ForbiddenError if the user lacks access
  *
- * @param sceneId - The scene ID to check access for
+ * @param labelId - The label ID to check access for
  * @param userId - The user ID to check
- * @throws NotFoundError if scene doesn't exist
+ * @throws NotFoundError if label doesn't exist
  * @throws ForbiddenError if user lacks access
  */
-export async function requireSceneAccess(
-  sceneId: string,
+export async function requireLabelAccess(
+  labelId: string,
   userId: string,
 ): Promise<void> {
   const db = getDb();
 
-  // Get the scene with its project owner and check access in a single query
-  const sceneResult = await db
+  // Get the label with its project owner and check access in a single query
+  const labelResult = await db
     .select({
-      sceneId: scenes.id,
+      labelId: labels.id,
       projectOwnerId: projects.userId,
       projectId: projects.id,
     })
-    .from(scenes)
-    .innerJoin(projects, eq(scenes.projectId, projects.id))
+    .from(labels)
+    .innerJoin(projects, eq(labels.projectId, projects.id))
     .leftJoin(projectUsers, eq(projectUsers.projectId, projects.id))
     .where(
       and(
-        eq(scenes.id, sceneId),
+        eq(labels.id, labelId),
         or(eq(projects.userId, userId), eq(projectUsers.userId, userId)),
       ),
     )
     .limit(1);
 
-  if (sceneResult.length === 0) {
-    // Check if scene exists at all
-    const sceneExists = await db
-      .select({ id: scenes.id })
-      .from(scenes)
-      .where(eq(scenes.id, sceneId))
+  if (labelResult.length === 0) {
+    // Check if label exists at all
+    const labelExists = await db
+      .select({ id: labels.id })
+      .from(labels)
+      .where(eq(labels.id, labelId))
       .limit(1);
 
-    if (sceneExists.length === 0) {
-      throw new NotFoundError("Scene");
+    if (labelExists.length === 0) {
+      throw new NotFoundError("Label");
     }
 
-    // Scene exists but user doesn't have access
-    throw new ForbiddenError("You do not have access to this scene");
+    // Label exists but user doesn't have access
+    throw new ForbiddenError("You do not have access to this label");
   }
 }
 
 /**
- * Get a user's role for a scene (via the scene's project)
- * Returns 'OWNER' if the user owns the scene's project, or their role from project_users
+ * Get a user's role for a label (via the label's project)
+ * Returns 'OWNER' if the user owns the label's project, or their role from project_users
  * Returns null if the user has no access
  *
- * @param sceneId - The scene ID to check
+ * @param labelId - The label ID to check
  * @param userId - The user ID to check
  * @returns The user's role ('OWNER', 'READER', 'TESTER') or null
  */
-export async function getSceneRole(
-  sceneId: string,
+export async function getLabelRole(
+  labelId: string,
   userId: string,
 ): Promise<UserRole | null> {
   const db = getDb();
 
-  // Get the scene with its project owner
-  const sceneResult = await db
+  // Get the label with its project owner
+  const labelResult = await db
     .select({
       projectOwnerId: projects.userId,
       projectId: projects.id,
     })
-    .from(scenes)
-    .innerJoin(projects, eq(scenes.projectId, projects.id))
-    .where(eq(scenes.id, sceneId))
+    .from(labels)
+    .innerJoin(projects, eq(labels.projectId, projects.id))
+    .where(eq(labels.id, labelId))
     .limit(1);
 
-  if (sceneResult.length === 0) {
+  if (labelResult.length === 0) {
     return null;
   }
 
-  const { projectOwnerId, projectId } = sceneResult[0];
+  const { projectOwnerId, projectId } = labelResult[0];
 
   // Check if user is the owner
   if (projectOwnerId === userId) {
@@ -319,7 +319,7 @@ export async function getSceneRole(
     }
     // Log unexpected role value and treat as no access
     console.error(
-      `[authz.service] Unexpected role value in project_users: "${role}" for scene ${sceneId}, user ${userId}`,
+      `[authz.service] Unexpected role value in project_users: "${role}" for label ${labelId}, user ${userId}`,
     );
     return null;
   }

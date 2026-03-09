@@ -9,8 +9,8 @@ import { getDb } from "../db/index.js";
 import {
   gitlabSyncOperations,
   gitlabFiles,
-  scenes,
-  sceneLines,
+  labels,
+  labelLines,
   characters,
 } from "../db/schema/index.js";
 import { eq, and, desc, inArray, asc } from "drizzle-orm";
@@ -47,7 +47,7 @@ class ConcurrencyLimiter {
     this.running++;
     try {
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Task timeout')), timeoutMs);
+        setTimeout(() => reject(new Error("Task timeout")), timeoutMs);
       });
       return await Promise.race([fn(), timeoutPromise]);
     } finally {
@@ -93,9 +93,9 @@ export interface ConflictDetectionResult {
   error?: string;
 }
 
-// Type for scene line insert values
-interface SceneLineInsertValues {
-  sceneId: string;
+// Type for label line insert values
+interface LabelLineInsertValues {
+  labelId: string;
   sequence: number;
   contentType: "NARRATION" | "DIALOGUE" | "CHOICE" | "MENU" | "JUMP";
   content: string;
@@ -350,11 +350,11 @@ export async function importFromGitlab(
         // Fetch all scenes for this file once to avoid N+1 queries
         const fileScenes = await db
           .select()
-          .from(scenes)
-          .where(eq(scenes.gitlabFileId, gitlabFile.id));
+          .from(labels)
+          .where(eq(labels.gitlabFileId, gitlabFile.id));
 
         // Build a Map keyed by labelName for O(1) lookups
-        const scenesByLabel = new Map<string, typeof fileScenes[0]>();
+        const scenesByLabel = new Map<string, (typeof fileScenes)[0]>();
         for (const scene of fileScenes) {
           if (scene.labelName) {
             scenesByLabel.set(scene.labelName, scene);
@@ -379,14 +379,14 @@ export async function importFromGitlab(
             // Update existing scene
             await db.transaction(async (tx) => {
               await tx
-                .delete(sceneLines)
-                .where(eq(sceneLines.sceneId, existingScene.id));
+                .delete(labelLines)
+                .where(eq(labelLines.labelId, existingScene.id));
 
-              const allValues: SceneLineInsertValues[] = labelData.entries.map(
+              const allValues: LabelLineInsertValues[] = labelData.entries.map(
                 (entry, index) => {
                   const mapped = mapEntryToDbContentType(entry);
                   return {
-                    sceneId: existingScene.id,
+                    labelId: existingScene.id,
                     sequence: index + 1,
                     contentType: mapped.contentType,
                     content: mapped.content,
@@ -395,14 +395,14 @@ export async function importFromGitlab(
               );
 
               if (allValues.length > 0) {
-                await tx.insert(sceneLines).values(allValues);
+                await tx.insert(labelLines).values(allValues);
               }
             });
           } else if (!existingScene) {
             // Create new scene with proper file linkage
             await db.transaction(async (tx) => {
               const [newScene] = await tx
-                .insert(scenes)
+                .insert(labels)
                 .values({
                   projectId,
                   title: label.label,
@@ -411,18 +411,18 @@ export async function importFromGitlab(
                   labelPosition: i,
                   sequenceOrder: i,
                   route: null, // User will assign route later
-                  sceneNumber: i + 1,
+                  labelNumber: i + 1,
                   status: "DRAFT",
                   prerequisites: {},
                   effects: {},
                 })
                 .returning();
 
-              const allValues: SceneLineInsertValues[] = labelData.entries.map(
+              const allValues: LabelLineInsertValues[] = labelData.entries.map(
                 (entry, index) => {
                   const mapped = mapEntryToDbContentType(entry);
                   return {
-                    sceneId: newScene.id,
+                    labelId: newScene.id,
                     sequence: index + 1,
                     contentType: mapped.contentType,
                     content: mapped.content,
@@ -431,7 +431,7 @@ export async function importFromGitlab(
               );
 
               if (allValues.length > 0) {
-                await tx.insert(sceneLines).values(allValues);
+                await tx.insert(labelLines).values(allValues);
               }
             });
           }
@@ -535,8 +535,8 @@ export async function detectConflicts(
     // Get all local scenes that are linked to GitLab files
     const localScenes = await db
       .select()
-      .from(scenes)
-      .where(eq(scenes.projectId, projectId));
+      .from(labels)
+      .where(eq(labels.projectId, projectId));
 
     // Filter to only scenes with gitlabFileId (imported from GitLab)
     const gitlabScenes = localScenes.filter((s) => s.gitlabFileId);
@@ -555,34 +555,34 @@ export async function detectConflicts(
     }
 
     // Fetch all scene lines for gitlab-linked scenes in a single query (avoid N+1)
-    // Guard against empty gitlabSceneIds to avoid invalid SQL: WHERE sceneId IN ()
+    // Guard against empty gitlabSceneIds to avoid invalid SQL: WHERE labelId IN ()
     const allLocalLinesWithSpeakers =
       gitlabSceneIds.size === 0
         ? []
         : await db
             .select({
-              sceneId: sceneLines.sceneId,
-              contentType: sceneLines.contentType,
+              labelId: labelLines.labelId,
+              contentType: labelLines.contentType,
               speakerTag: characters.renpyTag,
-              content: sceneLines.content,
-              sequence: sceneLines.sequence,
+              content: labelLines.content,
+              sequence: labelLines.sequence,
             })
-            .from(sceneLines)
-            .leftJoin(characters, eq(sceneLines.speakerId, characters.id))
-            .where(inArray(sceneLines.sceneId, Array.from(gitlabSceneIds)))
-            .orderBy(asc(sceneLines.sequence));
+            .from(labelLines)
+            .leftJoin(characters, eq(labelLines.speakerId, characters.id))
+            .where(inArray(labelLines.labelId, Array.from(gitlabSceneIds)))
+            .orderBy(asc(labelLines.sequence));
 
-    // Build a map of sceneId -> lines for efficient lookup
+    // Build a map of labelId -> lines for efficient lookup
     const localLinesBySceneId = new Map<
       string,
       Array<(typeof allLocalLinesWithSpeakers)[0]>
     >();
     for (const line of allLocalLinesWithSpeakers) {
-      const existing = localLinesBySceneId.get(line.sceneId);
+      const existing = localLinesBySceneId.get(line.labelId);
       if (existing) {
         existing.push(line);
       } else {
-        localLinesBySceneId.set(line.sceneId, [line]);
+        localLinesBySceneId.set(line.labelId, [line]);
       }
     }
 

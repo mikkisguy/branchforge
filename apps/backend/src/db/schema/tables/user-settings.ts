@@ -4,7 +4,7 @@
  * Per-user preferences and settings including avatar, username, language, and theme.
  */
 
-import { pgTable, uuid, text, timestamp, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, index, unique } from 'drizzle-orm/pg-core';
 import { users } from './users.js';
 
 export const userSettings = pgTable('user_settings', {
@@ -17,7 +17,7 @@ export const userSettings = pgTable('user_settings', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => [
-  index('user_settings_user_id_idx').on(table.userId),
+  unique('user_settings_user_id_unique').on(table.userId),
   index('user_settings_username_idx').on(table.username),
 ]);
 

@@ -8,7 +8,7 @@ import {
   ScriptEditor,
 } from "@/components/script-mode";
 import { GitLabFileTree } from "@/components/script-mode/GitLabFileTree";
-import { useScenes } from "@/hooks/useScenes";
+import { useLabels } from "@/hooks/useLabels";
 import { useGitLab } from "@/hooks/useGitLab";
 import { useGitLabFiles } from "@/hooks/useGitLabFiles";
 import { generateRpyContent, generateFileTree } from "@/lib/rpy-generator";
@@ -29,12 +29,12 @@ export function ScriptMode({
   gitlabBranch,
 }: ScriptModeProps) {
   const {
-    scenes,
-    activeScene,
-    activeSceneId,
-    setActiveSceneId,
-    isLoadingScenes,
-  } = useScenes();
+    labels,
+    activeLabel,
+    activeLabelId,
+    setActiveLabelId,
+    isLoadingLabels,
+  } = useLabels();
 
   const { isProjectLinked, getLinkedRepository } = useGitLab();
   const { files: gitLabFiles, isLoadingFiles } = useGitLabFiles(projectId);
@@ -49,9 +49,9 @@ export function ScriptMode({
     [gitLabFiles, activeFileId],
   );
 
-  // Generate file tree from scenes
+  // Generate file tree from labels
   const { flatFiles: files, fileNameToSceneId } = useMemo(() => {
-    const fileTree = generateFileTree(scenes);
+    const fileTree = generateFileTree(labels);
 
     // Build flat file list with folder separators and scene ID mapping
     const flatFiles: { name: string; type: "file" | "folder" }[] = [];
@@ -61,20 +61,20 @@ export function ScriptMode({
       flatFiles.push({ name: folder.name, type: "folder" });
       for (const file of folder.children || []) {
         flatFiles.push({ name: file.name, type: "file" });
-        if (file.sceneId) {
-          fileNameToSceneId.set(file.name, file.sceneId);
+        if (file.labelId) {
+          fileNameToSceneId.set(file.name, file.labelId);
         }
       }
     }
 
     return { flatFiles, fileNameToSceneId };
-  }, [scenes]);
+  }, [labels]);
 
   // Generate RPY content for active scene
-  const activeSceneContent = useMemo(() => {
-    if (!activeScene) return [];
-    return generateRpyContent(activeScene);
-  }, [activeScene]);
+  const activeLabelContent = useMemo(() => {
+    if (!activeLabel) return [];
+    return generateRpyContent(activeLabel);
+  }, [activeLabel]);
 
   // Get active file content directly for Script Mode editing
   const activeFileContent = activeGitLabFile?.content || "";
@@ -84,14 +84,14 @@ export function ScriptMode({
     [activeFileContent],
   );
 
-  // Track active file (scene) - for non-GitLab scenes
+  // Track active file (scene) - for non-GitLab labels
   const [activeFile, setActiveFile] = useState<string | null>(null);
 
   // Sync active file with active scene ID
   useEffect(() => {
-    if (activeSceneId) {
+    if (activeLabelId) {
       const fileEntry = Array.from(fileNameToSceneId.entries()).find(
-        ([, sceneId]) => sceneId === activeSceneId,
+        ([, sceneId]) => sceneId === activeLabelId,
       );
       if (fileEntry) {
         setActiveFile(fileEntry[0]);
@@ -99,13 +99,13 @@ export function ScriptMode({
     } else {
       setActiveFile(null);
     }
-  }, [activeSceneId, fileNameToSceneId]);
+  }, [activeLabelId, fileNameToSceneId]);
 
   // Handle file selection (matches FileTree's onSelectFile signature)
   const handleFileSelect = (fileName: string) => {
     const sceneId = fileNameToSceneId.get(fileName);
     if (sceneId) {
-      setActiveSceneId(sceneId);
+      setActiveLabelId(sceneId);
     }
   };
 
@@ -113,32 +113,32 @@ export function ScriptMode({
   const handleGitLabFileSelect = (fileId: string) => {
     setActiveFileId(fileId);
     // Also clear the active scene since we're now in file mode
-    setActiveSceneId(null);
+    setActiveLabelId(null);
   };
 
   // Handle GitLab scene selection (label within a file)
   const handleGitLabSceneSelect = (sceneId: string) => {
-    setActiveSceneId(sceneId);
+    setActiveLabelId(sceneId);
   };
 
   // Character panel data
   const characters = useMemo(() => {
-    return activeScene?.characters ?? [];
-  }, [activeScene]);
+    return activeLabel?.characters ?? [];
+  }, [activeLabel]);
 
   // Loading state
-  if (isLoadingScenes || isLoadingFiles) {
+  if (isLoadingLabels || isLoadingFiles) {
     return (
       <div className="flex-1 flex flex-col pt-16">
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-muted-foreground">Loading scenes...</p>
+          <p className="text-muted-foreground">Loading labels...</p>
         </div>
       </div>
     );
   }
 
-  // No scenes state
-  if (!scenes.length && !gitLabFiles.length) {
+  // No labels state
+  if (!labels.length && !gitLabFiles.length) {
     const isLinked = projectId ? isProjectLinked(projectId) : false;
     const linkedRepo = projectId ? getLinkedRepository(projectId) : null;
 
@@ -146,10 +146,10 @@ export function ScriptMode({
       <div className="flex-1 flex flex-col pt-16">
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
           <p className="text-muted-foreground">
-            No scenes found in this project
+            No labels found in this project
           </p>
           <p className="text-sm text-muted-foreground">
-            Create scenes in Write Mode or import from GitLab
+            Create labels in Write Mode or import from GitLab
           </p>
           {isLinked && (
             <Button
@@ -196,7 +196,7 @@ export function ScriptMode({
               <GitLabFileTree
                 files={gitLabFiles}
                 activeFileId={activeFileId ?? undefined}
-                activeSceneId={activeSceneId ?? undefined}
+                activeSceneId={activeLabelId ?? undefined}
                 onFileSelect={handleGitLabFileSelect}
                 onSceneSelect={handleGitLabSceneSelect}
               />
@@ -240,8 +240,8 @@ export function ScriptMode({
                 content={activeFileLines}
                 language="Ren'Py"
               />
-            ) : activeScene ? (
-              <ScriptEditor content={activeSceneContent} language="Ren'Py" />
+            ) : activeLabel ? (
+              <ScriptEditor content={activeLabelContent} language="Ren'Py" />
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
                 {gitLabFiles.length > 0
@@ -300,18 +300,18 @@ export function ScriptMode({
                     className="w-2 h-2 rounded-full"
                     style={{ background: "var(--theme-color)" }}
                   />
-                  <span>Status: {activeScene?.status ?? "Unknown"}</span>
+                  <span>Status: {activeLabel?.status ?? "Unknown"}</span>
                 </div>
-                {activeScene?.routeKey && (
+                {activeLabel?.routeKey && (
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
-                    <span>Route: {activeScene.routeKey}</span>
+                    <span>Route: {activeLabel.routeKey}</span>
                   </div>
                 )}
-                {activeScene?.groupType && activeScene?.groupValue && (
+                {activeLabel?.groupType && activeLabel?.groupValue && (
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
-                    <span>{activeScene.groupType}: {activeScene.groupValue}</span>
+                    <span>{activeLabel.groupType}: {activeLabel.groupValue}</span>
                   </div>
                 )}
               </div>
@@ -325,8 +325,8 @@ export function ScriptMode({
         lineCount={
           activeGitLabFile
             ? activeFileLines.length
-            : activeScene
-              ? activeSceneContent.length || 0
+            : activeLabel
+              ? activeLabelContent.length || 0
               : 0
         }
         language="Ren'Py"

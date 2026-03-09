@@ -12,9 +12,9 @@ import {
   hasProjectAccess,
   requireProjectAccess,
   getProjectRole,
-  hasSceneAccess,
-  requireSceneAccess,
-  getSceneRole,
+  hasLabelAccess,
+  requireLabelAccess,
+  getLabelRole,
   hasProjectRole,
   requireProjectRole,
 } from "../authz.service.js";
@@ -108,25 +108,25 @@ describe("Authorization Service", () => {
     });
   });
 
-  describe("Scene Authorization Functions", () => {
-    describe("hasSceneAccess", () => {
-      it("should be a function that accepts sceneId and userId", () => {
-        expect(typeof hasSceneAccess).toBe("function");
-        expect(hasSceneAccess.length).toBe(2);
+  describe("Label Authorization Functions", () => {
+    describe("hasLabelAccess", () => {
+      it("should be a function that accepts labelId and userId", () => {
+        expect(typeof hasLabelAccess).toBe("function");
+        expect(hasLabelAccess.length).toBe(2);
       });
     });
 
-    describe("requireSceneAccess", () => {
-      it("should be a function that accepts sceneId and userId", () => {
-        expect(typeof requireSceneAccess).toBe("function");
-        expect(requireSceneAccess.length).toBe(2);
+    describe("requireLabelAccess", () => {
+      it("should be a function that accepts labelId and userId", () => {
+        expect(typeof requireLabelAccess).toBe("function");
+        expect(requireLabelAccess.length).toBe(2);
       });
     });
 
-    describe("getSceneRole", () => {
-      it("should be a function that accepts sceneId and userId", () => {
-        expect(typeof getSceneRole).toBe("function");
-        expect(getSceneRole.length).toBe(2);
+    describe("getLabelRole", () => {
+      it("should be a function that accepts labelId and userId", () => {
+        expect(typeof getLabelRole).toBe("function");
+        expect(getLabelRole.length).toBe(2);
       });
     });
   });

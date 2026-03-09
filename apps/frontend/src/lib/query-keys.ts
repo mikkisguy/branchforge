@@ -55,20 +55,20 @@ export const projectKeys = {
 } as const;
 
 // ============================================================================
-// Scene Keys
+// Label Keys
 // ============================================================================
 
-export const sceneKeys = {
-  all: ['scenes'] as const,
-  lists: (projectId: string) => ['scenes', projectId, 'list'] as const,
+export const labelKeys = {
+  all: ['labels'] as const,
+  lists: (projectId: string) => ['labels', projectId, 'list'] as const,
   listsWithFilters: (
     projectId: string,
     filters?: { routeKey?: string; status?: string },
-  ) => ['scenes', projectId, 'list', filters] as const,
-  detail: (projectId: string, sceneId: string) =>
-    ['scenes', projectId, 'detail', sceneId] as const,
-  activeSceneId: (projectId: string) =>
-    ['scenes', projectId, 'activeSceneId'] as const,
+  ) => ['labels', projectId, 'list', filters] as const,
+  detail: (projectId: string, labelId: string) =>
+    ['labels', projectId, 'detail', labelId] as const,
+  activeLabelId: (projectId: string) =>
+    ['labels', projectId, 'activeLabelId'] as const,
 } as const;
 
 // ============================================================================

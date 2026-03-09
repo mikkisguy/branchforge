@@ -7,14 +7,14 @@
 import { pgTable, uuid, text, timestamp, jsonb, index } from 'drizzle-orm/pg-core';
 import { projects } from './projects.js';
 import { users } from './users.js';
-import { sceneLines } from './scene-lines.js';
+import { labelLines } from './label-lines.js';
 
 export const demoSessions = pgTable('demo_sessions', {
   id: uuid('id').primaryKey().defaultRandom(),
   projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   startedAt: timestamp('started_at').defaultNow().notNull(),
-  currentSceneLineId: uuid('current_scene_line_id').references(() => sceneLines.id, { onDelete: 'set null' }),
+  currentLabelLineId: uuid('current_label_line_id').references(() => labelLines.id, { onDelete: 'set null' }),
   activeFlags: jsonb('active_flags').notNull().$type<string[]>().default([]),
   activeMeters: jsonb('active_meters').notNull().$type<Record<string, number>>().default({}),
   routeTaken: text('route_taken'),
@@ -22,7 +22,7 @@ export const demoSessions = pgTable('demo_sessions', {
 }, (table) => [
   index('demo_sessions_project_id_idx').on(table.projectId),
   index('demo_sessions_user_id_idx').on(table.userId),
-  index('demo_sessions_current_scene_line_id_idx').on(table.currentSceneLineId),
+  index('demo_sessions_current_label_line_id_idx').on(table.currentLabelLineId),
 ]);
 
 // Types

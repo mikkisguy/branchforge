@@ -61,9 +61,9 @@ export function validateBody<T extends z.ZodTypeAny>(
  *
  * @example
  * ```ts
- * fastify.get('/scenes', {
- *   preValidation: validateQuery(listScenesQuerySchema),
- * }, listScenesHandler);
+ * fastify.get('/labels', {
+ *   preValidation: validateQuery(listLabelsQuerySchema),
+ * }, listLabelsHandler);
  * ```
  */
 export function validateQuery<T extends z.ZodTypeAny>(
@@ -125,12 +125,12 @@ export function validateParams<T extends z.ZodTypeAny>(
  *
  * @example
  * ```ts
- * fastify.post('/scenes/:sceneId', {
+ * fastify.post('/labels/:labelId', {
  *   preValidation: validateRequest({
- *     params: sceneIdParamsSchema,
- *     body: updateSceneSchema,
+ *     params: labelIdParamsSchema,
+ *     body: updateLabelSchema,
  *   }),
- * }, updateSceneHandler);
+ * }, updateLabelHandler);
  * ```
  */
 export function validateRequest<
