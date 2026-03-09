@@ -7,13 +7,13 @@
 import { pgTable, uuid, text, timestamp, jsonb, index } from 'drizzle-orm/pg-core';
 import { suggestionTypeEnum, suggestionStatusEnum } from '../enums.js';
 import { projects } from './projects.js';
-import { scenes } from './scenes.js';
+import { labels } from './labels.js';
 import { characters } from './characters.js';
 
 export const aiSuggestions = pgTable('ai_suggestions', {
   id: uuid('id').primaryKey().defaultRandom(),
   projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
-  sceneId: uuid('scene_id').references(() => scenes.id, { onDelete: 'set null' }),
+  labelId: uuid('label_id').references(() => labels.id, { onDelete: 'set null' }),
   characterId: uuid('character_id').references(() => characters.id, { onDelete: 'set null' }),
   suggestionType: suggestionTypeEnum('suggestion_type').notNull(),
   promptContext: jsonb('prompt_context').notNull(), // Anonymized context
@@ -25,7 +25,7 @@ export const aiSuggestions = pgTable('ai_suggestions', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => [
   index('ai_suggestions_project_id_idx').on(table.projectId),
-  index('ai_suggestions_scene_id_idx').on(table.sceneId),
+  index('ai_suggestions_label_id_idx').on(table.labelId),
   index('ai_suggestions_character_id_idx').on(table.characterId),
 ]);
 

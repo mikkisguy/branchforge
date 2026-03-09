@@ -15,7 +15,7 @@ import { z } from "zod";
 import { ValidationError } from "../middleware/error-handler.middleware.js";
 import { isIP } from "node:net";
 import {
-  SceneStatus,
+  LabelStatus,
   UserRole,
   ROUTE_KEY_REGEX,
   JUMP_PREFIX_REGEX,
@@ -139,10 +139,10 @@ export const userRoleSchema = z.enum(Object.values(UserRole), {
 });
 
 /**
- * Scene status enum
+ * Label status enum
  */
-export const sceneStatusSchema = z.enum(
-  [SceneStatus.DRAFT, SceneStatus.REVIEW, SceneStatus.FINAL],
+export const labelStatusSchema = z.enum(
+  [LabelStatus.DRAFT, LabelStatus.REVIEW, LabelStatus.FINAL],
   {
     message: "Status must be DRAFT, REVIEW, or FINAL",
   },
@@ -221,12 +221,12 @@ export const characterRoleSchema = z.enum(
 );
 
 /**
- * Scene visibility enum
+ * Label visibility enum
  */
-export const sceneVisibilitySchema = z.enum(
+export const labelVisibilitySchema = z.enum(
   ["EXCLUSIVE", "SHARED", "DUO_PAIR"],
   {
-    message: "Scene visibility must be EXCLUSIVE, SHARED, or DUO_PAIR",
+    message: "Label visibility must be EXCLUSIVE, SHARED, or DUO_PAIR",
   },
 );
 
@@ -300,51 +300,51 @@ export const projectIdParamsSchema = z.object({
 });
 
 // ============================================================================
-// Scene Schemas
+// Label Schemas
 // ============================================================================
 
 /**
- * List scenes query validation
+ * List labels query validation
  */
-export const listScenesQuerySchema = z.object({
+export const listLabelsQuerySchema = z.object({
   projectId: uuidSchema,
   routeKey: routeConfigKeySchema.optional(),
-  status: sceneStatusSchema.optional(),
+  status: labelStatusSchema.optional(),
   groupType: z.string().optional(),
   groupValue: z.string().optional(),
 });
 
 /**
- * Scene ID params validation
+ * Label ID params validation
  */
-export const sceneIdParamsSchema = z.object({
-  sceneId: uuidSchema,
+export const labelIdParamsSchema = z.object({
+  labelId: uuidSchema,
 });
 
 /**
- * Create scene request validation
+ * Create label request validation
  */
-export const createSceneSchema = z
+export const createLabelSchema = z
   .object({
     projectId: uuidSchema,
     routeKey: routeConfigKeySchema.optional(),
     groupType: z.string().max(50).optional(),
     groupValue: z.string().max(50).optional(),
-    sceneNumber: z.number().int().min(1).max(999),
+    labelNumber: z.number().int().min(1).max(999),
     sequenceOrder: z.number().int().min(1).optional(),
-    status: sceneStatusSchema.optional(),
-    visibility: sceneVisibilitySchema.optional(),
+    status: labelStatusSchema.optional(),
+    visibility: labelVisibilitySchema.optional(),
     title: optionalString(200),
     summary: optionalString(5000),
   })
   .strict();
 
 /**
- * Update scene request validation
+ * Update label request validation
  */
-export const updateSceneSchema = z
+export const updateLabelSchema = z
   .object({
-    status: sceneStatusSchema.optional(),
+    status: labelStatusSchema.optional(),
     title: optionalString(200),
     summary: optionalString(5000),
   })
@@ -352,9 +352,9 @@ export const updateSceneSchema = z
   .partial();
 
 /**
- * Update scene dialogue request validation
+ * Update label dialogue request validation
  */
-export const updateSceneDialogueBodySchema = z
+export const updateLabelDialogueBodySchema = z
   .object({
     dialogue: z
       .array(
@@ -547,9 +547,9 @@ export const createGitLabIntegrationSchema = z
  */
 export const exportRequestSchema = z.object({
   projectId: uuidSchema,
-  sceneIds: z
+  labelIds: z
     .array(uuidSchema)
-    .min(1, "At least one scene is required")
+    .min(1, "At least one label is required")
     .max(500),
 });
 
@@ -558,9 +558,9 @@ export const exportRequestSchema = z.object({
  */
 export const importRequestSchema = z.object({
   projectId: uuidSchema,
-  sceneIds: z
+  labelIds: z
     .array(uuidSchema)
-    .min(1, "At least one scene is required")
+    .min(1, "At least one label is required")
     .max(500),
 });
 
@@ -585,12 +585,13 @@ export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
-export type ListScenesQuery = z.infer<typeof listScenesQuerySchema>;
-export type CreateSceneInput = z.infer<typeof createSceneSchema>;
-export type UpdateSceneInput = z.infer<typeof updateSceneSchema>;
-export type UpdateSceneDialogueInput = z.infer<
-  typeof updateSceneDialogueBodySchema
+export type ListLabelsQuery = z.infer<typeof listLabelsQuerySchema>;
+export type CreateLabelInput = z.infer<typeof createLabelSchema>;
+export type UpdateLabelInput = z.infer<typeof updateLabelSchema>;
+export type UpdateLabelDialogueInput = z.infer<
+  typeof updateLabelDialogueBodySchema
 >;
+
 export type CreateCharacterInput = z.infer<typeof createCharacterSchema>;
 export type CreateGitLabIntegrationInput = z.infer<
   typeof createGitLabIntegrationSchema

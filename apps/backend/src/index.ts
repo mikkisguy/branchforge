@@ -7,7 +7,7 @@ import { authRoutes } from "./routes/auth.routes.js";
 import { adminSettingsRoutes } from "./routes/admin-settings.routes.js";
 import { gitlabRoutes } from "./routes/gitlab.routes.js";
 import { projectsRoutes } from "./routes/projects.routes.js";
-import { scenesRoutes } from "./routes/scenes.routes.js";
+import { labelsRoutes } from "./routes/labels.routes.js";
 import { routeConfigsRoutes } from "./routes/route-configs.routes.js";
 import { createDrizzleSessionStore } from "./services/session-store.service.js";
 import { setupShutdownHandlers } from "./lib/shutdown.js";
@@ -61,7 +61,7 @@ await server.register(authRoutes, { prefix: basePath });
 await server.register(adminSettingsRoutes, { prefix: basePath });
 await server.register(gitlabRoutes, { prefix: basePath });
 await server.register(projectsRoutes, { prefix: basePath });
-await server.register(scenesRoutes, { prefix: basePath });
+await server.register(labelsRoutes, { prefix: basePath });
 await server.register(routeConfigsRoutes, { prefix: basePath });
 
 // Start server

@@ -18,8 +18,8 @@ import { createHash } from "crypto";
 import {
   gitlabFiles,
   gitlabFileSyncState,
-  scenes,
-  sceneLines,
+  labels,
+  labelLines,
 } from "../db/schema/index.js";
 import { eq, and, inArray, desc } from "drizzle-orm";
 import {
@@ -32,17 +32,17 @@ import {
 // Types
 // ============================================================================
 
-export interface SyncScenesResult {
+export interface SyncLabelsResult {
   success: boolean;
-  scenesCreated: number;
-  scenesUpdated: number;
-  scenesDeleted: number;
+  labelsCreated: number;
+  labelsUpdated: number;
+  labelsDeleted: number;
   linesProcessed: number;
   errors: Array<{ label: string; error: string }>;
   skipped: boolean; // True if sync was skipped due to idempotency
 }
 
-export interface SyncScenesOptions {
+export interface SyncLabelsOptions {
   skipCleanup?: boolean;
 }
 
@@ -90,12 +90,12 @@ export function validateRPYContent(
 }
 
 /**
- * Validate that file type is STORY (only STORY files should sync to scenes)
+ * Validate that file type is STORY (only STORY files should sync to labels)
  */
 export function validateFileType(fileType: string): void {
   if (fileType !== "STORY") {
     throw new Error(
-      `Invalid file type for scene sync: ${fileType}. Only STORY files can sync to scenes.`,
+      `Invalid file type for label sync: ${fileType}. Only STORY files can sync to labels.`,
     );
   }
 }
@@ -167,8 +167,8 @@ export async function createSyncState(
       gitlabFileId,
       contentHash,
       status: "in_progress",
-      labelCount,
-      sceneCount: 0,
+      rpyLabelCount: labelCount,
+      dbLabelCount: 0,
     })
     .returning();
 
@@ -181,7 +181,7 @@ export async function createSyncState(
 export async function completeSyncState(
   syncStateId: string,
   success: boolean,
-  sceneCount?: number,
+  dbLabelCount?: number,
   errorMessage?: string,
 ): Promise<void> {
   const db = getDb();
@@ -191,7 +191,7 @@ export async function completeSyncState(
     .set({
       status: success ? "completed" : "failed",
       completedAt: new Date(),
-      sceneCount,
+      dbLabelCount,
       errorMessage,
     })
     .where(eq(gitlabFileSyncState.id, syncStateId));
@@ -218,12 +218,12 @@ function mapEntryToDbType(entry: {
     return entry.type as "NARRATION" | "DIALOGUE" | "JUMP";
   }
   // Don't default to NARRATION - skip unrecognized types
-  // This prevents non-dialogue entries from becoming scene_lines
+  // This prevents non-dialogue entries from becoming label_lines
   throw new Error(`Unrecognized entry type: ${entry.type}`);
 }
 
 /**
- * Sync scenes from GitLab file content
+ * Sync labels from GitLab file content
  *
  * This is the main sync function that:
  * 1. Validates input
@@ -239,19 +239,19 @@ function mapEntryToDbType(entry: {
  * @param options - Sync options (skipCleanup)
  * @returns Sync result with statistics
  */
-export async function syncScenesFromGitLabFile(
+export async function syncLabelsFromGitLabFile(
   gitlabFileId: string,
   rpyContent: string,
-  options?: SyncScenesOptions,
-): Promise<SyncScenesResult> {
+  options?: SyncLabelsOptions,
+): Promise<SyncLabelsResult> {
   const db = getDb();
   const skipCleanup = options?.skipCleanup ?? false;
 
-  const result: SyncScenesResult = {
+  const result: SyncLabelsResult = {
     success: false,
-    scenesCreated: 0,
-    scenesUpdated: 0,
-    scenesDeleted: 0,
+    labelsCreated: 0,
+    labelsUpdated: 0,
+    labelsDeleted: 0,
     linesProcessed: 0,
     errors: [],
     skipped: false,
@@ -316,25 +316,25 @@ export async function syncScenesFromGitLabFile(
 
       // Step 9: Execute sync in atomic transaction
       const syncResult = await db.transaction(async (tx) => {
-        // Fetch existing scenes for this file
-        const existingScenes = await tx
+        // Fetch existing labels for this file
+        const existingLabels = await tx
           .select()
-          .from(scenes)
-          .where(eq(scenes.gitlabFileId, gitlabFileId));
+          .from(labels)
+          .where(eq(labels.gitlabFileId, gitlabFileId));
 
-        const existingScenesByLabel = new Map<
+        const existingLabelsByName = new Map<
           string,
-          (typeof existingScenes)[0]
+          (typeof existingLabels)[0]
         >();
-        for (const scene of existingScenes) {
-          if (scene.labelName) {
-            existingScenesByLabel.set(scene.labelName, scene);
+        for (const labelRow of existingLabels) {
+          if (labelRow.labelName) {
+            existingLabelsByName.set(labelRow.labelName, labelRow);
           }
         }
 
         // Track results
-        let scenesCreated = 0;
-        let scenesUpdated = 0;
+        let labelsCreated = 0;
+        let labelsUpdated = 0;
         let linesProcessed = 0;
         const errors: Array<{ label: string; error: string }> = [];
 
@@ -347,14 +347,14 @@ export async function syncScenesFromGitLabFile(
           );
 
           try {
-            const existingScene = existingScenesByLabel.get(label.label);
+            const existingLabel = existingLabelsByName.get(label.label);
 
-            if (existingScene) {
-              // Update existing scene
+            if (existingLabel) {
+              // Update existing label
               // Delete old lines
               await tx
-                .delete(sceneLines)
-                .where(eq(sceneLines.sceneId, existingScene.id));
+                .delete(labelLines)
+                .where(eq(labelLines.labelId, existingLabel.id));
 
               // Insert new lines in batch
               if (labelData.entries.length > 0) {
@@ -365,7 +365,7 @@ export async function syncScenesFromGitLabFile(
                     : entry.text || "";
 
                   return {
-                    sceneId: existingScene.id,
+                    labelId: existingLabel.id,
                     sequence: index + 1,
                     contentType,
                     content,
@@ -373,15 +373,15 @@ export async function syncScenesFromGitLabFile(
                   };
                 });
 
-                await tx.insert(sceneLines).values(lineValues);
+                await tx.insert(labelLines).values(lineValues);
                 linesProcessed += lineValues.length;
               }
 
-              scenesUpdated++;
+              labelsUpdated++;
             } else {
               // Create new scene
               const [newScene] = await tx
-                .insert(scenes)
+                .insert(labels)
                 .values({
                   projectId: file.projectId,
                   title: label.label,
@@ -390,7 +390,7 @@ export async function syncScenesFromGitLabFile(
                   labelPosition: i,
                   sequenceOrder: i,
                   route: null, // User will assign route later
-                  sceneNumber: i + 1,
+                  labelNumber: i + 1,
                   status: "DRAFT",
                   prerequisites: {},
                   effects: {},
@@ -406,7 +406,7 @@ export async function syncScenesFromGitLabFile(
                     : entry.text || "";
 
                   return {
-                    sceneId: newScene.id,
+                    labelId: newScene.id,
                     sequence: index + 1,
                     contentType,
                     content,
@@ -414,11 +414,11 @@ export async function syncScenesFromGitLabFile(
                   };
                 });
 
-                await tx.insert(sceneLines).values(lineValues);
+                await tx.insert(labelLines).values(lineValues);
                 linesProcessed += lineValues.length;
               }
 
-              scenesCreated++;
+              labelsCreated++;
             }
           } catch (error) {
             errors.push({
@@ -428,34 +428,34 @@ export async function syncScenesFromGitLabFile(
           }
         }
 
-        // Orphan cleanup (scenes whose labels no longer exist)
-        let scenesDeleted = 0;
+        // Orphan cleanup (labels that no longer exist in RPY content)
+        let labelsDeleted = 0;
         if (!skipCleanup) {
           const currentLabelNames = new Set(parsed.labels.map((l) => l.label));
 
-          const orphanedScenes = existingScenes.filter(
+          const orphanedLabels = existingLabels.filter(
             (s) => s.labelName && !currentLabelNames.has(s.labelName),
           );
 
-          if (orphanedScenes.length > 0) {
-            const orphanedIds = orphanedScenes.map((s) => s.id);
+          if (orphanedLabels.length > 0) {
+            const orphanedIds = orphanedLabels.map((s) => s.id);
 
-            // Delete scene lines for orphaned scenes
+            // Delete label lines for orphaned labels
             await tx
-              .delete(sceneLines)
-              .where(inArray(sceneLines.sceneId, orphanedIds));
+              .delete(labelLines)
+              .where(inArray(labelLines.labelId, orphanedIds));
 
-            // Delete orphaned scenes
-            await tx.delete(scenes).where(inArray(scenes.id, orphanedIds));
+            // Delete orphaned labels
+            await tx.delete(labels).where(inArray(labels.id, orphanedIds));
 
-            scenesDeleted = orphanedIds.length;
+            labelsDeleted = orphanedIds.length;
           }
         }
 
         return {
-          scenesCreated,
-          scenesUpdated,
-          scenesDeleted,
+          labelsCreated,
+          labelsUpdated,
+          labelsDeleted,
           linesProcessed,
           errors,
         };
@@ -478,7 +478,7 @@ export async function syncScenesFromGitLabFile(
         await completeSyncState(
           syncStateId,
           true,
-          syncResult.scenesCreated + syncResult.scenesUpdated,
+          syncResult.labelsCreated + syncResult.labelsUpdated,
         );
       } catch (metadataError) {
         // Metadata update failed but transaction already committed.
@@ -492,9 +492,9 @@ export async function syncScenesFromGitLabFile(
           contentHash,
           syncStateId,
           syncResultSummary: {
-            scenesCreated: syncResult.scenesCreated,
-            scenesUpdated: syncResult.scenesUpdated,
-            scenesDeleted: syncResult.scenesDeleted,
+            labelsCreated: syncResult.labelsCreated,
+            labelsUpdated: syncResult.labelsUpdated,
+            labelsDeleted: syncResult.labelsDeleted,
             linesProcessed: syncResult.linesProcessed,
             errorCount: syncResult.errors.length,
           },
@@ -509,9 +509,9 @@ export async function syncScenesFromGitLabFile(
       // Return success
       return {
         success: true,
-        scenesCreated: syncResult.scenesCreated,
-        scenesUpdated: syncResult.scenesUpdated,
-        scenesDeleted: syncResult.scenesDeleted,
+        labelsCreated: syncResult.labelsCreated,
+        labelsUpdated: syncResult.labelsUpdated,
+        labelsDeleted: syncResult.labelsDeleted,
         linesProcessed: syncResult.linesProcessed,
         errors: syncResult.errors,
         skipped: false,

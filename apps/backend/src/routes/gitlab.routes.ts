@@ -13,7 +13,7 @@ import {
   projects,
   gitlabSyncOperations,
   gitlabFiles,
-  scenes,
+  labels,
 } from "../db/schema/index.js";
 import { eq, inArray } from "drizzle-orm";
 import {
@@ -37,7 +37,7 @@ import {
   detectConflicts,
   type ConflictResolution,
 } from "../services/gitlab-sync.service.js";
-import { syncScenesFromGitLabFile } from "../services/gitlab-file-sync.service.js";
+import { syncLabelsFromGitLabFile } from "../services/gitlab-file-sync.service.js";
 
 /**
  * Helper to get the authenticated user ID from a request.
@@ -928,13 +928,13 @@ async function getGitLabFilesHandler(
       fileIds.length > 0
         ? await db
             .select({
-              id: scenes.id,
-              labelName: scenes.labelName,
-              title: scenes.title,
-              gitlabFileId: scenes.gitlabFileId,
+              id: labels.id,
+              labelName: labels.labelName,
+              title: labels.title,
+              gitlabFileId: labels.gitlabFileId,
             })
-            .from(scenes)
-            .where(inArray(scenes.gitlabFileId, fileIds))
+            .from(labels)
+            .where(inArray(labels.gitlabFileId, fileIds))
         : [];
 
     // Create a lookup keyed by gitlabFileId
@@ -1029,7 +1029,7 @@ async function updateGitLabFileHandler(
       })
       .where(eq(gitlabFiles.id, fileId));
 
-    const syncResult = await syncScenesFromGitLabFile(fileId, content);
+    const syncResult = await syncLabelsFromGitLabFile(fileId, content);
 
     if (!syncResult.success && syncResult.errors.length > 0) {
       // Check if it's a concurrent sync error
@@ -1058,9 +1058,9 @@ async function updateGitLabFileHandler(
       success: true,
       sync: {
         skipped: syncResult.skipped,
-        scenesCreated: syncResult.scenesCreated,
-        scenesUpdated: syncResult.scenesUpdated,
-        scenesDeleted: syncResult.scenesDeleted,
+        scenesCreated: syncResult.labelsCreated,
+        scenesUpdated: syncResult.labelsUpdated,
+        scenesDeleted: syncResult.labelsDeleted,
         linesProcessed: syncResult.linesProcessed,
         errors: syncResult.errors,
       },

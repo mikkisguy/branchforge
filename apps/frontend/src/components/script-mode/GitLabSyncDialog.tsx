@@ -14,7 +14,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { type ConflictResolution } from "@/lib/api/gitlab";
 import { useGitLabSync } from "@/hooks/useGitLabSync";
 import { useToast } from "@/contexts/ToastContext";
-import { useScenes } from "@/hooks/useScenes";
+import { useLabels } from "@/hooks/useLabels";
 
 // ============================================================================
 // Types
@@ -66,10 +66,10 @@ export function GitLabSyncDialog({
 }: GitLabSyncDialogProps) {
   const { state, exportToGitlab, importFromGitlab, reset } = useGitLabSync();
   const { success, error } = useToast();
-  const { invalidateScenes, scenes, isLoadingScenes } = useScenes();
+  const { invalidateLabels, labels, isLoadingLabels } = useLabels();
 
-  // Check if this is a first sync (no local scenes)
-  const isFirstSync = !isLoadingScenes && scenes.length === 0;
+  // Check if this is a first sync (no local labels)
+  const isFirstSync = !isLoadingLabels && labels.length === 0;
 
   // Form state
   const [branch, setBranch] = useState(defaultBranch);
@@ -122,7 +122,7 @@ export function GitLabSyncDialog({
       );
 
       // Refresh scene list after successful sync
-      await invalidateScenes();
+      await invalidateLabels();
 
       // Clear any existing timeout before scheduling a new one
       if (timeoutRef.current) {
@@ -147,7 +147,7 @@ export function GitLabSyncDialog({
     onOpenChange,
     success,
     error,
-    invalidateScenes,
+    invalidateLabels,
     isFirstSync,
   ]);
 
@@ -185,7 +185,7 @@ export function GitLabSyncDialog({
               </h2>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {operationType === "export"
-                  ? "Push your BranchForge scenes to GitLab"
+                  ? "Push your BranchForge labels to GitLab"
                   : "Pull changes from GitLab to BranchForge"}
               </p>
             </div>

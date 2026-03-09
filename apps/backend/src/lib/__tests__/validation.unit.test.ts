@@ -10,7 +10,7 @@ import {
   emailSchema,
   nonEmptyStringSchema,
   passwordSchema,
-  sceneStatusSchema,
+  labelStatusSchema,
   booleanStringSchema,
   intStringSchema,
   registerSchema,
@@ -18,10 +18,10 @@ import {
   createProjectSchema,
   updateProjectSchema,
   projectIdParamsSchema,
-  listScenesQuerySchema,
-  sceneIdParamsSchema,
-  createSceneSchema,
-  updateSceneSchema,
+  listLabelsQuerySchema,
+  labelIdParamsSchema,
+  createLabelSchema,
+  updateLabelSchema,
   createCharacterSchema,
   characterIdParamsSchema,
   gitlabUrlSchema,
@@ -145,18 +145,18 @@ describe("Common Schemas", () => {
 });
 
 describe("Enum Schemas", () => {
-  describe("sceneStatusSchema", () => {
-    it("should accept valid scene statuses", () => {
+  describe("labelStatusSchema", () => {
+    it("should accept valid label statuses", () => {
       const validStatuses = ["DRAFT", "REVIEW", "FINAL"];
 
       for (const status of validStatuses) {
-        const result = sceneStatusSchema.safeParse(status);
+        const result = labelStatusSchema.safeParse(status);
         expect(result.success).toBe(true);
       }
     });
 
-    it("should reject invalid scene statuses", () => {
-      const result = sceneStatusSchema.safeParse("INVALID");
+    it("should reject invalid label statuses", () => {
+      const result = labelStatusSchema.safeParse("INVALID");
       expect(result.success).toBe(false);
     });
   });
@@ -599,8 +599,8 @@ describe("Project Schemas", () => {
   });
 });
 
-describe("Scene Schemas", () => {
-  describe("listScenesQuerySchema", () => {
+describe("Label Schemas", () => {
+  describe("listLabelsQuerySchema", () => {
     it("should accept valid query parameters", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
@@ -608,7 +608,7 @@ describe("Scene Schemas", () => {
         status: "DRAFT",
       };
 
-      const result = listScenesQuerySchema.safeParse(validData);
+      const result = listLabelsQuerySchema.safeParse(validData);
       expect(result.success).toBe(true);
     });
 
@@ -617,76 +617,76 @@ describe("Scene Schemas", () => {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
       };
 
-      const result = listScenesQuerySchema.safeParse(partialData);
+      const result = listLabelsQuerySchema.safeParse(partialData);
       expect(result.success).toBe(true);
     });
   });
 
-  describe("sceneIdParamsSchema", () => {
-    it("should accept valid scene ID", () => {
+  describe("labelIdParamsSchema", () => {
+    it("should accept valid label ID", () => {
       const validData = {
-        sceneId: "550e8400-e29b-41d4-a716-446655440000",
+        labelId: "550e8400-e29b-41d4-a716-446655440000",
       };
 
-      const result = sceneIdParamsSchema.safeParse(validData);
+      const result = labelIdParamsSchema.safeParse(validData);
       expect(result.success).toBe(true);
     });
 
-    it("should reject invalid scene ID", () => {
+    it("should reject invalid label ID", () => {
       const invalidData = {
-        sceneId: "not-a-uuid",
+        labelId: "not-a-uuid",
       };
 
-      const result = sceneIdParamsSchema.safeParse(invalidData);
+      const result = labelIdParamsSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
   });
 });
 
-describe("Create Scene Schema", () => {
-  describe("createSceneSchema", () => {
-    it("should accept valid minimal scene payload", () => {
+describe("Create Label Schema", () => {
+  describe("createLabelSchema", () => {
+    it("should accept valid minimal label payload", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         routeKey: "eileen",
-        sceneNumber: 1,
+        labelNumber: 1,
       };
 
-      const result = createSceneSchema.safeParse(validData);
+      const result = createLabelSchema.safeParse(validData);
       expect(result.success).toBe(true);
     });
 
-    it("should accept valid full scene payload with grouping", () => {
+    it("should accept valid full label payload with grouping", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         routeKey: "lucas",
         groupType: "act",
         groupValue: "I",
-        sceneNumber: 42,
+        labelNumber: 42,
         status: "DRAFT",
         visibility: "EXCLUSIVE",
         title: "Scene Title",
         summary: "Scene summary text",
       };
 
-      const result = createSceneSchema.safeParse(validData);
+      const result = createLabelSchema.safeParse(validData);
       expect(result.success).toBe(true);
     });
 
-    it("should accept valid full scene payload with chapter grouping", () => {
+    it("should accept valid full label payload with chapter grouping", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         routeKey: "female",
         groupType: "chapter",
         groupValue: "5",
-        sceneNumber: 10,
+        labelNumber: 10,
         status: "REVIEW",
         visibility: "SHARED",
         title: "Chapter Scene",
         summary: "Summary here",
       };
 
-      const result = createSceneSchema.safeParse(validData);
+      const result = createLabelSchema.safeParse(validData);
       expect(result.success).toBe(true);
     });
 
@@ -694,31 +694,31 @@ describe("Create Scene Schema", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         routeKey: "common",
-        sceneNumber: 1,
+        labelNumber: 1,
         sequenceOrder: 100,
       };
 
-      const result = createSceneSchema.safeParse(validData);
+      const result = createLabelSchema.safeParse(validData);
       expect(result.success).toBe(true);
     });
 
     it("should reject missing required field: projectId", () => {
       const invalidData = {
         routeKey: "eileen",
-        sceneNumber: 1,
+        labelNumber: 1,
       };
 
-      const result = createSceneSchema.safeParse(invalidData);
+      const result = createLabelSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
 
-    it("should accept scene without routeKey (optional field)", () => {
+    it("should accept label without routeKey (optional field)", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        sceneNumber: 1,
+        labelNumber: 1,
       };
 
-      const result = createSceneSchema.safeParse(validData);
+      const result = createLabelSchema.safeParse(validData);
       expect(result.success).toBe(true);
     });
 
@@ -726,10 +726,10 @@ describe("Create Scene Schema", () => {
       const invalidData = {
         projectId: "not-a-uuid",
         routeKey: "eileen",
-        sceneNumber: 1,
+        labelNumber: 1,
       };
 
-      const result = createSceneSchema.safeParse(invalidData);
+      const result = createLabelSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
 
@@ -737,10 +737,10 @@ describe("Create Scene Schema", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         routeKey: "my_custom_route",
-        sceneNumber: 1,
+        labelNumber: 1,
       };
 
-      const result = createSceneSchema.safeParse(validData);
+      const result = createLabelSchema.safeParse(validData);
       expect(result.success).toBe(true);
     });
 
@@ -748,11 +748,11 @@ describe("Create Scene Schema", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         routeKey: "eileen",
-        sceneNumber: 1,
+        labelNumber: 1,
         status: "INVALID_STATUS",
       };
 
-      const result = createSceneSchema.safeParse(invalidData);
+      const result = createLabelSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
 
@@ -760,110 +760,92 @@ describe("Create Scene Schema", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         routeKey: "eileen",
-        sceneNumber: 1,
+        labelNumber: 1,
         visibility: "INVALID_VISIBILITY",
       };
 
-      const result = createSceneSchema.safeParse(invalidData);
+      const result = createLabelSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
 
-    it("should reject act value below minimum (1)", () => {
+    it("should reject labelNumber value below minimum (1)", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         routeKey: "eileen",
-        act: 0,
+        labelNumber: 0,
       };
 
-      const result = createSceneSchema.safeParse(invalidData);
+      const result = createLabelSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
 
-    it("should reject act value above maximum (99)", () => {
+    it("should reject labelNumber value above maximum (999)", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         routeKey: "eileen",
-        act: 100,
+        labelNumber: 1000,
       };
 
-      const result = createSceneSchema.safeParse(invalidData);
+      const result = createLabelSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
 
-    it("should reject non-integer act value", () => {
+    it("should reject non-integer labelNumber value", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         routeKey: "eileen",
-        act: 1.5,
+        labelNumber: 1.5,
       };
 
-      const result = createSceneSchema.safeParse(invalidData);
+      const result = createLabelSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
 
-    it("should reject scene value below minimum (1)", () => {
+    it("should reject unknown 'scene' property", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         routeKey: "eileen",
-        scene: 0,
+        labelNumber: 1,
+        scene: 0, // Unknown property - not part of createLabelSchema
       };
 
-      const result = createSceneSchema.safeParse(invalidData);
+      const result = createLabelSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
 
-    it("should reject scene value above maximum (999)", () => {
-      const invalidData = {
-        projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "eileen",
-        scene: 1000,
-      };
-
-      const result = createSceneSchema.safeParse(invalidData);
-      expect(result.success).toBe(false);
-    });
-
-    it("should reject chapter value below minimum (1)", () => {
+    it("should reject unknown 'chapter' property", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         routeKey: "female",
-        chapter: 0,
+        labelNumber: 1,
+        chapter: 5, // Unknown property - not part of createLabelSchema
       };
 
-      const result = createSceneSchema.safeParse(invalidData);
+      const result = createLabelSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
 
-    it("should reject chapter value above maximum (99)", () => {
-      const invalidData = {
-        projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "female",
-        chapter: 100,
-      };
-
-      const result = createSceneSchema.safeParse(invalidData);
-      expect(result.success).toBe(false);
-    });
-
-    it("should reject negative sequenceOrder value", () => {
+    it("should reject sequenceOrder value below minimum (1)", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         routeKey: "common",
-        sequenceOrder: -1,
+        labelNumber: 1,
+        sequenceOrder: 0,
       };
 
-      const result = createSceneSchema.safeParse(invalidData);
+      const result = createLabelSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
 
-    it("should reject non-integer scene value", () => {
+    it("should reject non-integer sequenceOrder value", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "eileen",
-        scene: 1.5,
+        routeKey: "common",
+        labelNumber: 1,
+        sequenceOrder: 1.5,
       };
 
-      const result = createSceneSchema.safeParse(invalidData);
+      const result = createLabelSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
   });

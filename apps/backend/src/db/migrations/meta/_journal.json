@@ -2,5 +2,26 @@
   "version": "7",
   "dialect": "postgresql",
   "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1773018247824,
+      "tag": "0000_mature_mad_thinker",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1773054783363,
+      "tag": "0001_lyrical_wraith",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1773056115050,
+      "tag": "0002_productive_energizer",
+      "breakpoints": true
+    }
   ]
 }

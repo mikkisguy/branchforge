@@ -1,19 +1,19 @@
 /**
- * Scenes Routes
+ * Labels Routes
  *
- * Routes for scene management operations including listing scenes for a project
- * and getting detailed scene information with lines and characters.
+ * Routes for label management operations including listing labels for a project
+ * and getting detailed label information with lines and characters.
  */
 
 import type { FastifyInstance } from "fastify";
 import type { FastifyRequest, FastifyReply } from "fastify";
 import {
-  listScenes,
-  getScene,
-  type PublicScene,
-  type SceneDetail,
-  type ListScenesFilters,
-} from "../services/scenes.service.js";
+  listLabels,
+  getLabel,
+  type PublicLabel,
+  type LabelDetail,
+  type ListLabelsFilters,
+} from "../services/labels.service.js";
 import { authenticate } from "../middleware/auth.middleware.js";
 import {
   validateQuery,
@@ -21,17 +21,17 @@ import {
   validateBody,
 } from "../middleware/validation.middleware.js";
 import {
-  listScenesQuerySchema,
-  sceneIdParamsSchema,
-  updateSceneDialogueBodySchema,
-  type ListScenesQuery,
-  type UpdateSceneDialogueInput,
+  listLabelsQuerySchema,
+  labelIdParamsSchema,
+  updateLabelDialogueBodySchema,
+  type ListLabelsQuery,
+  type UpdateLabelDialogueInput,
 } from "../lib/validation.js";
 import { getDb } from "../db/index.js";
 import {
   projects,
-  scenes,
-  sceneLines,
+  labels,
+  labelLines,
   gitlabFiles,
 } from "../db/schema/index.js";
 import { eq, asc, inArray } from "drizzle-orm";
@@ -41,25 +41,25 @@ import { reconstructRPYFile } from "../services/rpy-parser.service.js";
 // Types
 // ============================================================================
 
-interface ListScenesResponse {
-  scenes: PublicScene[];
+interface ListLabelsResponse {
+  labels: PublicLabel[];
 }
 
-interface GetSceneParams {
-  sceneId: string;
+interface GetLabelParams {
+  labelId: string;
 }
 
-interface GetSceneResponse {
-  scene: SceneDetail;
+interface GetLabelResponse {
+  label: LabelDetail;
 }
 
 interface ErrorResponse {
   error: string;
 }
 
-// UpdateSceneDialogueBody is now imported from validation.ts as UpdateSceneDialogueInput
+// UpdateLabelDialogueBody is now imported from validation.ts as UpdateLabelDialogueInput
 
-interface UpdateSceneDialogueResponse {
+interface UpdateLabelDialogueResponse {
   success: boolean;
 }
 
@@ -95,20 +95,20 @@ async function authorizeProjectAccess(
 // ============================================================================
 
 /**
- * List all scenes for a project
+ * List all labels for a project
  *
- * GET /scenes?projectId=xxx&route=xxx&status=xxx
+ * GET /labels?projectId=xxx&route=xxx&status=xxx
  * Requires authentication
  */
-async function listScenesHandler(
-  request: FastifyRequest<{ Querystring: ListScenesQuery }>,
+async function listLabelsHandler(
+  request: FastifyRequest<{ Querystring: ListLabelsQuery }>,
   reply: FastifyReply,
 ): Promise<void> {
   const user = request.user!;
   const { projectId, routeKey, status } = request.query;
 
   // Build filters
-  const filters: ListScenesFilters = {};
+  const filters: ListLabelsFilters = {};
   if (routeKey) {
     filters.routeKey = routeKey;
   }
@@ -117,8 +117,8 @@ async function listScenesHandler(
   }
 
   try {
-    const scenes = await listScenes(projectId, user.id, filters);
-    reply.status(200).send({ scenes } as ListScenesResponse);
+    const labels = await listLabels(projectId, user.id, filters);
+    reply.status(200).send({ labels } as ListLabelsResponse);
   } catch (error) {
     request.log.error(error);
     reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
@@ -126,27 +126,27 @@ async function listScenesHandler(
 }
 
 /**
- * Get a single scene by ID with full details
+ * Get a single label by ID with full details
  *
- * GET /scenes/:sceneId
+ * GET /labels/:labelId
  * Requires authentication
  */
-async function getSceneHandler(
-  request: FastifyRequest<{ Params: GetSceneParams }>,
+async function getLabelHandler(
+  request: FastifyRequest<{ Params: GetLabelParams }>,
   reply: FastifyReply,
 ): Promise<void> {
-  const { sceneId } = request.params;
+  const { labelId } = request.params;
   const user = request.user!;
 
   try {
-    const scene = await getScene(sceneId, user.id);
+    const label = await getLabel(labelId, user.id);
 
-    if (!scene) {
-      reply.status(404).send({ error: "Scene not found" } as ErrorResponse);
+    if (!label) {
+      reply.status(404).send({ error: "Label not found" } as ErrorResponse);
       return;
     }
 
-    reply.status(200).send({ scene } as GetSceneResponse);
+    reply.status(200).send({ label } as GetLabelResponse);
   } catch (error) {
     request.log.error(error);
     reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
@@ -154,43 +154,43 @@ async function getSceneHandler(
 }
 
 /**
- * Update scene dialogue
+ * Update label dialogue
  *
- * PUT /scenes/:sceneId/dialogue
+ * PUT /labels/:labelId/dialogue
  * Body: { dialogue: Array<{ speaker: string | null; text: string }> }
  *
- * Updates dialogue for a scene (Write Mode) and reconstructs the file.
+ * Updates dialogue for a label (Write Mode) and reconstructs the file.
  * This is used when Write Mode saves dialogue changes.
  */
-async function updateSceneDialogueHandler(
+async function updateLabelDialogueHandler(
   request: FastifyRequest<{
-    Params: GetSceneParams;
-    Body: UpdateSceneDialogueInput;
+    Params: GetLabelParams;
+    Body: UpdateLabelDialogueInput;
   }>,
   reply: FastifyReply,
 ): Promise<void> {
-  const { sceneId } = request.params;
+  const { labelId } = request.params;
   const { dialogue } = request.body;
   const user = request.user!;
 
   try {
     const db = getDb();
 
-    // Get scene with file info
-    const [scene] = await db
+    // Get label with file info
+    const [label] = await db
       .select({
-        id: scenes.id,
-        projectId: scenes.projectId,
-        gitlabFileId: scenes.gitlabFileId,
+        id: labels.id,
+        projectId: labels.projectId,
+        gitlabFileId: labels.gitlabFileId,
       })
-      .from(scenes)
-      .where(eq(scenes.id, sceneId))
+      .from(labels)
+      .where(eq(labels.id, labelId))
       .limit(1);
 
-    if (!scene || !scene.gitlabFileId) {
+    if (!label || !label.gitlabFileId) {
       reply
         .status(404)
-        .send({ error: "Scene or file not found" } as ErrorResponse);
+        .send({ error: "Label or file not found" } as ErrorResponse);
       return;
     }
 
@@ -198,7 +198,7 @@ async function updateSceneDialogueHandler(
     const [gitlabFile] = await db
       .select()
       .from(gitlabFiles)
-      .where(eq(gitlabFiles.id, scene.gitlabFileId))
+      .where(eq(gitlabFiles.id, label.gitlabFileId))
       .limit(1);
 
     if (!gitlabFile) {
@@ -207,16 +207,16 @@ async function updateSceneDialogueHandler(
     }
 
     // Verify user owns the project
-    if (!(await authorizeProjectAccess(scene.projectId, user.id, reply))) {
+    if (!(await authorizeProjectAccess(label.projectId, user.id, reply))) {
       return;
     }
 
-    // Update scene_lines with new dialogue
+    // Update label_lines with new dialogue
     await db.transaction(async (tx) => {
-      await tx.delete(sceneLines).where(eq(sceneLines.sceneId, sceneId));
+      await tx.delete(labelLines).where(eq(labelLines.labelId, labelId));
 
       const allValues = dialogue.map((entry, index) => ({
-        sceneId,
+        labelId,
         sequence: index + 1,
         contentType: (entry.speaker ? "DIALOGUE" : "NARRATION") as
           | "DIALOGUE"
@@ -227,20 +227,20 @@ async function updateSceneDialogueHandler(
       }));
 
       if (allValues.length > 0) {
-        await tx.insert(sceneLines).values(allValues);
+        await tx.insert(labelLines).values(allValues);
       }
     });
 
     // Reconstruct file content with updated dialogue
-    const allScenes = await db
+    const allLabels = await db
       .select({
-        id: scenes.id,
-        labelName: scenes.labelName,
-        title: scenes.title,
+        id: labels.id,
+        labelName: labels.labelName,
+        title: labels.title,
       })
-      .from(scenes)
-      .where(eq(scenes.gitlabFileId, gitlabFile.id))
-      .orderBy(asc(scenes.labelPosition));
+      .from(labels)
+      .where(eq(labels.gitlabFileId, gitlabFile.id))
+      .orderBy(asc(labels.labelPosition));
 
     // Build dialogue map for reconstruction
     const updatedDialogue = new Map<
@@ -248,43 +248,43 @@ async function updateSceneDialogueHandler(
       Array<{ speaker: string | null; text: string }>
     >();
 
-    // Batch fetch all scene lines for all scenes (avoiding N+1 query)
-    const allSceneLines = await db
+    // Batch fetch all label lines for all labels (avoiding N+1 query)
+    const allLabelLines = await db
       .select({
-        sceneId: sceneLines.sceneId,
-        demoNotes: sceneLines.demoNotes,
-        content: sceneLines.content,
-        sequence: sceneLines.sequence,
+        labelId: labelLines.labelId,
+        demoNotes: labelLines.demoNotes,
+        content: labelLines.content,
+        sequence: labelLines.sequence,
       })
-      .from(sceneLines)
-      .where(inArray(sceneLines.sceneId, allScenes.map((s) => s.id)))
-      .orderBy(asc(sceneLines.sequence));
+      .from(labelLines)
+      .where(inArray(labelLines.labelId, allLabels.map((l) => l.id)))
+      .orderBy(asc(labelLines.sequence));
 
-    // Group lines by sceneId in-memory
-    const linesBySceneId = new Map<
+    // Group lines by labelId in-memory
+    const linesByLabelId = new Map<
       string,
       Array<{ demoNotes: string | null; content: string }>
     >();
-    for (const line of allSceneLines) {
-      if (!linesBySceneId.has(line.sceneId)) {
-        linesBySceneId.set(line.sceneId, []);
+    for (const line of allLabelLines) {
+      if (!linesByLabelId.has(line.labelId)) {
+        linesByLabelId.set(line.labelId, []);
       }
-      linesBySceneId.get(line.sceneId)!.push({
+      linesByLabelId.get(line.labelId)!.push({
         demoNotes: line.demoNotes,
         content: line.content,
       });
     }
 
     // Build dialogue map from grouped lines
-    for (const s of allScenes) {
-      const labelName = s.labelName || s.title;
-      const sceneLinesData = linesBySceneId.get(s.id) || [];
+    for (const l of allLabels) {
+      const labelName = l.labelName || l.title;
+      const labelLinesData = linesByLabelId.get(l.id) || [];
 
-      const sceneDialogue = sceneLinesData.map((l) => ({
+      const labelDialogue = labelLinesData.map((l) => ({
         speaker: l.demoNotes || null,
         text: l.content,
       }));
-      updatedDialogue.set(labelName, sceneDialogue);
+      updatedDialogue.set(labelName, labelDialogue);
     }
 
     // Reconstruct file
@@ -302,7 +302,7 @@ async function updateSceneDialogueHandler(
       })
       .where(eq(gitlabFiles.id, gitlabFile.id));
 
-    reply.send({ success: true } as UpdateSceneDialogueResponse);
+    reply.send({ success: true } as UpdateLabelDialogueResponse);
   } catch (error) {
     request.log.error(error);
     reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
@@ -313,34 +313,33 @@ async function updateSceneDialogueHandler(
 // Routes Registration
 // ============================================================================
 
-export async function scenesRoutes(fastify: FastifyInstance): Promise<void> {
+export async function labelsRoutes(fastify: FastifyInstance): Promise<void> {
   // All routes require authentication
-  fastify.get<{ Querystring: ListScenesQuery }>(
-    "/scenes",
+  fastify.get<{ Querystring: ListLabelsQuery }>(
+    "/labels",
     {
       onRequest: authenticate,
-      preValidation: validateQuery(listScenesQuerySchema),
+      preValidation: validateQuery(listLabelsQuerySchema),
     },
-    listScenesHandler,
+    listLabelsHandler,
   );
-  fastify.get<{ Params: GetSceneParams }>(
-    "/scenes/:sceneId",
+  fastify.get<{ Params: GetLabelParams }>(
+    "/labels/:labelId",
     {
       onRequest: authenticate,
-      preValidation: validateParams(sceneIdParamsSchema),
+      preValidation: validateParams(labelIdParamsSchema),
     },
-    getSceneHandler,
+    getLabelHandler,
   );
-  fastify.put<{ Params: GetSceneParams; Body: UpdateSceneDialogueInput }>(
-    "/scenes/:sceneId/dialogue",
+  fastify.put<{ Params: GetLabelParams; Body: UpdateLabelDialogueInput }>(
+    "/labels/:labelId/dialogue",
     {
       onRequest: authenticate,
       preValidation: [
-        validateParams(sceneIdParamsSchema),
-        validateBody(updateSceneDialogueBodySchema),
+        validateParams(labelIdParamsSchema),
+        validateBody(updateLabelDialogueBodySchema),
       ],
     },
-    updateSceneDialogueHandler,
+    updateLabelDialogueHandler,
   );
 }
-

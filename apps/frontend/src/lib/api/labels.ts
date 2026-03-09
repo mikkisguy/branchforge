@@ -1,7 +1,7 @@
 /**
- * Scenes API Client
+ * Labels API Client
  *
- * Client for scene management operations.
+ * Client for label management operations.
  */
 
 import { request } from "./client";
@@ -12,49 +12,49 @@ import { request } from "./client";
 
 // Import types from shared package - these match backend response types
 import type {
-  PublicScene,
-  SceneDetail,
+  PublicLabel,
+  LabelDetail,
 } from "@branchforge/shared";
 
-export interface ListScenesParams {
+export interface ListLabelsParams {
   projectId: string;
   routeKey?: string;
   status?: string;
 }
 
-export interface ListScenesResponse {
-  scenes: PublicScene[];
+export interface ListLabelsResponse {
+  labels: PublicLabel[];
 }
 
-export interface GetSceneResponse {
-  scene: SceneDetail;
+export interface GetLabelResponse {
+  label: LabelDetail;
 }
 
 // ============================================================================
-// Scenes API
+// Labels API
 // ============================================================================
 
-export const scenesApi = {
+export const labelsApi = {
   /**
-   * List scenes for a project with optional filtering
+   * List labels for a project with optional filtering
    */
-  async listScenes(params: ListScenesParams): Promise<PublicScene[]> {
+  async listLabels(params: ListLabelsParams): Promise<PublicLabel[]> {
     const searchParams = new URLSearchParams();
     searchParams.set("projectId", params.projectId);
     if (params.routeKey) searchParams.set("routeKey", params.routeKey);
     if (params.status) searchParams.set("status", params.status);
 
-    const response = await request<ListScenesResponse>(
-      `/scenes?${searchParams.toString()}`,
+    const response = await request<ListLabelsResponse>(
+      `/labels?${searchParams.toString()}`,
     );
-    return response.scenes;
+    return response.labels;
   },
 
   /**
-   * Get a single scene by ID with full details (lines and characters)
+   * Get a single label by ID with full details (lines and characters)
    */
-  async getScene(sceneId: string): Promise<SceneDetail> {
-    const response = await request<GetSceneResponse>(`/scenes/${sceneId}`);
-    return response.scene;
+  async getLabel(labelId: string): Promise<LabelDetail> {
+    const response = await request<GetLabelResponse>(`/labels/${labelId}`);
+    return response.label;
   },
 };
