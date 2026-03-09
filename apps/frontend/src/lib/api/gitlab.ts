@@ -152,6 +152,11 @@ async function request<T>(
     );
   }
 
+  // Handle 204 No Content responses (empty body)
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return response.json();
 }
 
@@ -241,7 +246,7 @@ export const gitlabApi = {
     updatedAt: string;
   } | null> {
     try {
-      return request<{
+      const result = await request<{
         id: string;
         username?: string;
         gitlabUrl?: string;
@@ -250,6 +255,8 @@ export const gitlabApi = {
       }>("/gitlab/integration", {
         method: "GET",
       });
+      // request() returns undefined for 204 No Content
+      return result ?? null;
     } catch (error) {
       // If integration not found (404), return null
       if (error instanceof ApiError && error.status === 404) {
