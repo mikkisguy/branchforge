@@ -10,6 +10,9 @@ import type { FastifyRequest, FastifyReply } from "fastify";
 import {
   listLabels,
   getLabel,
+  createLabel,
+  updateLabel,
+  deleteLabel,
   type PublicLabel,
   type LabelDetail,
   type ListLabelsFilters,
@@ -21,11 +24,19 @@ import {
   validateBody,
 } from "../middleware/validation.middleware.js";
 import {
+  NotFoundError,
+  ForbiddenError,
+} from "../middleware/error-handler.middleware.js";
+import {
   listLabelsQuerySchema,
   labelIdParamsSchema,
   updateLabelDialogueBodySchema,
+  createLabelSchema,
+  updateLabelSchema,
   type ListLabelsQuery,
   type UpdateLabelDialogueInput,
+  type CreateLabelInput,
+  type UpdateLabelInput,
 } from "../lib/validation.js";
 import { getDb } from "../db/index.js";
 import {
@@ -34,8 +45,11 @@ import {
   labelLines,
   gitlabFiles,
 } from "../db/schema/index.js";
-import { eq, asc, inArray } from "drizzle-orm";
+import { eq, asc, inArray, isNull, and } from "drizzle-orm";
 import { reconstructRPYFile } from "../services/rpy-parser.service.js";
+import { calculateDialogueHash } from "../lib/hash.js";
+import { updateAuditFields } from "../lib/audit.js";
+import { calculateContentHash } from "../lib/hash.js";
 
 // ============================================================================
 // Types
@@ -161,6 +175,7 @@ async function getLabelHandler(
  *
  * Updates dialogue for a label (Write Mode) and reconstructs the file.
  * This is used when Write Mode saves dialogue changes.
+ * Sets updatedBy, increments version, calculates contentHash, and marks as modified_local.
  */
 async function updateLabelDialogueHandler(
   request: FastifyRequest<{
@@ -176,15 +191,17 @@ async function updateLabelDialogueHandler(
   try {
     const db = getDb();
 
-    // Get label with file info
+    // Get label with file info and current version
     const [label] = await db
       .select({
         id: labels.id,
         projectId: labels.projectId,
         gitlabFileId: labels.gitlabFileId,
+        version: labels.version,
+        labelPosition: labels.labelPosition,
       })
       .from(labels)
-      .where(eq(labels.id, labelId))
+      .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
       .limit(1);
 
     if (!label || !label.gitlabFileId) {
@@ -211,9 +228,18 @@ async function updateLabelDialogueHandler(
       return;
     }
 
+    // Calculate content hash for new dialogue
+    const contentHash = calculateDialogueHash(dialogue);
+
     // Update label_lines with new dialogue
     await db.transaction(async (tx) => {
-      await tx.delete(labelLines).where(eq(labelLines.labelId, labelId));
+      // Soft delete existing lines
+      await tx
+        .update(labelLines)
+        .set({ deletedAt: new Date() })
+        .where(
+          and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt)),
+        );
 
       const allValues = dialogue.map((entry, index) => ({
         labelId,
@@ -224,11 +250,28 @@ async function updateLabelDialogueHandler(
         content: entry.text,
         speakerId: null, // TODO: Lookup character by speaker tag to get UUID
         demoNotes: entry.speaker || null, // Store raw speaker tag for reconstruction
+        isDirty: true, // Mark as modified since last sync
+        gitlabFileId: label.gitlabFileId,
+        linePosition: (label.labelPosition ?? 0) + index,
+        contentHash: calculateContentHash(entry.text),
+        lastSyncedHash: null, // No synced hash for newly created/modified lines
       }));
 
       if (allValues.length > 0) {
         await tx.insert(labelLines).values(allValues);
       }
+
+      // Update label with audit fields and sync status
+      const currentVersion = label.version ?? 1;
+      const auditFields = updateAuditFields(currentVersion, user.id);
+      await tx
+        .update(labels)
+        .set({
+          ...auditFields,
+          contentHash,
+          syncStatus: "modified_local",
+        })
+        .where(eq(labels.id, labelId));
     });
 
     // Reconstruct file content with updated dialogue
@@ -239,7 +282,9 @@ async function updateLabelDialogueHandler(
         title: labels.title,
       })
       .from(labels)
-      .where(eq(labels.gitlabFileId, gitlabFile.id))
+      .where(
+        and(eq(labels.gitlabFileId, gitlabFile.id), isNull(labels.deletedAt)),
+      )
       .orderBy(asc(labels.labelPosition));
 
     // Build dialogue map for reconstruction
@@ -257,7 +302,15 @@ async function updateLabelDialogueHandler(
         sequence: labelLines.sequence,
       })
       .from(labelLines)
-      .where(inArray(labelLines.labelId, allLabels.map((l) => l.id)))
+      .where(
+        and(
+          inArray(
+            labelLines.labelId,
+            allLabels.map((l) => l.id),
+          ),
+          isNull(labelLines.deletedAt),
+        ),
+      )
       .orderBy(asc(labelLines.sequence));
 
     // Group lines by labelId in-memory
@@ -309,6 +362,109 @@ async function updateLabelDialogueHandler(
   }
 }
 
+/**
+ * Create a new label
+ *
+ * POST /labels
+ * Body: CreateLabelInput
+ * Requires authentication
+ */
+async function createLabelHandler(
+  request: FastifyRequest<{ Body: CreateLabelInput }>,
+  reply: FastifyReply,
+): Promise<void> {
+  const user = request.user!;
+
+  try {
+    const label = await createLabel(user.id, request.body);
+    reply.status(201).send({ label });
+  } catch (error) {
+    request.log.error(error);
+
+    // Handle known error types
+    if (error instanceof NotFoundError) {
+      reply.status(404).send({ error: "Project not found" } as ErrorResponse);
+      return;
+    }
+    if (error instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      return;
+    }
+
+    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+  }
+}
+
+/**
+ * Update label metadata
+ *
+ * PUT /labels/:labelId
+ * Body: UpdateLabelInput
+ * Requires authentication
+ */
+async function updateLabelHandler(
+  request: FastifyRequest<{
+    Params: GetLabelParams;
+    Body: UpdateLabelInput;
+  }>,
+  reply: FastifyReply,
+): Promise<void> {
+  const { labelId } = request.params;
+  const user = request.user!;
+
+  try {
+    const label = await updateLabel(labelId, user.id, request.body);
+    reply.status(200).send({ label });
+  } catch (error) {
+    request.log.error(error);
+
+    // Handle known error types
+    if (error instanceof NotFoundError) {
+      reply.status(404).send({ error: "Label not found" } as ErrorResponse);
+      return;
+    }
+    if (error instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      return;
+    }
+
+    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+  }
+}
+
+/**
+ * Soft delete a label
+ *
+ * DELETE /labels/:labelId
+ * Requires authentication
+ */
+async function deleteLabelHandler(
+  request: FastifyRequest<{ Params: GetLabelParams }>,
+  reply: FastifyReply,
+): Promise<void> {
+  const { labelId } = request.params;
+  const user = request.user!;
+
+  try {
+    await deleteLabel(labelId, user.id);
+    reply.status(204).send();
+  } catch (error) {
+    request.log.error(error);
+
+    // Handle known error types
+    if (error instanceof NotFoundError) {
+      reply.status(404).send({ error: "Label not found" } as ErrorResponse);
+      return;
+    }
+    if (error instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      return;
+    }
+
+    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+  }
+}
+
 // ============================================================================
 // Routes Registration
 // ============================================================================
@@ -331,6 +487,33 @@ export async function labelsRoutes(fastify: FastifyInstance): Promise<void> {
     },
     getLabelHandler,
   );
+  fastify.post<{ Body: CreateLabelInput }>(
+    "/labels",
+    {
+      onRequest: authenticate,
+      preValidation: validateBody(createLabelSchema),
+    },
+    createLabelHandler,
+  );
+  fastify.put<{ Params: GetLabelParams; Body: UpdateLabelInput }>(
+    "/labels/:labelId",
+    {
+      onRequest: authenticate,
+      preValidation: [
+        validateParams(labelIdParamsSchema),
+        validateBody(updateLabelSchema),
+      ],
+    },
+    updateLabelHandler,
+  );
+  fastify.delete<{ Params: GetLabelParams }>(
+    "/labels/:labelId",
+    {
+      onRequest: authenticate,
+      preValidation: validateParams(labelIdParamsSchema),
+    },
+    deleteLabelHandler,
+  );
   fastify.put<{ Params: GetLabelParams; Body: UpdateLabelDialogueInput }>(
     "/labels/:labelId/dialogue",
     {
@@ -343,3 +526,4 @@ export async function labelsRoutes(fastify: FastifyInstance): Promise<void> {
     updateLabelDialogueHandler,
   );
 }
+

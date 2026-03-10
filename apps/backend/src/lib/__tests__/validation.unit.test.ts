@@ -648,8 +648,9 @@ describe("Create Label Schema", () => {
     it("should accept valid minimal label payload", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "eileen",
+        route: "eileen",
         labelNumber: 1,
+        title: "Scene Title",
       };
 
       const result = createLabelSchema.safeParse(validData);
@@ -659,14 +660,13 @@ describe("Create Label Schema", () => {
     it("should accept valid full label payload with grouping", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "lucas",
+        route: "lucas",
         groupType: "act",
         groupValue: "I",
         labelNumber: 42,
         status: "DRAFT",
         visibility: "EXCLUSIVE",
         title: "Scene Title",
-        summary: "Scene summary text",
       };
 
       const result = createLabelSchema.safeParse(validData);
@@ -676,14 +676,13 @@ describe("Create Label Schema", () => {
     it("should accept valid full label payload with chapter grouping", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "female",
+        route: "female",
         groupType: "chapter",
         groupValue: "5",
         labelNumber: 10,
         status: "REVIEW",
         visibility: "SHARED",
         title: "Chapter Scene",
-        summary: "Summary here",
       };
 
       const result = createLabelSchema.safeParse(validData);
@@ -693,9 +692,10 @@ describe("Create Label Schema", () => {
     it("should accept valid sequenceOrder for linear sequencing", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "common",
+        route: "common",
         labelNumber: 1,
         sequenceOrder: 100,
+        title: "Scene Title",
       };
 
       const result = createLabelSchema.safeParse(validData);
@@ -704,18 +704,20 @@ describe("Create Label Schema", () => {
 
     it("should reject missing required field: projectId", () => {
       const invalidData = {
-        routeKey: "eileen",
+        route: "eileen",
         labelNumber: 1,
+        title: "Scene Title",
       };
 
       const result = createLabelSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
 
-    it("should accept label without routeKey (optional field)", () => {
+    it("should accept label without route (optional field)", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         labelNumber: 1,
+        title: "Scene Title",
       };
 
       const result = createLabelSchema.safeParse(validData);
@@ -725,19 +727,21 @@ describe("Create Label Schema", () => {
     it("should reject invalid UUID for projectId", () => {
       const invalidData = {
         projectId: "not-a-uuid",
-        routeKey: "eileen",
+        route: "eileen",
         labelNumber: 1,
+        title: "Scene Title",
       };
 
       const result = createLabelSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
 
-    it("should accept any string value for routeKey", () => {
+    it("should accept any string value for route", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "my_custom_route",
+        route: "my_custom_route",
         labelNumber: 1,
+        title: "Scene Title",
       };
 
       const result = createLabelSchema.safeParse(validData);

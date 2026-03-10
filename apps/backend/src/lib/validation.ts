@@ -241,9 +241,9 @@ export const syncOperationSchema = z.enum(["export", "import"], {
  * Sync status enum
  */
 export const syncStatusSchema = z.enum(
-  ["pending", "in_progress", "completed", "failed"],
+  ["synced", "modified_local", "conflict"],
   {
-    message: "Sync status must be pending, in_progress, completed, or failed",
+    message: "Sync status must be synced, modified_local, or conflict",
   },
 );
 
@@ -327,15 +327,14 @@ export const labelIdParamsSchema = z.object({
 export const createLabelSchema = z
   .object({
     projectId: uuidSchema,
-    routeKey: routeConfigKeySchema.optional(),
-    groupType: z.string().max(50).optional(),
-    groupValue: z.string().max(50).optional(),
+    route: routeConfigKeySchema.optional(),
+    groupType: optionalString(50),
+    groupValue: optionalString(50),
     labelNumber: z.number().int().min(1).max(999),
-    sequenceOrder: z.number().int().min(1).optional(),
+    sequenceOrder: z.number().int().min(0).optional(),
     status: labelStatusSchema.optional(),
     visibility: labelVisibilitySchema.optional(),
-    title: optionalString(200),
-    summary: optionalString(5000),
+    title: z.string().trim().min(1, "Title is required").max(255),
   })
   .strict();
 
@@ -344,9 +343,10 @@ export const createLabelSchema = z
  */
 export const updateLabelSchema = z
   .object({
+    route: routeConfigKeySchema.optional().nullable(),
     status: labelStatusSchema.optional(),
-    title: optionalString(200),
-    summary: optionalString(5000),
+    title: z.string().trim().min(1, "Title is required").max(255).optional(),
+    visibility: labelVisibilitySchema.optional(),
   })
   .strict()
   .partial();

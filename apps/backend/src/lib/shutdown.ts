@@ -14,10 +14,7 @@
 import type { FastifyInstance } from "fastify";
 import type { DrizzleSessionStore } from "../services/session-store.service.js";
 import { closeDb } from "../db/index.js";
-import {
-  cleanupRateLimiter as cleanupRateLimiterService,
-  getRateLimiterInterval,
-} from "../services/rate-limiter.service.js";
+import { cleanupRateLimiter as cleanupRateLimiterService } from "../services/rate-limiter.service.js";
 
 /**
  * Shutdown state tracking

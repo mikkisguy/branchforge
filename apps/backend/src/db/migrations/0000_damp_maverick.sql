@@ -9,7 +9,8 @@ CREATE TYPE "public"."character_role" AS ENUM('PRIMARY', 'SECONDARY', 'BACKGROUN
 CREATE TYPE "public"."renpy_definition_category" AS ENUM('CHARACTER', 'TRANSFORM', 'IMAGE', 'INIT');--> statement-breakpoint
 CREATE TYPE "public"."label_visibility" AS ENUM('EXCLUSIVE', 'SHARED', 'DUO_PAIR');--> statement-breakpoint
 CREATE TYPE "public"."sync_operation" AS ENUM('export', 'import');--> statement-breakpoint
-CREATE TYPE "public"."sync_status" AS ENUM('pending', 'in_progress', 'completed', 'failed');--> statement-breakpoint
+CREATE TYPE "public"."sync_status" AS ENUM('synced', 'modified_local', 'conflict');--> statement-breakpoint
+CREATE TYPE "public"."sync_operation_status" AS ENUM('pending', 'in_progress', 'completed', 'failed');--> statement-breakpoint
 CREATE TYPE "public"."gitlab_file_type" AS ENUM('STORY', 'SETTINGS');--> statement-breakpoint
 CREATE TABLE "users" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -38,7 +39,8 @@ CREATE TABLE "user_settings" (
 	"language" text DEFAULT 'en',
 	"theme" text DEFAULT 'light',
 	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "user_settings_user_id_unique" UNIQUE("user_id")
 );
 --> statement-breakpoint
 CREATE TABLE "admin_settings" (
@@ -66,7 +68,8 @@ CREATE TABLE "project_users" (
 	"project_id" uuid NOT NULL,
 	"user_id" uuid NOT NULL,
 	"role" "user_role" NOT NULL,
-	"added_at" timestamp DEFAULT now() NOT NULL
+	"added_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "project_users_project_id_user_id_pk" PRIMARY KEY("project_id","user_id")
 );
 --> statement-breakpoint
 CREATE TABLE "visual_systems" (
@@ -178,6 +181,17 @@ CREATE TABLE "labels" (
 	"gitlab_file_id" uuid,
 	"label_name" text,
 	"label_position" integer,
+	"content_hash" text,
+	"last_synced_hash" text,
+	"sync_status" "sync_status",
+	"last_exported_at" timestamp,
+	"last_imported_at" timestamp,
+	"export_commit_sha" text,
+	"import_commit_sha" text,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"version" integer DEFAULT 1,
+	"deleted_at" timestamp,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
@@ -196,6 +210,15 @@ CREATE TABLE "label_lines" (
 	"word_count" integer,
 	"demo_placeholder_color" text,
 	"demo_notes" text,
+	"gitlab_file_id" uuid,
+	"line_position" integer,
+	"content_hash" text,
+	"last_synced_hash" text,
+	"is_dirty" boolean DEFAULT false,
+	"last_synced_at" timestamp,
+	"rpy_line_number" integer,
+	"rpy_indent_level" integer,
+	"deleted_at" timestamp,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
@@ -205,7 +228,8 @@ CREATE TABLE "label_characters" (
 	"character_id" uuid NOT NULL,
 	"role" character_role DEFAULT 'PRIMARY' NOT NULL,
 	"emotion" text,
-	"notes" text
+	"notes" text,
+	CONSTRAINT "label_characters_label_id_character_id_pk" PRIMARY KEY("label_id","character_id")
 );
 --> statement-breakpoint
 CREATE TABLE "world_elements" (
@@ -249,8 +273,8 @@ CREATE TABLE "import_logs" (
 	"project_id" uuid NOT NULL,
 	"source" text NOT NULL,
 	"source_url" text,
-	"scenes_created" integer DEFAULT 0 NOT NULL,
-	"scenes_skipped" integer DEFAULT 0 NOT NULL,
+	"labels_created" integer DEFAULT 0 NOT NULL,
+	"labels_skipped" integer DEFAULT 0 NOT NULL,
 	"errors" jsonb,
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
@@ -308,7 +332,7 @@ CREATE TABLE "gitlab_sync_operations" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"project_id" uuid NOT NULL,
 	"operation" "sync_operation" NOT NULL,
-	"status" "sync_status" NOT NULL,
+	"status" "sync_operation_status" NOT NULL,
 	"branch" text,
 	"conflict_count" integer DEFAULT 0,
 	"error_message" text,
@@ -347,8 +371,11 @@ ALTER TABLE "flags" ADD CONSTRAINT "flags_project_id_projects_id_fk" FOREIGN KEY
 ALTER TABLE "labels" ADD CONSTRAINT "labels_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "labels" ADD CONSTRAINT "labels_duo_pair_id_pair_groups_id_fk" FOREIGN KEY ("duo_pair_id") REFERENCES "public"."pair_groups"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "labels" ADD CONSTRAINT "labels_gitlab_file_id_gitlab_files_id_fk" FOREIGN KEY ("gitlab_file_id") REFERENCES "public"."gitlab_files"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "labels" ADD CONSTRAINT "labels_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "labels" ADD CONSTRAINT "labels_updated_by_users_id_fk" FOREIGN KEY ("updated_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "label_lines" ADD CONSTRAINT "label_lines_label_id_labels_id_fk" FOREIGN KEY ("label_id") REFERENCES "public"."labels"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "label_lines" ADD CONSTRAINT "label_lines_speaker_id_characters_id_fk" FOREIGN KEY ("speaker_id") REFERENCES "public"."characters"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "label_lines" ADD CONSTRAINT "label_lines_gitlab_file_id_gitlab_files_id_fk" FOREIGN KEY ("gitlab_file_id") REFERENCES "public"."gitlab_files"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "label_characters" ADD CONSTRAINT "label_characters_label_id_labels_id_fk" FOREIGN KEY ("label_id") REFERENCES "public"."labels"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "label_characters" ADD CONSTRAINT "label_characters_character_id_characters_id_fk" FOREIGN KEY ("character_id") REFERENCES "public"."characters"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "world_elements" ADD CONSTRAINT "world_elements_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -368,11 +395,9 @@ ALTER TABLE "demo_sessions" ADD CONSTRAINT "demo_sessions_current_label_line_id_
 CREATE INDEX "users_email_idx" ON "users" USING btree ("email");--> statement-breakpoint
 CREATE INDEX "user_sessions_user_id_idx" ON "user_sessions" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "user_sessions_expires_at_idx" ON "user_sessions" USING btree ("expires_at");--> statement-breakpoint
-CREATE INDEX "user_settings_user_id_idx" ON "user_settings" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "user_settings_username_idx" ON "user_settings" USING btree ("username");--> statement-breakpoint
 CREATE INDEX "admin_settings_key_idx" ON "admin_settings" USING btree ("key");--> statement-breakpoint
 CREATE INDEX "projects_user_id_idx" ON "projects" USING btree ("user_id");--> statement-breakpoint
-CREATE INDEX "project_users_pk" ON "project_users" USING btree ("project_id","user_id");--> statement-breakpoint
 CREATE INDEX "visual_systems_project_id_idx" ON "visual_systems" USING btree ("project_id");--> statement-breakpoint
 CREATE INDEX "route_configs_project_id_idx" ON "route_configs" USING btree ("project_id");--> statement-breakpoint
 CREATE INDEX "renpy_definitions_project_id_idx" ON "renpy_definitions" USING btree ("project_id");--> statement-breakpoint
@@ -390,9 +415,16 @@ CREATE INDEX "labels_project_route_idx" ON "labels" USING btree ("project_id","r
 CREATE INDEX "labels_project_status_idx" ON "labels" USING btree ("project_id","status");--> statement-breakpoint
 CREATE INDEX "labels_project_sequence_idx" ON "labels" USING btree ("project_id","sequence_order");--> statement-breakpoint
 CREATE INDEX "labels_project_label_number_idx" ON "labels" USING btree ("project_id","label_number");--> statement-breakpoint
+CREATE INDEX "labels_sync_status_idx" ON "labels" USING btree ("sync_status");--> statement-breakpoint
+CREATE INDEX "labels_deleted_at_idx" ON "labels" USING btree ("deleted_at");--> statement-breakpoint
+CREATE INDEX "labels_created_by_idx" ON "labels" USING btree ("created_by");--> statement-breakpoint
+CREATE INDEX "labels_updated_by_idx" ON "labels" USING btree ("updated_by");--> statement-breakpoint
 CREATE INDEX "label_lines_speaker_id_idx" ON "label_lines" USING btree ("speaker_id");--> statement-breakpoint
 CREATE INDEX "label_lines_label_sequence_idx" ON "label_lines" USING btree ("label_id","sequence");--> statement-breakpoint
-CREATE INDEX "label_characters_pk" ON "label_characters" USING btree ("label_id","character_id");--> statement-breakpoint
+CREATE INDEX "label_lines_gitlab_file_id_idx" ON "label_lines" USING btree ("gitlab_file_id");--> statement-breakpoint
+CREATE INDEX "label_lines_gitlab_file_position_idx" ON "label_lines" USING btree ("gitlab_file_id","line_position");--> statement-breakpoint
+CREATE INDEX "label_lines_is_dirty_idx" ON "label_lines" USING btree ("is_dirty") WHERE "label_lines"."is_dirty" = true;--> statement-breakpoint
+CREATE INDEX "label_lines_deleted_at_idx" ON "label_lines" USING btree ("deleted_at") WHERE "label_lines"."deleted_at" IS NULL;--> statement-breakpoint
 CREATE INDEX "world_elements_project_id_idx" ON "world_elements" USING btree ("project_id");--> statement-breakpoint
 CREATE INDEX "ai_suggestions_project_id_idx" ON "ai_suggestions" USING btree ("project_id");--> statement-breakpoint
 CREATE INDEX "ai_suggestions_label_id_idx" ON "ai_suggestions" USING btree ("label_id");--> statement-breakpoint

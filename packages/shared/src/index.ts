@@ -61,6 +61,37 @@ export const LabelVisibility = {
   DUO_PAIR: "DUO_PAIR",
 } as const;
 
+/**
+ * Label sync status enumeration
+ * Tracks synchronization state between local and GitLab versions
+ *
+ * NOTE: Uses lowercase values to match database column storage (sync_status enum).
+ * Other enum-like types use UPPERCASE, but this must match the DB values exactly.
+ */
+export type LabelSyncStatus = "synced" | "modified_local" | "conflict";
+// NOTE: Keys are UPPERCASE for consistency with other enum objects,
+// but values are lowercase to match database storage.
+export const LabelSyncStatus = {
+  SYNCED: "synced",
+  MODIFIED_LOCAL: "modified_local",
+  CONFLICT: "conflict",
+} as const;
+
+/**
+ * Validates that a value is a valid LabelSyncStatus.
+ * @param value - The value to validate
+ * @returns true if the value is a valid LabelSyncStatus
+ */
+export function isValidLabelSyncStatus(
+  value: string,
+): value is LabelSyncStatus {
+  return (
+    value === "synced" ||
+    value === "modified_local" ||
+    value === "conflict"
+  );
+}
+
 // ============================================================================
 // Route Configuration
 // ============================================================================

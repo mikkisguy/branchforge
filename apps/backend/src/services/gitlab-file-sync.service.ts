@@ -14,19 +14,19 @@
  */
 
 import { getDb } from "../db/index.js";
-import { createHash } from "crypto";
 import {
   gitlabFiles,
   gitlabFileSyncState,
   labels,
   labelLines,
 } from "../db/schema/index.js";
-import { eq, and, inArray, desc } from "drizzle-orm";
+import { eq, and, inArray, desc, isNull } from "drizzle-orm";
 import {
   parseRPYFileWithLabels,
   convertToBranchForgeFormatFromLabels,
   type ParsedRPYFileWithLabels,
 } from "./rpy-parser.service.js";
+import { calculateContentHash, calculateLinesHash } from "../lib/hash.js";
 
 // ============================================================================
 // Types
@@ -49,13 +49,6 @@ export interface SyncLabelsOptions {
 // ============================================================================
 // Validation Functions
 // ============================================================================
-
-/**
- * Calculate SHA-256 hash of content for idempotency
- */
-export function calculateContentHash(content: string): string {
-  return createHash("sha256").update(content, "utf8").digest("hex");
-}
 
 /**
  * Validate RPY content before sync
@@ -106,6 +99,7 @@ export function validateFileType(fileType: string): void {
 
 /**
  * Check if there's an in-progress sync for this file
+ * Uses completedAt = null with status 'modified_local' to indicate in-progress
  */
 export async function checkInProgressSync(
   gitlabFileId: string,
@@ -118,7 +112,8 @@ export async function checkInProgressSync(
     .where(
       and(
         eq(gitlabFileSyncState.gitlabFileId, gitlabFileId),
-        eq(gitlabFileSyncState.status, "in_progress"),
+        eq(gitlabFileSyncState.status, "modified_local"),
+        isNull(gitlabFileSyncState.completedAt),
       ),
     )
     .limit(1);
@@ -135,20 +130,20 @@ export async function checkContentAlreadySynced(
 ): Promise<boolean> {
   const db = getDb();
 
-  const [lastCompleted] = await db
+  const [lastSynced] = await db
     .select()
     .from(gitlabFileSyncState)
     .where(
       and(
         eq(gitlabFileSyncState.gitlabFileId, gitlabFileId),
-        eq(gitlabFileSyncState.status, "completed"),
+        eq(gitlabFileSyncState.status, "synced"),
         eq(gitlabFileSyncState.contentHash, contentHash),
       ),
     )
     .orderBy(desc(gitlabFileSyncState.completedAt))
     .limit(1);
 
-  return !!lastCompleted;
+  return !!lastSynced;
 }
 
 /**
@@ -166,7 +161,7 @@ export async function createSyncState(
     .values({
       gitlabFileId,
       contentHash,
-      status: "in_progress",
+      status: "modified_local",
       rpyLabelCount: labelCount,
       dbLabelCount: 0,
     })
@@ -189,7 +184,7 @@ export async function completeSyncState(
   await db
     .update(gitlabFileSyncState)
     .set({
-      status: success ? "completed" : "failed",
+      status: success ? "synced" : "conflict",
       completedAt: new Date(),
       dbLabelCount,
       errorMessage,
@@ -344,6 +339,7 @@ export async function syncLabelsFromGitLabFile(
           const labelData = convertToBranchForgeFormatFromLabels(
             parsed,
             label.label,
+            rpyContent,
           );
 
           try {
@@ -356,6 +352,9 @@ export async function syncLabelsFromGitLabFile(
                 .delete(labelLines)
                 .where(eq(labelLines.labelId, existingLabel.id));
 
+              // Calculate label lines hash
+              const labelLinesHash = calculateLinesHash(labelData.entries);
+
               // Insert new lines in batch
               if (labelData.entries.length > 0) {
                 const lineValues = labelData.entries.map((entry, index) => {
@@ -363,6 +362,7 @@ export async function syncLabelsFromGitLabFile(
                   const content = entry.target
                     ? `jump ${entry.target}`
                     : entry.text || "";
+                  const lineHash = calculateContentHash(content);
 
                   return {
                     labelId: existingLabel.id,
@@ -370,6 +370,13 @@ export async function syncLabelsFromGitLabFile(
                     contentType,
                     content,
                     visualType: "GENERATED" as const,
+                    gitlabFileId: gitlabFileId,
+                    linePosition: index,
+                    contentHash: lineHash,
+                    lastSyncedHash: lineHash,
+                    lastSyncedAt: new Date(),
+                    rpyLineNumber: entry.lineNumber,
+                    rpyIndentLevel: entry.indentLevel ?? 0,
                   };
                 });
 
@@ -377,9 +384,22 @@ export async function syncLabelsFromGitLabFile(
                 linesProcessed += lineValues.length;
               }
 
+              // Update label sync metadata
+              await tx
+                .update(labels)
+                .set({
+                  contentHash: labelLinesHash,
+                  lastSyncedHash: labelLinesHash,
+                  syncStatus: "synced",
+                  updatedAt: new Date(),
+                })
+                .where(eq(labels.id, existingLabel.id));
+
               labelsUpdated++;
             } else {
               // Create new scene
+              const labelLinesHash = calculateLinesHash(labelData.entries);
+
               const [newScene] = await tx
                 .insert(labels)
                 .values({
@@ -394,6 +414,10 @@ export async function syncLabelsFromGitLabFile(
                   status: "DRAFT",
                   prerequisites: {},
                   effects: {},
+                  // Sync fields
+                  contentHash: labelLinesHash,
+                  lastSyncedHash: labelLinesHash,
+                  syncStatus: "synced",
                 })
                 .returning();
 
@@ -404,6 +428,7 @@ export async function syncLabelsFromGitLabFile(
                   const content = entry.target
                     ? `jump ${entry.target}`
                     : entry.text || "";
+                  const lineHash = calculateContentHash(content);
 
                   return {
                     labelId: newScene.id,
@@ -411,6 +436,13 @@ export async function syncLabelsFromGitLabFile(
                     contentType,
                     content,
                     visualType: "GENERATED" as const,
+                    gitlabFileId: gitlabFileId,
+                    linePosition: index,
+                    contentHash: lineHash,
+                    lastSyncedHash: lineHash,
+                    lastSyncedAt: new Date(),
+                    rpyLineNumber: entry.lineNumber,
+                    rpyIndentLevel: entry.indentLevel ?? 0,
                   };
                 });
 
@@ -433,20 +465,35 @@ export async function syncLabelsFromGitLabFile(
         if (!skipCleanup) {
           const currentLabelNames = new Set(parsed.labels.map((l) => l.label));
 
+          // Find orphaned labels (excluding already soft-deleted)
           const orphanedLabels = existingLabels.filter(
-            (s) => s.labelName && !currentLabelNames.has(s.labelName),
+            (s) =>
+              s.labelName &&
+              !currentLabelNames.has(s.labelName) &&
+              !s.deletedAt,
           );
 
           if (orphanedLabels.length > 0) {
             const orphanedIds = orphanedLabels.map((s) => s.id);
 
-            // Delete label lines for orphaned labels
+            // Soft delete label lines for orphaned labels
             await tx
-              .delete(labelLines)
-              .where(inArray(labelLines.labelId, orphanedIds));
+              .update(labelLines)
+              .set({ deletedAt: new Date() })
+              .where(
+                and(
+                  inArray(labelLines.labelId, orphanedIds),
+                  isNull(labelLines.deletedAt),
+                ),
+              );
 
-            // Delete orphaned labels
-            await tx.delete(labels).where(inArray(labels.id, orphanedIds));
+            // Soft delete orphaned labels
+            await tx
+              .update(labels)
+              .set({ deletedAt: new Date() })
+              .where(
+                and(inArray(labels.id, orphanedIds), isNull(labels.deletedAt)),
+              );
 
             labelsDeleted = orphanedIds.length;
           }

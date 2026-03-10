@@ -24,10 +24,15 @@ import {
   jsonb,
   index,
 } from "drizzle-orm/pg-core";
-import { labelStatusEnum, labelVisibilityEnum } from "../enums.js";
+import {
+  labelStatusEnum,
+  labelVisibilityEnum,
+  syncStatusEnum,
+} from "../enums.js";
 import { projects } from "./projects.js";
 import { pairGroups } from "./pair-groups.js";
 import { gitlabFiles } from "./gitlab-integrations.js";
+import { users } from "./users.js";
 
 export const labels = pgTable(
   "labels",
@@ -50,21 +55,44 @@ export const labels = pgTable(
     prerequisites: jsonb("prerequisites")
       .notNull()
       .$type<{ flags?: string[]; meters?: Record<string, number> }>(), // {flags: [], meters: {}}
-    effects: jsonb("effects")
-      .notNull()
-      .$type<{
-        flagsSet?: string[];
-        flagsUnset?: string[];
-        meters?: Record<string, number>;
-      }>(), // {flagsSet: [], flagsUnset: [], meters: {}}
+    effects: jsonb("effects").notNull().$type<{
+      flagsSet?: string[];
+      flagsUnset?: string[];
+      meters?: Record<string, number>;
+    }>(), // {flagsSet: [], flagsUnset: [], meters: {}}
     crossRouteContext: text("cross_route_context"), // Prequel: "Lucas_Friend_Mode"
     readerNotes: text("reader_notes"), // Beta feedback
+
     // GitLab integration fields
     gitlabFileId: uuid("gitlab_file_id").references(() => gitlabFiles.id, {
       onDelete: "set null",
     }),
     labelName: text("label_name"), // The actual label name in the RPY file
     labelPosition: integer("label_position"), // Position of this label within the file
+
+    // Version tracking
+    contentHash: text("content_hash"), // Hash of all lines' content
+    lastSyncedHash: text("last_synced_hash"),
+    syncStatus: syncStatusEnum("sync_status"), // 'synced', 'modified_local', 'conflict'
+
+    // Sync metadata
+    lastExportedAt: timestamp("last_exported_at"),
+    lastImportedAt: timestamp("last_imported_at"),
+    exportCommitSha: text("export_commit_sha"),
+    importCommitSha: text("import_commit_sha"),
+
+    // Audit trail
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    updatedBy: uuid("updated_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    version: integer("version").default(1),
+
+    // Soft delete
+    deletedAt: timestamp("deleted_at"),
+
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -86,6 +114,12 @@ export const labels = pgTable(
       table.projectId,
       table.labelNumber,
     ),
+    // Sync status indexes
+    index("labels_sync_status_idx").on(table.syncStatus),
+    index("labels_deleted_at_idx").on(table.deletedAt),
+    // Audit trail indexes
+    index("labels_created_by_idx").on(table.createdBy),
+    index("labels_updated_by_idx").on(table.updatedBy),
   ],
 );
 

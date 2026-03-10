@@ -81,8 +81,17 @@ export const labelVisibilityEnum = pgEnum("label_visibility", [
 // GitLab sync operation types
 export const syncOperationEnum = pgEnum("sync_operation", ["export", "import"]);
 
-// GitLab sync status types
+// GitLab sync status types (for labels and file sync state)
+// Tracks the sync state of data: synced with remote, modified locally, or in conflict
 export const syncStatusEnum = pgEnum("sync_status", [
+  "synced",
+  "modified_local",
+  "conflict",
+]);
+
+// GitLab sync operation status (for sync operations tracking)
+// Tracks the progress of a sync operation: pending, in progress, completed, or failed
+export const syncOperationStatusEnum = pgEnum("sync_operation_status", [
   "pending",
   "in_progress",
   "completed",

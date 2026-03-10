@@ -62,6 +62,8 @@ export interface BranchForgeScene {
     speaker?: string;
     text?: string;
     target?: string;
+    lineNumber?: number; // RPY line number for accurate export
+    indentLevel?: number; // Indent level for proper formatting
   }>;
   characters?: Array<{ tag: string; name: string }>;
 }
@@ -1073,11 +1075,13 @@ export function parseRPYFile(content: string): RPYParsedData {
  *
  * @param parsed - The parsed RPY file with label boundaries
  * @param labelName - The label name to convert
+ * @param originalContent - Optional original RPY content to extract line numbers and indent levels
  * @returns BranchForge scene with only this label's dialogue
  */
 export function convertToBranchForgeFormatFromLabels(
   parsed: ParsedRPYFileWithLabels,
   labelName: string,
+  originalContent?: string,
 ): BranchForgeScene {
   const labelData = parsed.labels.find((l) => l.label === labelName);
 
@@ -1091,6 +1095,22 @@ export function convertToBranchForgeFormatFromLabels(
 
   const entries: BranchForgeScene["entries"] = [];
 
+  // Pre-split original content into lines array once for efficient lookups
+  const originalLines = originalContent ? originalContent.split("\n") : [];
+
+  // Helper function to get indent level from original content
+  const getIndentLevel = (lineNumber: number): number => {
+    if (originalLines.length === 0) return 0;
+    if (lineNumber < 1 || lineNumber > originalLines.length) return 0;
+    const line = originalLines[lineNumber - 1];
+    // Count leading spaces/tabs (convert tabs to 4 spaces for consistency)
+    const match = line.match(/^(\s*)/);
+    if (!match) return 0;
+    const indent = match[1].replace(/\t/g, "    ").length;
+    // Return indent level in increments of 4 spaces (common RPY convention)
+    return Math.floor(indent / 4);
+  };
+
   // Add dialogue entries for THIS label only
   for (const d of labelData.dialogue) {
     // Skip empty dialogue text
@@ -1101,6 +1121,8 @@ export function convertToBranchForgeFormatFromLabels(
       type: d.speaker ? "DIALOGUE" : "NARRATION",
       speaker: d.speaker || undefined,
       text: d.text,
+      lineNumber: d.lineNumber,
+      indentLevel: getIndentLevel(d.lineNumber),
     });
   }
 
@@ -1110,6 +1132,18 @@ export function convertToBranchForgeFormatFromLabels(
       type: "FLAG",
       text: c.label,
       target: c.target || undefined,
+      lineNumber: c.lineNumber,
+      indentLevel: getIndentLevel(c.lineNumber),
+    });
+  }
+
+  // Add jump entries for THIS label only
+  for (const j of labelData.jumps) {
+    entries.push({
+      type: "JUMP",
+      target: j.to,
+      lineNumber: j.lineNumber,
+      indentLevel: getIndentLevel(j.lineNumber),
     });
   }
 
@@ -1134,6 +1168,82 @@ export function convertToBranchForgeFormatFromLabels(
     entries,
     characters: characters.length > 0 ? characters : undefined,
   };
+}
+
+/**
+ * Remove a label from RPY file content
+ * Returns the updated RPY content with the specified label removed.
+ * Preserves all other labels and non-label content (character definitions, etc.).
+ *
+ * @param content - The original RPY file content
+ * @param labelToRemove - The label name to remove
+ * @returns RPY content with the label removed
+ */
+export function removeLabelFromRPYContent(
+  content: string,
+  labelToRemove: string,
+): string {
+  const lines = content.split("\n");
+  const result: string[] = [];
+  let skipMode = false;
+  let skipIndent = -1;
+  let labelCount = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Check for label definition
+    const labelMatch = line.match(/^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+    if (labelMatch) {
+      const currentLabel = labelMatch[1];
+
+      if (currentLabel === labelToRemove) {
+        // Start skipping this label
+        skipMode = true;
+        skipIndent = line.search(/\S/);
+        labelCount++;
+        continue;
+      } else {
+        // Different label - stop skipping if we were
+        skipMode = false;
+        result.push(line);
+        continue;
+      }
+    }
+
+    // If we're in skip mode, skip lines that are indented more than the label
+    if (skipMode) {
+      // Compute lineIndent first before checking for empty lines
+      // This ensures we properly detect when we've exited the label block
+      const lineIndent = trimmed.length === 0 ? skipIndent + 1 : line.search(/\S/);
+
+      if (lineIndent > skipIndent) {
+        // This line belongs to the label we're removing (or is empty line within the block)
+        continue;
+      } else {
+        // We've exited the label block
+        skipMode = false;
+      }
+    }
+
+    // Keep all other lines
+    result.push(line);
+  }
+
+  // If we removed the last/only label, add a minimal return statement at the end
+  // to keep the RPY file syntactically valid
+  if (labelCount > 0) {
+    const finalContent = result.join("\n");
+    // Check if there are any labels left
+    const hasLabels = /^\s*label\s+/m.test(finalContent);
+    if (!hasLabels) {
+      // No labels left, return a minimal valid RPY file
+      return finalContent.trim() + "\n";
+    }
+  }
+
+  return result.join("\n");
 }
 
 /**

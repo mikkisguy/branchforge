@@ -770,6 +770,72 @@ describe("GitLabSyncService (Integration)", () => {
         .delete(gitlabFiles)
         .where(eq(gitlabFiles.id, testGitlabFile2.id));
     });
+
+    it("should advance lastSyncedHash baseline after successful export", async () => {
+      // Create a label with initial lastSyncedHash different from contentHash
+      const initialContentHash = "initial-content-hash";
+      const initialLastSyncedHash = "old-baseline-hash";
+      const lineContentHash = "line-content-hash";
+      const lineLastSyncedHash = "old-line-baseline-hash";
+
+      await db.insert(labelsTable).values({
+        ...testScene,
+        contentHash: initialContentHash,
+        lastSyncedHash: initialLastSyncedHash,
+        syncStatus: "modified_local",
+      });
+
+      // Create label lines with different hashes
+      await db.insert(labelLines).values({
+        id: testUuid("46000000", 1),
+        labelId: testScene.id,
+        sequence: 1,
+        contentType: "NARRATION" as const,
+        content: "Test content",
+        contentHash: lineContentHash,
+        lastSyncedHash: lineLastSyncedHash,
+        lastSyncedAt: new Date("2024-01-01"),
+        isDirty: true,
+        visualType: "GENERATED" as const,
+      });
+
+      // Mock the GitLab service
+      vi.spyOn(gitlabService, "createOrUpdateFile").mockResolvedValue({
+        file_path: testGitlabFile.filePath,
+        branch: testBranch,
+      } as any);
+
+      // Perform export
+      const result = await exportToGitlab(
+        testProjectId,
+        testBranch,
+        "Test export",
+      );
+
+      expect(result.status).toBe("completed");
+
+      // Verify label's lastSyncedHash was advanced to contentHash
+      const [updatedLabel] = await db
+        .select()
+        .from(labelsTable)
+        .where(eq(labelsTable.id, testScene.id));
+      expect(updatedLabel).toBeDefined();
+      expect(updatedLabel?.lastSyncedHash).toBe(initialContentHash);
+      expect(updatedLabel?.syncStatus).toBe("synced");
+
+      // Verify label_lines' lastSyncedHash was advanced to contentHash
+      const [updatedLine] = await db
+        .select()
+        .from(labelLines)
+        .where(eq(labelLines.labelId, testScene.id));
+      expect(updatedLine).toBeDefined();
+      expect(updatedLine?.lastSyncedHash).toBe(lineContentHash);
+      expect(updatedLine?.isDirty).toBe(false);
+      expect(updatedLine?.lastSyncedAt).toBeDefined();
+      expect(updatedLine?.lastSyncedAt?.getTime()).toBeGreaterThan(
+        new Date("2024-01-01").getTime(),
+      );
+    });
   });
 
   describe("importFromGitlab", () => {

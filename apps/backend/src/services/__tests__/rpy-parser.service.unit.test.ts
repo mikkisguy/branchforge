@@ -20,6 +20,9 @@ import {
   extractChoices,
   extractJumps,
   parseRPYFile,
+  parseRPYFileWithLabels,
+  convertToBranchForgeFormatFromLabels,
+  reconstructRPYFile,
 } from "../rpy-parser.service.js";
 
 describe("RPYParserService", () => {
@@ -524,6 +527,471 @@ label start:
       const result = parseRPYContent(screenRPY);
 
       expect(result.labels).toContain("start");
+    });
+  });
+
+  describe("parseRPYFileWithLabels", () => {
+    const storyRPY = `# Character definition
+define s = Character("Sylvie")
+
+label start:
+    "Hello, world!"
+    s "Welcome!"
+
+label chapter1:
+    s "This is chapter 1."
+    "Narration here."
+`;
+
+    const settingsRPY = `# Settings file with no labels
+define s = Character("Sylvie")
+define e = Character("Eileen")
+
+screen my_screen():
+    text "Hello"
+
+init python:
+    def my_function():
+        pass
+`;
+
+    const mixedRPY = `# File with both character definitions and labels
+define s = Character("Sylvie")
+
+label start:
+    s "Hello!"
+    return
+`;
+
+    it("should detect STORY file type when labels are present", () => {
+      const result = parseRPYFileWithLabels(storyRPY);
+
+      expect(result.fileType).toBe("STORY");
+    });
+
+    it("should detect SETTINGS file type when only definitions are present", () => {
+      const result = parseRPYFileWithLabels(settingsRPY);
+
+      expect(result.fileType).toBe("SETTINGS");
+    });
+
+    it("should detect STORY file type when both labels and definitions are present", () => {
+      const result = parseRPYFileWithLabels(mixedRPY);
+
+      expect(result.fileType).toBe("STORY");
+    });
+
+    it("should extract characters from the file", () => {
+      const result = parseRPYFileWithLabels(storyRPY);
+
+      expect(result.characters).toHaveLength(1);
+      expect(result.characters[0].tag).toBe("s");
+      expect(result.characters[0].name).toBe("Sylvie");
+    });
+
+    it("should parse labels with their dialogue", () => {
+      const result = parseRPYFileWithLabels(storyRPY);
+
+      expect(result.labels).toHaveLength(2);
+
+      const startLabel = result.labels.find((l) => l.label === "start");
+      expect(startLabel).toBeDefined();
+      expect(startLabel?.dialogue).toHaveLength(2);
+      expect(startLabel?.dialogue[0].speaker).toBeNull();
+      expect(startLabel?.dialogue[0].text).toBe("Hello, world!");
+    });
+
+    it("should not include invalid labels in result", () => {
+      const rpyWithInvalid = `label start:
+    "Valid"
+
+label _:
+    "Invalid"
+
+label _private:
+    "Also invalid"
+
+label a:
+    "Single char - invalid"
+`;
+      const result = parseRPYFileWithLabels(rpyWithInvalid);
+
+      expect(result.labels).toHaveLength(1);
+      expect(result.labels[0].label).toBe("start");
+    });
+
+    it("should track line numbers for dialogue", () => {
+      const rpy = `label start:
+    "Line 2"
+    s "Line 3"
+`;
+      const result = parseRPYFileWithLabels(rpy);
+
+      const startLabel = result.labels.find((l) => l.label === "start");
+      expect(startLabel?.dialogue[0].lineNumber).toBe(2);
+      expect(startLabel?.dialogue[1].lineNumber).toBe(3);
+    });
+
+    it("should handle empty file", () => {
+      const result = parseRPYFileWithLabels("");
+
+      expect(result.fileType).toBe("SETTINGS");
+      expect(result.labels).toEqual([]);
+      expect(result.characters).toEqual([]);
+    });
+  });
+
+  describe("convertToBranchForgeFormatFromLabels", () => {
+    const parsedData = {
+      labels: [
+        {
+          label: "start",
+          lineNumber: 1,
+          dialogue: [
+            { speaker: null, text: "Hello world!", lineNumber: 2 },
+            { speaker: "s", text: "Welcome!", lineNumber: 3 },
+          ],
+          choices: [],
+          jumps: [],
+        },
+        {
+          label: "chapter1",
+          lineNumber: 5,
+          dialogue: [
+            { speaker: "s", text: "Chapter content", lineNumber: 6 },
+          ],
+          choices: [
+            { label: "Choice 1", target: "route_a", lineNumber: 7 },
+          ],
+          jumps: [{ to: "ending", lineNumber: 8 }],
+        },
+      ],
+      characters: [
+        { tag: "s", name: "Sylvie", color: "#c8ffc8" },
+      ],
+      fileType: "STORY" as const,
+    };
+
+    const originalContent = `label start:
+    "Hello world!"
+    s "Welcome!"
+
+label chapter1:
+    s "Chapter content"
+`;
+
+    it("should convert label to BranchForge scene format", () => {
+      const result = convertToBranchForgeFormatFromLabels(
+        parsedData,
+        "start",
+        originalContent,
+      );
+
+      expect(result.name).toBe("start");
+      expect(result.entries).toHaveLength(2);
+      expect(result.characters).toHaveLength(1);
+    });
+
+    it("should create DIALOGUE entries for lines with speakers", () => {
+      const result = convertToBranchForgeFormatFromLabels(
+        parsedData,
+        "start",
+        originalContent,
+      );
+
+      const dialogueEntry = result.entries.find((e) => e.type === "DIALOGUE");
+      expect(dialogueEntry).toBeDefined();
+      expect(dialogueEntry?.speaker).toBe("s");
+      expect(dialogueEntry?.text).toBe("Welcome!");
+    });
+
+    it("should create NARRATION entries for lines without speakers", () => {
+      const result = convertToBranchForgeFormatFromLabels(
+        parsedData,
+        "start",
+        originalContent,
+      );
+
+      const narrationEntry = result.entries.find((e) => e.type === "NARRATION");
+      expect(narrationEntry).toBeDefined();
+      expect(narrationEntry?.text).toBe("Hello world!");
+    });
+
+    it("should create FLAG entries for choices", () => {
+      const result = convertToBranchForgeFormatFromLabels(
+        parsedData,
+        "chapter1",
+        originalContent,
+      );
+
+      const flagEntry = result.entries.find((e) => e.type === "FLAG");
+      expect(flagEntry).toBeDefined();
+      expect(flagEntry?.text).toBe("Choice 1");
+      expect(flagEntry?.target).toBe("route_a");
+    });
+
+    it("should create JUMP entries for jumps", () => {
+      const result = convertToBranchForgeFormatFromLabels(
+        parsedData,
+        "chapter1",
+        originalContent,
+      );
+
+      const jumpEntry = result.entries.find((e) => e.type === "JUMP");
+      expect(jumpEntry).toBeDefined();
+      expect(jumpEntry?.target).toBe("ending");
+    });
+
+    it("should return empty scene for non-existent label", () => {
+      const result = convertToBranchForgeFormatFromLabels(
+        parsedData,
+        "nonexistent",
+        originalContent,
+      );
+
+      expect(result.name).toBe("nonexistent");
+      expect(result.entries).toEqual([]);
+      expect(result.characters).toEqual([]);
+    });
+
+    it("should extract unique speakers from label dialogue", () => {
+      const result = convertToBranchForgeFormatFromLabels(
+        parsedData,
+        "start",
+        originalContent,
+      );
+
+      expect(result.characters).toHaveLength(1);
+      expect(result.characters?.[0].tag).toBe("s");
+      expect(result.characters?.[0].name).toBe("Sylvie");
+    });
+
+    it("should skip empty dialogue entries", () => {
+      const parsedWithEmpty = {
+        ...parsedData,
+        labels: [
+          {
+            ...parsedData.labels[0],
+            dialogue: [
+              { speaker: null, text: "", lineNumber: 2 },
+              { speaker: null, text: "   ", lineNumber: 3 },
+              { speaker: null, text: "Valid text", lineNumber: 4 },
+            ],
+          },
+        ],
+      };
+
+      const result = convertToBranchForgeFormatFromLabels(
+        parsedWithEmpty,
+        "start",
+        originalContent,
+      );
+
+      expect(result.entries).toHaveLength(1);
+      expect(result.entries[0].text).toBe("Valid text");
+    });
+
+    it("should calculate indent level from original content", () => {
+      const contentWithIndent = `label start:
+    "Four spaces"
+        "Eight spaces"
+  "Two spaces"
+`;
+
+      const parsed = {
+        labels: [
+          {
+            label: "start",
+            lineNumber: 1,
+            dialogue: [
+              { speaker: null, text: "Four spaces", lineNumber: 2 },
+              { speaker: null, text: "Eight spaces", lineNumber: 3 },
+              { speaker: null, text: "Two spaces", lineNumber: 4 },
+            ],
+            choices: [],
+            jumps: [],
+          },
+        ],
+        characters: [],
+        fileType: "STORY" as const,
+      };
+
+      const result = convertToBranchForgeFormatFromLabels(
+        parsed,
+        "start",
+        contentWithIndent,
+      );
+
+      expect(result.entries[0].indentLevel).toBe(1); // 4 spaces / 4
+      expect(result.entries[1].indentLevel).toBe(2); // 8 spaces / 4
+      expect(result.entries[2].indentLevel).toBe(0); // 2 spaces / 4 (rounded down)
+    });
+  });
+
+  describe("reconstructRPYFile", () => {
+    const originalContent = `label start:
+    "Original line 1"
+    s "Original line 2"
+
+label chapter1:
+    "Chapter content"
+`;
+
+    it("should replace dialogue with updated content", () => {
+      const updatedDialogue = new Map([
+        [
+          "start",
+          [
+            { speaker: null, text: "Updated line 1" },
+            { speaker: "s", text: "Updated line 2" },
+          ],
+        ],
+      ]);
+
+      const result = reconstructRPYFile({
+        originalContent,
+        updatedDialogue,
+      });
+
+      expect(result).toContain('Updated line 1"');
+      expect(result).toContain('s "Updated line 2"');
+      expect(result).not.toContain("Original line 1");
+    });
+
+    it("should preserve non-dialogue lines", () => {
+      const updatedDialogue = new Map([
+        ["start", [{ speaker: null, text: "Updated" }]],
+      ]);
+
+      const result = reconstructRPYFile({
+        originalContent,
+        updatedDialogue,
+      });
+
+      // Should preserve label declarations and other keywords
+      expect(result).toContain("label start:");
+      expect(result).toContain("label chapter1:");
+    });
+
+    it("should handle fewer updated entries than original", () => {
+      const updatedDialogue = new Map([
+        ["start", [{ speaker: null, text: "Only one line" }]],
+      ]);
+
+      const result = reconstructRPYFile({
+        originalContent,
+        updatedDialogue,
+      });
+
+      // Original lines should be preserved when update has fewer entries
+      expect(result).toContain('Only one line"');
+      // The second original line should still be there (preserved)
+      expect(result).toContain("s \"Original line 2\"");
+    });
+
+    it("should append extra updated dialogue entries", () => {
+      const updatedDialogue = new Map([
+        [
+          "start",
+          [
+            { speaker: null, text: "Line 1" },
+            { speaker: null, text: "Line 2" },
+            { speaker: null, text: "Line 3 (extra)" },
+          ],
+        ],
+      ]);
+
+      const result = reconstructRPYFile({
+        originalContent: `label start:
+    "Original 1"
+    "Original 2"
+`,
+        updatedDialogue,
+      });
+
+      expect(result).toContain('Line 1"');
+      expect(result).toContain('Line 2"');
+      expect(result).toContain('Line 3 (extra)"');
+    });
+
+    it("should preserve original indentation", () => {
+      const indentedContent = `label start:
+  "Two spaces"
+    "Four spaces"
+`;
+
+      const updatedDialogue = new Map([
+        ["start", [{ speaker: null, text: "Updated" }]],
+      ]);
+
+      const result = reconstructRPYFile({
+        originalContent: indentedContent,
+        updatedDialogue,
+      });
+
+      // Should maintain the original indentation
+      expect(result).toContain('  "Updated"');
+    });
+
+    it("should handle labels with no updates", () => {
+      const updatedDialogue = new Map([
+        ["chapter1", [{ speaker: null, text: "Chapter updated" }]],
+      ]);
+
+      const result = reconstructRPYFile({
+        originalContent,
+        updatedDialogue,
+      });
+
+      // start label should keep original content
+      expect(result).toContain("Original line 1");
+      expect(result).toContain("Original line 2");
+      // chapter1 label should be updated
+      expect(result).toContain("Chapter updated");
+    });
+
+    it("should handle empty updated dialogue map", () => {
+      const updatedDialogue = new Map();
+
+      const result = reconstructRPYFile({
+        originalContent,
+        updatedDialogue,
+      });
+
+      // Original content should be preserved
+      expect(result).toBe(originalContent);
+    });
+
+    it("should handle labels not in original content", () => {
+      const updatedDialogue = new Map([
+        ["new_label", [{ speaker: null, text: "New label content" }]],
+      ]);
+
+      const result = reconstructRPYFile({
+        originalContent,
+        updatedDialogue,
+      });
+
+      // New label content should be appended
+      expect(result).toContain("New label content");
+    });
+
+    it("should properly reconstruct dialogue with speakers", () => {
+      const content = `label start:
+    s "Hello"
+    "World"
+`;
+
+      const updatedDialogue = new Map([
+        ["start", [{ speaker: "e", text: "Updated speaker" }]],
+      ]);
+
+      const result = reconstructRPYFile({
+        originalContent: content,
+        updatedDialogue,
+      });
+
+      expect(result).toContain('e "Updated speaker"');
     });
   });
 });

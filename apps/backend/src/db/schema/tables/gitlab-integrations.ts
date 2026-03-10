@@ -14,7 +14,12 @@ import {
   index,
   unique,
 } from "drizzle-orm/pg-core";
-import { syncOperationEnum, syncStatusEnum, gitlabFileTypeEnum } from "../enums.js";
+import {
+  syncOperationEnum,
+  syncStatusEnum,
+  syncOperationStatusEnum,
+  gitlabFileTypeEnum,
+} from "../enums.js";
 import { users } from "./users.js";
 import { projects } from "./projects.js";
 
@@ -78,7 +83,7 @@ export const gitlabFileSyncState = pgTable(
       .notNull()
       .references(() => gitlabFiles.id, { onDelete: "cascade" }),
     contentHash: text("content_hash").notNull(), // SHA-256 for idempotency
-    status: syncStatusEnum("status").notNull(), // 'pending', 'in_progress', 'completed', 'failed'
+    status: syncStatusEnum("status").notNull(), // 'synced', 'modified_local', 'conflict'
     startedAt: timestamp("started_at").defaultNow().notNull(),
     completedAt: timestamp("completed_at"),
     errorMessage: text("error_message"),
@@ -131,7 +136,7 @@ export const gitlabSyncOperations = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     operation: syncOperationEnum("operation").notNull(),
-    status: syncStatusEnum("status").notNull(),
+    status: syncOperationStatusEnum("status").notNull(),
     branch: text("branch"),
     conflictCount: integer("conflict_count").default(0),
     errorMessage: text("error_message"),

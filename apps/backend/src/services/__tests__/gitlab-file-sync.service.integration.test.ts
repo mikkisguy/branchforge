@@ -26,10 +26,9 @@ import {
   gitlabFiles,
   gitlabFileSyncState,
 } from "../../db/schema/index.js";
-import { eq } from "drizzle-orm";
+import { eq, isNull, and } from "drizzle-orm";
 import {
   syncLabelsFromGitLabFile,
-  calculateContentHash,
   validateRPYContent,
   validateFileType,
   checkInProgressSync,
@@ -38,6 +37,7 @@ import {
   completeSyncState,
 } from "../gitlab-file-sync.service.js";
 import { parseRPYFileWithLabels } from "../rpy-parser.service.js";
+import { calculateContentHash } from "../../lib/hash.js";
 import { testEmail, testUuid } from "../../utils/test-ids.js";
 
 describe("GitLabFileSyncService (Integration)", () => {
@@ -219,7 +219,7 @@ describe("GitLabFileSyncService (Integration)", () => {
         id: testUuid("67000000", 1),
         gitlabFileId: testGitlabFileId,
         contentHash: "hash123",
-        status: "in_progress",
+        status: "modified_local",
         rpyLabelCount: 1,
         dbLabelCount: 0,
       });
@@ -237,7 +237,7 @@ describe("GitLabFileSyncService (Integration)", () => {
         id: testUuid("67000000", 1),
         gitlabFileId: testGitlabFileId,
         contentHash: "hash123",
-        status: "completed",
+        status: "synced",
         rpyLabelCount: 1,
         dbLabelCount: 1,
         completedAt: new Date(),
@@ -268,7 +268,7 @@ describe("GitLabFileSyncService (Integration)", () => {
         id: testUuid("67000000", 1),
         gitlabFileId: testGitlabFileId,
         contentHash,
-        status: "failed",
+        status: "conflict",
         rpyLabelCount: 1,
         dbLabelCount: 0,
         completedAt: new Date(),
@@ -292,7 +292,7 @@ describe("GitLabFileSyncService (Integration)", () => {
         id: testUuid("67000000", 1),
         gitlabFileId: testGitlabFileId,
         contentHash,
-        status: "completed",
+        status: "synced",
         rpyLabelCount: 1,
         dbLabelCount: 1,
         completedAt: new Date(),
@@ -314,7 +314,7 @@ describe("GitLabFileSyncService (Integration)", () => {
         id: testUuid("67000000", 1),
         gitlabFileId: testGitlabFileId,
         contentHash: "hash123",
-        status: "completed",
+        status: "synced",
         rpyLabelCount: 1,
         dbLabelCount: 1,
         completedAt: new Date(),
@@ -354,7 +354,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       expect(syncState).toBeDefined();
       expect(syncState.gitlabFileId).toBe(testGitlabFileId);
       expect(syncState.contentHash).toBe(contentHash);
-      expect(syncState.status).toBe("in_progress");
+      expect(syncState.status).toBe("modified_local");
       expect(syncState.rpyLabelCount).toBe(labelCount);
       expect(syncState.dbLabelCount).toBe(0);
       expect(syncState.completedAt).toBeNull();
@@ -371,7 +371,7 @@ describe("GitLabFileSyncService (Integration)", () => {
           id: testUuid("67000000", 1),
           gitlabFileId: testGitlabFileId,
           contentHash: "hash123",
-          status: "in_progress",
+          status: "modified_local",
           rpyLabelCount: 1,
           dbLabelCount: 0,
         })
@@ -385,7 +385,7 @@ describe("GitLabFileSyncService (Integration)", () => {
         .where(eq(gitlabFileSyncState.id, syncState.id))
         .limit(1);
 
-      expect(updated.status).toBe("completed");
+      expect(updated.status).toBe("synced");
       expect(updated.dbLabelCount).toBe(5);
       expect(updated.completedAt).not.toBeNull();
       expect(updated.errorMessage).toBeNull();
@@ -402,7 +402,7 @@ describe("GitLabFileSyncService (Integration)", () => {
           id: testUuid("67000000", 1),
           gitlabFileId: testGitlabFileId,
           contentHash: "hash123",
-          status: "in_progress",
+          status: "modified_local",
           rpyLabelCount: 1,
           dbLabelCount: 0,
         })
@@ -416,7 +416,7 @@ describe("GitLabFileSyncService (Integration)", () => {
         .where(eq(gitlabFileSyncState.id, syncState.id))
         .limit(1);
 
-      expect(updated.status).toBe("failed");
+      expect(updated.status).toBe("conflict");
       expect(updated.dbLabelCount).toBe(0);
       expect(updated.completedAt).not.toBeNull();
       expect(updated.errorMessage).toBe("Sync failed");
@@ -584,7 +584,7 @@ describe("GitLabFileSyncService (Integration)", () => {
         id: testUuid("67000000", 1),
         gitlabFileId: testGitlabFileId,
         contentHash: "hash123",
-        status: "in_progress",
+        status: "modified_local",
         rpyLabelCount: 1,
         dbLabelCount: 0,
       });
@@ -638,7 +638,12 @@ describe("GitLabFileSyncService (Integration)", () => {
       const remainingLabels = await db
         .select()
         .from(labelsTable)
-        .where(eq(labelsTable.gitlabFileId, testGitlabFileId));
+        .where(
+          and(
+            eq(labelsTable.gitlabFileId, testGitlabFileId),
+            isNull(labelsTable.deletedAt),
+          ),
+        );
 
       expect(remainingLabels).toHaveLength(1);
       expect(remainingLabels[0].labelName).toBe("start");
@@ -772,7 +777,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       expect(syncStates.length).toBeGreaterThanOrEqual(1);
 
       const latestState = syncStates[0];
-      expect(latestState.status).toBe("completed");
+      expect(latestState.status).toBe("synced");
       expect(latestState.rpyLabelCount).toBe(1);
       expect(latestState.dbLabelCount).toBe(1);
     });
@@ -796,7 +801,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       expect(syncStates.length).toBeGreaterThanOrEqual(1);
 
       const latestState = syncStates[0];
-      expect(latestState.status).toBe("failed");
+      expect(latestState.status).toBe("conflict");
       expect(latestState.errorMessage).not.toBeNull();
     });
   });

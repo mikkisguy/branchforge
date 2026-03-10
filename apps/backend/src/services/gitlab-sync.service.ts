@@ -13,7 +13,7 @@ import {
   labelLines,
   characters,
 } from "../db/schema/index.js";
-import { eq, and, desc, inArray, asc } from "drizzle-orm";
+import { eq, and, desc, inArray, asc, isNull } from "drizzle-orm";
 import {
   listRpyFiles,
   getFileContent,
@@ -28,6 +28,7 @@ import {
   type ParsedRPYFileWithLabels,
   type ReconstructedFileOptions,
 } from "./rpy-parser.service.js";
+import { calculateLinesHash, calculateContentHash } from "../lib/hash.js";
 
 /**
  * Simple concurrency limiter for parallel async operations
@@ -99,6 +100,13 @@ interface LabelLineInsertValues {
   sequence: number;
   contentType: "NARRATION" | "DIALOGUE" | "CHOICE" | "MENU" | "JUMP";
   content: string;
+  gitlabFileId?: string;
+  linePosition?: number;
+  contentHash?: string;
+  lastSyncedHash?: string;
+  lastSyncedAt?: Date;
+  rpyLineNumber?: number;
+  rpyIndentLevel?: number;
 }
 
 /**
@@ -222,6 +230,51 @@ export async function exportToGitlab(
           message,
         );
       }
+    }
+
+    // Update labels with export metadata (commitSha tracking not yet implemented)
+    // Only update labels that were actually exported (linked to the exported gitlab_files)
+    const exportedFileIds = projectFiles.map((f) => f.id);
+
+    const exportedLabels = await db
+      .select({ id: labels.id, contentHash: labels.contentHash })
+      .from(labels)
+      .where(
+        and(
+          eq(labels.projectId, projectId),
+          inArray(labels.gitlabFileId, exportedFileIds),
+          isNull(labels.deletedAt),
+        ),
+      );
+
+    if (exportedLabels.length > 0) {
+      const exportedLabelIds = exportedLabels.map((l) => l.id);
+
+      // Update labels: advance lastSyncedHash to current contentHash, establishing new baseline
+      await db
+        .update(labels)
+        .set({
+          lastSyncedHash: labels.contentHash, // Set to current contentHash
+          syncStatus: "synced",
+          lastExportedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(inArray(labels.id, exportedLabelIds));
+
+      // Update label_lines: advance lastSyncedHash baseline for exported lines
+      await db
+        .update(labelLines)
+        .set({
+          lastSyncedHash: labelLines.contentHash, // Set to current contentHash
+          lastSyncedAt: new Date(),
+          isDirty: false,
+        })
+        .where(
+          and(
+            inArray(labelLines.labelId, exportedLabelIds),
+            isNull(labelLines.deletedAt),
+          ),
+        );
     }
 
     // Mark operation as completed
@@ -370,7 +423,11 @@ export async function importFromGitlab(
           const labelData = convertToBranchForgeFormatFromLabels(
             parsed,
             label.label,
+            content,
           );
+
+          // Calculate content hash for the label's lines
+          const contentHash = calculateLinesHash(labelData.entries);
 
           if (existingScene && conflictResolution === "manual_review") {
             // Count as conflict for manual review
@@ -385,11 +442,19 @@ export async function importFromGitlab(
               const allValues: LabelLineInsertValues[] = labelData.entries.map(
                 (entry, index) => {
                   const mapped = mapEntryToDbContentType(entry);
+                  const entryContentHash = calculateContentHash(mapped.content);
                   return {
                     labelId: existingScene.id,
                     sequence: index + 1,
                     contentType: mapped.contentType,
                     content: mapped.content,
+                    gitlabFileId: gitlabFile.id,
+                    linePosition: index,
+                    contentHash: entryContentHash,
+                    lastSyncedHash: entryContentHash,
+                    lastSyncedAt: new Date(),
+                    rpyLineNumber: entry.lineNumber,
+                    rpyIndentLevel: entry.indentLevel ?? 0,
                   };
                 },
               );
@@ -397,6 +462,18 @@ export async function importFromGitlab(
               if (allValues.length > 0) {
                 await tx.insert(labelLines).values(allValues);
               }
+
+              // Update label metadata
+              await tx
+                .update(labels)
+                .set({
+                  contentHash,
+                  lastSyncedHash: contentHash,
+                  syncStatus: "synced",
+                  lastImportedAt: new Date(),
+                  updatedAt: new Date(),
+                })
+                .where(eq(labels.id, existingScene.id));
             });
           } else if (!existingScene) {
             // Create new scene with proper file linkage
@@ -415,17 +492,30 @@ export async function importFromGitlab(
                   status: "DRAFT",
                   prerequisites: {},
                   effects: {},
+                  // Sync fields
+                  contentHash,
+                  lastSyncedHash: contentHash,
+                  syncStatus: "synced",
+                  lastImportedAt: new Date(),
                 })
                 .returning();
 
               const allValues: LabelLineInsertValues[] = labelData.entries.map(
                 (entry, index) => {
                   const mapped = mapEntryToDbContentType(entry);
+                  const entryContentHash = calculateContentHash(mapped.content);
                   return {
                     labelId: newScene.id,
                     sequence: index + 1,
                     contentType: mapped.contentType,
                     content: mapped.content,
+                    gitlabFileId: gitlabFile.id,
+                    linePosition: index,
+                    contentHash: entryContentHash,
+                    lastSyncedHash: entryContentHash,
+                    lastSyncedAt: new Date(),
+                    rpyLineNumber: entry.lineNumber,
+                    rpyIndentLevel: entry.indentLevel ?? 0,
                   };
                 },
               );
@@ -532,11 +622,16 @@ export async function detectConflicts(
   try {
     const db = getDb();
 
-    // Get all local scenes that are linked to GitLab files
+    // Get all local scenes that are linked to GitLab files (excluding soft-deleted)
     const localScenes = await db
       .select()
       .from(labels)
-      .where(eq(labels.projectId, projectId));
+      .where(
+        and(
+          eq(labels.projectId, projectId),
+          isNull(labels.deletedAt),
+        ),
+      );
 
     // Filter to only scenes with gitlabFileId (imported from GitLab)
     const gitlabScenes = localScenes.filter((s) => s.gitlabFileId);

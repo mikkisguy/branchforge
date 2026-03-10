@@ -1,5 +1,5 @@
 {
-  "id": "f6dd61b8-dae7-487a-8d85-00ca89b37b52",
+  "id": "65328c87-001d-426b-bbd3-884a5dc9ccbc",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -237,21 +237,6 @@
         }
       },
       "indexes": {
-        "user_settings_user_id_idx": {
-          "name": "user_settings_user_id_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "user_settings_username_idx": {
           "name": "user_settings_username_idx",
           "columns": [
@@ -284,7 +269,15 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "user_settings_user_id_unique": {
+          "name": "user_settings_user_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "user_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -506,29 +499,7 @@
           "default": "now()"
         }
       },
-      "indexes": {
-        "project_users_pk": {
-          "name": "project_users_pk",
-          "columns": [
-            {
-              "expression": "project_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "project_users_project_id_projects_id_fk": {
           "name": "project_users_project_id_projects_id_fk",
@@ -557,7 +528,15 @@
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "project_users_project_id_user_id_pk": {
+          "name": "project_users_project_id_user_id_pk",
+          "columns": [
+            "project_id",
+            "user_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
@@ -1529,6 +1508,74 @@
           "primaryKey": false,
           "notNull": false
         },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_synced_hash": {
+          "name": "last_synced_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sync_status": {
+          "name": "sync_status",
+          "type": "sync_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_exported_at": {
+          "name": "last_exported_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_imported_at": {
+          "name": "last_imported_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "export_commit_sha": {
+          "name": "export_commit_sha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "import_commit_sha": {
+          "name": "import_commit_sha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 1
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -1658,6 +1705,66 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "labels_sync_status_idx": {
+          "name": "labels_sync_status_idx",
+          "columns": [
+            {
+              "expression": "sync_status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "labels_deleted_at_idx": {
+          "name": "labels_deleted_at_idx",
+          "columns": [
+            {
+              "expression": "deleted_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "labels_created_by_idx": {
+          "name": "labels_created_by_idx",
+          "columns": [
+            {
+              "expression": "created_by",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "labels_updated_by_idx": {
+          "name": "labels_updated_by_idx",
+          "columns": [
+            {
+              "expression": "updated_by",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -1693,6 +1800,32 @@
           "tableTo": "gitlab_files",
           "columnsFrom": [
             "gitlab_file_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "labels_created_by_users_id_fk": {
+          "name": "labels_created_by_users_id_fk",
+          "tableFrom": "labels",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "labels_updated_by_users_id_fk": {
+          "name": "labels_updated_by_users_id_fk",
+          "tableFrom": "labels",
+          "tableTo": "users",
+          "columnsFrom": [
+            "updated_by"
           ],
           "columnsTo": [
             "id"
@@ -1793,6 +1926,61 @@
           "primaryKey": false,
           "notNull": false
         },
+        "gitlab_file_id": {
+          "name": "gitlab_file_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "line_position": {
+          "name": "line_position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_synced_hash": {
+          "name": "last_synced_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_dirty": {
+          "name": "is_dirty",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "last_synced_at": {
+          "name": "last_synced_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rpy_line_number": {
+          "name": "rpy_line_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rpy_indent_level": {
+          "name": "rpy_indent_level",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -1844,6 +2032,74 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "label_lines_gitlab_file_id_idx": {
+          "name": "label_lines_gitlab_file_id_idx",
+          "columns": [
+            {
+              "expression": "gitlab_file_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "label_lines_gitlab_file_position_idx": {
+          "name": "label_lines_gitlab_file_position_idx",
+          "columns": [
+            {
+              "expression": "gitlab_file_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "line_position",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "label_lines_is_dirty_idx": {
+          "name": "label_lines_is_dirty_idx",
+          "columns": [
+            {
+              "expression": "is_dirty",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"label_lines\".\"is_dirty\" = true",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "label_lines_deleted_at_idx": {
+          "name": "label_lines_deleted_at_idx",
+          "columns": [
+            {
+              "expression": "deleted_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"label_lines\".\"deleted_at\" IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -1866,6 +2122,19 @@
           "tableTo": "characters",
           "columnsFrom": [
             "speaker_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "label_lines_gitlab_file_id_gitlab_files_id_fk": {
+          "name": "label_lines_gitlab_file_id_gitlab_files_id_fk",
+          "tableFrom": "label_lines",
+          "tableTo": "gitlab_files",
+          "columnsFrom": [
+            "gitlab_file_id"
           ],
           "columnsTo": [
             "id"
@@ -1917,29 +2186,7 @@
           "notNull": false
         }
       },
-      "indexes": {
-        "label_characters_pk": {
-          "name": "label_characters_pk",
-          "columns": [
-            {
-              "expression": "label_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "character_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "label_characters_label_id_labels_id_fk": {
           "name": "label_characters_label_id_labels_id_fk",
@@ -1968,7 +2215,15 @@
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "label_characters_label_id_character_id_pk": {
+          "name": "label_characters_label_id_character_id_pk",
+          "columns": [
+            "label_id",
+            "character_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
@@ -2361,15 +2616,15 @@
           "primaryKey": false,
           "notNull": false
         },
-        "scenes_created": {
-          "name": "scenes_created",
+        "labels_created": {
+          "name": "labels_created",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "default": 0
         },
-        "scenes_skipped": {
-          "name": "scenes_skipped",
+        "labels_skipped": {
+          "name": "labels_skipped",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -2884,7 +3139,7 @@
         },
         "status": {
           "name": "status",
-          "type": "sync_status",
+          "type": "sync_operation_status",
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
@@ -3152,15 +3407,6 @@
         "FINAL"
       ]
     },
-    "public.scene_status": {
-      "name": "scene_status",
-      "schema": "public",
-      "values": [
-        "DRAFT",
-        "REVIEW",
-        "FINAL"
-      ]
-    },
     "public.content_type": {
       "name": "content_type",
       "schema": "public",
@@ -3239,15 +3485,6 @@
         "DUO_PAIR"
       ]
     },
-    "public.scene_visibility": {
-      "name": "scene_visibility",
-      "schema": "public",
-      "values": [
-        "EXCLUSIVE",
-        "SHARED",
-        "DUO_PAIR"
-      ]
-    },
     "public.sync_operation": {
       "name": "sync_operation",
       "schema": "public",
@@ -3258,6 +3495,15 @@
     },
     "public.sync_status": {
       "name": "sync_status",
+      "schema": "public",
+      "values": [
+        "synced",
+        "modified_local",
+        "conflict"
+      ]
+    },
+    "public.sync_operation_status": {
+      "name": "sync_operation_status",
       "schema": "public",
       "values": [
         "pending",
