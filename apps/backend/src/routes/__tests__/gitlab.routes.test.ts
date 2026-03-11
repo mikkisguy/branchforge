@@ -442,8 +442,8 @@ describe("GitLab Routes", () => {
       vi.spyOn(gitlabSyncService, "exportToGitlab").mockResolvedValue({
         id: testOperationId,
         projectId: testProjectId,
-        operation: "export",
-        status: "pending",
+        operation: "EXPORT",
+        status: "PENDING",
         branch: testBranch,
         conflictCount: 0,
         startedAt: new Date(),
@@ -462,8 +462,8 @@ describe("GitLab Routes", () => {
       expect(response.statusCode).toBe(202);
       expect(response.json()).toMatchObject({
         id: testOperationId,
-        operation: "export",
-        status: "pending",
+        operation: "EXPORT",
+        status: "PENDING",
       });
     });
 
@@ -485,8 +485,8 @@ describe("GitLab Routes", () => {
       vi.spyOn(gitlabSyncService, "importFromGitlab").mockResolvedValue({
         id: testOperationId,
         projectId: testProjectId,
-        operation: "import",
-        status: "pending",
+        operation: "IMPORT",
+        status: "PENDING",
         branch: testBranch,
         conflictCount: 0,
         startedAt: new Date(),
@@ -505,8 +505,8 @@ describe("GitLab Routes", () => {
       expect(response.statusCode).toBe(202);
       expect(response.json()).toMatchObject({
         id: testOperationId,
-        operation: "import",
-        status: "pending",
+        operation: "IMPORT",
+        status: "PENDING",
       });
     });
 
@@ -530,8 +530,8 @@ describe("GitLab Routes", () => {
       vi.spyOn(gitlabSyncService, "getSyncOperation").mockResolvedValue({
         id: testOperationId,
         projectId: testProjectId,
-        operation: "export",
-        status: "completed",
+        operation: "EXPORT",
+        status: "COMPLETED",
         branch: testBranch,
         conflictCount: 0,
         startedAt: new Date(),
@@ -545,8 +545,8 @@ describe("GitLab Routes", () => {
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
         id: testOperationId,
-        operation: "export",
-        status: "completed",
+        operation: "EXPORT",
+        status: "COMPLETED",
       });
     });
 
@@ -570,8 +570,8 @@ describe("GitLab Routes", () => {
         {
           id: "op-1",
           projectId: testProjectId,
-          operation: "export",
-          status: "completed",
+          operation: "EXPORT",
+          status: "COMPLETED",
           branch: testBranch,
           conflictCount: 0,
           startedAt: new Date(),
@@ -579,8 +579,8 @@ describe("GitLab Routes", () => {
         {
           id: "op-2",
           projectId: testProjectId,
-          operation: "import",
-          status: "completed",
+          operation: "IMPORT",
+          status: "COMPLETED",
           branch: "develop",
           conflictCount: 0,
           startedAt: new Date(),

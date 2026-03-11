@@ -233,17 +233,17 @@ export const labelVisibilitySchema = z.enum(
 /**
  * Sync operation enum
  */
-export const syncOperationSchema = z.enum(["export", "import"], {
-  message: "Sync operation must be export or import",
+export const syncOperationSchema = z.enum(["EXPORT", "IMPORT"], {
+  message: "Sync operation must be EXPORT or IMPORT",
 });
 
 /**
  * Sync status enum
  */
 export const syncStatusSchema = z.enum(
-  ["synced", "modified_local", "conflict"],
+  ["SYNCED", "MODIFIED_LOCAL", "CONFLICT"],
   {
-    message: "Sync status must be synced, modified_local, or conflict",
+    message: "Sync status must be SYNCED, MODIFIED_LOCAL, or CONFLICT",
   },
 );
 
@@ -296,7 +296,7 @@ export const updateProjectSchema = z
  * Project ID params validation
  */
 export const projectIdParamsSchema = z.object({
-  id: uuidSchema,
+  projectId: uuidSchema,
 });
 
 // ============================================================================
@@ -431,16 +431,103 @@ export const routeConfigProjectIdParamsSchema = z.object({
 // ============================================================================
 
 /**
- * Create character request validation
+ * Ren'Py tag validation schema
+ * Validates character tags (alphanumeric, underscores)
+ */
+export const renpyTagSchema = z
+  .string()
+  .min(1, "Character tag is required")
+  .max(50, "Character tag is too long")
+  .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, "Character tag must start with letter/underscore and contain only letters, numbers, and underscores");
+
+/**
+ * Color hex validation schema
+ * Validates hex color format (#RRGGBB)
+ */
+export const colorHexSchema = z
+  .string()
+  .regex(/^#[0-9A-Fa-f]{6}$/, "Color must be a valid hex format (#RRGGBB)");
+
+/**
+ * Detected character from RPY file
+ */
+export const detectedCharacterSchema = z.object({
+  tag: renpyTagSchema,
+  name: z.string().nullable().optional(),
+  displayName: z.string().min(1, "Display name is required").max(200),
+  color: colorHexSchema,
+  isSpecial: z.boolean().default(false),
+  sourceFile: z.string().optional(),
+  confidence: z.number().min(0).max(1).optional(),
+});
+
+/**
+ * Create character request validation (import from RPY)
+ *
+ * Field explanations:
+ * - renpyTag: The dialogue tag used in RPY files (e.g., "s" for `s "Hello!"`)
+ * - name: The variable reference from Character() definition (e.g., "[s_first]", "Name", None)
+ * - displayName: The human-readable name shown in BranchForge UI (Writer Mode, Character menu)
+ * - color: Hex color for dialogue display
  */
 export const createCharacterSchema = z
   .object({
     projectId: uuidSchema,
     name: requiredString(200, "Name is too long"),
-    alias: optionalString(100),
-    description: optionalString(5000),
+    displayName: requiredString(200, "Display name is too long"),
+    renpyTag: renpyTagSchema,
+    color: colorHexSchema,
+    routeAffiliation: optionalString(50),
+    isLoveInterest: z.boolean().default(false).optional(),
+    dialogueStyle: optionalString(100),
+    conditionalPrefix: optionalString(50),
   })
   .strict();
+
+/**
+ * Update character request validation
+ */
+export const updateCharacterSchema = z
+  .object({
+    name: requiredString(200, "Name is too long").optional(),
+    displayName: requiredString(200, "Display name is too long").optional(),
+    color: colorHexSchema.optional(),
+    routeAffiliation: optionalString(50),
+    isLoveInterest: z.boolean().optional(),
+    dialogueStyle: optionalString(100),
+    conditionalPrefix: optionalString(50),
+  })
+  .strict()
+  .partial();
+
+/**
+ * Character import request validation
+ */
+export const importCharactersSchema = z
+  .object({
+    characters: z.array(z.object({
+      tag: renpyTagSchema,
+      name: z.string().nullable(),
+      displayName: requiredString(200, "Display name is too long"),
+      color: colorHexSchema,
+      isLoveInterest: z.boolean().optional(),
+      routeAffiliation: optionalString(50),
+    })).min(1, "At least one character is required"),
+    excludedTags: z.array(renpyTagSchema).default([]),
+    linkToLines: z.boolean().default(true),
+  })
+  .strict();
+
+/**
+ * Project settings validation
+ */
+export const projectSettingsSchema = z
+  .object({
+    excludedCharacterTags: z.array(renpyTagSchema).default([]),
+    autoLinkSpeakers: z.boolean().default(true),
+  })
+  .strict()
+  .partial();
 
 /**
  * Character ID params validation
@@ -593,6 +680,10 @@ export type UpdateLabelDialogueInput = z.infer<
 >;
 
 export type CreateCharacterInput = z.infer<typeof createCharacterSchema>;
+export type UpdateCharacterInput = z.infer<typeof updateCharacterSchema>;
+export type ImportCharactersInput = z.infer<typeof importCharactersSchema>;
+export type ProjectSettingsInput = z.infer<typeof projectSettingsSchema>;
+export type DetectedCharacterInput = z.infer<typeof detectedCharacterSchema>;
 export type CreateGitLabIntegrationInput = z.infer<
   typeof createGitLabIntegrationSchema
 >;

@@ -29,6 +29,8 @@ import {
   type ReconstructedFileOptions,
 } from "./rpy-parser.service.js";
 import { calculateLinesHash, calculateContentHash } from "../lib/hash.js";
+import { characterParserService, type DetectedCharacter } from "./character-parser.service.js";
+import { projectSettings } from "../db/schema/index.js";
 
 /**
  * Simple concurrency limiter for parallel async operations
@@ -68,13 +70,14 @@ export type ConflictResolution =
 export interface SyncOperation {
   id: string;
   projectId: string;
-  operation: "export" | "import";
-  status: "pending" | "in_progress" | "completed" | "failed";
+  operation: "EXPORT" | "IMPORT";
+  status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "FAILED";
   branch: string | null;
   conflictCount: number;
   errorMessage: string | null;
   startedAt: Date;
   completedAt: Date | null;
+  detectedCharacters?: DetectedCharacter[];
 }
 
 export interface ConflictInfo {
@@ -149,7 +152,7 @@ function mapEntryToDbContentType(entry: {
  */
 async function createSyncOperation(
   projectId: string,
-  operation: "export" | "import",
+  operation: "EXPORT" | "IMPORT",
   branch: string | null,
 ): Promise<SyncOperation> {
   const db = getDb();
@@ -159,7 +162,7 @@ async function createSyncOperation(
     .values({
       projectId,
       operation,
-      status: "in_progress",
+      status: "IN_PROGRESS",
       branch,
       conflictCount: 0,
     })
@@ -182,7 +185,7 @@ async function updateSyncOperation(
     .set({
       ...updates,
       completedAt:
-        updates.status === "completed" || updates.status === "failed"
+        updates.status === "COMPLETED" || updates.status === "FAILED"
           ? new Date()
           : undefined,
     })
@@ -207,7 +210,7 @@ export async function exportToGitlab(
   // Create sync operation
   const operation = await createSyncOperation(
     projectId,
-    "export",
+    "EXPORT",
     targetBranch,
   );
 
@@ -255,7 +258,7 @@ export async function exportToGitlab(
         .update(labels)
         .set({
           lastSyncedHash: labels.contentHash, // Set to current contentHash
-          syncStatus: "synced",
+          syncStatus: "SYNCED",
           lastExportedAt: new Date(),
           updatedAt: new Date(),
         })
@@ -279,13 +282,13 @@ export async function exportToGitlab(
 
     // Mark operation as completed
     await updateSyncOperation(operation.id, {
-      status: "completed",
+      status: "COMPLETED",
       conflictCount: 0,
     });
 
     return {
       ...operation,
-      status: "completed",
+      status: "COMPLETED",
       conflictCount: 0,
     };
   } catch (error) {
@@ -293,13 +296,13 @@ export async function exportToGitlab(
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
     await updateSyncOperation(operation.id, {
-      status: "failed",
+      status: "FAILED",
       errorMessage,
     });
 
     return {
       ...operation,
-      status: "failed",
+      status: "FAILED",
       errorMessage,
     };
   }
@@ -318,7 +321,7 @@ export async function importFromGitlab(
   const db = getDb();
 
   // Create sync operation
-  const operation = await createSyncOperation(projectId, "import", branch);
+  const operation = await createSyncOperation(projectId, "IMPORT", branch);
 
   try {
     // List RPY files in the repository
@@ -327,13 +330,13 @@ export async function importFromGitlab(
     if (rpyFiles.length === 0) {
       // No files to import - mark as completed
       await updateSyncOperation(operation.id, {
-        status: "completed",
+        status: "COMPLETED",
         conflictCount: 0,
       });
 
       return {
         ...operation,
-        status: "completed",
+        status: "COMPLETED",
         conflictCount: 0,
       };
     }
@@ -469,7 +472,7 @@ export async function importFromGitlab(
                 .set({
                   contentHash,
                   lastSyncedHash: contentHash,
-                  syncStatus: "synced",
+                  syncStatus: "SYNCED",
                   lastImportedAt: new Date(),
                   updatedAt: new Date(),
                 })
@@ -495,7 +498,7 @@ export async function importFromGitlab(
                   // Sync fields
                   contentHash,
                   lastSyncedHash: contentHash,
-                  syncStatus: "synced",
+                  syncStatus: "SYNCED",
                   lastImportedAt: new Date(),
                 })
                 .returning();
@@ -534,40 +537,81 @@ export async function importFromGitlab(
     if (!anySuccess && rpyFiles.length > 0) {
       const errorMessage = firstError?.message || "All file fetches failed";
       await updateSyncOperation(operation.id, {
-        status: "failed",
+        status: "FAILED",
         errorMessage,
       });
 
       return {
         ...operation,
-        status: "failed",
+        status: "FAILED",
         errorMessage,
       };
     }
 
+    // Detect characters from imported files
+    let detectedCharacters: DetectedCharacter[] = [];
+
+    // Get project settings for excluded tags
+    const [settings] = await db
+      .select()
+      .from(projectSettings)
+      .where(eq(projectSettings.projectId, projectId))
+      .limit(1);
+
+    const excludedTags = new Set(settings?.excludedCharacterTags || ['n', 'u', 'narrator', 'extend']);
+
+    // Get all gitlab_files for this project
+    const importedFiles = await db
+      .select()
+      .from(gitlabFiles)
+      .where(eq(gitlabFiles.projectId, projectId));
+
+    // Parse characters from all imported files
+    const allDetected: DetectedCharacter[] = [];
+    for (const file of importedFiles) {
+      if (file.content) {
+        const fileCharacters = characterParserService.parseWithExclusions(
+          file.content,
+          file.filePath,
+          excludedTags
+        );
+        allDetected.push(...fileCharacters);
+      }
+    }
+
+    // Deduplicate by tag
+    const seenTags = new Set<string>();
+    for (const char of allDetected) {
+      if (!seenTags.has(char.tag)) {
+        seenTags.add(char.tag);
+        detectedCharacters.push(char);
+      }
+    }
+
     // Mark operation as completed
     await updateSyncOperation(operation.id, {
-      status: "completed",
+      status: "COMPLETED",
       conflictCount,
     });
 
     return {
       ...operation,
-      status: "completed",
+      status: "COMPLETED",
       conflictCount,
+      detectedCharacters,
     };
   } catch (error) {
     // Mark operation as failed
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
     await updateSyncOperation(operation.id, {
-      status: "failed",
+      status: "FAILED",
       errorMessage,
     });
 
     return {
       ...operation,
-      status: "failed",
+      status: "FAILED",
       errorMessage,
     };
   }

@@ -43,7 +43,7 @@ export async function markLabelModified(labelId: string): Promise<void> {
   await db
     .update(labels)
     .set({
-      syncStatus: "modified_local",
+      syncStatus: "MODIFIED_LOCAL",
       updatedAt: new Date(),
     })
     .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)));
@@ -86,7 +86,7 @@ export async function markLabelSynced(
     await tx
       .update(labels)
       .set({
-        syncStatus: "synced",
+        syncStatus: "SYNCED",
         lastExportedAt: new Date(),
         exportCommitSha: commitSha,
         lastSyncedHash: contentHash,
@@ -124,7 +124,7 @@ export async function markLabelImported(
   await db
     .update(labels)
     .set({
-      syncStatus: "synced",
+      syncStatus: "SYNCED",
       lastImportedAt: new Date(),
       importCommitSha: commitSha,
       updatedAt: new Date(),
@@ -168,7 +168,7 @@ export async function detectLabelConflicts(
     return false;
   }
 
-  const hasLocalChanges = label.syncStatus === "modified_local";
+  const hasLocalChanges = label.syncStatus === "MODIFIED_LOCAL";
   const hasRemoteChanges = label.lastSyncedHash !== newRemoteHash;
 
   return hasLocalChanges && hasRemoteChanges;
@@ -240,7 +240,7 @@ export async function getPendingExportLabels(
     .where(
       and(
         eq(labels.projectId, projectId),
-        eq(labels.syncStatus, "modified_local"),
+        eq(labels.syncStatus, "MODIFIED_LOCAL"),
         isNull(labels.deletedAt),
       ),
     );
@@ -266,7 +266,7 @@ export async function getConflictedLabels(
     .where(
       and(
         eq(labels.projectId, projectId),
-        eq(labels.syncStatus, "conflict"),
+        eq(labels.syncStatus, "CONFLICT"),
         isNull(labels.deletedAt),
       ),
     );

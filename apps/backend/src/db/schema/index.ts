@@ -25,6 +25,7 @@ export * from './tables/admin-settings.js';
 
 // Project tables
 export * from './tables/projects.js';
+export * from './tables/project-settings.js';
 
 // Visual system tables
 export * from './tables/visual-systems.js';

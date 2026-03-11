@@ -32,13 +32,22 @@ export interface GitLabRepository {
 export interface SyncOperation {
   id: string;
   projectId: string;
-  operation: "export" | "import";
-  status: "pending" | "in_progress" | "completed" | "failed";
+  operation: "EXPORT" | "IMPORT";
+  status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "FAILED";
   branch: string | null;
   conflictCount: number;
   errorMessage: string | null;
   startedAt: string;
   completedAt: string | null;
+  detectedCharacters?: Array<{
+    tag: string;
+    name: string | null;
+    displayName: string;
+    color: string;
+    isSpecial: boolean;
+    sourceFile: string;
+    confidence: number;
+  }>;
 }
 
 export interface ContentItem {
@@ -521,7 +530,7 @@ export const gitlabApi = {
         onUpdate(operation);
 
         // Stop polling if operation is complete or failed
-        if (operation.status === "completed" || operation.status === "failed") {
+        if (operation.status === "COMPLETED" || operation.status === "FAILED") {
           return operation;
         }
 

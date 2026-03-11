@@ -655,8 +655,8 @@ describe("GitLabSyncService (Integration)", () => {
 
       expect(result).toMatchObject({
         projectId: testProjectId,
-        operation: "export",
-        status: "completed",
+        operation: "EXPORT",
+        status: "COMPLETED",
         branch: testBranch,
         conflictCount: 0,
       });
@@ -689,8 +689,8 @@ describe("GitLabSyncService (Integration)", () => {
 
       expect(result).toMatchObject({
         projectId: testProjectId,
-        operation: "export",
-        status: "completed",
+        operation: "EXPORT",
+        status: "COMPLETED",
         branch: testBranch,
         conflictCount: 0,
       });
@@ -711,8 +711,8 @@ describe("GitLabSyncService (Integration)", () => {
 
       expect(result).toMatchObject({
         projectId: testProjectId,
-        operation: "export",
-        status: "failed",
+        operation: "EXPORT",
+        status: "FAILED",
         errorMessage: "GitLab API Error",
       });
     });
@@ -762,7 +762,7 @@ describe("GitLabSyncService (Integration)", () => {
         "Test export",
       );
 
-      expect(result.status).toBe("completed");
+      expect(result.status).toBe("COMPLETED");
       expect(createOrUpdateFileSpy).toHaveBeenCalledTimes(2);
 
       // Cleanup
@@ -782,7 +782,7 @@ describe("GitLabSyncService (Integration)", () => {
         ...testScene,
         contentHash: initialContentHash,
         lastSyncedHash: initialLastSyncedHash,
-        syncStatus: "modified_local",
+        syncStatus: "MODIFIED_LOCAL",
       });
 
       // Create label lines with different hashes
@@ -812,7 +812,7 @@ describe("GitLabSyncService (Integration)", () => {
         "Test export",
       );
 
-      expect(result.status).toBe("completed");
+      expect(result.status).toBe("COMPLETED");
 
       // Verify label's lastSyncedHash was advanced to contentHash
       const [updatedLabel] = await db
@@ -821,7 +821,7 @@ describe("GitLabSyncService (Integration)", () => {
         .where(eq(labelsTable.id, testScene.id));
       expect(updatedLabel).toBeDefined();
       expect(updatedLabel?.lastSyncedHash).toBe(initialContentHash);
-      expect(updatedLabel?.syncStatus).toBe("synced");
+      expect(updatedLabel?.syncStatus).toBe("SYNCED");
 
       // Verify label_lines' lastSyncedHash was advanced to contentHash
       const [updatedLine] = await db
@@ -873,8 +873,8 @@ describe("GitLabSyncService (Integration)", () => {
 
       expect(result).toMatchObject({
         projectId: testProjectId,
-        operation: "import",
-        status: "completed",
+        operation: "IMPORT",
+        status: "COMPLETED",
         branch: testBranch,
         conflictCount: 0,
       });
@@ -918,7 +918,7 @@ describe("GitLabSyncService (Integration)", () => {
       );
 
       expect(result).toMatchObject({
-        status: "completed",
+        status: "COMPLETED",
         conflictCount: 0,
       });
     });
@@ -957,7 +957,7 @@ describe("GitLabSyncService (Integration)", () => {
         "gitlab_wins" as ConflictResolution,
       );
 
-      expect(result.status).toBe("completed");
+      expect(result.status).toBe("COMPLETED");
       expect(result.conflictCount).toBe(0);
     });
 
@@ -995,7 +995,7 @@ describe("GitLabSyncService (Integration)", () => {
         "manual_review" as ConflictResolution,
       );
 
-      expect(result.status).toBe("completed");
+      expect(result.status).toBe("COMPLETED");
       expect(result.conflictCount).toBeGreaterThanOrEqual(1);
     });
 
@@ -1011,7 +1011,7 @@ describe("GitLabSyncService (Integration)", () => {
       );
 
       expect(result).toMatchObject({
-        status: "failed",
+        status: "FAILED",
         errorMessage: "API Error",
       });
     });
@@ -1038,7 +1038,7 @@ describe("GitLabSyncService (Integration)", () => {
         "branchforge_wins" as ConflictResolution,
       );
 
-      expect(result.status).toBe("completed");
+      expect(result.status).toBe("COMPLETED");
     });
   });
 });

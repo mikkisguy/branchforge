@@ -4,7 +4,9 @@
  * Tests for shutdown functionality in src/lib/shutdown.ts
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from "vitest";
+import type { FastifyInstance } from "fastify";
+import type { DrizzleSessionStore } from "../../services/session-store.service.js";
 import { isShutting, setShuttingState, shutdownForTest } from "../shutdown.js";
 
 // Mock the dependencies
@@ -16,12 +18,21 @@ vi.mock("../../services/rate-limiter.service.js", () => ({
   cleanupRateLimiter: vi.fn(),
 }));
 
+// Mock type definitions - use Partial to match expected interfaces
+type MockServer = Partial<FastifyInstance> & {
+  close: Mock<(callback?: (err?: Error) => void) => MockServer>;
+};
+
+type MockSessionStore = Partial<DrizzleSessionStore> & {
+  cleanup: Mock;
+};
+
 // We need to dynamically import after mocking
 describe("Graceful Shutdown Helpers", () => {
-  let mockServer: any;
-  let mockSessionStore: any;
-  let closeDb: any;
-  let cleanupRateLimiter: any;
+  let mockServer: MockServer;
+  let mockSessionStore: MockSessionStore;
+  let closeDb: Mock<() => Promise<void>>;
+  let cleanupRateLimiter: Mock;
 
   beforeEach(async () => {
     // Reset shutdown state before each test
@@ -186,7 +197,7 @@ describe("Graceful Shutdown Helpers", () => {
       expect(cleanupRateLimiter).not.toHaveBeenCalled();
     });
 
-    it("should be idempotent for multiple calls", async () => {
+    it("should be callable multiple times and reset state", async () => {
       // First call
       await shutdownForTest(mockServer, mockSessionStore);
       expect(mockServer.close).toHaveBeenCalledTimes(1);

@@ -51,6 +51,7 @@ export const labelLines = pgTable('label_lines', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => [
   index('label_lines_speaker_id_idx').on(table.speakerId),
+  index('label_lines_label_speaker_idx').on(table.labelId, table.speakerId),
   // Composite index for label lines ordered by sequence (common query pattern)
   // Leftmost prefix (labelId) serves queries filtering by labelId alone
   index('label_lines_label_sequence_idx').on(table.labelId, table.sequence),

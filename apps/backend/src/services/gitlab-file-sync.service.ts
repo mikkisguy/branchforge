@@ -112,7 +112,7 @@ export async function checkInProgressSync(
     .where(
       and(
         eq(gitlabFileSyncState.gitlabFileId, gitlabFileId),
-        eq(gitlabFileSyncState.status, "modified_local"),
+        eq(gitlabFileSyncState.status, "MODIFIED_LOCAL"),
         isNull(gitlabFileSyncState.completedAt),
       ),
     )
@@ -136,7 +136,7 @@ export async function checkContentAlreadySynced(
     .where(
       and(
         eq(gitlabFileSyncState.gitlabFileId, gitlabFileId),
-        eq(gitlabFileSyncState.status, "synced"),
+        eq(gitlabFileSyncState.status, "SYNCED"),
         eq(gitlabFileSyncState.contentHash, contentHash),
       ),
     )
@@ -161,7 +161,7 @@ export async function createSyncState(
     .values({
       gitlabFileId,
       contentHash,
-      status: "modified_local",
+      status: "MODIFIED_LOCAL",
       rpyLabelCount: labelCount,
       dbLabelCount: 0,
     })
@@ -184,7 +184,7 @@ export async function completeSyncState(
   await db
     .update(gitlabFileSyncState)
     .set({
-      status: success ? "synced" : "conflict",
+      status: success ? "SYNCED" : "CONFLICT",
       completedAt: new Date(),
       dbLabelCount,
       errorMessage,
@@ -390,7 +390,7 @@ export async function syncLabelsFromGitLabFile(
                 .set({
                   contentHash: labelLinesHash,
                   lastSyncedHash: labelLinesHash,
-                  syncStatus: "synced",
+                  syncStatus: "SYNCED",
                   updatedAt: new Date(),
                 })
                 .where(eq(labels.id, existingLabel.id));
@@ -417,7 +417,7 @@ export async function syncLabelsFromGitLabFile(
                   // Sync fields
                   contentHash: labelLinesHash,
                   lastSyncedHash: labelLinesHash,
-                  syncStatus: "synced",
+                  syncStatus: "SYNCED",
                 })
                 .returning();
 

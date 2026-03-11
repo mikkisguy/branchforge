@@ -23,6 +23,7 @@ export const characters = pgTable('characters', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => [
   index('characters_project_id_idx').on(table.projectId),
+  index('characters_project_renpytag_idx').on(table.projectId, table.renpyTag),
   index('characters_pair_group_id_idx').on(table.pairGroupId),
 ]);
 

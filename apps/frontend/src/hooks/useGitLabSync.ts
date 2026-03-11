@@ -33,13 +33,13 @@ function calculateProgress(
   status: SyncOperation["status"],
   pollStartTime: number | null,
 ): number {
-  if (status === "completed") {
+  if (status === "COMPLETED") {
     return 100;
   }
-  if (status === "failed") {
+  if (status === "FAILED") {
     return 0;
   }
-  if (status === "in_progress" && pollStartTime) {
+  if (status === "IN_PROGRESS" && pollStartTime) {
     const elapsed = Date.now() - pollStartTime;
     return Math.min(
       Math.max(10 + Math.round((elapsed / POLL_TIMEOUT_MS) * 80), 10),
@@ -129,7 +129,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
     ) => {
       const data = query.state.data as SyncOperation | null | undefined;
       // Stop polling when operation is complete or failed
-      if (!data || data.status === "completed" || data.status === "failed") {
+      if (!data || data.status === "COMPLETED" || data.status === "FAILED") {
         return false;
       }
       return 1000; // Poll every second
@@ -146,25 +146,29 @@ export function useGitLabSync(): UseGitLabSyncReturn {
       ...prev,
       operation: op,
       progress: calculateProgress(op.status, pollStartTime),
-      isProcessing: op.status === "pending" || op.status === "in_progress",
+      isProcessing: op.status === "PENDING" || op.status === "IN_PROGRESS",
       error:
-        op.status === "failed" ? (op.errorMessage ?? "Operation failed") : null,
+        op.status === "FAILED" ? (op.errorMessage ?? "Operation failed") : null,
     }));
 
     // Stop polling on completion and invalidate caches
-    if (op.status === "completed" || op.status === "failed") {
+    if (op.status === "COMPLETED" || op.status === "FAILED") {
       const projectId = activeProjectIdRef.current;
       updateActiveOperationId(null);
       setPollStartTime(null);
       activeProjectIdRef.current = null;
 
       // Invalidate caches on successful completion
-      if (op.status === "completed" && projectId) {
+      if (op.status === "COMPLETED" && projectId) {
         queryClient.invalidateQueries({
           queryKey: labelKeys.lists(projectId),
         });
         queryClient.invalidateQueries({
           queryKey: gitlabKeys.importedFiles(projectId),
+        });
+        // Invalidate linked repositories to refresh bottom bar
+        queryClient.invalidateQueries({
+          queryKey: gitlabKeys.repositories(),
         });
       }
     }

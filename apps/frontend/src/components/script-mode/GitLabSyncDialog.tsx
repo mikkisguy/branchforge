@@ -15,6 +15,8 @@ import { type ConflictResolution } from "@/lib/api/gitlab";
 import { useGitLabSync } from "@/hooks/useGitLabSync";
 import { useToast } from "@/contexts/ToastContext";
 import { useLabels } from "@/hooks/useLabels";
+import { CharacterImportWizard } from "@/components/CharacterImportWizard";
+import { charactersApi, type DetectCharactersResponse } from "@/lib/api/characters";
 
 // ============================================================================
 // Types
@@ -79,6 +81,10 @@ export function GitLabSyncDialog({
   const [conflictResolution, setConflictResolution] =
     useState<ConflictResolution>("branchforge_wins");
 
+  // Character wizard state
+  const [showCharacterWizard, setShowCharacterWizard] = useState(false);
+  const [detectedCharacters, setDetectedCharacters] = useState<DetectCharactersResponse | null>(null);
+
   // Ref to track the timeout so we can clear it on unmount
   const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
@@ -116,7 +122,7 @@ export function GitLabSyncDialog({
         : await importFromGitlab(projectId, branch.trim(), resolution);
 
     // Use the returned result for toast notifications
-    if (result?.status === "completed") {
+    if (result?.status === "COMPLETED") {
       success(
         `${operationType === "export" ? "Export" : "Import"} completed successfully`,
       );
@@ -124,6 +130,34 @@ export function GitLabSyncDialog({
       // Refresh scene list after successful sync
       await invalidateLabels();
 
+      // For import operations, always show the character wizard
+      // (even if no characters were detected - users can manually add them)
+      if (operationType === "import") {
+        try {
+          // Get full detection info including conflicts
+          const detectionResult = await charactersApi.detectCharacters(projectId);
+          setDetectedCharacters({
+            characters: detectionResult.characters,
+            conflicts: detectionResult.conflicts,
+            excludedTags: detectionResult.excludedTags,
+          });
+          setShowCharacterWizard(true);
+          // Don't close the dialog - show the character wizard
+          return;
+        } catch (err) {
+          console.error("Failed to detect characters:", err);
+          // Still show wizard even if detection fails - users can add manually
+          setDetectedCharacters({
+            characters: [],
+            conflicts: [],
+            excludedTags: [],
+          });
+          setShowCharacterWizard(true);
+          return;
+        }
+      }
+
+      // Close dialog after successful sync (if not showing character wizard)
       // Clear any existing timeout before scheduling a new one
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -132,7 +166,7 @@ export function GitLabSyncDialog({
         reset();
         onOpenChange(false);
       }, 1000);
-    } else if (result?.status === "failed") {
+    } else if (result?.status === "FAILED") {
       error(result.errorMessage || "Operation failed");
     }
   }, [
@@ -227,12 +261,12 @@ export function GitLabSyncDialog({
               {state.operation && (
                 <div
                   className={
-                    state.operation.status === "completed"
+                    state.operation.status === "COMPLETED"
                       ? "text-green-600"
                       : "text-amber-600"
                   }
                 >
-                  {state.operation.status === "completed" && (
+                  {state.operation.status === "COMPLETED" && (
                     <div className="flex items-center gap-2 text-sm">
                       <CheckCircle2 className="w-4 h-4" />
                       <span>
@@ -241,7 +275,7 @@ export function GitLabSyncDialog({
                       </span>
                     </div>
                   )}
-                  {state.operation.status === "failed" && (
+                  {state.operation.status === "FAILED" && (
                     <div className="flex items-center gap-2 text-sm">
                       <AlertCircle className="w-4 h-4" />
                       <span>{state.error || "Operation failed"}</span>
@@ -356,7 +390,7 @@ export function GitLabSyncDialog({
             </>
           )}
           {(state.isProcessing || state.operation) &&
-            state.operation?.status !== "completed" && (
+            state.operation?.status !== "COMPLETED" && (
               <Button onClick={handleClose} variant="outline">
                 Close
               </Button>
@@ -366,6 +400,29 @@ export function GitLabSyncDialog({
           )}
         </div>
       </DialogContent>
+
+      {/* Character Import Wizard */}
+      {detectedCharacters && (
+        <CharacterImportWizard
+          open={showCharacterWizard}
+          onOpenChange={(open) => {
+            setShowCharacterWizard(open);
+            if (!open) {
+              // Close the sync dialog after character wizard is closed
+              reset();
+              onOpenChange(false);
+            }
+          }}
+          projectId={projectId}
+          detectedCharacters={detectedCharacters.characters}
+          conflicts={detectedCharacters.conflicts}
+          excludedTags={detectedCharacters.excludedTags}
+          onComplete={() => {
+            // Refresh labels after character import
+            invalidateLabels();
+          }}
+        />
+      )}
     </Dialog>
   );
 }

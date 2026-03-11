@@ -269,7 +269,7 @@ async function updateLabelDialogueHandler(
         .set({
           ...auditFields,
           contentHash,
-          syncStatus: "modified_local",
+          syncStatus: "MODIFIED_LOCAL",
         })
         .where(eq(labels.id, labelId));
     });
