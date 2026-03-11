@@ -16,7 +16,10 @@
     "test:e2e": "echo \"E2E tests not yet implemented\"",
     "dev": "VITE_API_ENV=development pnpm --parallel -r --filter './apps/*' dev",
     "build": "pnpm -r --filter './packages/*' --filter './apps/*' build",
-    "lint": "pnpm -r --filter './packages/*' --filter './apps/*' lint",
+    "lint": "pnpm --filter @branchforge/shared --filter @branchforge/backend lint",
+    "lint:fix": "pnpm --filter @branchforge/shared --filter @branchforge/backend lint:fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "typecheck": "pnpm -r --filter './packages/*' --filter './apps/*' typecheck",
     "clean": "rm -rf node_modules apps/*/node_modules apps/*/dist packages/*/node_modules packages/*/dist"
   },

@@ -139,7 +139,7 @@ class CharacterParserService {
     // Also supports: default tag = Character("name", options...)
     // Also supports variable names: Character(variable_name, ...) or Character([variable_name], ...)
     const standardMatch = trimmed.match(
-      /(?:define|default)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\(\s*(?:"([^"]+)"|(\[?[a-zA-Z_][a-zA-Z0-9_\[\]*.]*\]?))(\s*,\s*([^)]*))?\s*\)/
+      /(?:define|default)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\(\s*(?:"([^"]+)"|(\[?[a-zA-Z_][a-zA-Z0-9_[\]*.]*\]?))(\s*,\s*([^)]*))?\s*\)/
     );
     if (standardMatch) {
       const tag = standardMatch[1];
@@ -212,7 +212,7 @@ class CharacterParserService {
 
       // Check if name is on the same line (quoted string, variable, or bracketed variable)
       const quotedNameMatch = rest.match(/"([^"]*)"/);
-      const bracketedNameMatch = !quotedNameMatch && rest.match(/\[([a-zA-Z_][a-zA-Z0-9_\[\]*.]*)\]/);
+      const bracketedNameMatch = !quotedNameMatch && rest.match(/\[([a-zA-Z_][a-zA-Z0-9_[\]*.]*)\]/);
       const variableNameMatch = !quotedNameMatch && !bracketedNameMatch && rest.match(/([a-zA-Z_][a-zA-Z0-9_.]*)/);
       const name = quotedNameMatch ? quotedNameMatch[1] : (bracketedNameMatch ? bracketedNameMatch[1] : (variableNameMatch ? variableNameMatch[0] : null));
 

@@ -243,7 +243,7 @@ export async function listGitlabRepositories(
     } else {
       break;
     }
-  } while (true);
+  } while (true); // eslint-disable-line no-constant-condition -- Valid pagination pattern with break condition inside loop
 
   return gitlabRepositories;
 }
@@ -548,7 +548,7 @@ export async function listRpyFiles(
     } else {
       break;
     }
-  } while (true);
+  } while (true); // eslint-disable-line no-constant-condition -- Valid pagination pattern with break condition inside loop
 
   return rpyFiles;
 }
@@ -668,60 +668,54 @@ export async function createOrUpdateFile(
 
   for (let retry = 0; retry < maxRetries && !response; retry++) {
     for (const method of methods) {
-      try {
-        const attemptResponse = await fetchWithTimeout(apiUrl.toString(), {
-          method,
-          headers: {
-            "PRIVATE-TOKEN": token,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            branch,
-            content: base64Content,
-            commit_message: commitMessage,
-            encoding: "base64",
-          }),
-        });
+      const attemptResponse = await fetchWithTimeout(apiUrl.toString(), {
+        method,
+        headers: {
+          "PRIVATE-TOKEN": token,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          branch,
+          content: base64Content,
+          commit_message: commitMessage,
+          encoding: "base64",
+        }),
+      });
 
-        // GitLab returns 400 with "file with same name" error when trying to POST to existing file
-        // GitLab returns 404 when trying to PUT to a non-existent file
-        // On success, we return the response
-        if (attemptResponse.ok) {
-          response = attemptResponse;
-          break;
-        }
+      // GitLab returns 400 with "file with same name" error when trying to POST to existing file
+      // GitLab returns 404 when trying to PUT to a non-existent file
+      // On success, we return the response
+      if (attemptResponse.ok) {
+        response = attemptResponse;
+        break;
+      }
 
-        const errorText = await attemptResponse.text();
+      const errorText = await attemptResponse.text();
 
-        // If PUT fails with 404, file doesn't exist - try POST next
-        if (method === "PUT" && attemptResponse.status === 404) {
-          lastError = new Error(
-            `GitLab API error: ${attemptResponse.status} - ${errorText}`,
-          );
-          continue;
-        }
-
-        // If POST fails with 400 (likely file already exists), retry from PUT
-        if (
-          method === "POST" &&
-          attemptResponse.status === 400 &&
-          errorText.includes("file with same name")
-        ) {
-          lastError = new Error(
-            `GitLab API error: ${attemptResponse.status} - ${errorText}`,
-          );
-          break; // Break inner loop to retry from PUT
-        }
-
-        // For other errors, don't retry - fail immediately
-        throw new Error(
+      // If PUT fails with 404, file doesn't exist - try POST next
+      if (method === "PUT" && attemptResponse.status === 404) {
+        lastError = new Error(
           `GitLab API error: ${attemptResponse.status} - ${errorText}`,
         );
-      } catch (e) {
-        // Re-throw all errors immediately. Retryable cases (PUT 404, POST 400)
-        // are handled above via continue/break without throwing.
-        throw e;
+        continue;
       }
+
+      // If POST fails with 400 (likely file already exists), retry from PUT
+      if (
+        method === "POST" &&
+        attemptResponse.status === 400 &&
+        errorText.includes("file with same name")
+      ) {
+        lastError = new Error(
+          `GitLab API error: ${attemptResponse.status} - ${errorText}`,
+        );
+        break; // Break inner loop to retry from PUT
+      }
+
+      // For other errors, don't retry - fail immediately
+      throw new Error(
+        `GitLab API error: ${attemptResponse.status} - ${errorText}`,
+      );
     }
   }
 

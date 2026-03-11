@@ -621,7 +621,7 @@ export const createGitLabIntegrationSchema = z
       .string()
       .min(1, "Branch name is required")
       .max(255, "Branch name is too long")
-      .regex(/^[a-zA-Z0-9-_\/]+$/, "Branch name contains invalid characters"),
+      .regex(/^[a-zA-Z0-9-_/]+$/, "Branch name contains invalid characters"),
   })
   .strict();
 

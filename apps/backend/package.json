@@ -19,7 +19,10 @@
     "db:restore": "dotenv -e ../../.env -- tsx scripts/db-restore.ts",
     "db:list": "dotenv -e ../../.env -- tsx scripts/db-list.ts",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@branchforge/shared": "workspace:*",
@@ -41,7 +44,9 @@
     "dotenv-cli": "^11.0.0",
     "drizzle-kit": "^0.31.9",
     "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
     "nock": "^14.0.11",
+    "prettier": "^3.4.2",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "vite-tsconfig-paths": "^6.0.0",

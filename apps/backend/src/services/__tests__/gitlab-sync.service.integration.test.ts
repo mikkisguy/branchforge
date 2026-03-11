@@ -841,6 +841,9 @@ describe("GitLabSyncService (Integration)", () => {
   describe("importFromGitlab", () => {
     it("should import files from GitLab", async () => {
       // Mock the GitLab service
+      vi.spyOn(gitlabService, "getBranchCommitSha").mockResolvedValue(
+        "abc123def456",
+      );
       vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([
         { name: "script.rpy", path: "game/script.rpy" } as any,
       ]);
@@ -909,6 +912,9 @@ describe("GitLabSyncService (Integration)", () => {
     });
 
     it("should handle import from empty repository", async () => {
+      vi.spyOn(gitlabService, "getBranchCommitSha").mockResolvedValue(
+        "abc123def456",
+      );
       vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([]);
 
       const result = await importFromGitlab(
@@ -927,6 +933,9 @@ describe("GitLabSyncService (Integration)", () => {
       // Create an existing scene
       await db.insert(labelsTable).values(testScene);
 
+      vi.spyOn(gitlabService, "getBranchCommitSha").mockResolvedValue(
+        "abc123def456",
+      );
       vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([
         { name: "script.rpy", path: "game/script.rpy" } as any,
       ]);
@@ -965,6 +974,9 @@ describe("GitLabSyncService (Integration)", () => {
       // Create an existing scene
       await db.insert(labelsTable).values(testScene);
 
+      vi.spyOn(gitlabService, "getBranchCommitSha").mockResolvedValue(
+        "abc123def456",
+      );
       vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([
         { name: "script.rpy", path: "game/script.rpy" } as any,
       ]);
@@ -1000,6 +1012,9 @@ describe("GitLabSyncService (Integration)", () => {
     });
 
     it("should handle API errors", async () => {
+      vi.spyOn(gitlabService, "getBranchCommitSha").mockResolvedValue(
+        "abc123def456",
+      );
       vi.spyOn(gitlabService, "listRpyFiles").mockRejectedValue(
         new Error("API Error"),
       );
@@ -1017,6 +1032,9 @@ describe("GitLabSyncService (Integration)", () => {
     });
 
     it("should handle invalid RPY content gracefully", async () => {
+      vi.spyOn(gitlabService, "getBranchCommitSha").mockResolvedValue(
+        "abc123def456",
+      );
       vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([
         { name: "script.rpy", path: "game/script.rpy" } as any,
       ]);
