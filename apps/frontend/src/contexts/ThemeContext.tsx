@@ -1,6 +1,16 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react";
 
-export type ThemePalette = "forest" | "periwinkle" | "dark-amethyst" | "graphite";
+export type ThemePalette =
+  | "forest"
+  | "periwinkle"
+  | "dark-amethyst"
+  | "graphite";
 
 interface ThemeColors {
   primary: string;
@@ -8,10 +18,10 @@ interface ThemeColors {
 }
 
 const themeConfigs: Record<ThemePalette, ThemeColors> = {
-  "forest": { primary: "#40bb82", hover: "#52c992" },
-  "periwinkle": { primary: "#3d4ac2", hover: "#515fcc" },
+  forest: { primary: "#40bb82", hover: "#52c992" },
+  periwinkle: { primary: "#3d4ac2", hover: "#515fcc" },
   "dark-amethyst": { primary: "#9549b6", hover: "#a960c7" },
-  "graphite": { primary: "#9ca3af", hover: "#b0b7c4" },
+  graphite: { primary: "#9ca3af", hover: "#b0b7c4" },
 };
 
 interface ThemeContextType {
@@ -43,10 +53,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // Generate rgba variants for opacity support
     const rgb = hexToRgb(colors.primary);
     if (rgb) {
-      root.style.setProperty("--theme-color-rgb", `${rgb.r}, ${rgb.g}, ${rgb.b}`);
+      root.style.setProperty(
+        "--theme-color-rgb",
+        `${rgb.r}, ${rgb.g}, ${rgb.b}`
+      );
       // Theme border color (subtle version of theme color)
-      root.style.setProperty("--theme-border", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`);
-      root.style.setProperty("--theme-border-subtle", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`);
+      root.style.setProperty(
+        "--theme-border",
+        `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`
+      );
+      root.style.setProperty(
+        "--theme-border-subtle",
+        `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`
+      );
     }
   }, [theme, colors]);
 

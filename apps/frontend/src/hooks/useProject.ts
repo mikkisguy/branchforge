@@ -39,7 +39,7 @@ function persistCurrentProjectId(projectId: string | null): void {
     if (projectId) {
       localStorage.setItem(
         CURRENT_PROJECT_STORAGE_KEY,
-        JSON.stringify(projectId),
+        JSON.stringify(projectId)
       );
       return;
     }
@@ -175,4 +175,3 @@ export function useProject(): UseProjectReturn {
     createProject,
   };
 }
-

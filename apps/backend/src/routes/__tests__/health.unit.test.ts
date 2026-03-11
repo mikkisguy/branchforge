@@ -49,4 +49,3 @@ describe("Health Routes", () => {
     expect(date.toISOString()).toBe(payload.timestamp);
   });
 });
-

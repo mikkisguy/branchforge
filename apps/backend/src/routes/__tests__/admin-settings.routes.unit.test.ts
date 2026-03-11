@@ -1,12 +1,12 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import Fastify from 'fastify';
-import cookie from '@fastify/cookie';
-import session from '@fastify/session';
-import { adminSettingsRoutes } from '../admin-settings.routes.js';
-import * as adminSettingsService from '../../services/admin-settings.service.js';
+import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+import Fastify from "fastify";
+import cookie from "@fastify/cookie";
+import session from "@fastify/session";
+import { adminSettingsRoutes } from "../admin-settings.routes.js";
+import * as adminSettingsService from "../../services/admin-settings.service.js";
 
 // Mock the admin settings service
-vi.mock('../../services/admin-settings.service.js', () => ({
+vi.mock("../../services/admin-settings.service.js", () => ({
   getAdminSetting: vi.fn(),
   setAdminSetting: vi.fn(),
 }));
@@ -22,14 +22,14 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('Admin Settings Routes (Unit)', () => {
+describe("Admin Settings Routes (Unit)", () => {
   let fastify: ReturnType<typeof Fastify>;
 
   beforeEach(async () => {
     fastify = Fastify();
     await fastify.register(cookie);
     await fastify.register(session, {
-      secret: 'a'.repeat(32),
+      secret: "a".repeat(32),
     });
 
     // Register admin settings routes
@@ -37,73 +37,87 @@ describe('Admin Settings Routes (Unit)', () => {
     await fastify.ready();
   });
 
-  describe('GET /public/settings/signups', () => {
-    it('should return signups enabled status when setting is true', async () => {
-      vi.mocked(adminSettingsService.getAdminSetting).mockResolvedValueOnce(true);
+  describe("GET /public/settings/signups", () => {
+    it("should return signups enabled status when setting is true", async () => {
+      vi.mocked(adminSettingsService.getAdminSetting).mockResolvedValueOnce(
+        true
+      );
 
       const response = await fastify.inject({
-        method: 'GET',
-        url: '/public/settings/signups',
+        method: "GET",
+        url: "/public/settings/signups",
       });
 
       expect(response.statusCode).toBe(200);
       expect(JSON.parse(response.payload)).toEqual({ enabled: true });
-      expect(adminSettingsService.getAdminSetting).toHaveBeenCalledWith('sign_ups_enabled');
+      expect(adminSettingsService.getAdminSetting).toHaveBeenCalledWith(
+        "sign_ups_enabled"
+      );
     });
 
-    it('should return signups enabled status when setting is false', async () => {
-      vi.mocked(adminSettingsService.getAdminSetting).mockResolvedValueOnce(false);
+    it("should return signups enabled status when setting is false", async () => {
+      vi.mocked(adminSettingsService.getAdminSetting).mockResolvedValueOnce(
+        false
+      );
 
       const response = await fastify.inject({
-        method: 'GET',
-        url: '/public/settings/signups',
+        method: "GET",
+        url: "/public/settings/signups",
       });
 
       expect(response.statusCode).toBe(200);
       expect(JSON.parse(response.payload)).toEqual({ enabled: false });
     });
 
-    it('should return signups enabled status when setting does not exist (null)', async () => {
-      vi.mocked(adminSettingsService.getAdminSetting).mockResolvedValueOnce(null);
+    it("should return signups enabled status when setting does not exist (null)", async () => {
+      vi.mocked(adminSettingsService.getAdminSetting).mockResolvedValueOnce(
+        null
+      );
 
       const response = await fastify.inject({
-        method: 'GET',
-        url: '/public/settings/signups',
+        method: "GET",
+        url: "/public/settings/signups",
       });
 
       expect(response.statusCode).toBe(200);
       expect(JSON.parse(response.payload)).toEqual({ enabled: true });
     });
 
-    it('should return signups enabled status for truthy values', async () => {
-      vi.mocked(adminSettingsService.getAdminSetting).mockResolvedValueOnce('yes');
+    it("should return signups enabled status for truthy values", async () => {
+      vi.mocked(adminSettingsService.getAdminSetting).mockResolvedValueOnce(
+        "yes"
+      );
 
       const response = await fastify.inject({
-        method: 'GET',
-        url: '/public/settings/signups',
+        method: "GET",
+        url: "/public/settings/signups",
       });
 
       expect(response.statusCode).toBe(200);
       expect(JSON.parse(response.payload)).toEqual({ enabled: true });
     });
 
-    it('should be accessible without authentication', async () => {
-      vi.mocked(adminSettingsService.getAdminSetting).mockResolvedValueOnce(true);
+    it("should be accessible without authentication", async () => {
+      vi.mocked(adminSettingsService.getAdminSetting).mockResolvedValueOnce(
+        true
+      );
 
       const response = await fastify.inject({
-        method: 'GET',
-        url: '/public/settings/signups',
+        method: "GET",
+        url: "/public/settings/signups",
       });
 
       expect(response.statusCode).toBe(200);
     });
 
-    it('should handle service errors gracefully', async () => {
-      vi.mocked(adminSettingsService.getAdminSetting).mockRejectedValueOnce(new Error('Database error'));
+    it("should handle service errors gracefully", async () => {
+      vi.mocked(adminSettingsService.getAdminSetting).mockRejectedValueOnce(
+        new Error("Database error")
+      );
 
       const response = await fastify.inject({
-        method: 'GET',
-        url: '/public/settings/signups',
+        method: "GET",
+        url: "/public/settings/signups",
       });
 
       // Should return 500 on error
@@ -111,17 +125,17 @@ describe('Admin Settings Routes (Unit)', () => {
     });
   });
 
-  describe('GET /admin/settings', () => {
-    it('should return 401 when not authenticated', async () => {
+  describe("GET /admin/settings", () => {
+    it("should return 401 when not authenticated", async () => {
       const response = await fastify.inject({
-        method: 'GET',
-        url: '/admin/settings',
+        method: "GET",
+        url: "/admin/settings",
       });
 
       expect(response.statusCode).toBe(401);
       expect(JSON.parse(response.payload)).toEqual({
-        error: 'Unauthorized',
-        message: 'Authentication required',
+        error: "Unauthorized",
+        message: "Authentication required",
       });
     });
 
@@ -129,26 +143,26 @@ describe('Admin Settings Routes (Unit)', () => {
     // These tests are better suited for integration tests with real auth
   });
 
-  describe('PUT /admin/settings/:key', () => {
-    it('should return 401 when not authenticated', async () => {
+  describe("PUT /admin/settings/:key", () => {
+    it("should return 401 when not authenticated", async () => {
       const response = await fastify.inject({
-        method: 'PUT',
-        url: '/admin/settings/sign_ups_enabled',
+        method: "PUT",
+        url: "/admin/settings/sign_ups_enabled",
         payload: { value: false },
       });
 
       expect(response.statusCode).toBe(401);
       expect(JSON.parse(response.payload)).toEqual({
-        error: 'Unauthorized',
-        message: 'Authentication required',
+        error: "Unauthorized",
+        message: "Authentication required",
       });
     });
 
-    it('should return 401 when updating any setting without auth', async () => {
+    it("should return 401 when updating any setting without auth", async () => {
       const response = await fastify.inject({
-        method: 'PUT',
-        url: '/admin/settings/some_key',
-        payload: { value: 'some_value' },
+        method: "PUT",
+        url: "/admin/settings/some_key",
+        payload: { value: "some_value" },
       });
 
       expect(response.statusCode).toBe(401);

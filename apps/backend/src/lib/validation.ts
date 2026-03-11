@@ -96,7 +96,7 @@ export const passwordSchema = z.preprocess(
   z
     .string()
     .min(8, "Password must be at least 8 characters")
-    .max(128, "Password is too long"),
+    .max(128, "Password is too long")
 );
 
 /**
@@ -145,7 +145,7 @@ export const labelStatusSchema = z.enum(
   [LabelStatus.DRAFT, LabelStatus.REVIEW, LabelStatus.FINAL],
   {
     message: "Status must be DRAFT, REVIEW, or FINAL",
-  },
+  }
 );
 
 /**
@@ -158,7 +158,7 @@ export const routeConfigKeySchema = z
   .max(50, "Route key is too long")
   .regex(
     ROUTE_KEY_REGEX,
-    "Route key must contain only letters, numbers, underscores, and hyphens",
+    "Route key must contain only letters, numbers, underscores, and hyphens"
   );
 
 /**
@@ -168,7 +168,7 @@ export const contentTypeSchema = z.enum(
   ["NARRATION", "DIALOGUE", "CHOICE", "MENU", "JUMP"],
   {
     message: "Content type must be NARRATION, DIALOGUE, CHOICE, MENU, or JUMP",
-  },
+  }
 );
 
 /**
@@ -185,7 +185,7 @@ export const elementTypeSchema = z.enum(
   ["LOCATION", "ITEM", "CONCEPT", "EVENT"],
   {
     message: "Element type must be LOCATION, ITEM, CONCEPT, or EVENT",
-  },
+  }
 );
 
 /**
@@ -196,7 +196,7 @@ export const suggestionTypeSchema = z.enum(
   {
     message:
       "Suggestion type must be CONSISTENCY, FLAG_SUGGEST, METER_SUGGEST, or DIALOGUE_VARIANT",
-  },
+  }
 );
 
 /**
@@ -206,7 +206,7 @@ export const suggestionStatusSchema = z.enum(
   ["PENDING", "ACCEPTED", "REJECTED"],
   {
     message: "Suggestion status must be PENDING, ACCEPTED, or REJECTED",
-  },
+  }
 );
 
 /**
@@ -217,7 +217,7 @@ export const characterRoleSchema = z.enum(
   {
     message:
       "Character role must be PRIMARY, SECONDARY, BACKGROUND, or MENTIONED",
-  },
+  }
 );
 
 /**
@@ -227,24 +227,24 @@ export const labelVisibilitySchema = z.enum(
   ["EXCLUSIVE", "SHARED", "DUO_PAIR"],
   {
     message: "Label visibility must be EXCLUSIVE, SHARED, or DUO_PAIR",
-  },
+  }
 );
 
 /**
  * Sync operation enum
  */
-export const syncOperationSchema = z.enum(["export", "import"], {
-  message: "Sync operation must be export or import",
+export const syncOperationSchema = z.enum(["EXPORT", "IMPORT"], {
+  message: "Sync operation must be EXPORT or IMPORT",
 });
 
 /**
  * Sync status enum
  */
 export const syncStatusSchema = z.enum(
-  ["pending", "in_progress", "completed", "failed"],
+  ["SYNCED", "MODIFIED_LOCAL", "CONFLICT"],
   {
-    message: "Sync status must be pending, in_progress, completed, or failed",
-  },
+    message: "Sync status must be SYNCED, MODIFIED_LOCAL, or CONFLICT",
+  }
 );
 
 // ============================================================================
@@ -296,7 +296,7 @@ export const updateProjectSchema = z
  * Project ID params validation
  */
 export const projectIdParamsSchema = z.object({
-  id: uuidSchema,
+  projectId: uuidSchema,
 });
 
 // ============================================================================
@@ -327,15 +327,14 @@ export const labelIdParamsSchema = z.object({
 export const createLabelSchema = z
   .object({
     projectId: uuidSchema,
-    routeKey: routeConfigKeySchema.optional(),
-    groupType: z.string().max(50).optional(),
-    groupValue: z.string().max(50).optional(),
+    route: routeConfigKeySchema.optional(),
+    groupType: optionalString(50),
+    groupValue: optionalString(50),
     labelNumber: z.number().int().min(1).max(999),
-    sequenceOrder: z.number().int().min(1).optional(),
+    sequenceOrder: z.number().int().min(0).optional(),
     status: labelStatusSchema.optional(),
     visibility: labelVisibilitySchema.optional(),
-    title: optionalString(200),
-    summary: optionalString(5000),
+    title: z.string().trim().min(1, "Title is required").max(255),
   })
   .strict();
 
@@ -344,9 +343,10 @@ export const createLabelSchema = z
  */
 export const updateLabelSchema = z
   .object({
+    route: routeConfigKeySchema.optional().nullable(),
     status: labelStatusSchema.optional(),
-    title: optionalString(200),
-    summary: optionalString(5000),
+    title: z.string().trim().min(1, "Title is required").max(255).optional(),
+    visibility: labelVisibilitySchema.optional(),
   })
   .strict()
   .partial();
@@ -361,7 +361,7 @@ export const updateLabelDialogueBodySchema = z
         z.object({
           speaker: z.string().nullable(),
           text: z.string().min(1, "Dialogue text cannot be empty"),
-        }),
+        })
       )
       .min(1, "At least one dialogue entry is required"),
   })
@@ -384,7 +384,7 @@ export const createRouteConfigSchema = z
       .max(50, "Jump prefix is too long")
       .regex(
         JUMP_PREFIX_REGEX,
-        "Jump prefix must contain only letters, numbers, underscores, and hyphens",
+        "Jump prefix must contain only letters, numbers, underscores, and hyphens"
       ),
     sortOrder: z.number().int().min(0).max(9999).optional(),
     isShared: z.boolean().optional(),
@@ -404,7 +404,7 @@ export const updateRouteConfigSchema = z
       .max(50, "Jump prefix is too long")
       .regex(
         JUMP_PREFIX_REGEX,
-        "Jump prefix must contain only letters, numbers, underscores, and hyphens",
+        "Jump prefix must contain only letters, numbers, underscores, and hyphens"
       )
       .optional(),
     sortOrder: z.number().int().min(0).max(9999).optional(),
@@ -431,16 +431,110 @@ export const routeConfigProjectIdParamsSchema = z.object({
 // ============================================================================
 
 /**
- * Create character request validation
+ * Ren'Py tag validation schema
+ * Validates character tags (alphanumeric, underscores)
+ */
+export const renpyTagSchema = z
+  .string()
+  .min(1, "Character tag is required")
+  .max(50, "Character tag is too long")
+  .regex(
+    /^[a-zA-Z_][a-zA-Z0-9_]*$/,
+    "Character tag must start with letter/underscore and contain only letters, numbers, and underscores"
+  );
+
+/**
+ * Color hex validation schema
+ * Validates hex color format (#RRGGBB)
+ */
+export const colorHexSchema = z
+  .string()
+  .regex(/^#[0-9A-Fa-f]{6}$/, "Color must be a valid hex format (#RRGGBB)");
+
+/**
+ * Detected character from RPY file
+ */
+export const detectedCharacterSchema = z.object({
+  tag: renpyTagSchema,
+  name: z.string().nullable().optional(),
+  displayName: z.string().min(1, "Display name is required").max(200),
+  color: colorHexSchema,
+  isSpecial: z.boolean().default(false),
+  sourceFile: z.string().optional(),
+  confidence: z.number().min(0).max(1).optional(),
+});
+
+/**
+ * Create character request validation (import from RPY)
+ *
+ * Field explanations:
+ * - renpyTag: The dialogue tag used in RPY files (e.g., "s" for `s "Hello!"`)
+ * - name: The variable reference from Character() definition (e.g., "[s_first]", "Name", None)
+ * - displayName: The human-readable name shown in BranchForge UI (Writer Mode, Character menu)
+ * - color: Hex color for dialogue display
  */
 export const createCharacterSchema = z
   .object({
     projectId: uuidSchema,
     name: requiredString(200, "Name is too long"),
-    alias: optionalString(100),
-    description: optionalString(5000),
+    displayName: requiredString(200, "Display name is too long"),
+    renpyTag: renpyTagSchema,
+    color: colorHexSchema,
+    routeAffiliation: optionalString(50),
+    isLoveInterest: z.boolean().default(false).optional(),
+    dialogueStyle: optionalString(100),
+    conditionalPrefix: optionalString(50),
   })
   .strict();
+
+/**
+ * Update character request validation
+ */
+export const updateCharacterSchema = z
+  .object({
+    name: requiredString(200, "Name is too long").optional(),
+    displayName: requiredString(200, "Display name is too long").optional(),
+    color: colorHexSchema.optional(),
+    routeAffiliation: optionalString(50),
+    isLoveInterest: z.boolean().optional(),
+    dialogueStyle: optionalString(100),
+    conditionalPrefix: optionalString(50),
+  })
+  .strict()
+  .partial();
+
+/**
+ * Character import request validation
+ */
+export const importCharactersSchema = z
+  .object({
+    characters: z
+      .array(
+        z.object({
+          tag: renpyTagSchema,
+          name: z.string().nullable(),
+          displayName: requiredString(200, "Display name is too long"),
+          color: colorHexSchema,
+          isLoveInterest: z.boolean().optional(),
+          routeAffiliation: optionalString(50),
+        })
+      )
+      .min(1, "At least one character is required"),
+    excludedTags: z.array(renpyTagSchema).default([]),
+    linkToLines: z.boolean().default(true),
+  })
+  .strict();
+
+/**
+ * Project settings validation
+ */
+export const projectSettingsSchema = z
+  .object({
+    excludedCharacterTags: z.array(renpyTagSchema).default([]),
+    autoLinkSpeakers: z.boolean().default(true),
+  })
+  .strict()
+  .partial();
 
 /**
  * Character ID params validation
@@ -502,7 +596,7 @@ export const gitlabUrlSchema = z
         return false;
       }
     },
-    { message: "Private/local URLs are not allowed" },
+    { message: "Private/local URLs are not allowed" }
   )
   .refine(
     (url) => {
@@ -517,7 +611,7 @@ export const gitlabUrlSchema = z
     },
     {
       message: "Only HTTPS URLs to gitlab.com or GitLab instances are allowed",
-    },
+    }
   );
 
 /**
@@ -534,7 +628,7 @@ export const createGitLabIntegrationSchema = z
       .string()
       .min(1, "Branch name is required")
       .max(255, "Branch name is too long")
-      .regex(/^[a-zA-Z0-9-_\/]+$/, "Branch name contains invalid characters"),
+      .regex(/^[a-zA-Z0-9-_/]+$/, "Branch name contains invalid characters"),
   })
   .strict();
 
@@ -593,6 +687,10 @@ export type UpdateLabelDialogueInput = z.infer<
 >;
 
 export type CreateCharacterInput = z.infer<typeof createCharacterSchema>;
+export type UpdateCharacterInput = z.infer<typeof updateCharacterSchema>;
+export type ImportCharactersInput = z.infer<typeof importCharactersSchema>;
+export type ProjectSettingsInput = z.infer<typeof projectSettingsSchema>;
+export type DetectedCharacterInput = z.infer<typeof detectedCharacterSchema>;
 export type CreateGitLabIntegrationInput = z.infer<
   typeof createGitLabIntegrationSchema
 >;
@@ -625,7 +723,7 @@ export type UpdateRouteConfigInput = z.infer<typeof updateRouteConfigSchema>;
 export function validateData<T extends z.ZodTypeAny>(
   data: unknown,
   schema: T,
-  errorMessage: string = "Validation failed",
+  errorMessage: string = "Validation failed"
 ): z.infer<T> {
   try {
     return schema.parse(data);
@@ -657,7 +755,7 @@ export function validateData<T extends z.ZodTypeAny>(
  */
 export function safeValidateData<T extends z.ZodTypeAny>(
   data: unknown,
-  schema: T,
+  schema: T
 ): { success: true; data: z.infer<T> } | { success: false; error: z.ZodError } {
   const result = schema.safeParse(data);
 
@@ -667,4 +765,3 @@ export function safeValidateData<T extends z.ZodTypeAny>(
 
   return { success: false, error: result.error };
 }
-

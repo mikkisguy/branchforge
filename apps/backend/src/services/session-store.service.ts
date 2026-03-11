@@ -11,21 +11,21 @@
  * - Better security with database-level isolation
  */
 
-import type { SessionStore } from '@fastify/session';
-import type { Session } from 'fastify';
-import { getDb } from '../db/index.js';
-import { userSessions } from '../db/schema/index.js';
-import { eq, lt } from 'drizzle-orm';
+import type { SessionStore } from "@fastify/session";
+import type { Session } from "fastify";
+import { getDb } from "../db/index.js";
+import { userSessions } from "../db/schema/index.js";
+import { eq, lt } from "drizzle-orm";
 
-type Callback = (err?: any) => void;
-type CallbackSession = (err: any, result?: Session | null) => void;
+type Callback = (err?: Error | null) => void;
+type CallbackSession = (err: Error | null, result?: Session | null) => void;
 
 // Define allowed session data properties for validation
 const ALLOWED_SESSION_KEYS = new Set([
-  'user',
-  'csrfToken',
-  'flash',
-  'returnTo',
+  "user",
+  "csrfToken",
+  "flash",
+  "returnTo",
   // Add other allowed keys as needed
 ]);
 
@@ -48,7 +48,7 @@ export type DeadLetterAlertCallback = (entry: DeadLetterEntry) => void;
 // Dead-letter queue for failed session operations
 interface DeadLetterEntry {
   sessionId: string;
-  operation: 'set' | 'destroy';
+  operation: "set" | "destroy";
   sessionData?: Session;
   timestamp: Date;
   lastError: string;
@@ -76,7 +76,7 @@ class DeadLetterQueue {
         this.alertCallback(entry);
       } catch (err) {
         // Log but don't throw - alert callback failures shouldn't disrupt session flow
-        console.error('DeadLetterQueue alert callback error:', err);
+        console.error("DeadLetterQueue alert callback error:", err);
       }
     }
   }
@@ -97,7 +97,9 @@ class DeadLetterQueue {
 /**
  * Validate and sanitize session data before storage
  */
-function validateSessionData(data: Record<string, unknown>): Record<string, unknown> {
+function validateSessionData(
+  data: Record<string, unknown>
+): Record<string, unknown> {
   const sanitized: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(data)) {
@@ -108,7 +110,7 @@ function validateSessionData(data: Record<string, unknown>): Record<string, unkn
     }
 
     // Recursively validate nested objects (up to 2 levels deep)
-    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
       const nestedObj = value as Record<string, unknown>;
       const sanitizedNested: Record<string, unknown> = {};
       let hasValidNested = false;
@@ -116,20 +118,24 @@ function validateSessionData(data: Record<string, unknown>): Record<string, unkn
       for (const [nestedKey, nestedValue] of Object.entries(nestedObj)) {
         // Limit nested object size and key length
         if (Object.keys(sanitizedNested).length >= 50) {
-          console.warn(`Session store: Too many keys in nested object "${key}"`);
+          console.warn(
+            `Session store: Too many keys in nested object "${key}"`
+          );
           break;
         }
         if (nestedKey.length > 100) {
-          console.warn(`Session store: Nested key too long in "${key}.${nestedKey}"`);
+          console.warn(
+            `Session store: Nested key too long in "${key}.${nestedKey}"`
+          );
           continue;
         }
 
         // Validate primitive values only (no nested objects beyond 2 levels)
         if (
           nestedValue === null ||
-          typeof nestedValue === 'string' ||
-          typeof nestedValue === 'number' ||
-          typeof nestedValue === 'boolean'
+          typeof nestedValue === "string" ||
+          typeof nestedValue === "number" ||
+          typeof nestedValue === "boolean"
         ) {
           sanitizedNested[nestedKey] = nestedValue;
           hasValidNested = true;
@@ -141,9 +147,9 @@ function validateSessionData(data: Record<string, unknown>): Record<string, unkn
       }
     } else if (
       value === null ||
-      typeof value === 'string' ||
-      typeof value === 'number' ||
-      typeof value === 'boolean'
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
     ) {
       // Allow primitive values
       sanitized[key] = value;
@@ -167,15 +173,23 @@ interface SessionRow {
 /**
  * Convert Fastify session data to database format
  */
-function sessionToDbData(session: Session): { userId: string; data: Record<string, unknown> } {
+function sessionToDbData(session: Session): {
+  userId: string;
+  data: Record<string, unknown>;
+} {
   // Extract userId from session data if present
-  const userId = (session.user as { id?: string } | undefined)?.id || '';
+  const userId = (session.user as { id?: string } | undefined)?.id || "";
 
   // Clean the session data before storing (remove Fastify internals)
   const rawData: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(session)) {
     // Skip internal Fastify session properties
-    if (key !== 'expires' && key !== 'cookie' && key !== 'sessionId' && key !== 'encryptedSessionId') {
+    if (
+      key !== "expires" &&
+      key !== "cookie" &&
+      key !== "sessionId" &&
+      key !== "encryptedSessionId"
+    ) {
       rawData[key] = value;
     }
   }
@@ -218,10 +232,13 @@ async function retryWithBackoff<T>(
 
       if (attempt < maxRetries) {
         // Calculate exponential backoff delay with jitter
-        const exponentialDelay = Math.min(baseDelayMs * 2 ** attempt, maxDelayMs);
+        const exponentialDelay = Math.min(
+          baseDelayMs * 2 ** attempt,
+          maxDelayMs
+        );
         const jitter = Math.random() * 0.3 * exponentialDelay; // Add up to 30% jitter
         const delay = exponentialDelay + jitter;
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
   }
@@ -239,11 +256,13 @@ export class DrizzleSessionStore implements SessionStore {
   private readonly retryOptions: RetryOptions;
   private readonly deadLetterQueue: DeadLetterQueue;
 
-  constructor(options: {
-    cleanupInterval?: number;
-    retryOptions?: Partial<RetryOptions>;
-    onDeadLetterEntry?: DeadLetterAlertCallback;
-  } = {}) {
+  constructor(
+    options: {
+      cleanupInterval?: number;
+      retryOptions?: Partial<RetryOptions>;
+      onDeadLetterEntry?: DeadLetterAlertCallback;
+    } = {}
+  ) {
     this.cleanupIntervalMs = options.cleanupInterval ?? 60 * 60 * 1000; // Default: 1 hour
     this.retryOptions = { ...DEFAULT_RETRY_OPTIONS, ...options.retryOptions };
     this.deadLetterQueue = new DeadLetterQueue(options.onDeadLetterEntry);
@@ -265,20 +284,25 @@ export class DrizzleSessionStore implements SessionStore {
     callback();
 
     // Run DB write with retries in the background
-    retryWithBackoff(() => this.setAsync(sessionId, session), this.retryOptions)
-      .catch((err) => {
-        // All retries exhausted - add to dead-letter queue
-        this.deadLetterQueue.add({
-          sessionId,
-          operation: 'set',
-          sessionData: session,
-          timestamp: new Date(),
-          lastError: err.message || String(err),
-          retryCount: this.retryOptions.maxRetries,
-        });
-
-        console.error(`Session store: Failed to save session "${sessionId}" after ${this.retryOptions.maxRetries} retries:`, err);
+    retryWithBackoff(
+      () => this.setAsync(sessionId, session),
+      this.retryOptions
+    ).catch((err) => {
+      // All retries exhausted - add to dead-letter queue
+      this.deadLetterQueue.add({
+        sessionId,
+        operation: "set",
+        sessionData: session,
+        timestamp: new Date(),
+        lastError: err.message || String(err),
+        retryCount: this.retryOptions.maxRetries,
       });
+
+      console.error(
+        `Session store: Failed to save session "${sessionId}" after ${this.retryOptions.maxRetries} retries:`,
+        err
+      );
+    });
   }
 
   /**
@@ -293,7 +317,7 @@ export class DrizzleSessionStore implements SessionStore {
       // We only persist authenticated sessions to the database
       // Use a small delay to match async behavior of real DB operations
       if (!userId) {
-        await new Promise(resolve => setImmediate(resolve));
+        await new Promise((resolve) => setImmediate(resolve));
         return;
       }
 
@@ -319,7 +343,7 @@ export class DrizzleSessionStore implements SessionStore {
           },
         });
     } catch (error) {
-      console.error('Session store set error:', error);
+      console.error("Session store set error:", error);
       throw error;
     }
   }
@@ -336,7 +360,7 @@ export class DrizzleSessionStore implements SessionStore {
     this.getAsync(sessionId)
       .then((session) => callback(null, session))
       .catch((err) => {
-        console.error('Session store get error:', err);
+        console.error("Session store get error:", err);
         // Return null on error - session will be treated as not found
         callback(null, null);
       });
@@ -369,7 +393,7 @@ export class DrizzleSessionStore implements SessionStore {
 
       return dbDataToSession(row as SessionRow);
     } catch (error) {
-      console.error('Session store get error:', error);
+      console.error("Session store get error:", error);
       throw error;
     }
   }
@@ -389,19 +413,24 @@ export class DrizzleSessionStore implements SessionStore {
     callback();
 
     // Run DB delete with retries in the background
-    retryWithBackoff(() => this.destroyAsync(sessionId), this.retryOptions)
-      .catch((err) => {
-        // All retries exhausted - add to dead-letter queue
-        this.deadLetterQueue.add({
-          sessionId,
-          operation: 'destroy',
-          timestamp: new Date(),
-          lastError: err.message || String(err),
-          retryCount: this.retryOptions.maxRetries,
-        });
-
-        console.error(`Session store: Failed to destroy session "${sessionId}" after ${this.retryOptions.maxRetries} retries:`, err);
+    retryWithBackoff(
+      () => this.destroyAsync(sessionId),
+      this.retryOptions
+    ).catch((err) => {
+      // All retries exhausted - add to dead-letter queue
+      this.deadLetterQueue.add({
+        sessionId,
+        operation: "destroy",
+        timestamp: new Date(),
+        lastError: err.message || String(err),
+        retryCount: this.retryOptions.maxRetries,
       });
+
+      console.error(
+        `Session store: Failed to destroy session "${sessionId}" after ${this.retryOptions.maxRetries} retries:`,
+        err
+      );
+    });
   }
 
   /**
@@ -412,7 +441,7 @@ export class DrizzleSessionStore implements SessionStore {
       const db = getDb();
       await db.delete(userSessions).where(eq(userSessions.id, sessionId));
     } catch (error) {
-      console.error('Session store destroy error:', error);
+      console.error("Session store destroy error:", error);
       throw error;
     }
   }
@@ -434,7 +463,7 @@ export class DrizzleSessionStore implements SessionStore {
 
       return result.rowCount ?? 0;
     } catch (error) {
-      console.error('Session store cleanup error:', error);
+      console.error("Session store cleanup error:", error);
       return 0;
     }
   }
@@ -452,7 +481,9 @@ export class DrizzleSessionStore implements SessionStore {
       const count = await this.cleanExpiredSessions();
       const duration = Date.now() - startTime;
       if (count > 0) {
-        console.log(`Session store: Cleaned up ${count} expired sessions (${duration}ms)`);
+        console.log(
+          `Session store: Cleaned up ${count} expired sessions (${duration}ms)`
+        );
       }
     }, this.cleanupIntervalMs);
 

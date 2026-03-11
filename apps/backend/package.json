@@ -12,13 +12,17 @@
     "test:integration": "dotenv -e ../../.env -- vitest run --config vitest.integration.config.ts",
     "db:generate": "tsc -p tsconfig.schema.json && drizzle-kit --config=drizzle.config.cjs generate",
     "db:migrate": "drizzle-kit --config=drizzle.config.cjs push",
-    "db:push:test": "tsc -p tsconfig.schema.json && NODE_ENV=test dotenv -e ../../.env -- drizzle-kit --config=drizzle.config.cjs push --force",
+    "db:migrate:dev": "drizzle-kit --config=drizzle.config.cjs push --force",
+    "db:migrate:test": "tsc -p tsconfig.schema.json && NODE_ENV=test dotenv -e ../../.env -- drizzle-kit --config=drizzle.config.cjs push --force",
     "db:studio": "drizzle-kit --config=drizzle.config.cjs studio",
     "db:backup": "dotenv -e ../../.env -- tsx scripts/db-backup.ts",
     "db:restore": "dotenv -e ../../.env -- tsx scripts/db-restore.ts",
     "db:list": "dotenv -e ../../.env -- tsx scripts/db-list.ts",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@branchforge/shared": "workspace:*",
@@ -34,15 +38,20 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@eslint/js": "^9.18.0",
     "@types/node": "^22.10.0",
     "@types/pg": "^8.13.0",
     "@vitest/ui": "^4.0.0",
     "dotenv-cli": "^11.0.0",
     "drizzle-kit": "^0.31.9",
-    "eslint": "^8.57.0",
+    "eslint": "^9.18.0",
+    "eslint-config-prettier": "^9.1.0",
+    "globals": "^15.14.0",
     "nock": "^14.0.11",
+    "prettier": "^3.4.2",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
+    "typescript-eslint": "^8.19.1",
     "vite-tsconfig-paths": "^6.0.0",
     "vitest": "^4.0.0"
   }

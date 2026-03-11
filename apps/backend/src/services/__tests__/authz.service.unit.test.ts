@@ -51,7 +51,7 @@ describe("Authorization Service", () => {
 
         try {
           await expect(hasProjectAccess("project-id", "user-id")).resolves.toBe(
-            false,
+            false
           );
         } finally {
           getDbSpy.mockRestore();
@@ -68,7 +68,7 @@ describe("Authorization Service", () => {
       it("should throw NotFoundError when project does not exist", async () => {
         // This will throw an error because there's no database, but we can verify the function exists
         await expect(
-          requireProjectAccess("nonexistent-project", "user-id"),
+          requireProjectAccess("nonexistent-project", "user-id")
         ).rejects.toThrow();
       });
     });
@@ -99,7 +99,7 @@ describe("Authorization Service", () => {
 
         try {
           await expect(getProjectRole("project-id", "user-id")).resolves.toBe(
-            null,
+            null
           );
         } finally {
           getDbSpy.mockRestore();
@@ -156,7 +156,7 @@ describe("Authorization Service", () => {
           const validRoles = ["OWNER", "READER", "TESTER"] as const;
           for (const role of validRoles) {
             await expect(
-              hasProjectRole("project-id", "user-id", role),
+              hasProjectRole("project-id", "user-id", role)
             ).resolves.toBe(true);
           }
         } finally {
@@ -185,8 +185,8 @@ describe("Authorization Service", () => {
               hasProjectRole(
                 "project-id",
                 "user-id",
-                role as unknown as UserRole,
-              ),
+                role as unknown as UserRole
+              )
             ).resolves.toBe(false);
           }
         } finally {
@@ -219,4 +219,3 @@ describe("Authorization Service", () => {
     });
   });
 });
-

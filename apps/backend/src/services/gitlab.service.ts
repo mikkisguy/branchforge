@@ -11,7 +11,7 @@ import {
   gitlabRepositories,
   projects,
 } from "../db/schema/index.js";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import {
   validateAndGetUsername,
   encryptPAT,
@@ -32,7 +32,7 @@ const DEFAULT_TIMEOUT_MS = 30000;
 async function fetchWithTimeout(
   url: string,
   options: RequestInit = {},
-  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -102,7 +102,7 @@ export interface GitlabTreeItem {
  */
 export async function validateGitlabPAT(
   token: string,
-  gitlabUrl: string = "https://gitlab.com",
+  gitlabUrl: string = "https://gitlab.com"
 ): Promise<string | null> {
   return validateAndGetUsername(token, gitlabUrl);
 }
@@ -133,7 +133,7 @@ export async function getGitlabIntegration(userId: string) {
 export async function storeGitlabIntegration(
   userId: string,
   token: string,
-  gitlabUrl: string = "https://gitlab.com",
+  gitlabUrl: string = "https://gitlab.com"
 ): Promise<void> {
   const db = getDb();
 
@@ -194,7 +194,7 @@ async function getDecryptedToken(userId: string): Promise<string> {
 
 export async function listGitlabRepositories(
   userId: string,
-  gitlabUrl?: string,
+  gitlabUrl?: string
 ): Promise<GitlabRepository[]> {
   const integration = await getGitlabIntegration(userId);
   if (!integration) {
@@ -203,7 +203,7 @@ export async function listGitlabRepositories(
 
   const token = decryptPAT(integration.encryptedToken);
   const url = validateGitLabUrl(
-    gitlabUrl || integration.gitlabUrl || undefined,
+    gitlabUrl || integration.gitlabUrl || undefined
   );
 
   const gitlabRepositories: GitlabRepository[] = [];
@@ -233,7 +233,7 @@ export async function listGitlabRepositories(
         id: p.id,
         name: p.name,
         path_with_namespace: p.path_with_namespace,
-      })),
+      }))
     );
 
     // Check pagination headers
@@ -243,7 +243,7 @@ export async function listGitlabRepositories(
     } else {
       break;
     }
-  } while (true);
+  } while (true); // eslint-disable-line no-constant-condition -- Valid pagination pattern with break condition inside loop
 
   return gitlabRepositories;
 }
@@ -257,7 +257,7 @@ export async function listGitlabRepositories(
 export async function getGitlabProject(
   userId: string,
   gitlabProjectId: number,
-  gitlabUrl?: string,
+  gitlabUrl?: string
 ): Promise<GitlabRepository | null> {
   const integration = await getGitlabIntegration(userId);
   if (!integration) {
@@ -266,7 +266,7 @@ export async function getGitlabProject(
 
   const token = decryptPAT(integration.encryptedToken);
   const url = validateGitLabUrl(
-    gitlabUrl || integration.gitlabUrl || undefined,
+    gitlabUrl || integration.gitlabUrl || undefined
   );
 
   const apiUrl = new URL(`/api/v4/projects/${gitlabProjectId}`, url);
@@ -305,7 +305,7 @@ export async function linkRepository(
   projectId: string,
   gitlabProjectId: number,
   repositoryName: string,
-  defaultBranch: string = "main",
+  defaultBranch: string = "main"
 ): Promise<void> {
   const db = getDb();
   await db
@@ -384,7 +384,7 @@ export async function listRepositoryLinks(userId: string) {
  */
 export async function listBranches(
   projectId: string,
-  gitlabUrl?: string,
+  gitlabUrl?: string
 ): Promise<string[]> {
   const repoLink = await getRepositoryLink(projectId);
   if (!repoLink) {
@@ -408,7 +408,7 @@ export async function listBranches(
 
   const apiUrl = new URL(
     `/api/v4/projects/${repoLink.gitlabProjectId}/repository/branches`,
-    url,
+    url
   );
 
   const response = await fetchWithTimeout(apiUrl.toString(), {
@@ -426,6 +426,59 @@ export async function listBranches(
 }
 
 /**
+ * Get the HEAD commit SHA for a branch
+ * @param projectId - The BranchForge project ID
+ * @param branch - The branch name
+ * @param gitlabUrl - Optional GitLab URL override
+ * @returns The commit SHA
+ */
+export async function getBranchCommitSha(
+  projectId: string,
+  branch: string,
+  gitlabUrl?: string
+): Promise<string> {
+  const repoLink = await getRepositoryLink(projectId);
+  if (!repoLink) {
+    throw new Error("GitLab repository not linked");
+  }
+
+  // Get user ID from project
+  const db = getDb();
+  const projectResult = await db
+    .select({ userId: projects.userId })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+
+  if (projectResult.length === 0) {
+    throw new Error("Project not found");
+  }
+
+  const token = await getDecryptedToken(projectResult[0].userId);
+  const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
+
+  const apiUrl = new URL(
+    `/api/v4/projects/${
+      repoLink.gitlabProjectId
+    }/repository/branches/${encodeURIComponent(branch)}`,
+    url
+  );
+
+  const response = await fetchWithTimeout(apiUrl.toString(), {
+    headers: {
+      "PRIVATE-TOKEN": token,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`GitLab API error: ${response.status}`);
+  }
+
+  const branchData = (await response.json()) as GitlabBranch;
+  return branchData.commit.id;
+}
+
+/**
  * List .rpy files in a GitLab repository
  * @param projectId - The BranchForge project ID
  * @param branch - The branch to search
@@ -435,7 +488,7 @@ export async function listBranches(
 export async function listRpyFiles(
   projectId: string,
   branch: string,
-  gitlabUrl?: string,
+  gitlabUrl?: string
 ): Promise<Array<{ name: string; path: string }>> {
   const repoLink = await getRepositoryLink(projectId);
   if (!repoLink) {
@@ -464,7 +517,7 @@ export async function listRpyFiles(
   do {
     const apiUrl = new URL(
       `/api/v4/projects/${repoLink.gitlabProjectId}/repository/tree`,
-      url,
+      url
     );
     apiUrl.searchParams.set("ref", branch);
     apiUrl.searchParams.set("recursive", "true");
@@ -497,7 +550,7 @@ export async function listRpyFiles(
     } else {
       break;
     }
-  } while (true);
+  } while (true); // eslint-disable-line no-constant-condition -- Valid pagination pattern with break condition inside loop
 
   return rpyFiles;
 }
@@ -514,7 +567,7 @@ export async function getFileContent(
   projectId: string,
   filePath: string,
   branch: string,
-  gitlabUrl?: string,
+  gitlabUrl?: string
 ): Promise<string | null> {
   const repoLink = await getRepositoryLink(projectId);
   if (!repoLink) {
@@ -537,8 +590,10 @@ export async function getFileContent(
   const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
 
   const apiUrl = new URL(
-    `/api/v4/projects/${repoLink.gitlabProjectId}/repository/files/${encodeURIComponent(filePath)}`,
-    url,
+    `/api/v4/projects/${
+      repoLink.gitlabProjectId
+    }/repository/files/${encodeURIComponent(filePath)}`,
+    url
   );
   apiUrl.searchParams.set("ref", branch);
 
@@ -578,7 +633,7 @@ export async function createOrUpdateFile(
   filePath: string,
   content: string,
   commitMessage: string,
-  gitlabUrl?: string,
+  gitlabUrl?: string
 ): Promise<{ file_path: string; branch: string }> {
   const repoLink = await getRepositoryLink(projectId);
   if (!repoLink) {
@@ -601,8 +656,10 @@ export async function createOrUpdateFile(
   const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
 
   const apiUrl = new URL(
-    `/api/v4/projects/${repoLink.gitlabProjectId}/repository/files/${encodeURIComponent(filePath)}`,
-    url,
+    `/api/v4/projects/${
+      repoLink.gitlabProjectId
+    }/repository/files/${encodeURIComponent(filePath)}`,
+    url
   );
 
   // Encode content as base64
@@ -617,60 +674,54 @@ export async function createOrUpdateFile(
 
   for (let retry = 0; retry < maxRetries && !response; retry++) {
     for (const method of methods) {
-      try {
-        const attemptResponse = await fetchWithTimeout(apiUrl.toString(), {
-          method,
-          headers: {
-            "PRIVATE-TOKEN": token,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            branch,
-            content: base64Content,
-            commit_message: commitMessage,
-            encoding: "base64",
-          }),
-        });
+      const attemptResponse = await fetchWithTimeout(apiUrl.toString(), {
+        method,
+        headers: {
+          "PRIVATE-TOKEN": token,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          branch,
+          content: base64Content,
+          commit_message: commitMessage,
+          encoding: "base64",
+        }),
+      });
 
-        // GitLab returns 400 with "file with same name" error when trying to POST to existing file
-        // GitLab returns 404 when trying to PUT to a non-existent file
-        // On success, we return the response
-        if (attemptResponse.ok) {
-          response = attemptResponse;
-          break;
-        }
-
-        const errorText = await attemptResponse.text();
-
-        // If PUT fails with 404, file doesn't exist - try POST next
-        if (method === "PUT" && attemptResponse.status === 404) {
-          lastError = new Error(
-            `GitLab API error: ${attemptResponse.status} - ${errorText}`,
-          );
-          continue;
-        }
-
-        // If POST fails with 400 (likely file already exists), retry from PUT
-        if (
-          method === "POST" &&
-          attemptResponse.status === 400 &&
-          errorText.includes("file with same name")
-        ) {
-          lastError = new Error(
-            `GitLab API error: ${attemptResponse.status} - ${errorText}`,
-          );
-          break; // Break inner loop to retry from PUT
-        }
-
-        // For other errors, don't retry - fail immediately
-        throw new Error(
-          `GitLab API error: ${attemptResponse.status} - ${errorText}`,
-        );
-      } catch (e) {
-        // Re-throw all errors immediately. Retryable cases (PUT 404, POST 400)
-        // are handled above via continue/break without throwing.
-        throw e;
+      // GitLab returns 400 with "file with same name" error when trying to POST to existing file
+      // GitLab returns 404 when trying to PUT to a non-existent file
+      // On success, we return the response
+      if (attemptResponse.ok) {
+        response = attemptResponse;
+        break;
       }
+
+      const errorText = await attemptResponse.text();
+
+      // If PUT fails with 404, file doesn't exist - try POST next
+      if (method === "PUT" && attemptResponse.status === 404) {
+        lastError = new Error(
+          `GitLab API error: ${attemptResponse.status} - ${errorText}`
+        );
+        continue;
+      }
+
+      // If POST fails with 400 (likely file already exists), retry from PUT
+      if (
+        method === "POST" &&
+        attemptResponse.status === 400 &&
+        errorText.includes("file with same name")
+      ) {
+        lastError = new Error(
+          `GitLab API error: ${attemptResponse.status} - ${errorText}`
+        );
+        break; // Break inner loop to retry from PUT
+      }
+
+      // For other errors, don't retry - fail immediately
+      throw new Error(
+        `GitLab API error: ${attemptResponse.status} - ${errorText}`
+      );
     }
   }
 
@@ -680,4 +731,3 @@ export async function createOrUpdateFile(
 
   return (await response.json()) as { file_path: string; branch: string };
 }
-

@@ -16,7 +16,7 @@ const MODE_STORAGE_KEY = "branchforge_ide_mode";
 function getStoredMode(): "write" | "script" {
   try {
     const stored = localStorage.getItem(MODE_STORAGE_KEY);
-    return (stored === "write" || stored === "script") ? stored : "write";
+    return stored === "write" || stored === "script" ? stored : "write";
   } catch {
     return "write";
   }
@@ -130,4 +130,3 @@ export function HomePageIDE() {
     </div>
   );
 }
-

@@ -20,11 +20,7 @@ import {
   getFileContent,
   createOrUpdateFile,
 } from "../gitlab.service.js";
-import {
-  gitlabIntegrations,
-  gitlabRepositories,
-} from "../../db/schema/index.js";
-import { eq, and } from "drizzle-orm";
+import { gitlabRepositories } from "../../db/schema/index.js";
 import * as encryptionService from "../encryption.service.js";
 
 // Test token must be defined before vi.mock since vi.mock is hoisted
@@ -133,7 +129,7 @@ describe("GitLabService", () => {
   describe("validateGitlabPAT", () => {
     it("should return username for valid PAT", async () => {
       vi.mocked(encryptionService.validateAndGetUsername).mockResolvedValue(
-        "testuser",
+        "testuser"
       );
 
       const result = await validateGitlabPAT(testToken);
@@ -141,13 +137,13 @@ describe("GitLabService", () => {
       expect(result).toBe("testuser");
       expect(encryptionService.validateAndGetUsername).toHaveBeenCalledWith(
         testToken,
-        "https://gitlab.com",
+        "https://gitlab.com"
       );
     });
 
     it("should work with custom GitLab URL", async () => {
       vi.mocked(encryptionService.validateAndGetUsername).mockResolvedValue(
-        "customuser",
+        "customuser"
       );
 
       const result = await validateGitlabPAT(testToken, testGitlabUrl);
@@ -155,13 +151,13 @@ describe("GitLabService", () => {
       expect(result).toBe("customuser");
       expect(encryptionService.validateAndGetUsername).toHaveBeenCalledWith(
         testToken,
-        testGitlabUrl,
+        testGitlabUrl
       );
     });
 
     it("should return null for invalid PAT", async () => {
       vi.mocked(encryptionService.validateAndGetUsername).mockResolvedValue(
-        null,
+        null
       );
 
       const result = await validateGitlabPAT("invalid-token");
@@ -179,7 +175,7 @@ describe("GitLabService", () => {
 
     it("should return null on network error", async () => {
       vi.mocked(encryptionService.validateAndGetUsername).mockResolvedValue(
-        null,
+        null
       );
 
       const result = await validateGitlabPAT(testToken);
@@ -230,10 +226,10 @@ describe("GitLabService", () => {
   describe("storeGitlabIntegration", () => {
     it("should store new integration", async () => {
       vi.mocked(encryptionService.validateAndGetUsername).mockResolvedValue(
-        "testuser",
+        "testuser"
       );
       vi.mocked(encryptionService.encryptPAT).mockReturnValue(
-        "encrypted_test_token",
+        "encrypted_test_token"
       );
 
       await storeGitlabIntegration(testUserId, testToken, testGitlabUrl);
@@ -241,17 +237,17 @@ describe("GitLabService", () => {
       expect(mockDb.insert).toHaveBeenCalled();
       expect(encryptionService.validateAndGetUsername).toHaveBeenCalledWith(
         testToken,
-        testGitlabUrl,
+        testGitlabUrl
       );
       expect(encryptionService.encryptPAT).toHaveBeenCalledWith(testToken);
     });
 
     it("should update existing integration", async () => {
       vi.mocked(encryptionService.validateAndGetUsername).mockResolvedValue(
-        "testuser",
+        "testuser"
       );
       vi.mocked(encryptionService.encryptPAT).mockReturnValue(
-        "encrypted_test_token",
+        "encrypted_test_token"
       );
 
       await storeGitlabIntegration(testUserId, testToken, testGitlabUrl);
@@ -261,11 +257,11 @@ describe("GitLabService", () => {
 
     it("should throw when token validation fails", async () => {
       vi.mocked(encryptionService.validateAndGetUsername).mockResolvedValue(
-        null,
+        null
       );
 
       await expect(
-        storeGitlabIntegration(testUserId, testToken, testGitlabUrl),
+        storeGitlabIntegration(testUserId, testToken, testGitlabUrl)
       ).rejects.toThrow("Invalid GitLab token");
     });
   });
@@ -388,7 +384,7 @@ describe("GitLabService", () => {
       mockLimit.mockResolvedValueOnce([]);
 
       await expect(
-        listGitlabRepositories(testUserId, testGitlabUrl),
+        listGitlabRepositories(testUserId, testGitlabUrl)
       ).rejects.toThrow("GitLab integration not found");
     });
   });
@@ -408,7 +404,7 @@ describe("GitLabService", () => {
         testProjectId,
         testGitlabProjectId,
         testRepositoryName,
-        testBranch,
+        testBranch
       );
 
       expect(mockDb.insert).toHaveBeenCalledWith(gitlabRepositories);
@@ -427,7 +423,7 @@ describe("GitLabService", () => {
       await linkRepository(
         testProjectId,
         testGitlabProjectId,
-        testRepositoryName,
+        testRepositoryName
       );
 
       expect(mockDb.insert).toHaveBeenCalledWith(gitlabRepositories);
@@ -497,7 +493,7 @@ describe("GitLabService", () => {
       mockLimit.mockResolvedValue([]);
 
       await expect(listBranches(testProjectId, testGitlabUrl)).rejects.toThrow(
-        "GitLab repository not linked",
+        "GitLab repository not linked"
       );
     });
   });
@@ -555,7 +551,7 @@ describe("GitLabService", () => {
       const result = await listRpyFiles(
         testProjectId,
         testBranch,
-        testGitlabUrl,
+        testGitlabUrl
       );
 
       expect(result).toEqual([
@@ -643,7 +639,7 @@ describe("GitLabService", () => {
       const result = await listRpyFiles(
         testProjectId,
         testBranch,
-        testGitlabUrl,
+        testGitlabUrl
       );
 
       expect(result).toEqual([
@@ -689,7 +685,7 @@ describe("GitLabService", () => {
 
       nock(testGitlabUrl)
         .get(
-          `/api/v4/projects/${testGitlabProjectId}/repository/files/game%2Fscript.rpy`,
+          `/api/v4/projects/${testGitlabProjectId}/repository/files/game%2Fscript.rpy`
         )
         .matchHeader("private-token", testToken)
         .query({ ref: testBranch })
@@ -704,7 +700,7 @@ describe("GitLabService", () => {
         testProjectId,
         "game/script.rpy",
         testBranch,
-        testGitlabUrl,
+        testGitlabUrl
       );
 
       expect(result).toBe(content);
@@ -742,7 +738,7 @@ describe("GitLabService", () => {
 
       nock(testGitlabUrl)
         .get(
-          `/api/v4/projects/${testGitlabProjectId}/repository/files/game%2Fmissing.rpy`,
+          `/api/v4/projects/${testGitlabProjectId}/repository/files/game%2Fmissing.rpy`
         )
         .matchHeader("private-token", testToken)
         .query({ ref: testBranch })
@@ -752,7 +748,7 @@ describe("GitLabService", () => {
         testProjectId,
         "game/missing.rpy",
         testBranch,
-        testGitlabUrl,
+        testGitlabUrl
       );
 
       expect(result).toBeNull();
@@ -795,7 +791,7 @@ describe("GitLabService", () => {
 
       nock(testGitlabUrl)
         .put(
-          `/api/v4/projects/${testGitlabProjectId}/repository/files/game%2Fnew.rpy`,
+          `/api/v4/projects/${testGitlabProjectId}/repository/files/game%2Fnew.rpy`
         )
         .matchHeader("private-token", testToken)
         .reply(200, {
@@ -809,7 +805,7 @@ describe("GitLabService", () => {
         "game/new.rpy",
         content,
         commitMessage,
-        testGitlabUrl,
+        testGitlabUrl
       );
 
       expect(result).toEqual({
@@ -853,7 +849,7 @@ describe("GitLabService", () => {
 
       nock(testGitlabUrl)
         .put(
-          `/api/v4/projects/${testGitlabProjectId}/repository/files/game%2Fscript.rpy`,
+          `/api/v4/projects/${testGitlabProjectId}/repository/files/game%2Fscript.rpy`
         )
         .matchHeader("private-token", testToken)
         .reply(200, {
@@ -867,7 +863,7 @@ describe("GitLabService", () => {
         "game/script.rpy",
         content,
         commitMessage,
-        testGitlabUrl,
+        testGitlabUrl
       );
 
       expect(result).toEqual({
@@ -908,7 +904,7 @@ describe("GitLabService", () => {
 
       nock(testGitlabUrl)
         .put(
-          `/api/v4/projects/${testGitlabProjectId}/repository/files/game%2Fscript.rpy`,
+          `/api/v4/projects/${testGitlabProjectId}/repository/files/game%2Fscript.rpy`
         )
         .matchHeader("private-token", testToken)
         .reply(500);
@@ -920,10 +916,9 @@ describe("GitLabService", () => {
           "game/script.rpy",
           "content",
           "message",
-          testGitlabUrl,
-        ),
+          testGitlabUrl
+        )
       ).rejects.toThrow();
     });
   });
 });
-

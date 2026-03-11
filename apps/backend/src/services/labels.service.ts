@@ -13,12 +13,19 @@ import {
   characters,
   projects,
   projectUsers,
+  routeConfigs,
+  gitlabFiles,
 } from "../db/schema/index.js";
 import { labelCharacters as labelCharactersTable } from "../db/schema/tables/label-characters.js";
-import { eq, and, asc, or } from "drizzle-orm";
+import { eq, and, asc, or, isNull } from "drizzle-orm";
 import type { Label, LabelLine } from "../db/schema/index.js";
 import type { PublicLabel } from "@branchforge/shared";
 import { LabelStatus } from "@branchforge/shared";
+import { createAuditFields, updateAuditFields } from "../lib/audit.js";
+import {
+  NotFoundError,
+  ForbiddenError,
+} from "../middleware/error-handler.middleware.js";
 
 // Re-export PublicLabel from shared for route handlers
 export type { PublicLabel };
@@ -31,7 +38,7 @@ export type { PublicLabel };
  * Type guard to check if a value is a valid label status
  */
 export function isValidLabelStatus(
-  value: string | null | undefined,
+  value: string | null | undefined
 ): value is LabelStatus {
   const validStatuses: LabelStatus[] = [
     LabelStatus.DRAFT,
@@ -52,10 +59,8 @@ export function isValidLabelStatus(
 /**
  * Label line with speaker information
  */
-export interface LabelLineWithSpeaker extends Omit<
-  LabelLine,
-  "speakerId" | "createdAt" | "updatedAt"
-> {
+export interface LabelLineWithSpeaker
+  extends Omit<LabelLine, "speakerId" | "createdAt" | "updatedAt"> {
   speakerId: string | null;
   speakerName: string | null; // From characters.displayName
   speakerTag: string | null; // From characters.renpyTag
@@ -96,8 +101,8 @@ type LabelForPublic = Pick<
   | "id"
   | "projectId"
   | "title"
-  | "groupType"      // was: act
-  | "groupValue"     // was: chapter
+  | "groupType" // was: act
+  | "groupValue" // was: chapter
   | "labelNumber"
   | "sequenceOrder"
   | "route"
@@ -129,7 +134,7 @@ export interface ListLabelsFilters {
 export async function listLabels(
   projectId: string,
   userId: string,
-  filters?: ListLabelsFilters,
+  filters?: ListLabelsFilters
 ): Promise<PublicLabel[]> {
   const db = getDb();
 
@@ -142,8 +147,8 @@ export async function listLabels(
     .where(
       and(
         eq(projects.id, projectId),
-        or(eq(projects.userId, userId), eq(projectUsers.userId, userId)),
-      ),
+        or(eq(projects.userId, userId), eq(projectUsers.userId, userId))
+      )
     )
     .limit(1);
 
@@ -153,7 +158,10 @@ export async function listLabels(
   }
 
   // Build where conditions for filters
-  const whereConditions = [eq(labels.projectId, projectId)];
+  const whereConditions = [
+    eq(labels.projectId, projectId),
+    isNull(labels.deletedAt), // Exclude soft-deleted labels
+  ];
 
   if (filters?.routeKey) {
     whereConditions.push(eq(labels.route, filters.routeKey));
@@ -184,7 +192,7 @@ export async function listLabels(
  */
 export async function getLabel(
   labelId: string,
-  userId: string,
+  userId: string
 ): Promise<LabelDetail | null> {
   const db = getDb();
 
@@ -200,8 +208,9 @@ export async function getLabel(
     .where(
       and(
         eq(labels.id, labelId),
-        or(eq(projects.userId, userId), eq(projectUsers.userId, userId)),
-      ),
+        isNull(labels.deletedAt), // Exclude soft-deleted labels
+        or(eq(projects.userId, userId), eq(projectUsers.userId, userId))
+      )
     )
     .limit(1);
 
@@ -214,7 +223,7 @@ export async function getLabel(
   // Fetch label lines and characters in parallel using Promise.all
   // This fixes the N+1 query issue by running both queries concurrently
   const [linesResult, charactersResult] = await Promise.all([
-    // Fetch label lines with speaker information
+    // Fetch label lines with speaker information (excluding soft-deleted)
     db
       .select({
         line: labelLines,
@@ -223,7 +232,7 @@ export async function getLabel(
       })
       .from(labelLines)
       .leftJoin(characters, eq(labelLines.speakerId, characters.id))
-      .where(eq(labelLines.labelId, labelId))
+      .where(and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt)))
       .orderBy(asc(labelLines.sequence)),
 
     // Fetch label characters with their information
@@ -237,7 +246,7 @@ export async function getLabel(
       .from(labelCharactersTable)
       .innerJoin(
         characters,
-        eq(labelCharactersTable.characterId, characters.id),
+        eq(labelCharactersTable.characterId, characters.id)
       )
       .where(eq(labelCharactersTable.labelId, labelId)),
   ]);
@@ -277,7 +286,7 @@ export async function getLabel(
  */
 export async function authorizeLabelAccess(
   labelId: string,
-  userId: string,
+  userId: string
 ): Promise<boolean> {
   const db = getDb();
 
@@ -310,8 +319,8 @@ export async function authorizeLabelAccess(
     .where(
       and(
         eq(projectUsers.projectId, projectId),
-        eq(projectUsers.userId, userId),
-      ),
+        eq(projectUsers.userId, userId)
+      )
     )
     .limit(1);
 
@@ -336,4 +345,272 @@ function mapToPublicLabel(label: LabelForPublic): PublicLabel {
     createdAt: label.createdAt.toISOString(),
     updatedAt: label.updatedAt.toISOString(),
   };
+}
+
+// ============================================================================
+// CRUD Operations
+// ============================================================================
+
+/**
+ * Validate that a route exists in route_configs for the given project
+ * @param projectId - The project ID to check routes for
+ * @param routeKey - The route key to validate
+ * @returns True if the route exists, false otherwise
+ */
+async function validateRouteExists(
+  projectId: string,
+  routeKey: string
+): Promise<boolean> {
+  const db = getDb();
+  const route = await db
+    .select({ id: routeConfigs.id })
+    .from(routeConfigs)
+    .where(
+      and(
+        eq(routeConfigs.projectId, projectId),
+        eq(routeConfigs.routeKey, routeKey)
+      )
+    )
+    .limit(1);
+  return route.length > 0;
+}
+
+/**
+ * Create a new label
+ * @param userId - The ID of the user creating the label
+ * @param data - The label data to create
+ * @returns The created label
+ * @throws NotFoundError if project not found or user lacks access
+ * @throws ForbiddenError if user lacks permission
+ */
+export async function createLabel(
+  userId: string,
+  data: {
+    projectId: string;
+    title: string;
+    route?: string | null;
+    groupType?: string | null;
+    groupValue?: string | null;
+    labelNumber: number;
+    sequenceOrder?: number;
+    status?: LabelStatus | null;
+    visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR" | null;
+  }
+): Promise<PublicLabel> {
+  const db = getDb();
+
+  // Verify user has access to the project
+  const [project] = await db
+    .select({ userId: projects.userId })
+    .from(projects)
+    .where(eq(projects.id, data.projectId))
+    .limit(1);
+
+  if (!project) {
+    throw new NotFoundError("Project");
+  }
+
+  if (project.userId !== userId) {
+    throw new ForbiddenError("Insufficient permissions");
+  }
+
+  // Validate route exists in route_configs for this project
+  // If route is provided but doesn't exist, coerce to null
+  let validatedRoute = data.route ?? null;
+  if (validatedRoute !== null) {
+    const routeExists = await validateRouteExists(
+      data.projectId,
+      validatedRoute
+    );
+    if (!routeExists) {
+      // Coerce to null if route doesn't exist
+      console.warn(
+        `Label service: Route "${validatedRoute}" does not exist in route_configs for project ${data.projectId}. Coercing to null.`
+      );
+      validatedRoute = null;
+    }
+  }
+
+  const auditFields = createAuditFields(userId);
+
+  const [label] = await db
+    .insert(labels)
+    .values({
+      projectId: data.projectId,
+      title: data.title,
+      route: validatedRoute,
+      groupType: data.groupType ?? null,
+      groupValue: data.groupValue ?? null,
+      labelNumber: data.labelNumber,
+      sequenceOrder: data.sequenceOrder ?? 0,
+      status: data.status ?? "DRAFT",
+      visibility: data.visibility ?? "EXCLUSIVE",
+      prerequisites: {},
+      effects: {},
+      ...auditFields,
+    })
+    .returning();
+
+  return mapToPublicLabel(label);
+}
+
+/**
+ * Update label metadata (title, route, status, visibility)
+ * @param labelId - The ID of the label to update
+ * @param userId - The ID of the user updating the label
+ * @param data - The label data to update
+ * @returns The updated label
+ * @throws NotFoundError if label not found
+ * @throws ForbiddenError if user lacks permission
+ */
+export async function updateLabel(
+  labelId: string,
+  userId: string,
+  data: {
+    title?: string;
+    route?: string | null;
+    status?: LabelStatus;
+    visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
+  }
+): Promise<PublicLabel> {
+  const db = getDb();
+
+  // Get label with project owner info
+  const [labelWithProject] = await db
+    .select({
+      label: labels,
+      projectOwnerId: projects.userId,
+    })
+    .from(labels)
+    .innerJoin(projects, eq(labels.projectId, projects.id))
+    .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
+    .limit(1);
+
+  if (!labelWithProject) {
+    throw new NotFoundError("Label");
+  }
+
+  if (labelWithProject.projectOwnerId !== userId) {
+    throw new ForbiddenError("Insufficient permissions");
+  }
+
+  // Validate route exists in route_configs for this project
+  // If route is provided but doesn't exist, coerce to null
+  let validatedRoute = data.route;
+  if (validatedRoute !== null && validatedRoute !== undefined) {
+    const routeExists = await validateRouteExists(
+      labelWithProject.label.projectId,
+      validatedRoute
+    );
+    if (!routeExists) {
+      // Coerce to null if route doesn't exist
+      console.warn(
+        `Label service: Route "${validatedRoute}" does not exist in route_configs for project ${labelWithProject.label.projectId}. Coercing to null.`
+      );
+      validatedRoute = null;
+    }
+  }
+
+  const currentVersion = labelWithProject.label.version ?? 1;
+  const auditFields = updateAuditFields(currentVersion, userId);
+
+  // Build update data with validated route
+  const updateData = {
+    ...data,
+    ...(validatedRoute !== undefined ? { route: validatedRoute } : {}),
+  };
+
+  const [updated] = await db
+    .update(labels)
+    .set({
+      ...updateData,
+      ...auditFields,
+    })
+    .where(eq(labels.id, labelId))
+    .returning();
+
+  return mapToPublicLabel(updated);
+}
+
+/**
+ * Soft delete a label
+ * @param labelId - The ID of the label to delete
+ * @param userId - The ID of the user deleting the label
+ * @throws NotFoundError if label not found
+ * @throws ForbiddenError if user lacks permission
+ */
+export async function deleteLabel(
+  labelId: string,
+  userId: string
+): Promise<void> {
+  const db = getDb();
+
+  // Import the removeLabelFromRPYContent function dynamically
+  const { removeLabelFromRPYContent } = await import("./rpy-parser.service.js");
+
+  // Get label with project owner info and gitlabFileId
+  const [labelWithProject] = await db
+    .select({
+      label: labels,
+      projectOwnerId: projects.userId,
+      gitlabFileContent: gitlabFiles.content,
+      gitlabFileId: labels.gitlabFileId,
+    })
+    .from(labels)
+    .innerJoin(projects, eq(labels.projectId, projects.id))
+    .leftJoin(gitlabFiles, eq(labels.gitlabFileId, gitlabFiles.id))
+    .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
+    .limit(1);
+
+  if (!labelWithProject) {
+    throw new NotFoundError("Label");
+  }
+
+  if (labelWithProject.projectOwnerId !== userId) {
+    throw new ForbiddenError("Insufficient permissions");
+  }
+
+  const labelName = labelWithProject.label.labelName;
+
+  // Soft delete the label and all associated lines in a single transaction
+  // This ensures both updates succeed or fail together, preventing
+  // inconsistencies where a label is deleted but its lines remain active
+  await db.transaction(async (tx) => {
+    // Delete the label
+    await tx
+      .update(labels)
+      .set({ deletedAt: new Date() })
+      .where(eq(labels.id, labelId));
+
+    // Delete all associated lines
+    await tx
+      .update(labelLines)
+      .set({ deletedAt: new Date() })
+      .where(
+        and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt))
+      );
+
+    // If the label has a gitlabFileId and a valid labelName, rebuild the file content without this label
+    // This ensures exports don't re-publish the deleted label.
+    // UI-created labels have null labelName and should skip this step since they don't exist in RPY files.
+    if (
+      labelWithProject.gitlabFileId &&
+      labelWithProject.gitlabFileContent &&
+      labelName !== null
+    ) {
+      const updatedContent = removeLabelFromRPYContent(
+        labelWithProject.gitlabFileContent,
+        labelName
+      );
+
+      // Update the gitlab_files.content with the new content (without the deleted label)
+      await tx
+        .update(gitlabFiles)
+        .set({
+          content: updatedContent,
+          updatedAt: new Date(),
+        })
+        .where(eq(gitlabFiles.id, labelWithProject.gitlabFileId));
+    }
+  });
 }

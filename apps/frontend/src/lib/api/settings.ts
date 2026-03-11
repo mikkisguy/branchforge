@@ -1,4 +1,5 @@
-const API_BASE = import.meta.env.VITE_API_ENV === "development" ? "/api/api" : "/api";
+const API_BASE =
+  import.meta.env.VITE_API_ENV === "development" ? "/api/api" : "/api";
 
 export interface ApiError {
   error: string;
@@ -23,8 +24,12 @@ async function request<T>(
   });
 
   if (!response.ok) {
-    const error: ApiError = await response.json().catch(() => ({ error: "Unknown error" }));
-    throw new Error(error.error || `Request failed with status ${response.status}`);
+    const error: ApiError = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      error.error || `Request failed with status ${response.status}`
+    );
   }
 
   // For 204 No Content responses
@@ -45,11 +50,11 @@ export interface SignUpStatusResponse {
 
 export interface SettingResponse {
   key: string;
-  value: any;
+  value: unknown;
 }
 
 export interface AllSettingsResponse {
-  settings: Record<string, any>;
+  settings: Record<string, unknown>;
 }
 
 // ============================================================================
@@ -58,16 +63,16 @@ export interface AllSettingsResponse {
 
 export const settingsApi = {
   async getSignUpStatus(): Promise<SignUpStatusResponse> {
-    return request<SignUpStatusResponse>('/public/settings/signups');
+    return request<SignUpStatusResponse>("/public/settings/signups");
   },
 
   async getAllSettings(): Promise<AllSettingsResponse> {
-    return request<AllSettingsResponse>('/admin/settings');
+    return request<AllSettingsResponse>("/admin/settings");
   },
 
-  async updateSetting(key: string, value: any): Promise<SettingResponse> {
+  async updateSetting(key: string, value: unknown): Promise<SettingResponse> {
     return request<SettingResponse>(`/admin/settings/${key}`, {
-      method: 'PUT',
+      method: "PUT",
       body: JSON.stringify({ value }),
     });
   },

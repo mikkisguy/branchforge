@@ -186,7 +186,7 @@ describe("AdminSettingsService (Integration)", () => {
       const secondUpdatedAt = secondResult[0].updatedAt;
 
       expect(secondUpdatedAt.getTime()).toBeGreaterThanOrEqual(
-        firstUpdatedAt.getTime(),
+        firstUpdatedAt.getTime()
       );
     });
 
@@ -334,4 +334,3 @@ describe("AdminSettingsService (Integration)", () => {
     });
   });
 });
-

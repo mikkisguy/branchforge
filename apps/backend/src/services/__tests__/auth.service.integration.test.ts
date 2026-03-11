@@ -14,12 +14,7 @@ import { describe, it, expect, beforeEach, afterEach, beforeAll } from "vitest";
 import { getDb } from "../../db/index.js";
 import { users, adminSettings } from "../../db/schema/index.js";
 import { eq, sql } from "drizzle-orm";
-import {
-  register,
-  validateCredentials,
-  hashPassword,
-  validatePassword,
-} from "../auth.service.js";
+import { register, validateCredentials } from "../auth.service.js";
 
 describe("AuthService (Integration)", () => {
   let db: ReturnType<typeof getDb>;
@@ -81,25 +76,25 @@ describe("AuthService (Integration)", () => {
 
       // Attempt to register with same email
       await expect(register("test@example.com", "password456")).rejects.toThrow(
-        "Email already registered",
+        "Email already registered"
       );
     });
 
     it("should fail with invalid email format", async () => {
       await expect(register("invalid-email", "password123")).rejects.toThrow(
-        "Invalid email format",
+        "Invalid email format"
       );
     });
 
     it("should fail with weak password (too short)", async () => {
       await expect(register("test@example.com", "123")).rejects.toThrow(
-        "Password must be at least 8 characters",
+        "Password must be at least 8 characters"
       );
     });
 
     it("should fail with empty password", async () => {
       await expect(register("test@example.com", "")).rejects.toThrow(
-        "Password must be at least 8 characters",
+        "Password must be at least 8 characters"
       );
     });
 
@@ -117,7 +112,7 @@ describe("AuthService (Integration)", () => {
         });
 
       await expect(register("new@example.com", "password123")).rejects.toThrow(
-        "Registration is currently disabled",
+        "Registration is currently disabled"
       );
     });
 
@@ -155,7 +150,7 @@ describe("AuthService (Integration)", () => {
     it("should return user for valid credentials", async () => {
       const result = await validateCredentials(
         "test@example.com",
-        "correctPassword123",
+        "correctPassword123"
       );
 
       expect(result).toMatchObject({
@@ -168,7 +163,7 @@ describe("AuthService (Integration)", () => {
     it("should return null for invalid email", async () => {
       const result = await validateCredentials(
         "nonexistent@example.com",
-        "password",
+        "password"
       );
       expect(result).toBeNull();
     });
@@ -176,7 +171,7 @@ describe("AuthService (Integration)", () => {
     it("should return null for invalid password", async () => {
       const result = await validateCredentials(
         "test@example.com",
-        "wrongPassword",
+        "wrongPassword"
       );
       expect(result).toBeNull();
     });
@@ -190,7 +185,7 @@ describe("AuthService (Integration)", () => {
       // Database emails should be case-sensitive per PostgreSQL's default
       const result = await validateCredentials(
         "TEST@EXAMPLE.COM",
-        "correctPassword123",
+        "correctPassword123"
       );
       // This depends on database collation - in most cases emails are stored as-is
       // The test verifies the behavior matches the implementation
@@ -206,7 +201,7 @@ describe("AuthService (Integration)", () => {
       await register("test@example.com", "password123");
 
       await expect(register("test@example.com", "password456")).rejects.toThrow(
-        "Email already registered",
+        "Email already registered"
       );
     });
 
@@ -222,10 +217,9 @@ describe("AuthService (Integration)", () => {
       const dbUsers = await db.select().from(users);
       const testUsers = dbUsers.filter(
         (u) =>
-          u.email === "test@example.com" || u.email === "another@example.com",
+          u.email === "test@example.com" || u.email === "another@example.com"
       );
       expect(testUsers).toHaveLength(2);
     });
   });
 });
-

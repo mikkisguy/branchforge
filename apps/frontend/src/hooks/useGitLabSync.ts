@@ -31,19 +31,19 @@ const POLL_TIMEOUT_MS = 120_000;
 
 function calculateProgress(
   status: SyncOperation["status"],
-  pollStartTime: number | null,
+  pollStartTime: number | null
 ): number {
-  if (status === "completed") {
+  if (status === "COMPLETED") {
     return 100;
   }
-  if (status === "failed") {
+  if (status === "FAILED") {
     return 0;
   }
-  if (status === "in_progress" && pollStartTime) {
+  if (status === "IN_PROGRESS" && pollStartTime) {
     const elapsed = Date.now() - pollStartTime;
     return Math.min(
       Math.max(10 + Math.round((elapsed / POLL_TIMEOUT_MS) * 80), 10),
-      90,
+      90
     );
   }
   return 10;
@@ -68,14 +68,14 @@ interface UseGitLabSyncReturn {
   exportToGitlab: (
     projectId: string,
     branch?: string,
-    commitMessage?: string,
+    commitMessage?: string
   ) => Promise<SyncOperation | null>;
 
   // Import
   importFromGitlab: (
     projectId: string,
     branch: string,
-    conflictResolution: ConflictResolution,
+    conflictResolution: ConflictResolution
   ) => Promise<SyncOperation | null>;
 
   // Operation status
@@ -96,7 +96,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
   const queryClient = useQueryClient();
   const [pollStartTime, setPollStartTime] = useState<number | null>(null);
   const [activeOperationId, setActiveOperationId] = useState<string | null>(
-    null,
+    null
   );
   const activeOperationIdRef = useRef<string | null>(null);
   // Store projectId for cache invalidation when operation completes
@@ -125,11 +125,11 @@ export function useGitLabSync(): UseGitLabSyncReturn {
     },
     enabled: !!activeOperationId,
     refetchInterval: (
-      query: Query<SyncOperation | null, Error, SyncOperation | null>,
+      query: Query<SyncOperation | null, Error, SyncOperation | null>
     ) => {
       const data = query.state.data as SyncOperation | null | undefined;
       // Stop polling when operation is complete or failed
-      if (!data || data.status === "completed" || data.status === "failed") {
+      if (!data || data.status === "COMPLETED" || data.status === "FAILED") {
         return false;
       }
       return 1000; // Poll every second
@@ -146,25 +146,29 @@ export function useGitLabSync(): UseGitLabSyncReturn {
       ...prev,
       operation: op,
       progress: calculateProgress(op.status, pollStartTime),
-      isProcessing: op.status === "pending" || op.status === "in_progress",
+      isProcessing: op.status === "PENDING" || op.status === "IN_PROGRESS",
       error:
-        op.status === "failed" ? (op.errorMessage ?? "Operation failed") : null,
+        op.status === "FAILED" ? op.errorMessage ?? "Operation failed" : null,
     }));
 
     // Stop polling on completion and invalidate caches
-    if (op.status === "completed" || op.status === "failed") {
+    if (op.status === "COMPLETED" || op.status === "FAILED") {
       const projectId = activeProjectIdRef.current;
       updateActiveOperationId(null);
       setPollStartTime(null);
       activeProjectIdRef.current = null;
 
       // Invalidate caches on successful completion
-      if (op.status === "completed" && projectId) {
+      if (op.status === "COMPLETED" && projectId) {
         queryClient.invalidateQueries({
           queryKey: labelKeys.lists(projectId),
         });
         queryClient.invalidateQueries({
           queryKey: gitlabKeys.importedFiles(projectId),
+        });
+        // Invalidate linked repositories to refresh bottom bar
+        queryClient.invalidateQueries({
+          queryKey: gitlabKeys.repositories(),
         });
       }
     }
@@ -276,7 +280,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
   const exportToGitlab = async (
     projectId: string,
     branch?: string,
-    commitMessage?: string,
+    commitMessage?: string
   ): Promise<SyncOperation | null> => {
     try {
       const result = await exportMutation.mutateAsync({
@@ -305,7 +309,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
   const importFromGitlab = async (
     projectId: string,
     branch: string,
-    conflictResolution: ConflictResolution,
+    conflictResolution: ConflictResolution
   ): Promise<SyncOperation | null> => {
     try {
       const result = await importMutation.mutateAsync({
@@ -340,7 +344,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
         return null;
       }
     },
-    [],
+    []
   );
 
   // List operations
@@ -352,7 +356,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
         return [];
       }
     },
-    [],
+    []
   );
 
   return {
@@ -364,4 +368,3 @@ export function useGitLabSync(): UseGitLabSyncReturn {
     reset,
   };
 }
-

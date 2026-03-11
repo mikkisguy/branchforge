@@ -48,7 +48,7 @@ export interface UseGitLabReturn {
   removeIntegration: () => Promise<void>;
   validateToken: (
     token: string,
-    gitlabUrl?: string,
+    gitlabUrl?: string
   ) => Promise<{ valid: boolean; username?: string }>;
   listRepositories: () => Promise<GitLabRepository[]>;
   isProjectLinked: (projectId: string) => boolean;
@@ -88,7 +88,7 @@ export function useGitLab(): UseGitLabReturn {
       enabled: !!integration, // Only fetch when integration exists
       retry: false,
       staleTime: 2 * 60 * 1000, // 2 minutes
-    },
+    }
   );
 
   // Store token mutation
@@ -124,13 +124,13 @@ export function useGitLab(): UseGitLabReturn {
   // Memoized map for efficient repository lookups
   const linkedReposMap = useMemo(
     () => new Map(linkedRepositories.map((r) => [r.projectId, r])),
-    [linkedRepositories],
+    [linkedRepositories]
   );
 
   // Helper: Validate token (no mutation, direct API call)
   const validateToken = async (
     token: string,
-    gitlabUrl?: string,
+    gitlabUrl?: string
   ): Promise<{ valid: boolean; username?: string }> => {
     return gitlabApi.validateToken(token, gitlabUrl);
   };
@@ -147,7 +147,7 @@ export function useGitLab(): UseGitLabReturn {
 
   // Helper: Get linked repository for a project
   const getLinkedRepository = (
-    projectId: string,
+    projectId: string
   ): LinkedRepository | undefined => {
     return linkedReposMap.get(projectId);
   };
@@ -182,4 +182,3 @@ export function useGitLab(): UseGitLabReturn {
     getLinkedRepository,
   };
 }
-

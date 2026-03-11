@@ -9,17 +9,19 @@
  * to enable auto-selection behavior.
  */
 
-import { useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { projectKeys } from '@/lib/query-keys';
-import type { Project } from '@/lib/api/projects';
+import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { projectKeys } from "@/lib/query-keys";
+import type { Project } from "@/lib/api/projects";
 
 export function AutoSelectProject() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
     // Check if we already have a current project selected
-    const currentProjectId = queryClient.getQueryData<string | null>(projectKeys.current());
+    const currentProjectId = queryClient.getQueryData<string | null>(
+      projectKeys.current()
+    );
 
     // If we have a current project, no need to auto-select
     if (currentProjectId) {
@@ -27,7 +29,8 @@ export function AutoSelectProject() {
     }
 
     // Get the projects list from cache
-    const projects = queryClient.getQueryData<Project[]>(projectKeys.lists()) ?? [];
+    const projects =
+      queryClient.getQueryData<Project[]>(projectKeys.lists()) ?? [];
 
     // Auto-select the first project if available
     if (projects.length > 0) {
@@ -51,11 +54,14 @@ export function useRefreshCurrentProject() {
   const queryClient = useQueryClient();
 
   return () => {
-    const currentProjectId = queryClient.getQueryData<string | null>(projectKeys.current());
+    const currentProjectId = queryClient.getQueryData<string | null>(
+      projectKeys.current()
+    );
 
     if (!currentProjectId) {
       // No current project, try to auto-select
-      const projects = queryClient.getQueryData<Project[]>(projectKeys.lists()) ?? [];
+      const projects =
+        queryClient.getQueryData<Project[]>(projectKeys.lists()) ?? [];
       if (projects.length > 0) {
         queryClient.setQueryData(projectKeys.current(), projects[0].id);
       }
@@ -63,7 +69,8 @@ export function useRefreshCurrentProject() {
     }
 
     // We have a current project, check if it still exists
-    const projects = queryClient.getQueryData<Project[]>(projectKeys.lists()) ?? [];
+    const projects =
+      queryClient.getQueryData<Project[]>(projectKeys.lists()) ?? [];
     const updatedProject = projects.find((p) => p.id === currentProjectId);
 
     if (updatedProject) {

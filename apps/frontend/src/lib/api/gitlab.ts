@@ -32,13 +32,22 @@ export interface GitLabRepository {
 export interface SyncOperation {
   id: string;
   projectId: string;
-  operation: "export" | "import";
-  status: "pending" | "in_progress" | "completed" | "failed";
+  operation: "EXPORT" | "IMPORT";
+  status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "FAILED";
   branch: string | null;
   conflictCount: number;
   errorMessage: string | null;
   startedAt: string;
   completedAt: string | null;
+  detectedCharacters?: Array<{
+    tag: string;
+    name: string | null;
+    displayName: string;
+    color: string;
+    isSpecial: boolean;
+    sourceFile: string;
+    confidence: number;
+  }>;
 }
 
 export interface ContentItem {
@@ -87,7 +96,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
-    public readonly payload: unknown,
+    public readonly payload: unknown
   ) {
     super(message);
     this.name = "ApiError";
@@ -129,7 +138,7 @@ function validateRequired(value: string, fieldName: string): void {
 
 async function request<T>(
   endpoint: string,
-  options: RequestInit = {},
+  options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
   const response = await fetch(url, {
@@ -148,7 +157,7 @@ async function request<T>(
     throw new ApiError(
       payload.error || `Request failed with status ${response.status}`,
       response.status,
-      payload,
+      payload
     );
   }
 
@@ -165,7 +174,7 @@ async function request<T>(
  */
 async function requestNoContent(
   endpoint: string,
-  options: RequestInit = {},
+  options: RequestInit = {}
 ): Promise<void> {
   const url = `${API_BASE}${endpoint}`;
   const response = await fetch(url, {
@@ -184,7 +193,7 @@ async function requestNoContent(
     throw new ApiError(
       payload.error || `Request failed with status ${response.status}`,
       response.status,
-      payload,
+      payload
     );
   }
 
@@ -201,7 +210,7 @@ export const gitlabApi = {
    */
   async validateToken(
     token: string,
-    gitlabUrl?: string,
+    gitlabUrl?: string
   ): Promise<ValidateTokenResponse> {
     validateRequired(token, "Token");
 
@@ -290,7 +299,7 @@ export const gitlabApi = {
   async linkRepository(
     projectId: string,
     gitlabProjectId: number,
-    branch: string = "main",
+    branch: string = "main"
   ): Promise<void> {
     validateRequired(projectId, "Project ID");
 
@@ -334,7 +343,7 @@ export const gitlabApi = {
    */
   async getRpyFiles(projectId: string, branch: string): Promise<RpyFile[]> {
     return request<RpyFile[]>(
-      `/gitlab/files/${projectId}?branch=${encodeURIComponent(branch)}`,
+      `/gitlab/files/${projectId}?branch=${encodeURIComponent(branch)}`
     );
   },
 
@@ -360,28 +369,33 @@ export const gitlabApi = {
       }>;
     }>
   > {
-    return request<Array<{
-      id: string;
-      projectId: string;
-      filePath: string;
-      fileType: "STORY" | "SETTINGS";
-      content: string;
-      lastSyncedAt: string | null;
-      lastCommitSha: string | null;
-      createdAt: string;
-      updatedAt: string;
-      scenes: Array<{
+    return request<
+      Array<{
         id: string;
-        labelName: string | null;
-        title: string;
-      }>;
-    }>>(`/gitlab/files/stored/${projectId}`);
+        projectId: string;
+        filePath: string;
+        fileType: "STORY" | "SETTINGS";
+        content: string;
+        lastSyncedAt: string | null;
+        lastCommitSha: string | null;
+        createdAt: string;
+        updatedAt: string;
+        scenes: Array<{
+          id: string;
+          labelName: string | null;
+          title: string;
+        }>;
+      }>
+    >(`/gitlab/files/stored/${projectId}`);
   },
 
   /**
    * Update GitLab file content (Script Mode)
    */
-  async updateGitLabFile(fileId: string, content: string): Promise<{ success: boolean }> {
+  async updateGitLabFile(
+    fileId: string,
+    content: string
+  ): Promise<{ success: boolean }> {
     return request<{ success: boolean }>(`/gitlab/files/${fileId}`, {
       method: "PUT",
       body: JSON.stringify({ content }),
@@ -395,7 +409,7 @@ export const gitlabApi = {
     projectId: string,
     branch?: string,
     commitMessage?: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SyncOperation> {
     return request<SyncOperation>("/gitlab/export", {
       method: "POST",
@@ -415,7 +429,7 @@ export const gitlabApi = {
     projectId: string,
     branch: string,
     conflictResolution: ConflictResolution,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SyncOperation> {
     return request<SyncOperation>("/gitlab/import", {
       method: "POST",
@@ -433,7 +447,7 @@ export const gitlabApi = {
    */
   async getOperationStatus(
     operationId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SyncOperation> {
     return request<SyncOperation>(`/gitlab/operations/${operationId}`, {
       signal,
@@ -453,7 +467,7 @@ export const gitlabApi = {
   async detectConflicts(
     projectId: string,
     branch: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ConflictDetectionResult> {
     return request<ConflictDetectionResult>("/gitlab/detect-conflicts", {
       method: "POST",
@@ -471,7 +485,7 @@ export const gitlabApi = {
   async pollOperation(
     operationId: string,
     onUpdate: (operation: SyncOperation) => void,
-    options: { interval?: number; timeout?: number; signal?: AbortSignal } = {},
+    options: { interval?: number; timeout?: number; signal?: AbortSignal } = {}
   ): Promise<SyncOperation> {
     const { interval = 1000, timeout = 60000, signal } = options;
     const startTime = Date.now();
@@ -521,7 +535,7 @@ export const gitlabApi = {
         onUpdate(operation);
 
         // Stop polling if operation is complete or failed
-        if (operation.status === "completed" || operation.status === "failed") {
+        if (operation.status === "COMPLETED" || operation.status === "FAILED") {
           return operation;
         }
 
@@ -534,4 +548,3 @@ export const gitlabApi = {
     }
   },
 };
-

@@ -24,4 +24,3 @@ export function Logo({ className = "", compact = false }: LogoProps) {
     </h1>
   );
 }
-

@@ -1,6 +1,6 @@
 {
-  "id": "6897e0a4-0700-43a2-97f2-ded9fd6955e0",
-  "prevId": "f6dd61b8-dae7-487a-8d85-00ca89b37b52",
+  "id": "e7ad1324-9dc5-44ae-9519-aec0fa0eff00",
+  "prevId": "65328c87-001d-426b-bbd3-884a5dc9ccbc",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -73,9 +73,7 @@
         "users_email_unique": {
           "name": "users_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -162,12 +160,8 @@
           "name": "user_sessions_user_id_users_id_fk",
           "tableFrom": "user_sessions",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -237,21 +231,6 @@
         }
       },
       "indexes": {
-        "user_settings_user_id_idx": {
-          "name": "user_settings_user_id_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "user_settings_username_idx": {
           "name": "user_settings_username_idx",
           "columns": [
@@ -273,18 +252,20 @@
           "name": "user_settings_user_id_users_id_fk",
           "tableFrom": "user_settings",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "user_settings_user_id_unique": {
+          "name": "user_settings_user_id_unique",
+          "nullsNotDistinct": false,
+          "columns": ["user_id"]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -354,12 +335,8 @@
           "name": "admin_settings_updated_by_users_id_fk",
           "tableFrom": "admin_settings",
           "tableTo": "users",
-          "columnsFrom": [
-            "updated_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["updated_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -369,9 +346,7 @@
         "admin_settings_key_unique": {
           "name": "admin_settings_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "key"
-          ]
+          "columns": ["key"]
         }
       },
       "policies": {},
@@ -459,12 +434,8 @@
           "name": "projects_user_id_users_id_fk",
           "tableFrom": "projects",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -512,12 +483,8 @@
           "name": "project_users_project_id_projects_id_fk",
           "tableFrom": "project_users",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -525,12 +492,8 @@
           "name": "project_users_user_id_users_id_fk",
           "tableFrom": "project_users",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -538,12 +501,75 @@
       "compositePrimaryKeys": {
         "project_users_project_id_user_id_pk": {
           "name": "project_users_project_id_user_id_pk",
-          "columns": [
-            "project_id",
-            "user_id"
-          ]
+          "columns": ["project_id", "user_id"]
         }
       },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.project_settings": {
+      "name": "project_settings",
+      "schema": "",
+      "columns": {
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "excluded_character_tags": {
+          "name": "excluded_character_tags",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'[]'::jsonb"
+        },
+        "auto_link_speakers": {
+          "name": "auto_link_speakers",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "project_settings_updated_at_idx": {
+          "name": "project_settings_updated_at_idx",
+          "columns": [
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "project_settings_project_id_projects_id_fk": {
+          "name": "project_settings_project_id_projects_id_fk",
+          "tableFrom": "project_settings",
+          "tableTo": "projects",
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
@@ -646,12 +672,8 @@
           "name": "visual_systems_project_id_projects_id_fk",
           "tableFrom": "visual_systems",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -661,9 +683,7 @@
         "visual_systems_project_id_unique": {
           "name": "visual_systems_project_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "project_id"
-          ]
+          "columns": ["project_id"]
         }
       },
       "policies": {},
@@ -756,12 +776,8 @@
           "name": "route_configs_project_id_projects_id_fk",
           "tableFrom": "route_configs",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -771,10 +787,7 @@
         "route_configs_project_key_unique": {
           "name": "route_configs_project_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "project_id",
-            "route_key"
-          ]
+          "columns": ["project_id", "route_key"]
         }
       },
       "policies": {},
@@ -873,12 +886,8 @@
           "name": "renpy_definitions_project_id_projects_id_fk",
           "tableFrom": "renpy_definitions",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -992,6 +1001,27 @@
           "method": "btree",
           "with": {}
         },
+        "characters_project_renpytag_idx": {
+          "name": "characters_project_renpytag_idx",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "renpy_tag",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "characters_pair_group_id_idx": {
           "name": "characters_pair_group_id_idx",
           "columns": [
@@ -1013,12 +1043,8 @@
           "name": "characters_project_id_projects_id_fk",
           "tableFrom": "characters",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1138,12 +1164,8 @@
           "name": "pair_groups_project_id_projects_id_fk",
           "tableFrom": "pair_groups",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1151,12 +1173,8 @@
           "name": "pair_groups_character_a_id_characters_id_fk",
           "tableFrom": "pair_groups",
           "tableTo": "characters",
-          "columnsFrom": [
-            "character_a_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["character_a_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1164,12 +1182,8 @@
           "name": "pair_groups_character_b_id_characters_id_fk",
           "tableFrom": "pair_groups",
           "tableTo": "characters",
-          "columnsFrom": [
-            "character_b_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["character_b_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1287,12 +1301,8 @@
           "name": "meters_project_id_projects_id_fk",
           "tableFrom": "meters",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1300,12 +1310,8 @@
           "name": "meters_character_id_characters_id_fk",
           "tableFrom": "meters",
           "tableTo": "characters",
-          "columnsFrom": [
-            "character_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["character_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1381,12 +1387,8 @@
           "name": "flags_project_id_projects_id_fk",
           "tableFrom": "flags",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1512,6 +1514,74 @@
         "label_position": {
           "name": "label_position",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_synced_hash": {
+          "name": "last_synced_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sync_status": {
+          "name": "sync_status",
+          "type": "sync_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_exported_at": {
+          "name": "last_exported_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_imported_at": {
+          "name": "last_imported_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "export_commit_sha": {
+          "name": "export_commit_sha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "import_commit_sha": {
+          "name": "import_commit_sha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 1
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false
         },
@@ -1644,6 +1714,66 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "labels_sync_status_idx": {
+          "name": "labels_sync_status_idx",
+          "columns": [
+            {
+              "expression": "sync_status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "labels_deleted_at_idx": {
+          "name": "labels_deleted_at_idx",
+          "columns": [
+            {
+              "expression": "deleted_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "labels_created_by_idx": {
+          "name": "labels_created_by_idx",
+          "columns": [
+            {
+              "expression": "created_by",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "labels_updated_by_idx": {
+          "name": "labels_updated_by_idx",
+          "columns": [
+            {
+              "expression": "updated_by",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -1651,12 +1781,8 @@
           "name": "labels_project_id_projects_id_fk",
           "tableFrom": "labels",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1664,12 +1790,8 @@
           "name": "labels_duo_pair_id_pair_groups_id_fk",
           "tableFrom": "labels",
           "tableTo": "pair_groups",
-          "columnsFrom": [
-            "duo_pair_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["duo_pair_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -1677,12 +1799,26 @@
           "name": "labels_gitlab_file_id_gitlab_files_id_fk",
           "tableFrom": "labels",
           "tableTo": "gitlab_files",
-          "columnsFrom": [
-            "gitlab_file_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["gitlab_file_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "labels_created_by_users_id_fk": {
+          "name": "labels_created_by_users_id_fk",
+          "tableFrom": "labels",
+          "tableTo": "users",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "labels_updated_by_users_id_fk": {
+          "name": "labels_updated_by_users_id_fk",
+          "tableFrom": "labels",
+          "tableTo": "users",
+          "columnsFrom": ["updated_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1779,6 +1915,61 @@
           "primaryKey": false,
           "notNull": false
         },
+        "gitlab_file_id": {
+          "name": "gitlab_file_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "line_position": {
+          "name": "line_position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_synced_hash": {
+          "name": "last_synced_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_dirty": {
+          "name": "is_dirty",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "last_synced_at": {
+          "name": "last_synced_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rpy_line_number": {
+          "name": "rpy_line_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rpy_indent_level": {
+          "name": "rpy_indent_level",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -1798,6 +1989,27 @@
         "label_lines_speaker_id_idx": {
           "name": "label_lines_speaker_id_idx",
           "columns": [
+            {
+              "expression": "speaker_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "label_lines_label_speaker_idx": {
+          "name": "label_lines_label_speaker_idx",
+          "columns": [
+            {
+              "expression": "label_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
             {
               "expression": "speaker_id",
               "isExpression": false,
@@ -1830,6 +2042,74 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "label_lines_gitlab_file_id_idx": {
+          "name": "label_lines_gitlab_file_id_idx",
+          "columns": [
+            {
+              "expression": "gitlab_file_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "label_lines_gitlab_file_position_idx": {
+          "name": "label_lines_gitlab_file_position_idx",
+          "columns": [
+            {
+              "expression": "gitlab_file_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "line_position",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "label_lines_is_dirty_idx": {
+          "name": "label_lines_is_dirty_idx",
+          "columns": [
+            {
+              "expression": "is_dirty",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"label_lines\".\"is_dirty\" = true",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "label_lines_deleted_at_idx": {
+          "name": "label_lines_deleted_at_idx",
+          "columns": [
+            {
+              "expression": "deleted_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"label_lines\".\"deleted_at\" IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -1837,12 +2117,8 @@
           "name": "label_lines_label_id_labels_id_fk",
           "tableFrom": "label_lines",
           "tableTo": "labels",
-          "columnsFrom": [
-            "label_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["label_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1850,12 +2126,17 @@
           "name": "label_lines_speaker_id_characters_id_fk",
           "tableFrom": "label_lines",
           "tableTo": "characters",
-          "columnsFrom": [
-            "speaker_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["speaker_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "label_lines_gitlab_file_id_gitlab_files_id_fk": {
+          "name": "label_lines_gitlab_file_id_gitlab_files_id_fk",
+          "tableFrom": "label_lines",
+          "tableTo": "gitlab_files",
+          "columnsFrom": ["gitlab_file_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1909,12 +2190,8 @@
           "name": "label_characters_label_id_labels_id_fk",
           "tableFrom": "label_characters",
           "tableTo": "labels",
-          "columnsFrom": [
-            "label_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["label_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1922,12 +2199,8 @@
           "name": "label_characters_character_id_characters_id_fk",
           "tableFrom": "label_characters",
           "tableTo": "characters",
-          "columnsFrom": [
-            "character_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["character_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1935,10 +2208,7 @@
       "compositePrimaryKeys": {
         "label_characters_label_id_character_id_pk": {
           "name": "label_characters_label_id_character_id_pk",
-          "columns": [
-            "label_id",
-            "character_id"
-          ]
+          "columns": ["label_id", "character_id"]
         }
       },
       "uniqueConstraints": {},
@@ -2019,12 +2289,8 @@
           "name": "world_elements_project_id_projects_id_fk",
           "tableFrom": "world_elements",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2169,12 +2435,8 @@
           "name": "ai_suggestions_project_id_projects_id_fk",
           "tableFrom": "ai_suggestions",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2182,12 +2444,8 @@
           "name": "ai_suggestions_label_id_labels_id_fk",
           "tableFrom": "ai_suggestions",
           "tableTo": "labels",
-          "columnsFrom": [
-            "label_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["label_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -2195,12 +2453,8 @@
           "name": "ai_suggestions_character_id_characters_id_fk",
           "tableFrom": "ai_suggestions",
           "tableTo": "characters",
-          "columnsFrom": [
-            "character_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["character_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2288,12 +2542,8 @@
           "name": "exports_project_id_projects_id_fk",
           "tableFrom": "exports",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2383,12 +2633,8 @@
           "name": "import_logs_project_id_projects_id_fk",
           "tableFrom": "import_logs",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2456,12 +2702,8 @@
           "name": "gitlab_integrations_user_id_users_id_fk",
           "tableFrom": "gitlab_integrations",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2471,9 +2713,7 @@
         "gitlab_integrations_user_id_unique": {
           "name": "gitlab_integrations_user_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "user_id"
-          ]
+          "columns": ["user_id"]
         }
       },
       "policies": {},
@@ -2571,12 +2811,8 @@
           "name": "gitlab_files_project_id_projects_id_fk",
           "tableFrom": "gitlab_files",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2586,10 +2822,7 @@
         "gitlab_files_project_file_uidx": {
           "name": "gitlab_files_project_file_uidx",
           "nullsNotDistinct": false,
-          "columns": [
-            "project_id",
-            "file_path"
-          ]
+          "columns": ["project_id", "file_path"]
         }
       },
       "policies": {},
@@ -2695,12 +2928,8 @@
           "name": "gitlab_file_sync_state_gitlab_file_id_gitlab_files_id_fk",
           "tableFrom": "gitlab_file_sync_state",
           "tableTo": "gitlab_files",
-          "columnsFrom": [
-            "gitlab_file_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["gitlab_file_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2805,12 +3034,8 @@
           "name": "gitlab_repositories_project_id_projects_id_fk",
           "tableFrom": "gitlab_repositories",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2820,10 +3045,7 @@
         "gitlab_repositories_project_gitlab_project_uidx": {
           "name": "gitlab_repositories_project_gitlab_project_uidx",
           "nullsNotDistinct": false,
-          "columns": [
-            "project_id",
-            "gitlab_project_id"
-          ]
+          "columns": ["project_id", "gitlab_project_id"]
         }
       },
       "policies": {},
@@ -2856,7 +3078,7 @@
         },
         "status": {
           "name": "status",
-          "type": "sync_status",
+          "type": "sync_operation_status",
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
@@ -2931,12 +3153,8 @@
           "name": "gitlab_sync_operations_project_id_projects_id_fk",
           "tableFrom": "gitlab_sync_operations",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3062,12 +3280,8 @@
           "name": "demo_sessions_project_id_projects_id_fk",
           "tableFrom": "demo_sessions",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3075,12 +3289,8 @@
           "name": "demo_sessions_user_id_users_id_fk",
           "tableFrom": "demo_sessions",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3088,12 +3298,8 @@
           "name": "demo_sessions_current_label_line_id_label_lines_id_fk",
           "tableFrom": "demo_sessions",
           "tableTo": "label_lines",
-          "columnsFrom": [
-            "current_label_line_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["current_label_line_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -3109,50 +3315,27 @@
     "public.user_role": {
       "name": "user_role",
       "schema": "public",
-      "values": [
-        "OWNER",
-        "READER",
-        "TESTER"
-      ]
+      "values": ["OWNER", "READER", "TESTER"]
     },
     "public.label_status": {
       "name": "label_status",
       "schema": "public",
-      "values": [
-        "DRAFT",
-        "REVIEW",
-        "FINAL"
-      ]
+      "values": ["DRAFT", "REVIEW", "FINAL"]
     },
     "public.content_type": {
       "name": "content_type",
       "schema": "public",
-      "values": [
-        "NARRATION",
-        "DIALOGUE",
-        "CHOICE",
-        "MENU",
-        "JUMP"
-      ]
+      "values": ["NARRATION", "DIALOGUE", "CHOICE", "MENU", "JUMP"]
     },
     "public.visual_type": {
       "name": "visual_type",
       "schema": "public",
-      "values": [
-        "GENERATED",
-        "BLACK",
-        "CUSTOM"
-      ]
+      "values": ["GENERATED", "BLACK", "CUSTOM"]
     },
     "public.element_type": {
       "name": "element_type",
       "schema": "public",
-      "values": [
-        "LOCATION",
-        "ITEM",
-        "CONCEPT",
-        "EVENT"
-      ]
+      "values": ["LOCATION", "ITEM", "CONCEPT", "EVENT"]
     },
     "public.suggestion_type": {
       "name": "suggestion_type",
@@ -3167,66 +3350,42 @@
     "public.suggestion_status": {
       "name": "suggestion_status",
       "schema": "public",
-      "values": [
-        "PENDING",
-        "ACCEPTED",
-        "REJECTED"
-      ]
+      "values": ["PENDING", "ACCEPTED", "REJECTED"]
     },
     "public.character_role": {
       "name": "character_role",
       "schema": "public",
-      "values": [
-        "PRIMARY",
-        "SECONDARY",
-        "BACKGROUND",
-        "MENTIONED"
-      ]
+      "values": ["PRIMARY", "SECONDARY", "BACKGROUND", "MENTIONED"]
     },
     "public.renpy_definition_category": {
       "name": "renpy_definition_category",
       "schema": "public",
-      "values": [
-        "CHARACTER",
-        "TRANSFORM",
-        "IMAGE",
-        "INIT"
-      ]
+      "values": ["CHARACTER", "TRANSFORM", "IMAGE", "INIT"]
     },
     "public.label_visibility": {
       "name": "label_visibility",
       "schema": "public",
-      "values": [
-        "EXCLUSIVE",
-        "SHARED",
-        "DUO_PAIR"
-      ]
+      "values": ["EXCLUSIVE", "SHARED", "DUO_PAIR"]
     },
     "public.sync_operation": {
       "name": "sync_operation",
       "schema": "public",
-      "values": [
-        "export",
-        "import"
-      ]
+      "values": ["export", "import"]
     },
     "public.sync_status": {
       "name": "sync_status",
       "schema": "public",
-      "values": [
-        "pending",
-        "in_progress",
-        "completed",
-        "failed"
-      ]
+      "values": ["synced", "modified_local", "conflict"]
+    },
+    "public.sync_operation_status": {
+      "name": "sync_operation_status",
+      "schema": "public",
+      "values": ["pending", "in_progress", "completed", "failed"]
     },
     "public.gitlab_file_type": {
       "name": "gitlab_file_type",
       "schema": "public",
-      "values": [
-        "STORY",
-        "SETTINGS"
-      ]
+      "values": ["STORY", "SETTINGS"]
     }
   },
   "schemas": {},

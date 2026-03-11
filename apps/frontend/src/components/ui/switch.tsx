@@ -1,13 +1,17 @@
-import * as React from "react"
-import { cn } from "@/lib/utils"
+import * as React from "react";
+import { cn } from "@/lib/utils";
 
-export interface SwitchProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onChange'> {
-  checked?: boolean
-  onCheckedChange?: (checked: boolean) => void
+export interface SwitchProps
+  extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "onChange"> {
+  checked?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
 }
 
 const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
-  ({ className, checked = false, onCheckedChange, disabled, ...props }, ref) => {
+  (
+    { className, checked = false, onCheckedChange, disabled, ...props },
+    ref
+  ) => {
     return (
       <button
         type="button"
@@ -30,9 +34,9 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
           )}
         />
       </button>
-    )
+    );
   }
-)
-Switch.displayName = "Switch"
+);
+Switch.displayName = "Switch";
 
-export { Switch }
+export { Switch };

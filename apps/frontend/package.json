@@ -10,7 +10,10 @@
     "test": "vitest",
     "test:unit": "vitest run",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@branchforge/shared": "workspace:*",
@@ -24,6 +27,7 @@
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.18.0",
     "@testing-library/dom": "^10.0.0",
     "@testing-library/jest-dom": "^6.6.0",
     "@testing-library/react": "^16.0.0",
@@ -33,11 +37,17 @@
     "@vitejs/plugin-react": "^5.0.0",
     "@vitest/ui": "^4.0.0",
     "autoprefixer": "^10.4.27",
+    "eslint": "^9.18.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "globals": "^15.14.0",
     "jsdom": "^25.0.0",
     "postcss": "^8.4.47",
+    "prettier": "^3.4.2",
     "tailwindcss": "^3.4.19",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.7.0",
+    "typescript-eslint": "^8.19.1",
     "vite": "^6.0.0",
     "vitest": "^4.0.0"
   }

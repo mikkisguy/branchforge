@@ -6,7 +6,12 @@ interface BookmarkTabProps {
   onClose?: () => void;
 }
 
-export function BookmarkTab({ name, isActive, onClick, onClose }: BookmarkTabProps) {
+export function BookmarkTab({
+  name,
+  isActive,
+  onClick,
+  onClose,
+}: BookmarkTabProps) {
   return (
     <button
       onClick={onClick}

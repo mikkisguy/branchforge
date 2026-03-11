@@ -77,7 +77,7 @@ interface ErrorResponse {
  */
 async function listRouteConfigsByProjectHandler(
   request: FastifyRequest<{ Params: ListRouteConfigsByProjectParams }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const { projectId } = request.params;
   const user = request.user!;
@@ -95,7 +95,7 @@ async function listRouteConfigsByProjectHandler(
  */
 async function getRouteConfigHandler(
   request: FastifyRequest<{ Params: GetRouteConfigParams }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const { routeConfigId } = request.params;
   const user = request.user!;
@@ -103,7 +103,9 @@ async function getRouteConfigHandler(
   const routeConfig = await getRouteConfig(routeConfigId, user.id);
 
   if (!routeConfig) {
-    reply.status(404).send({ error: "Route configuration not found" } as ErrorResponse);
+    reply
+      .status(404)
+      .send({ error: "Route configuration not found" } as ErrorResponse);
     return;
   }
 
@@ -121,7 +123,7 @@ async function createRouteConfigByProjectHandler(
     Params: CreateRouteConfigByProjectParams;
     Body: CreateRouteConfigInput;
   }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const { projectId } = request.params;
   const user = request.user!;
@@ -143,7 +145,7 @@ async function updateRouteConfigHandler(
     Params: GetRouteConfigParams;
     Body: UpdateRouteConfigInput;
   }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const { routeConfigId } = request.params;
   const user = request.user!;
@@ -162,7 +164,7 @@ async function updateRouteConfigHandler(
  */
 async function deleteRouteConfigHandler(
   request: FastifyRequest<{ Params: GetRouteConfigParams }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const { routeConfigId } = request.params;
   const user = request.user!;
@@ -176,7 +178,9 @@ async function deleteRouteConfigHandler(
 // Routes Registration
 // ============================================================================
 
-export async function routeConfigsRoutes(fastify: FastifyInstance): Promise<void> {
+export async function routeConfigsRoutes(
+  fastify: FastifyInstance
+): Promise<void> {
   // All routes require authentication
 
   // List route configurations for a project
@@ -186,7 +190,7 @@ export async function routeConfigsRoutes(fastify: FastifyInstance): Promise<void
       onRequest: authenticate,
       preValidation: validateParams(routeConfigProjectIdParamsSchema),
     },
-    listRouteConfigsByProjectHandler,
+    listRouteConfigsByProjectHandler
   );
 
   // Create route configuration for a project
@@ -202,7 +206,7 @@ export async function routeConfigsRoutes(fastify: FastifyInstance): Promise<void
         validateBody(createRouteConfigSchema),
       ],
     },
-    createRouteConfigByProjectHandler,
+    createRouteConfigByProjectHandler
   );
 
   // Get a single route configuration
@@ -212,7 +216,7 @@ export async function routeConfigsRoutes(fastify: FastifyInstance): Promise<void
       onRequest: authenticate,
       preValidation: validateParams(routeConfigIdParamsSchema),
     },
-    getRouteConfigHandler,
+    getRouteConfigHandler
   );
 
   // Update a route configuration
@@ -228,7 +232,7 @@ export async function routeConfigsRoutes(fastify: FastifyInstance): Promise<void
         validateBody(updateRouteConfigSchema),
       ],
     },
-    updateRouteConfigHandler,
+    updateRouteConfigHandler
   );
 
   // Delete a route configuration
@@ -238,6 +242,6 @@ export async function routeConfigsRoutes(fastify: FastifyInstance): Promise<void
       onRequest: authenticate,
       preValidation: validateParams(routeConfigIdParamsSchema),
     },
-    deleteRouteConfigHandler,
+    deleteRouteConfigHandler
   );
 }

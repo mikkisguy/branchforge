@@ -123,10 +123,12 @@ export function clearRateLimit(identifier: string): void {
  *
  * @param identifier - IP address or other identifier
  */
-export function getRateLimitInfo(identifier: string): {
-  count: number;
-  resetTime: number;
-} | undefined {
+export function getRateLimitInfo(identifier: string):
+  | {
+      count: number;
+      resetTime: number;
+    }
+  | undefined {
   return rateLimitStore.get(identifier);
 }
 
@@ -145,7 +147,9 @@ export function getRateLimiterSize(): number {
  *
  * @returns The cleanup interval or null if not started
  */
-export function getRateLimiterInterval(): ReturnType<typeof setInterval> | null {
+export function getRateLimiterInterval(): ReturnType<
+  typeof setInterval
+> | null {
   return cleanupInterval;
 }
 

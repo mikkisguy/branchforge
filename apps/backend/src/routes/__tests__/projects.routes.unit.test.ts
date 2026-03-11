@@ -20,7 +20,7 @@ vi.mock("../../services/projects.service.js", () => ({
 
 // Mock the authenticate middleware to attach a test user
 vi.mock("../../middleware/auth.middleware.js", () => ({
-  authenticate: async (request: any, reply: any) => {
+  authenticate: async (request: any, _reply: any) => {
     (request as any).user = {
       id: "user-123",
       email: "test@example.com",
@@ -177,4 +177,3 @@ describe("ProjectsRoutes", () => {
     });
   });
 });
-

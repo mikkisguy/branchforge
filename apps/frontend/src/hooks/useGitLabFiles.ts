@@ -41,7 +41,7 @@ export interface UseGitLabFilesReturn {
 // ============================================================================
 
 export function useGitLabFiles(
-  projectId: string | undefined,
+  projectId: string | undefined
 ): UseGitLabFilesReturn {
   const queryClient = useQueryClient();
 
@@ -98,4 +98,3 @@ export function useGitLabFiles(
     isUpdatingFile: updateFileMutation.isPending,
   };
 }
-

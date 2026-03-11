@@ -21,9 +21,10 @@ import {
   listLabelsQuerySchema,
   labelIdParamsSchema,
   createLabelSchema,
-  updateLabelSchema,
   createCharacterSchema,
   characterIdParamsSchema,
+  renpyTagSchema,
+  colorHexSchema,
   gitlabUrlSchema,
   validateData,
   safeValidateData,
@@ -581,7 +582,7 @@ describe("Project Schemas", () => {
   describe("projectIdParamsSchema", () => {
     it("should accept valid project ID", () => {
       const validData = {
-        id: "550e8400-e29b-41d4-a716-446655440000",
+        projectId: "550e8400-e29b-41d4-a716-446655440000",
       };
 
       const result = projectIdParamsSchema.safeParse(validData);
@@ -590,7 +591,7 @@ describe("Project Schemas", () => {
 
     it("should reject invalid project ID", () => {
       const invalidData = {
-        id: "not-a-uuid",
+        projectId: "not-a-uuid",
       };
 
       const result = projectIdParamsSchema.safeParse(invalidData);
@@ -648,8 +649,9 @@ describe("Create Label Schema", () => {
     it("should accept valid minimal label payload", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "eileen",
+        route: "eileen",
         labelNumber: 1,
+        title: "Scene Title",
       };
 
       const result = createLabelSchema.safeParse(validData);
@@ -659,14 +661,13 @@ describe("Create Label Schema", () => {
     it("should accept valid full label payload with grouping", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "lucas",
+        route: "lucas",
         groupType: "act",
         groupValue: "I",
         labelNumber: 42,
         status: "DRAFT",
         visibility: "EXCLUSIVE",
         title: "Scene Title",
-        summary: "Scene summary text",
       };
 
       const result = createLabelSchema.safeParse(validData);
@@ -676,14 +677,13 @@ describe("Create Label Schema", () => {
     it("should accept valid full label payload with chapter grouping", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "female",
+        route: "female",
         groupType: "chapter",
         groupValue: "5",
         labelNumber: 10,
         status: "REVIEW",
         visibility: "SHARED",
         title: "Chapter Scene",
-        summary: "Summary here",
       };
 
       const result = createLabelSchema.safeParse(validData);
@@ -693,9 +693,10 @@ describe("Create Label Schema", () => {
     it("should accept valid sequenceOrder for linear sequencing", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "common",
+        route: "common",
         labelNumber: 1,
         sequenceOrder: 100,
+        title: "Scene Title",
       };
 
       const result = createLabelSchema.safeParse(validData);
@@ -704,18 +705,20 @@ describe("Create Label Schema", () => {
 
     it("should reject missing required field: projectId", () => {
       const invalidData = {
-        routeKey: "eileen",
+        route: "eileen",
         labelNumber: 1,
+        title: "Scene Title",
       };
 
       const result = createLabelSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
 
-    it("should accept label without routeKey (optional field)", () => {
+    it("should accept label without route (optional field)", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         labelNumber: 1,
+        title: "Scene Title",
       };
 
       const result = createLabelSchema.safeParse(validData);
@@ -725,19 +728,21 @@ describe("Create Label Schema", () => {
     it("should reject invalid UUID for projectId", () => {
       const invalidData = {
         projectId: "not-a-uuid",
-        routeKey: "eileen",
+        route: "eileen",
         labelNumber: 1,
+        title: "Scene Title",
       };
 
       const result = createLabelSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
 
-    it("should accept any string value for routeKey", () => {
+    it("should accept any string value for route", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "my_custom_route",
+        route: "my_custom_route",
         labelNumber: 1,
+        title: "Scene Title",
       };
 
       const result = createLabelSchema.safeParse(validData);
@@ -852,11 +857,68 @@ describe("Create Label Schema", () => {
 });
 
 describe("Character Schemas", () => {
+  describe("renpyTagSchema", () => {
+    it("should accept valid ren'Py tag starting with letter", () => {
+      const result = renpyTagSchema.safeParse("s");
+      expect(result.success).toBe(true);
+    });
+
+    it("should accept valid ren'Py tag starting with underscore", () => {
+      const result = renpyTagSchema.safeParse("_special");
+      expect(result.success).toBe(true);
+    });
+
+    it("should accept valid ren'Py tag with alphanumeric and underscores", () => {
+      const result = renpyTagSchema.safeParse("s_01_first");
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject tag starting with number", () => {
+      const result = renpyTagSchema.safeParse("1_character");
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject tag with hyphens", () => {
+      const result = renpyTagSchema.safeParse("s-character");
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject empty tag", () => {
+      const result = renpyTagSchema.safeParse("");
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("colorHexSchema", () => {
+    it("should accept valid hex color", () => {
+      const result = colorHexSchema.safeParse("#FF5733");
+      expect(result.success).toBe(true);
+    });
+
+    it("should accept lowercase hex color", () => {
+      const result = colorHexSchema.safeParse("#ff5733");
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject hex color without hash", () => {
+      const result = colorHexSchema.safeParse("FF5733");
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject short hex color", () => {
+      const result = colorHexSchema.safeParse("#F53");
+      expect(result.success).toBe(false);
+    });
+  });
+
   describe("createCharacterSchema", () => {
     it("should accept valid minimal character payload", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         name: "Character Name",
+        displayName: "Character Display Name",
+        renpyTag: "char_name",
+        color: "#FF5733",
       };
 
       const result = createCharacterSchema.safeParse(validData);
@@ -867,8 +929,13 @@ describe("Character Schemas", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         name: "Jane Doe",
-        alias: "Jane",
-        description: "A detailed character description that can be quite long",
+        displayName: "Jane",
+        renpyTag: "jane",
+        color: "#ABC123",
+        routeAffiliation: "EILEEN",
+        isLoveInterest: true,
+        dialogueStyle: "casual",
+        conditionalPrefix: "jane_",
       };
 
       const result = createCharacterSchema.safeParse(validData);
@@ -879,6 +946,9 @@ describe("Character Schemas", () => {
       const data = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         name: "  Character Name  ",
+        displayName: "Display Name",
+        renpyTag: "char",
+        color: "#FF5733",
       };
 
       const result = createCharacterSchema.safeParse(data);
@@ -888,35 +958,30 @@ describe("Character Schemas", () => {
       }
     });
 
-    it("should trim whitespace from alias", () => {
+    it("should trim whitespace from displayName", () => {
       const data = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         name: "Character Name",
-        alias: "  Alias  ",
+        displayName: "  Display Name  ",
+        renpyTag: "char",
+        color: "#FF5733",
       };
 
       const result = createCharacterSchema.safeParse(data);
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.alias).toBe("Alias");
+        expect(result.data.displayName).toBe("Display Name");
       }
     });
 
-    it("should accept empty alias (optional field)", () => {
+    it("should accept optional fields", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         name: "Character Name",
-        alias: "",
-      };
-
-      const result = createCharacterSchema.safeParse(validData);
-      expect(result.success).toBe(true);
-    });
-
-    it("should accept missing description (optional field)", () => {
-      const validData = {
-        projectId: "550e8400-e29b-41d4-a716-446655440000",
-        name: "Character Name",
+        displayName: "Display Name",
+        renpyTag: "char",
+        color: "#FF5733",
+        routeAffiliation: "SHARED",
       };
 
       const result = createCharacterSchema.safeParse(validData);
@@ -926,6 +991,9 @@ describe("Character Schemas", () => {
     it("should reject missing required field: projectId", () => {
       const invalidData = {
         name: "Character Name",
+        displayName: "Display Name",
+        renpyTag: "char",
+        color: "#FF5733",
       };
 
       const result = createCharacterSchema.safeParse(invalidData);
@@ -935,6 +1003,45 @@ describe("Character Schemas", () => {
     it("should reject missing required field: name", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
+        displayName: "Display Name",
+        renpyTag: "char",
+        color: "#FF5733",
+      };
+
+      const result = createCharacterSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject missing required field: displayName", () => {
+      const invalidData = {
+        projectId: "550e8400-e29b-41d4-a716-446655440000",
+        name: "Character Name",
+        renpyTag: "char",
+        color: "#FF5733",
+      };
+
+      const result = createCharacterSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject missing required field: renpyTag", () => {
+      const invalidData = {
+        projectId: "550e8400-e29b-41d4-a716-446655440000",
+        name: "Character Name",
+        displayName: "Display Name",
+        color: "#FF5733",
+      };
+
+      const result = createCharacterSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject missing required field: color", () => {
+      const invalidData = {
+        projectId: "550e8400-e29b-41d4-a716-446655440000",
+        name: "Character Name",
+        displayName: "Display Name",
+        renpyTag: "char",
       };
 
       const result = createCharacterSchema.safeParse(invalidData);
@@ -945,6 +1052,9 @@ describe("Character Schemas", () => {
       const invalidData = {
         projectId: "not-a-uuid",
         name: "Character Name",
+        displayName: "Display Name",
+        renpyTag: "char",
+        color: "#FF5733",
       };
 
       const result = createCharacterSchema.safeParse(invalidData);
@@ -955,6 +1065,9 @@ describe("Character Schemas", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         name: "   ",
+        displayName: "Display Name",
+        renpyTag: "char",
+        color: "#FF5733",
       };
 
       const result = createCharacterSchema.safeParse(invalidData);
@@ -965,28 +1078,49 @@ describe("Character Schemas", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         name: "a".repeat(201),
+        displayName: "Display Name",
+        renpyTag: "char",
+        color: "#FF5733",
       };
 
       const result = createCharacterSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
 
-    it("should reject alias exceeding maximum length (100)", () => {
+    it("should reject invalid ren'Py tag starting with number", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         name: "Character Name",
-        alias: "a".repeat(101),
+        displayName: "Display Name",
+        renpyTag: "1_invalid",
+        color: "#FF5733",
       };
 
       const result = createCharacterSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
 
-    it("should reject description exceeding maximum length (5000)", () => {
+    it("should reject invalid color format", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
         name: "Character Name",
-        description: "a".repeat(5001),
+        displayName: "Display Name",
+        renpyTag: "char",
+        color: "red",
+      };
+
+      const result = createCharacterSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject unknown fields (strict mode)", () => {
+      const invalidData = {
+        projectId: "550e8400-e29b-41d4-a716-446655440000",
+        name: "Character Name",
+        displayName: "Display Name",
+        renpyTag: "char",
+        color: "#FF5733",
+        unknownField: "should not be allowed",
       };
 
       const result = createCharacterSchema.safeParse(invalidData);
@@ -1079,4 +1213,3 @@ describe("Helper Functions", () => {
     });
   });
 });
-

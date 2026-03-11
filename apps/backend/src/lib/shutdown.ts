@@ -14,10 +14,7 @@
 import type { FastifyInstance } from "fastify";
 import type { DrizzleSessionStore } from "../services/session-store.service.js";
 import { closeDb } from "../db/index.js";
-import {
-  cleanupRateLimiter as cleanupRateLimiterService,
-  getRateLimiterInterval,
-} from "../services/rate-limiter.service.js";
+import { cleanupRateLimiter as cleanupRateLimiterService } from "../services/rate-limiter.service.js";
 
 /**
  * Shutdown state tracking
@@ -62,7 +59,7 @@ export async function gracefulShutdown(
   server: FastifyInstance,
   sessionStore: DrizzleSessionStore,
   signal?: string,
-  exitCode = 0,
+  exitCode = 0
 ): Promise<void> {
   if (isShuttingDown) {
     console.log("Shutdown already in progress, ignoring duplicate signal");
@@ -72,7 +69,7 @@ export async function gracefulShutdown(
   isShuttingDown = true;
   const signalMsg = signal ? ` (${signal})` : "";
   console.log(
-    `\n${new Date().toISOString()} - Starting graceful shutdown${signalMsg}`,
+    `\n${new Date().toISOString()} - Starting graceful shutdown${signalMsg}`
   );
 
   const startTime = Date.now();
@@ -81,7 +78,7 @@ export async function gracefulShutdown(
   try {
     // Step 1: Stop accepting new connections
     console.log("  [1/4] Stopping HTTP server...");
-    await new Promise<void>((resolve, reject) => {
+    await new Promise<void>((resolve) => {
       const timeout = setTimeout(() => {
         console.warn("    Server close timeout, forcing shutdown");
         resolve();
@@ -136,7 +133,7 @@ export async function gracefulShutdown(
  */
 export function setupShutdownHandlers(
   server: FastifyInstance,
-  sessionStore: DrizzleSessionStore,
+  sessionStore: DrizzleSessionStore
 ): void {
   // Handle SIGTERM (standard termination signal from Docker, systemd, etc.)
   process.on("SIGTERM", () => {
@@ -162,7 +159,7 @@ export function setupShutdownHandlers(
       (shutdownErr) => {
         console.error("Error during uncaughtException shutdown:", shutdownErr);
         process.exit(1);
-      },
+      }
     );
   });
 
@@ -186,7 +183,7 @@ export function setupShutdownHandlers(
  */
 export async function shutdownForTest(
   server: FastifyInstance,
-  sessionStore: DrizzleSessionStore,
+  sessionStore: DrizzleSessionStore
 ): Promise<void> {
   if (isShuttingDown) {
     return;
@@ -216,4 +213,3 @@ export async function shutdownForTest(
   // Reset shutdown state for test re-use
   isShuttingDown = false;
 }
-

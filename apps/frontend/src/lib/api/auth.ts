@@ -1,4 +1,5 @@
-const API_BASE = import.meta.env.VITE_API_ENV === "development" ? "/api/api" : "/api";
+const API_BASE =
+  import.meta.env.VITE_API_ENV === "development" ? "/api/api" : "/api";
 
 import type { PublicUser } from "@branchforge/shared";
 
@@ -164,8 +165,12 @@ async function request<T>(
   });
 
   if (!response.ok) {
-    const error: ApiError = await response.json().catch(() => ({ error: "Unknown error" }));
-    throw new Error(error.error || `Request failed with status ${response.status}`);
+    const error: ApiError = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      error.error || `Request failed with status ${response.status}`
+    );
   }
 
   // For 204 No Content responses

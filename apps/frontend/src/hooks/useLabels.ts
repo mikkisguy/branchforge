@@ -58,17 +58,17 @@ export function useLabels(): UseLabelsReturn {
     () => {
       if (!currentProject?.id) return null;
       const cached = queryClient.getQueryData<string | null>(
-        labelKeys.activeLabelId(currentProject.id),
+        labelKeys.activeLabelId(currentProject.id)
       );
       return cached ?? null;
-    },
+    }
   );
 
   // Query for active label detail
   const { data: activeLabel, isLoading: isLoadingLabel } = useQuery({
     queryKey: labelKeys.detail(
       currentProject?.id ?? "",
-      localActiveLabelId ?? "",
+      localActiveLabelId ?? ""
     ),
     queryFn: () => labelsApi.getLabel(localActiveLabelId!),
     enabled: !!localActiveLabelId && !!currentProject?.id,
@@ -78,7 +78,7 @@ export function useLabels(): UseLabelsReturn {
   // Memoized map for efficient lookups (like useProject pattern)
   const labelsMap = useMemo(
     () => new Map(labels.map((l) => [l.id, l])),
-    [labels],
+    [labels]
   );
 
   // Set active label method (updates both local state and cache)
@@ -88,11 +88,11 @@ export function useLabels(): UseLabelsReturn {
       if (currentProject) {
         queryClient.setQueryData(
           labelKeys.activeLabelId(currentProject.id),
-          labelId,
+          labelId
         );
       }
     },
-    [currentProject, queryClient],
+    [currentProject, queryClient]
   );
 
   // Invalidate labels method

@@ -14,19 +14,19 @@
  */
 
 import { getDb } from "../db/index.js";
-import { createHash } from "crypto";
 import {
   gitlabFiles,
   gitlabFileSyncState,
   labels,
   labelLines,
 } from "../db/schema/index.js";
-import { eq, and, inArray, desc } from "drizzle-orm";
+import { eq, and, inArray, desc, isNull } from "drizzle-orm";
 import {
   parseRPYFileWithLabels,
   convertToBranchForgeFormatFromLabels,
   type ParsedRPYFileWithLabels,
 } from "./rpy-parser.service.js";
+import { calculateContentHash, calculateLinesHash } from "../lib/hash.js";
 
 // ============================================================================
 // Types
@@ -51,19 +51,12 @@ export interface SyncLabelsOptions {
 // ============================================================================
 
 /**
- * Calculate SHA-256 hash of content for idempotency
- */
-export function calculateContentHash(content: string): string {
-  return createHash("sha256").update(content, "utf8").digest("hex");
-}
-
-/**
  * Validate RPY content before sync
  * @throws Error if validation fails
  */
 export function validateRPYContent(
   content: string,
-  parsed: ParsedRPYFileWithLabels,
+  parsed: ParsedRPYFileWithLabels
 ): void {
   if (!content || content.trim().length === 0) {
     throw new Error("RPY content is empty");
@@ -95,7 +88,7 @@ export function validateRPYContent(
 export function validateFileType(fileType: string): void {
   if (fileType !== "STORY") {
     throw new Error(
-      `Invalid file type for label sync: ${fileType}. Only STORY files can sync to labels.`,
+      `Invalid file type for label sync: ${fileType}. Only STORY files can sync to labels.`
     );
   }
 }
@@ -106,9 +99,10 @@ export function validateFileType(fileType: string): void {
 
 /**
  * Check if there's an in-progress sync for this file
+ * Uses completedAt = null with status 'modified_local' to indicate in-progress
  */
 export async function checkInProgressSync(
-  gitlabFileId: string,
+  gitlabFileId: string
 ): Promise<boolean> {
   const db = getDb();
 
@@ -118,8 +112,9 @@ export async function checkInProgressSync(
     .where(
       and(
         eq(gitlabFileSyncState.gitlabFileId, gitlabFileId),
-        eq(gitlabFileSyncState.status, "in_progress"),
-      ),
+        eq(gitlabFileSyncState.status, "MODIFIED_LOCAL"),
+        isNull(gitlabFileSyncState.completedAt)
+      )
     )
     .limit(1);
 
@@ -131,24 +126,24 @@ export async function checkInProgressSync(
  */
 export async function checkContentAlreadySynced(
   gitlabFileId: string,
-  contentHash: string,
+  contentHash: string
 ): Promise<boolean> {
   const db = getDb();
 
-  const [lastCompleted] = await db
+  const [lastSynced] = await db
     .select()
     .from(gitlabFileSyncState)
     .where(
       and(
         eq(gitlabFileSyncState.gitlabFileId, gitlabFileId),
-        eq(gitlabFileSyncState.status, "completed"),
-        eq(gitlabFileSyncState.contentHash, contentHash),
-      ),
+        eq(gitlabFileSyncState.status, "SYNCED"),
+        eq(gitlabFileSyncState.contentHash, contentHash)
+      )
     )
     .orderBy(desc(gitlabFileSyncState.completedAt))
     .limit(1);
 
-  return !!lastCompleted;
+  return !!lastSynced;
 }
 
 /**
@@ -157,7 +152,7 @@ export async function checkContentAlreadySynced(
 export async function createSyncState(
   gitlabFileId: string,
   contentHash: string,
-  labelCount: number,
+  labelCount: number
 ): Promise<string> {
   const db = getDb();
 
@@ -166,7 +161,7 @@ export async function createSyncState(
     .values({
       gitlabFileId,
       contentHash,
-      status: "in_progress",
+      status: "MODIFIED_LOCAL",
       rpyLabelCount: labelCount,
       dbLabelCount: 0,
     })
@@ -182,14 +177,14 @@ export async function completeSyncState(
   syncStateId: string,
   success: boolean,
   dbLabelCount?: number,
-  errorMessage?: string,
+  errorMessage?: string
 ): Promise<void> {
   const db = getDb();
 
   await db
     .update(gitlabFileSyncState)
     .set({
-      status: success ? "completed" : "failed",
+      status: success ? "SYNCED" : "CONFLICT",
       completedAt: new Date(),
       dbLabelCount,
       errorMessage,
@@ -242,7 +237,7 @@ function mapEntryToDbType(entry: {
 export async function syncLabelsFromGitLabFile(
   gitlabFileId: string,
   rpyContent: string,
-  options?: SyncLabelsOptions,
+  options?: SyncLabelsOptions
 ): Promise<SyncLabelsResult> {
   const db = getDb();
   const skipCleanup = options?.skipCleanup ?? false;
@@ -291,7 +286,7 @@ export async function syncLabelsFromGitLabFile(
     // Step 5: Check idempotency (same content already synced?)
     const alreadySynced = await checkContentAlreadySynced(
       gitlabFileId,
-      contentHash,
+      contentHash
     );
     if (alreadySynced) {
       result.skipped = true;
@@ -303,7 +298,7 @@ export async function syncLabelsFromGitLabFile(
     const syncStateId = await createSyncState(
       gitlabFileId,
       contentHash,
-      parsed.labels.length,
+      parsed.labels.length
     );
 
     // Step 7-9: Validate and sync in a single try block for proper error handling
@@ -344,6 +339,7 @@ export async function syncLabelsFromGitLabFile(
           const labelData = convertToBranchForgeFormatFromLabels(
             parsed,
             label.label,
+            rpyContent
           );
 
           try {
@@ -356,6 +352,9 @@ export async function syncLabelsFromGitLabFile(
                 .delete(labelLines)
                 .where(eq(labelLines.labelId, existingLabel.id));
 
+              // Calculate label lines hash
+              const labelLinesHash = calculateLinesHash(labelData.entries);
+
               // Insert new lines in batch
               if (labelData.entries.length > 0) {
                 const lineValues = labelData.entries.map((entry, index) => {
@@ -363,6 +362,7 @@ export async function syncLabelsFromGitLabFile(
                   const content = entry.target
                     ? `jump ${entry.target}`
                     : entry.text || "";
+                  const lineHash = calculateContentHash(content);
 
                   return {
                     labelId: existingLabel.id,
@@ -370,6 +370,13 @@ export async function syncLabelsFromGitLabFile(
                     contentType,
                     content,
                     visualType: "GENERATED" as const,
+                    gitlabFileId: gitlabFileId,
+                    linePosition: index,
+                    contentHash: lineHash,
+                    lastSyncedHash: lineHash,
+                    lastSyncedAt: new Date(),
+                    rpyLineNumber: entry.lineNumber,
+                    rpyIndentLevel: entry.indentLevel ?? 0,
                   };
                 });
 
@@ -377,9 +384,22 @@ export async function syncLabelsFromGitLabFile(
                 linesProcessed += lineValues.length;
               }
 
+              // Update label sync metadata
+              await tx
+                .update(labels)
+                .set({
+                  contentHash: labelLinesHash,
+                  lastSyncedHash: labelLinesHash,
+                  syncStatus: "SYNCED",
+                  updatedAt: new Date(),
+                })
+                .where(eq(labels.id, existingLabel.id));
+
               labelsUpdated++;
             } else {
               // Create new scene
+              const labelLinesHash = calculateLinesHash(labelData.entries);
+
               const [newScene] = await tx
                 .insert(labels)
                 .values({
@@ -394,6 +414,10 @@ export async function syncLabelsFromGitLabFile(
                   status: "DRAFT",
                   prerequisites: {},
                   effects: {},
+                  // Sync fields
+                  contentHash: labelLinesHash,
+                  lastSyncedHash: labelLinesHash,
+                  syncStatus: "SYNCED",
                 })
                 .returning();
 
@@ -404,6 +428,7 @@ export async function syncLabelsFromGitLabFile(
                   const content = entry.target
                     ? `jump ${entry.target}`
                     : entry.text || "";
+                  const lineHash = calculateContentHash(content);
 
                   return {
                     labelId: newScene.id,
@@ -411,6 +436,13 @@ export async function syncLabelsFromGitLabFile(
                     contentType,
                     content,
                     visualType: "GENERATED" as const,
+                    gitlabFileId: gitlabFileId,
+                    linePosition: index,
+                    contentHash: lineHash,
+                    lastSyncedHash: lineHash,
+                    lastSyncedAt: new Date(),
+                    rpyLineNumber: entry.lineNumber,
+                    rpyIndentLevel: entry.indentLevel ?? 0,
                   };
                 });
 
@@ -433,20 +465,33 @@ export async function syncLabelsFromGitLabFile(
         if (!skipCleanup) {
           const currentLabelNames = new Set(parsed.labels.map((l) => l.label));
 
+          // Find orphaned labels (excluding already soft-deleted)
           const orphanedLabels = existingLabels.filter(
-            (s) => s.labelName && !currentLabelNames.has(s.labelName),
+            (s) =>
+              s.labelName && !currentLabelNames.has(s.labelName) && !s.deletedAt
           );
 
           if (orphanedLabels.length > 0) {
             const orphanedIds = orphanedLabels.map((s) => s.id);
 
-            // Delete label lines for orphaned labels
+            // Soft delete label lines for orphaned labels
             await tx
-              .delete(labelLines)
-              .where(inArray(labelLines.labelId, orphanedIds));
+              .update(labelLines)
+              .set({ deletedAt: new Date() })
+              .where(
+                and(
+                  inArray(labelLines.labelId, orphanedIds),
+                  isNull(labelLines.deletedAt)
+                )
+              );
 
-            // Delete orphaned labels
-            await tx.delete(labels).where(inArray(labels.id, orphanedIds));
+            // Soft delete orphaned labels
+            await tx
+              .update(labels)
+              .set({ deletedAt: new Date() })
+              .where(
+                and(inArray(labels.id, orphanedIds), isNull(labels.deletedAt))
+              );
 
             labelsDeleted = orphanedIds.length;
           }
@@ -478,7 +523,7 @@ export async function syncLabelsFromGitLabFile(
         await completeSyncState(
           syncStateId,
           true,
-          syncResult.labelsCreated + syncResult.labelsUpdated,
+          syncResult.labelsCreated + syncResult.labelsUpdated
         );
       } catch (metadataError) {
         // Metadata update failed but transaction already committed.
@@ -501,7 +546,9 @@ export async function syncLabelsFromGitLabFile(
           metadataError: errorMessage,
         };
         console.error(
-          `[GitLabFileSync] Metadata update failed after successful transaction. Data may be inconsistent: ${JSON.stringify(errorDetails)}`,
+          `[GitLabFileSync] Metadata update failed after successful transaction. Data may be inconsistent: ${JSON.stringify(
+            errorDetails
+          )}`
         );
         // Continue to return success - the core sync work is complete
       }
@@ -522,7 +569,7 @@ export async function syncLabelsFromGitLabFile(
         syncStateId,
         false,
         undefined,
-        error instanceof Error ? error.message : "Unknown error",
+        error instanceof Error ? error.message : "Unknown error"
       );
 
       throw error;
@@ -537,4 +584,3 @@ export async function syncLabelsFromGitLabFile(
     return result;
   }
 }
-

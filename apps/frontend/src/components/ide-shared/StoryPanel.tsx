@@ -5,7 +5,11 @@ interface StoryPanelProps {
   className?: string;
 }
 
-export function StoryPanel({ children, title, className = "" }: StoryPanelProps) {
+export function StoryPanel({
+  children,
+  title,
+  className = "",
+}: StoryPanelProps) {
   return (
     <div className={`relative ${className}`}>
       {/* Decorative corner flourishes */}

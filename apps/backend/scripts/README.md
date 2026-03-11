@@ -36,6 +36,7 @@ pnpm db:restore <filename>
 ```
 
 Example:
+
 ```bash
 pnpm db:restore backup-2025-01-15T10-30-00-000Z.sql
 ```
@@ -45,6 +46,7 @@ pnpm db:restore backup-2025-01-15T10-30-00-000Z.sql
 ## How it works
 
 - **Backup script** (`db-backup.ts`):
+
   - Connects to the database using the `DATABASE_URL` from your `.env`
   - Exports all table data as SQL INSERT statements
   - Saves to timestamped file in `apps/backups/`

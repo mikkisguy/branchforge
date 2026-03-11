@@ -50,8 +50,8 @@ describe("GitLabSyncService", () => {
       const mockOperation = {
         id: testOperationId,
         projectId: testProjectId,
-        operation: "export" as const,
-        status: "completed" as const,
+        operation: "EXPORT" as const,
+        status: "COMPLETED" as const,
         branch: testBranch,
         conflictCount: 0,
         startedAt: new Date(),
@@ -96,8 +96,8 @@ describe("GitLabSyncService", () => {
         {
           id: "op-1",
           projectId: testProjectId,
-          operation: "export" as const,
-          status: "completed" as const,
+          operation: "EXPORT" as const,
+          status: "COMPLETED" as const,
           branch: testBranch,
           conflictCount: 0,
           startedAt: new Date(),
@@ -105,8 +105,8 @@ describe("GitLabSyncService", () => {
         {
           id: "op-2",
           projectId: testProjectId,
-          operation: "import" as const,
-          status: "completed" as const,
+          operation: "IMPORT" as const,
+          status: "COMPLETED" as const,
           branch: "develop",
           conflictCount: 0,
           startedAt: new Date(),
@@ -151,8 +151,8 @@ describe("GitLabSyncService", () => {
         {
           id: "op-1",
           projectId: testProjectId,
-          operation: "export" as const,
-          status: "completed" as const,
+          operation: "EXPORT" as const,
+          status: "COMPLETED" as const,
           branch: testBranch,
           conflictCount: 0,
           startedAt: new Date(),
@@ -192,4 +192,3 @@ describe("GitLabSyncService", () => {
    * with real database and external service mocking provide better confidence.
    */
 });
-

@@ -112,11 +112,15 @@ describe("ProjectsRoutes (Integration)", () => {
 
     // First try to find the canonical session cookie, then fall back to legacy name
     const sessionCookie = loginResponse.cookies.find(
-      (cookie: { name: string; value: string }) => cookie.name === SESSION_COOKIE_NAME,
+      (cookie: { name: string; value: string }) =>
+        cookie.name === SESSION_COOKIE_NAME
     );
-    const sessionId = sessionCookie?.value ?? loginResponse.cookies.find(
-      (cookie: { name: string; value: string }) => cookie.name === "connect.sid",
-    )?.value;
+    const sessionId =
+      sessionCookie?.value ??
+      loginResponse.cookies.find(
+        (cookie: { name: string; value: string }) =>
+          cookie.name === "connect.sid"
+      )?.value;
     if (!sessionId) {
       throw new Error("Failed to create session cookie");
     }
@@ -159,7 +163,7 @@ describe("ProjectsRoutes (Integration)", () => {
       "/test-login",
       async (
         request: FastifyRequest<{ Body: { userId: string } }>,
-        reply: FastifyReply,
+        reply: FastifyReply
       ) => {
         const { userId } = request.body;
         const [user] = await db
@@ -175,7 +179,7 @@ describe("ProjectsRoutes (Integration)", () => {
           };
         }
         reply.send({ success: true });
-      },
+      }
     );
 
     await fastify.ready();
@@ -479,4 +483,3 @@ describe("ProjectsRoutes (Integration)", () => {
     });
   });
 });
-

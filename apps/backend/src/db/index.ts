@@ -5,9 +5,12 @@
  * In test environment, it uses a separate database.
  */
 
-import { drizzle } from 'drizzle-orm/node-postgres';
-import pg from 'pg';
-import * as schema from './schema/index.js';
+import { drizzle } from "drizzle-orm/node-postgres";
+import pg from "pg";
+import * as schema from "./schema/index.js";
+
+// Export the database type for use in other modules
+export type Db = ReturnType<typeof drizzle<typeof schema>>;
 
 const { Pool } = pg;
 
@@ -18,18 +21,20 @@ export function getDb() {
   if (!db) {
     let connectionString: string;
 
-    if (process.env.NODE_ENV === 'test') {
+    if (process.env.NODE_ENV === "test") {
       // In test environment, use DATABASE_URL_TEST
       const testUrl = process.env.DATABASE_URL_TEST;
       if (!testUrl) {
-        throw new Error('DATABASE_URL_TEST environment variable is required in test environment');
+        throw new Error(
+          "DATABASE_URL_TEST environment variable is required in test environment"
+        );
       }
       connectionString = testUrl;
     } else {
       // In development/production, use DATABASE_URL
       const url = process.env.DATABASE_URL;
       if (!url) {
-        throw new Error('DATABASE_URL environment variable is required');
+        throw new Error("DATABASE_URL environment variable is required");
       }
       connectionString = url;
     }
@@ -58,7 +63,7 @@ export async function closeDb(): Promise<void> {
       pool = null;
       db = null;
     } catch (error) {
-      console.error('Error closing database pool:', error);
+      console.error("Error closing database pool:", error);
       // Still clear references even if close fails
       pool = null;
       db = null;

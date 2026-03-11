@@ -32,7 +32,7 @@ interface ListProjectsResponse {
 }
 
 interface GetProjectParams {
-  id: string;
+  projectId: string;
 }
 
 interface GetProjectResponse {
@@ -59,7 +59,7 @@ interface ErrorResponse {
  */
 async function listProjectsHandler(
   request: FastifyRequest,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const user = request.user!;
 
@@ -71,17 +71,17 @@ async function listProjectsHandler(
 /**
  * Get a single project by ID
  *
- * GET /projects/:id
+ * GET /projects/:projectId
  * Requires authentication
  */
 async function getProjectHandler(
   request: FastifyRequest<{ Params: GetProjectParams }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
-  const { id } = request.params;
+  const { projectId } = request.params;
   const user = request.user!;
 
-  const project = await getProject(id, user.id);
+  const project = await getProject(projectId, user.id);
 
   if (!project) {
     reply.status(404).send({ error: "Project not found" } as ErrorResponse);
@@ -99,7 +99,7 @@ async function getProjectHandler(
  */
 async function createProjectHandler(
   request: FastifyRequest<{ Body: CreateProjectInput }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const user = request.user!;
   const body = request.body;
@@ -117,12 +117,12 @@ export async function projectsRoutes(fastify: FastifyInstance): Promise<void> {
   // All routes require authentication
   fastify.get("/projects", { onRequest: authenticate }, listProjectsHandler);
   fastify.get<{ Params: GetProjectParams }>(
-    "/projects/:id",
+    "/projects/:projectId",
     {
       onRequest: authenticate,
       preValidation: validateParams(projectIdParamsSchema),
     },
-    getProjectHandler,
+    getProjectHandler
   );
   fastify.post<{ Body: CreateProjectInput }>(
     "/projects",
@@ -130,7 +130,6 @@ export async function projectsRoutes(fastify: FastifyInstance): Promise<void> {
       onRequest: authenticate,
       preValidation: validateBody(createProjectSchema),
     },
-    createProjectHandler,
+    createProjectHandler
   );
 }
-

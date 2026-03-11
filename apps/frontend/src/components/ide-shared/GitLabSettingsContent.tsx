@@ -61,7 +61,7 @@ export function GitLabSettingsContent() {
 
   // Linked projects display state
   const [linkedProjects, setLinkedProjects] = useState<LinkedProjectDisplay[]>(
-    [],
+    []
   );
 
   // Dialog state
@@ -70,7 +70,7 @@ export function GitLabSettingsContent() {
 
   // Unlinking state - track which project ID is being unlinked
   const [unlinkingProjectId, setUnlinkingProjectId] = useState<string | null>(
-    null,
+    null
   );
 
   /**
@@ -90,7 +90,7 @@ export function GitLabSettingsContent() {
       setValidationResult(result);
       if (result.valid) {
         success(
-          `Token validated successfully for ${result.username || "user"}`,
+          `Token validated successfully for ${result.username || "user"}`
         );
       } else {
         error("Invalid GitLab token");
@@ -197,7 +197,7 @@ export function GitLabSettingsContent() {
         setUnlinkingProjectId(null);
       }
     },
-    [refreshIntegration, success, error],
+    [refreshIntegration, success, error]
   );
 
   /**
@@ -209,7 +209,7 @@ export function GitLabSettingsContent() {
 
     // Map linked repositories with actual project names
     const linkedProjectsList: LinkedProjectDisplay[] = Array.from(
-      linkedRepositories.values(),
+      linkedRepositories.values()
     ).map((repo) => ({
       id: repo.id,
       name:
@@ -479,4 +479,3 @@ export function GitLabSettingsContent() {
     </div>
   );
 }
-

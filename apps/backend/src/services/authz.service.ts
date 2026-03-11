@@ -36,7 +36,7 @@ import { UserRole, isValidUserRole, ROLE_HIERARCHY } from "@branchforge/shared";
  */
 export async function hasProjectAccess(
   projectId: string,
-  userId: string,
+  userId: string
 ): Promise<boolean> {
   const db = getDb();
 
@@ -49,9 +49,9 @@ export async function hasProjectAccess(
         and(eq(projects.id, projectId), eq(projects.userId, userId)),
         and(
           eq(projectUsers.projectId, projectId),
-          eq(projectUsers.userId, userId),
-        ),
-      ),
+          eq(projectUsers.userId, userId)
+        )
+      )
     )
     .limit(1);
 
@@ -70,7 +70,7 @@ export async function hasProjectAccess(
  */
 export async function requireProjectAccess(
   projectId: string,
-  userId: string,
+  userId: string
 ): Promise<void> {
   const db = getDb();
 
@@ -93,8 +93,8 @@ export async function requireProjectAccess(
     .where(
       and(
         eq(projects.id, projectId),
-        or(eq(projects.userId, userId), eq(projectUsers.userId, userId)),
-      ),
+        or(eq(projects.userId, userId), eq(projectUsers.userId, userId))
+      )
     )
     .limit(1);
 
@@ -115,7 +115,7 @@ export async function requireProjectAccess(
  */
 export async function getProjectRole(
   projectId: string,
-  userId: string,
+  userId: string
 ): Promise<UserRole | null> {
   const db = getDb();
 
@@ -137,8 +137,8 @@ export async function getProjectRole(
     .where(
       and(
         eq(projectUsers.projectId, projectId),
-        eq(projectUsers.userId, userId),
-      ),
+        eq(projectUsers.userId, userId)
+      )
     )
     .limit(1);
 
@@ -149,7 +149,7 @@ export async function getProjectRole(
     }
     // Log unexpected role value and treat as no access
     console.error(
-      `[authz.service] Unexpected role value in project_users: "${role}" for project ${projectId}, user ${userId}`,
+      `[authz.service] Unexpected role value in project_users: "${role}" for project ${projectId}, user ${userId}`
     );
     return null;
   }
@@ -171,7 +171,7 @@ export async function getProjectRole(
  */
 export async function hasLabelAccess(
   labelId: string,
-  userId: string,
+  userId: string
 ): Promise<boolean> {
   const db = getDb();
 
@@ -204,8 +204,8 @@ export async function hasLabelAccess(
     .where(
       and(
         eq(projectUsers.projectId, projectId),
-        eq(projectUsers.userId, userId),
-      ),
+        eq(projectUsers.userId, userId)
+      )
     )
     .limit(1);
 
@@ -224,7 +224,7 @@ export async function hasLabelAccess(
  */
 export async function requireLabelAccess(
   labelId: string,
-  userId: string,
+  userId: string
 ): Promise<void> {
   const db = getDb();
 
@@ -241,8 +241,8 @@ export async function requireLabelAccess(
     .where(
       and(
         eq(labels.id, labelId),
-        or(eq(projects.userId, userId), eq(projectUsers.userId, userId)),
-      ),
+        or(eq(projects.userId, userId), eq(projectUsers.userId, userId))
+      )
     )
     .limit(1);
 
@@ -274,7 +274,7 @@ export async function requireLabelAccess(
  */
 export async function getLabelRole(
   labelId: string,
-  userId: string,
+  userId: string
 ): Promise<UserRole | null> {
   const db = getDb();
 
@@ -307,8 +307,8 @@ export async function getLabelRole(
     .where(
       and(
         eq(projectUsers.projectId, projectId),
-        eq(projectUsers.userId, userId),
-      ),
+        eq(projectUsers.userId, userId)
+      )
     )
     .limit(1);
 
@@ -319,7 +319,7 @@ export async function getLabelRole(
     }
     // Log unexpected role value and treat as no access
     console.error(
-      `[authz.service] Unexpected role value in project_users: "${role}" for label ${labelId}, user ${userId}`,
+      `[authz.service] Unexpected role value in project_users: "${role}" for label ${labelId}, user ${userId}`
     );
     return null;
   }
@@ -343,7 +343,7 @@ export async function getLabelRole(
 export async function hasProjectRole(
   projectId: string,
   userId: string,
-  minimumRole: UserRole,
+  minimumRole: UserRole
 ): Promise<boolean> {
   const role = await getProjectRole(projectId, userId);
 
@@ -367,14 +367,13 @@ export async function hasProjectRole(
 export async function requireProjectRole(
   projectId: string,
   userId: string,
-  minimumRole: UserRole,
+  minimumRole: UserRole
 ): Promise<void> {
   const hasAccess = await hasProjectRole(projectId, userId, minimumRole);
 
   if (!hasAccess) {
     throw new ForbiddenError(
-      `This action requires ${minimumRole} access or higher`,
+      `This action requires ${minimumRole} access or higher`
     );
   }
 }
-

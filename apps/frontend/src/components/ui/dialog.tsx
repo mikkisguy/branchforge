@@ -9,7 +9,12 @@ interface DialogProps {
   closeOnBackdropClick?: boolean;
 }
 
-export function Dialog({ open, onOpenChange, children, closeOnBackdropClick = true }: DialogProps) {
+export function Dialog({
+  open,
+  onOpenChange,
+  children,
+  closeOnBackdropClick = true,
+}: DialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
 
@@ -23,15 +28,15 @@ export function Dialog({ open, onOpenChange, children, closeOnBackdropClick = tr
     // Find all focusable elements within the dialog
     const getFocusableElements = (): HTMLElement[] => {
       const focusableSelectors = [
-        'button:not([disabled])',
-        '[href]',
-        'input:not([disabled])',
-        'select:not([disabled])',
-        'textarea:not([disabled])',
+        "button:not([disabled])",
+        "[href]",
+        "input:not([disabled])",
+        "select:not([disabled])",
+        "textarea:not([disabled])",
         '[tabindex]:not([tabindex="-1"])',
       ];
       return Array.from(
-        dialog.querySelectorAll<HTMLElement>(focusableSelectors.join(','))
+        dialog.querySelectorAll<HTMLElement>(focusableSelectors.join(","))
       );
     };
 
@@ -49,7 +54,7 @@ export function Dialog({ open, onOpenChange, children, closeOnBackdropClick = tr
       }
 
       // Focus trap for Tab/Shift+Tab
-      if (e.key === 'Tab') {
+      if (e.key === "Tab") {
         const currentFocusable = getFocusableElements();
         if (currentFocusable.length === 0) return;
 
@@ -72,11 +77,11 @@ export function Dialog({ open, onOpenChange, children, closeOnBackdropClick = tr
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
 
     // Cleanup: restore focus and remove listener
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown);
       if (previouslyFocusedElementRef.current) {
         previouslyFocusedElementRef.current.focus();
       }
@@ -93,11 +98,7 @@ export function Dialog({ open, onOpenChange, children, closeOnBackdropClick = tr
         onClick={closeOnBackdropClick ? () => onOpenChange?.(false) : undefined}
       />
       {/* Content */}
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-      >
+      <div ref={dialogRef} role="dialog" aria-modal="true">
         {children}
       </div>
     </div>
@@ -114,7 +115,7 @@ export function DialogContent({ children, className }: DialogContentProps) {
     <div
       className={cn(
         "relative bg-card border border-border/30 rounded-lg shadow-xl p-6 w-full max-w-md max-h-[85vh] overflow-y-auto",
-        className,
+        className
       )}
     >
       {children}
@@ -132,7 +133,7 @@ export function DialogHeader({ children, className }: DialogHeaderProps) {
     <div
       className={cn(
         "flex flex-col space-y-1.5 text-center sm:text-left mb-4",
-        className,
+        className
       )}
     >
       {children}
@@ -150,7 +151,7 @@ export function DialogTitle({ children, className }: DialogTitleProps) {
     <h2
       className={cn(
         "text-lg font-semibold leading-none tracking-tight",
-        className,
+        className
       )}
     >
       {children}
@@ -171,4 +172,3 @@ export function DialogDescription({
     <p className={cn("text-sm text-muted-foreground", className)}>{children}</p>
   );
 }
-

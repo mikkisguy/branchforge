@@ -14,7 +14,12 @@ import {
   index,
   unique,
 } from "drizzle-orm/pg-core";
-import { syncOperationEnum, syncStatusEnum, gitlabFileTypeEnum } from "../enums.js";
+import {
+  syncOperationEnum,
+  syncStatusEnum,
+  syncOperationStatusEnum,
+  gitlabFileTypeEnum,
+} from "../enums.js";
 import { users } from "./users.js";
 import { projects } from "./projects.js";
 
@@ -34,7 +39,7 @@ export const gitlabIntegrations = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (table) => [unique("gitlab_integrations_user_id_unique").on(table.userId)],
+  (table) => [unique("gitlab_integrations_user_id_unique").on(table.userId)]
 );
 
 /**
@@ -61,8 +66,11 @@ export const gitlabFiles = pgTable(
   },
   (table) => [
     index("gitlab_files_project_id_idx").on(table.projectId),
-    unique("gitlab_files_project_file_uidx").on(table.projectId, table.filePath),
-  ],
+    unique("gitlab_files_project_file_uidx").on(
+      table.projectId,
+      table.filePath
+    ),
+  ]
 );
 
 /**
@@ -78,7 +86,7 @@ export const gitlabFileSyncState = pgTable(
       .notNull()
       .references(() => gitlabFiles.id, { onDelete: "cascade" }),
     contentHash: text("content_hash").notNull(), // SHA-256 for idempotency
-    status: syncStatusEnum("status").notNull(), // 'pending', 'in_progress', 'completed', 'failed'
+    status: syncStatusEnum("status").notNull(), // 'synced', 'modified_local', 'conflict'
     startedAt: timestamp("started_at").defaultNow().notNull(),
     completedAt: timestamp("completed_at"),
     errorMessage: text("error_message"),
@@ -88,7 +96,7 @@ export const gitlabFileSyncState = pgTable(
   (table) => [
     index("gitlab_file_sync_state_gitlab_file_id_idx").on(table.gitlabFileId),
     index("gitlab_file_sync_state_status_idx").on(table.status),
-  ],
+  ]
 );
 
 /**
@@ -111,13 +119,13 @@ export const gitlabRepositories = pgTable(
   (table) => [
     index("gitlab_repositories_project_id_idx").on(table.projectId),
     index("gitlab_repositories_gitlab_project_id_idx").on(
-      table.gitlabProjectId,
+      table.gitlabProjectId
     ),
     unique("gitlab_repositories_project_gitlab_project_uidx").on(
       table.projectId,
-      table.gitlabProjectId,
+      table.gitlabProjectId
     ),
-  ],
+  ]
 );
 
 /**
@@ -131,7 +139,7 @@ export const gitlabSyncOperations = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     operation: syncOperationEnum("operation").notNull(),
-    status: syncStatusEnum("status").notNull(),
+    status: syncOperationStatusEnum("status").notNull(),
     branch: text("branch"),
     conflictCount: integer("conflict_count").default(0),
     errorMessage: text("error_message"),
@@ -141,7 +149,7 @@ export const gitlabSyncOperations = pgTable(
   (table) => [
     index("gitlab_sync_operations_project_id_idx").on(table.projectId),
     index("gitlab_sync_operations_status_idx").on(table.status),
-  ],
+  ]
 );
 
 // Types
@@ -159,4 +167,3 @@ export type NewGitlabFile = typeof gitlabFiles.$inferInsert;
 
 export type GitlabFileSyncState = typeof gitlabFileSyncState.$inferSelect;
 export type NewGitlabFileSyncState = typeof gitlabFileSyncState.$inferInsert;
-

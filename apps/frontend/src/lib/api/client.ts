@@ -21,7 +21,7 @@ export interface ApiError {
  */
 async function fetchInternal(
   endpoint: string,
-  options: RequestInit = {},
+  options: RequestInit = {}
 ): Promise<Response> {
   const url = `${API_BASE}${endpoint}`;
   const response = await fetch(url, {
@@ -38,7 +38,7 @@ async function fetchInternal(
       .json()
       .catch(() => ({ error: "Unknown error" }));
     throw new Error(
-      error.error || `Request failed with status ${response.status}`,
+      error.error || `Request failed with status ${response.status}`
     );
   }
 
@@ -48,19 +48,19 @@ async function fetchInternal(
 // Overload for endpoints that return void (204 No Content)
 export async function request(
   endpoint: string,
-  options?: RequestInit,
+  options?: RequestInit
 ): Promise<void>;
 
 // Overload for endpoints that return data
 export async function request<T>(
   endpoint: string,
-  options?: RequestInit,
+  options?: RequestInit
 ): Promise<T>;
 
 // Implementation
 export async function request<T>(
   endpoint: string,
-  options: RequestInit = {},
+  options: RequestInit = {}
 ): Promise<T | void> {
   const response = await fetchInternal(endpoint, options);
 
@@ -85,9 +85,8 @@ export async function request<T>(
  */
 export async function requestVoid(
   endpoint: string,
-  options: RequestInit = {},
+  options: RequestInit = {}
 ): Promise<void> {
   await fetchInternal(endpoint, options);
   // No need to check 204 status - fetchInternal already validates the response
 }
-

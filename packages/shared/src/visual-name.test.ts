@@ -233,4 +233,3 @@ describe("generateJumpLabel", () => {
     expect(result).toBe("lucas_5");
   });
 });
-
