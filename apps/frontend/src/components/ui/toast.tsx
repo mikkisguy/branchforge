@@ -9,7 +9,8 @@ const toastVariants = cva(
     variants: {
       variant: {
         default: "bg-background border-border/30",
-        success: "bg-background border-green-500/30 text-green-600 dark:text-green-400",
+        success:
+          "bg-background border-green-500/30 text-green-600 dark:text-green-400",
         destructive: "bg-background border-destructive/30 text-destructive",
       },
     },
@@ -19,20 +20,28 @@ const toastVariants = cva(
   }
 );
 
-interface ToastProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof toastVariants> {
+interface ToastProps
+  extends React.HTMLAttributes<HTMLDivElement>,
+    VariantProps<typeof toastVariants> {
   title?: string;
   onClose?: () => void;
 }
 
-export function Toast({ className, variant, title, children, onClose, ...props }: ToastProps) {
+export function Toast({
+  className,
+  variant,
+  title,
+  children,
+  onClose,
+  ...props
+}: ToastProps) {
   return (
-    <div
-      className={cn(toastVariants({ variant }), className)}
-      {...props}
-    >
+    <div className={cn(toastVariants({ variant }), className)} {...props}>
       <div className="flex-1">
         {title && <p className="text-sm font-medium">{title}</p>}
-        {children && <p className="text-sm text-muted-foreground mt-0.5">{children}</p>}
+        {children && (
+          <p className="text-sm text-muted-foreground mt-0.5">{children}</p>
+        )}
       </div>
       {onClose && (
         <button
@@ -53,7 +62,9 @@ interface ToastIconProps {
 export function ToastIcon({ variant = "default" }: ToastIconProps) {
   switch (variant) {
     case "success":
-      return <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />;
+      return (
+        <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+      );
     case "destructive":
       return <AlertCircle className="w-5 h-5 text-destructive" />;
     default:

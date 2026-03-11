@@ -30,4 +30,3 @@ export function ScriptEditor({ content = [] }: EditorProps) {
     </div>
   );
 }
-

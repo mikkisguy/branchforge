@@ -16,7 +16,10 @@ import { useGitLabSync } from "@/hooks/useGitLabSync";
 import { useToast } from "@/contexts/ToastContext";
 import { useLabels } from "@/hooks/useLabels";
 import { CharacterImportWizard } from "@/components/CharacterImportWizard";
-import { charactersApi, type DetectCharactersResponse } from "@/lib/api/characters";
+import {
+  charactersApi,
+  type DetectCharactersResponse,
+} from "@/lib/api/characters";
 
 // ============================================================================
 // Types
@@ -76,14 +79,15 @@ export function GitLabSyncDialog({
   // Form state
   const [branch, setBranch] = useState(defaultBranch);
   const [commitMessage, setCommitMessage] = useState(
-    `Sync ${operationType} from BranchForge`,
+    `Sync ${operationType} from BranchForge`
   );
   const [conflictResolution, setConflictResolution] =
     useState<ConflictResolution>("branchforge_wins");
 
   // Character wizard state
   const [showCharacterWizard, setShowCharacterWizard] = useState(false);
-  const [detectedCharacters, setDetectedCharacters] = useState<DetectCharactersResponse | null>(null);
+  const [detectedCharacters, setDetectedCharacters] =
+    useState<DetectCharactersResponse | null>(null);
 
   // Ref to track the timeout so we can clear it on unmount
   const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
@@ -117,14 +121,16 @@ export function GitLabSyncDialog({
         ? await exportToGitlab(
             projectId,
             branch.trim(),
-            commitMessage.trim() || undefined,
+            commitMessage.trim() || undefined
           )
         : await importFromGitlab(projectId, branch.trim(), resolution);
 
     // Use the returned result for toast notifications
     if (result?.status === "COMPLETED") {
       success(
-        `${operationType === "export" ? "Export" : "Import"} completed successfully`,
+        `${
+          operationType === "export" ? "Export" : "Import"
+        } completed successfully`
       );
 
       // Refresh scene list after successful sync
@@ -135,7 +141,9 @@ export function GitLabSyncDialog({
       if (operationType === "import") {
         try {
           // Get full detection info including conflicts
-          const detectionResult = await charactersApi.detectCharacters(projectId);
+          const detectionResult = await charactersApi.detectCharacters(
+            projectId
+          );
           setDetectedCharacters({
             characters: detectionResult.characters,
             conflicts: detectionResult.conflicts,
@@ -426,4 +434,3 @@ export function GitLabSyncDialog({
     </Dialog>
   );
 }
-

@@ -155,7 +155,7 @@ export function extractLabels(content: string): string[] {
  * Format: speaker "text" or just "text" for narration
  */
 export function extractDialogue(
-  content: string,
+  content: string
 ): Array<{ speaker: string | null; text: string }> {
   const dialogue: Array<{ speaker: string | null; text: string }> = [];
 
@@ -224,7 +224,7 @@ export function extractDialogue(
 
     // Try to match dialogue with speaker and triple-quote placeholder
     const speakerTripleMatch = trimmed.match(
-      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+__TRIPLE_QUOTE_(\d+)__$/,
+      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+__TRIPLE_QUOTE_(\d+)__$/
     );
     if (speakerTripleMatch) {
       const speaker = speakerTripleMatch[1];
@@ -243,7 +243,7 @@ export function extractDialogue(
     // "((?:[^"\\]|\\.)*)" - Quoted text allowing escaped characters (\")
     // The (?:[^"\\]|\\.)* pattern matches: non-quote/non-backslash OR escaped char
     const dialogueMatch = trimmed.match(
-      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"((?:[^"\\]|\\.)*)"$/,
+      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"((?:[^"\\]|\\.)*)"$/
     );
     if (dialogueMatch) {
       dialogue.push({
@@ -290,7 +290,7 @@ export function extractDialogue(
  * Returns choices with their target labels and parent label
  */
 export function extractChoices(
-  content: string,
+  content: string
 ): Array<{ label: string; target: string | null; parentLabel: string }> {
   const choices: Array<{
     label: string;
@@ -364,7 +364,7 @@ export function extractChoices(
 
           // Check for jump statement before breaking on indentation
           const jumpMatch = nextTrimmed.match(
-            /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/,
+            /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/
           );
           if (jumpMatch) {
             target = jumpMatch[1];
@@ -413,7 +413,7 @@ export function extractChoices(
 
           // Check for jump statement before breaking on indentation
           const jumpMatch = nextTrimmed.match(
-            /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/,
+            /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/
           );
           if (jumpMatch) {
             target = jumpMatch[1];
@@ -445,7 +445,7 @@ export function extractChoices(
  * Returns jump/call/return statements with source and target
  */
 export function extractJumps(
-  content: string,
+  content: string
 ): Array<{ from: string; to: string; isCall?: boolean }> {
   const jumps: Array<{ from: string; to: string; isCall?: boolean }> = [];
   const lines = content.split("\n");
@@ -519,7 +519,7 @@ export function extractJumps(
         }
 
         const nestedJumpMatch = nextTrimmed.match(
-          /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/,
+          /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/
         );
         if (nestedJumpMatch) {
           const target = nestedJumpMatch[1];
@@ -546,7 +546,7 @@ export function extractJumps(
             const elseTrimmed = elseLine.trim();
 
             const elseJumpMatch = elseTrimmed.match(
-              /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/,
+              /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/
             );
             if (elseJumpMatch) {
               const target = elseJumpMatch[1];
@@ -583,7 +583,7 @@ export function extractJumps(
  * Handles both single-line and multi-line definitions
  */
 function extractCharacters(
-  content: string,
+  content: string
 ): Array<{ tag: string; name: string; color?: string }> {
   const characters: Array<{ tag: string; name: string; color?: string }> = [];
   const lines = content.split("\n");
@@ -608,7 +608,7 @@ function extractCharacters(
     // Check for single-line character definition
     // Format: define tag = Character("name", options...)
     const singleLineMatch = trimmed.match(
-      /define\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\(\s*"([^"]+)"(\s*,\s*([^)]*))?\s*\)/,
+      /define\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\(\s*"([^"]+)"(\s*,\s*([^)]*))?\s*\)/
     );
     if (singleLineMatch && !trimmed.includes("\n")) {
       const tag = singleLineMatch[1];
@@ -630,7 +630,7 @@ function extractCharacters(
 
     // Check for start of multi-line character definition
     const multiLineStartMatch = trimmed.match(
-      /define\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\((.*)/,
+      /define\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\((.*)/
     );
     if (multiLineStartMatch) {
       const tag = multiLineStartMatch[1];
@@ -714,7 +714,7 @@ function extractCharacters(
  * For Write Mode: This function provides label-specific dialogue for editing
  */
 export function parseRPYFileWithLabels(
-  content: string,
+  content: string
 ): ParsedRPYFileWithLabels {
   const lines = content.split("\n");
   const result: ParsedRPYFileWithLabels = {
@@ -816,7 +816,7 @@ export function parseRPYFileWithLabels(
 
       // Extract dialogue
       const dialogueMatch = trimmed.match(
-        /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"((?:[^"\\]|\\.)*)"$/,
+        /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"((?:[^"\\]|\\.)*)"$/
       );
       if (dialogueMatch) {
         currentLabelData.dialogue.push({
@@ -857,7 +857,7 @@ export function parseRPYFileWithLabels(
 
       // Find the label data for this label
       const labelData = result.labels.find(
-        (l) => l.label === currentLabelForTracking,
+        (l) => l.label === currentLabelForTracking
       );
       if (!labelData) continue;
 
@@ -899,7 +899,7 @@ export function parseRPYFileWithLabels(
 
               // Check for jump statement before breaking on indentation
               const jumpMatch = jumpTrimmed.match(
-                /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/,
+                /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/
               );
               if (jumpMatch) {
                 target = jumpMatch[1];
@@ -970,7 +970,7 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
 
     // Check if this is a dialogue line
     const dialogueMatch = trimmed.match(
-      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"((?:[^"\\]|\\.)*)"$/,
+      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"((?:[^"\\]|\\.)*)"$/
     );
     const narrationMatch = trimmed.match(/^"(.*)"$/);
 
@@ -984,7 +984,7 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
       // Track original dialogue count (every dialogue line counts, even if replaced)
       originalDialogueCounts.set(
         currentLabel,
-        (originalDialogueCounts.get(currentLabel) || 0) + 1,
+        (originalDialogueCounts.get(currentLabel) || 0) + 1
       );
 
       // Track indentation for appending extra entries later
@@ -1081,7 +1081,7 @@ export function parseRPYFile(content: string): RPYParsedData {
 export function convertToBranchForgeFormatFromLabels(
   parsed: ParsedRPYFileWithLabels,
   labelName: string,
-  originalContent?: string,
+  originalContent?: string
 ): BranchForgeScene {
   const labelData = parsed.labels.find((l) => l.label === labelName);
 
@@ -1181,7 +1181,7 @@ export function convertToBranchForgeFormatFromLabels(
  */
 export function removeLabelFromRPYContent(
   content: string,
-  labelToRemove: string,
+  labelToRemove: string
 ): string {
   const lines = content.split("\n");
   const result: string[] = [];
@@ -1216,7 +1216,8 @@ export function removeLabelFromRPYContent(
     if (skipMode) {
       // Compute lineIndent first before checking for empty lines
       // This ensures we properly detect when we've exited the label block
-      const lineIndent = trimmed.length === 0 ? skipIndent + 1 : line.search(/\S/);
+      const lineIndent =
+        trimmed.length === 0 ? skipIndent + 1 : line.search(/\S/);
 
       if (lineIndent > skipIndent) {
         // This line belongs to the label we're removing (or is empty line within the block)
@@ -1288,4 +1289,3 @@ export function generateRpyFile(scene: BranchForgeScene): string {
 
   return lines.join("\n");
 }
-

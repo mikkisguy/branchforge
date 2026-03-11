@@ -31,7 +31,7 @@ const POLL_TIMEOUT_MS = 120_000;
 
 function calculateProgress(
   status: SyncOperation["status"],
-  pollStartTime: number | null,
+  pollStartTime: number | null
 ): number {
   if (status === "COMPLETED") {
     return 100;
@@ -43,7 +43,7 @@ function calculateProgress(
     const elapsed = Date.now() - pollStartTime;
     return Math.min(
       Math.max(10 + Math.round((elapsed / POLL_TIMEOUT_MS) * 80), 10),
-      90,
+      90
     );
   }
   return 10;
@@ -68,14 +68,14 @@ interface UseGitLabSyncReturn {
   exportToGitlab: (
     projectId: string,
     branch?: string,
-    commitMessage?: string,
+    commitMessage?: string
   ) => Promise<SyncOperation | null>;
 
   // Import
   importFromGitlab: (
     projectId: string,
     branch: string,
-    conflictResolution: ConflictResolution,
+    conflictResolution: ConflictResolution
   ) => Promise<SyncOperation | null>;
 
   // Operation status
@@ -96,7 +96,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
   const queryClient = useQueryClient();
   const [pollStartTime, setPollStartTime] = useState<number | null>(null);
   const [activeOperationId, setActiveOperationId] = useState<string | null>(
-    null,
+    null
   );
   const activeOperationIdRef = useRef<string | null>(null);
   // Store projectId for cache invalidation when operation completes
@@ -125,7 +125,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
     },
     enabled: !!activeOperationId,
     refetchInterval: (
-      query: Query<SyncOperation | null, Error, SyncOperation | null>,
+      query: Query<SyncOperation | null, Error, SyncOperation | null>
     ) => {
       const data = query.state.data as SyncOperation | null | undefined;
       // Stop polling when operation is complete or failed
@@ -148,7 +148,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
       progress: calculateProgress(op.status, pollStartTime),
       isProcessing: op.status === "PENDING" || op.status === "IN_PROGRESS",
       error:
-        op.status === "FAILED" ? (op.errorMessage ?? "Operation failed") : null,
+        op.status === "FAILED" ? op.errorMessage ?? "Operation failed" : null,
     }));
 
     // Stop polling on completion and invalidate caches
@@ -280,7 +280,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
   const exportToGitlab = async (
     projectId: string,
     branch?: string,
-    commitMessage?: string,
+    commitMessage?: string
   ): Promise<SyncOperation | null> => {
     try {
       const result = await exportMutation.mutateAsync({
@@ -309,7 +309,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
   const importFromGitlab = async (
     projectId: string,
     branch: string,
-    conflictResolution: ConflictResolution,
+    conflictResolution: ConflictResolution
   ): Promise<SyncOperation | null> => {
     try {
       const result = await importMutation.mutateAsync({
@@ -344,7 +344,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
         return null;
       }
     },
-    [],
+    []
   );
 
   // List operations
@@ -356,7 +356,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
         return [];
       }
     },
-    [],
+    []
   );
 
   return {
@@ -368,4 +368,3 @@ export function useGitLabSync(): UseGitLabSyncReturn {
     reset,
   };
 }
-

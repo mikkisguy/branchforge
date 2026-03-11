@@ -64,7 +64,7 @@ export async function markLabelModified(labelId: string): Promise<void> {
  */
 export async function markLabelSynced(
   labelId: string,
-  commitSha: string,
+  commitSha: string
 ): Promise<void> {
   const db = getDb();
 
@@ -103,7 +103,7 @@ export async function markLabelSynced(
         lastSyncedHash: contentHash,
       })
       .where(
-        and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt)),
+        and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt))
       );
   });
 }
@@ -117,7 +117,7 @@ export async function markLabelSynced(
  */
 export async function markLabelImported(
   labelId: string,
-  commitSha: string,
+  commitSha: string
 ): Promise<void> {
   const db = getDb();
 
@@ -150,7 +150,7 @@ export async function markLabelImported(
  */
 export async function detectLabelConflicts(
   labelId: string,
-  newRemoteHash: string,
+  newRemoteHash: string
 ): Promise<boolean> {
   const db = getDb();
 
@@ -183,7 +183,7 @@ export async function detectLabelConflicts(
  */
 export async function updateLabelContentHash(
   labelId: string,
-  newContentHash: string,
+  newContentHash: string
 ): Promise<void> {
   const db = getDb();
 
@@ -205,7 +205,7 @@ export async function updateLabelContentHash(
  */
 export async function markLineModified(
   lineId: string,
-  newContent: string,
+  newContent: string
 ): Promise<void> {
   const db = getDb();
 
@@ -230,7 +230,7 @@ export async function markLineModified(
  * @returns Array of label IDs that have pending changes
  */
 export async function getPendingExportLabels(
-  projectId: string,
+  projectId: string
 ): Promise<string[]> {
   const db = getDb();
 
@@ -241,8 +241,8 @@ export async function getPendingExportLabels(
       and(
         eq(labels.projectId, projectId),
         eq(labels.syncStatus, "MODIFIED_LOCAL"),
-        isNull(labels.deletedAt),
-      ),
+        isNull(labels.deletedAt)
+      )
     );
 
   return result.map((r) => r.id);
@@ -256,7 +256,7 @@ export async function getPendingExportLabels(
  * @returns Array of label IDs that have conflicts
  */
 export async function getConflictedLabels(
-  projectId: string,
+  projectId: string
 ): Promise<string[]> {
   const db = getDb();
 
@@ -267,10 +267,9 @@ export async function getConflictedLabels(
       and(
         eq(labels.projectId, projectId),
         eq(labels.syncStatus, "CONFLICT"),
-        isNull(labels.deletedAt),
-      ),
+        isNull(labels.deletedAt)
+      )
     );
 
   return result.map((r) => r.id);
 }
-

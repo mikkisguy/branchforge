@@ -32,7 +32,7 @@ const DEFAULT_TIMEOUT_MS = 30000;
 async function fetchWithTimeout(
   url: string,
   options: RequestInit = {},
-  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -102,7 +102,7 @@ export interface GitlabTreeItem {
  */
 export async function validateGitlabPAT(
   token: string,
-  gitlabUrl: string = "https://gitlab.com",
+  gitlabUrl: string = "https://gitlab.com"
 ): Promise<string | null> {
   return validateAndGetUsername(token, gitlabUrl);
 }
@@ -133,7 +133,7 @@ export async function getGitlabIntegration(userId: string) {
 export async function storeGitlabIntegration(
   userId: string,
   token: string,
-  gitlabUrl: string = "https://gitlab.com",
+  gitlabUrl: string = "https://gitlab.com"
 ): Promise<void> {
   const db = getDb();
 
@@ -194,7 +194,7 @@ async function getDecryptedToken(userId: string): Promise<string> {
 
 export async function listGitlabRepositories(
   userId: string,
-  gitlabUrl?: string,
+  gitlabUrl?: string
 ): Promise<GitlabRepository[]> {
   const integration = await getGitlabIntegration(userId);
   if (!integration) {
@@ -203,7 +203,7 @@ export async function listGitlabRepositories(
 
   const token = decryptPAT(integration.encryptedToken);
   const url = validateGitLabUrl(
-    gitlabUrl || integration.gitlabUrl || undefined,
+    gitlabUrl || integration.gitlabUrl || undefined
   );
 
   const gitlabRepositories: GitlabRepository[] = [];
@@ -233,7 +233,7 @@ export async function listGitlabRepositories(
         id: p.id,
         name: p.name,
         path_with_namespace: p.path_with_namespace,
-      })),
+      }))
     );
 
     // Check pagination headers
@@ -257,7 +257,7 @@ export async function listGitlabRepositories(
 export async function getGitlabProject(
   userId: string,
   gitlabProjectId: number,
-  gitlabUrl?: string,
+  gitlabUrl?: string
 ): Promise<GitlabRepository | null> {
   const integration = await getGitlabIntegration(userId);
   if (!integration) {
@@ -266,7 +266,7 @@ export async function getGitlabProject(
 
   const token = decryptPAT(integration.encryptedToken);
   const url = validateGitLabUrl(
-    gitlabUrl || integration.gitlabUrl || undefined,
+    gitlabUrl || integration.gitlabUrl || undefined
   );
 
   const apiUrl = new URL(`/api/v4/projects/${gitlabProjectId}`, url);
@@ -305,7 +305,7 @@ export async function linkRepository(
   projectId: string,
   gitlabProjectId: number,
   repositoryName: string,
-  defaultBranch: string = "main",
+  defaultBranch: string = "main"
 ): Promise<void> {
   const db = getDb();
   await db
@@ -384,7 +384,7 @@ export async function listRepositoryLinks(userId: string) {
  */
 export async function listBranches(
   projectId: string,
-  gitlabUrl?: string,
+  gitlabUrl?: string
 ): Promise<string[]> {
   const repoLink = await getRepositoryLink(projectId);
   if (!repoLink) {
@@ -408,7 +408,7 @@ export async function listBranches(
 
   const apiUrl = new URL(
     `/api/v4/projects/${repoLink.gitlabProjectId}/repository/branches`,
-    url,
+    url
   );
 
   const response = await fetchWithTimeout(apiUrl.toString(), {
@@ -435,7 +435,7 @@ export async function listBranches(
 export async function getBranchCommitSha(
   projectId: string,
   branch: string,
-  gitlabUrl?: string,
+  gitlabUrl?: string
 ): Promise<string> {
   const repoLink = await getRepositoryLink(projectId);
   if (!repoLink) {
@@ -458,8 +458,10 @@ export async function getBranchCommitSha(
   const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
 
   const apiUrl = new URL(
-    `/api/v4/projects/${repoLink.gitlabProjectId}/repository/branches/${encodeURIComponent(branch)}`,
-    url,
+    `/api/v4/projects/${
+      repoLink.gitlabProjectId
+    }/repository/branches/${encodeURIComponent(branch)}`,
+    url
   );
 
   const response = await fetchWithTimeout(apiUrl.toString(), {
@@ -486,7 +488,7 @@ export async function getBranchCommitSha(
 export async function listRpyFiles(
   projectId: string,
   branch: string,
-  gitlabUrl?: string,
+  gitlabUrl?: string
 ): Promise<Array<{ name: string; path: string }>> {
   const repoLink = await getRepositoryLink(projectId);
   if (!repoLink) {
@@ -515,7 +517,7 @@ export async function listRpyFiles(
   do {
     const apiUrl = new URL(
       `/api/v4/projects/${repoLink.gitlabProjectId}/repository/tree`,
-      url,
+      url
     );
     apiUrl.searchParams.set("ref", branch);
     apiUrl.searchParams.set("recursive", "true");
@@ -565,7 +567,7 @@ export async function getFileContent(
   projectId: string,
   filePath: string,
   branch: string,
-  gitlabUrl?: string,
+  gitlabUrl?: string
 ): Promise<string | null> {
   const repoLink = await getRepositoryLink(projectId);
   if (!repoLink) {
@@ -588,8 +590,10 @@ export async function getFileContent(
   const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
 
   const apiUrl = new URL(
-    `/api/v4/projects/${repoLink.gitlabProjectId}/repository/files/${encodeURIComponent(filePath)}`,
-    url,
+    `/api/v4/projects/${
+      repoLink.gitlabProjectId
+    }/repository/files/${encodeURIComponent(filePath)}`,
+    url
   );
   apiUrl.searchParams.set("ref", branch);
 
@@ -629,7 +633,7 @@ export async function createOrUpdateFile(
   filePath: string,
   content: string,
   commitMessage: string,
-  gitlabUrl?: string,
+  gitlabUrl?: string
 ): Promise<{ file_path: string; branch: string }> {
   const repoLink = await getRepositoryLink(projectId);
   if (!repoLink) {
@@ -652,8 +656,10 @@ export async function createOrUpdateFile(
   const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
 
   const apiUrl = new URL(
-    `/api/v4/projects/${repoLink.gitlabProjectId}/repository/files/${encodeURIComponent(filePath)}`,
-    url,
+    `/api/v4/projects/${
+      repoLink.gitlabProjectId
+    }/repository/files/${encodeURIComponent(filePath)}`,
+    url
   );
 
   // Encode content as base64
@@ -695,7 +701,7 @@ export async function createOrUpdateFile(
       // If PUT fails with 404, file doesn't exist - try POST next
       if (method === "PUT" && attemptResponse.status === 404) {
         lastError = new Error(
-          `GitLab API error: ${attemptResponse.status} - ${errorText}`,
+          `GitLab API error: ${attemptResponse.status} - ${errorText}`
         );
         continue;
       }
@@ -707,14 +713,14 @@ export async function createOrUpdateFile(
         errorText.includes("file with same name")
       ) {
         lastError = new Error(
-          `GitLab API error: ${attemptResponse.status} - ${errorText}`,
+          `GitLab API error: ${attemptResponse.status} - ${errorText}`
         );
         break; // Break inner loop to retry from PUT
       }
 
       // For other errors, don't retry - fail immediately
       throw new Error(
-        `GitLab API error: ${attemptResponse.status} - ${errorText}`,
+        `GitLab API error: ${attemptResponse.status} - ${errorText}`
       );
     }
   }
@@ -725,4 +731,3 @@ export async function createOrUpdateFile(
 
   return (await response.json()) as { file_path: string; branch: string };
 }
-

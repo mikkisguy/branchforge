@@ -40,7 +40,7 @@ function normalizeToCanonicalString(
     | { content: string }
     | { text?: string; target?: string }
     | { type?: string; speaker?: string; text?: string; target?: string }
-    | { speaker: string | null; text: string },
+    | { speaker: string | null; text: string }
 ): string {
   // Handle database canonical format ({ content: string })
   // Content is already in canonical format, use as-is
@@ -125,7 +125,7 @@ export function calculateLinesHash(
     | { text?: string; target?: string }
     | { type?: string; speaker?: string; text?: string; target?: string }
     | { speaker: string | null; text: string }
-  >,
+  >
 ): string {
   const combined = lines.map(normalizeToCanonicalString).join("\n");
   return calculateContentHash(combined);
@@ -148,7 +148,7 @@ export function calculateLinesHash(
  * ```
  */
 export function calculateDialogueHash(
-  dialogue: Array<{ speaker: string | null; text: string }>,
+  dialogue: Array<{ speaker: string | null; text: string }>
 ): string {
   return calculateLinesHash(dialogue);
 }

@@ -66,7 +66,7 @@ vi.mock("../../services/rate-limiter.service.js", () => ({
 
 // Mock the authenticate middleware
 vi.mock("../../middleware/auth.middleware.js", () => ({
-  authenticate: vi.fn(async (request: any, reply) => {
+  authenticate: vi.fn(async (request: any, _reply) => {
     // Simulate authenticated user
     request.session = {
       user: {
@@ -79,20 +79,19 @@ vi.mock("../../middleware/auth.middleware.js", () => ({
     request.userId = request.session.user.id;
   }),
   requireRole: vi.fn(() =>
-    vi.fn(async (request: any, reply) => {
+    vi.fn(async (request: any, _reply) => {
       request.user = {
         id: "user-123",
         email: "test@example.com",
         role: "OWNER" as const,
       };
       request.userId = request.user.id;
-    }),
+    })
   ),
 }));
 
 // Test fixtures
 const testUserId = "user-123";
-const testUserEmail = "test@example.com";
 const testProjectId = "project-123";
 const testGitlabProjectId = 12345;
 const testBranch = "main";
@@ -175,7 +174,7 @@ describe("GitLab Routes", () => {
 
     it("should validate a GitLab PAT", async () => {
       vi.spyOn(gitlabService, "validateGitlabPAT").mockResolvedValue(
-        "testuser",
+        "testuser"
       );
 
       const response = await fastify.inject({
@@ -249,10 +248,10 @@ describe("GitLab Routes", () => {
   describe("POST /api/gitlab/integration", () => {
     it("should store GitLab integration", async () => {
       vi.spyOn(gitlabService, "validateGitlabPAT").mockResolvedValue(
-        "testuser",
+        "testuser"
       );
       vi.spyOn(gitlabService, "storeGitlabIntegration").mockResolvedValue(
-        undefined,
+        undefined
       );
 
       const response = await fastify.inject({
@@ -302,7 +301,7 @@ describe("GitLab Routes", () => {
   describe("DELETE /api/gitlab/integration", () => {
     it("should remove GitLab integration", async () => {
       vi.spyOn(gitlabService, "deleteGitlabIntegration").mockResolvedValue(
-        undefined,
+        undefined
       );
 
       const response = await fastify.inject({
@@ -754,4 +753,3 @@ describe("GitLab Routes", () => {
     });
   });
 });
-

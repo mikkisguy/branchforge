@@ -6,12 +6,15 @@
  * Rate limiting on login prevents brute-force attacks.
  */
 
-import type { FastifyInstance } from 'fastify';
-import type { FastifyRequest, FastifyReply } from 'fastify';
-import { register, validateCredentials } from '../services/auth.service.js';
-import { checkRateLimit, clearRateLimit } from '../services/rate-limiter.service.js';
-import { authenticate } from '../middleware/auth.middleware.js';
-import type { PublicUser } from '../middleware/auth.middleware.js';
+import type { FastifyInstance } from "fastify";
+import type { FastifyRequest, FastifyReply } from "fastify";
+import { register, validateCredentials } from "../services/auth.service.js";
+import {
+  checkRateLimit,
+  clearRateLimit,
+} from "../services/rate-limiter.service.js";
+import { authenticate } from "../middleware/auth.middleware.js";
+import type { PublicUser } from "../middleware/auth.middleware.js";
 
 // ============================================================================
 // Types
@@ -48,22 +51,22 @@ interface RateLimitResponse extends ErrorResponse {
  */
 function getClientIp(request: FastifyRequest): string {
   // Check for forwarded IP (behind proxy/load balancer)
-  const forwarded = request.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string') {
-    return forwarded.split(',')[0].trim();
+  const forwarded = request.headers["x-forwarded-for"];
+  if (typeof forwarded === "string") {
+    return forwarded.split(",")[0].trim();
   }
   if (Array.isArray(forwarded)) {
     return forwarded[0].trim();
   }
 
   // Check for other common headers
-  const cfConnectingIp = request.headers['cf-connecting-ip'];
-  if (typeof cfConnectingIp === 'string') {
+  const cfConnectingIp = request.headers["cf-connecting-ip"];
+  if (typeof cfConnectingIp === "string") {
     return cfConnectingIp;
   }
 
-  const realIp = request.headers['x-real-ip'];
-  if (typeof realIp === 'string') {
+  const realIp = request.headers["x-real-ip"];
+  if (typeof realIp === "string") {
     return realIp;
   }
 
@@ -83,7 +86,7 @@ function handleRegistrationError(error: unknown, reply: FastifyReply): boolean {
   if (error instanceof Error) {
     // Log specific error for debugging (not exposed to client)
     // In production, consider structured logging
-    console.error('Registration error:', error.message);
+    console.error("Registration error:", error.message);
 
     // Return generic error message to prevent information leakage
     // This prevents attackers from learning:
@@ -91,7 +94,9 @@ function handleRegistrationError(error: unknown, reply: FastifyReply): boolean {
     // - Specific password requirements
     // - Email validation patterns
     // - Single-user limitation
-    reply.status(400).send({ error: 'Invalid registration data' } as ErrorResponse);
+    reply
+      .status(400)
+      .send({ error: "Invalid registration data" } as ErrorResponse);
     return true;
   }
   return false;
@@ -149,7 +154,7 @@ async function loginHandler(
   const rateLimit = checkRateLimit(clientIp);
   if (!rateLimit.allowed) {
     reply.status(429).send({
-      error: 'Too many login attempts. Please try again later.',
+      error: "Too many login attempts. Please try again later.",
       retryAfter: rateLimit.retryAfter,
     } as RateLimitResponse);
     return;
@@ -158,14 +163,14 @@ async function loginHandler(
   const { email, password } = request.body;
 
   if (!email || !password) {
-    reply.status(401).send({ error: 'Invalid credentials' } as ErrorResponse);
+    reply.status(401).send({ error: "Invalid credentials" } as ErrorResponse);
     return;
   }
 
   const user = await validateCredentials(email, password);
 
   if (!user) {
-    reply.status(401).send({ error: 'Invalid credentials' } as ErrorResponse);
+    reply.status(401).send({ error: "Invalid credentials" } as ErrorResponse);
     return;
   }
 
@@ -174,14 +179,13 @@ async function loginHandler(
 
   // Session rotation: regenerate session ID before storing user data
   // This prevents session fixation attacks where an attacker could set a known session ID
-  const oldSession = request.session;
   await request.session.regenerate();
 
   // Store user in the new session
   request.session.user = user;
 
   // Add rate limit headers
-  reply.header('X-RateLimit-Remaining', rateLimit.remainingAttempts.toString());
+  reply.header("X-RateLimit-Remaining", rateLimit.remainingAttempts.toString());
 
   reply.status(200).send({ user } as SuccessResponse);
 }
@@ -224,10 +228,10 @@ async function getMeHandler(
 
 export async function authRoutes(fastify: FastifyInstance): Promise<void> {
   // Public routes
-  fastify.post('/register', registerHandler);
-  fastify.post('/login', loginHandler);
+  fastify.post("/register", registerHandler);
+  fastify.post("/login", loginHandler);
 
   // Protected routes
-  fastify.post('/logout', { onRequest: authenticate }, logoutHandler);
-  fastify.get('/me', { onRequest: authenticate }, getMeHandler);
+  fastify.post("/logout", { onRequest: authenticate }, logoutHandler);
+  fastify.get("/me", { onRequest: authenticate }, getMeHandler);
 }

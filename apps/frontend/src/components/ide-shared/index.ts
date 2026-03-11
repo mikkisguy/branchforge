@@ -5,4 +5,3 @@ export { TopRightPanel } from "./TopRightPanel";
 export { GitLabSettingsContent } from "./GitLabSettingsContent";
 export { GitLabRepositoryLinkingDialog } from "./GitLabRepositoryLinkingDialog";
 export type { ThemePaletteOption } from "./ThemeSwitcher";
-

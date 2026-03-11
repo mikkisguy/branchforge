@@ -102,10 +102,10 @@ describe("Audit Helpers", () => {
       expect(result).toHaveProperty("deletedAt");
       expect(result.deletedAt).toBeInstanceOf(Date);
       expect(result.deletedAt.getTime()).toBeGreaterThanOrEqual(
-        beforeCreation.getTime(),
+        beforeCreation.getTime()
       );
       expect(result.deletedAt.getTime()).toBeLessThanOrEqual(
-        afterCreation.getTime(),
+        afterCreation.getTime()
       );
     });
 
@@ -118,7 +118,7 @@ describe("Audit Helpers", () => {
       const result2 = createSoftDeleteFields();
 
       expect(result1.deletedAt.getTime()).toBeLessThan(
-        result2.deletedAt.getTime(),
+        result2.deletedAt.getTime()
       );
     });
 

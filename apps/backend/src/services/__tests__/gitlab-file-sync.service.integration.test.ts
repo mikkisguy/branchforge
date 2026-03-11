@@ -51,7 +51,6 @@ describe("GitLabFileSyncService (Integration)", () => {
   const testUserId = testUuid("07000000", 1);
   const testProjectId = testUuid("17000000", 1);
   const testGitlabFileId = testUuid("57000000", 1);
-  const testBranch = "main";
 
   const testUser = {
     id: testUserId,
@@ -101,7 +100,7 @@ describe("GitLabFileSyncService (Integration)", () => {
   }
 
   // Helper to clean up additional labels
-  async function cleanupAdditionalData(labelIds: string[]) {
+  async function _cleanupAdditionalData(labelIds: string[]) {
     for (const labelId of labelIds) {
       await db.delete(labelLines).where(eq(labelLines.labelId, labelId));
       await db.delete(labelsTable).where(eq(labelsTable.id, labelId));
@@ -130,10 +129,10 @@ describe("GitLabFileSyncService (Integration)", () => {
 
     it("should calculate different hash for different content", () => {
       const hash1 = calculateContentHash(
-        "label start:\n    'Hello'\n    return",
+        "label start:\n    'Hello'\n    return"
       );
       const hash2 = calculateContentHash(
-        "label start:\n    'World'\n    return",
+        "label start:\n    'World'\n    return"
       );
 
       expect(hash1).not.toBe(hash2);
@@ -153,7 +152,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       const parsed = parseRPYFileWithLabels(content);
 
       expect(() => validateRPYContent(content, parsed)).toThrow(
-        "RPY content is empty",
+        "RPY content is empty"
       );
     });
 
@@ -162,7 +161,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       const parsed = parseRPYFileWithLabels(content);
 
       expect(() => validateRPYContent(content, parsed)).toThrow(
-        "RPY content is empty",
+        "RPY content is empty"
       );
     });
 
@@ -171,7 +170,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       const parsed = parseRPYFileWithLabels(content);
 
       expect(() => validateRPYContent(content, parsed)).toThrow(
-        "No labels found in RPY content",
+        "No labels found in RPY content"
       );
     });
 
@@ -181,7 +180,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       const parsed = parseRPYFileWithLabels(content);
 
       expect(() => validateRPYContent(content, parsed)).toThrow(
-        "Duplicate labels found",
+        "Duplicate labels found"
       );
     });
 
@@ -191,7 +190,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       const parsed = parseRPYFileWithLabels(content);
 
       expect(() => validateRPYContent(content, parsed)).toThrow(
-        "Duplicate labels found",
+        "Duplicate labels found"
       );
     });
   });
@@ -203,7 +202,7 @@ describe("GitLabFileSyncService (Integration)", () => {
 
     it("should throw error for SETTINGS type", () => {
       expect(() => validateFileType("SETTINGS")).toThrow(
-        "Invalid file type for label sync",
+        "Invalid file type for label sync"
       );
     });
   });
@@ -257,7 +256,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       const contentHash = "hash123";
       const alreadySynced = await checkContentAlreadySynced(
         testGitlabFileId,
-        contentHash,
+        contentHash
       );
       expect(alreadySynced).toBe(false);
     });
@@ -277,7 +276,7 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       const alreadySynced = await checkContentAlreadySynced(
         testGitlabFileId,
-        contentHash,
+        contentHash
       );
       expect(alreadySynced).toBe(false);
 
@@ -300,7 +299,7 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       const alreadySynced = await checkContentAlreadySynced(
         testGitlabFileId,
-        contentHash,
+        contentHash
       );
       expect(alreadySynced).toBe(true);
 
@@ -322,7 +321,7 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       const alreadySynced = await checkContentAlreadySynced(
         testGitlabFileId,
-        "differenthash",
+        "differenthash"
       );
       expect(alreadySynced).toBe(false);
 
@@ -340,7 +339,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       const syncStateId = await createSyncState(
         testGitlabFileId,
         contentHash,
-        labelCount,
+        labelCount
       );
 
       expect(syncStateId).toBeDefined();
@@ -497,7 +496,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       // First sync creates the label
       const result1 = await syncLabelsFromGitLabFile(
         testGitlabFileId,
-        content1,
+        content1
       );
       expect(result1.labelsCreated).toBe(1);
 
@@ -514,7 +513,7 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       const result2 = await syncLabelsFromGitLabFile(
         testGitlabFileId,
-        content2,
+        content2
       );
 
       expect(result2.success).toBe(true);
@@ -558,7 +557,7 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       const result1 = await syncLabelsFromGitLabFile(
         testGitlabFileId,
-        content1,
+        content1
       );
 
       expect(result1.success).toBe(true);
@@ -568,7 +567,7 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       const result2 = await syncLabelsFromGitLabFile(
         testGitlabFileId,
-        content2,
+        content2
       );
 
       expect(result2.success).toBe(true);
@@ -610,7 +609,7 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       const result1 = await syncLabelsFromGitLabFile(
         testGitlabFileId,
-        content1,
+        content1
       );
 
       expect(result1.labelsCreated).toBe(2);
@@ -628,7 +627,7 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       const result2 = await syncLabelsFromGitLabFile(
         testGitlabFileId,
-        content2,
+        content2
       );
 
       expect(result2.success).toBe(true);
@@ -641,8 +640,8 @@ describe("GitLabFileSyncService (Integration)", () => {
         .where(
           and(
             eq(labelsTable.gitlabFileId, testGitlabFileId),
-            isNull(labelsTable.deletedAt),
-          ),
+            isNull(labelsTable.deletedAt)
+          )
         );
 
       expect(remainingLabels).toHaveLength(1);
@@ -655,7 +654,7 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       const result1 = await syncLabelsFromGitLabFile(
         testGitlabFileId,
-        content1,
+        content1
       );
 
       expect(result1.labelsCreated).toBe(2);
@@ -666,7 +665,9 @@ describe("GitLabFileSyncService (Integration)", () => {
       const result2 = await syncLabelsFromGitLabFile(
         testGitlabFileId,
         content2,
-        { skipCleanup: true },
+        {
+          skipCleanup: true,
+        }
       );
 
       expect(result2.success).toBe(true);
@@ -736,7 +737,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       // First sync should succeed
       const result1 = await syncLabelsFromGitLabFile(
         testGitlabFileId,
-        validContent,
+        validContent
       );
 
       expect(result1.success).toBe(true);
@@ -838,4 +839,3 @@ describe("GitLabFileSyncService (Integration)", () => {
     });
   });
 });
-

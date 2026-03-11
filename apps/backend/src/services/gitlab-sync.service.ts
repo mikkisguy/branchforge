@@ -5,7 +5,7 @@
  * Handles conflict detection and resolution for bidirectional sync.
  */
 
-import { getDb } from "../db/index.js";
+import { getDb, type Db } from "../db/index.js";
 import {
   gitlabSyncOperations,
   gitlabFiles,
@@ -151,10 +151,19 @@ function mapEntryToDbContentType(entry: {
  */
 function getCharacterIdByTag(
   renpyTag: string | undefined,
-  charactersByTag: Map<string, string>,
+  charactersByTag: Map<string, string>
 ): string | null {
   if (!renpyTag) return null;
   return charactersByTag.get(renpyTag) ?? null;
+}
+
+// Type for Drizzle transaction - flexible interface to accept both typed and generic transactions
+// This avoids schema type inference issues while maintaining type safety for query methods
+interface Transaction {
+  select: Db["select"];
+  insert: Db["insert"];
+  update: Db["update"];
+  delete: Db["delete"];
 }
 
 /**
@@ -162,8 +171,8 @@ function getCharacterIdByTag(
  * Accepts a transaction context to ensure transactional consistency
  */
 async function fetchCharactersByTag(
-  tx: any,
-  projectId: string,
+  tx: Transaction,
+  projectId: string
 ): Promise<Map<string, string>> {
   const projectCharacters = await tx
     .select()
@@ -183,7 +192,7 @@ async function fetchCharactersByTag(
 async function createSyncOperation(
   projectId: string,
   operation: "EXPORT" | "IMPORT",
-  branch: string | null,
+  branch: string | null
 ): Promise<SyncOperation> {
   const db = getDb();
 
@@ -206,7 +215,7 @@ async function createSyncOperation(
  */
 async function updateSyncOperation(
   operationId: string,
-  updates: Partial<SyncOperation>,
+  updates: Partial<SyncOperation>
 ): Promise<void> {
   const db = getDb();
 
@@ -230,7 +239,7 @@ async function updateSyncOperation(
 export async function exportToGitlab(
   projectId: string,
   branch?: string,
-  commitMessage?: string,
+  commitMessage?: string
 ): Promise<SyncOperation> {
   const db = getDb();
   const targetBranch = branch || "main";
@@ -241,7 +250,7 @@ export async function exportToGitlab(
   const operation = await createSyncOperation(
     projectId,
     "EXPORT",
-    targetBranch,
+    targetBranch
   );
 
   try {
@@ -260,7 +269,7 @@ export async function exportToGitlab(
           targetBranch,
           file.filePath,
           file.content,
-          message,
+          message
         );
       }
     }
@@ -276,8 +285,8 @@ export async function exportToGitlab(
         and(
           eq(labels.projectId, projectId),
           inArray(labels.gitlabFileId, exportedFileIds),
-          isNull(labels.deletedAt),
-        ),
+          isNull(labels.deletedAt)
+        )
       );
 
     if (exportedLabels.length > 0) {
@@ -305,8 +314,8 @@ export async function exportToGitlab(
         .where(
           and(
             inArray(labelLines.labelId, exportedLabelIds),
-            isNull(labelLines.deletedAt),
-          ),
+            isNull(labelLines.deletedAt)
+          )
         );
     }
 
@@ -346,7 +355,7 @@ export async function exportToGitlab(
 export async function importFromGitlab(
   projectId: string,
   branch: string,
-  conflictResolution: ConflictResolution,
+  conflictResolution: ConflictResolution
 ): Promise<SyncOperation> {
   const db = getDb();
 
@@ -385,7 +394,7 @@ export async function importFromGitlab(
       .limit(1);
 
     const excludedTags = new Set(
-      settings?.excludedCharacterTags || ["n", "u", "narrator", "extend"],
+      settings?.excludedCharacterTags || ["n", "u", "narrator", "extend"]
     );
 
     // Fetch file contents in parallel with concurrency limit
@@ -395,8 +404,8 @@ export async function importFromGitlab(
         limiter.run(async () => {
           const content = await getFileContent(projectId, file.path, branch);
           return { file, content };
-        }),
-      ),
+        })
+      )
     );
 
     // Track if any file fetch succeeded and capture first error
@@ -468,7 +477,7 @@ export async function importFromGitlab(
           isSpecial: false,
           sourceFile: "",
           confidence: 1,
-        })),
+        }))
       );
     }
 
@@ -492,7 +501,7 @@ export async function importFromGitlab(
       .where(eq(characters.projectId, projectId));
 
     const existingByTag = new Map(
-      existingCharacters.map((c) => [c.renpyTag, c]),
+      existingCharacters.map((c) => [c.renpyTag, c])
     );
 
     // Create or update characters in a single transaction with bulk operations
@@ -522,7 +531,7 @@ export async function importFromGitlab(
             displayName: charData.displayName,
             renpyTag: charData.tag,
             color: charData.color,
-          })),
+          }))
         );
       }
 
@@ -570,7 +579,7 @@ export async function importFromGitlab(
           const labelData = convertToBranchForgeFormatFromLabels(
             parsed,
             label.label,
-            content,
+            content
           );
 
           // Calculate content hash for the label's lines
@@ -595,7 +604,7 @@ export async function importFromGitlab(
                   const entryContentHash = calculateContentHash(mapped.content);
                   const speakerId = getCharacterIdByTag(
                     entry.speaker,
-                    charactersByTag,
+                    charactersByTag
                   );
                   return {
                     labelId: existingScene.id,
@@ -611,7 +620,7 @@ export async function importFromGitlab(
                     rpyLineNumber: entry.lineNumber,
                     rpyIndentLevel: entry.indentLevel ?? 0,
                   };
-                },
+                }
               );
 
               if (allValues.length > 0) {
@@ -666,7 +675,7 @@ export async function importFromGitlab(
                   const entryContentHash = calculateContentHash(mapped.content);
                   const speakerId = getCharacterIdByTag(
                     entry.speaker,
-                    charactersByTag,
+                    charactersByTag
                   );
                   return {
                     labelId: newScene.id,
@@ -682,7 +691,7 @@ export async function importFromGitlab(
                     rpyLineNumber: entry.lineNumber,
                     rpyIndentLevel: entry.indentLevel ?? 0,
                   };
-                },
+                }
               );
 
               if (allValues.length > 0) {
@@ -743,7 +752,7 @@ export async function importFromGitlab(
  * Get a sync operation by ID
  */
 export async function getSyncOperation(
-  operationId: string,
+  operationId: string
 ): Promise<SyncOperation | null> {
   const db = getDb();
 
@@ -761,7 +770,7 @@ export async function getSyncOperation(
  */
 export async function listSyncOperations(
   projectId: string,
-  limit?: number,
+  limit?: number
 ): Promise<SyncOperation[]> {
   const db = getDb();
 
@@ -781,7 +790,7 @@ export async function listSyncOperations(
  */
 export async function detectConflicts(
   projectId: string,
-  branch: string,
+  branch: string
 ): Promise<ConflictDetectionResult> {
   const conflicts: ConflictInfo[] = [];
 
@@ -856,11 +865,11 @@ export async function detectConflicts(
           const content = await getFileContent(
             projectId,
             gitlabFile.filePath,
-            branch,
+            branch
           );
           return { gitlabFile, content };
-        }),
-      ),
+        })
+      )
     );
 
     // Track if any file fetch succeeded and capture first error
@@ -904,7 +913,7 @@ export async function detectConflicts(
           // Compare local and remote content
           const localScene = localScenes.find(
             (s) =>
-              s.gitlabFileId === gitlabFile.id && s.labelName === label.label,
+              s.gitlabFileId === gitlabFile.id && s.labelName === label.label
           );
           if (localScene) {
             // Use pre-fetched scene lines from map to avoid N+1 queries
@@ -915,7 +924,7 @@ export async function detectConflicts(
             const normalizedLocalDialogue = localLinesWithSpeakers
               .filter(
                 (l) =>
-                  l.contentType === "DIALOGUE" || l.contentType === "NARRATION",
+                  l.contentType === "DIALOGUE" || l.contentType === "NARRATION"
               )
               .map((l) => ({
                 speaker: l.speakerTag || null, // Use tag directly, null for narration
@@ -976,4 +985,3 @@ export async function detectConflicts(
     };
   }
 }
-

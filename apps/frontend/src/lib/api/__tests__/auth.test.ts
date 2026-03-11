@@ -43,7 +43,7 @@ describe("Auth API", () => {
       const callArgs = mockFetch.mock.calls[0];
       expect(callArgs[1]?.headers).toHaveProperty(
         "Content-Type",
-        "application/json",
+        "application/json"
       );
     });
 
@@ -51,7 +51,7 @@ describe("Auth API", () => {
       const invalidCredentials = { ...validCredentials, email: "" };
 
       await expect(authApi.login(invalidCredentials)).rejects.toThrow(
-        "Email is required",
+        "Email is required"
       );
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -60,7 +60,7 @@ describe("Auth API", () => {
       const invalidCredentials = { ...validCredentials, email: "   " };
 
       await expect(authApi.login(invalidCredentials)).rejects.toThrow(
-        "Email is required",
+        "Email is required"
       );
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -69,7 +69,7 @@ describe("Auth API", () => {
       const invalidCredentials = { ...validCredentials, email: "not-an-email" };
 
       await expect(authApi.login(invalidCredentials)).rejects.toThrow(
-        "Please enter a valid email address",
+        "Please enter a valid email address"
       );
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -78,7 +78,7 @@ describe("Auth API", () => {
       const invalidCredentials = { ...validCredentials, email: "example.com" };
 
       await expect(authApi.login(invalidCredentials)).rejects.toThrow(
-        "Please enter a valid email address",
+        "Please enter a valid email address"
       );
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -87,7 +87,7 @@ describe("Auth API", () => {
       const invalidCredentials = { ...validCredentials, email: "user@" };
 
       await expect(authApi.login(invalidCredentials)).rejects.toThrow(
-        "Please enter a valid email address",
+        "Please enter a valid email address"
       );
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -99,7 +99,7 @@ describe("Auth API", () => {
       };
 
       await expect(authApi.login(invalidCredentials)).rejects.toThrow(
-        "Email is too long",
+        "Email is too long"
       );
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -108,7 +108,7 @@ describe("Auth API", () => {
       const invalidCredentials = { email: "test@example.com", password: "" };
 
       await expect(authApi.login(invalidCredentials)).rejects.toThrow(
-        "Password is required",
+        "Password is required"
       );
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -120,7 +120,7 @@ describe("Auth API", () => {
       };
 
       await expect(authApi.login(invalidCredentials)).rejects.toThrow(
-        "Password is too long",
+        "Password is too long"
       );
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -132,7 +132,7 @@ describe("Auth API", () => {
       };
 
       await expect(authApi.login(invalidCredentials)).rejects.toThrow(
-        "Password contains invalid characters",
+        "Password contains invalid characters"
       );
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -144,7 +144,7 @@ describe("Auth API", () => {
       };
 
       await expect(authApi.login(invalidCredentials)).rejects.toThrow(
-        "Password contains invalid characters",
+        "Password contains invalid characters"
       );
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -163,7 +163,7 @@ describe("Auth API", () => {
       });
 
       const requestBody = JSON.parse(
-        mockFetch.mock.calls[0][1]?.body as string,
+        mockFetch.mock.calls[0][1]?.body as string
       );
       expect(requestBody.email).toBe("test@example.com");
     });
@@ -182,7 +182,7 @@ describe("Auth API", () => {
       });
 
       const requestBody = JSON.parse(
-        mockFetch.mock.calls[0][1]?.body as string,
+        mockFetch.mock.calls[0][1]?.body as string
       );
       expect(requestBody.password).toBe("password123");
     });
@@ -223,7 +223,7 @@ describe("Auth API", () => {
       const invalidCredentials = { ...validCredentials, email: "" };
 
       await expect(authApi.register(invalidCredentials)).rejects.toThrow(
-        "Email is required",
+        "Email is required"
       );
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -235,7 +235,7 @@ describe("Auth API", () => {
       };
 
       await expect(authApi.register(invalidCredentials)).rejects.toThrow(
-        "Please enter a valid email address",
+        "Please enter a valid email address"
       );
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -244,7 +244,7 @@ describe("Auth API", () => {
       const invalidCredentials = { ...validCredentials, password: "pass123" }; // 7 characters
 
       await expect(authApi.register(invalidCredentials)).rejects.toThrow(
-        "Password must be at least 8 characters",
+        "Password must be at least 8 characters"
       );
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -265,7 +265,7 @@ describe("Auth API", () => {
       await authApi.register({ ...validCredentials, password: "pass12  " });
 
       const requestBody = JSON.parse(
-        mockFetch.mock.calls[0][1]?.body as string,
+        mockFetch.mock.calls[0][1]?.body as string
       );
       // The sanitized password is sent, which is only 6 characters
       expect(requestBody.password).toBe("pass12");
@@ -278,7 +278,7 @@ describe("Auth API", () => {
       };
 
       await expect(authApi.register(invalidCredentials)).rejects.toThrow(
-        "Password is too long",
+        "Password is too long"
       );
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -290,7 +290,7 @@ describe("Auth API", () => {
       };
 
       await expect(authApi.register(invalidCredentials)).rejects.toThrow(
-        "Password contains invalid characters",
+        "Password contains invalid characters"
       );
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -309,7 +309,7 @@ describe("Auth API", () => {
       });
 
       const requestBody = JSON.parse(
-        mockFetch.mock.calls[0][1]?.body as string,
+        mockFetch.mock.calls[0][1]?.body as string
       );
       expect(requestBody.email).toBe("user@example.com");
     });
@@ -328,7 +328,7 @@ describe("Auth API", () => {
       });
 
       const requestBody = JSON.parse(
-        mockFetch.mock.calls[0][1]?.body as string,
+        mockFetch.mock.calls[0][1]?.body as string
       );
       expect(requestBody.password).toBe("password123");
     });
@@ -343,7 +343,7 @@ describe("Auth API", () => {
       });
 
       await expect(
-        authApi.login({ email: "test@example.com", password: "wrong" }),
+        authApi.login({ email: "test@example.com", password: "wrong" })
       ).rejects.toThrow("Invalid credentials");
     });
 
@@ -355,7 +355,7 @@ describe("Auth API", () => {
       });
 
       await expect(
-        authApi.login({ email: "test@example.com", password: "password123" }),
+        authApi.login({ email: "test@example.com", password: "password123" })
       ).rejects.toThrow("Unknown error");
     });
 
@@ -370,7 +370,7 @@ describe("Auth API", () => {
         authApi.register({
           email: "test@example.com",
           password: "password123",
-        }),
+        })
       ).rejects.toThrow("Invalid registration data");
     });
 
@@ -378,7 +378,7 @@ describe("Auth API", () => {
       mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
       await expect(
-        authApi.login({ email: "test@example.com", password: "password123" }),
+        authApi.login({ email: "test@example.com", password: "password123" })
       ).rejects.toThrow("Network error");
     });
   });
@@ -495,7 +495,7 @@ describe("Auth API", () => {
         authApi.login({
           email: "test@example.com",
           password: "P@ssw0rd!#$%^&*",
-        }),
+        })
       ).resolves.toBeDefined();
     });
 
@@ -511,7 +511,7 @@ describe("Auth API", () => {
         authApi.login({
           email: "test@example.com",
           password: "pass word",
-        }),
+        })
       ).resolves.toBeDefined();
     });
 
@@ -527,7 +527,7 @@ describe("Auth API", () => {
         authApi.login({
           email: "user@mail.example.com",
           password: "password123",
-        }),
+        })
       ).resolves.toBeDefined();
     });
 
@@ -543,7 +543,7 @@ describe("Auth API", () => {
         authApi.login({
           email: "user123@example.com",
           password: "password123",
-        }),
+        })
       ).resolves.toBeDefined();
     });
 
@@ -559,7 +559,7 @@ describe("Auth API", () => {
         authApi.login({
           email: "user+tag@example.com",
           password: "password123",
-        }),
+        })
       ).resolves.toBeDefined();
     });
 
@@ -575,9 +575,8 @@ describe("Auth API", () => {
         authApi.login({
           email: "first.last@example.com",
           password: "password123",
-        }),
+        })
       ).resolves.toBeDefined();
     });
   });
 });
-

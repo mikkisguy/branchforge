@@ -11,10 +11,7 @@ import { request } from "./client";
 // ============================================================================
 
 // Import types from shared package - these match backend response types
-import type {
-  PublicLabel,
-  LabelDetail,
-} from "@branchforge/shared";
+import type { PublicLabel, LabelDetail } from "@branchforge/shared";
 
 export interface ListLabelsParams {
   projectId: string;
@@ -45,7 +42,7 @@ export const labelsApi = {
     if (params.status) searchParams.set("status", params.status);
 
     const response = await request<ListLabelsResponse>(
-      `/labels?${searchParams.toString()}`,
+      `/labels?${searchParams.toString()}`
     );
     return response.labels;
   },

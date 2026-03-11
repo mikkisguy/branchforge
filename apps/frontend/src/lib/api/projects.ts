@@ -58,7 +58,7 @@ export const projectsApi = {
       `/projects/${encodeURIComponent(projectId)}`,
       {
         method: "GET",
-      },
+      }
     );
     return response.project;
   },
@@ -74,4 +74,3 @@ export const projectsApi = {
     return response.project;
   },
 };
-

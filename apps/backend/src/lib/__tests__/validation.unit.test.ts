@@ -21,7 +21,6 @@ import {
   listLabelsQuerySchema,
   labelIdParamsSchema,
   createLabelSchema,
-  updateLabelSchema,
   createCharacterSchema,
   characterIdParamsSchema,
   renpyTagSchema,
@@ -1214,4 +1213,3 @@ describe("Helper Functions", () => {
     });
   });
 });
-

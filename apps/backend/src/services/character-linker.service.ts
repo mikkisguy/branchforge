@@ -5,9 +5,9 @@
  * Handles exact matches, case-insensitive fallback, and special characters.
  */
 
-import { getDb } from '../db/index.js';
-import { labelLines, characters, labels } from '../db/schema/index.js';
-import { eq, and, inArray, isNull, sql } from 'drizzle-orm';
+import { getDb } from "../db/index.js";
+import { labelLines, characters, labels } from "../db/schema/index.js";
+import { eq, and, inArray, isNull, sql } from "drizzle-orm";
 
 /**
  * Conflict information for speaker linking
@@ -30,7 +30,7 @@ export interface SpeakerLinkResult {
 /**
  * Default excluded character tags (special Ren'Py characters)
  */
-const DEFAULT_EXCLUDED_TAGS = new Set(['n', 'u', 'narrator', 'extend']);
+const DEFAULT_EXCLUDED_TAGS = new Set(["n", "u", "narrator", "extend"]);
 
 /**
  * Character Linker Service
@@ -39,7 +39,10 @@ class CharacterLinkerService {
   /**
    * Check if a speaker tag should be linked to a character
    */
-  private shouldLinkTag(speakerTag: string | null, excludedTags: Set<string>): boolean {
+  private shouldLinkTag(
+    speakerTag: string | null,
+    excludedTags: Set<string>
+  ): boolean {
     if (!speakerTag) return false;
     if (DEFAULT_EXCLUDED_TAGS.has(speakerTag)) return false;
     if (excludedTags.has(speakerTag)) return false;
@@ -50,18 +53,25 @@ class CharacterLinkerService {
    * Extract speaker tag from dialogue content
    * Handles RPY dialogue format: tag "text" or "text" for narration
    */
-  private extractSpeakerTag(content: string, contentType: string): string | null {
+  private extractSpeakerTag(
+    content: string,
+    contentType: string
+  ): string | null {
     // Only process DIALOGUE type
-    if (contentType !== 'DIALOGUE') return null;
+    if (contentType !== "DIALOGUE") return null;
 
     const trimmed = content.trim();
 
     // Try to match dialogue with speaker: tag "text"
     // Handles both single and double quotes
-    const speakerMatch = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s+"([^"]*)"$/);
+    const speakerMatch = trimmed.match(
+      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"([^"]*)"$/
+    );
     if (speakerMatch) return speakerMatch[1];
 
-    const speakerMatch2 = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s+'([^']*)'$/);
+    const speakerMatch2 = trimmed.match(
+      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+'([^']*)'$/
+    );
     if (speakerMatch2) return speakerMatch2[1];
 
     // No speaker found (narration)
@@ -99,13 +109,14 @@ class CharacterLinkerService {
 
     // Get all dialogue lines for these labels
     const allLines = await db
-      .select({ id: labelLines.id, content: labelLines.content, contentType: labelLines.contentType })
+      .select({
+        id: labelLines.id,
+        content: labelLines.content,
+        contentType: labelLines.contentType,
+      })
       .from(labelLines)
       .where(
-        and(
-          inArray(labelLines.labelId, labelIds),
-          isNull(labelLines.deletedAt)
-        )
+        and(inArray(labelLines.labelId, labelIds), isNull(labelLines.deletedAt))
       );
 
     // Track unique speaker tags that couldn't be matched
@@ -156,11 +167,13 @@ class CharacterLinkerService {
     }
 
     // Build conflict info for unmatched tags
-    const conflicts: SpeakerLinkConflict[] = Array.from(unmatchedTags).map(tag => ({
-      speakerTag: tag,
-      matchedCharacterId: null,
-      lineCount: 0, // Would need additional query to count
-    }));
+    const conflicts: SpeakerLinkConflict[] = Array.from(unmatchedTags).map(
+      (tag) => ({
+        speakerTag: tag,
+        matchedCharacterId: null,
+        lineCount: 0, // Would need additional query to count
+      })
+    );
 
     return {
       linked: linkedCount,
@@ -176,13 +189,13 @@ class CharacterLinkerService {
     const db = getDb();
 
     const lines = await db
-      .select({ content: labelLines.content, contentType: labelLines.contentType })
+      .select({
+        content: labelLines.content,
+        contentType: labelLines.contentType,
+      })
       .from(labelLines)
       .where(
-        and(
-          eq(labelLines.labelId, labelId),
-          isNull(labelLines.deletedAt)
-        )
+        and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt))
       );
 
     const speakerTags = new Set<string>();
@@ -214,10 +227,7 @@ class CharacterLinkerService {
       .from(labelLines)
       .innerJoin(labels, eq(labelLines.labelId, labels.id))
       .where(
-        and(
-          eq(labels.projectId, projectId),
-          isNull(labelLines.deletedAt)
-        )
+        and(eq(labels.projectId, projectId), isNull(labelLines.deletedAt))
       );
 
     const totalLines = Number(totalResult?.count) || 0;

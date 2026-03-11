@@ -61,7 +61,8 @@ export function RegisterPage() {
             <CardHeader>
               <CardTitle>Registration Closed</CardTitle>
               <CardDescription>
-                New user registration is currently disabled. Please contact an administrator.
+                New user registration is currently disabled. Please contact an
+                administrator.
               </CardDescription>
             </CardHeader>
             <CardFooter>
@@ -182,4 +183,3 @@ export function RegisterPage() {
     </div>
   );
 }
-

@@ -56,7 +56,7 @@ export interface SyncLabelsOptions {
  */
 export function validateRPYContent(
   content: string,
-  parsed: ParsedRPYFileWithLabels,
+  parsed: ParsedRPYFileWithLabels
 ): void {
   if (!content || content.trim().length === 0) {
     throw new Error("RPY content is empty");
@@ -88,7 +88,7 @@ export function validateRPYContent(
 export function validateFileType(fileType: string): void {
   if (fileType !== "STORY") {
     throw new Error(
-      `Invalid file type for label sync: ${fileType}. Only STORY files can sync to labels.`,
+      `Invalid file type for label sync: ${fileType}. Only STORY files can sync to labels.`
     );
   }
 }
@@ -102,7 +102,7 @@ export function validateFileType(fileType: string): void {
  * Uses completedAt = null with status 'modified_local' to indicate in-progress
  */
 export async function checkInProgressSync(
-  gitlabFileId: string,
+  gitlabFileId: string
 ): Promise<boolean> {
   const db = getDb();
 
@@ -113,8 +113,8 @@ export async function checkInProgressSync(
       and(
         eq(gitlabFileSyncState.gitlabFileId, gitlabFileId),
         eq(gitlabFileSyncState.status, "MODIFIED_LOCAL"),
-        isNull(gitlabFileSyncState.completedAt),
-      ),
+        isNull(gitlabFileSyncState.completedAt)
+      )
     )
     .limit(1);
 
@@ -126,7 +126,7 @@ export async function checkInProgressSync(
  */
 export async function checkContentAlreadySynced(
   gitlabFileId: string,
-  contentHash: string,
+  contentHash: string
 ): Promise<boolean> {
   const db = getDb();
 
@@ -137,8 +137,8 @@ export async function checkContentAlreadySynced(
       and(
         eq(gitlabFileSyncState.gitlabFileId, gitlabFileId),
         eq(gitlabFileSyncState.status, "SYNCED"),
-        eq(gitlabFileSyncState.contentHash, contentHash),
-      ),
+        eq(gitlabFileSyncState.contentHash, contentHash)
+      )
     )
     .orderBy(desc(gitlabFileSyncState.completedAt))
     .limit(1);
@@ -152,7 +152,7 @@ export async function checkContentAlreadySynced(
 export async function createSyncState(
   gitlabFileId: string,
   contentHash: string,
-  labelCount: number,
+  labelCount: number
 ): Promise<string> {
   const db = getDb();
 
@@ -177,7 +177,7 @@ export async function completeSyncState(
   syncStateId: string,
   success: boolean,
   dbLabelCount?: number,
-  errorMessage?: string,
+  errorMessage?: string
 ): Promise<void> {
   const db = getDb();
 
@@ -237,7 +237,7 @@ function mapEntryToDbType(entry: {
 export async function syncLabelsFromGitLabFile(
   gitlabFileId: string,
   rpyContent: string,
-  options?: SyncLabelsOptions,
+  options?: SyncLabelsOptions
 ): Promise<SyncLabelsResult> {
   const db = getDb();
   const skipCleanup = options?.skipCleanup ?? false;
@@ -286,7 +286,7 @@ export async function syncLabelsFromGitLabFile(
     // Step 5: Check idempotency (same content already synced?)
     const alreadySynced = await checkContentAlreadySynced(
       gitlabFileId,
-      contentHash,
+      contentHash
     );
     if (alreadySynced) {
       result.skipped = true;
@@ -298,7 +298,7 @@ export async function syncLabelsFromGitLabFile(
     const syncStateId = await createSyncState(
       gitlabFileId,
       contentHash,
-      parsed.labels.length,
+      parsed.labels.length
     );
 
     // Step 7-9: Validate and sync in a single try block for proper error handling
@@ -339,7 +339,7 @@ export async function syncLabelsFromGitLabFile(
           const labelData = convertToBranchForgeFormatFromLabels(
             parsed,
             label.label,
-            rpyContent,
+            rpyContent
           );
 
           try {
@@ -468,9 +468,7 @@ export async function syncLabelsFromGitLabFile(
           // Find orphaned labels (excluding already soft-deleted)
           const orphanedLabels = existingLabels.filter(
             (s) =>
-              s.labelName &&
-              !currentLabelNames.has(s.labelName) &&
-              !s.deletedAt,
+              s.labelName && !currentLabelNames.has(s.labelName) && !s.deletedAt
           );
 
           if (orphanedLabels.length > 0) {
@@ -483,8 +481,8 @@ export async function syncLabelsFromGitLabFile(
               .where(
                 and(
                   inArray(labelLines.labelId, orphanedIds),
-                  isNull(labelLines.deletedAt),
-                ),
+                  isNull(labelLines.deletedAt)
+                )
               );
 
             // Soft delete orphaned labels
@@ -492,7 +490,7 @@ export async function syncLabelsFromGitLabFile(
               .update(labels)
               .set({ deletedAt: new Date() })
               .where(
-                and(inArray(labels.id, orphanedIds), isNull(labels.deletedAt)),
+                and(inArray(labels.id, orphanedIds), isNull(labels.deletedAt))
               );
 
             labelsDeleted = orphanedIds.length;
@@ -525,7 +523,7 @@ export async function syncLabelsFromGitLabFile(
         await completeSyncState(
           syncStateId,
           true,
-          syncResult.labelsCreated + syncResult.labelsUpdated,
+          syncResult.labelsCreated + syncResult.labelsUpdated
         );
       } catch (metadataError) {
         // Metadata update failed but transaction already committed.
@@ -548,7 +546,9 @@ export async function syncLabelsFromGitLabFile(
           metadataError: errorMessage,
         };
         console.error(
-          `[GitLabFileSync] Metadata update failed after successful transaction. Data may be inconsistent: ${JSON.stringify(errorDetails)}`,
+          `[GitLabFileSync] Metadata update failed after successful transaction. Data may be inconsistent: ${JSON.stringify(
+            errorDetails
+          )}`
         );
         // Continue to return success - the core sync work is complete
       }
@@ -569,7 +569,7 @@ export async function syncLabelsFromGitLabFile(
         syncStateId,
         false,
         undefined,
-        error instanceof Error ? error.message : "Unknown error",
+        error instanceof Error ? error.message : "Unknown error"
       );
 
       throw error;
@@ -584,4 +584,3 @@ export async function syncLabelsFromGitLabFile(
     return result;
   }
 }
-

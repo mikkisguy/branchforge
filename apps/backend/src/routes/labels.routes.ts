@@ -81,7 +81,7 @@ interface UpdateLabelDialogueResponse {
 async function authorizeProjectAccess(
   projectId: string,
   userId: string,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<boolean> {
   const db = getDb();
 
@@ -116,7 +116,7 @@ async function authorizeProjectAccess(
  */
 async function listLabelsHandler(
   request: FastifyRequest<{ Querystring: ListLabelsQuery }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const user = request.user!;
   const { projectId, routeKey, status } = request.query;
@@ -147,7 +147,7 @@ async function listLabelsHandler(
  */
 async function getLabelHandler(
   request: FastifyRequest<{ Params: GetLabelParams }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const { labelId } = request.params;
   const user = request.user!;
@@ -182,7 +182,7 @@ async function updateLabelDialogueHandler(
     Params: GetLabelParams;
     Body: UpdateLabelDialogueInput;
   }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const { labelId } = request.params;
   const { dialogue } = request.body;
@@ -238,7 +238,7 @@ async function updateLabelDialogueHandler(
         .update(labelLines)
         .set({ deletedAt: new Date() })
         .where(
-          and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt)),
+          and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt))
         );
 
       const allValues = dialogue.map((entry, index) => ({
@@ -283,7 +283,7 @@ async function updateLabelDialogueHandler(
       })
       .from(labels)
       .where(
-        and(eq(labels.gitlabFileId, gitlabFile.id), isNull(labels.deletedAt)),
+        and(eq(labels.gitlabFileId, gitlabFile.id), isNull(labels.deletedAt))
       )
       .orderBy(asc(labels.labelPosition));
 
@@ -306,10 +306,10 @@ async function updateLabelDialogueHandler(
         and(
           inArray(
             labelLines.labelId,
-            allLabels.map((l) => l.id),
+            allLabels.map((l) => l.id)
           ),
-          isNull(labelLines.deletedAt),
-        ),
+          isNull(labelLines.deletedAt)
+        )
       )
       .orderBy(asc(labelLines.sequence));
 
@@ -371,7 +371,7 @@ async function updateLabelDialogueHandler(
  */
 async function createLabelHandler(
   request: FastifyRequest<{ Body: CreateLabelInput }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const user = request.user!;
 
@@ -407,7 +407,7 @@ async function updateLabelHandler(
     Params: GetLabelParams;
     Body: UpdateLabelInput;
   }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const { labelId } = request.params;
   const user = request.user!;
@@ -440,7 +440,7 @@ async function updateLabelHandler(
  */
 async function deleteLabelHandler(
   request: FastifyRequest<{ Params: GetLabelParams }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const { labelId } = request.params;
   const user = request.user!;
@@ -477,7 +477,7 @@ export async function labelsRoutes(fastify: FastifyInstance): Promise<void> {
       onRequest: authenticate,
       preValidation: validateQuery(listLabelsQuerySchema),
     },
-    listLabelsHandler,
+    listLabelsHandler
   );
   fastify.get<{ Params: GetLabelParams }>(
     "/labels/:labelId",
@@ -485,7 +485,7 @@ export async function labelsRoutes(fastify: FastifyInstance): Promise<void> {
       onRequest: authenticate,
       preValidation: validateParams(labelIdParamsSchema),
     },
-    getLabelHandler,
+    getLabelHandler
   );
   fastify.post<{ Body: CreateLabelInput }>(
     "/labels",
@@ -493,7 +493,7 @@ export async function labelsRoutes(fastify: FastifyInstance): Promise<void> {
       onRequest: authenticate,
       preValidation: validateBody(createLabelSchema),
     },
-    createLabelHandler,
+    createLabelHandler
   );
   fastify.put<{ Params: GetLabelParams; Body: UpdateLabelInput }>(
     "/labels/:labelId",
@@ -504,7 +504,7 @@ export async function labelsRoutes(fastify: FastifyInstance): Promise<void> {
         validateBody(updateLabelSchema),
       ],
     },
-    updateLabelHandler,
+    updateLabelHandler
   );
   fastify.delete<{ Params: GetLabelParams }>(
     "/labels/:labelId",
@@ -512,7 +512,7 @@ export async function labelsRoutes(fastify: FastifyInstance): Promise<void> {
       onRequest: authenticate,
       preValidation: validateParams(labelIdParamsSchema),
     },
-    deleteLabelHandler,
+    deleteLabelHandler
   );
   fastify.put<{ Params: GetLabelParams; Body: UpdateLabelDialogueInput }>(
     "/labels/:labelId/dialogue",
@@ -523,7 +523,6 @@ export async function labelsRoutes(fastify: FastifyInstance): Promise<void> {
         validateBody(updateLabelDialogueBodySchema),
       ],
     },
-    updateLabelDialogueHandler,
+    updateLabelDialogueHandler
   );
 }
-

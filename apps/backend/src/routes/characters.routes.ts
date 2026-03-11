@@ -15,18 +15,12 @@ import {
   gitlabFiles,
   projects,
 } from "../db/schema/index.js";
-import { eq, and, inArray, isNull } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { authenticate } from "../middleware/auth.middleware.js";
 import {
-  validateQuery,
   validateParams,
   validateBody,
 } from "../middleware/validation.middleware.js";
-import {
-  NotFoundError,
-  ForbiddenError,
-  ConflictError,
-} from "../middleware/error-handler.middleware.js";
 import {
   characterIdParamsSchema,
   projectIdParamsSchema,
@@ -44,7 +38,6 @@ import {
   type DetectedCharacter,
 } from "../services/character-parser.service.js";
 import { characterLinkerService } from "../services/character-linker.service.js";
-import { listRpyFiles, getFileContent } from "../services/gitlab.service.js";
 
 // ============================================================================
 // Types
@@ -110,35 +103,6 @@ interface ErrorResponse {
 // ============================================================================
 
 /**
- * Helper function to authorize project access
- */
-async function authorizeProjectAccess(
-  projectId: string,
-  userId: string,
-  reply: FastifyReply,
-): Promise<boolean> {
-  const db = getDb();
-
-  const [project] = await db
-    .select({ userId: projects.userId })
-    .from(projects)
-    .where(eq(projects.id, projectId))
-    .limit(1);
-
-  if (!project) {
-    reply.status(404).send({ error: "Project not found" } as ErrorResponse);
-    return false;
-  }
-
-  if (project.userId !== userId) {
-    reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
-    return false;
-  }
-
-  return true;
-}
-
-/**
  * Get or create project settings
  */
 async function getProjectSettings(projectId: string) {
@@ -177,7 +141,7 @@ async function getProjectSettings(projectId: string) {
  */
 async function detectCharactersHandler(
   request: FastifyRequest<{ Params: DetectCharactersParams }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const { projectId } = request.params;
   const user = request.user!;
@@ -221,16 +185,16 @@ async function detectCharactersHandler(
       if (file.content) {
         request.log.info(
           { filePath: file.filePath, contentLength: file.content.length },
-          "Parsing characters from file",
+          "Parsing characters from file"
         );
         const fileCharacters = characterParserService.parseWithExclusions(
           file.content,
           file.filePath,
-          excludedTags,
+          excludedTags
         );
         request.log.info(
           { filePath: file.filePath, characterCount: fileCharacters.length },
-          `Found ${fileCharacters.length} characters`,
+          `Found ${fileCharacters.length} characters`
         );
         allDetected.push(...fileCharacters);
       }
@@ -238,7 +202,7 @@ async function detectCharactersHandler(
 
     request.log.info(
       { totalCharacters: allDetected.length },
-      `Total characters detected before deduplication`,
+      `Total characters detected before deduplication`
     );
 
     // Deduplicate by tag
@@ -259,7 +223,7 @@ async function detectCharactersHandler(
         name: c.name,
         displayName: c.displayName,
         color: c.color,
-      })),
+      }))
     );
 
     reply.status(200).send({
@@ -285,7 +249,7 @@ async function importCharactersHandler(
     Params: DetectCharactersParams;
     Body: ImportCharactersInput;
   }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const { projectId } = request.params;
   const {
@@ -335,7 +299,7 @@ async function importCharactersHandler(
       .where(eq(characters.projectId, projectId));
 
     const existingByTag = new Map(
-      existingCharacters.map((c) => [c.renpyTag, c]),
+      existingCharacters.map((c) => [c.renpyTag, c])
     );
 
     // Create or update characters
@@ -410,7 +374,7 @@ async function importCharactersHandler(
         const result = await characterLinkerService.linkSpeakersToLines(
           projectId,
           labelIds,
-          new Set(excludedTags),
+          new Set(excludedTags)
         );
         linked = result.linked;
         unmatched = result.unmatched;
@@ -436,7 +400,7 @@ async function importCharactersHandler(
  */
 async function listCharactersHandler(
   request: FastifyRequest<{ Params: DetectCharactersParams }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const { projectId } = request.params;
   const user = request.user!;
@@ -487,7 +451,7 @@ async function listCharactersHandler(
  */
 async function getCharacterHandler(
   request: FastifyRequest<{ Params: { characterId: string } }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const { characterId } = request.params;
   const user = request.user!;
@@ -549,7 +513,7 @@ async function createCharacterHandler(
     Params: DetectCharactersParams;
     Body: CreateCharacterInput;
   }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const { projectId } = request.params;
   const user = request.user!;
@@ -576,17 +540,15 @@ async function createCharacterHandler(
       .where(
         and(
           eq(characters.projectId, projectId),
-          eq(characters.renpyTag, request.body.renpyTag),
-        ),
+          eq(characters.renpyTag, request.body.renpyTag)
+        )
       )
       .limit(1);
 
     if (existing) {
-      reply
-        .status(409)
-        .send({
-          error: "Character with this tag already exists",
-        } as ErrorResponse);
+      reply.status(409).send({
+        error: "Character with this tag already exists",
+      } as ErrorResponse);
       return;
     }
 
@@ -636,7 +598,7 @@ async function updateCharacterHandler(
     Params: { characterId: string };
     Body: UpdateCharacterInput;
   }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const { characterId } = request.params;
   const user = request.user!;
@@ -703,7 +665,7 @@ async function updateCharacterHandler(
  */
 async function deleteCharacterHandler(
   request: FastifyRequest<{ Params: { characterId: string } }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const { characterId } = request.params;
   const user = request.user!;
@@ -751,7 +713,7 @@ async function deleteCharacterHandler(
  */
 async function getProjectSettingsHandler(
   request: FastifyRequest<{ Params: DetectCharactersParams }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const { projectId } = request.params;
   const user = request.user!;
@@ -795,7 +757,7 @@ async function updateProjectSettingsHandler(
     Params: DetectCharactersParams;
     Body: ProjectSettingsInput;
   }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const { projectId } = request.params;
   const user = request.user!;
@@ -858,7 +820,7 @@ async function updateProjectSettingsHandler(
 // ============================================================================
 
 export async function charactersRoutes(
-  fastify: FastifyInstance,
+  fastify: FastifyInstance
 ): Promise<void> {
   // All routes require authentication
 
@@ -869,7 +831,7 @@ export async function charactersRoutes(
       onRequest: authenticate,
       preValidation: validateParams(projectIdParamsSchema),
     },
-    detectCharactersHandler,
+    detectCharactersHandler
   );
 
   // Import characters after review
@@ -882,7 +844,7 @@ export async function charactersRoutes(
         validateBody(importCharactersSchema),
       ],
     },
-    importCharactersHandler,
+    importCharactersHandler
   );
 
   // List characters for project
@@ -892,7 +854,7 @@ export async function charactersRoutes(
       onRequest: authenticate,
       preValidation: validateParams(projectIdParamsSchema),
     },
-    listCharactersHandler,
+    listCharactersHandler
   );
 
   // Get project settings
@@ -902,7 +864,7 @@ export async function charactersRoutes(
       onRequest: authenticate,
       preValidation: validateParams(projectIdParamsSchema),
     },
-    getProjectSettingsHandler,
+    getProjectSettingsHandler
   );
 
   // Update project settings
@@ -915,7 +877,7 @@ export async function charactersRoutes(
         validateBody(projectSettingsSchema),
       ],
     },
-    updateProjectSettingsHandler,
+    updateProjectSettingsHandler
   );
 
   // Get single character
@@ -925,7 +887,7 @@ export async function charactersRoutes(
       onRequest: authenticate,
       preValidation: validateParams(characterIdParamsSchema),
     },
-    getCharacterHandler,
+    getCharacterHandler
   );
 
   // Create character
@@ -938,7 +900,7 @@ export async function charactersRoutes(
         validateBody(createCharacterSchema),
       ],
     },
-    createCharacterHandler,
+    createCharacterHandler
   );
 
   // Update character
@@ -951,7 +913,7 @@ export async function charactersRoutes(
         validateBody(updateCharacterSchema),
       ],
     },
-    updateCharacterHandler,
+    updateCharacterHandler
   );
 
   // Delete character
@@ -961,7 +923,6 @@ export async function charactersRoutes(
       onRequest: authenticate,
       preValidation: validateParams(characterIdParamsSchema),
     },
-    deleteCharacterHandler,
+    deleteCharacterHandler
   );
 }
-

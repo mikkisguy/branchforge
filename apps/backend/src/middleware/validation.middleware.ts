@@ -33,7 +33,7 @@ import { ValidationError } from "./error-handler.middleware.js";
  * ```
  */
 export function validateBody<T extends z.ZodTypeAny>(
-  schema: T,
+  schema: T
 ): (request: FastifyRequest, reply: FastifyReply) => Promise<void> {
   return async (request: FastifyRequest) => {
     try {
@@ -67,7 +67,7 @@ export function validateBody<T extends z.ZodTypeAny>(
  * ```
  */
 export function validateQuery<T extends z.ZodTypeAny>(
-  schema: T,
+  schema: T
 ): (request: FastifyRequest, reply: FastifyReply) => Promise<void> {
   return async (request: FastifyRequest) => {
     try {
@@ -99,7 +99,7 @@ export function validateQuery<T extends z.ZodTypeAny>(
  * ```
  */
 export function validateParams<T extends z.ZodTypeAny>(
-  schema: T,
+  schema: T
 ): (request: FastifyRequest, reply: FastifyReply) => Promise<void> {
   return async (request: FastifyRequest) => {
     try {
@@ -136,7 +136,7 @@ export function validateParams<T extends z.ZodTypeAny>(
 export function validateRequest<
   BodySchema extends z.ZodTypeAny = z.ZodNever,
   QuerySchema extends z.ZodTypeAny = z.ZodNever,
-  ParamsSchema extends z.ZodTypeAny = z.ZodNever,
+  ParamsSchema extends z.ZodTypeAny = z.ZodNever
 >(options: {
   body?: BodySchema;
   query?: QuerySchema;
@@ -195,7 +195,7 @@ export function validateRequest<
  * ```
  */
 export function validateHeaders<T extends z.ZodTypeAny>(
-  schema: T,
+  schema: T
 ): (request: FastifyRequest, reply: FastifyReply) => Promise<void> {
   return async (request: FastifyRequest) => {
     try {
@@ -219,4 +219,3 @@ export function validateHeaders<T extends z.ZodTypeAny>(
 
 // Re-export canonical validation helpers for consumers that import from middleware.
 export { validateData, safeValidateData } from "../lib/validation.js";
-

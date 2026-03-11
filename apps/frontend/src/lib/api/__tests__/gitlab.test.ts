@@ -36,7 +36,7 @@ describe("GitLab API Client", () => {
         expect.objectContaining({
           method: "POST",
           body: JSON.stringify({ token: "glpat-test123" }),
-        }),
+        })
       );
     });
 
@@ -48,7 +48,7 @@ describe("GitLab API Client", () => {
 
       await gitlabApi.validateToken(
         "glpat-test123",
-        "https://gitlab.example.com",
+        "https://gitlab.example.com"
       );
 
       expect(mockFetch).toHaveBeenCalledWith(
@@ -58,7 +58,7 @@ describe("GitLab API Client", () => {
             token: "glpat-test123",
             gitlabUrl: "https://gitlab.example.com",
           }),
-        }),
+        })
       );
     });
 
@@ -69,7 +69,7 @@ describe("GitLab API Client", () => {
       } as Response);
 
       await expect(gitlabApi.validateToken("glpat-invalid")).rejects.toThrow(
-        "Invalid GitLab token",
+        "Invalid GitLab token"
       );
     });
 
@@ -87,7 +87,7 @@ describe("GitLab API Client", () => {
 
     it("should reject invalid token format", async () => {
       await expect(gitlabApi.validateToken("invalid-format")).rejects.toThrow(
-        "Token must start with glpat-",
+        "Token must start with glpat-"
       );
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -110,7 +110,7 @@ describe("GitLab API Client", () => {
           body: JSON.stringify({
             token: "glpat-test123",
           }),
-        }),
+        })
       );
     });
 
@@ -123,7 +123,7 @@ describe("GitLab API Client", () => {
 
       await gitlabApi.storeIntegration(
         "glpat-test123",
-        "https://gitlab.example.com",
+        "https://gitlab.example.com"
       );
 
       expect(mockFetch).toHaveBeenCalledWith(
@@ -133,7 +133,7 @@ describe("GitLab API Client", () => {
             token: "glpat-test123",
             gitlabUrl: "https://gitlab.example.com",
           }),
-        }),
+        })
       );
     });
   });
@@ -151,7 +151,7 @@ describe("GitLab API Client", () => {
         expect.stringContaining("/gitlab/integration"),
         expect.objectContaining({
           method: "DELETE",
-        }),
+        })
       );
     });
   });
@@ -202,7 +202,7 @@ describe("GitLab API Client", () => {
             gitlabProjectId: 12345,
             branch: "main",
           }),
-        }),
+        })
       );
     });
 
@@ -223,7 +223,7 @@ describe("GitLab API Client", () => {
             gitlabProjectId: 12345,
             branch: "main",
           }),
-        }),
+        })
       );
     });
   });
@@ -241,7 +241,7 @@ describe("GitLab API Client", () => {
         expect.stringContaining("/gitlab/unlink/project-123"),
         expect.objectContaining({
           method: "DELETE",
-        }),
+        })
       );
     });
   });
@@ -299,7 +299,7 @@ describe("GitLab API Client", () => {
       const result = await gitlabApi.exportToGitlab(
         "project-123",
         "main",
-        "Test export",
+        "Test export"
       );
 
       expect(result).toEqual(mockOperation);
@@ -312,7 +312,7 @@ describe("GitLab API Client", () => {
             branch: "main",
             commitMessage: "Test export",
           }),
-        }),
+        })
       );
     });
   });
@@ -337,7 +337,7 @@ describe("GitLab API Client", () => {
       const result = await gitlabApi.importFromGitlab(
         "project-123",
         "main",
-        "gitlab_wins",
+        "gitlab_wins"
       );
 
       expect(result).toEqual(mockOperation);
@@ -364,9 +364,9 @@ describe("GitLab API Client", () => {
           expect.any(String),
           expect.objectContaining({
             body: expect.stringContaining(
-              `"conflictResolution":"${resolution}"`,
+              `"conflictResolution":"${resolution}"`
             ),
-          }),
+          })
         );
       }
     });
@@ -517,7 +517,7 @@ describe("GitLab API Client", () => {
         gitlabApi.pollOperation("op-123", onUpdate, {
           interval: 20,
           timeout: 50,
-        }),
+        })
       ).rejects.toThrow("Operation polling timed out");
 
       // Should have called update at least once before timeout
@@ -525,4 +525,3 @@ describe("GitLab API Client", () => {
     });
   });
 });
-

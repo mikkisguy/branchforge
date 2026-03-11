@@ -39,7 +39,7 @@ export const gitlabIntegrations = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (table) => [unique("gitlab_integrations_user_id_unique").on(table.userId)],
+  (table) => [unique("gitlab_integrations_user_id_unique").on(table.userId)]
 );
 
 /**
@@ -66,8 +66,11 @@ export const gitlabFiles = pgTable(
   },
   (table) => [
     index("gitlab_files_project_id_idx").on(table.projectId),
-    unique("gitlab_files_project_file_uidx").on(table.projectId, table.filePath),
-  ],
+    unique("gitlab_files_project_file_uidx").on(
+      table.projectId,
+      table.filePath
+    ),
+  ]
 );
 
 /**
@@ -93,7 +96,7 @@ export const gitlabFileSyncState = pgTable(
   (table) => [
     index("gitlab_file_sync_state_gitlab_file_id_idx").on(table.gitlabFileId),
     index("gitlab_file_sync_state_status_idx").on(table.status),
-  ],
+  ]
 );
 
 /**
@@ -116,13 +119,13 @@ export const gitlabRepositories = pgTable(
   (table) => [
     index("gitlab_repositories_project_id_idx").on(table.projectId),
     index("gitlab_repositories_gitlab_project_id_idx").on(
-      table.gitlabProjectId,
+      table.gitlabProjectId
     ),
     unique("gitlab_repositories_project_gitlab_project_uidx").on(
       table.projectId,
-      table.gitlabProjectId,
+      table.gitlabProjectId
     ),
-  ],
+  ]
 );
 
 /**
@@ -146,7 +149,7 @@ export const gitlabSyncOperations = pgTable(
   (table) => [
     index("gitlab_sync_operations_project_id_idx").on(table.projectId),
     index("gitlab_sync_operations_status_idx").on(table.status),
-  ],
+  ]
 );
 
 // Types
@@ -164,4 +167,3 @@ export type NewGitlabFile = typeof gitlabFiles.$inferInsert;
 
 export type GitlabFileSyncState = typeof gitlabFileSyncState.$inferSelect;
 export type NewGitlabFileSyncState = typeof gitlabFileSyncState.$inferInsert;
-

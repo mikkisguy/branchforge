@@ -15,7 +15,7 @@ interface GitLabFileTreeProps {
  * Group files by folder structure
  */
 function groupFilesByFolder(
-  files: GitLabFileNode[],
+  files: GitLabFileNode[]
 ): Map<string, GitLabFileNode[]> {
   const grouped = new Map<string, GitLabFileNode[]>();
 
@@ -48,7 +48,7 @@ export function GitLabFileTree({
 }: GitLabFileTreeProps) {
   // Track expanded folders and files
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
-    () => new Set(initialExpandedFolders ?? []),
+    () => new Set(initialExpandedFolders ?? [])
   );
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
 
@@ -175,4 +175,3 @@ export function GitLabFileTree({
     </div>
   );
 }
-

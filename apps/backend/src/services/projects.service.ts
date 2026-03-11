@@ -7,7 +7,7 @@
 import { getDb } from "../db/index.js";
 import { projects, projectUsers } from "../db/schema/index.js";
 import { eq, and } from "drizzle-orm";
-import type { Project, NewProject } from "../db/schema/tables/projects.js";
+import type { NewProject } from "../db/schema/tables/projects.js";
 import type { UserRole } from "@branchforge/shared";
 
 /**
@@ -46,7 +46,7 @@ type SharedProjectRow = ProjectRow & { role: UserRole };
  */
 function toPublicProject(
   project: ProjectRow,
-  visibility: UserRole,
+  visibility: UserRole
 ): PublicProject {
   return {
     id: project.id,
@@ -85,7 +85,7 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
 
   // Get projects shared with the user via project_users junction table
   // Include the user's role from the junction table
-  const sharedProjectsResult = await db
+  const sharedProjectsResult = (await db
     .select({
       id: projects.id,
       name: projects.name,
@@ -98,7 +98,7 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
     .from(projects)
     .innerJoin(projectUsers, eq(projectUsers.projectId, projects.id))
     .where(eq(projectUsers.userId, userId))
-    .orderBy(projects.createdAt) as SharedProjectRow[];
+    .orderBy(projects.createdAt)) as SharedProjectRow[];
 
   // Combine both lists, removing duplicates
   // Owned projects take priority over shared projects
@@ -116,7 +116,7 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
       // Runtime guard: role should always be present due to inner join
       if (shared.role == null) {
         throw new Error(
-          `Shared project ${shared.id} is missing role in project_users junction table`,
+          `Shared project ${shared.id} is missing role in project_users junction table`
         );
       }
       result.push(toPublicProject(shared, shared.role));
@@ -134,7 +134,7 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
  */
 export async function getProject(
   projectId: string,
-  userId: string,
+  userId: string
 ): Promise<PublicProject | null> {
   const db = getDb();
 
@@ -188,7 +188,7 @@ export async function getProject(
  */
 export async function createProject(
   userId: string,
-  body: CreateProjectBody,
+  body: CreateProjectBody
 ): Promise<PublicProject> {
   const db = getDb();
 
@@ -203,10 +203,9 @@ export async function createProject(
 
   if (!result || result.length === 0 || !result[0]) {
     throw new Error(
-      "Failed to create project: database insert returned no rows",
+      "Failed to create project: database insert returned no rows"
     );
   }
 
   return toPublicProject(result[0]!, "OWNER");
 }
-

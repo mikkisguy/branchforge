@@ -54,7 +54,7 @@ interface AllSettingsResponse {
  */
 async function getSignUpStatusHandler(
   _request: FastifyRequest,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const enabled = await getAdminSetting("sign_ups_enabled");
   reply.send({ enabled: enabled !== false } as SignUpStatusResponse);
@@ -70,7 +70,7 @@ async function getSignUpStatusHandler(
  */
 async function getAllSettingsHandler(
   request: FastifyRequest,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const db = getDb();
   const settings = await db.select().from(adminSettings);
@@ -95,7 +95,7 @@ async function updateSettingHandler(
     Params: UpdateSettingParams;
     Body: UpdateSettingBody;
   }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const { key } = request.params;
   const { value } = request.body;
@@ -111,7 +111,7 @@ async function updateSettingHandler(
 // ============================================================================
 
 export async function adminSettingsRoutes(
-  fastify: FastifyInstance,
+  fastify: FastifyInstance
 ): Promise<void> {
   // Public routes
   fastify.get("/public/settings/signups", getSignUpStatusHandler);
@@ -122,7 +122,7 @@ export async function adminSettingsRoutes(
     {
       onRequest: [authenticate, requireRole("OWNER")],
     },
-    getAllSettingsHandler,
+    getAllSettingsHandler
   );
 
   fastify.put<{ Params: UpdateSettingParams; Body: UpdateSettingBody }>(
@@ -130,7 +130,6 @@ export async function adminSettingsRoutes(
     {
       onRequest: [authenticate, requireRole("OWNER")],
     },
-    updateSettingHandler,
+    updateSettingHandler
   );
 }
-

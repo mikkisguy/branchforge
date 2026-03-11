@@ -4,7 +4,15 @@
  * Tests for shutdown functionality in src/lib/shutdown.ts
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  vi,
+  type Mock,
+} from "vitest";
 import type { FastifyInstance } from "fastify";
 import type { DrizzleSessionStore } from "../../services/session-store.service.js";
 import { isShutting, setShuttingState, shutdownForTest } from "../shutdown.js";
@@ -42,8 +50,9 @@ describe("Graceful Shutdown Helpers", () => {
     const dbModule = await import("../../db/index.js");
     closeDb = dbModule.closeDb;
 
-    const rateLimiterModule =
-      await import("../../services/rate-limiter.service.js");
+    const rateLimiterModule = await import(
+      "../../services/rate-limiter.service.js"
+    );
     cleanupRateLimiter = rateLimiterModule.cleanupRateLimiter;
 
     // Create mock server with close method
@@ -157,13 +166,13 @@ describe("Graceful Shutdown Helpers", () => {
       // Verify order: server close → rate limiter → session store → db close
       expect(executionOrder[0]).toBe("server-close-start");
       expect(executionOrder.indexOf("rate-limiter")).toBeGreaterThan(
-        executionOrder.indexOf("server-close-end"),
+        executionOrder.indexOf("server-close-end")
       );
       expect(executionOrder.indexOf("session-store")).toBeGreaterThan(
-        executionOrder.indexOf("rate-limiter"),
+        executionOrder.indexOf("rate-limiter")
       );
       expect(executionOrder.indexOf("db-close-start")).toBeGreaterThan(
-        executionOrder.indexOf("session-store"),
+        executionOrder.indexOf("session-store")
       );
     });
 
@@ -178,7 +187,7 @@ describe("Graceful Shutdown Helpers", () => {
 
       // Should not throw even on error
       await expect(
-        shutdownForTest(mockServer, mockSessionStore),
+        shutdownForTest(mockServer, mockSessionStore)
       ).resolves.toBeUndefined();
 
       // Should still execute other cleanup
@@ -231,4 +240,3 @@ describe("Graceful Shutdown Helpers", () => {
     });
   });
 });
-

@@ -26,7 +26,9 @@ function consolidateChangelogs() {
   for (const pkg of packages) {
     const changelogPath = pkg.changelogPath;
     if (!fs.existsSync(changelogPath)) {
-      console.log(`ℹ️  No CHANGELOG.md found for ${pkg.name} at ${changelogPath}`);
+      console.log(
+        `ℹ️  No CHANGELOG.md found for ${pkg.name} at ${changelogPath}`
+      );
       continue;
     }
 
@@ -34,12 +36,20 @@ function consolidateChangelogs() {
     console.log(`📖 Reading ${pkg.name} changelog from ${changelogPath}`);
 
     // Extract changes for this version (handles both "## 0.1.2" and "## [0.1.2]" formats)
-    const versionRegex = new RegExp(`##\\s*\\[?${version}\\]?\\s*\\n([\\s\\S]*?)(?=##\\s*\\[?\\d|$)`, "i");
+    const versionRegex = new RegExp(
+      `##\\s*\\[?${version}\\]?\\s*\\n([\\s\\S]*?)(?=##\\s*\\[?\\d|$)`,
+      "i"
+    );
     const match = changelog.match(versionRegex);
 
     if (!match || !match[1]) {
       console.log(`⚠️  No version ${version} entry found in ${pkg.name}`);
-      console.log(`   Changelog content preview:\n${changelog.split('\n').slice(0, 10).join('\n')}`);
+      console.log(
+        `   Changelog content preview:\n${changelog
+          .split("\n")
+          .slice(0, 10)
+          .join("\n")}`
+      );
       // Don't delete the changelog if we couldn't parse it
       continue;
     }
@@ -112,7 +122,11 @@ function consolidateChangelogs() {
     }
 
     function addItemByType(type, item) {
-      if (type === "added" || type === "minor changes" || type === "major changes") {
+      if (
+        type === "added" ||
+        type === "minor changes" ||
+        type === "major changes"
+      ) {
         added.push(item);
       } else if (type === "changed") {
         changed.push(item);
@@ -131,10 +145,17 @@ function consolidateChangelogs() {
   }
 
   // Only proceed if we found actual changes to consolidate
-  if (added.length === 0 && changed.length === 0 && fixed.length === 0 &&
-    removed.length === 0 && other.length === 0) {
+  if (
+    added.length === 0 &&
+    changed.length === 0 &&
+    fixed.length === 0 &&
+    removed.length === 0 &&
+    other.length === 0
+  ) {
     console.log(`ℹ️  No changes found to consolidate for v${version}`);
-    console.log(`ℹ️  Package CHANGELOG.md files left unchanged for inspection.`);
+    console.log(
+      `ℹ️  Package CHANGELOG.md files left unchanged for inspection.`
+    );
     process.exit(0);
   }
 

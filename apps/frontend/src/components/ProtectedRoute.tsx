@@ -19,7 +19,9 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to={`${BASE_URL}login`} state={{ from: location }} replace />;
+    return (
+      <Navigate to={`${BASE_URL}login`} state={{ from: location }} replace />
+    );
   }
 
   return <>{children}</>;

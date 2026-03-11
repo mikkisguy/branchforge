@@ -49,7 +49,7 @@ export const routeConfigsApi = {
       `/projects/${encodeURIComponent(projectId)}/routes`,
       {
         method: "GET",
-      },
+      }
     );
     return response.routeConfigs;
   },
@@ -62,7 +62,7 @@ export const routeConfigsApi = {
       `/routes/${encodeURIComponent(routeConfigId)}`,
       {
         method: "GET",
-      },
+      }
     );
     return response.routeConfig;
   },
@@ -72,14 +72,14 @@ export const routeConfigsApi = {
    */
   async createRouteConfig(
     projectId: string,
-    body: CreateRouteConfigBody,
+    body: CreateRouteConfigBody
   ): Promise<RouteConfig> {
     const response = await request<GetRouteConfigResponse>(
       `/projects/${encodeURIComponent(projectId)}/routes`,
       {
         method: "POST",
         body: JSON.stringify(body),
-      },
+      }
     );
     return response.routeConfig;
   },
@@ -89,14 +89,14 @@ export const routeConfigsApi = {
    */
   async updateRouteConfig(
     routeConfigId: string,
-    body: UpdateRouteConfigBody,
+    body: UpdateRouteConfigBody
   ): Promise<RouteConfig> {
     const response = await request<GetRouteConfigResponse>(
       `/routes/${encodeURIComponent(routeConfigId)}`,
       {
         method: "PATCH",
         body: JSON.stringify(body),
-      },
+      }
     );
     return response.routeConfig;
   },

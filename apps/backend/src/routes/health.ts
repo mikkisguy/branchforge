@@ -1,10 +1,10 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from "fastify";
 
 export async function healthRoutes(fastify: FastifyInstance) {
-  fastify.get('/health', async () => {
+  fastify.get("/health", async () => {
     return {
-      status: 'ok',
-      service: 'branchforge-backend',
+      status: "ok",
+      service: "branchforge-backend",
       timestamp: new Date().toISOString(),
     };
   });

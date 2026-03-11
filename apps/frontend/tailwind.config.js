@@ -1,10 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: ["class"],
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   safelist: [
     "bg-[#6c9385]",
     "bg-[#4e95b1]",
@@ -75,7 +72,7 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
         // BranchForge custom palettes
-        "forest": {
+        forest: {
           50: "#f0f9f4",
           100: "#dcf2e8",
           200: "#b5e5cf",
@@ -88,7 +85,7 @@ export default {
           900: "#0c271a",
           950: "#06140d",
         },
-        "periwinkle": {
+        periwinkle: {
           50: "#ecedf9",
           100: "#d8d3",
           200: "#b1b7e7",
@@ -114,7 +111,7 @@ export default {
           900: "#1e0f24",
           950: "#150a1a",
         },
-        "graphite": {
+        graphite: {
           50: "#f8f8f8",
           100: "#e8e8e8",
           200: "#d0d0d0",
@@ -150,4 +147,4 @@ export default {
     },
   },
   plugins: [require("tailwindcss-animate")],
-}
+};

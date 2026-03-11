@@ -24,7 +24,7 @@ export class HttpError extends Error {
   constructor(
     public statusCode: number,
     public message: string,
-    public userMessage: string = message,
+    public userMessage: string = message
   ) {
     super(message);
     this.name = this.constructor.name;
@@ -39,10 +39,7 @@ export class HttpError extends Error {
  * Use when input validation fails (e.g., from Zod schemas)
  */
 export class ValidationError extends HttpError {
-  constructor(
-    message: string = "Validation failed",
-    public details?: unknown,
-  ) {
+  constructor(message: string = "Validation failed", public details?: unknown) {
     super(400, message, "Invalid request data");
     this.name = "ValidationError";
   }
@@ -99,7 +96,7 @@ export class ConflictError extends HttpError {
 export class RateLimitError extends HttpError {
   constructor(
     public retryAfter?: number,
-    message: string = "Too many requests",
+    message: string = "Too many requests"
   ) {
     super(429, message, "Too many requests, please try again later");
     this.name = "RateLimitError";
@@ -199,7 +196,7 @@ export function logAuthError(context: string, error: unknown): void {
 export function globalErrorHandler(
   error: FastifyError,
   request: FastifyRequest,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): void {
   const route = `${request.method} ${request.url}`;
 
@@ -278,4 +275,3 @@ export function globalErrorHandler(
 
   reply.status(500).send(response);
 }
-

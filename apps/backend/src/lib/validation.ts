@@ -96,7 +96,7 @@ export const passwordSchema = z.preprocess(
   z
     .string()
     .min(8, "Password must be at least 8 characters")
-    .max(128, "Password is too long"),
+    .max(128, "Password is too long")
 );
 
 /**
@@ -145,7 +145,7 @@ export const labelStatusSchema = z.enum(
   [LabelStatus.DRAFT, LabelStatus.REVIEW, LabelStatus.FINAL],
   {
     message: "Status must be DRAFT, REVIEW, or FINAL",
-  },
+  }
 );
 
 /**
@@ -158,7 +158,7 @@ export const routeConfigKeySchema = z
   .max(50, "Route key is too long")
   .regex(
     ROUTE_KEY_REGEX,
-    "Route key must contain only letters, numbers, underscores, and hyphens",
+    "Route key must contain only letters, numbers, underscores, and hyphens"
   );
 
 /**
@@ -168,7 +168,7 @@ export const contentTypeSchema = z.enum(
   ["NARRATION", "DIALOGUE", "CHOICE", "MENU", "JUMP"],
   {
     message: "Content type must be NARRATION, DIALOGUE, CHOICE, MENU, or JUMP",
-  },
+  }
 );
 
 /**
@@ -185,7 +185,7 @@ export const elementTypeSchema = z.enum(
   ["LOCATION", "ITEM", "CONCEPT", "EVENT"],
   {
     message: "Element type must be LOCATION, ITEM, CONCEPT, or EVENT",
-  },
+  }
 );
 
 /**
@@ -196,7 +196,7 @@ export const suggestionTypeSchema = z.enum(
   {
     message:
       "Suggestion type must be CONSISTENCY, FLAG_SUGGEST, METER_SUGGEST, or DIALOGUE_VARIANT",
-  },
+  }
 );
 
 /**
@@ -206,7 +206,7 @@ export const suggestionStatusSchema = z.enum(
   ["PENDING", "ACCEPTED", "REJECTED"],
   {
     message: "Suggestion status must be PENDING, ACCEPTED, or REJECTED",
-  },
+  }
 );
 
 /**
@@ -217,7 +217,7 @@ export const characterRoleSchema = z.enum(
   {
     message:
       "Character role must be PRIMARY, SECONDARY, BACKGROUND, or MENTIONED",
-  },
+  }
 );
 
 /**
@@ -227,7 +227,7 @@ export const labelVisibilitySchema = z.enum(
   ["EXCLUSIVE", "SHARED", "DUO_PAIR"],
   {
     message: "Label visibility must be EXCLUSIVE, SHARED, or DUO_PAIR",
-  },
+  }
 );
 
 /**
@@ -244,7 +244,7 @@ export const syncStatusSchema = z.enum(
   ["SYNCED", "MODIFIED_LOCAL", "CONFLICT"],
   {
     message: "Sync status must be SYNCED, MODIFIED_LOCAL, or CONFLICT",
-  },
+  }
 );
 
 // ============================================================================
@@ -361,7 +361,7 @@ export const updateLabelDialogueBodySchema = z
         z.object({
           speaker: z.string().nullable(),
           text: z.string().min(1, "Dialogue text cannot be empty"),
-        }),
+        })
       )
       .min(1, "At least one dialogue entry is required"),
   })
@@ -384,7 +384,7 @@ export const createRouteConfigSchema = z
       .max(50, "Jump prefix is too long")
       .regex(
         JUMP_PREFIX_REGEX,
-        "Jump prefix must contain only letters, numbers, underscores, and hyphens",
+        "Jump prefix must contain only letters, numbers, underscores, and hyphens"
       ),
     sortOrder: z.number().int().min(0).max(9999).optional(),
     isShared: z.boolean().optional(),
@@ -404,7 +404,7 @@ export const updateRouteConfigSchema = z
       .max(50, "Jump prefix is too long")
       .regex(
         JUMP_PREFIX_REGEX,
-        "Jump prefix must contain only letters, numbers, underscores, and hyphens",
+        "Jump prefix must contain only letters, numbers, underscores, and hyphens"
       )
       .optional(),
     sortOrder: z.number().int().min(0).max(9999).optional(),
@@ -438,7 +438,10 @@ export const renpyTagSchema = z
   .string()
   .min(1, "Character tag is required")
   .max(50, "Character tag is too long")
-  .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, "Character tag must start with letter/underscore and contain only letters, numbers, and underscores");
+  .regex(
+    /^[a-zA-Z_][a-zA-Z0-9_]*$/,
+    "Character tag must start with letter/underscore and contain only letters, numbers, and underscores"
+  );
 
 /**
  * Color hex validation schema
@@ -505,14 +508,18 @@ export const updateCharacterSchema = z
  */
 export const importCharactersSchema = z
   .object({
-    characters: z.array(z.object({
-      tag: renpyTagSchema,
-      name: z.string().nullable(),
-      displayName: requiredString(200, "Display name is too long"),
-      color: colorHexSchema,
-      isLoveInterest: z.boolean().optional(),
-      routeAffiliation: optionalString(50),
-    })).min(1, "At least one character is required"),
+    characters: z
+      .array(
+        z.object({
+          tag: renpyTagSchema,
+          name: z.string().nullable(),
+          displayName: requiredString(200, "Display name is too long"),
+          color: colorHexSchema,
+          isLoveInterest: z.boolean().optional(),
+          routeAffiliation: optionalString(50),
+        })
+      )
+      .min(1, "At least one character is required"),
     excludedTags: z.array(renpyTagSchema).default([]),
     linkToLines: z.boolean().default(true),
   })
@@ -589,7 +596,7 @@ export const gitlabUrlSchema = z
         return false;
       }
     },
-    { message: "Private/local URLs are not allowed" },
+    { message: "Private/local URLs are not allowed" }
   )
   .refine(
     (url) => {
@@ -604,7 +611,7 @@ export const gitlabUrlSchema = z
     },
     {
       message: "Only HTTPS URLs to gitlab.com or GitLab instances are allowed",
-    },
+    }
   );
 
 /**
@@ -716,7 +723,7 @@ export type UpdateRouteConfigInput = z.infer<typeof updateRouteConfigSchema>;
 export function validateData<T extends z.ZodTypeAny>(
   data: unknown,
   schema: T,
-  errorMessage: string = "Validation failed",
+  errorMessage: string = "Validation failed"
 ): z.infer<T> {
   try {
     return schema.parse(data);
@@ -748,7 +755,7 @@ export function validateData<T extends z.ZodTypeAny>(
  */
 export function safeValidateData<T extends z.ZodTypeAny>(
   data: unknown,
-  schema: T,
+  schema: T
 ): { success: true; data: z.infer<T> } | { success: false; error: z.ZodError } {
   const result = schema.safeParse(data);
 
@@ -758,4 +765,3 @@ export function safeValidateData<T extends z.ZodTypeAny>(
 
   return { success: false, error: result.error };
 }
-

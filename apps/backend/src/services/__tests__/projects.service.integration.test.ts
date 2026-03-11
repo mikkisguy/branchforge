@@ -17,7 +17,6 @@ import {
   projectUsers,
   type NewUser,
   type NewProject,
-  type NewProjectUser,
 } from "../../db/schema/index.js";
 import { eq, and, inArray } from "drizzle-orm";
 import {
@@ -82,7 +81,9 @@ describe("ProjectsService (Integration)", () => {
     const testUserIds = [testUserId, otherUserId, thirdUserId];
 
     // Delete all projectUsers entries for test users
-    await db.delete(projectUsers).where(inArray(projectUsers.userId, testUserIds));
+    await db
+      .delete(projectUsers)
+      .where(inArray(projectUsers.userId, testUserIds));
 
     // Delete ALL projects owned by test users (covers fixture projects + any created during tests)
     await db.delete(projects).where(inArray(projects.userId, testUserIds));
@@ -281,8 +282,8 @@ describe("ProjectsService (Integration)", () => {
         .where(
           and(
             eq(projectUsers.projectId, sharedProject.id!),
-            eq(projectUsers.userId, testUserId),
-          ),
+            eq(projectUsers.userId, testUserId)
+          )
         );
       await db.insert(projectUsers).values({
         projectId: sharedProject.id!,
@@ -395,18 +396,17 @@ describe("ProjectsService (Integration)", () => {
       expect(project.createdAt).toBeInstanceOf(Date);
       expect(project.updatedAt).toBeInstanceOf(Date);
       expect(project.createdAt.getTime()).toBeGreaterThanOrEqual(
-        beforeCreate.getTime(),
+        beforeCreate.getTime()
       );
       expect(project.createdAt.getTime()).toBeLessThanOrEqual(
-        afterCreate.getTime(),
+        afterCreate.getTime()
       );
       expect(project.updatedAt.getTime()).toBeGreaterThanOrEqual(
-        beforeCreate.getTime(),
+        beforeCreate.getTime()
       );
       expect(project.updatedAt.getTime()).toBeLessThanOrEqual(
-        afterCreate.getTime(),
+        afterCreate.getTime()
       );
     });
   });
 });
-

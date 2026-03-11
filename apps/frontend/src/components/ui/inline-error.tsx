@@ -21,7 +21,7 @@ export function InlineMessage({
         variant === "error"
           ? "bg-destructive/10 text-destructive-muted"
           : "bg-green-500/10 text-green-600 dark:text-green-400",
-        className,
+        className
       )}
     >
       {icon &&

@@ -5,11 +5,11 @@
  * Replaces the SettingsContext with optimistic updates via onMutate/onError.
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { settingsApi } from '@/lib/api/settings';
-import { settingsKeys } from '@/lib/query-keys';
-import { useToast } from '@/contexts/ToastContext';
-import type { PublicUser } from '@/lib/api/auth';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { settingsApi } from "@/lib/api/settings";
+import { settingsKeys } from "@/lib/query-keys";
+import { useToast } from "@/contexts/ToastContext";
+import type { PublicUser } from "@/lib/api/auth";
 
 // ============================================================================
 // Types
@@ -37,14 +37,14 @@ export function useSettings(): UseSettingsReturn {
   const toast = useToast();
 
   // Get current user from auth query cache
-  const authQuery = queryClient.getQueryData<{ user: PublicUser }>(['auth', 'user']);
+  const authQuery = queryClient.getQueryData<{ user: PublicUser }>([
+    "auth",
+    "user",
+  ]);
   const user = authQuery?.user ?? null;
 
   // Query for sign-ups status
-  const {
-    data: signUpStatus,
-    isLoading,
-  } = useQuery({
+  const { data: signUpStatus, isLoading } = useQuery({
     queryKey: settingsKeys.signUps(),
     queryFn: async () => {
       const status = await settingsApi.getSignUpStatus();
@@ -58,10 +58,10 @@ export function useSettings(): UseSettingsReturn {
   // Update sign-ups setting mutation with optimistic updates
   const updateMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
-      if (user?.role !== 'OWNER') {
-        throw new Error('Only administrators can change this setting');
+      if (user?.role !== "OWNER") {
+        throw new Error("Only administrators can change this setting");
       }
-      await settingsApi.updateSetting('sign_ups_enabled', enabled);
+      await settingsApi.updateSetting("sign_ups_enabled", enabled);
       return enabled;
     },
     onMutate: async (enabled) => {
@@ -69,7 +69,9 @@ export function useSettings(): UseSettingsReturn {
       await queryClient.cancelQueries({ queryKey: settingsKeys.signUps() });
 
       // Snapshot the previous value
-      const previousValue = queryClient.getQueryData<boolean>(settingsKeys.signUps());
+      const previousValue = queryClient.getQueryData<boolean>(
+        settingsKeys.signUps()
+      );
 
       // Optimistically update to the new value
       queryClient.setQueryData<boolean>(settingsKeys.signUps(), enabled);
@@ -80,17 +82,20 @@ export function useSettings(): UseSettingsReturn {
     onError: (_error, _variables, context) => {
       // Rollback to the previous value on error
       if (context?.previousValue !== undefined) {
-        queryClient.setQueryData<boolean>(settingsKeys.signUps(), context.previousValue);
+        queryClient.setQueryData<boolean>(
+          settingsKeys.signUps(),
+          context.previousValue
+        );
       }
       toast.error(
-        'Failed to update setting. The original value has been restored.',
-        'Error'
+        "Failed to update setting. The original value has been restored.",
+        "Error"
       );
     },
     onSuccess: (enabled) => {
       toast.success(
-        enabled ? 'Sign-ups have been enabled' : 'Sign-ups have been disabled',
-        'Setting saved'
+        enabled ? "Sign-ups have been enabled" : "Sign-ups have been disabled",
+        "Setting saved"
       );
     },
     onSettled: () => {

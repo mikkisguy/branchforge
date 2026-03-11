@@ -59,7 +59,7 @@ interface ErrorResponse {
  */
 async function listProjectsHandler(
   request: FastifyRequest,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const user = request.user!;
 
@@ -76,7 +76,7 @@ async function listProjectsHandler(
  */
 async function getProjectHandler(
   request: FastifyRequest<{ Params: GetProjectParams }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const { projectId } = request.params;
   const user = request.user!;
@@ -99,7 +99,7 @@ async function getProjectHandler(
  */
 async function createProjectHandler(
   request: FastifyRequest<{ Body: CreateProjectInput }>,
-  reply: FastifyReply,
+  reply: FastifyReply
 ): Promise<void> {
   const user = request.user!;
   const body = request.body;
@@ -122,7 +122,7 @@ export async function projectsRoutes(fastify: FastifyInstance): Promise<void> {
       onRequest: authenticate,
       preValidation: validateParams(projectIdParamsSchema),
     },
-    getProjectHandler,
+    getProjectHandler
   );
   fastify.post<{ Body: CreateProjectInput }>(
     "/projects",
@@ -130,7 +130,6 @@ export async function projectsRoutes(fastify: FastifyInstance): Promise<void> {
       onRequest: authenticate,
       preValidation: validateBody(createProjectSchema),
     },
-    createProjectHandler,
+    createProjectHandler
   );
 }
-

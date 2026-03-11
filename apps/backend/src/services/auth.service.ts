@@ -4,12 +4,12 @@
  * Handles password hashing, user registration, and credential validation.
  */
 
-import bcrypt from 'bcrypt';
-import { getDb } from '../db/index.js';
-import { users } from '../db/schema/index.js';
-import { eq } from 'drizzle-orm';
-import { isSignUpsEnabled } from './admin-settings.service.js';
-import type { PublicUser } from '@branchforge/shared';
+import bcrypt from "bcrypt";
+import { getDb } from "../db/index.js";
+import { users } from "../db/schema/index.js";
+import { eq } from "drizzle-orm";
+import { isSignUpsEnabled } from "./admin-settings.service.js";
+import type { PublicUser } from "@branchforge/shared";
 
 export type { PublicUser };
 
@@ -30,7 +30,10 @@ export async function hashPassword(password: string): Promise<string> {
 /**
  * Validate a password against a hash
  */
-export async function validatePassword(password: string, hash: string): Promise<boolean> {
+export async function validatePassword(
+  password: string,
+  hash: string
+): Promise<boolean> {
   if (!password) {
     return false;
   }
@@ -40,28 +43,34 @@ export async function validatePassword(password: string, hash: string): Promise<
 /**
  * Register a new user (only allowed once - single user setup)
  */
-export async function register(email: string, password: string): Promise<PublicUser> {
+export async function register(
+  email: string,
+  password: string
+): Promise<PublicUser> {
   // Validate email format
   if (!email || !EMAIL_REGEX.test(email)) {
-    throw new Error('Invalid email format');
+    throw new Error("Invalid email format");
   }
 
   // Validate password strength
   if (!password || password.length < MIN_PASSWORD_LENGTH) {
-    throw new Error('Password must be at least 8 characters');
+    throw new Error("Password must be at least 8 characters");
   }
 
   const db = getDb();
 
   // Check if signups are enabled
   if (!(await isSignUpsEnabled())) {
-    throw new Error('Registration is currently disabled');
+    throw new Error("Registration is currently disabled");
   }
 
   // Check if email is already registered
-  const emailExists = await db.select().from(users).where(eq(users.email, email));
+  const emailExists = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, email));
   if (emailExists.length > 0) {
-    throw new Error('Email already registered');
+    throw new Error("Email already registered");
   }
 
   // Hash the password
@@ -73,26 +82,29 @@ export async function register(email: string, password: string): Promise<PublicU
     .values({
       email,
       passwordHash,
-      role: 'OWNER',
+      role: "OWNER",
     })
     .returning({ id: users.id, email: users.email, role: users.role });
 
   if (result.length === 0) {
-    throw new Error('Failed to create user');
+    throw new Error("Failed to create user");
   }
 
   const user = result[0];
   return {
     id: user.id,
     email: user.email,
-    role: user.role ?? 'OWNER',
+    role: user.role ?? "OWNER",
   };
 }
 
 /**
  * Validate user credentials for login
  */
-export async function validateCredentials(email: string, password: string): Promise<PublicUser | null> {
+export async function validateCredentials(
+  email: string,
+  password: string
+): Promise<PublicUser | null> {
   const db = getDb();
 
   const result = await db
@@ -119,6 +131,6 @@ export async function validateCredentials(email: string, password: string): Prom
   return {
     id: user.id,
     email: user.email,
-    role: user.role ?? 'OWNER',
+    role: user.role ?? "OWNER",
   };
 }

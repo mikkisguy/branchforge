@@ -12,7 +12,7 @@
  * - Character definitions
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   parseRPYContent,
   extractLabels,
@@ -427,7 +427,7 @@ label next:
 
       const dialogueOrder = result.dialogue.map((d) => d.text);
       expect(dialogueOrder.indexOf("Hello, world!")).toBeLessThan(
-        dialogueOrder.indexOf("This is chapter 1."),
+        dialogueOrder.indexOf("This is chapter 1.")
       );
     });
 
@@ -436,7 +436,7 @@ label next:
 
       // Choices should have parentLabel information
       const chapter1Choices = result.choices.filter(
-        (c) => c.parentLabel === "chapter1",
+        (c) => c.parentLabel === "chapter1"
       );
       expect(chapter1Choices).toHaveLength(2);
     });
@@ -657,18 +657,12 @@ label a:
         {
           label: "chapter1",
           lineNumber: 5,
-          dialogue: [
-            { speaker: "s", text: "Chapter content", lineNumber: 6 },
-          ],
-          choices: [
-            { label: "Choice 1", target: "route_a", lineNumber: 7 },
-          ],
+          dialogue: [{ speaker: "s", text: "Chapter content", lineNumber: 6 }],
+          choices: [{ label: "Choice 1", target: "route_a", lineNumber: 7 }],
           jumps: [{ to: "ending", lineNumber: 8 }],
         },
       ],
-      characters: [
-        { tag: "s", name: "Sylvie", color: "#c8ffc8" },
-      ],
+      characters: [{ tag: "s", name: "Sylvie", color: "#c8ffc8" }],
       fileType: "STORY" as const,
     };
 
@@ -684,7 +678,7 @@ label chapter1:
       const result = convertToBranchForgeFormatFromLabels(
         parsedData,
         "start",
-        originalContent,
+        originalContent
       );
 
       expect(result.name).toBe("start");
@@ -696,7 +690,7 @@ label chapter1:
       const result = convertToBranchForgeFormatFromLabels(
         parsedData,
         "start",
-        originalContent,
+        originalContent
       );
 
       const dialogueEntry = result.entries.find((e) => e.type === "DIALOGUE");
@@ -709,7 +703,7 @@ label chapter1:
       const result = convertToBranchForgeFormatFromLabels(
         parsedData,
         "start",
-        originalContent,
+        originalContent
       );
 
       const narrationEntry = result.entries.find((e) => e.type === "NARRATION");
@@ -721,7 +715,7 @@ label chapter1:
       const result = convertToBranchForgeFormatFromLabels(
         parsedData,
         "chapter1",
-        originalContent,
+        originalContent
       );
 
       const flagEntry = result.entries.find((e) => e.type === "FLAG");
@@ -734,7 +728,7 @@ label chapter1:
       const result = convertToBranchForgeFormatFromLabels(
         parsedData,
         "chapter1",
-        originalContent,
+        originalContent
       );
 
       const jumpEntry = result.entries.find((e) => e.type === "JUMP");
@@ -746,7 +740,7 @@ label chapter1:
       const result = convertToBranchForgeFormatFromLabels(
         parsedData,
         "nonexistent",
-        originalContent,
+        originalContent
       );
 
       expect(result.name).toBe("nonexistent");
@@ -758,7 +752,7 @@ label chapter1:
       const result = convertToBranchForgeFormatFromLabels(
         parsedData,
         "start",
-        originalContent,
+        originalContent
       );
 
       expect(result.characters).toHaveLength(1);
@@ -784,7 +778,7 @@ label chapter1:
       const result = convertToBranchForgeFormatFromLabels(
         parsedWithEmpty,
         "start",
-        originalContent,
+        originalContent
       );
 
       expect(result.entries).toHaveLength(1);
@@ -819,7 +813,7 @@ label chapter1:
       const result = convertToBranchForgeFormatFromLabels(
         parsed,
         "start",
-        contentWithIndent,
+        contentWithIndent
       );
 
       expect(result.entries[0].indentLevel).toBe(1); // 4 spaces / 4
@@ -886,7 +880,7 @@ label chapter1:
       // Original lines should be preserved when update has fewer entries
       expect(result).toContain('Only one line"');
       // The second original line should still be there (preserved)
-      expect(result).toContain("s \"Original line 2\"");
+      expect(result).toContain('s "Original line 2"');
     });
 
     it("should append extra updated dialogue entries", () => {
@@ -995,4 +989,3 @@ label chapter1:
     });
   });
 });
-

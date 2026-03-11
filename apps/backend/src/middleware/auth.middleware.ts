@@ -6,15 +6,15 @@
  * Includes robust error handling for session storage issues and unexpected errors.
  */
 
-import type { FastifyRequest, FastifyReply } from 'fastify';
-import type { PublicUser, UserRole } from '@branchforge/shared';
+import type { FastifyRequest, FastifyReply } from "fastify";
+import type { PublicUser, UserRole } from "@branchforge/shared";
 
 export type { PublicUser };
 
 /**
  * Extend the Fastify Session type to include user data
  */
-declare module 'fastify' {
+declare module "fastify" {
   interface Session {
     user?: PublicUser;
   }
@@ -48,7 +48,7 @@ function logAuthError(context: string, error: unknown): void {
   if (error instanceof Error) {
     console.error(`Auth error [${context}]:`, error.message);
     // Don't log stack traces in production to avoid leaking implementation details
-    if (process.env.NODE_ENV !== 'production') {
+    if (process.env.NODE_ENV !== "production") {
       console.error(error.stack);
     }
   } else {
@@ -76,10 +76,10 @@ export async function authenticate(
 
     // Check if session exists
     if (!session) {
-      logAuthError('authenticate', 'Session object is undefined');
+      logAuthError("authenticate", "Session object is undefined");
       const error: InternalError = {
-        error: 'Internal Server Error',
-        message: 'Unable to verify authentication',
+        error: "Internal Server Error",
+        message: "Unable to verify authentication",
       };
       reply.status(500).send(error);
       return;
@@ -88,8 +88,8 @@ export async function authenticate(
     // Check if user is in session
     if (!session.user) {
       const error: AuthError = {
-        error: 'Unauthorized',
-        message: 'Authentication required',
+        error: "Unauthorized",
+        message: "Authentication required",
       };
       reply.status(401).send(error);
       return;
@@ -97,11 +97,11 @@ export async function authenticate(
 
     // Validate session user data structure
     if (!session.user.id || !session.user.email || !session.user.role) {
-      logAuthError('authenticate', 'Invalid session user data structure');
+      logAuthError("authenticate", "Invalid session user data structure");
       // Treat invalid session data as not authenticated
       const error: AuthError = {
-        error: 'Unauthorized',
-        message: 'Invalid session',
+        error: "Unauthorized",
+        message: "Invalid session",
       };
       reply.status(401).send(error);
       return;
@@ -111,10 +111,10 @@ export async function authenticate(
     request.user = session.user;
   } catch (error) {
     // Handle unexpected errors (session storage issues, etc.)
-    logAuthError('authenticate', error);
+    logAuthError("authenticate", error);
     const internalError: InternalError = {
-      error: 'Internal Server Error',
-      message: 'Unable to verify authentication',
+      error: "Internal Server Error",
+      message: "Unable to verify authentication",
     };
     reply.status(500).send(internalError);
   }
@@ -151,7 +151,7 @@ export async function optionalAuth(
     // If no user in session or invalid data, continue without error
   } catch (error) {
     // Log error but don't block the request
-    logAuthError('optionalAuth', error);
+    logAuthError("optionalAuth", error);
     // Continue without authentication
   }
 }
@@ -179,10 +179,10 @@ export function requireRole(...allowedRoles: UserRole[]) {
 
       // Check if session exists
       if (!session) {
-        logAuthError('requireRole', 'Session object is undefined');
+        logAuthError("requireRole", "Session object is undefined");
         const error: InternalError = {
-          error: 'Internal Server Error',
-          message: 'Unable to verify authentication',
+          error: "Internal Server Error",
+          message: "Unable to verify authentication",
         };
         reply.status(500).send(error);
         return;
@@ -191,8 +191,8 @@ export function requireRole(...allowedRoles: UserRole[]) {
       // Check if user is authenticated
       if (!session.user) {
         const error: AuthError = {
-          error: 'Unauthorized',
-          message: 'Authentication required',
+          error: "Unauthorized",
+          message: "Authentication required",
         };
         reply.status(401).send(error);
         return;
@@ -200,10 +200,10 @@ export function requireRole(...allowedRoles: UserRole[]) {
 
       // Validate session user data structure
       if (!session.user.id || !session.user.email || !session.user.role) {
-        logAuthError('requireRole', 'Invalid session user data structure');
+        logAuthError("requireRole", "Invalid session user data structure");
         const error: AuthError = {
-          error: 'Unauthorized',
-          message: 'Invalid session',
+          error: "Unauthorized",
+          message: "Invalid session",
         };
         reply.status(401).send(error);
         return;
@@ -212,8 +212,8 @@ export function requireRole(...allowedRoles: UserRole[]) {
       // Check if user has required role
       if (!allowedRoles.includes(session.user.role)) {
         const error: AuthError = {
-          error: 'Forbidden',
-          message: 'Insufficient permissions',
+          error: "Forbidden",
+          message: "Insufficient permissions",
         };
         reply.status(403).send(error);
         return;
@@ -223,10 +223,10 @@ export function requireRole(...allowedRoles: UserRole[]) {
       request.user = session.user;
     } catch (error) {
       // Handle unexpected errors
-      logAuthError('requireRole', error);
+      logAuthError("requireRole", error);
       const internalError: InternalError = {
-        error: 'Internal Server Error',
-        message: 'Unable to verify authorization',
+        error: "Internal Server Error",
+        message: "Unable to verify authorization",
       };
       reply.status(500).send(internalError);
     }

@@ -6,7 +6,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import * as dbModule from "../../db/index.js";
 
 // Mock the label-characters schema table before importing the service
 // This prevents circular dependency issues in the test environment
@@ -27,14 +26,13 @@ import {
   createLabel,
   updateLabel,
   deleteLabel,
-  authorizeLabelAccess,
-  type LabelDetail,
   type LabelLineWithSpeaker,
 } from "../labels.service.js";
 
 // Mock the RPY parser service
-const mockRemoveLabelFromRPYContent = vi.fn().mockImplementation(
-  (content: string, labelName: string) => {
+const mockRemoveLabelFromRPYContent = vi
+  .fn()
+  .mockImplementation((content: string, labelName: string) => {
     // Simple mock implementation that removes the label line
     const lines = content.split("\n");
     return lines
@@ -43,8 +41,7 @@ const mockRemoveLabelFromRPYContent = vi.fn().mockImplementation(
         return !labelMatch || labelMatch[1] !== labelName;
       })
       .join("\n");
-  },
-);
+  });
 
 vi.mock("../rpy-parser.service.js", () => ({
   removeLabelFromRPYContent: (content: string, labelName: string) =>
@@ -61,7 +58,7 @@ const createMockChain = (resolveValue: any) => {
       Object.assign(result, {
         orderBy: vi.fn(() => result),
         limit: vi.fn(() => result),
-      }),
+      })
     ),
     orderBy: vi.fn(() => result),
     limit: vi.fn(() => result),
@@ -317,7 +314,7 @@ describe("LabelsService", () => {
         status: "INVALID_STATUS" as any, // Simulate corrupted DB
       };
       mockSelect.mockImplementation(() =>
-        createMockChain([labelWithInvalidStatus]),
+        createMockChain([labelWithInvalidStatus])
       );
 
       const labels = await listLabels(projectId, userId);
@@ -334,7 +331,7 @@ describe("LabelsService", () => {
         status: "REVIEW",
       };
       mockSelect.mockImplementation(() =>
-        createMockChain([labelWithValidValues]),
+        createMockChain([labelWithValidValues])
       );
 
       const labels = await listLabels(projectId, userId);
@@ -351,7 +348,7 @@ describe("LabelsService", () => {
         status: null,
       };
       mockSelect.mockImplementation(() =>
-        createMockChain([labelWithNullValues]),
+        createMockChain([labelWithNullValues])
       );
 
       const labels = await listLabels(projectId, userId);
@@ -370,7 +367,7 @@ describe("LabelsService", () => {
     it("should create a label with valid data", async () => {
       // Mock project exists and user is owner
       mockSelect.mockImplementation(() =>
-        createMockChain([{ userId: userId }]),
+        createMockChain([{ userId: userId }])
       );
 
       const mockInsert = vi.fn().mockReturnValue({
@@ -410,14 +407,14 @@ describe("LabelsService", () => {
           projectId: "nonexistent-project",
           title: "Test Label",
           labelNumber: 1,
-        }),
+        })
       ).rejects.toThrow("Project");
     });
 
     it("should throw ForbiddenError when user is not project owner", async () => {
       // Mock project exists but user is not owner
       mockSelect.mockImplementation(() =>
-        createMockChain([{ userId: "different-user" }]),
+        createMockChain([{ userId: "different-user" }])
       );
 
       const mockInsert = vi.fn().mockReturnValue({
@@ -432,7 +429,7 @@ describe("LabelsService", () => {
           projectId,
           title: "Test Label",
           labelNumber: 1,
-        }),
+        })
       ).rejects.toThrow("Insufficient permissions");
     });
 
@@ -469,7 +466,7 @@ describe("LabelsService", () => {
 
     it("should set default values for optional fields", async () => {
       mockSelect.mockImplementation(() =>
-        createMockChain([{ userId: userId }]),
+        createMockChain([{ userId: userId }])
       );
 
       const mockInsert = vi.fn().mockReturnValue({
@@ -501,21 +498,21 @@ describe("LabelsService", () => {
             label: { ...mockLabel, title: "Old Title" },
             projectOwnerId: userId,
           },
-        ]),
+        ])
       );
 
       const mockUpdate = vi.fn().mockReturnValue({
         set: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([
-              { ...mockLabel, title: "New Title" },
-            ]),
+            returning: vi
+              .fn()
+              .mockResolvedValue([{ ...mockLabel, title: "New Title" }]),
           }),
         }),
       });
       mockDb.update = mockUpdate;
 
-      const result = await updateLabel(labelId, userId, {
+      const _result = await updateLabel(labelId, userId, {
         title: "New Title",
       });
 
@@ -526,7 +523,7 @@ describe("LabelsService", () => {
       mockSelect.mockImplementation(createEmptyMockChain);
 
       await expect(
-        updateLabel("nonexistent-label", userId, { title: "New Title" }),
+        updateLabel("nonexistent-label", userId, { title: "New Title" })
       ).rejects.toThrow("Label");
     });
 
@@ -537,11 +534,11 @@ describe("LabelsService", () => {
             label: mockLabel,
             projectOwnerId: "different-user",
           },
-        ]),
+        ])
       );
 
       await expect(
-        updateLabel(labelId, userId, { title: "New Title" }),
+        updateLabel(labelId, userId, { title: "New Title" })
       ).rejects.toThrow("Insufficient permissions");
     });
 
@@ -552,15 +549,15 @@ describe("LabelsService", () => {
             label: { ...mockLabel, status: "DRAFT" },
             projectOwnerId: userId,
           },
-        ]),
+        ])
       );
 
       const mockUpdate = vi.fn().mockReturnValue({
         set: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([
-              { ...mockLabel, status: "REVIEW" },
-            ]),
+            returning: vi
+              .fn()
+              .mockResolvedValue([{ ...mockLabel, status: "REVIEW" }]),
           }),
         }),
       });
@@ -615,7 +612,7 @@ describe("LabelsService", () => {
             label: mockLabel,
             projectOwnerId: userId,
           },
-        ]),
+        ])
       );
 
       const mockUpdate = vi.fn().mockReturnValue({
@@ -642,7 +639,7 @@ describe("LabelsService", () => {
       mockSelect.mockImplementation(createEmptyMockChain);
 
       await expect(deleteLabel("nonexistent-label", userId)).rejects.toThrow(
-        "Label",
+        "Label"
       );
     });
 
@@ -653,11 +650,11 @@ describe("LabelsService", () => {
             label: mockLabel,
             projectOwnerId: "different-user",
           },
-        ]),
+        ])
       );
 
       await expect(deleteLabel(labelId, userId)).rejects.toThrow(
-        "Insufficient permissions",
+        "Insufficient permissions"
       );
     });
 
@@ -668,7 +665,7 @@ describe("LabelsService", () => {
             label: mockLabel,
             projectOwnerId: userId,
           },
-        ]),
+        ])
       );
 
       const updateCalls: any[] = [];
@@ -703,7 +700,7 @@ describe("LabelsService", () => {
             label: mockLabel,
             projectOwnerId: userId,
           },
-        ]),
+        ])
       );
 
       let whereClause: any;
@@ -732,7 +729,8 @@ describe("LabelsService", () => {
     });
 
     it("should update gitlab_files.content when label has a gitlabFileId", async () => {
-      const mockContent = 'label chapter1_label1:\n    "Test content"\n    return\nlabel chapter1_label2:\n    "Other content"\n    return';
+      const mockContent =
+        'label chapter1_label1:\n    "Test content"\n    return\nlabel chapter1_label2:\n    "Other content"\n    return';
       const mockLabelWithGitlab = {
         ...mockLabel,
         labelName: "chapter1_label1",
@@ -746,22 +744,25 @@ describe("LabelsService", () => {
             gitlabFileId: "gitlab-file-123",
             gitlabFileContent: mockContent,
           },
-        ]),
+        ])
       );
 
       const updateCalls: any[] = [];
-      const mockUpdate = vi.fn().mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue(undefined),
-        }),
-      }).mockImplementation(() => {
-        updateCalls.push("update");
-        return {
+      const mockUpdate = vi
+        .fn()
+        .mockReturnValue({
           set: vi.fn().mockReturnValue({
             where: vi.fn().mockResolvedValue(undefined),
           }),
-        };
-      });
+        })
+        .mockImplementation(() => {
+          updateCalls.push("update");
+          return {
+            set: vi.fn().mockReturnValue({
+              where: vi.fn().mockResolvedValue(undefined),
+            }),
+          };
+        });
       mockDb.update = mockUpdate;
 
       const mockTransaction = vi.fn().mockImplementation(async (callback) => {
@@ -780,7 +781,7 @@ describe("LabelsService", () => {
       // Verify the removeLabelFromRPYContent function was called
       expect(mockRemoveLabelFromRPYContent).toHaveBeenCalledWith(
         mockContent,
-        "chapter1_label1",
+        "chapter1_label1"
       );
     });
 
@@ -799,22 +800,25 @@ describe("LabelsService", () => {
             gitlabFileId: null,
             gitlabFileContent: null,
           },
-        ]),
+        ])
       );
 
       const updateCalls: any[] = [];
-      const mockUpdate = vi.fn().mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue(undefined),
-        }),
-      }).mockImplementation(() => {
-        updateCalls.push("update");
-        return {
+      const mockUpdate = vi
+        .fn()
+        .mockReturnValue({
           set: vi.fn().mockReturnValue({
             where: vi.fn().mockResolvedValue(undefined),
           }),
-        };
-      });
+        })
+        .mockImplementation(() => {
+          updateCalls.push("update");
+          return {
+            set: vi.fn().mockReturnValue({
+              where: vi.fn().mockResolvedValue(undefined),
+            }),
+          };
+        });
       mockDb.update = mockUpdate;
 
       const mockTransaction = vi.fn().mockImplementation(async (callback) => {

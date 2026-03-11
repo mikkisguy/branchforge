@@ -89,7 +89,7 @@ export function StatusBar({
                 onClick={handleImportClick}
                 className={cn(
                   "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
-                  "hover:bg-muted/50 text-muted-foreground hover:text-foreground",
+                  "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
                 )}
                 title="Import from GitLab"
               >
@@ -100,7 +100,7 @@ export function StatusBar({
                 onClick={handleExportClick}
                 className={cn(
                   "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
-                  "hover:bg-muted/50 text-muted-foreground hover:text-foreground",
+                  "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
                 )}
                 title="Export to GitLab"
               >
@@ -148,4 +148,3 @@ export function StatusBar({
     </>
   );
 }
-

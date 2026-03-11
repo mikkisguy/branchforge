@@ -46,7 +46,7 @@ export function ScriptMode({
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const activeGitLabFile = useMemo(
     () => gitLabFiles.find((f) => f.id === activeFileId) || null,
-    [gitLabFiles, activeFileId],
+    [gitLabFiles, activeFileId]
   );
 
   // Generate file tree from labels
@@ -81,7 +81,7 @@ export function ScriptMode({
   // Memoize file lines to avoid repeated split operations
   const activeFileLines = useMemo(
     () => activeFileContent.split("\n"),
-    [activeFileContent],
+    [activeFileContent]
   );
 
   // Track active file (scene) - for non-GitLab labels
@@ -91,7 +91,7 @@ export function ScriptMode({
   useEffect(() => {
     if (activeLabelId) {
       const fileEntry = Array.from(fileNameToSceneId.entries()).find(
-        ([, sceneId]) => sceneId === activeLabelId,
+        ([, sceneId]) => sceneId === activeLabelId
       );
       if (fileEntry) {
         setActiveFile(fileEntry[0]);
@@ -236,10 +236,7 @@ export function ScriptMode({
           {/* Editor */}
           <StoryPanel className="flex-1 !mt-0">
             {activeGitLabFile ? (
-              <ScriptEditor
-                content={activeFileLines}
-                language="Ren'Py"
-              />
+              <ScriptEditor content={activeFileLines} language="Ren'Py" />
             ) : activeLabel ? (
               <ScriptEditor content={activeLabelContent} language="Ren'Py" />
             ) : (
@@ -311,7 +308,9 @@ export function ScriptMode({
                 {activeLabel?.groupType && activeLabel?.groupValue && (
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
-                    <span>{activeLabel.groupType}: {activeLabel.groupValue}</span>
+                    <span>
+                      {activeLabel.groupType}: {activeLabel.groupValue}
+                    </span>
                   </div>
                 )}
               </div>
@@ -326,8 +325,8 @@ export function ScriptMode({
           activeGitLabFile
             ? activeFileLines.length
             : activeLabel
-              ? activeLabelContent.length || 0
-              : 0
+            ? activeLabelContent.length || 0
+            : 0
         }
         language="Ren'Py"
         themeName={themeName}
@@ -338,4 +337,3 @@ export function ScriptMode({
     </div>
   );
 }
-

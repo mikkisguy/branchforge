@@ -72,7 +72,7 @@ export function GitLabRepositoryLinkingDialog({
   const [showSyncPrompt, setShowSyncPrompt] = useState(false);
   const [linkedProjectId, setLinkedProjectId] = useState<string | null>(null);
   const [linkedProjectName, setLinkedProjectName] = useState<string | null>(
-    null,
+    null
   );
   const [showSyncDialog, setShowSyncDialog] = useState(false);
 
@@ -199,11 +199,11 @@ export function GitLabRepositoryLinkingDialog({
       await gitlabApi.linkRepository(
         request.projectId,
         request.gitlabProjectId,
-        request.branch,
+        request.branch
       );
 
       success(
-        `Successfully linked "${selectedGitlabProject.name}" to your project`,
+        `Successfully linked "${selectedGitlabProject.name}" to your project`
       );
 
       // Store the linked project info and show sync prompt
@@ -243,7 +243,7 @@ export function GitLabRepositoryLinkingDialog({
       project.name.toLowerCase().includes(projectSearch.toLowerCase()) ||
       project.path_with_namespace
         .toLowerCase()
-        .includes(projectSearch.toLowerCase()),
+        .includes(projectSearch.toLowerCase())
   );
 
   // ============================================================================
@@ -526,4 +526,3 @@ export function GitLabRepositoryLinkingDialog({
     </>
   );
 }
-

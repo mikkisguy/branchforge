@@ -107,12 +107,12 @@ export const labels = pgTable(
     // Used for ordering labels within a project
     index("labels_project_sequence_idx").on(
       table.projectId,
-      table.sequenceOrder,
+      table.sequenceOrder
     ),
     // Used for ordering by label number within a project
     index("labels_project_label_number_idx").on(
       table.projectId,
-      table.labelNumber,
+      table.labelNumber
     ),
     // Sync status indexes
     index("labels_sync_status_idx").on(table.syncStatus),
@@ -120,10 +120,9 @@ export const labels = pgTable(
     // Audit trail indexes
     index("labels_created_by_idx").on(table.createdBy),
     index("labels_updated_by_idx").on(table.updatedBy),
-  ],
+  ]
 );
 
 // Types
 export type Label = typeof labels.$inferSelect;
 export type NewLabel = typeof labels.$inferInsert;
-

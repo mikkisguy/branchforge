@@ -121,7 +121,7 @@ describe("GitLabSyncService (Integration)", () => {
   }
 
   // Helper to clean up additional test data (for multi-scene tests)
-  async function cleanupAdditionalData(labelIds: string[]) {
+  async function _cleanupAdditionalData(labelIds: string[]) {
     for (const labelId of labelIds) {
       await db.delete(labelLines).where(eq(labelLines.labelId, labelId));
       await db.delete(labelsTable).where(eq(labelsTable.id, labelId));
@@ -169,7 +169,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       // Mock GitLab API to return the same content (for getFileContent)
       vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
-        'label start:\n    "Same content"\n    return',
+        'label start:\n    "Same content"\n    return'
       );
 
       vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockReturnValue({
@@ -210,7 +210,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       // Mock GitLab API to return different content (for getFileContent)
       vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
-        'label start:\n    "Remote content"\n    return',
+        'label start:\n    "Remote content"\n    return'
       );
 
       vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockReturnValue({
@@ -255,7 +255,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       // Mock GitLab API to return the new label content
       vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
-        'label chapter2:\n    "New chapter"\n    return',
+        'label chapter2:\n    "New chapter"\n    return'
       );
 
       vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockReturnValue({
@@ -299,7 +299,7 @@ describe("GitLabSyncService (Integration)", () => {
         if (callCount === 1) {
           // First call for testGitlabFile - return different label
           return Promise.resolve(
-            'label other:\n    "Other content"\n    return',
+            'label other:\n    "Other content"\n    return'
           );
         }
         return Promise.resolve("");
@@ -327,7 +327,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       // Check that we have the deleted_remote_label conflict
       const deletedConflict = result.conflicts.find(
-        (c) => c.type === "deleted_remote_label",
+        (c) => c.type === "deleted_remote_label"
       );
       expect(deletedConflict).toMatchObject({
         label: "start",
@@ -355,7 +355,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       // Mock GitLab API to return different dialogue
       vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
-        'label start:\n    s "Remote dialogue"\n    return',
+        'label start:\n    s "Remote dialogue"\n    return'
       );
 
       vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockReturnValue({
@@ -404,7 +404,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       // Mock GitLab API to return the same dialogue
       vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
-        'label start:\n    s "Same dialogue"\n    return',
+        'label start:\n    s "Same dialogue"\n    return'
       );
 
       vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockReturnValue({
@@ -510,7 +510,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       // Mock GitLab API to throw error
       vi.spyOn(gitlabService, "getFileContent").mockRejectedValue(
-        new Error("API Error"),
+        new Error("API Error")
       );
 
       const result = await detectConflicts(testProjectId, testBranch);
@@ -583,10 +583,10 @@ describe("GitLabSyncService (Integration)", () => {
       // Mock GitLab API to return matching content for each scene
       vi.spyOn(gitlabService, "getFileContent")
         .mockResolvedValueOnce(
-          'label start:\n    "Line 1"\n    "Line 2"\n    return',
+          'label start:\n    "Line 1"\n    "Line 2"\n    return'
         )
         .mockResolvedValueOnce(
-          'label chapter1:\n    "Chapter 1 Line 1"\n    return',
+          'label chapter1:\n    "Chapter 1 Line 1"\n    return'
         );
 
       // Mock separate file parses for each scene
@@ -650,7 +650,7 @@ describe("GitLabSyncService (Integration)", () => {
       const result = await exportToGitlab(
         testProjectId,
         testBranch,
-        "Test export",
+        "Test export"
       );
 
       expect(result).toMatchObject({
@@ -665,7 +665,7 @@ describe("GitLabSyncService (Integration)", () => {
         testBranch,
         testGitlabFile.filePath,
         testGitlabFile.content,
-        "Test export",
+        "Test export"
       );
     });
 
@@ -684,7 +684,7 @@ describe("GitLabSyncService (Integration)", () => {
       const result = await exportToGitlab(
         testProjectId,
         testBranch,
-        "Test export",
+        "Test export"
       );
 
       expect(result).toMatchObject({
@@ -700,13 +700,13 @@ describe("GitLabSyncService (Integration)", () => {
     it("should handle GitLab API errors", async () => {
       // Mock the GitLab service to throw error
       vi.spyOn(gitlabService, "createOrUpdateFile").mockRejectedValue(
-        new Error("GitLab API Error"),
+        new Error("GitLab API Error")
       );
 
       const result = await exportToGitlab(
         testProjectId,
         testBranch,
-        "Test export",
+        "Test export"
       );
 
       expect(result).toMatchObject({
@@ -759,7 +759,7 @@ describe("GitLabSyncService (Integration)", () => {
       const result = await exportToGitlab(
         testProjectId,
         testBranch,
-        "Test export",
+        "Test export"
       );
 
       expect(result.status).toBe("COMPLETED");
@@ -809,7 +809,7 @@ describe("GitLabSyncService (Integration)", () => {
       const result = await exportToGitlab(
         testProjectId,
         testBranch,
-        "Test export",
+        "Test export"
       );
 
       expect(result.status).toBe("COMPLETED");
@@ -833,7 +833,7 @@ describe("GitLabSyncService (Integration)", () => {
       expect(updatedLine?.isDirty).toBe(false);
       expect(updatedLine?.lastSyncedAt).toBeDefined();
       expect(updatedLine?.lastSyncedAt?.getTime()).toBeGreaterThan(
-        new Date("2024-01-01").getTime(),
+        new Date("2024-01-01").getTime()
       );
     });
   });
@@ -842,14 +842,14 @@ describe("GitLabSyncService (Integration)", () => {
     it("should import files from GitLab", async () => {
       // Mock the GitLab service
       vi.spyOn(gitlabService, "getBranchCommitSha").mockResolvedValue(
-        "abc123def456",
+        "abc123def456"
       );
       vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([
         { name: "script.rpy", path: "game/script.rpy" } as any,
       ]);
 
       vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
-        'label start:\n    "Imported content"\n    return',
+        'label start:\n    "Imported content"\n    return'
       );
 
       vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockReturnValue({
@@ -871,7 +871,7 @@ describe("GitLabSyncService (Integration)", () => {
       const result = await importFromGitlab(
         testProjectId,
         testBranch,
-        "branchforge_wins" as ConflictResolution,
+        "branchforge_wins" as ConflictResolution
       );
 
       expect(result).toMatchObject({
@@ -889,7 +889,7 @@ describe("GitLabSyncService (Integration)", () => {
         .where(eq(gitlabFiles.filePath, "game/script.rpy"));
       expect(gitlabFile).toBeDefined();
       expect(gitlabFile?.content).toBe(
-        'label start:\n    "Imported content"\n    return',
+        'label start:\n    "Imported content"\n    return'
       );
 
       // Verify scene was created with linkage
@@ -913,14 +913,14 @@ describe("GitLabSyncService (Integration)", () => {
 
     it("should handle import from empty repository", async () => {
       vi.spyOn(gitlabService, "getBranchCommitSha").mockResolvedValue(
-        "abc123def456",
+        "abc123def456"
       );
       vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([]);
 
       const result = await importFromGitlab(
         testProjectId,
         testBranch,
-        "branchforge_wins" as ConflictResolution,
+        "branchforge_wins" as ConflictResolution
       );
 
       expect(result).toMatchObject({
@@ -934,14 +934,14 @@ describe("GitLabSyncService (Integration)", () => {
       await db.insert(labelsTable).values(testScene);
 
       vi.spyOn(gitlabService, "getBranchCommitSha").mockResolvedValue(
-        "abc123def456",
+        "abc123def456"
       );
       vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([
         { name: "script.rpy", path: "game/script.rpy" } as any,
       ]);
 
       vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
-        'label start:\n    "Updated from GitLab"\n    return',
+        'label start:\n    "Updated from GitLab"\n    return'
       );
 
       vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockReturnValue({
@@ -963,7 +963,7 @@ describe("GitLabSyncService (Integration)", () => {
       const result = await importFromGitlab(
         testProjectId,
         testBranch,
-        "gitlab_wins" as ConflictResolution,
+        "gitlab_wins" as ConflictResolution
       );
 
       expect(result.status).toBe("COMPLETED");
@@ -975,14 +975,14 @@ describe("GitLabSyncService (Integration)", () => {
       await db.insert(labelsTable).values(testScene);
 
       vi.spyOn(gitlabService, "getBranchCommitSha").mockResolvedValue(
-        "abc123def456",
+        "abc123def456"
       );
       vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([
         { name: "script.rpy", path: "game/script.rpy" } as any,
       ]);
 
       vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
-        'label start:\n    "Conflicting content"\n    return',
+        'label start:\n    "Conflicting content"\n    return'
       );
 
       vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockReturnValue({
@@ -1004,7 +1004,7 @@ describe("GitLabSyncService (Integration)", () => {
       const result = await importFromGitlab(
         testProjectId,
         testBranch,
-        "manual_review" as ConflictResolution,
+        "manual_review" as ConflictResolution
       );
 
       expect(result.status).toBe("COMPLETED");
@@ -1013,16 +1013,16 @@ describe("GitLabSyncService (Integration)", () => {
 
     it("should handle API errors", async () => {
       vi.spyOn(gitlabService, "getBranchCommitSha").mockResolvedValue(
-        "abc123def456",
+        "abc123def456"
       );
       vi.spyOn(gitlabService, "listRpyFiles").mockRejectedValue(
-        new Error("API Error"),
+        new Error("API Error")
       );
 
       const result = await importFromGitlab(
         testProjectId,
         testBranch,
-        "branchforge_wins" as ConflictResolution,
+        "branchforge_wins" as ConflictResolution
       );
 
       expect(result).toMatchObject({
@@ -1033,14 +1033,14 @@ describe("GitLabSyncService (Integration)", () => {
 
     it("should handle invalid RPY content gracefully", async () => {
       vi.spyOn(gitlabService, "getBranchCommitSha").mockResolvedValue(
-        "abc123def456",
+        "abc123def456"
       );
       vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([
         { name: "script.rpy", path: "game/script.rpy" } as any,
       ]);
 
       vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
-        "invalid rpy content",
+        "invalid rpy content"
       );
 
       // Parse should still work, just return empty labels
@@ -1053,11 +1053,10 @@ describe("GitLabSyncService (Integration)", () => {
       const result = await importFromGitlab(
         testProjectId,
         testBranch,
-        "branchforge_wins" as ConflictResolution,
+        "branchforge_wins" as ConflictResolution
       );
 
       expect(result.status).toBe("COMPLETED");
     });
   });
 });
-

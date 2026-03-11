@@ -18,11 +18,14 @@ import {
 } from "../db/schema/index.js";
 import { labelCharacters as labelCharactersTable } from "../db/schema/tables/label-characters.js";
 import { eq, and, asc, or, isNull } from "drizzle-orm";
-import type { Label, LabelLine, NewLabel } from "../db/schema/index.js";
+import type { Label, LabelLine } from "../db/schema/index.js";
 import type { PublicLabel } from "@branchforge/shared";
 import { LabelStatus } from "@branchforge/shared";
 import { createAuditFields, updateAuditFields } from "../lib/audit.js";
-import { NotFoundError, ForbiddenError } from "../middleware/error-handler.middleware.js";
+import {
+  NotFoundError,
+  ForbiddenError,
+} from "../middleware/error-handler.middleware.js";
 
 // Re-export PublicLabel from shared for route handlers
 export type { PublicLabel };
@@ -35,7 +38,7 @@ export type { PublicLabel };
  * Type guard to check if a value is a valid label status
  */
 export function isValidLabelStatus(
-  value: string | null | undefined,
+  value: string | null | undefined
 ): value is LabelStatus {
   const validStatuses: LabelStatus[] = [
     LabelStatus.DRAFT,
@@ -56,10 +59,8 @@ export function isValidLabelStatus(
 /**
  * Label line with speaker information
  */
-export interface LabelLineWithSpeaker extends Omit<
-  LabelLine,
-  "speakerId" | "createdAt" | "updatedAt"
-> {
+export interface LabelLineWithSpeaker
+  extends Omit<LabelLine, "speakerId" | "createdAt" | "updatedAt"> {
   speakerId: string | null;
   speakerName: string | null; // From characters.displayName
   speakerTag: string | null; // From characters.renpyTag
@@ -100,8 +101,8 @@ type LabelForPublic = Pick<
   | "id"
   | "projectId"
   | "title"
-  | "groupType"      // was: act
-  | "groupValue"     // was: chapter
+  | "groupType" // was: act
+  | "groupValue" // was: chapter
   | "labelNumber"
   | "sequenceOrder"
   | "route"
@@ -133,7 +134,7 @@ export interface ListLabelsFilters {
 export async function listLabels(
   projectId: string,
   userId: string,
-  filters?: ListLabelsFilters,
+  filters?: ListLabelsFilters
 ): Promise<PublicLabel[]> {
   const db = getDb();
 
@@ -146,8 +147,8 @@ export async function listLabels(
     .where(
       and(
         eq(projects.id, projectId),
-        or(eq(projects.userId, userId), eq(projectUsers.userId, userId)),
-      ),
+        or(eq(projects.userId, userId), eq(projectUsers.userId, userId))
+      )
     )
     .limit(1);
 
@@ -191,7 +192,7 @@ export async function listLabels(
  */
 export async function getLabel(
   labelId: string,
-  userId: string,
+  userId: string
 ): Promise<LabelDetail | null> {
   const db = getDb();
 
@@ -208,8 +209,8 @@ export async function getLabel(
       and(
         eq(labels.id, labelId),
         isNull(labels.deletedAt), // Exclude soft-deleted labels
-        or(eq(projects.userId, userId), eq(projectUsers.userId, userId)),
-      ),
+        or(eq(projects.userId, userId), eq(projectUsers.userId, userId))
+      )
     )
     .limit(1);
 
@@ -231,12 +232,7 @@ export async function getLabel(
       })
       .from(labelLines)
       .leftJoin(characters, eq(labelLines.speakerId, characters.id))
-      .where(
-        and(
-          eq(labelLines.labelId, labelId),
-          isNull(labelLines.deletedAt),
-        ),
-      )
+      .where(and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt)))
       .orderBy(asc(labelLines.sequence)),
 
     // Fetch label characters with their information
@@ -250,7 +246,7 @@ export async function getLabel(
       .from(labelCharactersTable)
       .innerJoin(
         characters,
-        eq(labelCharactersTable.characterId, characters.id),
+        eq(labelCharactersTable.characterId, characters.id)
       )
       .where(eq(labelCharactersTable.labelId, labelId)),
   ]);
@@ -290,7 +286,7 @@ export async function getLabel(
  */
 export async function authorizeLabelAccess(
   labelId: string,
-  userId: string,
+  userId: string
 ): Promise<boolean> {
   const db = getDb();
 
@@ -323,8 +319,8 @@ export async function authorizeLabelAccess(
     .where(
       and(
         eq(projectUsers.projectId, projectId),
-        eq(projectUsers.userId, userId),
-      ),
+        eq(projectUsers.userId, userId)
+      )
     )
     .limit(1);
 
@@ -363,7 +359,7 @@ function mapToPublicLabel(label: LabelForPublic): PublicLabel {
  */
 async function validateRouteExists(
   projectId: string,
-  routeKey: string,
+  routeKey: string
 ): Promise<boolean> {
   const db = getDb();
   const route = await db
@@ -372,8 +368,8 @@ async function validateRouteExists(
     .where(
       and(
         eq(routeConfigs.projectId, projectId),
-        eq(routeConfigs.routeKey, routeKey),
-      ),
+        eq(routeConfigs.routeKey, routeKey)
+      )
     )
     .limit(1);
   return route.length > 0;
@@ -399,7 +395,7 @@ export async function createLabel(
     sequenceOrder?: number;
     status?: LabelStatus | null;
     visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR" | null;
-  },
+  }
 ): Promise<PublicLabel> {
   const db = getDb();
 
@@ -424,12 +420,12 @@ export async function createLabel(
   if (validatedRoute !== null) {
     const routeExists = await validateRouteExists(
       data.projectId,
-      validatedRoute,
+      validatedRoute
     );
     if (!routeExists) {
       // Coerce to null if route doesn't exist
       console.warn(
-        `Label service: Route "${validatedRoute}" does not exist in route_configs for project ${data.projectId}. Coercing to null.`,
+        `Label service: Route "${validatedRoute}" does not exist in route_configs for project ${data.projectId}. Coercing to null.`
       );
       validatedRoute = null;
     }
@@ -475,7 +471,7 @@ export async function updateLabel(
     route?: string | null;
     status?: LabelStatus;
     visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
-  },
+  }
 ): Promise<PublicLabel> {
   const db = getDb();
 
@@ -487,12 +483,7 @@ export async function updateLabel(
     })
     .from(labels)
     .innerJoin(projects, eq(labels.projectId, projects.id))
-    .where(
-      and(
-        eq(labels.id, labelId),
-        isNull(labels.deletedAt),
-      ),
-    )
+    .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
     .limit(1);
 
   if (!labelWithProject) {
@@ -509,12 +500,12 @@ export async function updateLabel(
   if (validatedRoute !== null && validatedRoute !== undefined) {
     const routeExists = await validateRouteExists(
       labelWithProject.label.projectId,
-      validatedRoute,
+      validatedRoute
     );
     if (!routeExists) {
       // Coerce to null if route doesn't exist
       console.warn(
-        `Label service: Route "${validatedRoute}" does not exist in route_configs for project ${labelWithProject.label.projectId}. Coercing to null.`,
+        `Label service: Route "${validatedRoute}" does not exist in route_configs for project ${labelWithProject.label.projectId}. Coercing to null.`
       );
       validatedRoute = null;
     }
@@ -550,7 +541,7 @@ export async function updateLabel(
  */
 export async function deleteLabel(
   labelId: string,
-  userId: string,
+  userId: string
 ): Promise<void> {
   const db = getDb();
 
@@ -568,12 +559,7 @@ export async function deleteLabel(
     .from(labels)
     .innerJoin(projects, eq(labels.projectId, projects.id))
     .leftJoin(gitlabFiles, eq(labels.gitlabFileId, gitlabFiles.id))
-    .where(
-      and(
-        eq(labels.id, labelId),
-        isNull(labels.deletedAt),
-      ),
-    )
+    .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
     .limit(1);
 
   if (!labelWithProject) {
@@ -601,10 +587,7 @@ export async function deleteLabel(
       .update(labelLines)
       .set({ deletedAt: new Date() })
       .where(
-        and(
-          eq(labelLines.labelId, labelId),
-          isNull(labelLines.deletedAt),
-        ),
+        and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt))
       );
 
     // If the label has a gitlabFileId and a valid labelName, rebuild the file content without this label
@@ -617,7 +600,7 @@ export async function deleteLabel(
     ) {
       const updatedContent = removeLabelFromRPYContent(
         labelWithProject.gitlabFileContent,
-        labelName,
+        labelName
       );
 
       // Update the gitlab_files.content with the new content (without the deleted label)

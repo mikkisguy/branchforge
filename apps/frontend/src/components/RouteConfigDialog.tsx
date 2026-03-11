@@ -78,7 +78,7 @@ export function RouteConfigDialog({
           routeName: rc.routeName,
           jumpPrefix: rc.jumpPrefix,
           isShared: rc.isShared,
-        })),
+        }))
       );
       hasInitialized.current = true;
     } else if (open && routeConfigs.length === 0) {
@@ -130,7 +130,7 @@ export function RouteConfigDialog({
         return newRoutes;
       });
     },
-    [],
+    []
   );
 
   /**
@@ -156,7 +156,9 @@ export function RouteConfigDialog({
         return `Route ${i + 1}: Route key is required`;
       }
       if (!isValidRouteKey(route.routeKey)) {
-        return `Route ${i + 1}: Route key can only contain letters, numbers, underscores, and hyphens`;
+        return `Route ${
+          i + 1
+        }: Route key can only contain letters, numbers, underscores, and hyphens`;
       }
       if (!route.routeName.trim()) {
         return `Route ${i + 1}: Route name is required`;
@@ -165,7 +167,9 @@ export function RouteConfigDialog({
         return `Route ${i + 1}: Jump prefix is required`;
       }
       if (!isValidJumpPrefix(route.jumpPrefix)) {
-        return `Route ${i + 1}: Jump prefix can only contain letters, numbers, underscores, and hyphens`;
+        return `Route ${
+          i + 1
+        }: Jump prefix can only contain letters, numbers, underscores, and hyphens`;
       }
 
       // Check for duplicate route keys
@@ -191,7 +195,7 @@ export function RouteConfigDialog({
     try {
       // Delete routes that are no longer in the form (parallel)
       const routesToDelete = routeConfigs.filter(
-        (rc) => !routes.find((r) => r.id === rc.id),
+        (rc) => !routes.find((r) => r.id === rc.id)
       );
 
       const deleteResults = await Promise.allSettled(
@@ -207,12 +211,16 @@ export function RouteConfigDialog({
         const deleteErrorMessages = failedDeletes.map(
           ({ route, result }) =>
             `Route "${route.routeKey}" (${route.id}): ${
-              result.status === "rejected" ? result.reason.message : "Unknown error"
+              result.status === "rejected"
+                ? result.reason.message
+                : "Unknown error"
             }`
         );
         console.error("Failed to delete routes:", deleteErrorMessages);
         error(
-          `Failed to delete ${failedDeletes.length} route(s): ${deleteErrorMessages.join("; ")}`
+          `Failed to delete ${
+            failedDeletes.length
+          } route(s): ${deleteErrorMessages.join("; ")}`
         );
         return; // Don't proceed with creates/updates if deletes failed
       }
@@ -221,19 +229,19 @@ export function RouteConfigDialog({
       const routeMutations = routes.map((route) =>
         route.id
           ? // Update existing route
-              updateRouteConfig(route.id, {
-                routeKey: route.routeKey,
-                routeName: route.routeName,
-                jumpPrefix: route.jumpPrefix,
-                isShared: route.isShared,
-              })
+            updateRouteConfig(route.id, {
+              routeKey: route.routeKey,
+              routeName: route.routeName,
+              jumpPrefix: route.jumpPrefix,
+              isShared: route.isShared,
+            })
           : // Create new route
-              createRouteConfig({
-                routeKey: route.routeKey,
-                routeName: route.routeName,
-                jumpPrefix: route.jumpPrefix,
-                isShared: route.isShared,
-              }),
+            createRouteConfig({
+              routeKey: route.routeKey,
+              routeName: route.routeName,
+              jumpPrefix: route.jumpPrefix,
+              isShared: route.isShared,
+            })
       );
 
       const mutationResults = await Promise.allSettled(routeMutations);
@@ -247,12 +255,16 @@ export function RouteConfigDialog({
         const mutationErrorMessages = failedMutations.map(
           ({ route, result }) =>
             `Route "${route.routeKey}": ${
-              result.status === "rejected" ? result.reason.message : "Unknown error"
+              result.status === "rejected"
+                ? result.reason.message
+                : "Unknown error"
             }`
         );
         console.error("Failed to save routes:", mutationErrorMessages);
         error(
-          `Failed to save ${failedMutations.length} route(s): ${mutationErrorMessages.join("; ")}`
+          `Failed to save ${
+            failedMutations.length
+          } route(s): ${mutationErrorMessages.join("; ")}`
         );
         return;
       }
@@ -261,7 +273,8 @@ export function RouteConfigDialog({
       closeDialog();
     } catch (err) {
       // Catch any unexpected errors (should be rare with allSettled)
-      const message = err instanceof Error ? err.message : "Failed to save routes";
+      const message =
+        err instanceof Error ? err.message : "Failed to save routes";
       error(message);
     }
   }, [
@@ -359,7 +372,10 @@ export function RouteConfigDialog({
                       {/* Route Fields */}
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
-                          <Label htmlFor={`route-key-${index}`} className="text-xs">
+                          <Label
+                            htmlFor={`route-key-${index}`}
+                            className="text-xs"
+                          >
                             Route Key *
                           </Label>
                           <Input
@@ -378,7 +394,10 @@ export function RouteConfigDialog({
                         </div>
 
                         <div className="space-y-1">
-                          <Label htmlFor={`route-name-${index}`} className="text-xs">
+                          <Label
+                            htmlFor={`route-name-${index}`}
+                            className="text-xs"
+                          >
                             Route Name *
                           </Label>
                           <Input
@@ -397,7 +416,10 @@ export function RouteConfigDialog({
                         </div>
 
                         <div className="space-y-1">
-                          <Label htmlFor={`jump-prefix-${index}`} className="text-xs">
+                          <Label
+                            htmlFor={`jump-prefix-${index}`}
+                            className="text-xs"
+                          >
                             Jump Prefix *
                           </Label>
                           <Input
@@ -417,7 +439,10 @@ export function RouteConfigDialog({
                         </div>
 
                         <div className="space-y-1">
-                          <Label htmlFor={`is-shared-${index}`} className="text-xs">
+                          <Label
+                            htmlFor={`is-shared-${index}`}
+                            className="text-xs"
+                          >
                             Route Type
                           </Label>
                           <select
@@ -427,7 +452,7 @@ export function RouteConfigDialog({
                               updateRoute(
                                 index,
                                 "isShared",
-                                e.target.value === "shared",
+                                e.target.value === "shared"
                               )
                             }
                             disabled={isSaving}
@@ -463,11 +488,7 @@ export function RouteConfigDialog({
 
         {/* Footer */}
         <div className="p-6 border-t border-border/30 flex justify-end gap-2">
-          <Button
-            variant="outline"
-            onClick={closeDialog}
-            disabled={isSaving}
-          >
+          <Button variant="outline" onClick={closeDialog} disabled={isSaving}>
             Cancel
           </Button>
           <Button

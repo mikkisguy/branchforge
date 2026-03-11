@@ -47,7 +47,7 @@ export interface UseRouteConfigsReturn {
   createRouteConfig: (input: CreateRouteConfigInput) => Promise<RouteConfig>;
   updateRouteConfig: (
     routeConfigId: string,
-    input: UpdateRouteConfigInput,
+    input: UpdateRouteConfigInput
   ) => Promise<RouteConfig>;
   deleteRouteConfig: (routeConfigId: string) => Promise<void>;
 }
@@ -82,26 +82,42 @@ export function useRouteConfigs(projectId: string): UseRouteConfigsReturn {
     },
     onSuccess: () => {
       // Invalidate and refetch route configs list
-      queryClient.invalidateQueries({ queryKey: routeConfigKeys.lists(projectId) });
-      toast.success('Route configuration created successfully', 'Success');
+      queryClient.invalidateQueries({
+        queryKey: routeConfigKeys.lists(projectId),
+      });
+      toast.success("Route configuration created successfully", "Success");
     },
     onError: (error: Error) => {
-      toast.error(`Failed to create route configuration: ${error.message}`, 'Error');
+      toast.error(
+        `Failed to create route configuration: ${error.message}`,
+        "Error"
+      );
     },
   });
 
   // Update route config mutation
   const updateRouteConfigMutation = useMutation({
-    mutationFn: async ({ routeConfigId, input }: { routeConfigId: string; input: UpdateRouteConfigInput }) => {
+    mutationFn: async ({
+      routeConfigId,
+      input,
+    }: {
+      routeConfigId: string;
+      input: UpdateRouteConfigInput;
+    }) => {
       return routeConfigsApi.updateRouteConfig(routeConfigId, input);
     },
     onSuccess: () => {
       // Invalidate and refetch route configs list
-      queryClient.invalidateQueries({ queryKey: routeConfigKeys.lists(projectId) });
-      toast.success('Route configuration updated successfully', 'Success');
+      queryClient.invalidateQueries({
+        queryKey: routeConfigKeys.lists(projectId),
+      });
+      toast.success("Route configuration updated successfully", "Success");
     },
     onError: (error: Error) => {
-      toast.error(`Failed to update route configuration: ${error.message}`, 'Error');
+      toast.error(
+        `Failed to update route configuration: ${error.message}`,
+        "Error"
+      );
     },
   });
 
@@ -112,23 +128,30 @@ export function useRouteConfigs(projectId: string): UseRouteConfigsReturn {
     },
     onSuccess: () => {
       // Invalidate and refetch route configs list
-      queryClient.invalidateQueries({ queryKey: routeConfigKeys.lists(projectId) });
-      toast.success('Route configuration deleted successfully', 'Success');
+      queryClient.invalidateQueries({
+        queryKey: routeConfigKeys.lists(projectId),
+      });
+      toast.success("Route configuration deleted successfully", "Success");
     },
     onError: (error: Error) => {
-      toast.error(`Failed to delete route configuration: ${error.message}`, 'Error');
+      toast.error(
+        `Failed to delete route configuration: ${error.message}`,
+        "Error"
+      );
     },
   });
 
   // Create route config method
-  const createRouteConfig = async (input: CreateRouteConfigInput): Promise<RouteConfig> => {
+  const createRouteConfig = async (
+    input: CreateRouteConfigInput
+  ): Promise<RouteConfig> => {
     return createRouteConfigMutation.mutateAsync(input);
   };
 
   // Update route config method
   const updateRouteConfig = async (
     routeConfigId: string,
-    input: UpdateRouteConfigInput,
+    input: UpdateRouteConfigInput
   ): Promise<RouteConfig> => {
     return updateRouteConfigMutation.mutateAsync({ routeConfigId, input });
   };

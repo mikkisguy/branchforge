@@ -60,4 +60,3 @@ describe("AuthService", () => {
   // register and validateCredentials tests moved to integration tests due to database
   // constraint behavior (email uniqueness) and actual password hashing with bcrypt
 });
-

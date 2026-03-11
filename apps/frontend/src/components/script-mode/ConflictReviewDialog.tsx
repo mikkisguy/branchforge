@@ -8,10 +8,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { X, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   gitlabApi,
   type ConflictDetectionResult,
@@ -173,10 +170,10 @@ export function ConflictReviewDialog({
     (choice: "local" | "remote" | "skip") => {
       if (!currentConflict) return;
       setResolutions((prev) =>
-        new Map(prev).set(currentConflict.label, choice),
+        new Map(prev).set(currentConflict.label, choice)
       );
     },
-    [currentConflict],
+    [currentConflict]
   );
 
   /**
@@ -202,7 +199,7 @@ export function ConflictReviewDialog({
     try {
       // Convert resolutions to array
       const resolutionArray: ConflictResolution[] = Array.from(
-        resolutions.entries(),
+        resolutions.entries()
       ).map(([label, choice]) => ({
         label,
         choice,
@@ -360,8 +357,8 @@ export function ConflictReviewDialog({
                     {currentResolution === "local"
                       ? "BranchForge"
                       : currentResolution === "remote"
-                        ? "GitLab"
-                        : "Skipped"}{" "}
+                      ? "GitLab"
+                      : "Skipped"}{" "}
                     version
                   </span>
                 </div>

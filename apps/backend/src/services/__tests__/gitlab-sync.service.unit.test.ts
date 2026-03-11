@@ -192,4 +192,3 @@ describe("GitLabSyncService", () => {
    * with real database and external service mocking provide better confidence.
    */
 });
-

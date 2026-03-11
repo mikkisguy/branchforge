@@ -1,5 +1,5 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
@@ -32,8 +32,8 @@ export async function execFileNoThrow(
     const err = error as Error & { stdout?: string; stderr?: string };
     return {
       ok: false,
-      stdout: err.stdout ?? '',
-      stderr: err.stderr ?? '',
+      stdout: err.stdout ?? "",
+      stderr: err.stderr ?? "",
       error: err,
     };
   }

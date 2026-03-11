@@ -78,12 +78,10 @@ export const LabelSyncStatus = {
  * @returns true if the value is a valid LabelSyncStatus
  */
 export function isValidLabelSyncStatus(
-  value: string,
+  value: string
 ): value is LabelSyncStatus {
   return (
-    value === "SYNCED" ||
-    value === "MODIFIED_LOCAL" ||
-    value === "CONFLICT"
+    value === "SYNCED" || value === "MODIFIED_LOCAL" || value === "CONFLICT"
   );
 }
 
@@ -156,7 +154,7 @@ export interface VisualNameComponents {
  */
 export function generateVisualName(
   config: VisualSystemConfig,
-  components: VisualNameComponents,
+  components: VisualNameComponents
 ): string {
   let result = config.namingTemplate;
 
@@ -187,17 +185,17 @@ export function generateVisualName(
   // Replace {label}, {counter}, {slug}
   result = result.replace(
     "{label}",
-    String(components.labelNumber).padStart(config.labelPadding, "0"),
+    String(components.labelNumber).padStart(config.labelPadding, "0")
   );
 
   // Deprecated: {scene} fallback for compatibility
   result = result.replace(
     "{scene}",
-    String(components.labelNumber).padStart(config.labelPadding, "0"),
+    String(components.labelNumber).padStart(config.labelPadding, "0")
   );
   result = result.replace(
     "{counter}",
-    String(components.counter).padStart(config.counterPadding, "0"),
+    String(components.counter).padStart(config.counterPadding, "0")
   );
   result = result.replace("{slug}", components.slug);
 
@@ -216,7 +214,7 @@ export function generateVisualName(
 export function generateJumpLabel(
   routeConfig: RouteConfig | null,
   labelNumber: number,
-  labelPadding: 1 | 2,
+  labelPadding: 1 | 2
 ): string {
   const labelNum = String(labelNumber).padStart(labelPadding, "0");
 
@@ -414,4 +412,3 @@ export interface LabelDetail extends PublicLabel {
   lines: LabelLine[];
   characters: LabelCharacter[];
 }
-

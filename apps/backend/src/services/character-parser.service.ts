@@ -13,8 +13,8 @@
  */
 
 // Default excluded character tags (special Ren'Py characters)
-export const DEFAULT_EXCLUDED_TAGS = ['n', 'u', 'narrator', 'extend'] as const;
-export type DefaultExcludedTag = typeof DEFAULT_EXCLUDED_TAGS[number];
+export const DEFAULT_EXCLUDED_TAGS = ["n", "u", "narrator", "extend"] as const;
+export type DefaultExcludedTag = (typeof DEFAULT_EXCLUDED_TAGS)[number];
 
 /**
  * Detected character from RPY file parsing
@@ -33,9 +33,9 @@ export interface DetectedCharacter {
   name: string | null;
   displayName: string;
   color: string;
-  isSpecial: boolean;  // narration, unknown, etc.
+  isSpecial: boolean; // narration, unknown, etc.
   sourceFile: string;
-  confidence: number;  // 0-1 for fuzzy matches
+  confidence: number; // 0-1 for fuzzy matches
 }
 
 /**
@@ -83,23 +83,23 @@ class CharacterParserService {
    * Normalize color string to hex format
    */
   private normalizeColor(color: string | undefined): string {
-    if (!color) return '#cfcfcf'; // Default Ren'Py color
+    if (!color) return "#cfcfcf"; // Default Ren'Py color
 
     // If already hex, return as-is
-    if (color.startsWith('#')) {
+    if (color.startsWith("#")) {
       return color;
     }
 
     // Handle named colors (common Ren'Py colors)
     const namedColors: Record<string, string> = {
-      'white': '#ffffff',
-      'black': '#000000',
-      'red': '#ff0000',
-      'green': '#00ff00',
-      'blue': '#0000ff',
-      'yellow': '#ffff00',
-      'cyan': '#00ffff',
-      'magenta': '#ff00ff',
+      white: "#ffffff",
+      black: "#000000",
+      red: "#ff0000",
+      green: "#00ff00",
+      blue: "#0000ff",
+      yellow: "#ffff00",
+      cyan: "#00ffff",
+      magenta: "#ff00ff",
     };
 
     const normalized = namedColors[color.toLowerCase()];
@@ -110,17 +110,17 @@ class CharacterParserService {
     if (hexMatch) return hexMatch[0];
 
     // Default color
-    return '#cfcfcf';
+    return "#cfcfcf";
   }
 
   /**
    * Parse a single character definition line
    */
-  private parseCharacterLine(line: string, filename: string): CharacterPatternMatch | null {
+  private parseCharacterLine(line: string): CharacterPatternMatch | null {
     const trimmed = line.trim();
 
     // Skip comments and empty lines
-    if (!trimmed || trimmed.startsWith('#')) {
+    if (!trimmed || trimmed.startsWith("#")) {
       return null;
     }
 
@@ -212,9 +212,19 @@ class CharacterParserService {
 
       // Check if name is on the same line (quoted string, variable, or bracketed variable)
       const quotedNameMatch = rest.match(/"([^"]*)"/);
-      const bracketedNameMatch = !quotedNameMatch && rest.match(/\[([a-zA-Z_][a-zA-Z0-9_[\]*.]*)\]/);
-      const variableNameMatch = !quotedNameMatch && !bracketedNameMatch && rest.match(/([a-zA-Z_][a-zA-Z0-9_.]*)/);
-      const name = quotedNameMatch ? quotedNameMatch[1] : (bracketedNameMatch ? bracketedNameMatch[1] : (variableNameMatch ? variableNameMatch[0] : null));
+      const bracketedNameMatch =
+        !quotedNameMatch && rest.match(/\[([a-zA-Z_][a-zA-Z0-9_[\]*.]*)\]/);
+      const variableNameMatch =
+        !quotedNameMatch &&
+        !bracketedNameMatch &&
+        rest.match(/([a-zA-Z_][a-zA-Z0-9_.]*)/);
+      const name = quotedNameMatch
+        ? quotedNameMatch[1]
+        : bracketedNameMatch
+        ? bracketedNameMatch[1]
+        : variableNameMatch
+        ? variableNameMatch[0]
+        : null;
 
       // Try to extract color from rest of line (who_color first, then color)
       let color: string | undefined = undefined;
@@ -246,7 +256,7 @@ class CharacterParserService {
    */
   parseFile(content: string, filename: string): DetectedCharacter[] {
     const characters: DetectedCharacter[] = [];
-    const lines = content.split('\n');
+    const lines = content.split("\n");
 
     // Track multi-line definitions
     let pendingCharacter: {
@@ -263,7 +273,7 @@ class CharacterParserService {
       const trimmed = line.trim();
 
       // Skip empty lines and comments
-      if (!trimmed || trimmed.startsWith('#')) {
+      if (!trimmed || trimmed.startsWith("#")) {
         continue;
       }
 
@@ -274,7 +284,7 @@ class CharacterParserService {
         parenDepth -= (line.match(/\)/g) || []).length;
 
         // Capture options
-        if (trimmed && !trimmed.startsWith('#')) {
+        if (trimmed && !trimmed.startsWith("#")) {
           // Check if this line contains the name (if not already found)
           if (!pendingCharacter.name) {
             // Try quoted name
@@ -283,7 +293,9 @@ class CharacterParserService {
               pendingCharacter.name = quotedNameMatch[1];
             } else {
               // Try variable name
-              const variableNameMatch = trimmed.match(/([a-zA-Z_][a-zA-Z0-9_.]*)/);
+              const variableNameMatch = trimmed.match(
+                /([a-zA-Z_][a-zA-Z0-9_.]*)/
+              );
               if (variableNameMatch) {
                 pendingCharacter.name = variableNameMatch[1];
               }
@@ -297,12 +309,16 @@ class CharacterParserService {
           // Extract color from options (who_color first, then color)
           let color = pendingCharacter.color;
           if (!color) {
-            const optionsText = pendingCharacter.options.join(' ');
-            const whoColorMatch = optionsText.match(/who_color\s*=\s*["']?([^"')\s]+)/);
+            const optionsText = pendingCharacter.options.join(" ");
+            const whoColorMatch = optionsText.match(
+              /who_color\s*=\s*["']?([^"')\s]+)/
+            );
             if (whoColorMatch) {
               color = whoColorMatch[1];
             } else {
-              const colorMatch = optionsText.match(/color\s*=\s*["']?([^"')\s]+)/);
+              const colorMatch = optionsText.match(
+                /color\s*=\s*["']?([^"')\s]+)/
+              );
               if (colorMatch) {
                 color = colorMatch[1];
               }
@@ -330,7 +346,7 @@ class CharacterParserService {
       }
 
       // Try to parse as a character definition
-      const match = this.parseCharacterLine(line, filename);
+      const match = this.parseCharacterLine(line);
       if (match) {
         if (match.isMultiLine) {
           // Start tracking multi-line definition
@@ -352,7 +368,7 @@ class CharacterParserService {
             tag: match.tag,
             name: match.name,
             displayName,
-            color: match.color || '#cfcfcf',
+            color: match.color || "#cfcfcf",
             isSpecial,
             sourceFile: filename,
             confidence: match.name ? 1.0 : 0.5,
@@ -373,7 +389,7 @@ class CharacterParserService {
     excludedTags: Set<string>
   ): DetectedCharacter[] {
     const allCharacters = this.parseFile(content, filename);
-    return allCharacters.filter(c => !excludedTags.has(c.tag));
+    return allCharacters.filter((c) => !excludedTags.has(c.tag));
   }
 
   /**
@@ -381,10 +397,15 @@ class CharacterParserService {
    */
   detectConflicts(
     detected: DetectedCharacter[],
-    existing: Array<{ renpyTag: string; name: string; displayName: string; color: string }>
+    existing: Array<{
+      renpyTag: string;
+      name: string;
+      displayName: string;
+      color: string;
+    }>
   ): CharacterConflict[] {
     const conflicts: CharacterConflict[] = [];
-    const existingByTag = new Map(existing.map(c => [c.renpyTag, c]));
+    const existingByTag = new Map(existing.map((c) => [c.renpyTag, c]));
 
     for (const detectedChar of detected) {
       const existingChar = existingByTag.get(detectedChar.tag);
@@ -392,7 +413,8 @@ class CharacterParserService {
       if (existingChar) {
         // Check for differences
         const nameMismatch = detectedChar.name !== existingChar.name;
-        const displayNameMismatch = detectedChar.displayName !== existingChar.displayName;
+        const displayNameMismatch =
+          detectedChar.displayName !== existingChar.displayName;
         const colorMismatch = detectedChar.color !== existingChar.color;
 
         if (nameMismatch || displayNameMismatch || colorMismatch) {
@@ -413,7 +435,9 @@ class CharacterParserService {
   /**
    * Parse multiple files and aggregate results
    */
-  parseFiles(files: Array<{ content: string; filename: string }>): CharacterParseResult {
+  parseFiles(
+    files: Array<{ content: string; filename: string }>
+  ): CharacterParseResult {
     const allCharacters: DetectedCharacter[] = [];
     const excludedTags = new Set<string>(DEFAULT_EXCLUDED_TAGS);
 

@@ -17,16 +17,22 @@ export function generateRpyContent(label: LabelDetail): string[] {
 
   // Header comments
   lines.push(
-    `<span class="text-muted-foreground"># Label: ${escapeHtml(label.title)}</span>`,
+    `<span class="text-muted-foreground"># Label: ${escapeHtml(
+      label.title
+    )}</span>`
   );
   if (label.groupType && label.groupValue) {
     lines.push(
-      `<span class="text-muted-foreground"># ${label.groupType}: ${escapeHtml(label.groupValue)}</span>`,
+      `<span class="text-muted-foreground"># ${label.groupType}: ${escapeHtml(
+        label.groupValue
+      )}</span>`
     );
   }
   if (label.routeKey) {
     lines.push(
-      `<span class="text-muted-foreground"># Route: ${escapeHtml(label.routeKey)}</span>`,
+      `<span class="text-muted-foreground"># Route: ${escapeHtml(
+        label.routeKey
+      )}</span>`
     );
   }
   lines.push("");
@@ -38,7 +44,9 @@ export function generateRpyContent(label: LabelDetail): string[] {
     .replace(/[^a-z0-9_]+/g, "_")
     .replace(/^_+|_+$/g, ""); // Trim leading/trailing underscores
   lines.push(
-    `<span class="text-purple-400">label</span> <span class="text-blue-400">${escapeHtml(labelName)}</span><span class="text-muted-foreground">:</span>`,
+    `<span class="text-purple-400">label</span> <span class="text-blue-400">${escapeHtml(
+      labelName
+    )}</span><span class="text-muted-foreground">:</span>`
   );
   lines.push("");
 
@@ -47,27 +55,33 @@ export function generateRpyContent(label: LabelDetail): string[] {
     if (line.contentType === "DIALOGUE" && line.speakerTag) {
       // Dialogue line: e "Hello"
       lines.push(
-        `    <span class="text-blue-400">${escapeHtml(line.speakerTag)}</span> <span class="text-green-400">"${escapeHtml(line.content)}"</span>`,
+        `    <span class="text-blue-400">${escapeHtml(
+          line.speakerTag
+        )}</span> <span class="text-green-400">"${escapeHtml(
+          line.content
+        )}"</span>`
       );
     } else if (line.contentType === "NARRATION") {
       // Narration line: "The story..."
       lines.push(
-        `    <span class="text-green-400">"${escapeHtml(line.content)}"</span>`,
+        `    <span class="text-green-400">"${escapeHtml(line.content)}"</span>`
       );
     } else if (line.contentType === "JUMP") {
       // Jump statement: jump other_label
       lines.push(
-        `    <span class="text-purple-400">${escapeHtml(line.content)}</span>`,
+        `    <span class="text-purple-400">${escapeHtml(line.content)}</span>`
       );
     } else if (line.contentType === "MENU") {
       // Menu starts
       lines.push(
-        `    <span class="text-yellow-400">menu</span><span class="text-muted-foreground">:</span>`,
+        `    <span class="text-yellow-400">menu</span><span class="text-muted-foreground">:</span>`
       );
     } else if (line.contentType === "CHOICE") {
       // Choice option: "Choice text":
       lines.push(
-        `        <span class="text-green-400">"${escapeHtml(line.content)}"</span><span class="text-muted-foreground">:</span>`,
+        `        <span class="text-green-400">"${escapeHtml(
+          line.content
+        )}"</span><span class="text-muted-foreground">:</span>`
       );
     }
   }
@@ -105,21 +119,18 @@ export function generateFileTree(labels: PublicLabel[]): FileItem[] {
   if (!labels.length) return [];
 
   // Group by groupType/groupValue for hierarchical display
-  const grouped = labels.reduce(
-    (acc, label) => {
-      // Use group value if available, otherwise "Main"
-      const key =
-        label.groupType && label.groupValue
-          ? `${label.groupType} ${label.groupValue}`
-          : "Main";
-      if (!acc[key]) {
-        acc[key] = [];
-      }
-      acc[key].push(label);
-      return acc;
-    },
-    {} as Record<string, PublicLabel[]>,
-  );
+  const grouped = labels.reduce((acc, label) => {
+    // Use group value if available, otherwise "Main"
+    const key =
+      label.groupType && label.groupValue
+        ? `${label.groupType} ${label.groupValue}`
+        : "Main";
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key].push(label);
+    return acc;
+  }, {} as Record<string, PublicLabel[]>);
 
   // Convert to file tree structure
   return Object.entries(grouped)
@@ -134,4 +145,3 @@ export function generateFileTree(labels: PublicLabel[]): FileItem[] {
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
-

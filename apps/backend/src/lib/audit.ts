@@ -58,7 +58,7 @@ export function createAuditFields(userId: string): AuditFields {
  */
 export function updateAuditFields(
   currentVersion: number,
-  userId: string,
+  userId: string
 ): AuditFields {
   return {
     updatedBy: userId,

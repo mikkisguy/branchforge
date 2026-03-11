@@ -100,7 +100,7 @@ export const charactersApi = {
    */
   async detectCharacters(projectId: string): Promise<DetectCharactersResponse> {
     return await request<DetectCharactersResponse>(
-      `/projects/${projectId}/characters/detect`,
+      `/projects/${projectId}/characters/detect`
     );
   },
 
@@ -109,14 +109,14 @@ export const charactersApi = {
    */
   async importCharacters(
     projectId: string,
-    data: ImportCharactersRequest,
+    data: ImportCharactersRequest
   ): Promise<ImportCharactersResponse> {
     return await request<ImportCharactersResponse>(
       `/projects/${projectId}/characters/import`,
       {
         method: "POST",
         body: JSON.stringify(data),
-      },
+      }
     );
   },
 
@@ -125,7 +125,7 @@ export const charactersApi = {
    */
   async listCharacters(projectId: string): Promise<Character[]> {
     const response = await request<ListCharactersResponse>(
-      `/projects/${projectId}/characters`,
+      `/projects/${projectId}/characters`
     );
     return response.characters;
   },
@@ -135,7 +135,7 @@ export const charactersApi = {
    */
   async getCharacter(characterId: string): Promise<Character> {
     const response = await request<GetCharacterResponse>(
-      `/characters/${characterId}`,
+      `/characters/${characterId}`
     );
     return response.character;
   },
@@ -145,7 +145,7 @@ export const charactersApi = {
    */
   async getProjectSettings(projectId: string): Promise<ProjectSettings> {
     return await request<ProjectSettingsResponse>(
-      `/projects/${projectId}/character-settings`,
+      `/projects/${projectId}/character-settings`
     );
   },
 
@@ -154,14 +154,14 @@ export const charactersApi = {
    */
   async updateProjectSettings(
     projectId: string,
-    settings: Partial<ProjectSettings>,
+    settings: Partial<ProjectSettings>
   ): Promise<ProjectSettings> {
     return await request<ProjectSettingsResponse>(
       `/projects/${projectId}/character-settings`,
       {
         method: "PUT",
         body: JSON.stringify(settings),
-      },
+      }
     );
   },
 };

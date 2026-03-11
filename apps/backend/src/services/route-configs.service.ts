@@ -67,7 +67,7 @@ export interface UpdateRouteConfigBody {
  */
 export async function listRouteConfigs(
   projectId: string,
-  userId: string,
+  userId: string
 ): Promise<PublicRouteConfig[]> {
   const db = getDb();
 
@@ -100,7 +100,7 @@ export async function listRouteConfigs(
  */
 export async function getRouteConfig(
   routeConfigId: string,
-  userId: string,
+  userId: string
 ): Promise<PublicRouteConfig | null> {
   const db = getDb();
 
@@ -130,7 +130,7 @@ export async function getRouteConfig(
 export async function createRouteConfig(
   userId: string,
   projectId: string,
-  body: CreateRouteConfigBody,
+  body: CreateRouteConfigBody
 ): Promise<PublicRouteConfig> {
   const db = getDb();
 
@@ -162,7 +162,7 @@ export async function createRouteConfig(
 
     if (!result || result.length === 0 || !result[0]) {
       throw new Error(
-        "Failed to create route configuration: database insert returned no rows",
+        "Failed to create route configuration: database insert returned no rows"
       );
     }
 
@@ -186,7 +186,7 @@ export async function createRouteConfig(
 export async function updateRouteConfig(
   routeConfigId: string,
   userId: string,
-  body: UpdateRouteConfigBody,
+  body: UpdateRouteConfigBody
 ): Promise<PublicRouteConfig> {
   const db = getDb();
 
@@ -230,7 +230,7 @@ export async function updateRouteConfig(
 
     if (!result || result.length === 0 || !result[0]) {
       throw new Error(
-        "Failed to update route configuration: database update returned no rows",
+        "Failed to update route configuration: database update returned no rows"
       );
     }
 
@@ -252,7 +252,7 @@ export async function updateRouteConfig(
  */
 export async function deleteRouteConfig(
   routeConfigId: string,
-  userId: string,
+  userId: string
 ): Promise<boolean> {
   const db = getDb();
 
@@ -293,4 +293,3 @@ function mapToPublicRouteConfig(routeConfig: RouteConfig): PublicRouteConfig {
     updatedAt: routeConfig.updatedAt,
   };
 }
-

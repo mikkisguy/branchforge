@@ -103,4 +103,3 @@ export const gitlabFileTypeEnum = pgEnum("gitlab_file_type", [
   "STORY",
   "SETTINGS",
 ]);
-

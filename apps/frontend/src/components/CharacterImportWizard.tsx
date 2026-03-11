@@ -25,6 +25,7 @@ import {
   charactersApi,
   type DetectedCharacter,
   type CharacterConflict,
+  type ImportCharacter,
 } from "@/lib/api/characters";
 import { useToast } from "@/contexts/ToastContext";
 
@@ -61,7 +62,7 @@ interface CharacterGroup {
 function groupCharacters(
   detected: DetectedCharacter[],
   conflicts: CharacterConflict[],
-  excludedTags: string[],
+  excludedTags: string[]
 ): CharacterGroup {
   const conflictTags = new Set(conflicts.map((c) => c.tag));
   const specialTags = new Set(["n", "u", "narrator", "extend"]);
@@ -116,7 +117,7 @@ export function CharacterImportWizard({
 
   // Group characters on mount
   const [groups, setGroups] = useState<CharacterGroup>(() =>
-    groupCharacters(detectedCharacters, conflicts, excludedTags),
+    groupCharacters(detectedCharacters, conflicts, excludedTags)
   );
 
   // Import settings
@@ -164,16 +165,16 @@ export function CharacterImportWizard({
     (
       group: keyof CharacterGroup,
       index: number,
-      updates: Partial<EditableCharacter>,
+      updates: Partial<EditableCharacter>
     ) => {
       setGroups((prev) => ({
         ...prev,
         [group]: prev[group].map((char, i) =>
-          i === index ? { ...char, ...updates } : char,
+          i === index ? { ...char, ...updates } : char
         ),
       }));
     },
-    [],
+    []
   );
 
   /**
@@ -196,18 +197,20 @@ export function CharacterImportWizard({
             isSpecial: false,
             sourceFile: "",
             confidence: 1,
+            isLoveInterest: false,
+            routeAffiliation: undefined,
           })),
         ...groups.special.filter((c) => !c.excluded),
       ];
 
       // Map to import format
-      const importData = charactersToImport.map((c) => ({
+      const importData: ImportCharacter[] = charactersToImport.map((c) => ({
         tag: c.tag,
         name: c.name ?? c.tag,
         displayName: c.displayName,
         color: c.color,
-        isLoveInterest: (c as any).isLoveInterest ?? false,
-        routeAffiliation: (c as any).routeAffiliation,
+        isLoveInterest: c.isLoveInterest ?? false,
+        routeAffiliation: c.routeAffiliation,
       }));
 
       const newExcludedTags = [
@@ -321,8 +324,8 @@ export function CharacterImportWizard({
                 {detectedCharacters.length > 0
                   ? `Review and approve ${detectedCharacters.length} detected character(s)`
                   : newCount > 0
-                    ? `${newCount} character(s) added manually`
-                    : "No characters detected - add them manually"}
+                  ? `${newCount} character(s) added manually`
+                  : "No characters detected - add them manually"}
               </p>
             </div>
           </div>
@@ -788,7 +791,9 @@ export function CharacterImportWizard({
             >
               {isImporting
                 ? "Importing..."
-                : `Import ${selectedCount} Character${selectedCount !== 1 ? "s" : ""}`}
+                : `Import ${selectedCount} Character${
+                    selectedCount !== 1 ? "s" : ""
+                  }`}
             </Button>
           </div>
         </div>
@@ -796,4 +801,3 @@ export function CharacterImportWizard({
     </Dialog>
   );
 }
-

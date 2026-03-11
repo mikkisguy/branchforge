@@ -39,14 +39,18 @@ const tabs: TabOption[] = [
  * @param hasProject - Whether a project is selected
  * @returns An object with filtered tabs and the appropriate active tab
  */
-function getVisibleTabs(activeTab: Tab, userRole?: string, hasProject?: boolean) {
+function getVisibleTabs(
+  activeTab: Tab,
+  userRole?: string,
+  hasProject?: boolean
+) {
   return useMemo(() => {
     // Filter out system tab for non-OWNER users
     // Filter out routes tab when no project is selected
     const visibleTabs = tabs.filter(
       (tab) =>
         (tab.id !== "system" || userRole === "OWNER") &&
-        (tab.id !== "routes" || hasProject),
+        (tab.id !== "routes" || hasProject)
     );
 
     // If current active tab is not visible, switch to first visible tab
@@ -79,7 +83,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const { visibleTabs, activeTab: adjustedActiveTab } = getVisibleTabs(
     activeTab,
     user?.role,
-    !!currentProject?.id,
+    !!currentProject?.id
   );
 
   // Sync state if active tab was adjusted by helper
@@ -114,7 +118,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                     "w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors",
                     activeTab === tab.id
                       ? "bg-accent text-accent-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   )}
                 >
                   {tab.label}
@@ -157,8 +161,8 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                 </div>
                 <div className="p-6 border border-dashed border-border/30 rounded-md text-center">
                   <p className="text-sm text-muted-foreground mb-4">
-                    Configure route keys, names, jump prefixes, and shared
-                    route settings for your project.
+                    Configure route keys, names, jump prefixes, and shared route
+                    settings for your project.
                   </p>
                   <button
                     onClick={() => setIsRouteConfigOpen(true)}
@@ -207,4 +211,3 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     </Dialog>
   );
 }
-
