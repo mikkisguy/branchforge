@@ -11,7 +11,7 @@ import {
   gitlabRepositories,
   projects,
 } from "../db/schema/index.js";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import {
   validateAndGetUsername,
   encryptPAT,
@@ -423,6 +423,57 @@ export async function listBranches(
 
   const branches = (await response.json()) as GitlabBranch[];
   return branches.map((b) => b.name);
+}
+
+/**
+ * Get the HEAD commit SHA for a branch
+ * @param projectId - The BranchForge project ID
+ * @param branch - The branch name
+ * @param gitlabUrl - Optional GitLab URL override
+ * @returns The commit SHA
+ */
+export async function getBranchCommitSha(
+  projectId: string,
+  branch: string,
+  gitlabUrl?: string,
+): Promise<string> {
+  const repoLink = await getRepositoryLink(projectId);
+  if (!repoLink) {
+    throw new Error("GitLab repository not linked");
+  }
+
+  // Get user ID from project
+  const db = getDb();
+  const projectResult = await db
+    .select({ userId: projects.userId })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+
+  if (projectResult.length === 0) {
+    throw new Error("Project not found");
+  }
+
+  const token = await getDecryptedToken(projectResult[0].userId);
+  const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
+
+  const apiUrl = new URL(
+    `/api/v4/projects/${repoLink.gitlabProjectId}/repository/branches/${encodeURIComponent(branch)}`,
+    url,
+  );
+
+  const response = await fetchWithTimeout(apiUrl.toString(), {
+    headers: {
+      "PRIVATE-TOKEN": token,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`GitLab API error: ${response.status}`);
+  }
+
+  const branchData = (await response.json()) as GitlabBranch;
+  return branchData.commit.id;
 }
 
 /**

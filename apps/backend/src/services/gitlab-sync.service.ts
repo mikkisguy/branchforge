@@ -18,18 +18,15 @@ import {
   listRpyFiles,
   getFileContent,
   createOrUpdateFile,
+  getBranchCommitSha,
 } from "./gitlab.service.js";
 import {
-  generateRpyFile,
   parseRPYFileWithLabels,
   convertToBranchForgeFormatFromLabels,
-  reconstructRPYFile,
-  type BranchForgeScene,
   type ParsedRPYFileWithLabels,
-  type ReconstructedFileOptions,
 } from "./rpy-parser.service.js";
 import { calculateLinesHash, calculateContentHash } from "../lib/hash.js";
-import { characterParserService, type DetectedCharacter } from "./character-parser.service.js";
+import { type DetectedCharacter } from "./character-parser.service.js";
 import { projectSettings } from "../db/schema/index.js";
 
 /**
@@ -103,6 +100,7 @@ interface LabelLineInsertValues {
   sequence: number;
   contentType: "NARRATION" | "DIALOGUE" | "CHOICE" | "MENU" | "JUMP";
   content: string;
+  speakerId?: string | null; // Optional speaker ID for dialogue lines
   gitlabFileId?: string;
   linePosition?: number;
   contentHash?: string;
@@ -145,6 +143,38 @@ function mapEntryToDbContentType(entry: {
   }
 
   return { contentType: dbContentType, content };
+}
+
+/**
+ * Helper function to get character ID by renpyTag
+ * Returns null if character not found
+ */
+function getCharacterIdByTag(
+  renpyTag: string | undefined,
+  charactersByTag: Map<string, string>,
+): string | null {
+  if (!renpyTag) return null;
+  return charactersByTag.get(renpyTag) ?? null;
+}
+
+/**
+ * Helper function to fetch characters and build a Map of renpyTag -> id
+ * Accepts a transaction context to ensure transactional consistency
+ */
+async function fetchCharactersByTag(
+  tx: any,
+  projectId: string,
+): Promise<Map<string, string>> {
+  const projectCharacters = await tx
+    .select()
+    .from(characters)
+    .where(eq(characters.projectId, projectId));
+
+  const charactersByTag = new Map<string, string>();
+  for (const char of projectCharacters) {
+    charactersByTag.set(char.renpyTag, char.id);
+  }
+  return charactersByTag;
 }
 
 /**
@@ -324,6 +354,9 @@ export async function importFromGitlab(
   const operation = await createSyncOperation(projectId, "IMPORT", branch);
 
   try {
+    // Get the commit SHA for this branch at import time
+    const importCommitSha = await getBranchCommitSha(projectId, branch);
+
     // List RPY files in the repository
     const rpyFiles = await listRpyFiles(projectId, branch);
 
@@ -342,6 +375,18 @@ export async function importFromGitlab(
     }
 
     let conflictCount = 0;
+    let detectedCharacters: DetectedCharacter[] = [];
+
+    // Get project settings for excluded tags (for character import)
+    const [settings] = await db
+      .select()
+      .from(projectSettings)
+      .where(eq(projectSettings.projectId, projectId))
+      .limit(1);
+
+    const excludedTags = new Set(
+      settings?.excludedCharacterTags || ["n", "u", "narrator", "extend"],
+    );
 
     // Fetch file contents in parallel with concurrency limit
     const limiter = new ConcurrencyLimiter(5); // Limit to 5 concurrent requests
@@ -358,7 +403,14 @@ export async function importFromGitlab(
     let anySuccess = false;
     let firstError: Error | null = null;
 
-    // Process fetched results, handling errors per-file
+    // Phase 1: Parse all files and detect characters
+    const parsedFiles: Array<{
+      file: (typeof rpyFiles)[0];
+      content: string;
+      parsed: ParsedRPYFileWithLabels;
+      gitlabFile: { id: string };
+    }> = [];
+
     for (const result of fileFetchResults) {
       if (result.status === "rejected") {
         // Capture the first error for reporting
@@ -401,6 +453,98 @@ export async function importFromGitlab(
         })
         .returning();
 
+      parsedFiles.push({ file, content, parsed, gitlabFile });
+    }
+
+    // Phase 2: Import/update all detected characters
+    const allDetected: DetectedCharacter[] = [];
+    for (const { parsed } of parsedFiles) {
+      allDetected.push(
+        ...parsed.characters.map((c) => ({
+          tag: c.tag,
+          name: c.name || null,
+          displayName: c.name || c.tag,
+          color: c.color || "#cfcfcf",
+          isSpecial: false,
+          sourceFile: "",
+          confidence: 1,
+        })),
+      );
+    }
+
+    // Deduplicate by tag, excluding special tags
+    const seenTags = new Set<string>();
+    const uniqueCharacters: DetectedCharacter[] = [];
+    for (const char of allDetected) {
+      if (!seenTags.has(char.tag) && !excludedTags.has(char.tag)) {
+        seenTags.add(char.tag);
+        uniqueCharacters.push(char);
+      }
+    }
+
+    // Set detectedCharacters for return value
+    detectedCharacters = uniqueCharacters;
+
+    // Import detected characters into the database
+    const existingCharacters = await db
+      .select()
+      .from(characters)
+      .where(eq(characters.projectId, projectId));
+
+    const existingByTag = new Map(
+      existingCharacters.map((c) => [c.renpyTag, c]),
+    );
+
+    // Create or update characters in a single transaction with bulk operations
+    await db.transaction(async (tx) => {
+      // Separate characters into new and existing for bulk operations
+      const newCharacters: typeof uniqueCharacters = [];
+      const existingCharactersToUpdate: Array<{
+        existing: (typeof existingCharacters)[0];
+        data: (typeof uniqueCharacters)[0];
+      }> = [];
+
+      for (const charData of uniqueCharacters) {
+        const existing = existingByTag.get(charData.tag);
+        if (existing) {
+          existingCharactersToUpdate.push({ existing, data: charData });
+        } else {
+          newCharacters.push(charData);
+        }
+      }
+
+      // Bulk insert new characters (all-or-nothing)
+      if (newCharacters.length > 0) {
+        await tx.insert(characters).values(
+          newCharacters.map((charData) => ({
+            projectId,
+            name: charData.name ?? charData.tag,
+            displayName: charData.displayName,
+            renpyTag: charData.tag,
+            color: charData.color,
+          })),
+        );
+      }
+
+      // Update existing characters (within transaction for atomicity)
+      if (existingCharactersToUpdate.length > 0) {
+        const now = new Date();
+        for (const { existing, data } of existingCharactersToUpdate) {
+          await tx
+            .update(characters)
+            .set({
+              name: data.name ?? data.tag,
+              displayName: data.displayName,
+              color: data.color,
+              updatedAt: now,
+            })
+            .where(eq(characters.id, existing.id));
+        }
+      }
+    });
+
+    // Phase 3: Process parsed files to create labels with speaker linking
+    for (const { parsed, gitlabFile, content } of parsedFiles) {
       // For STORY files, import labels as scenes
       if (parsed.fileType === "STORY") {
         // Fetch all scenes for this file once to avoid N+1 queries
@@ -442,15 +586,23 @@ export async function importFromGitlab(
                 .delete(labelLines)
                 .where(eq(labelLines.labelId, existingScene.id));
 
+              // Fetch characters inside transaction to get latest state
+              const charactersByTag = await fetchCharactersByTag(tx, projectId);
+
               const allValues: LabelLineInsertValues[] = labelData.entries.map(
                 (entry, index) => {
                   const mapped = mapEntryToDbContentType(entry);
                   const entryContentHash = calculateContentHash(mapped.content);
+                  const speakerId = getCharacterIdByTag(
+                    entry.speaker,
+                    charactersByTag,
+                  );
                   return {
                     labelId: existingScene.id,
                     sequence: index + 1,
                     contentType: mapped.contentType,
                     content: mapped.content,
+                    speakerId,
                     gitlabFileId: gitlabFile.id,
                     linePosition: index,
                     contentHash: entryContentHash,
@@ -474,6 +626,7 @@ export async function importFromGitlab(
                   lastSyncedHash: contentHash,
                   syncStatus: "SYNCED",
                   lastImportedAt: new Date(),
+                  importCommitSha,
                   updatedAt: new Date(),
                 })
                 .where(eq(labels.id, existingScene.id));
@@ -500,18 +653,27 @@ export async function importFromGitlab(
                   lastSyncedHash: contentHash,
                   syncStatus: "SYNCED",
                   lastImportedAt: new Date(),
+                  importCommitSha,
                 })
                 .returning();
+
+              // Fetch characters inside transaction to get latest state
+              const charactersByTag = await fetchCharactersByTag(tx, projectId);
 
               const allValues: LabelLineInsertValues[] = labelData.entries.map(
                 (entry, index) => {
                   const mapped = mapEntryToDbContentType(entry);
                   const entryContentHash = calculateContentHash(mapped.content);
+                  const speakerId = getCharacterIdByTag(
+                    entry.speaker,
+                    charactersByTag,
+                  );
                   return {
                     labelId: newScene.id,
                     sequence: index + 1,
                     contentType: mapped.contentType,
                     content: mapped.content,
+                    speakerId,
                     gitlabFileId: gitlabFile.id,
                     linePosition: index,
                     contentHash: entryContentHash,
@@ -546,46 +708,6 @@ export async function importFromGitlab(
         status: "FAILED",
         errorMessage,
       };
-    }
-
-    // Detect characters from imported files
-    let detectedCharacters: DetectedCharacter[] = [];
-
-    // Get project settings for excluded tags
-    const [settings] = await db
-      .select()
-      .from(projectSettings)
-      .where(eq(projectSettings.projectId, projectId))
-      .limit(1);
-
-    const excludedTags = new Set(settings?.excludedCharacterTags || ['n', 'u', 'narrator', 'extend']);
-
-    // Get all gitlab_files for this project
-    const importedFiles = await db
-      .select()
-      .from(gitlabFiles)
-      .where(eq(gitlabFiles.projectId, projectId));
-
-    // Parse characters from all imported files
-    const allDetected: DetectedCharacter[] = [];
-    for (const file of importedFiles) {
-      if (file.content) {
-        const fileCharacters = characterParserService.parseWithExclusions(
-          file.content,
-          file.filePath,
-          excludedTags
-        );
-        allDetected.push(...fileCharacters);
-      }
-    }
-
-    // Deduplicate by tag
-    const seenTags = new Set<string>();
-    for (const char of allDetected) {
-      if (!seenTags.has(char.tag)) {
-        seenTags.add(char.tag);
-        detectedCharacters.push(char);
-      }
     }
 
     // Mark operation as completed
@@ -670,12 +792,7 @@ export async function detectConflicts(
     const localScenes = await db
       .select()
       .from(labels)
-      .where(
-        and(
-          eq(labels.projectId, projectId),
-          isNull(labels.deletedAt),
-        ),
-      );
+      .where(and(eq(labels.projectId, projectId), isNull(labels.deletedAt)));
 
     // Filter to only scenes with gitlabFileId (imported from GitLab)
     const gitlabScenes = localScenes.filter((s) => s.gitlabFileId);
