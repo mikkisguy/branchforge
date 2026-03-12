@@ -10,6 +10,7 @@ import { projectsRoutes } from "./routes/projects.routes.js";
 import { labelsRoutes } from "./routes/labels.routes.js";
 import { charactersRoutes } from "./routes/characters.routes.js";
 import { routeConfigsRoutes } from "./routes/route-configs.routes.js";
+import { stateVariablesRoutes } from "./routes/state-variables.routes.js";
 import { createDrizzleSessionStore } from "./services/session-store.service.js";
 import { setupShutdownHandlers } from "./lib/shutdown.js";
 import { globalErrorHandler } from "./middleware/error-handler.middleware.js";
@@ -65,6 +66,7 @@ await server.register(projectsRoutes, { prefix: basePath });
 await server.register(labelsRoutes, { prefix: basePath });
 await server.register(charactersRoutes, { prefix: basePath });
 await server.register(routeConfigsRoutes, { prefix: basePath });
+await server.register(stateVariablesRoutes, { prefix: basePath });
 
 // Start server
 const start = async () => {
