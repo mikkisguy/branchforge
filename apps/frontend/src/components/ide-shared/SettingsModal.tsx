@@ -12,10 +12,11 @@ import { useSettings } from "@/hooks/useSettings";
 import { useProject } from "@/hooks/useProject";
 import { GitLabSettingsContent } from "@/components/ide-shared/GitLabSettingsContent";
 import { RouteConfigDialog } from "@/components/RouteConfigDialog";
+import { StateVariablesDialog } from "@/components/StateVariablesDialog";
 import { cn } from "@/lib/utils";
 import { APP_NAME, APP_VERSION } from "@/lib/version";
 
-type Tab = "user" | "gitlab" | "routes" | "system";
+type Tab = "user" | "gitlab" | "routes" | "stateVariables" | "system";
 
 interface TabOption {
   id: Tab;
@@ -26,13 +27,14 @@ const tabs: TabOption[] = [
   { id: "user", label: "User" },
   { id: "gitlab", label: "GitLab" },
   { id: "routes", label: "Routes" },
+  { id: "stateVariables", label: "State Variables" },
   { id: "system", label: "System Admin" },
 ];
 
 /**
  * Helper function to filter tabs based on user role and ensure a valid active tab.
  * Only users with OWNER role can see the System Admin tab.
- * Routes tab only shows when a project is selected.
+ * Routes and State Variables tabs only show when a project is selected.
  *
  * @param activeTab - The currently active tab
  * @param userRole - The user's role (optional)
@@ -46,11 +48,12 @@ function getVisibleTabs(
 ) {
   return useMemo(() => {
     // Filter out system tab for non-OWNER users
-    // Filter out routes tab when no project is selected
+    // Filter out routes and state variables tabs when no project is selected
     const visibleTabs = tabs.filter(
       (tab) =>
         (tab.id !== "system" || userRole === "OWNER") &&
-        (tab.id !== "routes" || hasProject)
+        (tab.id !== "routes" || hasProject) &&
+        (tab.id !== "stateVariables" || hasProject)
     );
 
     // If current active tab is not visible, switch to first visible tab
@@ -70,6 +73,7 @@ interface SettingsModalProps {
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<Tab>("user");
   const [isRouteConfigOpen, setIsRouteConfigOpen] = useState(false);
+  const [isStateVariablesOpen, setIsStateVariablesOpen] = useState(false);
   const { user } = useAuth();
   const { currentProject } = useProject();
   const {
@@ -174,6 +178,29 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               </div>
             )}
 
+            {activeTab === "stateVariables" && (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-medium">State Variables Management</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    State variables are boolean state variables used in conditional branching logic.
+                    They control label accessibility, menu visibility, and story state changes.
+                  </p>
+                </div>
+                <div className="p-6 border border-dashed border-border/30 rounded-md text-center">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Create and manage state variables for conditional prerequisites, effects, and menu options.
+                  </p>
+                  <button
+                    onClick={() => setIsStateVariablesOpen(true)}
+                    className="px-4 py-2 bg-[var(--theme-color)] text-white rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
+                  >
+                    Open State Variables Management
+                  </button>
+                </div>
+              </div>
+            )}
+
             {activeTab === "system" && (
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">System Administration</h3>
@@ -205,6 +232,15 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
         <RouteConfigDialog
           open={isRouteConfigOpen}
           onOpenChange={setIsRouteConfigOpen}
+          projectId={currentProject.id}
+        />
+      )}
+
+      {/* State Variables Dialog */}
+      {currentProject?.id && (
+        <StateVariablesDialog
+          open={isStateVariablesOpen}
+          onOpenChange={setIsStateVariablesOpen}
           projectId={currentProject.id}
         />
       )}

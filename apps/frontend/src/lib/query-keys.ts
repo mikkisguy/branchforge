@@ -86,3 +86,15 @@ export const routeConfigKeys = {
   detail: (routeConfigId: string) =>
     ["routeConfigs", "detail", routeConfigId] as const,
 } as const;
+
+// ============================================================================
+// State Variable Keys
+// ============================================================================
+
+export const stateVariableKeys = {
+  all: ["stateVariables"] as const,
+  lists: (projectId: string) =>
+    ["stateVariables", projectId, "list"] as const,
+  detail: (stateVariableId: string) =>
+    ["stateVariables", "detail", stateVariableId] as const,
+} as const;

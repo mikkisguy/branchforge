@@ -1,0 +1,1 @@
+ALTER TABLE "state_variables" ADD CONSTRAINT "state_variables_project_key_idx" UNIQUE("project_id","key");

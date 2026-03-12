@@ -40,7 +40,7 @@ export * from "./tables/pair-groups.js";
 
 // Game state tables
 export * from "./tables/meters.js";
-export * from "./tables/flags.js";
+export * from "./tables/state_variables.js";
 
 // Content tables
 export * from "./tables/labels.js";

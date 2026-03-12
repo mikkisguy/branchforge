@@ -54,12 +54,12 @@ export const labels = pgTable(
     status: labelStatusEnum("status").default("DRAFT"),
     prerequisites: jsonb("prerequisites")
       .notNull()
-      .$type<{ flags?: string[]; meters?: Record<string, number> }>(), // {flags: [], meters: {}}
+      .$type<{ stateVariables?: string[]; meters?: Record<string, number> }>(), // {stateVariables: [], meters: {}}
     effects: jsonb("effects").notNull().$type<{
-      flagsSet?: string[];
-      flagsUnset?: string[];
+      stateVariablesSet?: string[];
+      stateVariablesUnset?: string[];
       meters?: Record<string, number>;
-    }>(), // {flagsSet: [], flagsUnset: [], meters: {}}
+    }>(), // {stateVariablesSet: [], stateVariablesUnset: [], meters: {}}
     crossRouteContext: text("cross_route_context"), // Prequel: "Lucas_Friend_Mode"
     readerNotes: text("reader_notes"), // Beta feedback
 

@@ -427,6 +427,52 @@ export const routeConfigProjectIdParamsSchema = z.object({
 });
 
 // ============================================================================
+// State Variable Schemas
+// ============================================================================
+
+/**
+ * State variable key validation schema
+ * Validates state variable key format (alphanumeric, underscores, hyphens)
+ */
+export const stateVariableKeySchema = z
+  .string()
+  .min(1, "State variable key is required")
+  .max(50, "State variable key is too long")
+  .regex(
+    /^[a-zA-Z0-9_-]+$/,
+    "State variable key must contain only letters, numbers, underscores, and hyphens"
+  );
+
+/**
+ * Create state variable request validation
+ */
+export const createStateVariableSchema = z
+  .object({
+    key: stateVariableKeySchema,
+    description: optionalString(500, "Description is too long"),
+    category: optionalString(50, "Category is too long"),
+  })
+  .strict();
+
+/**
+ * Update state variable request validation
+ */
+export const updateStateVariableSchema = z
+  .object({
+    key: stateVariableKeySchema.optional(),
+    description: optionalString(500, "Description is too long"),
+    category: optionalString(50, "Category is too long"),
+  })
+  .strict();
+
+/**
+ * State variable ID params validation
+ */
+export const stateVariableIdParamsSchema = z.object({
+  stateVariableId: uuidSchema,
+});
+
+// ============================================================================
 // Character Schemas
 // ============================================================================
 
@@ -699,6 +745,8 @@ export type ImportRequestInput = z.infer<typeof importRequestSchema>;
 export type PaginationQuery = z.infer<typeof paginationQuerySchema>;
 export type CreateRouteConfigInput = z.infer<typeof createRouteConfigSchema>;
 export type UpdateRouteConfigInput = z.infer<typeof updateRouteConfigSchema>;
+export type CreateStateVariableInput = z.infer<typeof createStateVariableSchema>;
+export type UpdateStateVariableInput = z.infer<typeof updateStateVariableSchema>;
 
 // ============================================================================
 // Helper Functions

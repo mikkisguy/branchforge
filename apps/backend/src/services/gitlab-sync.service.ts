@@ -12,6 +12,7 @@ import {
   labels,
   labelLines,
   characters,
+  stateVariables,
 } from "../db/schema/index.js";
 import { eq, and, desc, inArray, asc, isNull } from "drizzle-orm";
 import {
@@ -25,6 +26,10 @@ import {
   convertToBranchForgeFormatFromLabels,
   type ParsedRPYFileWithLabels,
 } from "./rpy-parser.service.js";
+import {
+  patchRPYWithStateVariables,
+  generateStateVariablesFile,
+} from "./rpy-generator.service.js";
 import { calculateLinesHash, calculateContentHash } from "../lib/hash.js";
 import { type DetectedCharacter } from "./character-parser.service.js";
 import { projectSettings } from "../db/schema/index.js";
@@ -260,18 +265,75 @@ export async function exportToGitlab(
       .from(gitlabFiles)
       .where(eq(gitlabFiles.projectId, projectId));
 
+    // Get all labels with gitlabFileId, prerequisites and effects for state variable patching
+    const projectLabels = await db
+      .select({
+        title: labels.title,
+        prerequisites: labels.prerequisites,
+        effects: labels.effects,
+        gitlabFileId: labels.gitlabFileId,
+      })
+      .from(labels)
+      .where(
+        and(eq(labels.projectId, projectId), isNull(labels.deletedAt))
+      );
+
+    // Create a map of file ID to labels for that file
+    const labelsByFile = new Map<string, typeof projectLabels>();
+    for (const label of projectLabels) {
+      if (label.gitlabFileId) {
+        if (!labelsByFile.has(label.gitlabFileId)) {
+          labelsByFile.set(label.gitlabFileId, []);
+        }
+        labelsByFile.get(label.gitlabFileId)!.push(label);
+      }
+    }
+
     // Export each file - Script Mode uses stored content directly
     for (const file of projectFiles) {
       if (file.content) {
-        // Use stored full content for Script Mode files
+        let contentToExport = file.content;
+
+        // Patch content with state variables if this file has labels with conditions
+        const fileLabels = labelsByFile.get(file.id);
+        if (fileLabels && fileLabels.length > 0) {
+          contentToExport = patchRPYWithStateVariables(
+            file.content,
+            fileLabels
+          );
+        }
+
         await createOrUpdateFile(
           projectId,
           targetBranch,
           file.filePath,
-          file.content,
+          contentToExport,
           message
         );
       }
+    }
+
+    // Generate and export state_variables.rpy file if state variables exist
+    const projectStateVariables = await db
+      .select({
+        key: stateVariables.key,
+        description: stateVariables.description,
+        category: stateVariables.category,
+      })
+      .from(stateVariables)
+      .where(eq(stateVariables.projectId, projectId));
+
+    if (projectStateVariables.length > 0) {
+      const stateVariablesContent = generateStateVariablesFile(
+        projectStateVariables
+      );
+      await createOrUpdateFile(
+        projectId,
+        targetBranch,
+        "state_variables.rpy",
+        stateVariablesContent,
+        message
+      );
     }
 
     // Update labels with export metadata (commitSha tracking not yet implemented)

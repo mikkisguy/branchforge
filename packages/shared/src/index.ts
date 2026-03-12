@@ -104,6 +104,23 @@ export interface RouteConfig {
 }
 
 // ============================================================================
+// State Variable Configuration
+// ============================================================================
+
+/**
+ * State Variable for conditional branching logic
+ * State variables are boolean state variables used in prerequisites and effects
+ */
+export interface StateVariable {
+  id: string;
+  projectId: string;
+  key: string;
+  description: string | null;
+  category: string | null;
+  createdAt: string;
+}
+
+// ============================================================================
 // Public User Interface
 // ============================================================================
 
