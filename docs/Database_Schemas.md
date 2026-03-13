@@ -167,6 +167,25 @@ Character tags, colors, transforms.
 | `created_at`      | timestamp          |                                             |
 | `updated_at`      | timestamp          |                                             |
 
+Unique constraint: `(project_id, tag)`
+
+---
+
+### 8.1. State Variables
+
+Boolean story state tracking (simpler alternative to flags).
+
+| Column        | Type               | Notes                     |
+| ------------- | ------------------ | ------------------------- |
+| `id`          | uuid PK            |                           |
+| `project_id`  | uuid FK → projects |                           |
+| `key`         | text, not null     | `"met_viola"`             |
+| `description` | text               | Variable description      |
+| `category`    | text               | For grouping              |
+| `created_at`  | timestamp          |                           |
+
+Unique constraint: `(project_id, key)`
+
 ---
 
 ### 9. Characters
@@ -496,6 +515,7 @@ projects
 ├── visual_systems (1:1)
 ├── route_configs (1:m)
 ├── renpy_definitions (1:m)
+├── state_variables (1:m)
 ├── characters (1:m)
 ├── pair_groups (1:m)
 ├── meters (1:m)

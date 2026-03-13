@@ -5,10 +5,10 @@
 
 ## Summary
 
-- **Total Database Tables**: 25 tables
-- **Fully Implemented**: 9 tables (36%)
-- **Partially Implemented**: 10 tables (40%)
-- **Not Implemented**: 6 tables (24%)
+- **Total Database Tables**: 26 tables
+- **Fully Implemented**: 11 tables (42%)
+- **Partially Implemented**: 10 tables (38%)
+- **Not Implemented**: 5 tables (19%)
 
 ---
 
@@ -154,7 +154,7 @@ PUT    /api/projects/:id/visual-system  // Update config
 
 ---
 
-### 8. Ren'Py Definitions ❌ Not Implemented
+### 8. Ren'Py Definitions ✅ Fully Implemented
 
 **Schema**: `renpy_definitions` table
 - `category`, `tag`, `display_name`, `definition_code`
@@ -162,19 +162,47 @@ PUT    /api/projects/:id/visual-system  // Update config
 
 **Implementation Status**:
 - ✅ Schema exists
-- ❌ No backend routes
-- ❌ No backend service
-- ❌ No UI
+- ✅ Backend routes: `renpy-definitions.routes.ts` (full CRUD)
+- ✅ Backend service: `renpy-definitions.service.ts`
+- ✅ Frontend component: `RenpyDefinitionsDialog.tsx`
+- ✅ Frontend hook: `useRenpyDefinitions.ts`
+- ✅ Frontend API client: `renpy-definitions.ts`
 
 **Purpose**: Store custom Ren'Py code definitions that get exported at the top of RPY files.
 
-**TODO**:
+**Routes Implemented**:
 ```typescript
-// Ren'Py definitions routes needed
-GET    /api/projects/:id/definitions     // List definitions
-POST   /api/projects/:id/definitions     // Create definition
-PUT    /api/projects/:id/definitions/:id // Update definition
-DELETE /api/projects/:id/definitions/:id // Delete definition
+GET    /api/projects/:projectId/renpy-definitions     // List definitions
+POST   /api/projects/:projectId/renpy-definitions     // Create definition
+GET    /api/renpy-definitions/:renpyDefinitionId      // Get single definition
+PATCH  /api/renpy-definitions/:renpyDefinitionId      // Update definition
+DELETE /api/renpy-definitions/:renpyDefinitionId      // Delete definition
+```
+
+---
+
+### 8.2. State Variables ✅ Fully Implemented
+
+**Schema**: `state_variables` table
+- Boolean story state tracking (simpler alternative to flags)
+
+**Implementation Status**:
+- ✅ Schema exists
+- ✅ Backend routes: `state-variables.routes.ts` (full CRUD)
+- ✅ Backend service: `state_variables.service.ts`
+- ✅ Frontend component: `StateVariablesDialog.tsx`
+- ✅ Frontend hook: `useStateVariables.ts`
+- ✅ Frontend API client: `state-variables.ts`
+
+**Purpose**: Track boolean state variables for story progression without the complexity of flags.
+
+**Routes Implemented**:
+```typescript
+GET    /api/projects/:projectId/state-variables     // List state variables
+POST   /api/projects/:projectId/state-variables     // Create state variable
+GET    /api/state-variables/:stateVariableId        // Get single state variable
+PATCH  /api/state-variables/:stateVariableId        // Update state variable
+DELETE /api/state-variables/:stateVariableId        // Delete state variable
 ```
 
 ---
@@ -572,11 +600,6 @@ POST   /api/demo/:id/end                  // End session
    - Effort: Medium
    - Dependencies: None
 
-9. **Ren'Py Definitions** (Ren'Py Definitions table)
-   - Impact: Can't add custom definitions to exports
-   - Effort: Low
-   - Dependencies: None
-
 ### Lower Priority (Advanced Features)
 
 10. **World Elements** (World Elements table)
@@ -617,8 +640,7 @@ POST   /api/demo/:id/end                  // End session
 
 ### Phase 2: Export & Configuration
 6. Visual System Configuration
-7. Ren'Py Definitions
-8. Export Generation
+7. Export Generation
 
 ### Phase 3: Collaboration
 9. User Settings
@@ -669,14 +691,15 @@ POST   /api/demo/:id/end                  // End session
 │   ├── POST   /:id/pairs
 │   ├── PUT    /:id/pairs/:pid
 │   ├── DELETE /:id/pairs/:pid
-│   ├── GET    /:id/world-elements  # [NEW] World bible
+│   ├── GET    /:id/world-elements       # [NEW] World bible
 │   ├── POST   /:id/world-elements
 │   ├── PUT    /:id/world-elements/:wid
 │   ├── DELETE /:id/world-elements/:wid
-│   ├── GET    /:id/definitions     # [NEW] Ren'Py definitions
-│   ├── POST   /:id/definitions
-│   ├── PUT    /:id/definitions/:did
-│   ├── DELETE /:id/definitions/:did
+│   ├── GET    /:id/renpy-definitions    # ✅ Ren'Py definitions
+│   ├── POST   /:id/renpy-definitions
+│   ├── GET    /:id/state-variables      # ✅ State variables
+│   ├── POST   /:id/state-variables
+│   ├── GET    /:id/export               # [NEW] Generate export
 │   ├── GET    /:id/visual-system   # [NEW] Visual system config
 │   ├── PUT    /:id/visual-system
 │   ├── GET    /:id/export          # [NEW] Generate export
@@ -697,6 +720,14 @@ POST   /api/demo/:id/end                  // End session
 │   ├── PUT    /:id/characters/:lcid
 │   ├── DELETE /:id/characters/:lcid
 │   └── POST   /:id/suggestions/generate  # [NEW] AI suggestions
+├── /renpy-definitions             # ✅ Ren'Py definitions
+│   ├── GET    /:renpyDefinitionId
+│   ├── PATCH  /:renpyDefinitionId
+│   └── DELETE /:renpyDefinitionId
+├── /state-variables               # ✅ State variables
+│   ├── GET    /:stateVariableId
+│   ├── PATCH  /:stateVariableId
+│   └── DELETE /:stateVariableId
 ├── /demo
 │   ├── POST   /projects/:id/start  # [NEW] Start demo
 │   ├── PUT    /:id/position        # [NEW] Update position
