@@ -28,6 +28,10 @@ import {
   gitlabUrlSchema,
   validateData,
   safeValidateData,
+  renpyDefinitionCategorySchema,
+  createRenpyDefinitionSchema,
+  updateRenpyDefinitionSchema,
+  renpyDefinitionIdParamsSchema,
 } from "../validation.js";
 import { ValidationError } from "../../middleware/error-handler.middleware.js";
 
@@ -1144,6 +1148,288 @@ describe("Character Schemas", () => {
       };
 
       const result = characterIdParamsSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+    });
+  });
+});
+
+describe("Ren'Py Definition Schemas", () => {
+  describe("renpyDefinitionCategorySchema", () => {
+    it("should accept valid categories", () => {
+      const validCategories = ["CHARACTER", "TRANSFORM", "IMAGE", "INIT"];
+      for (const category of validCategories) {
+        const result = renpyDefinitionCategorySchema.safeParse(category);
+        expect(result.success).toBe(true);
+      }
+    });
+
+    it("should reject invalid category", () => {
+      const result = renpyDefinitionCategorySchema.safeParse("INVALID");
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("createRenpyDefinitionSchema", () => {
+    describe("CHARACTER category (no spaces allowed)", () => {
+      it("should accept valid CHARACTER definition with single-word tag", () => {
+        const validData = {
+          category: "CHARACTER" as const,
+          tag: "eileen",
+          displayName: "Eileen Character",
+          definitionCode: 'define a = Character("Eileen", color="#cfb53b")',
+          referenceTag: null,
+          sortOrder: 0,
+        };
+
+        const result = createRenpyDefinitionSchema.safeParse(validData);
+        expect(result.success).toBe(true);
+      });
+
+      it("should accept valid CHARACTER definition with underscores in tag", () => {
+        const validData = {
+          category: "CHARACTER" as const,
+          tag: "hero_main",
+          displayName: "Main Hero",
+          definitionCode: 'define hero_main = Character("Hero")',
+          referenceTag: null,
+        };
+
+        const result = createRenpyDefinitionSchema.safeParse(validData);
+        expect(result.success).toBe(true);
+      });
+
+      it("should reject CHARACTER definition with spaces in tag", () => {
+        const invalidData = {
+          category: "CHARACTER" as const,
+          tag: "eileen character",
+          displayName: "Eileen Character",
+          definitionCode: 'define a = Character("Eileen")',
+          referenceTag: null,
+        };
+
+        const result = createRenpyDefinitionSchema.safeParse(invalidData);
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error.issues[0].message).toContain(
+            "letters, numbers, and underscores"
+          );
+        }
+      });
+    });
+
+    describe("IMAGE category (spaces allowed)", () => {
+      it("should accept valid IMAGE definition with spaces in tag", () => {
+        const validData = {
+          category: "IMAGE" as const,
+          tag: "bg cafe",
+          displayName: "Cafe Background",
+          definitionCode: 'image bg cafe = "images/cafe.png"',
+          referenceTag: null,
+        };
+
+        const result = createRenpyDefinitionSchema.safeParse(validData);
+        expect(result.success).toBe(true);
+      });
+
+      it("should accept valid IMAGE definition with multi-word tag", () => {
+        const validData = {
+          category: "IMAGE" as const,
+          tag: "bg office night",
+          displayName: "Night Office Background",
+          definitionCode: 'image bg office night = "images/office_night.png"',
+          referenceTag: null,
+        };
+
+        const result = createRenpyDefinitionSchema.safeParse(validData);
+        expect(result.success).toBe(true);
+      });
+
+      it("should trim leading/trailing spaces from IMAGE tag", () => {
+        const dataWithSpaces = {
+          category: "IMAGE" as const,
+          tag: " bg cafe ",
+          displayName: "Cafe Background",
+          definitionCode: 'image bg cafe = "images/cafe.png"',
+          referenceTag: null,
+        };
+
+        const result = createRenpyDefinitionSchema.safeParse(dataWithSpaces);
+        expect(result.success).toBe(true);
+        if (result.success) {
+          // Verify that leading/trailing spaces were trimmed
+          expect(result.data.tag).toBe("bg cafe");
+        }
+      });
+    });
+
+    describe("TRANSFORM category (no spaces allowed)", () => {
+      it("should accept valid TRANSFORM definition", () => {
+        const validData = {
+          category: "TRANSFORM" as const,
+          tag: "dissolve",
+          displayName: "Dissolve Transition",
+          definitionCode: "transform dissolve: alpha 0",
+          referenceTag: null,
+        };
+
+        const result = createRenpyDefinitionSchema.safeParse(validData);
+        expect(result.success).toBe(true);
+      });
+
+      it("should reject TRANSFORM definition with spaces in tag", () => {
+        const invalidData = {
+          category: "TRANSFORM" as const,
+          tag: "dissolve slow",
+          displayName: "Slow Dissolve",
+          definitionCode: "transform dissolve_slow: alpha 0",
+          referenceTag: null,
+        };
+
+        const result = createRenpyDefinitionSchema.safeParse(invalidData);
+        expect(result.success).toBe(false);
+      });
+    });
+
+    describe("INIT category (no spaces allowed)", () => {
+      it("should accept valid INIT definition", () => {
+        const validData = {
+          category: "INIT" as const,
+          tag: "debug_config",
+          displayName: "Debug Configuration",
+          definitionCode: 'init python: config.debug = True',
+          referenceTag: null,
+        };
+
+        const result = createRenpyDefinitionSchema.safeParse(validData);
+        expect(result.success).toBe(true);
+      });
+
+      it("should reject INIT definition with spaces in tag", () => {
+        const invalidData = {
+          category: "INIT" as const,
+          tag: "debug config",
+          displayName: "Debug Config",
+          definitionCode: 'init python: config.debug = True',
+          referenceTag: null,
+        };
+
+        const result = createRenpyDefinitionSchema.safeParse(invalidData);
+        expect(result.success).toBe(false);
+      });
+    });
+
+    it("should reject missing required fields", () => {
+      const invalidData = {
+        category: "CHARACTER" as const,
+        // missing tag
+        // missing displayName
+        // missing definitionCode
+      };
+
+      const result = createRenpyDefinitionSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject tag with special characters", () => {
+      const invalidData = {
+        category: "CHARACTER" as const,
+        tag: "char@name",
+        displayName: "Character",
+        definitionCode: 'define c = Character("Name")',
+        referenceTag: null,
+      };
+
+      const result = createRenpyDefinitionSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+    });
+
+    it("should accept valid referenceTag", () => {
+      const validData = {
+        category: "IMAGE" as const,
+        tag: "bg_cafe_day",
+        displayName: "Day Cafe Background",
+        definitionCode: 'image bg_cafe_day = "images/cafe_day.png"',
+        referenceTag: "bg_cafe",
+      };
+
+      const result = createRenpyDefinitionSchema.safeParse(validData);
+      expect(result.success).toBe(true);
+    });
+
+    it("should default sortOrder to 0 when not provided", () => {
+      const validData = {
+        category: "CHARACTER" as const,
+        tag: "eileen",
+        displayName: "Eileen",
+        definitionCode: 'define e = Character("Eileen")',
+        referenceTag: null,
+      };
+
+      const result = createRenpyDefinitionSchema.safeParse(validData);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.sortOrder).toBe(0);
+      }
+    });
+  });
+
+  describe("updateRenpyDefinitionSchema", () => {
+    it("should accept partial updates for CHARACTER category", () => {
+      const validData = {
+        displayName: "Updated Character Name",
+      };
+
+      const result = updateRenpyDefinitionSchema.safeParse(validData);
+      expect(result.success).toBe(true);
+    });
+
+    it("should accept tag update for IMAGE category with spaces", () => {
+      const validData = {
+        category: "IMAGE" as const,
+        tag: "bg new location",
+      };
+
+      const result = updateRenpyDefinitionSchema.safeParse(validData);
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject tag update for CHARACTER category with spaces", () => {
+      const invalidData = {
+        category: "CHARACTER" as const,
+        tag: "invalid tag",
+      };
+
+      const result = updateRenpyDefinitionSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject tag with spaces when category is not provided", () => {
+      // When category is not provided, strict validation is applied (safe default)
+      const invalidData = {
+        tag: "invalid tag",
+      };
+
+      const result = updateRenpyDefinitionSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("renpyDefinitionIdParamsSchema", () => {
+    it("should accept valid Ren'Py definition ID", () => {
+      const validData = {
+        renpyDefinitionId: "550e8400-e29b-41d4-a716-446655440000",
+      };
+
+      const result = renpyDefinitionIdParamsSchema.safeParse(validData);
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject invalid Ren'Py definition ID", () => {
+      const invalidData = {
+        renpyDefinitionId: "not-a-uuid",
+      };
+
+      const result = renpyDefinitionIdParamsSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
   });

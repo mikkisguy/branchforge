@@ -1,0 +1,1 @@
+ALTER TABLE "renpy_definitions" ADD CONSTRAINT "renpy_definitions_project_tag_unique" UNIQUE("project_id","tag");
