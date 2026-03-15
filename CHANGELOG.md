@@ -5,6 +5,19 @@ All notable changes to BranchForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.5.1 - 2026-03-15
+
+### Fixed
+- 4078ffb: Added Ren'Py definitions management service and UI components
+- 8a59220: Add character parser service and import wizard for RPY character management
+- 3ced98a: Added game state variables management
+- Updated dependencies [4078ffb]
+- Updated dependencies [9898c]
+- Updated dependencies [8a59220]
+- Updated dependencies [3ced98a]
+  - @branchforge/shared@0.5.1
+- 9898c: Add soft delete and sync tracking to labels
+
 ## v0.5.0 - 2026-03-09
 
 ### Added
