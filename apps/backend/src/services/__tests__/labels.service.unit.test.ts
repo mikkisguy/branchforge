@@ -2,10 +2,14 @@
  * Labels Service Unit Tests
  *
  * Tests for the labels business logic layer.
- * Tests listing labels, getting label details, and authorization.
+ *
+ * NOTE: Database operation tests (listLabels, getLabel, createLabel, updateLabel, deleteLabel)
+ * have been migrated to integration tests. These unit tests now focus on:
+ * - Data transformation logic (mapToPublicLabel)
+ * - GitLab file sync integration (RPY parser)
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // Mock the label-characters schema table before importing the service
 // This prevents circular dependency issues in the test environment
@@ -22,9 +26,6 @@ vi.mock("../../db/schema/tables/label-characters.js", () => ({
 // Now import the service after the mock is set up
 import {
   listLabels,
-  getLabel,
-  createLabel,
-  updateLabel,
   deleteLabel,
   type LabelLineWithSpeaker,
 } from "../labels.service.js";
@@ -75,8 +76,14 @@ const createMockChain = (resolveValue: any) => {
 const createEmptyMockChain = () => createMockChain([]);
 const mockSelect = vi.fn(createEmptyMockChain);
 
+// Additional mocks for deleteLabel tests (GitLab file sync)
+const mockUpdate = vi.fn();
+const mockTransaction = vi.fn();
+
 const mockDb = {
   select: mockSelect,
+  update: mockUpdate,
+  transaction: mockTransaction,
 };
 
 vi.mock("../../db/index.js", () => ({
@@ -108,22 +115,6 @@ describe("LabelsService", () => {
     updatedAt: new Date("2024-01-01"),
   };
 
-  const mockCharacter = {
-    id: "char-1",
-    projectId,
-    name: "Eileen",
-    displayName: "Eileen",
-    renpyTag: "a",
-    routeAffiliation: "EILEEN",
-    isLoveInterest: true,
-    pairGroupId: null,
-    dialogueStyle: null,
-    conditionalPrefix: null,
-    color: "#FF5733",
-    createdAt: new Date("2024-01-01"),
-    updatedAt: new Date("2024-01-01"),
-  };
-
   const mockLabelLine: LabelLineWithSpeaker = {
     id: "line-1",
     labelId,
@@ -144,150 +135,14 @@ describe("LabelsService", () => {
     updatedAt: new Date("2024-01-01").toISOString(),
   };
 
-  afterEach(() => {
+  beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe("listLabels", () => {
-    beforeEach(() => {
-      mockSelect.mockImplementation(createEmptyMockChain);
-    });
-
-    it("should return empty array when project has no labels", async () => {
-      const labels = await listLabels(projectId, userId);
-      expect(labels).toEqual([]);
-    });
-
-    it("should return list of labels for a project", async () => {
-      mockSelect.mockImplementation(() => createMockChain([mockLabel]));
-
-      const labels = await listLabels(projectId, userId);
-
-      expect(labels).toHaveLength(1);
-      expect(labels[0]).toEqual({
-        id: labelId,
-        projectId,
-        title: "chapter1_label1",
-        groupType: "act",
-        groupValue: "I",
-        labelNumber: 1,
-        sequenceOrder: 0,
-        routeKey: "common",
-        status: "DRAFT",
-        visibility: "EXCLUSIVE",
-        createdAt: mockLabel.createdAt.toISOString(),
-        updatedAt: mockLabel.updatedAt.toISOString(),
-      });
-    });
-
-    it("should return multiple labels ordered by sequence", async () => {
-      const label2 = {
-        ...mockLabel,
-        id: "label-2",
-        labelNumber: 2,
-        sequenceOrder: 1,
-      };
-      mockSelect.mockImplementation(() => createMockChain([mockLabel, label2]));
-
-      const labels = await listLabels(projectId, userId);
-
-      expect(labels).toHaveLength(2);
-      expect(labels[0].labelNumber).toBe(1);
-      expect(labels[1].labelNumber).toBe(2);
-    });
-  });
-
-  describe("getLabel", () => {
-    beforeEach(() => {
-      mockSelect.mockImplementation(createEmptyMockChain);
-    });
-
-    it("should return label with lines and characters when found", async () => {
-      // Mock label query
-      let callCount = 0;
-      const mockDbLabelLine = {
-        ...mockLabelLine,
-        createdAt: new Date("2024-01-01"),
-        updatedAt: new Date("2024-01-01"),
-      };
-
-      mockSelect.mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          // First call: get label with project owner
-          return createMockChain([
-            {
-              label: mockLabel,
-              projectOwnerId: userId,
-            },
-          ]);
-        } else if (callCount === 2) {
-          // Second call: get label lines with speakers
-          return createMockChain([
-            {
-              line: mockDbLabelLine,
-              speakerName: "Eileen",
-              speakerTag: "a",
-            },
-          ]);
-        } else {
-          // Third call: get label characters
-          return createMockChain([
-            {
-              character: mockCharacter,
-              role: "PRIMARY",
-              emotion: null,
-              notes: null,
-            },
-          ]);
-        }
-      });
-
-      const label = await getLabel(labelId, userId);
-
-      expect(label).not.toBeNull();
-      expect(label?.id).toBe(labelId);
-      expect(label?.title).toBe("chapter1_label1");
-      expect(label?.lines).toHaveLength(1);
-      expect(label?.lines[0].content).toBe("Hello world!");
-      expect(label?.characters).toHaveLength(1);
-      expect(label?.characters[0].name).toBe("Eileen");
-    });
-
-    it("should return null when label not found", async () => {
-      mockSelect.mockImplementation(createEmptyMockChain);
-
-      const label = await getLabel(labelId, userId);
-
-      expect(label).toBeNull();
-    });
-
-    it("should return label with empty lines array when no lines exist", async () => {
-      let callCount = 0;
-      mockSelect.mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          // First call: get label with project owner
-          return createMockChain([
-            {
-              label: mockLabel,
-              projectOwnerId: userId,
-            },
-          ]);
-        }
-        // All subsequent calls return empty
-        return createMockChain([]);
-      });
-
-      const label = await getLabel(labelId, userId);
-
-      expect(label).not.toBeNull();
-      expect(label?.lines).toEqual([]);
-    });
-  });
-
-  // authorizeLabelAccess tests moved to integration tests due to complex ORM queries with joins
-  // (labels → projects → projectUsers)
+  // ============================================================================
+  // Data transformation tests (mapToPublicLabel logic)
+  // These tests verify the data transformation logic that happens after DB queries
+  // ============================================================================
 
   describe("mapToPublicLabel (via listLabels)", () => {
     beforeEach(() => {
@@ -359,373 +214,14 @@ describe("LabelsService", () => {
     });
   });
 
-  describe("createLabel", () => {
+  // ============================================================================
+  // GitLab file sync tests (deleteLabel with RPY parser integration)
+  // These tests verify the GitLab file sync behavior when deleting labels
+  // ============================================================================
+
+  describe("deleteLabel - GitLab file sync", () => {
     beforeEach(() => {
       mockSelect.mockImplementation(createEmptyMockChain);
-    });
-
-    it("should create a label with valid data", async () => {
-      // Mock project exists and user is owner
-      mockSelect.mockImplementation(() =>
-        createMockChain([{ userId: userId }])
-      );
-
-      const mockInsert = vi.fn().mockReturnValue({
-        values: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([mockLabel]),
-        }),
-      });
-      mockDb.insert = mockInsert;
-
-      const result = await createLabel(userId, {
-        projectId,
-        title: "Test Label",
-        route: "common",
-        groupType: "act",
-        groupValue: "I",
-        labelNumber: 1,
-        sequenceOrder: 0,
-      });
-
-      expect(result.id).toBe(labelId);
-      expect(result.title).toBe("chapter1_label1");
-      expect(result.routeKey).toBe("common");
-    });
-
-    it("should throw NotFoundError when project does not exist", async () => {
-      mockSelect.mockImplementation(createEmptyMockChain);
-
-      const mockInsert = vi.fn().mockReturnValue({
-        values: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([mockLabel]),
-        }),
-      });
-      mockDb.insert = mockInsert;
-
-      await expect(
-        createLabel(userId, {
-          projectId: "nonexistent-project",
-          title: "Test Label",
-          labelNumber: 1,
-        })
-      ).rejects.toThrow("Project");
-    });
-
-    it("should throw ForbiddenError when user is not project owner", async () => {
-      // Mock project exists but user is not owner
-      mockSelect.mockImplementation(() =>
-        createMockChain([{ userId: "different-user" }])
-      );
-
-      const mockInsert = vi.fn().mockReturnValue({
-        values: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([mockLabel]),
-        }),
-      });
-      mockDb.insert = mockInsert;
-
-      await expect(
-        createLabel(userId, {
-          projectId,
-          title: "Test Label",
-          labelNumber: 1,
-        })
-      ).rejects.toThrow("Insufficient permissions");
-    });
-
-    it("should coerce route to null when route does not exist in route_configs", async () => {
-      let queryCount = 0;
-      mockSelect.mockImplementation(() => {
-        queryCount++;
-        if (queryCount === 1) {
-          // First call: check project ownership
-          return createMockChain([{ userId: userId }]);
-        } else {
-          // Second call: validate route - return empty (route doesn't exist)
-          return createMockChain([]);
-        }
-      });
-
-      const mockInsert = vi.fn().mockReturnValue({
-        values: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([mockLabel]),
-        }),
-      });
-      mockDb.insert = mockInsert;
-
-      await createLabel(userId, {
-        projectId,
-        title: "Test Label",
-        route: "nonexistent_route",
-        labelNumber: 1,
-      });
-
-      // Verify the insert was called with coerced null route
-      expect(mockInsert).toHaveBeenCalled();
-    });
-
-    it("should set default values for optional fields", async () => {
-      mockSelect.mockImplementation(() =>
-        createMockChain([{ userId: userId }])
-      );
-
-      const mockInsert = vi.fn().mockReturnValue({
-        values: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([mockLabel]),
-        }),
-      });
-      mockDb.insert = mockInsert;
-
-      await createLabel(userId, {
-        projectId,
-        title: "Test Label",
-        labelNumber: 1,
-      });
-
-      expect(mockInsert).toHaveBeenCalled();
-    });
-  });
-
-  describe("updateLabel", () => {
-    beforeEach(() => {
-      mockSelect.mockImplementation(createEmptyMockChain);
-    });
-
-    it("should update label title", async () => {
-      mockSelect.mockImplementation(() =>
-        createMockChain([
-          {
-            label: { ...mockLabel, title: "Old Title" },
-            projectOwnerId: userId,
-          },
-        ])
-      );
-
-      const mockUpdate = vi.fn().mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            returning: vi
-              .fn()
-              .mockResolvedValue([{ ...mockLabel, title: "New Title" }]),
-          }),
-        }),
-      });
-      mockDb.update = mockUpdate;
-
-      const _result = await updateLabel(labelId, userId, {
-        title: "New Title",
-      });
-
-      expect(mockUpdate).toHaveBeenCalled();
-    });
-
-    it("should throw NotFoundError when label does not exist", async () => {
-      mockSelect.mockImplementation(createEmptyMockChain);
-
-      await expect(
-        updateLabel("nonexistent-label", userId, { title: "New Title" })
-      ).rejects.toThrow("Label");
-    });
-
-    it("should throw ForbiddenError when user is not project owner", async () => {
-      mockSelect.mockImplementation(() =>
-        createMockChain([
-          {
-            label: mockLabel,
-            projectOwnerId: "different-user",
-          },
-        ])
-      );
-
-      await expect(
-        updateLabel(labelId, userId, { title: "New Title" })
-      ).rejects.toThrow("Insufficient permissions");
-    });
-
-    it("should update label status", async () => {
-      mockSelect.mockImplementation(() =>
-        createMockChain([
-          {
-            label: { ...mockLabel, status: "DRAFT" },
-            projectOwnerId: userId,
-          },
-        ])
-      );
-
-      const mockUpdate = vi.fn().mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            returning: vi
-              .fn()
-              .mockResolvedValue([{ ...mockLabel, status: "REVIEW" }]),
-          }),
-        }),
-      });
-      mockDb.update = mockUpdate;
-
-      await updateLabel(labelId, userId, { status: "REVIEW" });
-
-      expect(mockUpdate).toHaveBeenCalled();
-    });
-
-    it("should coerce route to null when route does not exist in route_configs", async () => {
-      let queryCount = 0;
-      mockSelect.mockImplementation(() => {
-        queryCount++;
-        if (queryCount === 1) {
-          return createMockChain([
-            {
-              label: mockLabel,
-              projectOwnerId: userId,
-            },
-          ]);
-        } else {
-          // Route validation - route doesn't exist
-          return createMockChain([]);
-        }
-      });
-
-      const mockUpdate = vi.fn().mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([mockLabel]),
-          }),
-        }),
-      });
-      mockDb.update = mockUpdate;
-
-      await updateLabel(labelId, userId, { route: "nonexistent_route" });
-
-      expect(mockUpdate).toHaveBeenCalled();
-    });
-  });
-
-  describe("deleteLabel", () => {
-    beforeEach(() => {
-      mockSelect.mockImplementation(createEmptyMockChain);
-    });
-
-    it("should soft delete a label", async () => {
-      mockSelect.mockImplementation(() =>
-        createMockChain([
-          {
-            label: mockLabel,
-            projectOwnerId: userId,
-          },
-        ])
-      );
-
-      const mockUpdate = vi.fn().mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue(undefined),
-        }),
-      });
-      mockDb.update = mockUpdate;
-
-      const mockTransaction = vi.fn().mockImplementation(async (callback) => {
-        const tx = {
-          update: mockUpdate,
-        };
-        await callback(tx);
-      });
-      mockDb.transaction = mockTransaction;
-
-      await deleteLabel(labelId, userId);
-
-      expect(mockTransaction).toHaveBeenCalled();
-    });
-
-    it("should throw NotFoundError when label does not exist", async () => {
-      mockSelect.mockImplementation(createEmptyMockChain);
-
-      await expect(deleteLabel("nonexistent-label", userId)).rejects.toThrow(
-        "Label"
-      );
-    });
-
-    it("should throw ForbiddenError when user is not project owner", async () => {
-      mockSelect.mockImplementation(() =>
-        createMockChain([
-          {
-            label: mockLabel,
-            projectOwnerId: "different-user",
-          },
-        ])
-      );
-
-      await expect(deleteLabel(labelId, userId)).rejects.toThrow(
-        "Insufficient permissions"
-      );
-    });
-
-    it("should delete both label and associated lines in transaction", async () => {
-      mockSelect.mockImplementation(() =>
-        createMockChain([
-          {
-            label: mockLabel,
-            projectOwnerId: userId,
-          },
-        ])
-      );
-
-      const updateCalls: any[] = [];
-      const mockUpdate = vi.fn().mockImplementation(() => {
-        updateCalls.push("update");
-        return {
-          set: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue(undefined),
-          }),
-        };
-      });
-      mockDb.update = mockUpdate;
-
-      const mockTransaction = vi.fn().mockImplementation(async (callback) => {
-        const tx = {
-          update: mockUpdate,
-        };
-        await callback(tx);
-      });
-      mockDb.transaction = mockTransaction;
-
-      await deleteLabel(labelId, userId);
-
-      // Should have called update twice (label + label lines)
-      expect(updateCalls).toHaveLength(2);
-    });
-
-    it("should only delete non-deleted label lines", async () => {
-      mockSelect.mockImplementation(() =>
-        createMockChain([
-          {
-            label: mockLabel,
-            projectOwnerId: userId,
-          },
-        ])
-      );
-
-      let whereClause: any;
-      const mockUpdate = vi.fn().mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockImplementation((clause) => {
-            whereClause = clause;
-            return Promise.resolve();
-          }),
-        }),
-      });
-      mockDb.update = mockUpdate;
-
-      const mockTransaction = vi.fn().mockImplementation(async (callback) => {
-        const tx = {
-          update: mockUpdate,
-        };
-        await callback(tx);
-      });
-      mockDb.transaction = mockTransaction;
-
-      await deleteLabel(labelId, userId);
-
-      // Verify the where clause filters for non-deleted lines
-      expect(whereClause).toBeDefined();
     });
 
     it("should update gitlab_files.content when label has a gitlabFileId", async () => {
