@@ -11,6 +11,7 @@ import {
   timestamp,
   integer,
   index,
+  unique,
 } from "drizzle-orm/pg-core";
 import { renpyDefinitionCategoryEnum } from "../enums.js";
 import { projects } from "./projects.js";
@@ -31,7 +32,10 @@ export const renpyDefinitions = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (table) => [index("renpy_definitions_project_id_idx").on(table.projectId)]
+  (table) => [
+    index("renpy_definitions_project_id_idx").on(table.projectId),
+    unique("renpy_definitions_project_tag_unique").on(table.projectId, table.tag),
+  ]
 );
 
 // Types

@@ -13,6 +13,7 @@ import {
   labelLines,
   characters,
   stateVariables,
+  renpyDefinitions,
 } from "../db/schema/index.js";
 import { eq, and, desc, inArray, asc, isNull } from "drizzle-orm";
 import {
@@ -29,6 +30,7 @@ import {
 import {
   patchRPYWithStateVariables,
   generateStateVariablesFile,
+  generateDefinitionsFile,
 } from "./rpy-generator.service.js";
 import { calculateLinesHash, calculateContentHash } from "../lib/hash.js";
 import { type DetectedCharacter } from "./character-parser.service.js";
@@ -332,6 +334,31 @@ export async function exportToGitlab(
         targetBranch,
         "state_variables.rpy",
         stateVariablesContent,
+        message
+      );
+    }
+
+    // Generate and export definitions.rpy file if definitions exist
+    const projectRenpyDefinitions = await db
+      .select({
+        category: renpyDefinitions.category,
+        tag: renpyDefinitions.tag,
+        displayName: renpyDefinitions.displayName,
+        definitionCode: renpyDefinitions.definitionCode,
+        sortOrder: renpyDefinitions.sortOrder,
+      })
+      .from(renpyDefinitions)
+      .where(eq(renpyDefinitions.projectId, projectId));
+
+    if (projectRenpyDefinitions.length > 0) {
+      const definitionsContent = generateDefinitionsFile(
+        projectRenpyDefinitions
+      );
+      await createOrUpdateFile(
+        projectId,
+        targetBranch,
+        "definitions.rpy",
+        definitionsContent,
         message
       );
     }

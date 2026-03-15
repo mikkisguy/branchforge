@@ -98,3 +98,15 @@ export const stateVariableKeys = {
   detail: (stateVariableId: string) =>
     ["stateVariables", "detail", stateVariableId] as const,
 } as const;
+
+// ============================================================================
+// Ren'Py Definition Keys
+// ============================================================================
+
+export const renpyDefinitionKeys = {
+  all: ["renpyDefinitions"] as const,
+  lists: (projectId: string) =>
+    ["renpyDefinitions", projectId, "list"] as const,
+  detail: (renpyDefinitionId: string) =>
+    ["renpyDefinitions", "detail", renpyDefinitionId] as const,
+} as const;

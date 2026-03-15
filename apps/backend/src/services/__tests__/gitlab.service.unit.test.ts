@@ -1,26 +1,24 @@
 /**
- * GitLab Service Tests
+ * GitLab Service Unit Tests
  *
  * Unit tests for GitLab API integration service.
- * Tests are written before implementation (TDD approach).
+ *
+ * NOTE: Database operation tests (getGitlabIntegration, storeGitlabIntegration,
+ * deleteGitlabIntegration, linkRepository, unlinkRepository) have been migrated
+ * to integration tests. These unit tests now focus on HTTP operations (using Nock)
+ * and validation logic.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import nock from "nock";
 import {
   validateGitlabPAT,
-  getGitlabIntegration,
-  storeGitlabIntegration,
-  deleteGitlabIntegration,
   listGitlabRepositories,
-  linkRepository,
-  unlinkRepository,
   listBranches,
   listRpyFiles,
   getFileContent,
   createOrUpdateFile,
 } from "../gitlab.service.js";
-import { gitlabRepositories } from "../../db/schema/index.js";
 import * as encryptionService from "../encryption.service.js";
 
 // Test token must be defined before vi.mock since vi.mock is hoisted
@@ -41,21 +39,14 @@ vi.mock("../encryption.service.js", () => ({
   isValidPATFormat: vi.fn((token: string) => token.startsWith("glpat-")),
 }));
 
-// Mock the database
+// Mock the database for HTTP operations that need integration lookup
 const mockLimit = vi.fn();
 const mockWhere = vi.fn();
 const mockFrom = vi.fn();
 const mockSelect = vi.fn();
-const mockInsert = vi.fn();
-const mockDelete = vi.fn();
-const mockValues = vi.fn();
-const mockOnConflictDoUpdate = vi.fn();
-const mockOnConflictDoNothing = vi.fn();
 
 const mockDb = {
   select: mockSelect,
-  insert: mockInsert,
-  delete: mockDelete,
 };
 
 // Setup mock chains
@@ -63,15 +54,6 @@ mockSelect.mockReturnValue({ from: mockFrom });
 mockFrom.mockReturnValue({ where: mockWhere });
 mockWhere.mockReturnValue({ limit: mockLimit });
 mockLimit.mockResolvedValue([]);
-
-mockInsert.mockReturnValue({ values: mockValues });
-mockValues.mockReturnValue({
-  onConflictDoUpdate: mockOnConflictDoUpdate,
-  onConflictDoNothing: mockOnConflictDoNothing,
-});
-mockOnConflictDoUpdate.mockResolvedValue(undefined);
-mockOnConflictDoNothing.mockResolvedValue(undefined);
-mockDelete.mockReturnValue({ where: mockWhere });
 
 vi.mock("../../db/index.js", () => ({
   getDb: vi.fn(() => mockDb),
@@ -85,7 +67,7 @@ const testGitlabProjectId = 12345;
 const testRepositoryName = "test-repo";
 const testBranch = "main";
 
-describe("GitLabService", () => {
+describe("GitLabService (HTTP Operations)", () => {
   beforeEach(() => {
     // Set environment variables
     process.env.ENCRYPTION_KEY = "test-encryption-key-32-chars-long!";
@@ -99,26 +81,12 @@ describe("GitLabService", () => {
     mockWhere.mockReset();
     mockFrom.mockReset();
     mockSelect.mockReset();
-    mockInsert.mockReset();
-    mockValues.mockReset();
-    mockOnConflictDoUpdate.mockReset();
-    mockOnConflictDoNothing.mockReset();
-    mockDelete.mockReset();
 
     // Re-setup mock chains
     mockSelect.mockReturnValue({ from: mockFrom });
     mockFrom.mockReturnValue({ where: mockWhere });
     mockWhere.mockReturnValue({ limit: mockLimit });
     mockLimit.mockResolvedValue([]);
-
-    mockInsert.mockReturnValue({ values: mockValues });
-    mockValues.mockReturnValue({
-      onConflictDoUpdate: mockOnConflictDoUpdate,
-      onConflictDoNothing: mockOnConflictDoNothing,
-    });
-    mockOnConflictDoUpdate.mockResolvedValue(undefined);
-    mockOnConflictDoNothing.mockResolvedValue(undefined);
-    mockDelete.mockReturnValue({ where: mockWhere });
   });
 
   afterEach(() => {
@@ -192,92 +160,14 @@ describe("GitLabService", () => {
     });
   });
 
-  describe("getGitlabIntegration", () => {
-    it("should return user integration", async () => {
-      const mockIntegration = {
-        id: "integration-123",
-        userId: testUserId,
-        encryptedToken: "encrypted_token",
-        gitlabUrl: testGitlabUrl,
-        username: "testuser",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      // Use the global mock setup
-      mockLimit.mockResolvedValueOnce([mockIntegration]);
-
-      const result = await getGitlabIntegration(testUserId);
-
-      expect(result).toEqual(mockIntegration);
-      expect(mockDb.select).toHaveBeenCalled();
-    });
-
-    it("should return null when integration does not exist", async () => {
-      // Use the global mock setup
-      mockLimit.mockResolvedValueOnce([]);
-
-      const result = await getGitlabIntegration(testUserId);
-
-      expect(result).toBeNull();
-    });
-  });
-
-  describe("storeGitlabIntegration", () => {
-    it("should store new integration", async () => {
-      vi.mocked(encryptionService.validateAndGetUsername).mockResolvedValue(
-        "testuser"
-      );
-      vi.mocked(encryptionService.encryptPAT).mockReturnValue(
-        "encrypted_test_token"
-      );
-
-      await storeGitlabIntegration(testUserId, testToken, testGitlabUrl);
-
-      expect(mockDb.insert).toHaveBeenCalled();
-      expect(encryptionService.validateAndGetUsername).toHaveBeenCalledWith(
-        testToken,
-        testGitlabUrl
-      );
-      expect(encryptionService.encryptPAT).toHaveBeenCalledWith(testToken);
-    });
-
-    it("should update existing integration", async () => {
-      vi.mocked(encryptionService.validateAndGetUsername).mockResolvedValue(
-        "testuser"
-      );
-      vi.mocked(encryptionService.encryptPAT).mockReturnValue(
-        "encrypted_test_token"
-      );
-
-      await storeGitlabIntegration(testUserId, testToken, testGitlabUrl);
-
-      expect(mockDb.insert).toHaveBeenCalled();
-    });
-
-    it("should throw when token validation fails", async () => {
-      vi.mocked(encryptionService.validateAndGetUsername).mockResolvedValue(
-        null
-      );
-
-      await expect(
-        storeGitlabIntegration(testUserId, testToken, testGitlabUrl)
-      ).rejects.toThrow("Invalid GitLab token");
-    });
-  });
-
-  describe("deleteGitlabIntegration", () => {
-    it("should delete integration", async () => {
-      const mockDelete = vi
-        .fn()
-        .mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
-      mockDb.delete.mockImplementation(mockDelete);
-
-      await deleteGitlabIntegration(testUserId);
-
-      expect(mockDb.delete).toHaveBeenCalled();
-    });
-  });
+  // ============================================================================
+  // Database operations migrated to integration tests
+  // - getGitlabIntegration
+  // - storeGitlabIntegration
+  // - deleteGitlabIntegration
+  // - linkRepository
+  // - unlinkRepository
+  // ============================================================================
 
   describe("listGitlabRepositories", () => {
     it("should list user repositories", async () => {
@@ -386,60 +276,6 @@ describe("GitLabService", () => {
       await expect(
         listGitlabRepositories(testUserId, testGitlabUrl)
       ).rejects.toThrow("GitLab integration not found");
-    });
-  });
-
-  describe("linkRepository", () => {
-    it("should link project to repository", async () => {
-      const mockValues = vi.fn();
-      const mockOnConflictDoNothing = vi.fn().mockResolvedValue(undefined);
-      mockInsert.mockReturnValue({
-        values: mockValues,
-      });
-      mockValues.mockReturnValue({
-        onConflictDoNothing: mockOnConflictDoNothing,
-      });
-
-      await linkRepository(
-        testProjectId,
-        testGitlabProjectId,
-        testRepositoryName,
-        testBranch
-      );
-
-      expect(mockDb.insert).toHaveBeenCalledWith(gitlabRepositories);
-    });
-
-    it("should use default branch when not provided", async () => {
-      const mockValues = vi.fn();
-      const mockOnConflictDoNothing = vi.fn().mockResolvedValue(undefined);
-      mockInsert.mockReturnValue({
-        values: mockValues,
-      });
-      mockValues.mockReturnValue({
-        onConflictDoNothing: mockOnConflictDoNothing,
-      });
-
-      await linkRepository(
-        testProjectId,
-        testGitlabProjectId,
-        testRepositoryName
-      );
-
-      expect(mockDb.insert).toHaveBeenCalledWith(gitlabRepositories);
-    });
-  });
-
-  describe("unlinkRepository", () => {
-    it("should unlink repository", async () => {
-      const mockDelete = vi
-        .fn()
-        .mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
-      mockDb.delete.mockImplementation(mockDelete);
-
-      await unlinkRepository(testProjectId);
-
-      expect(mockDb.delete).toHaveBeenCalled();
     });
   });
 
