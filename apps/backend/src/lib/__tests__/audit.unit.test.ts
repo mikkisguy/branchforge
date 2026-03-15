@@ -4,7 +4,7 @@
  * Tests for audit field helper functions in src/lib/audit.ts
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   createAuditFields,
   updateAuditFields,
@@ -109,17 +109,21 @@ describe("Audit Helpers", () => {
       );
     });
 
-    it("should create different timestamps for different calls", async () => {
+    it("should create different timestamps for different calls", () => {
+      vi.useFakeTimers();
+
       const result1 = createSoftDeleteFields();
 
-      // Small delay to ensure different timestamp
-      await new Promise((resolve) => setTimeout(resolve, 1));
+      // Advance time by 1 millisecond
+      vi.advanceTimersByTime(1);
 
       const result2 = createSoftDeleteFields();
 
       expect(result1.deletedAt.getTime()).toBeLessThan(
         result2.deletedAt.getTime()
       );
+
+      vi.useRealTimers();
     });
 
     it("should only return deletedAt property", () => {
