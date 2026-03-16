@@ -5,6 +5,7 @@
  */
 
 import { request } from "./client";
+import type { Character } from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -60,17 +61,7 @@ export interface ImportCharactersResponse {
   unmatched: string[];
 }
 
-export interface Character {
-  id: string;
-  name: string;
-  displayName: string;
-  renpyTag: string;
-  color: string;
-  routeAffiliation: string | null;
-  isLoveInterest: boolean;
-  dialogueStyle: string | null;
-  conditionalPrefix: string | null;
-}
+export type { Character } from "@branchforge/shared";
 
 export interface ListCharactersResponse {
   characters: Character[];
@@ -88,6 +79,27 @@ export interface ProjectSettings {
 export interface ProjectSettingsResponse {
   excludedCharacterTags: string[];
   autoLinkSpeakers: boolean;
+}
+
+export interface CreateCharacterBody {
+  name: string;
+  displayName: string;
+  renpyTag: string;
+  color: string;
+  routeAffiliation?: string;
+  isLoveInterest?: boolean;
+  dialogueStyle?: string;
+  conditionalPrefix?: string;
+}
+
+export interface UpdateCharacterBody {
+  name?: string;
+  displayName?: string;
+  color?: string;
+  routeAffiliation?: string;
+  isLoveInterest?: boolean;
+  dialogueStyle?: string;
+  conditionalPrefix?: string;
 }
 
 // ============================================================================
@@ -163,5 +175,48 @@ export const charactersApi = {
         body: JSON.stringify(settings),
       }
     );
+  },
+
+  /**
+   * Create a new character
+   */
+  async createCharacter(
+    projectId: string,
+    body: CreateCharacterBody
+  ): Promise<Character> {
+    const response = await request<GetCharacterResponse>(
+      `/projects/${projectId}/characters`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      }
+    );
+    return response.character;
+  },
+
+  /**
+   * Update a character
+   */
+  async updateCharacter(
+    characterId: string,
+    body: UpdateCharacterBody
+  ): Promise<Character> {
+    const response = await request<GetCharacterResponse>(
+      `/characters/${characterId}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }
+    );
+    return response.character;
+  },
+
+  /**
+   * Delete a character
+   */
+  async deleteCharacter(characterId: string): Promise<void> {
+    await request(`/characters/${characterId}`, {
+      method: "DELETE",
+    });
   },
 };

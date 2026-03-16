@@ -13,10 +13,49 @@ import { useProject } from "@/hooks/useProject";
 import { GitLabSettingsContent } from "@/components/ide-shared/GitLabSettingsContent";
 import { RouteConfigDialog } from "@/components/RouteConfigDialog";
 import { StateVariablesDialog } from "@/components/StateVariablesDialog";
+import { CharacterDialog } from "@/components/CharacterDialog";
 import { cn } from "@/lib/utils";
 import { APP_NAME, APP_VERSION } from "@/lib/version";
 
-type Tab = "user" | "gitlab" | "routes" | "stateVariables" | "system";
+interface TabContentCardProps {
+  title: string;
+  description: string;
+  helperText: string;
+  buttonLabel: string;
+  onButtonClick: () => void;
+}
+
+function TabContentCard({
+  title,
+  description,
+  helperText,
+  buttonLabel,
+  onButtonClick,
+}: TabContentCardProps) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-lg font-medium">{title}</h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          {description}
+        </p>
+      </div>
+      <div className="p-6 border border-dashed border-border/30 rounded-md text-center">
+        <p className="text-sm text-muted-foreground mb-4">
+          {helperText}
+        </p>
+        <button
+          onClick={onButtonClick}
+          className="px-4 py-2 bg-[var(--theme-color)] text-white rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
+        >
+          {buttonLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+type Tab = "user" | "gitlab" | "routes" | "stateVariables" | "characters" | "system";
 
 interface TabOption {
   id: Tab;
@@ -28,13 +67,14 @@ const tabs: TabOption[] = [
   { id: "gitlab", label: "GitLab" },
   { id: "routes", label: "Routes" },
   { id: "stateVariables", label: "State Variables" },
+  { id: "characters", label: "Characters" },
   { id: "system", label: "System Admin" },
 ];
 
 /**
  * Helper function to filter tabs based on user role and ensure a valid active tab.
  * Only users with OWNER role can see the System Admin tab.
- * Routes and State Variables tabs only show when a project is selected.
+ * Routes, State Variables, and Characters tabs only show when a project is selected.
  *
  * @param activeTab - The currently active tab
  * @param userRole - The user's role (optional)
@@ -48,12 +88,13 @@ function getVisibleTabs(
 ) {
   return useMemo(() => {
     // Filter out system tab for non-OWNER users
-    // Filter out routes and state variables tabs when no project is selected
+    // Filter out routes, state variables, and characters tabs when no project is selected
     const visibleTabs = tabs.filter(
       (tab) =>
         (tab.id !== "system" || userRole === "OWNER") &&
         (tab.id !== "routes" || hasProject) &&
-        (tab.id !== "stateVariables" || hasProject)
+        (tab.id !== "stateVariables" || hasProject) &&
+        (tab.id !== "characters" || hasProject)
     );
 
     // If current active tab is not visible, switch to first visible tab
@@ -74,6 +115,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<Tab>("user");
   const [isRouteConfigOpen, setIsRouteConfigOpen] = useState(false);
   const [isStateVariablesOpen, setIsStateVariablesOpen] = useState(false);
+  const [isCharactersOpen, setIsCharactersOpen] = useState(false);
   const { user } = useAuth();
   const { currentProject } = useProject();
   const {
@@ -155,50 +197,33 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             {activeTab === "gitlab" && <GitLabSettingsContent />}
 
             {activeTab === "routes" && (
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-medium">Route Configuration</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Define the routes for your visual novel project. Routes
-                    determine character paths and story branching.
-                  </p>
-                </div>
-                <div className="p-6 border border-dashed border-border/30 rounded-md text-center">
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Configure route keys, names, jump prefixes, and shared route
-                    settings for your project.
-                  </p>
-                  <button
-                    onClick={() => setIsRouteConfigOpen(true)}
-                    className="px-4 py-2 bg-[var(--theme-color)] text-white rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
-                  >
-                    Open Route Configuration
-                  </button>
-                </div>
-              </div>
+              <TabContentCard
+                title="Route Configuration"
+                description="Define the routes for your visual novel project. Routes determine character paths and story branching."
+                helperText="Configure route keys, names, jump prefixes, and shared route settings for your project."
+                buttonLabel="Open Route Configuration"
+                onButtonClick={() => setIsRouteConfigOpen(true)}
+              />
             )}
 
             {activeTab === "stateVariables" && (
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-medium">State Variables Management</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    State variables are boolean state variables used in conditional branching logic.
-                    They control label accessibility, menu visibility, and story state changes.
-                  </p>
-                </div>
-                <div className="p-6 border border-dashed border-border/30 rounded-md text-center">
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Create and manage state variables for conditional prerequisites, effects, and menu options.
-                  </p>
-                  <button
-                    onClick={() => setIsStateVariablesOpen(true)}
-                    className="px-4 py-2 bg-[var(--theme-color)] text-white rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
-                  >
-                    Open State Variables Management
-                  </button>
-                </div>
-              </div>
+              <TabContentCard
+                title="State Variables Management"
+                description="State variables are boolean state variables used in conditional branching logic. They control label accessibility, menu visibility, and story state changes."
+                helperText="Create and manage state variables for conditional prerequisites, effects, and menu options."
+                buttonLabel="Open State Variables Management"
+                onButtonClick={() => setIsStateVariablesOpen(true)}
+              />
+            )}
+
+            {activeTab === "characters" && (
+              <TabContentCard
+                title="Character Management"
+                description="Characters are NPCs and love interests that appear in your visual novel. Manage their display names, Ren'Py tags, colors, and dialogue styles."
+                helperText="Create and manage characters for your project."
+                buttonLabel="Open Character Management"
+                onButtonClick={() => setIsCharactersOpen(true)}
+              />
             )}
 
             {activeTab === "system" && (
@@ -241,6 +266,15 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
         <StateVariablesDialog
           open={isStateVariablesOpen}
           onOpenChange={setIsStateVariablesOpen}
+          projectId={currentProject.id}
+        />
+      )}
+
+      {/* Character Dialog */}
+      {currentProject?.id && (
+        <CharacterDialog
+          open={isCharactersOpen}
+          onOpenChange={setIsCharactersOpen}
           projectId={currentProject.id}
         />
       )}

@@ -465,3 +465,22 @@ export interface LabelDetail extends PublicLabel {
   lines: LabelLine[];
   characters: LabelCharacter[];
 }
+
+/**
+ * Character in a visual novel project
+ * Represents a character with dialogue lines and appearance settings
+ */
+export interface Character {
+  id: string;
+  projectId: string;
+  name: string;
+  displayName: string;
+  renpyTag: string;
+  color: string;
+  routeAffiliation: string | null;
+  isLoveInterest: boolean;
+  dialogueStyle: string | null;
+  conditionalPrefix: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

@@ -115,7 +115,7 @@ describe("LabelsService", () => {
     updatedAt: new Date("2024-01-01"),
   };
 
-  const mockLabelLine: LabelLineWithSpeaker = {
+  const _mockLabelLine: LabelLineWithSpeaker = {
     id: "line-1",
     labelId,
     sequence: 1,

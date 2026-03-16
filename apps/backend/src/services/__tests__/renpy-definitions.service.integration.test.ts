@@ -19,7 +19,7 @@ import {
   type NewProject,
   type NewRenpyDefinition,
 } from "../../db/schema/index.js";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import {
   listRenpyDefinitions,
   getRenpyDefinition,
