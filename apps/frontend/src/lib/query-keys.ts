@@ -100,6 +100,18 @@ export const stateVariableKeys = {
 } as const;
 
 // ============================================================================
+// Character Keys
+// ============================================================================
+
+export const characterKeys = {
+  all: ["characters"] as const,
+  lists: (projectId: string) =>
+    ["characters", projectId, "list"] as const,
+  detail: (characterId: string) =>
+    ["characters", "detail", characterId] as const,
+} as const;
+
+// ============================================================================
 // Ren'Py Definition Keys
 // ============================================================================
 

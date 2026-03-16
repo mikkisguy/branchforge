@@ -19,7 +19,7 @@ import {
   type NewProject,
   type NewStateVariable,
 } from "../../db/schema/index.js";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import {
   listStateVariables,
   getStateVariable,
