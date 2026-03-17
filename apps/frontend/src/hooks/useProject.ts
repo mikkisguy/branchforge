@@ -89,7 +89,8 @@ export function useProject(): UseProjectReturn {
 
   const { data: currentProjectId = null } = useQuery<string | null>({
     queryKey: projectKeys.current(),
-    initialData: () => {
+    queryFn: () => {
+      // Return cached value or read from localStorage
       return (
         queryClient.getQueryData<string | null>(projectKeys.current()) ??
         readStoredCurrentProjectId()
