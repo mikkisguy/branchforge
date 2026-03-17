@@ -9,15 +9,11 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import { useSettings } from "@/hooks/useSettings";
-import { useProject } from "@/hooks/useProject";
 import { GitLabSettingsContent } from "@/components/ide-shared/GitLabSettingsContent";
-import { RouteConfigContent } from "@/components/RouteConfigContent";
-import { StateVariablesContent } from "@/components/StateVariablesContent";
-import { CharacterContent } from "@/components/CharacterContent";
 import { cn } from "@/lib/utils";
 import { APP_NAME, APP_VERSION } from "@/lib/version";
 
-type Tab = "user" | "gitlab" | "routes" | "stateVariables" | "characters" | "system";
+type Tab = "user" | "gitlab" | "system";
 
 interface TabOption {
   id: Tab;
@@ -27,9 +23,6 @@ interface TabOption {
 const tabs: TabOption[] = [
   { id: "user", label: "User" },
   { id: "gitlab", label: "GitLab" },
-  { id: "routes", label: "Routes" },
-  { id: "stateVariables", label: "State Variables" },
-  { id: "characters", label: "Characters" },
   { id: "system", label: "System Admin" },
 ];
 
@@ -41,7 +34,6 @@ interface SettingsModalProps {
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<Tab>("user");
   const { user } = useAuth();
-  const { currentProject } = useProject();
   const {
     signUpsEnabled,
     updateSignUpsSetting,
@@ -51,14 +43,9 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
   // Compute visible tabs and ensure valid active tab
   // Only users with OWNER role can see the System Admin tab.
-  // Routes, State Variables, and Characters tabs only show when a project is selected.
   const { visibleTabs, adjustedActiveTab } = useMemo(() => {
     const visibleTabs = tabs.filter(
-      (tab) =>
-        (tab.id !== "system" || user?.role === "OWNER") &&
-        (tab.id !== "routes" || !!currentProject?.id) &&
-        (tab.id !== "stateVariables" || !!currentProject?.id) &&
-        (tab.id !== "characters" || !!currentProject?.id)
+      (tab) => tab.id !== "system" || user?.role === "OWNER"
     );
 
     // If current active tab is not visible, switch to first visible tab
@@ -67,7 +54,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
       : visibleTabs[0]?.id || activeTab;
 
     return { visibleTabs, adjustedActiveTab };
-  }, [activeTab, user?.role, currentProject?.id]);
+  }, [activeTab, user?.role]);
 
   // Sync derived state during render: adjustedActiveTab is computed from visibleTabs,
   // activeTab, and currentProject. If the active tab becomes invalid (e.g., user loses
@@ -134,18 +121,6 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             )}
 
             {activeTab === "gitlab" && <GitLabSettingsContent />}
-
-            {activeTab === "routes" && currentProject?.id && (
-              <RouteConfigContent projectId={currentProject.id} />
-            )}
-
-            {activeTab === "stateVariables" && currentProject?.id && (
-              <StateVariablesContent projectId={currentProject.id} />
-            )}
-
-            {activeTab === "characters" && currentProject?.id && (
-              <CharacterContent projectId={currentProject.id} />
-            )}
 
             {activeTab === "system" && (
               <div className="space-y-4">
