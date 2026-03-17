@@ -138,7 +138,7 @@ function consolidateChangelogs() {
   // Build the consolidated changelog entry
   const lines = [
     `## v${version} - ${new Date().toISOString().split("T")[0]}`,
-    "\n### Changes",
+    "",
     ...dedupedChanges,
   ];
 

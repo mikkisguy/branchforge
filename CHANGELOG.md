@@ -6,8 +6,6 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## v0.5.1 - 2026-03-15
 
-### Changes
-
 - 4078ffb: Added Ren'Py definitions management service and UI components
 - 8a59220: Add character parser service and import wizard for RPY character management
 - 3ced98a: Added game state variables management
@@ -16,8 +14,6 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - 9898c: Add soft delete and sync tracking to labels
 
 ## v0.5.0 - 2026-03-09
-
-### Changes
 
 - 3dfc713: Changed scene terminology to be consistent with Ren'Py
 - 2e58af9: General refactor: Add route configuration dialog and API integration
@@ -29,8 +25,6 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## v0.4.1 - 2026-03-06
 
-### Changes
-
 - a39e621: Integrated scenes with ScriptMode UI, added RPY generator, and added refresh for scenes after GitLab sync
 - 8057951: Enhanced GitLab integration
 - 57be3dc: Updated GitLab PAT handling and testing, renamed GitLab endpoint for clarity
@@ -40,16 +34,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## v0.4.0 - 2026-03-05
 
-### Changes
-
 - 9cdac7a: Migrated to TanStack Query for better data fetching and handling
 - 4d51360: Reduced type duplication across the codebase
 - Updated dependencies [4d51360]
   - @branchforge/shared@0.4.0
 
 ## v0.3.1 - 2026-03-05
-
-### Changes
 
 - 79715: Updated the GitLab routes to return appropriate responses
 - 3d7c10d: Fixed settings modal sizing
@@ -59,15 +49,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## v0.3.0 - 2026-03-05
 
-### Changes
-
 - da436a9: Performance and security improvements
 - Updated dependencies [da436a9]
   - @branchforge/shared@0.3.0
 
 ## v0.2.0 - 2026-03-03
-
-### Changes
 
 - 0ad737c: Added scene functionality to backend, created integration tests for projects
 - 3934293: Converted brittle unit tests to integration tests, updated test handling
@@ -76,16 +62,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## v0.1.3 - 2026-03-03
 
-### Changes
-
 - 01611fe: Fixed changelog handling
 - f93d106: Fixed missing pnpm
 - Updated dependencies [01611fe]
   - @branchforge/shared@0.1.3
 
 ## Previous documented changes (< v0.1.3)
-
-### Changes
 
 - GitLab integration (parts 1 and 2)
 - Settings modal
