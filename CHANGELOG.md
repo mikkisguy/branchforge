@@ -7,11 +7,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## v0.5.1 - 2026-03-15
 
 - 4078ffb: Added Ren'Py definitions management service and UI components
-- 8a59220: Add character parser service and import wizard for RPY character management
+- 8a59220: Added character parser service and import wizard for RPY character management
 - 3ced98a: Added game state variables management
 - Updated dependencies [4078ffb, 9898c, 8a59220, 3ced98a]
   - @branchforge/shared@0.5.1
-- 9898c: Add soft delete and sync tracking to labels
+- 9898c: Added soft delete and sync tracking to labels
 
 ## v0.5.0 - 2026-03-09
 
@@ -43,13 +43,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - 79715: Updated the GitLab routes to return appropriate responses
 - 3d7c10d: Fixed settings modal sizing
-- 55c156d: Bug fixes to project loading and sessions
+- 55c156d: Fixed bugs in project loading and sessions
 - Updated dependencies [55c156d]
   - @branchforge/shared@0.3.1
 
 ## v0.3.0 - 2026-03-05
 
-- da436a9: Performance and security improvements
+- da436a9: Improved app performance and security
 - Updated dependencies [da436a9]
   - @branchforge/shared@0.3.0
 
