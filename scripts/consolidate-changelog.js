@@ -17,11 +17,7 @@ function consolidateChangelogs() {
   const { version } = require("../package.json");
 
   // Collect all changes for this version
-  const added = [];
-  const changed = [];
-  const fixed = [];
-  const removed = [];
-  const other = [];
+  const changes = [];
 
   for (const pkg of packages) {
     const changelogPath = pkg.changelogPath;
@@ -89,9 +85,9 @@ function consolidateChangelogs() {
           sectionItems.push(currentItem.lines.join("\n"));
         }
 
-        // Add each item (with nested items included) to the appropriate category
+        // Add each item (with nested items included) to the changes list
         for (const item of sectionItems) {
-          addItemByType(type, item);
+          changes.push(item);
         }
       }
     } else {
@@ -117,25 +113,7 @@ function consolidateChangelogs() {
       }
 
       for (const item of flatItems) {
-        other.push(`${pkg.name}: ${item}`);
-      }
-    }
-
-    function addItemByType(type, item) {
-      if (
-        type === "added" ||
-        type === "minor changes" ||
-        type === "major changes"
-      ) {
-        added.push(item);
-      } else if (type === "changed") {
-        changed.push(item);
-      } else if (type === "fixed" || type === "patch changes") {
-        fixed.push(item);
-      } else if (type === "removed") {
-        removed.push(item);
-      } else {
-        other.push(item);
+        changes.push(`${pkg.name}: ${item}`);
       }
     }
 
@@ -145,13 +123,7 @@ function consolidateChangelogs() {
   }
 
   // Only proceed if we found actual changes to consolidate
-  if (
-    added.length === 0 &&
-    changed.length === 0 &&
-    fixed.length === 0 &&
-    removed.length === 0 &&
-    other.length === 0
-  ) {
+  if (changes.length === 0) {
     console.log(`ℹ️  No changes found to consolidate for v${version}`);
     console.log(
       `ℹ️  Package CHANGELOG.md files left unchanged for inspection.`
@@ -161,39 +133,14 @@ function consolidateChangelogs() {
 
   // Deduplicate items (same content may appear in multiple packages)
   const unique = (arr) => [...new Set(arr)];
-  const dedupedAdded = unique(added);
-  const dedupedChanged = unique(changed);
-  const dedupedFixed = unique(fixed);
-  const dedupedRemoved = unique(removed);
-  const dedupedOther = unique(other);
+  const dedupedChanges = unique(changes);
 
   // Build the consolidated changelog entry
-  const lines = [`## v${version} - ${new Date().toISOString().split("T")[0]}`];
-
-  if (dedupedAdded.length > 0) {
-    lines.push("\n### Added");
-    dedupedAdded.forEach((item) => lines.push(item));
-  }
-
-  if (dedupedChanged.length > 0) {
-    lines.push("\n### Changed");
-    dedupedChanged.forEach((item) => lines.push(item));
-  }
-
-  if (dedupedFixed.length > 0) {
-    lines.push("\n### Fixed");
-    dedupedFixed.forEach((item) => lines.push(item));
-  }
-
-  if (dedupedRemoved.length > 0) {
-    lines.push("\n### Removed");
-    dedupedRemoved.forEach((item) => lines.push(item));
-  }
-
-  if (dedupedOther.length > 0) {
-    lines.push("\n### Other");
-    dedupedOther.forEach((item) => lines.push(item));
-  }
+  const lines = [
+    `## v${version} - ${new Date().toISOString().split("T")[0]}`,
+    "\n### Changes",
+    ...dedupedChanges,
+  ];
 
   // Update root changelog
   const versionRegex = /## v?\[?\d+\.\d+\.\d+\]?/;
