@@ -6,8 +6,7 @@ import { useProject } from "@/hooks/useProject";
 import { useGitLab } from "@/hooks/useGitLab";
 import { useLabels } from "@/hooks/useLabels";
 import { themePalettes, BASE_URL } from "@/lib/constants";
-import { FloatingParticles, TopRightPanel } from "@/components/ide-shared";
-import { Logo } from "@/components/ui/logo";
+import { FloatingParticles, LeftSidebar } from "@/components/ide-shared";
 import { WriteMode } from "./WriteMode";
 import { ScriptMode } from "./ScriptMode";
 
@@ -35,6 +34,7 @@ export function HomePageIDE() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState<"write" | "script">(getStoredMode);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // Project context
   const { currentProject, projects, setCurrentProject, isLoadingProjects } =
@@ -71,62 +71,38 @@ export function HomePageIDE() {
   const gitlabBranch = gitlabRepo?.defaultBranch;
 
   return (
-    <div className="min-h-screen relative flex flex-col">
+    <div className="min-h-screen relative flex">
       <FloatingParticles />
 
-      {/* Top left logo */}
-      <div className="absolute top-4 left-6 z-10">
-        <Logo compact />
-      </div>
-
-      {/* Top right control panel */}
-      <TopRightPanel
+      {/* Left Sidebar */}
+      <LeftSidebar
         mode={mode}
         setMode={handleSetMode}
         theme={theme}
         setTheme={setTheme}
         themePalettes={themePalettes}
         onLogout={handleLogout}
+        projectId={currentProject?.id}
+        projects={projects}
+        setCurrentProject={setCurrentProject}
+        isLoadingProjects={isLoadingProjects}
+        isCollapsed={isSidebarCollapsed}
+        onCollapsedChange={setIsSidebarCollapsed}
       />
 
-      {/* Project selector (when in script mode) */}
-      {mode === "script" && (
-        <div className="absolute top-4 left-32 z-10">
-          <select
-            value={currentProject?.id || ""}
-            onChange={(e) => {
-              const project = projects.find((p) => p.id === e.target.value);
-              if (project) setCurrentProject(project);
-            }}
-            disabled={isLoadingProjects}
-            className="px-3 py-1.5 rounded-md text-sm font-medium bg-card/80 backdrop-blur border border-dashed cursor-pointer hover:bg-card transition-colors"
-            style={{ borderColor: "var(--theme-border-subtle)" }}
-          >
-            {isLoadingProjects ? (
-              <option>Loading...</option>
-            ) : projects.length === 0 ? (
-              <option>No projects</option>
-            ) : (
-              projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))
-            )}
-          </select>
-        </div>
-      )}
-
-      {mode === "write" ? (
-        <WriteMode setMode={setMode} />
-      ) : (
-        <ScriptMode
-          themeName={themeInfo?.name || ""}
-          projectId={currentProject?.id}
-          projectName={currentProject?.name}
-          gitlabBranch={gitlabBranch}
-        />
-      )}
+      {/* Main content area */}
+      <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? "ml-14" : "ml-56"}`}>
+        {mode === "write" ? (
+          <WriteMode setMode={setMode} />
+        ) : (
+          <ScriptMode
+            themeName={themeInfo?.name || ""}
+            projectId={currentProject?.id}
+            projectName={currentProject?.name}
+            gitlabBranch={gitlabBranch}
+          />
+        )}
+      </div>
     </div>
   );
 }
