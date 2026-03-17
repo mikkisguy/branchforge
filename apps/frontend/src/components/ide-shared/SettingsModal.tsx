@@ -11,49 +11,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSettings } from "@/hooks/useSettings";
 import { useProject } from "@/hooks/useProject";
 import { GitLabSettingsContent } from "@/components/ide-shared/GitLabSettingsContent";
-import { RouteConfigDialog } from "@/components/RouteConfigDialog";
-import { StateVariablesDialog } from "@/components/StateVariablesDialog";
-import { CharacterDialog } from "@/components/CharacterDialog";
+import { RouteConfigContent } from "@/components/RouteConfigContent";
+import { StateVariablesContent } from "@/components/StateVariablesContent";
+import { CharacterContent } from "@/components/CharacterContent";
 import { cn } from "@/lib/utils";
 import { APP_NAME, APP_VERSION } from "@/lib/version";
-
-interface TabContentCardProps {
-  title: string;
-  description: string;
-  helperText: string;
-  buttonLabel: string;
-  onButtonClick: () => void;
-}
-
-function TabContentCard({
-  title,
-  description,
-  helperText,
-  buttonLabel,
-  onButtonClick,
-}: TabContentCardProps) {
-  return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="text-lg font-medium">{title}</h3>
-        <p className="text-sm text-muted-foreground mt-1">
-          {description}
-        </p>
-      </div>
-      <div className="p-6 border border-dashed border-border/30 rounded-md text-center">
-        <p className="text-sm text-muted-foreground mb-4">
-          {helperText}
-        </p>
-        <button
-          onClick={onButtonClick}
-          className="px-4 py-2 bg-[var(--theme-color)] text-white rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
-        >
-          {buttonLabel}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 type Tab = "user" | "gitlab" | "routes" | "stateVariables" | "characters" | "system";
 
@@ -71,41 +33,6 @@ const tabs: TabOption[] = [
   { id: "system", label: "System Admin" },
 ];
 
-/**
- * Helper function to filter tabs based on user role and ensure a valid active tab.
- * Only users with OWNER role can see the System Admin tab.
- * Routes, State Variables, and Characters tabs only show when a project is selected.
- *
- * @param activeTab - The currently active tab
- * @param userRole - The user's role (optional)
- * @param hasProject - Whether a project is selected
- * @returns An object with filtered tabs and the appropriate active tab
- */
-function getVisibleTabs(
-  activeTab: Tab,
-  userRole?: string,
-  hasProject?: boolean
-) {
-  return useMemo(() => {
-    // Filter out system tab for non-OWNER users
-    // Filter out routes, state variables, and characters tabs when no project is selected
-    const visibleTabs = tabs.filter(
-      (tab) =>
-        (tab.id !== "system" || userRole === "OWNER") &&
-        (tab.id !== "routes" || hasProject) &&
-        (tab.id !== "stateVariables" || hasProject) &&
-        (tab.id !== "characters" || hasProject)
-    );
-
-    // If current active tab is not visible, switch to first visible tab
-    const adjustedActiveTab = visibleTabs.find((t) => t.id === activeTab)
-      ? activeTab
-      : visibleTabs[0]?.id || activeTab;
-
-    return { visibleTabs, activeTab: adjustedActiveTab };
-  }, [activeTab, userRole, hasProject]);
-}
-
 interface SettingsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -113,9 +40,6 @@ interface SettingsModalProps {
 
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<Tab>("user");
-  const [isRouteConfigOpen, setIsRouteConfigOpen] = useState(false);
-  const [isStateVariablesOpen, setIsStateVariablesOpen] = useState(false);
-  const [isCharactersOpen, setIsCharactersOpen] = useState(false);
   const { user } = useAuth();
   const { currentProject } = useProject();
   const {
@@ -125,19 +49,34 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     isSaving,
   } = useSettings();
 
-  // Use helper to get visible tabs and ensure valid active tab
-  const { visibleTabs, activeTab: adjustedActiveTab } = getVisibleTabs(
-    activeTab,
-    user?.role,
-    !!currentProject?.id
-  );
+  // Compute visible tabs and ensure valid active tab
+  // Only users with OWNER role can see the System Admin tab.
+  // Routes, State Variables, and Characters tabs only show when a project is selected.
+  const { visibleTabs, adjustedActiveTab } = useMemo(() => {
+    const visibleTabs = tabs.filter(
+      (tab) =>
+        (tab.id !== "system" || user?.role === "OWNER") &&
+        (tab.id !== "routes" || !!currentProject?.id) &&
+        (tab.id !== "stateVariables" || !!currentProject?.id) &&
+        (tab.id !== "characters" || !!currentProject?.id)
+    );
 
-  // Sync state if active tab was adjusted by helper
-  useMemo(() => {
-    if (adjustedActiveTab !== activeTab) {
-      setActiveTab(adjustedActiveTab);
-    }
-  }, [adjustedActiveTab, activeTab]);
+    // If current active tab is not visible, switch to first visible tab
+    const adjustedActiveTab = visibleTabs.find((t) => t.id === activeTab)
+      ? activeTab
+      : visibleTabs[0]?.id || activeTab;
+
+    return { visibleTabs, adjustedActiveTab };
+  }, [activeTab, user?.role, currentProject?.id]);
+
+  // Sync derived state during render: adjustedActiveTab is computed from visibleTabs,
+  // activeTab, and currentProject. If the active tab becomes invalid (e.g., user loses
+  // project access), we must sync immediately to avoid a flash/stale UI that useEffect
+  // would cause. The condition (adjustedActiveTab !== activeTab) becomes false after
+  // setActiveTab updates state, preventing render loops.
+  if (adjustedActiveTab !== activeTab) {
+    setActiveTab(adjustedActiveTab);
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -152,7 +91,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
           </button>
         </DialogHeader>
 
-        <div className="flex h-[500px]">
+        <div className="flex h-[650px]">
           {/* Vertical Tabs */}
           <div className="w-48 border-r border-border/30 p-2 flex flex-col">
             <div className="space-y-1">
@@ -181,7 +120,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
           </div>
 
           {/* Tab Content */}
-          <div className="flex-1 p-6">
+          <div className="flex-1 overflow-y-auto p-6">
             {activeTab === "user" && (
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">User Information</h3>
@@ -196,34 +135,16 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
             {activeTab === "gitlab" && <GitLabSettingsContent />}
 
-            {activeTab === "routes" && (
-              <TabContentCard
-                title="Route Configuration"
-                description="Define the routes for your visual novel project. Routes determine character paths and story branching."
-                helperText="Configure route keys, names, jump prefixes, and shared route settings for your project."
-                buttonLabel="Open Route Configuration"
-                onButtonClick={() => setIsRouteConfigOpen(true)}
-              />
+            {activeTab === "routes" && currentProject?.id && (
+              <RouteConfigContent projectId={currentProject.id} />
             )}
 
-            {activeTab === "stateVariables" && (
-              <TabContentCard
-                title="State Variables Management"
-                description="State variables are boolean state variables used in conditional branching logic. They control label accessibility, menu visibility, and story state changes."
-                helperText="Create and manage state variables for conditional prerequisites, effects, and menu options."
-                buttonLabel="Open State Variables Management"
-                onButtonClick={() => setIsStateVariablesOpen(true)}
-              />
+            {activeTab === "stateVariables" && currentProject?.id && (
+              <StateVariablesContent projectId={currentProject.id} />
             )}
 
-            {activeTab === "characters" && (
-              <TabContentCard
-                title="Character Management"
-                description="Characters are NPCs and love interests that appear in your visual novel. Manage their display names, Ren'Py tags, colors, and dialogue styles."
-                helperText="Create and manage characters for your project."
-                buttonLabel="Open Character Management"
-                onButtonClick={() => setIsCharactersOpen(true)}
-              />
+            {activeTab === "characters" && currentProject?.id && (
+              <CharacterContent projectId={currentProject.id} />
             )}
 
             {activeTab === "system" && (
@@ -251,33 +172,6 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
           </div>
         </div>
       </DialogContent>
-
-      {/* Route Config Dialog */}
-      {currentProject?.id && (
-        <RouteConfigDialog
-          open={isRouteConfigOpen}
-          onOpenChange={setIsRouteConfigOpen}
-          projectId={currentProject.id}
-        />
-      )}
-
-      {/* State Variables Dialog */}
-      {currentProject?.id && (
-        <StateVariablesDialog
-          open={isStateVariablesOpen}
-          onOpenChange={setIsStateVariablesOpen}
-          projectId={currentProject.id}
-        />
-      )}
-
-      {/* Character Dialog */}
-      {currentProject?.id && (
-        <CharacterDialog
-          open={isCharactersOpen}
-          onOpenChange={setIsCharactersOpen}
-          projectId={currentProject.id}
-        />
-      )}
     </Dialog>
   );
 }

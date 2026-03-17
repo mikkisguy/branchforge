@@ -7,10 +7,11 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { CharacterDialog } from "../CharacterDialog";
 import { charactersApi } from "@/lib/api/characters";
 import type { Character } from "@branchforge/shared";
+import { createTestQueryClient } from "@/test/query-client";
 
 // Mock the toast context with persistent mock functions
 export const mockToastSuccess = vi.fn();
@@ -75,17 +76,7 @@ describe("CharacterDialog", () => {
   );
 
   beforeEach(() => {
-    queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          staleTime: 0,
-        },
-        mutations: {
-          retry: false,
-        },
-      },
-    });
+    queryClient = createTestQueryClient();
     vi.clearAllMocks();
     mockToastSuccess.mockClear();
     mockToastError.mockClear();

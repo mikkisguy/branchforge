@@ -4,7 +4,7 @@ const API_BASE =
 import type { PublicUser } from "@branchforge/shared";
 
 export interface AuthResponse {
-  user: PublicUser;
+  user: PublicUser | null;
 }
 
 export type { PublicUser };
@@ -72,39 +72,44 @@ function sanitizePassword(password: string): string {
   return password.trim();
 }
 
+function validateEmail(email: string): void {
+  if (!email || email.trim() === "") {
+    throw new Error(VALIDATION_ERRORS.EMAIL_REQUIRED);
+  }
+  if (email.length > 254) {
+    throw new Error(VALIDATION_ERRORS.EMAIL_TOO_LONG);
+  }
+  const sanitizedEmail = sanitizeEmail(email);
+  if (!isValidEmail(sanitizedEmail)) {
+    throw new Error(VALIDATION_ERRORS.EMAIL_INVALID);
+  }
+}
+
+function validatePassword(
+  password: string,
+  options?: { minLength?: number }
+): void {
+  if (!password || password === "") {
+    throw new Error(VALIDATION_ERRORS.PASSWORD_REQUIRED);
+  }
+  if (options?.minLength && password.length < options.minLength) {
+    throw new Error(VALIDATION_ERRORS.PASSWORD_TOO_SHORT);
+  }
+  if (password.length > 72) {
+    throw new Error(VALIDATION_ERRORS.PASSWORD_TOO_LONG);
+  }
+  if (!isValidPassword(password)) {
+    throw new Error(VALIDATION_ERRORS.PASSWORD_INVALID_CHARS);
+  }
+}
+
 /**
  * Validates login credentials
  * @throws Error with validation message if validation fails
  */
 function validateLoginCredentials(credentials: LoginCredentials): void {
-  const { email, password } = credentials;
-
-  // Email validation
-  if (!email || email.trim() === "") {
-    throw new Error(VALIDATION_ERRORS.EMAIL_REQUIRED);
-  }
-
-  if (email.length > 254) {
-    throw new Error(VALIDATION_ERRORS.EMAIL_TOO_LONG);
-  }
-
-  const sanitizedEmail = sanitizeEmail(email);
-  if (!isValidEmail(sanitizedEmail)) {
-    throw new Error(VALIDATION_ERRORS.EMAIL_INVALID);
-  }
-
-  // Password validation
-  if (!password || password === "") {
-    throw new Error(VALIDATION_ERRORS.PASSWORD_REQUIRED);
-  }
-
-  if (password.length > 72) {
-    throw new Error(VALIDATION_ERRORS.PASSWORD_TOO_LONG);
-  }
-
-  if (!isValidPassword(password)) {
-    throw new Error(VALIDATION_ERRORS.PASSWORD_INVALID_CHARS);
-  }
+  validateEmail(credentials.email);
+  validatePassword(credentials.password);
 }
 
 /**
@@ -112,38 +117,8 @@ function validateLoginCredentials(credentials: LoginCredentials): void {
  * @throws Error with validation message if validation fails
  */
 function validateRegisterCredentials(credentials: RegisterCredentials): void {
-  const { email, password } = credentials;
-
-  // Email validation
-  if (!email || email.trim() === "") {
-    throw new Error(VALIDATION_ERRORS.EMAIL_REQUIRED);
-  }
-
-  if (email.length > 254) {
-    throw new Error(VALIDATION_ERRORS.EMAIL_TOO_LONG);
-  }
-
-  const sanitizedEmail = sanitizeEmail(email);
-  if (!isValidEmail(sanitizedEmail)) {
-    throw new Error(VALIDATION_ERRORS.EMAIL_INVALID);
-  }
-
-  // Password validation
-  if (!password || password === "") {
-    throw new Error(VALIDATION_ERRORS.PASSWORD_REQUIRED);
-  }
-
-  if (password.length < 8) {
-    throw new Error(VALIDATION_ERRORS.PASSWORD_TOO_SHORT);
-  }
-
-  if (password.length > 72) {
-    throw new Error(VALIDATION_ERRORS.PASSWORD_TOO_LONG);
-  }
-
-  if (!isValidPassword(password)) {
-    throw new Error(VALIDATION_ERRORS.PASSWORD_INVALID_CHARS);
-  }
+  validateEmail(credentials.email);
+  validatePassword(credentials.password, { minLength: 8 });
 }
 
 // ============================================================================
