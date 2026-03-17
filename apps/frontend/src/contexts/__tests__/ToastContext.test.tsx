@@ -28,12 +28,16 @@ describe("ToastContext", () => {
         <button onClick={() => success("Success message", "Success Title")}>
           Success
         </button>
-        <button onClick={() => error("Error message", "Error Title")}>Error</button>
+        <button onClick={() => error("Error message", "Error Title")}>
+          Error
+        </button>
         <button onClick={() => info("Info message", "Info Title")}>Info</button>
         <button onClick={() => success("Message without title")}>
           No Title
         </button>
-        <button onClick={() => success("Message with custom duration", "Title")}>
+        <button
+          onClick={() => success("Message with custom duration", "Title", 1000)}
+        >
           Custom Duration
         </button>
       </div>
@@ -214,7 +218,11 @@ describe("ToastContext", () => {
 
       // Add success toast (3s duration) at t=0
       fireEvent.click(screen.getByText("Success"));
-      vi.advanceTimersByTime(1000);
+
+      // Fast-forward 1 second (t=1)
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
 
       // Add error toast (5s duration) at t=1
       fireEvent.click(screen.getByText("Error"));
@@ -247,7 +255,9 @@ describe("ToastContext", () => {
       const button = screen.getByText("Custom Duration");
       fireEvent.click(button);
 
-      expect(screen.getByText("Message with custom duration")).toBeInTheDocument();
+      expect(
+        screen.getByText("Message with custom duration")
+      ).toBeInTheDocument();
 
       // Fast-forward 1 second (custom duration)
       act(() => {
@@ -255,7 +265,9 @@ describe("ToastContext", () => {
         vi.runOnlyPendingTimers();
       });
 
-      expect(screen.queryByText("Message with custom duration")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Message with custom duration")
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -317,7 +329,7 @@ describe("ToastContext", () => {
       );
 
       // The toast container should be present
-      const container = document.querySelector(".fixed.bottom-4.right-4");
+      const container = screen.getByTestId("toast-container");
       expect(container).toBeInTheDocument();
     });
   });
@@ -325,7 +337,9 @@ describe("ToastContext", () => {
   describe("useToast Hook", () => {
     it("should throw error when used outside provider", () => {
       // Suppress console.error for this test
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       expect(() => {
         render(<TestComponent />);

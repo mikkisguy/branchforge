@@ -7,11 +7,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { useLabels } from "../useLabels";
 import { labelsApi } from "@/lib/api/labels";
 import { labelKeys } from "@/lib/query-keys";
 import type { PublicLabel, LabelDetail } from "@branchforge/shared";
+import { createTestQueryClient } from "@/test/query-client";
 
 // Mock the labels API
 vi.mock("@/lib/api/labels", () => ({
@@ -63,12 +64,7 @@ describe("useLabels", () => {
   );
 
   beforeEach(() => {
-    queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false, staleTime: 0 },
-        mutations: { retry: false },
-      },
-    });
+    queryClient = createTestQueryClient();
     vi.clearAllMocks();
   });
 
@@ -105,7 +101,8 @@ describe("useLabels", () => {
 
     it("should show loading state during fetch", async () => {
       vi.mocked(labelsApi.listLabels).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve(mockLabels), 100))
+        () =>
+          new Promise((resolve) => setTimeout(() => resolve(mockLabels), 100))
       );
 
       const { result } = renderHook(() => useLabels(), { wrapper });
@@ -129,7 +126,9 @@ describe("useLabels", () => {
         expect(result.current.labels).toEqual(mockLabels);
       });
 
-      result.current.setActiveLabelId("label-1");
+      act(() => {
+        result.current.setActiveLabelId("label-1");
+      });
 
       await waitFor(() => {
         expect(result.current.activeLabel).toEqual(mockLabelDetail);
@@ -147,7 +146,9 @@ describe("useLabels", () => {
         expect(result.current.labels).toEqual(mockLabels);
       });
 
-      result.current.setActiveLabelId("label-1");
+      act(() => {
+        result.current.setActiveLabelId("label-1");
+      });
 
       // Check cache for persisted value
       const cachedId = queryClient.getQueryData<string | null>(
@@ -179,7 +180,9 @@ describe("useLabels", () => {
 
       const { result } = renderHook(() => useLabels(), { wrapper });
 
-      result.current.setActiveLabelId("label-1");
+      act(() => {
+        result.current.setActiveLabelId("label-1");
+      });
 
       await waitFor(() => {
         expect(result.current.activeLabelId).toBe("label-1");
@@ -191,14 +194,17 @@ describe("useLabels", () => {
 
       await waitFor(() => {
         expect(result.current.activeLabelId).toBeNull();
+        expect(result.current.activeLabel).toBeUndefined();
       });
-      expect(result.current.activeLabel).toBeUndefined();
     });
 
     it("should show loading state while fetching active label", async () => {
       vi.mocked(labelsApi.listLabels).mockResolvedValue(mockLabels);
       vi.mocked(labelsApi.getLabel).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve(mockLabelDetail), 100))
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve(mockLabelDetail), 100)
+          )
       );
 
       const { result } = renderHook(() => useLabels(), { wrapper });

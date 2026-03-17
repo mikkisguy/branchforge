@@ -6,7 +6,9 @@
  */
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import isEqual from "fast-deep-equal";
 import { Loader2, Plus, Trash2, Pencil, Heart } from "lucide-react";
+import type { Character } from "@branchforge/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,8 +82,7 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   // Track previous characters to detect actual changes
-  const prevCharactersRef = useRef<string>("");
-  const hasInitializedRef = useRef(false);
+  const prevCharactersRef = useRef<Character[] | null>(null);
 
   // Combined loading state for any mutation
   const isSaving =
@@ -99,13 +100,10 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
       return;
     }
 
-    // Only initialize once
-    if (hasInitializedRef.current) {
+    // Only update if characters actually changed
+    if (prevCharactersRef.current !== null && isEqual(prevCharactersRef.current, characters)) {
       return;
     }
-
-    // Serialize characters for comparison
-    const charactersJson = JSON.stringify(characters);
 
     // Initialize form state from characters
     setCharactersList(
@@ -123,8 +121,7 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
       }))
     );
 
-    prevCharactersRef.current = charactersJson;
-    hasInitializedRef.current = true;
+    prevCharactersRef.current = characters;
   }, [characters, isSaving]);
 
   /**
@@ -274,9 +271,16 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
         setCharactersList((prev) => prev.filter((_, i) => i !== index));
       } else {
         // Restore the original character from the incoming characters prop
+        // Use ID-based lookup instead of index for safety
+        const originalCharacter = characters.find((c) => c.id === character.id);
+        if (!originalCharacter) {
+          // Character no longer exists, remove from list
+          setCharactersList((prev) => prev.filter((_, i) => i !== index));
+          setEditingIndex(null);
+          return;
+        }
         setCharactersList((prev) => {
           const newCharacters = [...prev];
-          const originalCharacter = characters[index];
           newCharacters[index] = {
             id: originalCharacter.id,
             clientId: originalCharacter.id,

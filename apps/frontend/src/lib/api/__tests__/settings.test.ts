@@ -4,18 +4,14 @@
  * Tests for settings management API methods.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { settingsApi } from "../settings";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
+vi.stubGlobal("fetch", mockFetch);
 
 describe("Settings API", () => {
-  beforeEach(() => {
-    mockFetch.mockClear();
-  });
-
   afterEach(() => {
     vi.clearAllMocks();
   });
@@ -185,60 +181,23 @@ describe("Settings API", () => {
       expect(requestBody).toEqual({ value: 15 });
     });
 
-    it("should handle boolean values", async () => {
+    it.each([
+      ["boolean", "signups", true],
+      ["number", "maxMeterDelta", 20],
+      ["string", "title", "My Title"],
+      ["null", "nullable", null],
+    ])("should handle %s values", async (_type, key, value) => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ key: "signups", value: true }),
+        json: async () => ({ key, value }),
       });
 
-      await settingsApi.updateSetting("signups", true);
+      await settingsApi.updateSetting(key, value);
 
       const requestBody = JSON.parse(
         mockFetch.mock.calls[0][1]?.body as string
       );
-      expect(requestBody).toEqual({ value: true });
-    });
-
-    it("should handle numeric values", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ key: "maxMeterDelta", value: 20 }),
-      });
-
-      await settingsApi.updateSetting("maxMeterDelta", 20);
-
-      const requestBody = JSON.parse(
-        mockFetch.mock.calls[0][1]?.body as string
-      );
-      expect(requestBody).toEqual({ value: 20 });
-    });
-
-    it("should handle string values", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ key: "title", value: "My Title" }),
-      });
-
-      await settingsApi.updateSetting("title", "My Title");
-
-      const requestBody = JSON.parse(
-        mockFetch.mock.calls[0][1]?.body as string
-      );
-      expect(requestBody).toEqual({ value: "My Title" });
-    });
-
-    it("should handle null values", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ key: "nullable", value: null }),
-      });
-
-      await settingsApi.updateSetting("nullable", null);
-
-      const requestBody = JSON.parse(
-        mockFetch.mock.calls[0][1]?.body as string
-      );
-      expect(requestBody).toEqual({ value: null });
+      expect(requestBody).toEqual({ value });
     });
 
     it("should include credentials in request", async () => {

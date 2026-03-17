@@ -4,19 +4,15 @@
  * Tests for project management API methods.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { projectsApi } from "../projects";
 import type { Project, CreateProjectBody } from "../projects";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
+vi.stubGlobal("fetch", mockFetch);
 
 describe("Projects API", () => {
-  beforeEach(() => {
-    mockFetch.mockClear();
-  });
-
   afterEach(() => {
     vi.clearAllMocks();
   });
@@ -279,9 +275,7 @@ describe("Projects API", () => {
         json: async () => Promise.reject(new Error("JSON parse error")),
       });
 
-      await expect(projectsApi.listProjects()).rejects.toThrow(
-        "Unknown error"
-      );
+      await expect(projectsApi.listProjects()).rejects.toThrow("Unknown error");
     });
 
     it("should throw error with status code when no error message", async () => {

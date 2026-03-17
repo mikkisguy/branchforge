@@ -57,7 +57,9 @@ function validateStateVariable(
 // Component
 // ============================================================================
 
-export function StateVariablesContent({ projectId }: StateVariablesContentProps) {
+export function StateVariablesContent({
+  projectId,
+}: StateVariablesContentProps) {
   const {
     stateVariables,
     isLoadingStateVariables,
@@ -133,7 +135,10 @@ export function StateVariablesContent({ projectId }: StateVariablesContentProps)
     (index: number, field: keyof StateVariableForm, value: string) => {
       setStateVariablesList((prev) => {
         const newStateVariables = [...prev];
-        newStateVariables[index] = { ...newStateVariables[index], [field]: value };
+        newStateVariables[index] = {
+          ...newStateVariables[index],
+          [field]: value,
+        };
         return newStateVariables;
       });
     },
@@ -150,9 +155,7 @@ export function StateVariablesContent({ projectId }: StateVariablesContentProps)
         // Delete existing state variable
         try {
           await deleteStateVariable(stateVariable.id);
-          setStateVariablesList((prev) =>
-            prev.filter((_, i) => i !== index)
-          );
+          setStateVariablesList((prev) => prev.filter((_, i) => i !== index));
         } catch {
           // Error is handled by the hook's toast
         }
@@ -220,13 +223,38 @@ export function StateVariablesContent({ projectId }: StateVariablesContentProps)
   const cancelEdit = useCallback(
     (index: number) => {
       const stateVariable = stateVariablesList[index];
+      if (!stateVariable) {
+        return;
+      }
       // If it's a new state variable (no id), remove it
       if (!stateVariable.id) {
         setStateVariablesList((prev) => prev.filter((_, i) => i !== index));
+      } else {
+        // Restore the original state variable from server data
+        // Use ID-based lookup instead of index for safety
+        const original = stateVariables.find(
+          (sv) => sv.id === stateVariable.id
+        );
+        if (!original) {
+          // State variable no longer exists, remove from list
+          setStateVariablesList((prev) => prev.filter((_, i) => i !== index));
+          setEditingIndex(null);
+          return;
+        }
+        setStateVariablesList((prev) => {
+          const newStateVariables = [...prev];
+          newStateVariables[index] = {
+            id: original.id,
+            key: original.key,
+            description: original.description ?? "",
+            category: original.category ?? "",
+          };
+          return newStateVariables;
+        });
       }
       setEditingIndex(null);
     },
-    [stateVariablesList]
+    [stateVariablesList, stateVariables]
   );
 
   /**
@@ -259,8 +287,9 @@ export function StateVariablesContent({ projectId }: StateVariablesContentProps)
       <div>
         <h3 className="text-lg font-medium">State Variables Management</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          State variables are boolean state variables used in conditional branching logic.
-          They control label accessibility, menu visibility, and story state changes.
+          State variables are boolean state variables used in conditional
+          branching logic. They control label accessibility, menu visibility,
+          and story state changes.
         </p>
       </div>
 
@@ -277,7 +306,8 @@ export function StateVariablesContent({ projectId }: StateVariablesContentProps)
           {stateVariablesList.length === 0 ? (
             <div className="p-8 border border-dashed border-border/30 rounded-md text-center">
               <p className="text-sm text-muted-foreground mb-4">
-                No state variables configured yet. Add your first state variable to get started.
+                No state variables configured yet. Add your first state variable
+                to get started.
               </p>
               <Button
                 type="button"
@@ -298,9 +328,7 @@ export function StateVariablesContent({ projectId }: StateVariablesContentProps)
                     </h3>
                     <div className="space-y-2">
                       {categoryStateVariables.map((stateVariable) => {
-                        const index = stateVariablesList.indexOf(
-                          stateVariable
-                        );
+                        const index = stateVariablesList.indexOf(stateVariable);
                         const isEditing = editingIndex === index;
                         const validationError =
                           validateStateVariable(stateVariable);
@@ -344,9 +372,7 @@ export function StateVariablesContent({ projectId }: StateVariablesContentProps)
                                     type="button"
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() =>
-                                      removeStateVariable(index)
-                                    }
+                                    onClick={() => removeStateVariable(index)}
                                     disabled={isSaving}
                                     className="text-destructive hover:text-destructive"
                                   >
@@ -456,8 +482,7 @@ export function StateVariablesContent({ projectId }: StateVariablesContentProps)
                                     size="sm"
                                     onClick={() => saveStateVariable(index)}
                                     disabled={
-                                      !isStateVariableValid(index) ||
-                                      isSaving
+                                      !isStateVariableValid(index) || isSaving
                                     }
                                   >
                                     {isSaving && (

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ThemeProvider, useTheme } from "../ThemeContext";
 import type { ThemePalette } from "../ThemeContext";
 
@@ -31,25 +31,31 @@ Object.defineProperty(global, "localStorage", {
 });
 
 describe("ThemeContext", () => {
-  beforeEach(() => {
-    localStorage.clear();
-    // Clear CSS custom properties
+  const removeCSSProperties = () => {
     document.documentElement.style.removeProperty("--theme-color");
     document.documentElement.style.removeProperty("--theme-color-hover");
     document.documentElement.style.removeProperty("--theme-color-rgb");
     document.documentElement.style.removeProperty("--theme-border");
     document.documentElement.style.removeProperty("--theme-border-subtle");
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    // Clear CSS custom properties
+    removeCSSProperties();
   });
 
   afterEach(() => {
     localStorage.clear();
+    // Clear CSS custom properties
+    removeCSSProperties();
   });
 
   // Helper component to test the hook
   function TestComponent() {
     const { theme, setTheme, colors } = useTheme();
     return (
-      <div data-theme={theme} data-primary={colors.primary}>
+      <div data-theme={theme} data-primary={colors.primary} data-hover={colors.hover}>
         <button onClick={() => setTheme("forest")}>Set Forest</button>
       </div>
     );
@@ -74,8 +80,12 @@ describe("ThemeContext", () => {
         </ThemeProvider>
       );
 
-      expect(document.documentElement.style.getPropertyValue("--theme-color")).toBe("#3d4ac2");
-      expect(document.documentElement.style.getPropertyValue("--theme-color-hover")).toBe("#515fcc");
+      expect(
+        document.documentElement.style.getPropertyValue("--theme-color")
+      ).toBe("#3d4ac2");
+      expect(
+        document.documentElement.style.getPropertyValue("--theme-color-hover")
+      ).toBe("#515fcc");
     });
 
     it("should calculate RGB variants correctly for periwinkle", () => {
@@ -85,13 +95,17 @@ describe("ThemeContext", () => {
         </ThemeProvider>
       );
 
-      const rgb = document.documentElement.style.getPropertyValue("--theme-color-rgb");
+      const rgb =
+        document.documentElement.style.getPropertyValue("--theme-color-rgb");
       expect(rgb).toBe("61, 74, 194"); // #3d4ac2 = rgb(61, 74, 194)
 
-      const border = document.documentElement.style.getPropertyValue("--theme-border");
+      const border =
+        document.documentElement.style.getPropertyValue("--theme-border");
       expect(border).toBe("rgba(61, 74, 194, 0.3)");
 
-      const borderSubtle = document.documentElement.style.getPropertyValue("--theme-border-subtle");
+      const borderSubtle = document.documentElement.style.getPropertyValue(
+        "--theme-border-subtle"
+      );
       expect(borderSubtle).toBe("rgba(61, 74, 194, 0.15)");
     });
   });
@@ -122,7 +136,9 @@ describe("ThemeContext", () => {
       const container = document.querySelector('[data-primary="#40bb82"]');
       expect(container).toBeInTheDocument();
 
-      expect(document.documentElement.style.getPropertyValue("--theme-color")).toBe("#40bb82");
+      expect(
+        document.documentElement.style.getPropertyValue("--theme-color")
+      ).toBe("#40bb82");
     });
 
     it("should fall back to default for invalid saved theme", () => {
@@ -141,34 +157,30 @@ describe("ThemeContext", () => {
 
   describe("Set Theme", () => {
     it("should update theme when setTheme is called", async () => {
-      const { container } = render(
+      render(
         <ThemeProvider>
           <TestComponent />
         </ThemeProvider>
       );
 
-      const button = container.querySelector("button");
-      if (button) {
-        button.click();
-      }
+      fireEvent.click(screen.getByRole("button", { name: "Set Forest" }));
 
       await waitFor(() => {
-        const updatedContainer = document.querySelector('[data-theme="forest"]');
+        const updatedContainer = document.querySelector(
+          '[data-theme="forest"]'
+        );
         expect(updatedContainer).toBeInTheDocument();
       });
     });
 
     it("should save theme to localStorage when changed", async () => {
-      const { container } = render(
+      render(
         <ThemeProvider>
           <TestComponent />
         </ThemeProvider>
       );
 
-      const button = container.querySelector("button");
-      if (button) {
-        button.click();
-      }
+      fireEvent.click(screen.getByRole("button", { name: "Set Forest" }));
 
       await waitFor(() => {
         expect(localStorage.getItem("branchforge-theme")).toBe("forest");
@@ -176,65 +188,76 @@ describe("ThemeContext", () => {
     });
 
     it("should update CSS custom properties when theme changes", async () => {
-      const { container } = render(
+      render(
         <ThemeProvider>
           <TestComponent />
         </ThemeProvider>
       );
 
-      const button = container.querySelector("button");
-      if (button) {
-        button.click();
-      }
+      fireEvent.click(screen.getByRole("button", { name: "Set Forest" }));
 
       await waitFor(() => {
-        expect(document.documentElement.style.getPropertyValue("--theme-color")).toBe("#40bb82");
-        expect(document.documentElement.style.getPropertyValue("--theme-color-hover")).toBe("#52c992");
+        expect(
+          document.documentElement.style.getPropertyValue("--theme-color")
+        ).toBe("#40bb82");
+        expect(
+          document.documentElement.style.getPropertyValue("--theme-color-hover")
+        ).toBe("#52c992");
       });
     });
 
     it("should update RGB variants when theme changes", async () => {
-      const { container } = render(
+      render(
         <ThemeProvider>
           <TestComponent />
         </ThemeProvider>
       );
 
-      const button = container.querySelector("button");
-      if (button) {
-        button.click();
-      }
+      fireEvent.click(screen.getByRole("button", { name: "Set Forest" }));
 
       await waitFor(() => {
-        const rgb = document.documentElement.style.getPropertyValue("--theme-color-rgb");
+        const rgb =
+          document.documentElement.style.getPropertyValue("--theme-color-rgb");
         expect(rgb).toBe("64, 187, 130"); // #40bb82 = rgb(64, 187, 130)
       });
     });
   });
 
   describe("Theme Colors", () => {
-    it("should provide correct colors for all themes", () => {
-      const themes: ThemePalette[] = ["forest", "periwinkle", "dark-amethyst", "graphite"];
-      const expectedColors: Record<ThemePalette, { primary: string; hover: string }> = {
-        forest: { primary: "#40bb82", hover: "#52c992" },
-        periwinkle: { primary: "#3d4ac2", hover: "#515fcc" },
-        "dark-amethyst": { primary: "#9549b6", hover: "#a960c7" },
-        graphite: { primary: "#9ca3af", hover: "#b0b7c4" },
-      };
+    const themes: ThemePalette[] = [
+      "forest",
+      "periwinkle",
+      "dark-amethyst",
+      "graphite",
+    ];
+    const expectedColors: Record<
+      ThemePalette,
+      { primary: string; hover: string }
+    > = {
+      forest: { primary: "#40bb82", hover: "#52c992" },
+      periwinkle: { primary: "#3d4ac2", hover: "#515fcc" },
+      "dark-amethyst": { primary: "#9549b6", hover: "#a960c7" },
+      graphite: { primary: "#9ca3af", hover: "#b0b7c4" },
+    };
 
-      for (const theme of themes) {
-        localStorage.clear();
-        localStorage.setItem("branchforge-theme", theme);
+    it.each(themes)("should provide correct colors for %s", (theme) => {
+      localStorage.setItem("branchforge-theme", theme);
 
-        const { container } = render(
-          <ThemeProvider>
-            <TestComponent />
-          </ThemeProvider>
-        );
+      const { container } = render(
+        <ThemeProvider>
+          <TestComponent />
+        </ThemeProvider>
+      );
 
-        const primaryEl = container.querySelector(`[data-primary="${expectedColors[theme].primary}"]`);
-        expect(primaryEl).toBeInTheDocument();
-      }
+      const primaryEl = container.querySelector(
+        `[data-primary="${expectedColors[theme].primary}"]`
+      );
+      expect(primaryEl).toBeInTheDocument();
+
+      const hoverEl = container.querySelector(
+        `[data-hover="${expectedColors[theme].hover}"]`
+      );
+      expect(hoverEl).toBeInTheDocument();
     });
   });
 
@@ -253,7 +276,9 @@ describe("ThemeContext", () => {
   describe("useTheme Hook", () => {
     it("should throw error when used outside provider", () => {
       // Suppress console.error for this test
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       expect(() => {
         render(<TestComponent />);

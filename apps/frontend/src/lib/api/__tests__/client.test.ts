@@ -4,7 +4,7 @@
  * Tests for the shared HTTP client functionality.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { request, requestVoid, type ApiError } from "../client";
 
 // Mock fetch globally
@@ -13,10 +13,6 @@ global.fetch = mockFetch;
 
 describe("API Client", () => {
   beforeEach(() => {
-    mockFetch.mockClear();
-  });
-
-  afterEach(() => {
     vi.clearAllMocks();
   });
 
@@ -123,7 +119,7 @@ describe("API Client", () => {
       await expect(request("/test")).rejects.toThrow("Not found");
     });
 
-    it("should throw generic error when error response has no message", async () => {
+    it("should throw generic error when JSON parsing of error response fails", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
@@ -157,20 +153,31 @@ describe("API Client", () => {
         json: async () => Promise.reject(new Error("Invalid JSON")),
       });
 
-      await expect(request("/test")).rejects.toThrow("Failed to parse response as JSON");
+      await expect(request("/test")).rejects.toThrow(
+        "Failed to parse response as JSON"
+      );
     });
 
-    it("should use API base URL from environment", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({}),
-      });
+    it("should use deterministic API base URL from environment", async () => {
+      vi.stubEnv("VITE_API_ENV", "development");
 
-      await request("/test");
+      try {
+        vi.resetModules();
+        const { request: requestWithStubbedEnv } = await import("../client");
 
-      const [url] = mockFetch.mock.calls[0];
-      // URL should contain either /api or /api/api depending on environment
-      expect(url).toMatch(/\/(|)\/api/);
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({}),
+        });
+
+        await requestWithStubbedEnv("/endpoint");
+
+        const [url] = mockFetch.mock.calls[0];
+        expect(url).toBe("/api/api/endpoint");
+      } finally {
+        vi.unstubAllEnvs();
+        vi.resetModules();
+      }
     });
   });
 
@@ -230,7 +237,7 @@ describe("API Client", () => {
       await expect(requestVoid("/test")).rejects.toThrow("Unauthorized");
     });
 
-    it("should throw generic error when error response has no message", async () => {
+    it("should throw generic error when JSON parse fails", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,

@@ -4,7 +4,7 @@
  * Tests for label management API methods.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { labelsApi } from "../labels";
 import type { ListLabelsParams } from "../labels";
 import type { PublicLabel, LabelDetail } from "@branchforge/shared";
@@ -36,10 +36,6 @@ describe("Labels API", () => {
   };
 
   beforeEach(() => {
-    mockFetch.mockClear();
-  });
-
-  afterEach(() => {
     vi.clearAllMocks();
   });
 

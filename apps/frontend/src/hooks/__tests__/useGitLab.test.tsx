@@ -7,9 +7,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { useGitLab } from "../useGitLab";
 import { gitlabApi, type GitLabRepository } from "@/lib/api/gitlab";
+import { createTestQueryClient } from "@/test/query-client";
 
 // Mock the gitlab API
 vi.mock("@/lib/api/gitlab", () => ({
@@ -67,17 +68,7 @@ describe("useGitLab", () => {
   );
 
   beforeEach(() => {
-    queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          staleTime: 0,
-        },
-        mutations: {
-          retry: false,
-        },
-      },
-    });
+    queryClient = createTestQueryClient();
     vi.clearAllMocks();
   });
 
@@ -114,7 +105,10 @@ describe("useGitLab", () => {
 
     it("should show loading state during fetch", async () => {
       vi.mocked(gitlabApi.getIntegration).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve(mockIntegration), 100))
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve(mockIntegration), 100)
+          )
       );
       vi.mocked(gitlabApi.getLinkedRepositories).mockResolvedValue([]);
 
@@ -157,7 +151,9 @@ describe("useGitLab", () => {
   describe("Conditional Linked Repositories Query", () => {
     it("should fetch linked repositories when integration exists", async () => {
       vi.mocked(gitlabApi.getIntegration).mockResolvedValue(mockIntegration);
-      vi.mocked(gitlabApi.getLinkedRepositories).mockResolvedValue(mockLinkedRepositories);
+      vi.mocked(gitlabApi.getLinkedRepositories).mockResolvedValue(
+        mockLinkedRepositories
+      );
 
       const { result } = renderHook(() => useGitLab(), { wrapper });
 
@@ -184,7 +180,9 @@ describe("useGitLab", () => {
 
     it("should provide map for efficient repository lookups", async () => {
       vi.mocked(gitlabApi.getIntegration).mockResolvedValue(mockIntegration);
-      vi.mocked(gitlabApi.getLinkedRepositories).mockResolvedValue(mockLinkedRepositories);
+      vi.mocked(gitlabApi.getLinkedRepositories).mockResolvedValue(
+        mockLinkedRepositories
+      );
 
       const { result } = renderHook(() => useGitLab(), { wrapper });
 
@@ -198,7 +196,9 @@ describe("useGitLab", () => {
 
     it("should return undefined for non-existent project", async () => {
       vi.mocked(gitlabApi.getIntegration).mockResolvedValue(mockIntegration);
-      vi.mocked(gitlabApi.getLinkedRepositories).mockResolvedValue(mockLinkedRepositories);
+      vi.mocked(gitlabApi.getLinkedRepositories).mockResolvedValue(
+        mockLinkedRepositories
+      );
 
       const { result } = renderHook(() => useGitLab(), { wrapper });
 
@@ -212,7 +212,9 @@ describe("useGitLab", () => {
 
     it("should check if project is linked", async () => {
       vi.mocked(gitlabApi.getIntegration).mockResolvedValue(mockIntegration);
-      vi.mocked(gitlabApi.getLinkedRepositories).mockResolvedValue(mockLinkedRepositories);
+      vi.mocked(gitlabApi.getLinkedRepositories).mockResolvedValue(
+        mockLinkedRepositories
+      );
 
       const { result } = renderHook(() => useGitLab(), { wrapper });
 
@@ -236,7 +238,10 @@ describe("useGitLab", () => {
         expect(result.current.integration).toBeNull();
       });
 
-      await result.current.storeToken("test-token", "https://gitlab.example.com");
+      await result.current.storeToken(
+        "test-token",
+        "https://gitlab.example.com"
+      );
 
       expect(gitlabApi.storeIntegration).toHaveBeenCalledWith(
         "test-token",
@@ -261,14 +266,19 @@ describe("useGitLab", () => {
 
       await result.current.storeToken("test-token");
 
-      expect(gitlabApi.storeIntegration).toHaveBeenCalledWith("test-token", undefined);
+      expect(gitlabApi.storeIntegration).toHaveBeenCalledWith(
+        "test-token",
+        undefined
+      );
     });
   });
 
   describe("Remove Integration Mutation", () => {
     it("should remove integration and clear cache", async () => {
       vi.mocked(gitlabApi.getIntegration).mockResolvedValue(mockIntegration);
-      vi.mocked(gitlabApi.getLinkedRepositories).mockResolvedValue(mockLinkedRepositories);
+      vi.mocked(gitlabApi.getLinkedRepositories).mockResolvedValue(
+        mockLinkedRepositories
+      );
       vi.mocked(gitlabApi.deleteIntegration).mockResolvedValue(undefined);
 
       const { result } = renderHook(() => useGitLab(), { wrapper });
@@ -300,7 +310,10 @@ describe("useGitLab", () => {
 
       const validation = await result.current.validateToken("test-token");
 
-      expect(gitlabApi.validateToken).toHaveBeenCalledWith("test-token", undefined);
+      expect(gitlabApi.validateToken).toHaveBeenCalledWith(
+        "test-token",
+        undefined
+      );
       expect(validation).toEqual({
         valid: true,
         username: "testuser",
@@ -315,7 +328,10 @@ describe("useGitLab", () => {
 
       const { result } = renderHook(() => useGitLab(), { wrapper });
 
-      await result.current.validateToken("test-token", "https://custom.gitlab.com");
+      await result.current.validateToken(
+        "test-token",
+        "https://custom.gitlab.com"
+      );
 
       expect(gitlabApi.validateToken).toHaveBeenCalledWith(
         "test-token",
@@ -385,7 +401,10 @@ describe("useGitLab", () => {
   describe("Loading State", () => {
     it("should be loading while fetching integration", async () => {
       vi.mocked(gitlabApi.getIntegration).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve(mockIntegration), 100))
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve(mockIntegration), 100)
+          )
       );
       vi.mocked(gitlabApi.getLinkedRepositories).mockResolvedValue([]);
 
@@ -397,7 +416,10 @@ describe("useGitLab", () => {
     it("should be loading while fetching repositories", async () => {
       vi.mocked(gitlabApi.getIntegration).mockResolvedValue(mockIntegration);
       vi.mocked(gitlabApi.getLinkedRepositories).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve(mockLinkedRepositories), 100))
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve(mockLinkedRepositories), 100)
+          )
       );
 
       const { result } = renderHook(() => useGitLab(), { wrapper });

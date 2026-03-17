@@ -7,10 +7,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { useCharacters } from "../useCharacters";
 import { charactersApi } from "@/lib/api/characters";
 import type { Character } from "@branchforge/shared";
+import { createTestQueryClient } from "@/test/query-client";
 
 // Mock the characters API
 vi.mock("@/lib/api/characters", () => ({
@@ -69,23 +70,11 @@ describe("useCharacters", () => {
   const projectId = "test-project-id";
 
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={queryClient}>
-      {children}
-    </QueryClientProvider>
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
 
   beforeEach(() => {
-    queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          staleTime: 0,
-        },
-        mutations: {
-          retry: false,
-        },
-      },
-    });
+    queryClient = createTestQueryClient();
     vi.clearAllMocks();
     mockToastSuccess.mockClear();
     mockToastError.mockClear();
@@ -112,7 +101,10 @@ describe("useCharacters", () => {
 
     it("should show loading during fetch", async () => {
       vi.mocked(charactersApi.listCharacters).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve(mockCharacters), 100))
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve(mockCharacters), 100)
+          )
       );
 
       const { result } = renderHook(() => useCharacters(projectId), {
@@ -432,7 +424,8 @@ describe("useCharacters", () => {
     it("should show loading state during delete", async () => {
       vi.mocked(charactersApi.listCharacters).mockResolvedValue(mockCharacters);
       vi.mocked(charactersApi.deleteCharacter).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve(undefined), 100))
+        () =>
+          new Promise((resolve) => setTimeout(() => resolve(undefined), 100))
       );
 
       const { result } = renderHook(() => useCharacters(projectId), {
@@ -471,9 +464,9 @@ describe("useCharacters", () => {
         expect(result.current.characters).toEqual(mockCharacters);
       });
 
-      await expect(
-        result.current.deleteCharacter("char-1")
-      ).rejects.toThrow("Delete failed");
+      await expect(result.current.deleteCharacter("char-1")).rejects.toThrow(
+        "Delete failed"
+      );
 
       // Verify toast error was called
       expect(mockToastError).toHaveBeenCalledWith(

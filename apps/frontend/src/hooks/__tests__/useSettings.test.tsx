@@ -7,11 +7,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { useSettings } from "../useSettings";
 import { settingsApi } from "@/lib/api/settings";
 import { settingsKeys } from "@/lib/query-keys";
 import type { PublicUser } from "@/lib/api/auth";
+import { createTestQueryClient } from "@/test/query-client";
 
 // Mock the settings API
 vi.mock("@/lib/api/settings", () => ({
@@ -40,20 +41,8 @@ describe("useSettings", () => {
   );
 
   beforeEach(() => {
-    queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          staleTime: 0,
-        },
-        mutations: {
-          retry: false,
-        },
-      },
-    });
+    queryClient = createTestQueryClient();
     vi.clearAllMocks();
-    mockToastSuccess.mockClear();
-    mockToastError.mockClear();
   });
 
   afterEach(() => {
@@ -62,7 +51,9 @@ describe("useSettings", () => {
 
   describe("Query", () => {
     it("should fetch sign-ups status on mount", async () => {
-      vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({ enabled: true });
+      vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({
+        enabled: true,
+      });
 
       const { result } = renderHook(() => useSettings(), { wrapper });
 
@@ -75,7 +66,10 @@ describe("useSettings", () => {
 
     it("should show loading during fetch", async () => {
       vi.mocked(settingsApi.getSignUpStatus).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ enabled: true }), 100))
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve({ enabled: true }), 100)
+          )
       );
 
       const { result } = renderHook(() => useSettings(), { wrapper });
@@ -119,9 +113,17 @@ describe("useSettings", () => {
   describe("Optimistic Update Pattern", () => {
     it("should optimistically update sign-ups setting", async () => {
       // Set up initial state and user with OWNER role
-      vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({ enabled: false });
+      vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({
+        enabled: false,
+      });
       vi.mocked(settingsApi.updateSetting).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ key: "sign_ups_enabled", value: true }), 100))
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () => resolve({ key: "sign_ups_enabled", value: true }),
+              100
+            )
+          )
       );
 
       // Set a user with OWNER role in cache
@@ -151,7 +153,9 @@ describe("useSettings", () => {
     });
 
     it("should rollback optimistic update on error", async () => {
-      vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({ enabled: false });
+      vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({
+        enabled: false,
+      });
       const error = new Error("Update failed");
       vi.mocked(settingsApi.updateSetting).mockRejectedValue(error);
 
@@ -169,13 +173,15 @@ describe("useSettings", () => {
       });
 
       // Try to update - should fail
-      await expect(
-        result.current.updateSignUpsSetting(true)
-      ).rejects.toThrow("Update failed");
+      await expect(result.current.updateSignUpsSetting(true)).rejects.toThrow(
+        "Update failed"
+      );
 
       // Verify rollback happened - cache should be restored to original value
       await waitFor(() => {
-        const cachedData = queryClient.getQueryData<boolean>(settingsKeys.signUps());
+        const cachedData = queryClient.getQueryData<boolean>(
+          settingsKeys.signUps()
+        );
         expect(cachedData).toBe(false);
       });
 
@@ -188,8 +194,13 @@ describe("useSettings", () => {
     });
 
     it("should show success toast on successful update", async () => {
-      vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({ enabled: false });
-      vi.mocked(settingsApi.updateSetting).mockResolvedValue({ key: "sign_ups_enabled", value: true });
+      vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({
+        enabled: false,
+      });
+      vi.mocked(settingsApi.updateSetting).mockResolvedValue({
+        key: "sign_ups_enabled",
+        value: true,
+      });
 
       const mockUser: PublicUser = {
         id: "user-1",
@@ -217,8 +228,13 @@ describe("useSettings", () => {
     });
 
     it("should show success toast when disabling sign-ups", async () => {
-      vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({ enabled: true });
-      vi.mocked(settingsApi.updateSetting).mockResolvedValue({ key: "sign_ups_enabled", value: true });
+      vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({
+        enabled: true,
+      });
+      vi.mocked(settingsApi.updateSetting).mockResolvedValue({
+        key: "sign_ups_enabled",
+        value: false,
+      });
 
       const mockUser: PublicUser = {
         id: "user-1",
@@ -247,7 +263,10 @@ describe("useSettings", () => {
       vi.mocked(settingsApi.getSignUpStatus)
         .mockResolvedValueOnce({ enabled: false })
         .mockResolvedValueOnce({ enabled: true }); // After invalidation
-      vi.mocked(settingsApi.updateSetting).mockResolvedValue({ key: "sign_ups_enabled", value: true });
+      vi.mocked(settingsApi.updateSetting).mockResolvedValue({
+        key: "sign_ups_enabled",
+        value: true,
+      });
 
       const mockUser: PublicUser = {
         id: "user-1",
@@ -273,7 +292,9 @@ describe("useSettings", () => {
 
   describe("Authorization", () => {
     it("should throw error when non-OWNER tries to update", async () => {
-      vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({ enabled: false });
+      vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({
+        enabled: false,
+      });
 
       // Set a user with READER role (not OWNER)
       const mockUser: PublicUser = {
@@ -290,16 +311,18 @@ describe("useSettings", () => {
       });
 
       // Should throw error for non-OWNER user
-      await expect(
-        result.current.updateSignUpsSetting(true)
-      ).rejects.toThrow("Only administrators can change this setting");
+      await expect(result.current.updateSignUpsSetting(true)).rejects.toThrow(
+        "Only administrators can change this setting"
+      );
 
       // API should not be called
       expect(settingsApi.updateSetting).not.toHaveBeenCalled();
     });
 
     it("should throw error when no user tries to update", async () => {
-      vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({ enabled: false });
+      vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({
+        enabled: false,
+      });
 
       // No user in cache
       queryClient.setQueryData(["auth", "user"], null);
@@ -311,17 +334,25 @@ describe("useSettings", () => {
       });
 
       // Should throw error when no user
-      await expect(
-        result.current.updateSignUpsSetting(true)
-      ).rejects.toThrow("Only administrators can change this setting");
+      await expect(result.current.updateSignUpsSetting(true)).rejects.toThrow(
+        "Only administrators can change this setting"
+      );
     });
   });
 
   describe("Loading States", () => {
     it("should show saving state during mutation", async () => {
-      vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({ enabled: false });
+      vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({
+        enabled: false,
+      });
       vi.mocked(settingsApi.updateSetting).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ key: "sign_ups_enabled", value: true }), 100))
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () => resolve({ key: "sign_ups_enabled", value: true }),
+              100
+            )
+          )
       );
 
       const mockUser: PublicUser = {
@@ -353,7 +384,9 @@ describe("useSettings", () => {
     });
 
     it("should not show saving state when not updating", async () => {
-      vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({ enabled: true });
+      vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({
+        enabled: true,
+      });
 
       const { result } = renderHook(() => useSettings(), { wrapper });
 

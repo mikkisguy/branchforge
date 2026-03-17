@@ -372,11 +372,25 @@ describe("State Variables API", () => {
         json: async () => ({ stateVariable: mockStateVariable }),
       });
 
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ stateVariable: mockStateVariable }),
+      });
+
       await stateVariablesApi.createStateVariable("proj-1", {
         key: "test",
       });
 
+      await stateVariablesApi.updateStateVariable("var-1", {
+        description: "Updated description",
+      });
+
       expect(mockFetch.mock.calls[0][1]?.headers).toHaveProperty(
+        "Content-Type",
+        "application/json"
+      );
+
+      expect(mockFetch.mock.calls[1][1]?.headers).toHaveProperty(
         "Content-Type",
         "application/json"
       );
@@ -403,9 +417,9 @@ describe("State Variables API", () => {
         json: async () => ({}),
       });
 
-      await expect(
-        stateVariablesApi.getStateVariable("var-1")
-      ).rejects.toThrow("Request failed with status 503");
+      await expect(stateVariablesApi.getStateVariable("var-1")).rejects.toThrow(
+        "Request failed with status 503"
+      );
     });
   });
 });

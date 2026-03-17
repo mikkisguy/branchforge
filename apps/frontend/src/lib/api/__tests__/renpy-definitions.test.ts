@@ -4,19 +4,34 @@
  * Tests for Ren'Py definition management API methods.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  afterAll,
+  vi,
+} from "vitest";
 import { renpyDefinitionsApi } from "../renpy-definitions";
 import type {
   CreateRenpyDefinitionBody,
   UpdateRenpyDefinitionBody,
 } from "../renpy-definitions";
-import type { RenpyDefinition, RenpyDefinitionCategory } from "@branchforge/shared";
+import type {
+  RenpyDefinition,
+  RenpyDefinitionCategory,
+} from "@branchforge/shared";
 
 // Mock fetch globally
+const originalFetch = global.fetch;
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 describe("Ren'Py Definitions API", () => {
+  afterAll(() => {
+    global.fetch = originalFetch;
+  });
   const mockRenpyDefinition: RenpyDefinition = {
     id: "def-1",
     projectId: "proj-1",
@@ -345,7 +360,7 @@ describe("Ren'Py Definitions API", () => {
     });
 
     it("should handle updating referenceTag to null", async () => {
-      const bodyWithNull = { referenceTag: null as null | undefined };
+      const bodyWithNull: UpdateRenpyDefinitionBody = { referenceTag: null };
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -443,6 +458,23 @@ describe("Ren'Py Definitions API", () => {
       });
 
       expect(mockFetch.mock.calls[0][1]?.headers).toHaveProperty(
+        "Content-Type",
+        "application/json"
+      );
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ renpyDefinition: mockRenpyDefinition }),
+      });
+
+      await renpyDefinitionsApi.updateRenpyDefinition("some-id", {
+        category: "CHARACTER",
+        tag: "x",
+        displayName: "X",
+        definitionCode: "code",
+      });
+
+      expect(mockFetch.mock.calls[1][1]?.headers).toHaveProperty(
         "Content-Type",
         "application/json"
       );

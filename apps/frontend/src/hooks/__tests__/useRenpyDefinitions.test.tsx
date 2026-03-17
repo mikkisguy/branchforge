@@ -7,10 +7,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { useRenpyDefinitions } from "../useRenpyDefinitions";
 import { renpyDefinitionsApi } from "@/lib/api/renpy-definitions";
-import type { RenpyDefinition, RenpyDefinitionCategory } from "@branchforge/shared";
+import type {
+  RenpyDefinition,
+  RenpyDefinitionCategory,
+} from "@branchforge/shared";
+import { createTestQueryClient } from "@/test/query-client";
 
 // Mock the renpyDefinitions API
 vi.mock("@/lib/api/renpy-definitions", () => ({
@@ -55,15 +59,8 @@ describe("useRenpyDefinitions", () => {
   );
 
   beforeEach(() => {
-    queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false, staleTime: 0 },
-        mutations: { retry: false },
-      },
-    });
+    queryClient = createTestQueryClient();
     vi.clearAllMocks();
-    mockToastSuccess.mockClear();
-    mockToastError.mockClear();
   });
 
   afterEach(() => {
@@ -76,18 +73,28 @@ describe("useRenpyDefinitions", () => {
         mockRenpyDefinitions
       );
 
-      const { result } = renderHook(
-        () => useRenpyDefinitions("project-1"),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useRenpyDefinitions("project-1"), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.renpyDefinitions).toEqual(mockRenpyDefinitions);
       });
 
-      expect(
-        renpyDefinitionsApi.listRenpyDefinitions
-      ).toHaveBeenCalledWith("project-1");
+      expect(renpyDefinitionsApi.listRenpyDefinitions).toHaveBeenCalledWith(
+        "project-1"
+      );
+    });
+
+    it("should not fetch Ren'Py definitions when projectId is undefined", () => {
+      const { result } = renderHook(
+        () => useRenpyDefinitions(undefined as unknown as string),
+        { wrapper }
+      );
+
+      expect(renpyDefinitionsApi.listRenpyDefinitions).not.toHaveBeenCalled();
+      expect(result.current.renpyDefinitions).toEqual([]);
+      expect(result.current.isLoadingRenpyDefinitions).toBe(false);
     });
 
     it("should show loading state", async () => {
@@ -98,10 +105,9 @@ describe("useRenpyDefinitions", () => {
           )
       );
 
-      const { result } = renderHook(
-        () => useRenpyDefinitions("project-1"),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useRenpyDefinitions("project-1"), {
+        wrapper,
+      });
 
       expect(result.current.isLoadingRenpyDefinitions).toBe(true);
 
@@ -112,12 +118,13 @@ describe("useRenpyDefinitions", () => {
 
     it("should handle API errors", async () => {
       const error = new Error("Failed to fetch");
-      vi.mocked(renpyDefinitionsApi.listRenpyDefinitions).mockRejectedValue(error);
-
-      const { result } = renderHook(
-        () => useRenpyDefinitions("project-1"),
-        { wrapper }
+      vi.mocked(renpyDefinitionsApi.listRenpyDefinitions).mockRejectedValue(
+        error
       );
+
+      const { result } = renderHook(() => useRenpyDefinitions("project-1"), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isLoadingRenpyDefinitions).toBe(false);
@@ -145,10 +152,9 @@ describe("useRenpyDefinitions", () => {
         updatedAt: "2024-01-01T00:00:00.000Z",
       });
 
-      const { result } = renderHook(
-        () => useRenpyDefinitions("project-1"),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useRenpyDefinitions("project-1"), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.renpyDefinitions).toHaveLength(1);
@@ -161,9 +167,8 @@ describe("useRenpyDefinitions", () => {
         definitionCode: 'define l = Character("Lucas")',
       });
 
-      expect(
-        renpyDefinitionsApi.createRenpyDefinition
-      ).toHaveBeenCalledWith("project-1",
+      expect(renpyDefinitionsApi.createRenpyDefinition).toHaveBeenCalledWith(
+        "project-1",
         expect.objectContaining({
           category: "CHARACTER",
           tag: "l",
@@ -173,7 +178,9 @@ describe("useRenpyDefinitions", () => {
 
       // Verify cache was invalidated
       await waitFor(() => {
-        expect(renpyDefinitionsApi.listRenpyDefinitions).toHaveBeenCalledTimes(2);
+        expect(renpyDefinitionsApi.listRenpyDefinitions).toHaveBeenCalledTimes(
+          2
+        );
       });
 
       expect(mockToastSuccess).toHaveBeenCalledWith(
@@ -208,10 +215,9 @@ describe("useRenpyDefinitions", () => {
           )
       );
 
-      const { result } = renderHook(
-        () => useRenpyDefinitions("project-1"),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useRenpyDefinitions("project-1"), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.renpyDefinitions).toHaveLength(1);
@@ -240,12 +246,13 @@ describe("useRenpyDefinitions", () => {
         mockRenpyDefinitions
       );
       const error = new Error("Create failed");
-      vi.mocked(renpyDefinitionsApi.createRenpyDefinition).mockRejectedValue(error);
-
-      const { result } = renderHook(
-        () => useRenpyDefinitions("project-1"),
-        { wrapper }
+      vi.mocked(renpyDefinitionsApi.createRenpyDefinition).mockRejectedValue(
+        error
       );
+
+      const { result } = renderHook(() => useRenpyDefinitions("project-1"), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.renpyDefinitions).toHaveLength(1);
@@ -277,10 +284,9 @@ describe("useRenpyDefinitions", () => {
         displayName: "Updated Eileen",
       });
 
-      const { result } = renderHook(
-        () => useRenpyDefinitions("project-1"),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useRenpyDefinitions("project-1"), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.renpyDefinitions).toHaveLength(1);
@@ -290,9 +296,8 @@ describe("useRenpyDefinitions", () => {
         displayName: "Updated Eileen",
       });
 
-      expect(
-        renpyDefinitionsApi.updateRenpyDefinition
-      ).toHaveBeenCalledWith("def-1",
+      expect(renpyDefinitionsApi.updateRenpyDefinition).toHaveBeenCalledWith(
+        "def-1",
         expect.objectContaining({
           displayName: "Updated Eileen",
         })
@@ -300,7 +305,9 @@ describe("useRenpyDefinitions", () => {
 
       // Verify cache was invalidated
       await waitFor(() => {
-        expect(renpyDefinitionsApi.listRenpyDefinitions).toHaveBeenCalledTimes(2);
+        expect(renpyDefinitionsApi.listRenpyDefinitions).toHaveBeenCalledTimes(
+          2
+        );
       });
 
       expect(mockToastSuccess).toHaveBeenCalledWith(
@@ -314,19 +321,22 @@ describe("useRenpyDefinitions", () => {
         mockRenpyDefinitions
       );
       const error = new Error("Update failed");
-      vi.mocked(renpyDefinitionsApi.updateRenpyDefinition).mockRejectedValue(error);
-
-      const { result } = renderHook(
-        () => useRenpyDefinitions("project-1"),
-        { wrapper }
+      vi.mocked(renpyDefinitionsApi.updateRenpyDefinition).mockRejectedValue(
+        error
       );
+
+      const { result } = renderHook(() => useRenpyDefinitions("project-1"), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.renpyDefinitions).toHaveLength(1);
       });
 
       await expect(
-        result.current.updateRenpyDefinition("def-1", { displayName: "Updated" })
+        result.current.updateRenpyDefinition("def-1", {
+          displayName: "Updated",
+        })
       ).rejects.toThrow("Update failed");
 
       expect(mockToastError).toHaveBeenCalledWith(
@@ -341,12 +351,13 @@ describe("useRenpyDefinitions", () => {
       vi.mocked(renpyDefinitionsApi.listRenpyDefinitions).mockResolvedValue(
         mockRenpyDefinitions
       );
-      vi.mocked(renpyDefinitionsApi.deleteRenpyDefinition).mockResolvedValue(undefined);
-
-      const { result } = renderHook(
-        () => useRenpyDefinitions("project-1"),
-        { wrapper }
+      vi.mocked(renpyDefinitionsApi.deleteRenpyDefinition).mockResolvedValue(
+        undefined
       );
+
+      const { result } = renderHook(() => useRenpyDefinitions("project-1"), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.renpyDefinitions).toHaveLength(1);
@@ -354,13 +365,15 @@ describe("useRenpyDefinitions", () => {
 
       await result.current.deleteRenpyDefinition("def-1");
 
-      expect(
-        renpyDefinitionsApi.deleteRenpyDefinition
-      ).toHaveBeenCalledWith("def-1");
+      expect(renpyDefinitionsApi.deleteRenpyDefinition).toHaveBeenCalledWith(
+        "def-1"
+      );
 
       // Verify cache was invalidated
       await waitFor(() => {
-        expect(renpyDefinitionsApi.listRenpyDefinitions).toHaveBeenCalledTimes(2);
+        expect(renpyDefinitionsApi.listRenpyDefinitions).toHaveBeenCalledTimes(
+          2
+        );
       });
 
       expect(mockToastSuccess).toHaveBeenCalledWith(
@@ -374,12 +387,13 @@ describe("useRenpyDefinitions", () => {
         mockRenpyDefinitions
       );
       const error = new Error("Delete failed");
-      vi.mocked(renpyDefinitionsApi.deleteRenpyDefinition).mockRejectedValue(error);
-
-      const { result } = renderHook(
-        () => useRenpyDefinitions("project-1"),
-        { wrapper }
+      vi.mocked(renpyDefinitionsApi.deleteRenpyDefinition).mockRejectedValue(
+        error
       );
+
+      const { result } = renderHook(() => useRenpyDefinitions("project-1"), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.renpyDefinitions).toHaveLength(1);
@@ -416,10 +430,9 @@ describe("useRenpyDefinitions", () => {
           },
         ]);
 
-      const { result } = renderHook(
-        () => useRenpyDefinitions("project-1"),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useRenpyDefinitions("project-1"), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.renpyDefinitions).toHaveLength(1);

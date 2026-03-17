@@ -7,10 +7,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { useAuth } from "../useAuth";
 import { authApi, type PublicUser } from "@/lib/api/auth";
 import { authKeys } from "@/lib/query-keys";
+import { createTestQueryClient } from "@/test/query-client";
 
 // Mock the auth API
 vi.mock("@/lib/api/auth", () => ({
@@ -40,17 +41,7 @@ describe("useAuth", () => {
   );
 
   beforeEach(() => {
-    queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          staleTime: 0,
-        },
-        mutations: {
-          retry: false,
-        },
-      },
-    });
+    queryClient = createTestQueryClient();
     vi.clearAllMocks();
   });
 
@@ -105,7 +96,9 @@ describe("useAuth", () => {
     });
 
     it("should set isAuthenticated to false when user is null", async () => {
-      vi.mocked(authApi.getMe).mockResolvedValue({ user: null as unknown as PublicUser });
+      vi.mocked(authApi.getMe).mockResolvedValue({
+        user: null,
+      });
 
       const { result } = renderHook(() => useAuth(), { wrapper });
 
@@ -153,7 +146,9 @@ describe("useAuth", () => {
 
   describe("Login Mutation", () => {
     it("should login successfully and set cache", async () => {
-      vi.mocked(authApi.getMe).mockResolvedValue({ user: null as unknown as PublicUser });
+      vi.mocked(authApi.getMe).mockResolvedValue({
+        user: null,
+      });
       vi.mocked(authApi.login).mockResolvedValue({ user: mockUser });
 
       const { result } = renderHook(() => useAuth(), { wrapper });
@@ -180,7 +175,9 @@ describe("useAuth", () => {
     });
 
     it("should show loading state during login", async () => {
-      vi.mocked(authApi.getMe).mockResolvedValue({ user: null as unknown as PublicUser });
+      vi.mocked(authApi.getMe).mockResolvedValue({
+        user: null,
+      });
       vi.mocked(authApi.login).mockImplementation(
         () =>
           new Promise((resolve) =>
@@ -210,7 +207,9 @@ describe("useAuth", () => {
     });
 
     it("should throw error on failed login", async () => {
-      vi.mocked(authApi.getMe).mockResolvedValue({ user: null as unknown as PublicUser });
+      vi.mocked(authApi.getMe).mockResolvedValue({
+        user: null,
+      });
       const error = new Error("Invalid credentials");
       vi.mocked(authApi.login).mockRejectedValue(error);
 
@@ -231,11 +230,11 @@ describe("useAuth", () => {
     });
 
     it("should handle validation errors from API", async () => {
-      vi.mocked(authApi.getMe).mockResolvedValue({ user: null as unknown as PublicUser });
-      const error = new Error("Email is required");
-      vi.mocked(authApi.login).mockImplementation(() => {
-        throw error;
+      vi.mocked(authApi.getMe).mockResolvedValue({
+        user: null,
       });
+      const error = new Error("Email is required");
+      vi.mocked(authApi.login).mockRejectedValue(error);
 
       const { result } = renderHook(() => useAuth(), { wrapper });
 
@@ -251,7 +250,9 @@ describe("useAuth", () => {
 
   describe("Register Mutation", () => {
     it("should register successfully and set cache", async () => {
-      vi.mocked(authApi.getMe).mockResolvedValue({ user: null as unknown as PublicUser });
+      vi.mocked(authApi.getMe).mockResolvedValue({
+        user: null,
+      });
       vi.mocked(authApi.register).mockResolvedValue({ user: mockUser });
 
       const { result } = renderHook(() => useAuth(), { wrapper });
@@ -278,7 +279,9 @@ describe("useAuth", () => {
     });
 
     it("should show loading state during registration", async () => {
-      vi.mocked(authApi.getMe).mockResolvedValue({ user: null as unknown as PublicUser });
+      vi.mocked(authApi.getMe).mockResolvedValue({
+        user: null,
+      });
       vi.mocked(authApi.register).mockImplementation(
         () =>
           new Promise((resolve) =>
@@ -310,7 +313,9 @@ describe("useAuth", () => {
     });
 
     it("should throw error on failed registration", async () => {
-      vi.mocked(authApi.getMe).mockResolvedValue({ user: null as unknown as PublicUser });
+      vi.mocked(authApi.getMe).mockResolvedValue({
+        user: null,
+      });
       const error = new Error("Email already exists");
       vi.mocked(authApi.register).mockRejectedValue(error);
 
@@ -331,11 +336,11 @@ describe("useAuth", () => {
     });
 
     it("should handle validation errors from API", async () => {
-      vi.mocked(authApi.getMe).mockResolvedValue({ user: null as unknown as PublicUser });
-      const error = new Error("Password must be at least 8 characters");
-      vi.mocked(authApi.register).mockImplementation(() => {
-        throw error;
+      vi.mocked(authApi.getMe).mockResolvedValue({
+        user: null,
       });
+      const error = new Error("Password must be at least 8 characters");
+      vi.mocked(authApi.register).mockRejectedValue(error);
 
       const { result } = renderHook(() => useAuth(), { wrapper });
 
@@ -380,13 +385,20 @@ describe("useAuth", () => {
     it("should show loading state during logout", async () => {
       vi.mocked(authApi.getMe).mockResolvedValue({ user: mockUser });
       vi.mocked(authApi.logout).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve(undefined), 100))
+        () =>
+          new Promise((resolve) => setTimeout(() => resolve(undefined), 100))
       );
 
       const { result } = renderHook(() => useAuth(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.user).toEqual(mockUser);
+      });
+
+      // Mock getMe to return null before logout so the refetch triggered by the
+      // cache clear uses the null response deterministically (avoids a race).
+      vi.mocked(authApi.getMe).mockResolvedValue({
+        user: null,
       });
 
       // Start logout - note: isLoading is for the query, not the mutation
@@ -397,10 +409,6 @@ describe("useAuth", () => {
 
       // Wait for logout to complete
       await logoutPromise;
-
-      // After logout completes, the query cache is cleared
-      // The query will refetch, so mock getMe to return null user
-      vi.mocked(authApi.getMe).mockResolvedValue({ user: null as unknown as PublicUser });
 
       // Wait for the cache to be cleared and user to become null
       await waitFor(() => {
@@ -446,39 +454,6 @@ describe("useAuth", () => {
 
       // Should be called twice (initial mount + refresh)
       expect(authApi.getMe).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe("isAuthenticated", () => {
-    it("should return false when user is null", async () => {
-      vi.mocked(authApi.getMe).mockResolvedValue({ user: null as unknown as PublicUser });
-
-      const { result } = renderHook(() => useAuth(), { wrapper });
-
-      await waitFor(() => {
-        expect(result.current.user).toBeNull();
-      });
-
-      expect(result.current.isAuthenticated).toBe(false);
-    });
-
-    it("should return false when user is undefined", () => {
-      const { result } = renderHook(() => useAuth(), { wrapper });
-
-      expect(result.current.user).toBeUndefined();
-      expect(result.current.isAuthenticated).toBe(false);
-    });
-
-    it("should return true when user exists", async () => {
-      vi.mocked(authApi.getMe).mockResolvedValue({ user: mockUser });
-
-      const { result } = renderHook(() => useAuth(), { wrapper });
-
-      await waitFor(() => {
-        expect(result.current.user).toEqual(mockUser);
-      });
-
-      expect(result.current.isAuthenticated).toBe(true);
     });
   });
 });

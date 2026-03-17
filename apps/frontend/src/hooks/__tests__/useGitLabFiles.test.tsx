@@ -7,9 +7,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useGitLabFiles } from "../useGitLabFiles";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
+import { useGitLabFiles, type GitLabFileNode } from "../useGitLabFiles";
 import { gitlabApi } from "@/lib/api/gitlab";
+import { createTestQueryClient } from "@/test/query-client";
 
 // Mock the gitlab API
 vi.mock("@/lib/api/gitlab", () => ({
@@ -19,22 +20,7 @@ vi.mock("@/lib/api/gitlab", () => ({
   },
 }));
 
-const mockFiles: Array<{
-  id: string;
-  projectId: string;
-  filePath: string;
-  fileType: "STORY" | "SETTINGS";
-  content: string;
-  lastSyncedAt: string | null;
-  lastCommitSha: string | null;
-  createdAt: string;
-  updatedAt: string;
-  scenes: Array<{
-    id: string;
-    labelName: string | null;
-    title: string;
-  }>;
-}> = [
+const mockFiles: GitLabFileNode[] = [
   {
     id: "file-1",
     projectId: "project-1",
@@ -56,12 +42,7 @@ describe("useGitLabFiles", () => {
   );
 
   beforeEach(() => {
-    queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false, staleTime: 0 },
-        mutations: { retry: false },
-      },
-    });
+    queryClient = createTestQueryClient();
     vi.clearAllMocks();
   });
 
@@ -84,18 +65,21 @@ describe("useGitLabFiles", () => {
       expect(gitlabApi.getGitLabFiles).toHaveBeenCalledWith("project-1");
     });
 
-    it("should not fetch files when projectId is undefined", () => {
+    it("should not fetch files when projectId is undefined", async () => {
       const { result } = renderHook(() => useGitLabFiles(undefined), {
         wrapper,
       });
 
-      expect(gitlabApi.getGitLabFiles).not.toHaveBeenCalled();
-      expect(result.current.files).toEqual([]);
+      await waitFor(() => {
+        expect(gitlabApi.getGitLabFiles).not.toHaveBeenCalled();
+        expect(result.current.files).toEqual([]);
+      });
     });
 
     it("should show loading state during fetch", async () => {
       vi.mocked(gitlabApi.getGitLabFiles).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve(mockFiles), 100))
+        () =>
+          new Promise((resolve) => setTimeout(() => resolve(mockFiles), 100))
       );
 
       const { result } = renderHook(() => useGitLabFiles("project-1"), {
@@ -128,7 +112,9 @@ describe("useGitLabFiles", () => {
   describe("Update File Mutation", () => {
     it("should update file content and invalidate cache", async () => {
       vi.mocked(gitlabApi.getGitLabFiles).mockResolvedValue(mockFiles);
-      vi.mocked(gitlabApi.updateGitLabFile).mockResolvedValue({ success: true });
+      vi.mocked(gitlabApi.updateGitLabFile).mockResolvedValue({
+        success: true,
+      });
 
       const { result } = renderHook(() => useGitLabFiles("project-1"), {
         wrapper,
@@ -154,7 +140,10 @@ describe("useGitLabFiles", () => {
     it("should show loading state during update", async () => {
       vi.mocked(gitlabApi.getGitLabFiles).mockResolvedValue(mockFiles);
       vi.mocked(gitlabApi.updateGitLabFile).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ success: true }), 100))
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve({ success: true }), 100)
+          )
       );
 
       const { result } = renderHook(() => useGitLabFiles("project-1"), {
@@ -165,7 +154,10 @@ describe("useGitLabFiles", () => {
         expect(result.current.files).toHaveLength(1);
       });
 
-      const updatePromise = result.current.updateFileContent("file-1", "new content");
+      const updatePromise = result.current.updateFileContent(
+        "file-1",
+        "new content"
+      );
 
       await waitFor(() => {
         expect(result.current.isUpdatingFile).toBe(true);

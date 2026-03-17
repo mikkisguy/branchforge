@@ -7,10 +7,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { useStateVariables } from "../useStateVariables";
 import { stateVariablesApi } from "@/lib/api/state-variables";
 import type { StateVariable } from "@branchforge/shared";
+import { createTestQueryClient } from "@/test/query-client";
 
 // Mock the stateVariables API
 vi.mock("@/lib/api/state-variables", () => ({
@@ -51,15 +52,8 @@ describe("useStateVariables", () => {
   );
 
   beforeEach(() => {
-    queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false, staleTime: 0 },
-        mutations: { retry: false },
-      },
-    });
+    queryClient = createTestQueryClient();
     vi.clearAllMocks();
-    mockToastSuccess.mockClear();
-    mockToastError.mockClear();
   });
 
   afterEach(() => {
@@ -72,18 +66,17 @@ describe("useStateVariables", () => {
         mockStateVariables
       );
 
-      const { result } = renderHook(
-        () => useStateVariables("project-1"),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useStateVariables("project-1"), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.stateVariables).toEqual(mockStateVariables);
       });
 
-      expect(
-        stateVariablesApi.listStateVariables
-      ).toHaveBeenCalledWith("project-1");
+      expect(stateVariablesApi.listStateVariables).toHaveBeenCalledWith(
+        "project-1"
+      );
     });
 
     it("should show loading state", async () => {
@@ -94,10 +87,9 @@ describe("useStateVariables", () => {
           )
       );
 
-      const { result } = renderHook(
-        () => useStateVariables("project-1"),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useStateVariables("project-1"), {
+        wrapper,
+      });
 
       expect(result.current.isLoadingStateVariables).toBe(true);
 
@@ -110,10 +102,9 @@ describe("useStateVariables", () => {
       const error = new Error("Failed to fetch");
       vi.mocked(stateVariablesApi.listStateVariables).mockRejectedValue(error);
 
-      const { result } = renderHook(
-        () => useStateVariables("project-1"),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useStateVariables("project-1"), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isLoadingStateVariables).toBe(false);
@@ -137,10 +128,9 @@ describe("useStateVariables", () => {
         createdAt: "2024-01-01T00:00:00.000Z",
       } as StateVariable);
 
-      const { result } = renderHook(
-        () => useStateVariables("project-1"),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useStateVariables("project-1"), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.stateVariables).toHaveLength(1);
@@ -151,9 +141,8 @@ describe("useStateVariables", () => {
         description: "Met Lucas",
       });
 
-      expect(
-        stateVariablesApi.createStateVariable
-      ).toHaveBeenCalledWith("project-1",
+      expect(stateVariablesApi.createStateVariable).toHaveBeenCalledWith(
+        "project-1",
         expect.objectContaining({
           key: "met_lucas",
           description: "Met Lucas",
@@ -193,10 +182,9 @@ describe("useStateVariables", () => {
           )
       );
 
-      const { result } = renderHook(
-        () => useStateVariables("project-1"),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useStateVariables("project-1"), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.stateVariables).toHaveLength(1);
@@ -224,10 +212,9 @@ describe("useStateVariables", () => {
       const error = new Error("Create failed");
       vi.mocked(stateVariablesApi.createStateVariable).mockRejectedValue(error);
 
-      const { result } = renderHook(
-        () => useStateVariables("project-1"),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useStateVariables("project-1"), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.stateVariables).toHaveLength(1);
@@ -254,10 +241,9 @@ describe("useStateVariables", () => {
         description: "Updated description",
       });
 
-      const { result } = renderHook(
-        () => useStateVariables("project-1"),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useStateVariables("project-1"), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.stateVariables).toHaveLength(1);
@@ -267,9 +253,8 @@ describe("useStateVariables", () => {
         description: "Updated description",
       });
 
-      expect(
-        stateVariablesApi.updateStateVariable
-      ).toHaveBeenCalledWith("var-1",
+      expect(stateVariablesApi.updateStateVariable).toHaveBeenCalledWith(
+        "var-1",
         expect.objectContaining({
           description: "Updated description",
         })
@@ -286,6 +271,62 @@ describe("useStateVariables", () => {
       );
     });
 
+    it("should toggle isUpdatingStateVariable during update", async () => {
+      vi.mocked(stateVariablesApi.listStateVariables).mockResolvedValue(
+        mockStateVariables
+      );
+
+      let resolveUpdate: (value: StateVariable) => void;
+      const deferredUpdate = new Promise<StateVariable>((resolve) => {
+        resolveUpdate = resolve;
+      });
+
+      vi.mocked(stateVariablesApi.updateStateVariable).mockReturnValue(
+        deferredUpdate
+      );
+
+      const { result } = renderHook(() => useStateVariables("project-1"), {
+        wrapper,
+      });
+
+      await waitFor(() => {
+        expect(result.current.stateVariables).toHaveLength(1);
+      });
+
+      expect(result.current.isUpdatingStateVariable).toBe(false);
+
+      const updatePromise = result.current.updateStateVariable("var-1", {
+        description: "Updated description",
+      });
+
+      await waitFor(() => {
+        expect(result.current.isUpdatingStateVariable).toBe(true);
+      });
+
+      expect(stateVariablesApi.updateStateVariable).toHaveBeenCalledWith(
+        "var-1",
+        expect.objectContaining({
+          description: "Updated description",
+        })
+      );
+
+      resolveUpdate!({
+        ...mockStateVariables[0],
+        description: "Updated description",
+      });
+
+      await updatePromise;
+
+      await waitFor(() => {
+        expect(result.current.isUpdatingStateVariable).toBe(false);
+      });
+
+      expect(mockToastSuccess).toHaveBeenCalledWith(
+        "State variable updated successfully",
+        "Success"
+      );
+    });
+
     it("should show error toast on update failure", async () => {
       vi.mocked(stateVariablesApi.listStateVariables).mockResolvedValue(
         mockStateVariables
@@ -293,10 +334,9 @@ describe("useStateVariables", () => {
       const error = new Error("Update failed");
       vi.mocked(stateVariablesApi.updateStateVariable).mockRejectedValue(error);
 
-      const { result } = renderHook(
-        () => useStateVariables("project-1"),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useStateVariables("project-1"), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.stateVariables).toHaveLength(1);
@@ -318,12 +358,13 @@ describe("useStateVariables", () => {
       vi.mocked(stateVariablesApi.listStateVariables).mockResolvedValue(
         mockStateVariables
       );
-      vi.mocked(stateVariablesApi.deleteStateVariable).mockResolvedValue(undefined);
-
-      const { result } = renderHook(
-        () => useStateVariables("project-1"),
-        { wrapper }
+      vi.mocked(stateVariablesApi.deleteStateVariable).mockResolvedValue(
+        undefined
       );
+
+      const { result } = renderHook(() => useStateVariables("project-1"), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.stateVariables).toHaveLength(1);
@@ -331,9 +372,9 @@ describe("useStateVariables", () => {
 
       await result.current.deleteStateVariable("var-1");
 
-      expect(
-        stateVariablesApi.deleteStateVariable
-      ).toHaveBeenCalledWith("var-1");
+      expect(stateVariablesApi.deleteStateVariable).toHaveBeenCalledWith(
+        "var-1"
+      );
 
       // Verify cache was invalidated
       await waitFor(() => {
@@ -353,18 +394,17 @@ describe("useStateVariables", () => {
       const error = new Error("Delete failed");
       vi.mocked(stateVariablesApi.deleteStateVariable).mockRejectedValue(error);
 
-      const { result } = renderHook(
-        () => useStateVariables("project-1"),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useStateVariables("project-1"), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.stateVariables).toHaveLength(1);
       });
 
-      await expect(
-        result.current.deleteStateVariable("var-1")
-      ).rejects.toThrow("Delete failed");
+      await expect(result.current.deleteStateVariable("var-1")).rejects.toThrow(
+        "Delete failed"
+      );
 
       expect(mockToastError).toHaveBeenCalledWith(
         "Failed to delete state variable: Delete failed",
@@ -389,10 +429,9 @@ describe("useStateVariables", () => {
           },
         ]);
 
-      const { result } = renderHook(
-        () => useStateVariables("project-1"),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useStateVariables("project-1"), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.stateVariables).toHaveLength(1);

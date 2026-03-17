@@ -65,7 +65,10 @@ describe("Query Keys Factory", () => {
     });
 
     it("should create correct repositories key", () => {
-      expect(gitlabKeys.repositories()).toStrictEqual(["gitlab", "repositories"]);
+      expect(gitlabKeys.repositories()).toStrictEqual([
+        "gitlab",
+        "repositories",
+      ]);
     });
 
     it("should create correct repository key with projectId", () => {
@@ -427,12 +430,13 @@ describe("Query Keys Factory", () => {
     });
 
     it("should produce identical keys across multiple calls", () => {
+      const expectedKey = projectKeys.detail("stable-id");
       const keys = Array.from({ length: 10 }, () =>
         projectKeys.detail("stable-id")
       );
 
       keys.forEach((key) => {
-        expect(key).toStrictEqual(projectKeys.detail("stable-id"));
+        expect(key).toStrictEqual(expectedKey);
       });
     });
   });

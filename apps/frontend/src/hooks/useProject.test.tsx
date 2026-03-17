@@ -1,8 +1,9 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useProject } from "./useProject";
 import { projectsApi, type Project } from "@/lib/api/projects";
+import { createTestQueryClient } from "@/test/query-client";
 
 const TEST_PROJECTS: Project[] = [
   {
@@ -38,13 +39,7 @@ describe("useProject", () => {
   });
 
   it("auto-selects and persists the first project after projects load", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
+    const queryClient = createTestQueryClient();
 
     const { result } = renderHook(() => useProject(), {
       wrapper: createWrapper(queryClient),
@@ -65,13 +60,7 @@ describe("useProject", () => {
       JSON.stringify("missing-project")
     );
 
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
+    const queryClient = createTestQueryClient();
 
     const { result } = renderHook(() => useProject(), {
       wrapper: createWrapper(queryClient),

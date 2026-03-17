@@ -8,8 +8,9 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { RegisterPage } from "../register";
+import { createTestQueryClient } from "@/test/query-client";
 
 // Mock the useAuth hook
 const mockRegister = vi.fn();
@@ -40,26 +41,15 @@ describe("RegisterPage", () => {
 
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
-        {children}
-      </MemoryRouter>
+      <MemoryRouter>{children}</MemoryRouter>
     </QueryClientProvider>
   );
 
   beforeEach(() => {
-    queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-        mutations: {
-          retry: false,
-        },
-      },
-    });
+    queryClient = createTestQueryClient();
     vi.clearAllMocks();
     // Default to signups enabled and not loading
-    vi.mocked(mockUseSettings).mockReturnValue({
+    mockUseSettings.mockReturnValue({
       signUpsEnabled: true,
       isLoading: false,
       isSaving: false,
@@ -74,7 +64,9 @@ describe("RegisterPage", () => {
       expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/confirm password/i)).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /create account/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /create account/i })
+      ).toBeInTheDocument();
     });
 
     it("should show email placeholder", () => {
@@ -107,8 +99,12 @@ describe("RegisterPage", () => {
     it("should show link to login page", () => {
       render(<RegisterPage />, { wrapper });
 
-      expect(screen.getByText(/already have an account\?/i)).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: /sign in/i })).toBeInTheDocument();
+      expect(
+        screen.getByText(/already have an account\?/i)
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: /sign in/i })
+      ).toBeInTheDocument();
     });
 
     it("should have proper HTML5 validation attributes", () => {
@@ -129,7 +125,7 @@ describe("RegisterPage", () => {
 
   describe("Settings Loading State", () => {
     it("should show loading state while checking settings", () => {
-      vi.mocked(mockUseSettings).mockReturnValue({
+      mockUseSettings.mockReturnValue({
         signUpsEnabled: true,
         isLoading: true,
         isSaving: false,
@@ -142,7 +138,7 @@ describe("RegisterPage", () => {
     });
 
     it("should not show form while loading", () => {
-      vi.mocked(mockUseSettings).mockReturnValue({
+      mockUseSettings.mockReturnValue({
         signUpsEnabled: true,
         isLoading: true,
         isSaving: false,
@@ -157,7 +153,7 @@ describe("RegisterPage", () => {
 
   describe("Signups Disabled State", () => {
     it("should show registration closed message when signups disabled", () => {
-      vi.mocked(mockUseSettings).mockReturnValue({
+      mockUseSettings.mockReturnValue({
         signUpsEnabled: false,
         isLoading: false,
         isSaving: false,
@@ -167,11 +163,13 @@ describe("RegisterPage", () => {
       render(<RegisterPage />, { wrapper });
 
       expect(screen.getByText("Registration Closed")).toBeInTheDocument();
-      expect(screen.getByText(/new user registration is currently disabled/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/new user registration is currently disabled/i)
+      ).toBeInTheDocument();
     });
 
     it("should show link to login when signups disabled", () => {
-      vi.mocked(mockUseSettings).mockReturnValue({
+      mockUseSettings.mockReturnValue({
         signUpsEnabled: false,
         isLoading: false,
         isSaving: false,
@@ -185,7 +183,7 @@ describe("RegisterPage", () => {
     });
 
     it("should not show form when signups disabled", () => {
-      vi.mocked(mockUseSettings).mockReturnValue({
+      mockUseSettings.mockReturnValue({
         signUpsEnabled: false,
         isLoading: false,
         isSaving: false,
@@ -196,7 +194,9 @@ describe("RegisterPage", () => {
 
       expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument();
       expect(screen.queryByLabelText(/^password$/i)).not.toBeInTheDocument();
-      expect(screen.queryByLabelText(/confirm password/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByLabelText(/confirm password/i)
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -205,19 +205,14 @@ describe("RegisterPage", () => {
       const user = userEvent.setup({ delay: null });
       mockRegister.mockResolvedValue(undefined);
 
-      render(
-        <MemoryRouter initialEntries={["/register"]}>
-          <Routes>
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/" element={<div>Dashboard</div>} />
-          </Routes>
-        </MemoryRouter>
-      );
+      render(<RegisterPage />, { wrapper });
 
       const emailInput = screen.getByLabelText(/email/i);
       const passwordInput = screen.getByLabelText(/^password$/i);
       const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
-      const submitButton = screen.getByRole("button", { name: /create account/i });
+      const submitButton = screen.getByRole("button", {
+        name: /create account/i,
+      });
 
       await user.type(emailInput, "test@example.com");
       await user.type(passwordInput, "password123");
@@ -225,7 +220,10 @@ describe("RegisterPage", () => {
       await user.click(submitButton);
 
       await waitFor(() => {
-        expect(mockRegister).toHaveBeenCalledWith("test@example.com", "password123");
+        expect(mockRegister).toHaveBeenCalledWith(
+          "test@example.com",
+          "password123"
+        );
       });
     });
 
@@ -240,7 +238,9 @@ describe("RegisterPage", () => {
       const emailInput = screen.getByLabelText(/email/i);
       const passwordInput = screen.getByLabelText(/^password$/i);
       const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
-      const submitButton = screen.getByRole("button", { name: /create account/i });
+      const submitButton = screen.getByRole("button", {
+        name: /create account/i,
+      });
 
       await user.type(emailInput, "test@example.com");
       await user.type(passwordInput, "password123");
@@ -252,7 +252,8 @@ describe("RegisterPage", () => {
         expect(submitButton).toHaveTextContent("Creating account...");
       });
 
-      // Inputs should be disabled
+      // Button and inputs should be disabled
+      expect(submitButton).toBeDisabled();
       expect(emailInput).toBeDisabled();
       expect(passwordInput).toBeDisabled();
       expect(confirmPasswordInput).toBeDisabled();
@@ -268,7 +269,9 @@ describe("RegisterPage", () => {
       const emailInput = screen.getByLabelText(/email/i);
       const passwordInput = screen.getByLabelText(/^password$/i);
       const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
-      const submitButton = screen.getByRole("button", { name: /create account/i });
+      const submitButton = screen.getByRole("button", {
+        name: /create account/i,
+      });
 
       await user.type(emailInput, "existing@example.com");
       await user.type(passwordInput, "password123");
@@ -289,7 +292,9 @@ describe("RegisterPage", () => {
       const emailInput = screen.getByLabelText(/email/i);
       const passwordInput = screen.getByLabelText(/^password$/i);
       const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
-      const submitButton = screen.getByRole("button", { name: /create account/i });
+      const submitButton = screen.getByRole("button", {
+        name: /create account/i,
+      });
 
       await user.type(emailInput, "test@example.com");
       await user.type(passwordInput, "password123");
@@ -300,7 +305,10 @@ describe("RegisterPage", () => {
         expect(screen.getByText("Previous error")).toBeInTheDocument();
       });
 
-      // Error remains visible (component doesn't auto-clear on input)
+      // Type in input to verify error doesn't auto-clear
+      await user.type(emailInput, "x");
+
+      // Error should remain visible
       expect(screen.getByText("Previous error")).toBeInTheDocument();
     });
 
@@ -313,7 +321,9 @@ describe("RegisterPage", () => {
       const emailInput = screen.getByLabelText(/email/i);
       const passwordInput = screen.getByLabelText(/^password$/i);
       const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
-      const submitButton = screen.getByRole("button", { name: /create account/i });
+      const submitButton = screen.getByRole("button", {
+        name: /create account/i,
+      });
 
       await user.type(emailInput, "test@example.com");
       await user.type(passwordInput, "password123");
@@ -330,18 +340,22 @@ describe("RegisterPage", () => {
       mockRegister.mockResolvedValue(undefined);
 
       render(
-        <MemoryRouter initialEntries={["/register"]}>
-          <Routes>
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/" element={<div>Dashboard</div>} />
-          </Routes>
-        </MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={["/register"]}>
+            <Routes>
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/" element={<div>Dashboard</div>} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>
       );
 
       const emailInput = screen.getByLabelText(/email/i);
       const passwordInput = screen.getByLabelText(/^password$/i);
       const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
-      const submitButton = screen.getByRole("button", { name: /create account/i });
+      const submitButton = screen.getByRole("button", {
+        name: /create account/i,
+      });
 
       await user.type(emailInput, "test@example.com");
       await user.type(passwordInput, "password123");
@@ -361,7 +375,9 @@ describe("RegisterPage", () => {
       render(<RegisterPage />, { wrapper });
 
       const emailInput = screen.getByLabelText(/email/i);
-      const submitButton = screen.getByRole("button", { name: /create account/i });
+      const submitButton = screen.getByRole("button", {
+        name: /create account/i,
+      });
 
       // Try to submit with empty email (browser's HTML5 validation should block)
       await user.click(submitButton);
@@ -376,7 +392,9 @@ describe("RegisterPage", () => {
       render(<RegisterPage />, { wrapper });
 
       const passwordInput = screen.getByLabelText(/^password$/i);
-      const submitButton = screen.getByRole("button", { name: /create account/i });
+      const submitButton = screen.getByRole("button", {
+        name: /create account/i,
+      });
 
       // Try to submit with empty password (browser's HTML5 validation should block)
       await user.click(submitButton);
@@ -391,7 +409,9 @@ describe("RegisterPage", () => {
       render(<RegisterPage />, { wrapper });
 
       const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
-      const submitButton = screen.getByRole("button", { name: /create account/i });
+      const submitButton = screen.getByRole("button", {
+        name: /create account/i,
+      });
 
       // Try to submit with empty confirm password (browser's HTML5 validation should block)
       await user.click(submitButton);
@@ -402,14 +422,15 @@ describe("RegisterPage", () => {
 
     it("should validate password length minimum", async () => {
       const user = userEvent.setup({ delay: null });
-      mockRegister.mockResolvedValue(undefined);
 
       render(<RegisterPage />, { wrapper });
 
       const emailInput = screen.getByLabelText(/email/i);
       const passwordInput = screen.getByLabelText(/^password$/i);
       const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
-      const submitButton = screen.getByRole("button", { name: /create account/i });
+      const submitButton = screen.getByRole("button", {
+        name: /create account/i,
+      });
 
       await user.type(emailInput, "test@example.com");
       await user.type(passwordInput, "short");
@@ -417,7 +438,9 @@ describe("RegisterPage", () => {
       await user.click(submitButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Password must be at least 8 characters")).toBeInTheDocument();
+        expect(
+          screen.getByText("Password must be at least 8 characters")
+        ).toBeInTheDocument();
       });
 
       expect(mockRegister).not.toHaveBeenCalled();
@@ -425,14 +448,15 @@ describe("RegisterPage", () => {
 
     it("should validate passwords match", async () => {
       const user = userEvent.setup({ delay: null });
-      mockRegister.mockResolvedValue(undefined);
 
       render(<RegisterPage />, { wrapper });
 
       const emailInput = screen.getByLabelText(/email/i);
       const passwordInput = screen.getByLabelText(/^password$/i);
       const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
-      const submitButton = screen.getByRole("button", { name: /create account/i });
+      const submitButton = screen.getByRole("button", {
+        name: /create account/i,
+      });
 
       await user.type(emailInput, "test@example.com");
       await user.type(passwordInput, "password123");
@@ -475,10 +499,14 @@ describe("RegisterPage", () => {
   });
 
   describe("Disabled State", () => {
-    it("should disable form inputs during loading", async () => {
+    it("should re-enable form inputs after submission fails", async () => {
       const user = userEvent.setup({ delay: null });
+      // Simulate failed submission to keep component mounted and verify re-enabling
       mockRegister.mockImplementation(
-        () => new Promise((resolve) => setTimeout(resolve, 100))
+        () =>
+          new Promise<void>((_resolve, reject) =>
+            setTimeout(() => reject(new Error("Registration failed")), 100)
+          )
       );
 
       render(<RegisterPage />, { wrapper });
@@ -486,34 +514,9 @@ describe("RegisterPage", () => {
       const emailInput = screen.getByLabelText(/email/i);
       const passwordInput = screen.getByLabelText(/^password$/i);
       const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
-      const submitButton = screen.getByRole("button", { name: /create account/i });
-
-      await user.type(emailInput, "test@example.com");
-      await user.type(passwordInput, "password123");
-      await user.type(confirmPasswordInput, "password123");
-      await user.click(submitButton);
-
-      await waitFor(() => {
-        expect(submitButton).toBeDisabled();
+      const submitButton = screen.getByRole("button", {
+        name: /create account/i,
       });
-
-      expect(emailInput).toBeDisabled();
-      expect(passwordInput).toBeDisabled();
-      expect(confirmPasswordInput).toBeDisabled();
-    });
-
-    it("should re-enable form inputs after submission completes", async () => {
-      const user = userEvent.setup({ delay: null });
-      mockRegister.mockImplementation(
-        () => new Promise((resolve) => setTimeout(resolve, 100))
-      );
-
-      render(<RegisterPage />, { wrapper });
-
-      const emailInput = screen.getByLabelText(/email/i);
-      const passwordInput = screen.getByLabelText(/^password$/i);
-      const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
-      const submitButton = screen.getByRole("button", { name: /create account/i });
 
       await user.type(emailInput, "test@example.com");
       await user.type(passwordInput, "password123");
@@ -525,7 +528,7 @@ describe("RegisterPage", () => {
         expect(submitButton).toBeDisabled();
       });
 
-      // Wait for loading to complete
+      // Wait for loading to complete after failure - all inputs should be re-enabled
       await waitFor(() => {
         expect(submitButton).not.toBeDisabled();
       });

@@ -33,41 +33,6 @@ const tabs: TabOption[] = [
   { id: "system", label: "System Admin" },
 ];
 
-/**
- * Helper function to filter tabs based on user role and ensure a valid active tab.
- * Only users with OWNER role can see the System Admin tab.
- * Routes, State Variables, and Characters tabs only show when a project is selected.
- *
- * @param activeTab - The currently active tab
- * @param userRole - The user's role (optional)
- * @param hasProject - Whether a project is selected
- * @returns An object with filtered tabs and the appropriate active tab
- */
-function getVisibleTabs(
-  activeTab: Tab,
-  userRole?: string,
-  hasProject?: boolean
-) {
-  return useMemo(() => {
-    // Filter out system tab for non-OWNER users
-    // Filter out routes, state variables, and characters tabs when no project is selected
-    const visibleTabs = tabs.filter(
-      (tab) =>
-        (tab.id !== "system" || userRole === "OWNER") &&
-        (tab.id !== "routes" || hasProject) &&
-        (tab.id !== "stateVariables" || hasProject) &&
-        (tab.id !== "characters" || hasProject)
-    );
-
-    // If current active tab is not visible, switch to first visible tab
-    const adjustedActiveTab = visibleTabs.find((t) => t.id === activeTab)
-      ? activeTab
-      : visibleTabs[0]?.id || activeTab;
-
-    return { visibleTabs, activeTab: adjustedActiveTab };
-  }, [activeTab, userRole, hasProject]);
-}
-
 interface SettingsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -84,19 +49,34 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     isSaving,
   } = useSettings();
 
-  // Use helper to get visible tabs and ensure valid active tab
-  const { visibleTabs, activeTab: adjustedActiveTab } = getVisibleTabs(
-    activeTab,
-    user?.role,
-    !!currentProject?.id
-  );
+  // Compute visible tabs and ensure valid active tab
+  // Only users with OWNER role can see the System Admin tab.
+  // Routes, State Variables, and Characters tabs only show when a project is selected.
+  const { visibleTabs, adjustedActiveTab } = useMemo(() => {
+    const visibleTabs = tabs.filter(
+      (tab) =>
+        (tab.id !== "system" || user?.role === "OWNER") &&
+        (tab.id !== "routes" || !!currentProject?.id) &&
+        (tab.id !== "stateVariables" || !!currentProject?.id) &&
+        (tab.id !== "characters" || !!currentProject?.id)
+    );
 
-  // Sync state if active tab was adjusted by helper
-  useMemo(() => {
-    if (adjustedActiveTab !== activeTab) {
-      setActiveTab(adjustedActiveTab);
-    }
-  }, [adjustedActiveTab, activeTab]);
+    // If current active tab is not visible, switch to first visible tab
+    const adjustedActiveTab = visibleTabs.find((t) => t.id === activeTab)
+      ? activeTab
+      : visibleTabs[0]?.id || activeTab;
+
+    return { visibleTabs, adjustedActiveTab };
+  }, [activeTab, user?.role, currentProject?.id]);
+
+  // Sync derived state during render: adjustedActiveTab is computed from visibleTabs,
+  // activeTab, and currentProject. If the active tab becomes invalid (e.g., user loses
+  // project access), we must sync immediately to avoid a flash/stale UI that useEffect
+  // would cause. The condition (adjustedActiveTab !== activeTab) becomes false after
+  // setActiveTab updates state, preventing render loops.
+  if (adjustedActiveTab !== activeTab) {
+    setActiveTab(adjustedActiveTab);
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -7,10 +7,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { useRouteConfigs } from "../useRouteConfigs";
 import { routeConfigsApi } from "@/lib/api/route-configs";
 import type { RouteConfig } from "@branchforge/shared";
+import { createTestQueryClient } from "@/test/query-client";
 
 // Mock the routeConfigs API
 vi.mock("@/lib/api/route-configs", () => ({
@@ -52,15 +53,8 @@ describe("useRouteConfigs", () => {
   );
 
   beforeEach(() => {
-    queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false, staleTime: 0 },
-        mutations: { retry: false },
-      },
-    });
+    queryClient = createTestQueryClient();
     vi.clearAllMocks();
-    mockToastSuccess.mockClear();
-    mockToastError.mockClear();
   });
 
   afterEach(() => {
@@ -81,7 +75,9 @@ describe("useRouteConfigs", () => {
         expect(result.current.routeConfigs).toEqual(mockRouteConfigs);
       });
 
-      expect(routeConfigsApi.listRouteConfigs).toHaveBeenCalledWith("project-1");
+      expect(routeConfigsApi.listRouteConfigs).toHaveBeenCalledWith(
+        "project-1"
+      );
     });
 
     it("should show loading state", async () => {
@@ -361,9 +357,9 @@ describe("useRouteConfigs", () => {
         expect(result.current.routeConfigs).toHaveLength(1);
       });
 
-      await expect(
-        result.current.deleteRouteConfig("route-1")
-      ).rejects.toThrow("Delete failed");
+      await expect(result.current.deleteRouteConfig("route-1")).rejects.toThrow(
+        "Delete failed"
+      );
 
       expect(mockToastError).toHaveBeenCalledWith(
         "Failed to delete route configuration: Delete failed",
