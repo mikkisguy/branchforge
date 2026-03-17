@@ -283,27 +283,18 @@ DELETE /api/projects/:id/meters/:id   // Delete meter
 
 ---
 
-### 12. Flags ❌ Not Implemented
+### 12. Flags 🔄 Superseded by State Variables
 
 **Schema**: `flags` table
 - `key`, `description`, `category`
 
-**Implementation Status**:
-- ✅ Schema exists
-- ✅ Referenced in `labels.prerequisites` JSONB
-- ✅ Referenced in `labels.effects` JSONB
-- ❌ No backend routes
-- ❌ No UI
+**Status**: The `flags` table schema still exists but is no longer needed. Boolean story state is now tracked via **State Variables** (section 8.2), which provides a simpler and more intuitive interface for managing story progression conditions.
 
-**TODO**:
-```typescript
-// Flag routes needed
-GET    /api/projects/:id/flags        // List flags
-POST   /api/projects/:id/flags        // Create flag
-PUT    /api/projects/:id/flags/:id    // Update flag
-DELETE /api/projects/:id/flags/:id    // Delete flag
-GET    /api/projects/:id/flags/check  // Check flag conditions
-```
+**Implementation Note**:
+- ✅ Schema exists (kept for backwards compatibility)
+- ✅ Referenced in `labels.prerequisites` JSONB (legacy support)
+- ✅ Referenced in `labels.effects` JSONB (legacy support)
+- ✅ **State Variables provide the recommended alternative** - fully implemented with UI
 
 ---
 
@@ -483,7 +474,7 @@ POST   /api/demo/:id/end                  // End session
 
 **Required Features**:
 - Player UI (next/prev, choices display)
-- Flag/meter state tracking
+- State variable/meter state tracking
 - Route locking logic
 - Choice condition evaluation
 
@@ -568,10 +559,9 @@ POST   /api/demo/:id/end                  // End session
    - Effort: Medium
    - Dependencies: Characters (optional)
 
-3. **Flag Management** (Flags table)
-   - Impact: Can't implement conditional branches
-   - Effort: Low
-   - Dependencies: None
+3. **State Variables** (State Variables table - ✅ IMPLEMENTED)
+   - Already fully implemented as boolean story state tracking
+   - Provides simpler alternative to traditional flag systems
 
 4. **Label-Character Relationships** (Label Characters junction)
    - Impact: Can't associate characters with labels
@@ -632,7 +622,7 @@ POST   /api/demo/:id/end                  // End session
 ## Implementation Order Suggestion
 
 ### Phase 1: Core Story Elements
-1. Flags Management
+1. State Variables (✅ Already implemented - replaces traditional flags)
 2. Character CRUD
 3. Label-Character Relationships
 4. Meter Management
@@ -683,10 +673,6 @@ POST   /api/demo/:id/end                  // End session
 │   ├── POST   /:id/meters
 │   ├── PUT    /:id/meters/:mid
 │   ├── DELETE /:id/meters/:mid
-│   ├── GET    /:id/flags           # [NEW] Flag management
-│   ├── POST   /:id/flags
-│   ├── PUT    /:id/flags/:fid
-│   ├── DELETE /:id/flags/:fid
 │   ├── GET    /:id/pairs           # [NEW] Pair group management
 │   ├── POST   /:id/pairs
 │   ├── PUT    /:id/pairs/:pid
@@ -755,7 +741,6 @@ POST   /api/demo/:id/end                  // End session
 ├── /admin              ❌ [NEW] Admin settings page
 ├── /characters         ❌ [NEW] Character management
 ├── /meters             ❌ [NEW] Meter management
-├── /flags              ❌ [NEW] Flag management
 ├── /world              ❌ [NEW] World elements bible
 ├── /export             ❌ [NEW] Export generation
 └── /demo               ❌ [NEW] Playback/demo mode
