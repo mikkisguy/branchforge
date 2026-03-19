@@ -477,10 +477,39 @@ export interface Character {
   displayName: string;
   renpyTag: string;
   color: string;
+  avatarUrl: string | null;
   routeAffiliation: string | null;
   isLoveInterest: boolean;
   dialogueStyle: string | null;
   conditionalPrefix: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+// ============================================================================
+// Avatar Upload Configuration
+// ============================================================================
+
+/**
+ * Allowed MIME types for avatar uploads
+ */
+export const AVATAR_ALLOWED_MIME_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+] as const;
+
+/**
+ * Maximum file size for avatar uploads (2MB)
+ */
+export const AVATAR_MAX_SIZE = 2 * 1024 * 1024; // 2MB
+
+/**
+ * Validates if a MIME type is allowed for avatar uploads
+ * @param mimeType - The MIME type to validate
+ * @returns true if the MIME type is allowed
+ */
+export function isValidAvatarMimeType(mimeType: string): boolean {
+  return AVATAR_ALLOWED_MIME_TYPES.includes(mimeType.toLowerCase() as typeof AVATAR_ALLOWED_MIME_TYPES[number]);
 }

@@ -26,10 +26,13 @@ export const characters = pgTable(
     renpyTag: text("renpy_tag").notNull(),
     routeAffiliation: text("route_affiliation"),
     isLoveInterest: boolean("is_love_interest").default(false).notNull(),
-    pairGroupId: uuid("pair_group_id"), // Reference to pair_groups defined in migration to avoid circular dependency
+    // Note: Foreign key to pair_groups.id added manually in migration 0007
+    // due to circular dependency (pair_groups also references characters)
+    pairGroupId: uuid("pair_group_id"),
     dialogueStyle: text("dialogue_style"),
     conditionalPrefix: text("conditional_prefix"),
     color: text("color").notNull(),
+    avatarUrl: text("avatar_url"), // Path to avatar image file
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

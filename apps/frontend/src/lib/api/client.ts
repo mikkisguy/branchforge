@@ -24,13 +24,19 @@ async function fetchInternal(
   options: RequestInit = {}
 ): Promise<Response> {
   const url = `${API_BASE}${endpoint}`;
+
+  // Don't set Content-Type for FormData - let browser set it with proper boundary
+  const isFormData = options.body instanceof FormData;
+
   const response = await fetch(url, {
     ...options,
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
+    headers: isFormData
+      ? options.headers  // Don't add Content-Type for FormData
+      : {
+          "Content-Type": "application/json",
+          ...options.headers,
+        },
   });
 
   if (!response.ok) {

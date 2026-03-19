@@ -7,7 +7,7 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import isEqual from "fast-deep-equal";
-import { Loader2, Plus, Trash2, Pencil, Heart } from "lucide-react";
+import { Loader2, Plus, Trash2, Pencil, Heart, Upload } from "lucide-react";
 import type { Character } from "@branchforge/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,10 @@ interface CharacterForm {
   isLoveInterest: boolean;
   dialogueStyle: string;
   conditionalPrefix: string;
+  avatarUrl?: string; // Existing avatar URL from server
+  avatarFile?: File; // Temporary storage for new upload
+  avatarPreview?: string; // Object URL for preview
+  removedAvatar?: boolean; // Flag to mark avatar for deletion on save
 }
 
 // ============================================================================
@@ -71,9 +75,12 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
     isCreatingCharacter,
     isUpdatingCharacter,
     isDeletingCharacter,
+    isUploadingAvatar,
     createCharacter,
     updateCharacter,
     deleteCharacter,
+    uploadAvatar,
+    deleteAvatar,
   } = useCharacters(projectId);
   const { error } = useToast();
 
@@ -84,11 +91,21 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
   // Track previous characters to detect actual changes
   const prevCharactersRef = useRef<Character[] | null>(null);
 
+  // Track created object URLs for cleanup on unmount
+  const createdUrlsRef = useRef<Set<string>>(new Set());
+
+  // Track file input elements for clearing on avatar removal
+  const fileInputRefsRef = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Keep a ref to the current charactersList for side effect access
+  const charactersListRef = useRef<CharacterForm[]>([]);
+
   // Combined loading state for any mutation
   const isSaving =
     isCreatingCharacter ||
     isUpdatingCharacter ||
-    isDeletingCharacter;
+    isDeletingCharacter ||
+    isUploadingAvatar;
 
   /**
    * Initialize form state from characters
@@ -118,11 +135,29 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
         isLoveInterest: char.isLoveInterest,
         dialogueStyle: char.dialogueStyle ?? "",
         conditionalPrefix: char.conditionalPrefix ?? "",
+        avatarUrl: char.avatarUrl ?? undefined,
       }))
     );
 
     prevCharactersRef.current = characters;
   }, [characters, isSaving]);
+
+  // Sync charactersList to ref for side effect access
+  useEffect(() => {
+    charactersListRef.current = charactersList;
+  }, [charactersList]);
+
+  /**
+   * Cleanup: Revoke any remaining object URLs on unmount
+   */
+  useEffect(() => {
+    const urls = createdUrlsRef.current;
+    return () => {
+      urls.forEach((url) => {
+        URL.revokeObjectURL(url);
+      });
+    };
+  }, []);
 
   /**
    * Add new character
@@ -212,7 +247,14 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
 
       try {
         if (character.id) {
-          // Update existing character
+          // Step 1: Upload new avatar first if present
+          let uploadedAvatarUrl: string | undefined;
+          if (character.avatarFile) {
+            const result = await uploadAvatar(character.id, character.avatarFile);
+            uploadedAvatarUrl = result.avatarUrl;
+          }
+
+          // Step 2: Update character metadata
           await updateCharacter(character.id, {
             name: character.name,
             displayName: character.displayName,
@@ -222,6 +264,37 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
             dialogueStyle: character.dialogueStyle || undefined,
             conditionalPrefix: character.conditionalPrefix || undefined,
           });
+
+          // Step 3: Delete avatar if marked for removal (after successful update and upload)
+          // removedAvatar is only true when user explicitly clicked "Remove Avatar"
+          if (character.removedAvatar) {
+            await deleteAvatar(character.id);
+          }
+
+          // Update form with new avatar URL if uploaded, or clear if removed
+          if (uploadedAvatarUrl) {
+            setCharactersList((prev) => {
+              const newCharacters = [...prev];
+              newCharacters[index] = {
+                ...newCharacters[index],
+                avatarUrl: uploadedAvatarUrl,
+                avatarFile: undefined,
+                avatarPreview: undefined,
+                removedAvatar: undefined,
+              };
+              return newCharacters;
+            });
+          } else if (character.removedAvatar) {
+            setCharactersList((prev) => {
+              const newCharacters = [...prev];
+              newCharacters[index] = {
+                ...newCharacters[index],
+                avatarUrl: undefined,
+                removedAvatar: undefined,
+              };
+              return newCharacters;
+            });
+          }
         } else {
           // Create new character
           const newCharacter = await createCharacter({
@@ -234,7 +307,15 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
             dialogueStyle: character.dialogueStyle || undefined,
             conditionalPrefix: character.conditionalPrefix || undefined,
           });
-          // Update the form with the new character ID
+
+          // Upload avatar after creation and get the new URL
+          let uploadedAvatarUrl: string | undefined;
+          if (character.avatarFile) {
+            const result = await uploadAvatar(newCharacter.id, character.avatarFile);
+            uploadedAvatarUrl = result.avatarUrl;
+          }
+
+          // Update the form with the new character ID and avatar URL
           setCharactersList((prev) => {
             const newCharacters = [...prev];
             newCharacters[index] = {
@@ -248,16 +329,26 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
               isLoveInterest: newCharacter.isLoveInterest,
               dialogueStyle: newCharacter.dialogueStyle ?? "",
               conditionalPrefix: newCharacter.conditionalPrefix ?? "",
+              avatarUrl: uploadedAvatarUrl ?? newCharacter.avatarUrl ?? undefined,
+              avatarFile: undefined,
+              avatarPreview: undefined,
             };
             return newCharacters;
           });
         }
+
+        // Cleanup preview
+        if (character.avatarPreview) {
+          URL.revokeObjectURL(character.avatarPreview);
+          createdUrlsRef.current.delete(character.avatarPreview);
+        }
+
         setEditingIndex(null);
       } catch {
         // Error is handled by the hook's toast
       }
     },
-    [charactersList, createCharacter, updateCharacter, error]
+    [charactersList, createCharacter, updateCharacter, uploadAvatar, deleteAvatar, error]
   );
 
   /**
@@ -268,6 +359,11 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
       const character = charactersList[index];
       // If it's a new character (no id), remove it
       if (!character.id) {
+        // Revoke preview if it exists
+        if (character.avatarPreview) {
+          URL.revokeObjectURL(character.avatarPreview);
+          createdUrlsRef.current.delete(character.avatarPreview);
+        }
         setCharactersList((prev) => prev.filter((_, i) => i !== index));
       } else {
         // Restore the original character from the incoming characters prop
@@ -275,9 +371,19 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
         const originalCharacter = characters.find((c) => c.id === character.id);
         if (!originalCharacter) {
           // Character no longer exists, remove from list
+          // Revoke preview if it exists
+          if (character.avatarPreview) {
+            URL.revokeObjectURL(character.avatarPreview);
+            createdUrlsRef.current.delete(character.avatarPreview);
+          }
           setCharactersList((prev) => prev.filter((_, i) => i !== index));
           setEditingIndex(null);
           return;
+        }
+        // Revoke preview if it exists before restoring original
+        if (character.avatarPreview) {
+          URL.revokeObjectURL(character.avatarPreview);
+          createdUrlsRef.current.delete(character.avatarPreview);
         }
         setCharactersList((prev) => {
           const newCharacters = [...prev];
@@ -292,6 +398,7 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
             isLoveInterest: originalCharacter.isLoveInterest,
             dialogueStyle: originalCharacter.dialogueStyle ?? "",
             conditionalPrefix: originalCharacter.conditionalPrefix ?? "",
+            avatarUrl: originalCharacter.avatarUrl ?? undefined,
           };
           return newCharacters;
         });
@@ -299,6 +406,81 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
       setEditingIndex(null);
     },
     [charactersList, characters]
+  );
+
+  /**
+   * Handle avatar file selection
+   */
+  const handleAvatarSelect = useCallback(
+    (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      // Client-side validation
+      const allowedMimeTypes = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+      if (!allowedMimeTypes.includes(file.type)) {
+        error("Please select a PNG, JPEG, WEBP, or GIF image");
+        return;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        error("Image must be smaller than 2MB");
+        return;
+      }
+
+      // Revoke previous preview if exists
+      const prevCharacter = charactersList[index];
+      if (prevCharacter?.avatarPreview) {
+        URL.revokeObjectURL(prevCharacter.avatarPreview);
+        createdUrlsRef.current.delete(prevCharacter.avatarPreview);
+      }
+
+      // Create preview
+      const preview = URL.createObjectURL(file);
+      createdUrlsRef.current.add(preview);
+      setCharactersList((prev) => {
+        const newCharacters = [...prev];
+        newCharacters[index] = {
+          ...newCharacters[index],
+          avatarFile: file,
+          avatarPreview: preview,
+          removedAvatar: false,
+        };
+        return newCharacters;
+      });
+    },
+    [charactersList, error]
+  );
+
+  /**
+   * Handle avatar removal
+   */
+  const handleAvatarRemove = useCallback(
+    (index: number) => {
+      // Perform side effects first using the current state from ref
+      const character = charactersListRef.current[index];
+      if (character?.avatarPreview) {
+        URL.revokeObjectURL(character.avatarPreview);
+        createdUrlsRef.current.delete(character.avatarPreview);
+      }
+      // Clear the file input so selecting the same file again works
+      if (fileInputRefsRef.current[index]) {
+        fileInputRefsRef.current[index].value = '';
+      }
+
+      // Update state (updater only returns new state)
+      setCharactersList((prev) => {
+        const newCharacters = [...prev];
+        newCharacters[index] = {
+          ...newCharacters[index],
+          avatarFile: undefined,
+          avatarPreview: undefined,
+          avatarUrl: undefined,
+          removedAvatar: true,
+        };
+        return newCharacters;
+      });
+    },
+    []
   );
 
   /**
@@ -362,12 +544,22 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
                     {!isEditing ? (
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3 flex-1">
-                          {/* Color indicator */}
-                          <div
-                            data-testid={`character-color-${index}`}
-                            className="w-8 h-8 rounded-full border-2 border-background shadow-sm"
-                            style={{ backgroundColor: character.color }}
-                          />
+                          {/* Avatar or Color indicator */}
+                          {character.avatarUrl ? (
+                            <img
+                              src={character.avatarUrl}
+                              alt={`${character.displayName} avatar`}
+                              data-testid={`character-avatar-${index}`}
+                              className="w-8 h-8 rounded-full object-cover border-2 shadow-sm"
+                              style={{ borderColor: character.color }}
+                            />
+                          ) : (
+                            <div
+                              data-testid={`character-color-${index}`}
+                              className="w-8 h-8 rounded-full border-2 border-background shadow-sm"
+                              style={{ backgroundColor: character.color }}
+                            />
+                          )}
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
                               <span className="font-medium text-sm">
@@ -531,6 +723,61 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
                                 disabled={isSaving}
                                 className="w-12 h-9 p-0.5"
                               />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Avatar Upload Section */}
+                        <div className="space-y-2">
+                          <Label htmlFor={`character-avatar-${index}`} className="text-xs">Avatar Image</Label>
+                          <div className="flex items-center gap-4">
+                            {/* Preview */}
+                            <div className="relative w-20 h-20 flex-shrink-0">
+                              {character.avatarPreview || character.avatarUrl ? (
+                                <img
+                                  src={character.avatarPreview || character.avatarUrl}
+                                  alt={`${character.displayName} avatar`}
+                                  className="w-full h-full rounded-full object-cover border-4"
+                                  style={{ borderColor: character.color }}
+                                />
+                              ) : (
+                                <div
+                                  className="w-full h-full rounded-full border-4 border-dashed flex items-center justify-center"
+                                  style={{ borderColor: character.color }}
+                                >
+                                  <Upload className="w-6 h-6 text-muted-foreground" />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Upload Controls */}
+                            <div className="flex-1 space-y-2">
+                              <Input
+                                id={`character-avatar-${index}`}
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp,image/gif"
+                                onChange={(e) => handleAvatarSelect(index, e)}
+                                disabled={isSaving}
+                                className="text-sm"
+                                ref={(el) => {
+                                  fileInputRefsRef.current[index] = el;
+                                }}
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                PNG, JPEG, WebP, or GIF (max 2MB)
+                              </p>
+                              {(character.avatarPreview || character.avatarUrl) && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleAvatarRemove(index)}
+                                  disabled={isSaving}
+                                  className="text-destructive h-8 px-2 text-xs"
+                                >
+                                  Remove Avatar
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </div>

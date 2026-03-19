@@ -219,4 +219,29 @@ export const charactersApi = {
       method: "DELETE",
     });
   },
+
+  /**
+   * Upload avatar image for a character
+   */
+  async uploadAvatar(characterId: string, file: File): Promise<{ avatarUrl: string }> {
+    const formData = new FormData();
+    formData.append("avatar", file);
+
+    return await request<{ avatarUrl: string }>(
+      `/characters/${characterId}/avatar`,
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+  },
+
+  /**
+   * Remove avatar from a character
+   */
+  async deleteAvatar(characterId: string): Promise<void> {
+    await request(`/characters/${characterId}/avatar`, {
+      method: "DELETE",
+    });
+  },
 };

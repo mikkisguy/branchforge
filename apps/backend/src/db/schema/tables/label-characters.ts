@@ -4,7 +4,7 @@
  * Links labels to characters with role and emotion state.
  */
 
-import { pgTable, uuid, text, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, primaryKey, index } from "drizzle-orm/pg-core";
 import { characterRoleEnum } from "../enums.js";
 import { labels } from "./labels.js";
 import { characters } from "./characters.js";
@@ -24,6 +24,8 @@ export const labelCharacters = pgTable(
   },
   (table) => ({
     pk: primaryKey({ columns: [table.labelId, table.characterId] }),
+    // Standalone index for reverse lookups by character_id
+    characterIdIdx: index("label_characters_character_id_idx").on(table.characterId),
   })
 );
 

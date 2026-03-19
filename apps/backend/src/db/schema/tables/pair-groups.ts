@@ -11,7 +11,10 @@ import {
   timestamp,
   integer,
   index,
+  unique,
+  check,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { projects } from "./projects.js";
 import { characters } from "./characters.js";
 
@@ -37,6 +40,12 @@ export const pairGroups = pgTable(
     index("pair_groups_project_id_idx").on(table.projectId),
     index("pair_groups_character_a_id_idx").on(table.characterAId),
     index("pair_groups_character_b_id_idx").on(table.characterBId),
+    unique("pair_groups_project_character_pair_idx").on(
+      table.projectId,
+      table.characterAId,
+      table.characterBId
+    ),
+    check("pair_groups_not_self_pairing", sql`character_a_id < character_b_id`),
   ]
 );
 

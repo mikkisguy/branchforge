@@ -190,21 +190,22 @@ Unique constraint: `(project_id, key)`
 
 ### 9. Characters
 
-| Column               | Type                            | Notes                             |
-| -------------------- | ------------------------------- | --------------------------------- |
-| `id`                 | uuid PK                         |                                   |
-| `project_id`         | uuid FK → projects              |                                   |
-| `name`               | text, not null                  | Database key                      |
-| `display_name`       | text, not null                  | UI display                        |
-| `renpy_tag`          | text, not null                  | Export: `"eileen"`                |
-| `route_affiliation`  | text                            | Legacy; prefer `scene.route`      |
-| `is_love_interest`   | boolean, default false          |                                   |
-| `pair_group_id`      | uuid FK → pair_groups, nullable | Sequel duos                       |
-| `dialogue_style`     | text                            | Personality for AI dialogue       |
-| `conditional_prefix` | text, nullable                  | Sprite variants: `"eileen_happy"` |
-| `color`              | text                            | Hex for UI                        |
-| `created_at`         | timestamp                       |                                   |
-| `updated_at`         | timestamp                       |                                   |
+| Column               | Type                            | Notes                                    |
+| -------------------- | ------------------------------- | ---------------------------------------- |
+| `id`                 | uuid PK                         |                                          |
+| `project_id`         | uuid FK → projects              |                                          |
+| `name`               | text, not null                  | Database key                             |
+| `display_name`       | text, not null                  | UI display                               |
+| `renpy_tag`          | text, not null                  | Export: `"eileen"`                       |
+| `route_affiliation`  | text                            | Legacy; prefer `scene.route`             |
+| `is_love_interest`   | boolean, default false          |                                          |
+| `pair_group_id`      | uuid FK → pair_groups, nullable | Sequel duos                              |
+| `dialogue_style`     | text                            | Personality for AI dialogue              |
+| `conditional_prefix` | text, nullable                  | Sprite variants: `"eileen_happy"`        |
+| `color`              | text                            | Hex for UI                               |
+| `avatar_url`         | text, nullable                  | Path to avatar image (200px WebP)        |
+| `created_at`         | timestamp                       |                                          |
+| `updated_at`         | timestamp                       |                                          |
 
 ---
 

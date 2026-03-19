@@ -9,6 +9,16 @@ import { pgEnum } from "drizzle-orm/pg-core";
 // User roles (owner, beta reader, tester)
 export const userRoleEnum = pgEnum("user_role", ["OWNER", "READER", "TESTER"]);
 
+// Project visibility types (distinct from user roles)
+// PUBLIC: Anyone can view
+// PRIVATE: Only the owner can view
+// TEAM: Anyone with project access can view
+export const projectVisibilityEnum = pgEnum("project_visibility", [
+  "PUBLIC",
+  "PRIVATE",
+  "TEAM",
+]);
+
 // Label workflow status
 export const labelStatusEnum = pgEnum("label_status", [
   "DRAFT",
