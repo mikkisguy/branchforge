@@ -12,6 +12,7 @@ import { useToast } from "@/contexts/ToastContext";
 import type { Character } from "@branchforge/shared";
 import {
   AVATAR_MAX_SIZE,
+  AVATAR_MAX_SIZE_MB,
   isValidAvatarMimeType,
 } from "@branchforge/shared";
 
@@ -165,9 +166,8 @@ export function useCharacters(projectId: string): UseCharactersReturn {
       }
 
       if (file.size > AVATAR_MAX_SIZE) {
-        const maxSizeMB = AVATAR_MAX_SIZE / (1024 * 1024);
         throw new Error(
-          `File size exceeds ${maxSizeMB}MB limit. Please choose a smaller image.`
+          `File size exceeds ${AVATAR_MAX_SIZE_MB}MB limit. Please choose a smaller image.`
         );
       }
 

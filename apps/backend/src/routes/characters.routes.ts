@@ -21,6 +21,7 @@ import {
   validateParams,
   validateBody,
 } from "../middleware/validation.middleware.js";
+import { HttpError, ValidationError } from "../middleware/error-handler.middleware.js";
 import {
   characterIdParamsSchema,
   projectIdParamsSchema,
@@ -50,6 +51,7 @@ import {
 import { getBasePath } from "../lib/config.js";
 import { promises as fs } from "node:fs";
 import type { MultipartFile } from "@fastify/multipart";
+import { AVATAR_MAX_SIZE, AVATAR_MAX_SIZE_MB } from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -905,15 +907,43 @@ async function uploadCharacterAvatarHandler(
       return;
     }
 
-    // Parse multipart form data
-    const data = await request.file({ limits: { fileSize: 2 * 1024 * 1024 } }); // 2MB limit
+    // Parse multipart form data with fileSize limit enforced at stream creation
+    const data = await request.file({
+      limits: { fileSize: AVATAR_MAX_SIZE },
+    });
     if (!data) {
       reply.status(400).send({ error: "No file uploaded" } as ErrorResponse);
       return;
     }
 
     const file = data as MultipartFile;
-    const buffer = await file.toBuffer();
+
+    let buffer: Buffer;
+    try {
+      buffer = await file.toBuffer();
+    } catch (err: unknown) {
+      // Handle multipart plugin errors like file size limit exceeded
+      // The error may be thrown by busboy when fileSize limit is exceeded
+      if (err instanceof Error && (
+        'code' in err && (err.code === 'LIMIT_FILE_SIZE' || err.code === 'LIMIT_UNEXPECTED_FILE') ||
+        err.message.includes('File size') ||
+        err.message.includes('file size')
+      )) {
+        throw new ValidationError(`File must be smaller than ${AVATAR_MAX_SIZE_MB}MB`);
+      }
+      throw err; // Re-throw other errors to be caught by outer catch block
+    }
+
+    // Check if file was truncated due to size limit after buffering
+    // The truncated property is on the BusboyFileStream, not MultipartFile
+    if (file.file.truncated) {
+      throw new ValidationError(`File must be smaller than ${AVATAR_MAX_SIZE_MB}MB`);
+    }
+
+    // Validate the buffered file size as the authoritative check
+    if (buffer.length > AVATAR_MAX_SIZE) {
+      throw new ValidationError(`File must be smaller than ${AVATAR_MAX_SIZE_MB}MB`);
+    }
 
     // Validate and process image
     const result = await validateAndProcessAvatar(buffer, file.mimetype);
@@ -1033,6 +1063,14 @@ async function uploadCharacterAvatarHandler(
       avatarUrl,
     } as UploadAvatarResponse);
   } catch (error) {
+    // Re-throw HttpError instances (e.g., ValidationError) so the global error handler can use their status code
+    if (error instanceof HttpError) {
+      throw error;
+    }
+    // Handle multipart file size limit errors (from busboy)
+    if (error instanceof Error && 'code' in error && error.code === 'LIMIT_FILE_SIZE') {
+      throw new ValidationError(`File must be smaller than ${AVATAR_MAX_SIZE_MB}MB`);
+    }
     request.log.error(error);
     reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
   }
@@ -1100,6 +1138,10 @@ async function deleteCharacterAvatarHandler(
 
     reply.status(204).send();
   } catch (error) {
+    // Re-throw HttpError instances (e.g., ValidationError) so the global error handler can use their status code
+    if (error instanceof HttpError) {
+      throw error;
+    }
     request.log.error(error);
     reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
   }

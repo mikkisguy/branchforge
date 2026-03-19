@@ -15,7 +15,16 @@
  * - Test database must exist and have proper schema
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+  afterEach,
+  vi,
+} from "vitest";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import cookie from "@fastify/cookie";
 import session from "@fastify/session";
@@ -30,6 +39,7 @@ import {
 import { getDb, closeDb } from "../../db/index.js";
 import { SESSION_COOKIE_NAME } from "../../lib/session.js";
 import { testEmail, testUuid } from "../../utils/test-ids.js";
+import { globalErrorHandler } from "../../middleware/error-handler.middleware.js";
 import {
   users,
   projects,
@@ -41,6 +51,7 @@ import {
 } from "../../db/schema/index.js";
 import { eq } from "drizzle-orm";
 import { getAvatarFullPath } from "../../lib/storage.js";
+import { AVATAR_MAX_SIZE, AVATAR_MAX_SIZE_MB } from "@branchforge/shared";
 
 // Test data fixtures
 const testUserId = testUuid("02000000", 1);
@@ -190,8 +201,15 @@ describe("Character Avatar Routes (Integration)", () => {
       rolling: false,
     });
 
-    // Register multipart plugin
-    await fastify.register(multipart);
+    // Register multipart plugin with file size limit
+    // Set to 5MB to match production configuration
+    // Application-level validation will enforce the AVATAR_MAX_SIZE (AVATAR_MAX_SIZE_MB MB) limit for avatars
+    await fastify.register(multipart, {
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB (matches production)
+        files: 1, // Max 1 file per request
+      },
+    });
 
     // Register static file serving
     await fastify.register(fastifyStatic, {
@@ -203,6 +221,9 @@ describe("Character Avatar Routes (Integration)", () => {
     // Register the routes
     await fastify.register(charactersRoutes, { prefix: "/api" });
     await fastify.register(characterAvatarRoutes, { prefix: "/api" });
+
+    // Register global error handler
+    fastify.setErrorHandler(globalErrorHandler);
 
     // Add a test-only route to set the session user
     fastify.post(
@@ -253,7 +274,11 @@ describe("Character Avatar Routes (Integration)", () => {
       const auth = await createAuthenticatedRequest(testUserId);
 
       const formData = new FormData();
-      formData.append("avatar", new Blob([minimalPng]), "avatar.png");
+      formData.append(
+        "avatar",
+        new Blob([minimalPng], { type: "image/png" }),
+        "avatar.png"
+      );
 
       const response = await fastify.inject({
         method: "POST",
@@ -266,7 +291,9 @@ describe("Character Avatar Routes (Integration)", () => {
 
       expect(response.statusCode).toBe(200);
       const body = response.json();
-      expect(body.avatarUrl).toMatch(/^uploads\/avatars\/[\w-]+\.webp$/);
+      expect(body.avatarUrl).toMatch(
+        /^(\/[\w-]+)*\/uploads\/avatars\/[\w-]+\.webp$/
+      );
 
       // Verify avatar was saved to database
       const [updatedChar] = await db
@@ -275,17 +302,22 @@ describe("Character Avatar Routes (Integration)", () => {
         .where(eq(characters.id, characterId))
         .limit(1);
 
-      expect(updatedChar.avatarUrl).toBe(body.avatarUrl);
+      // The database stores just the filename, while the API returns the full URL
+      expect(updatedChar.avatarUrl).toBe(path.basename(body.avatarUrl));
     });
 
-    it("should reject file larger than 500KB", async () => {
+    it(`should reject file larger than ${AVATAR_MAX_SIZE_MB}MB`, async () => {
       const auth = await createAuthenticatedRequest(testUserId);
 
-      // Create a buffer larger than 500KB
-      const largeBuffer = Buffer.alloc(600 * 1024);
+      // Create a buffer larger than AVATAR_MAX_SIZE (but still under the 5MB multipart limit)
+      const largeBuffer = Buffer.alloc(AVATAR_MAX_SIZE + 1);
 
       const formData = new FormData();
-      formData.append("avatar", new Blob([largeBuffer]), "large.png");
+      formData.append(
+        "avatar",
+        new Blob([largeBuffer], { type: "image/png" }),
+        "large.png"
+      );
 
       const response = await fastify.inject({
         method: "POST",
@@ -329,7 +361,11 @@ describe("Character Avatar Routes (Integration)", () => {
       const auth = await createAuthenticatedRequest(testUserId);
 
       const formData = new FormData();
-      formData.append("avatar", new Blob([minimalPng]), "avatar.png");
+      formData.append(
+        "avatar",
+        new Blob([minimalPng], { type: "image/png" }),
+        "avatar.png"
+      );
 
       const response = await fastify.inject({
         method: "POST",
@@ -345,7 +381,11 @@ describe("Character Avatar Routes (Integration)", () => {
 
     it("should return 401 for unauthenticated request", async () => {
       const formData = new FormData();
-      formData.append("avatar", new Blob([minimalPng]), "avatar.png");
+      formData.append(
+        "avatar",
+        new Blob([minimalPng], { type: "image/png" }),
+        "avatar.png"
+      );
 
       const response = await fastify.inject({
         method: "POST",
@@ -360,7 +400,11 @@ describe("Character Avatar Routes (Integration)", () => {
       const otherAuth = await createAuthenticatedRequest(otherUserId);
 
       const formData = new FormData();
-      formData.append("avatar", new Blob([minimalPng]), "avatar.png");
+      formData.append(
+        "avatar",
+        new Blob([minimalPng], { type: "image/png" }),
+        "avatar.png"
+      );
 
       const response = await fastify.inject({
         method: "POST",
@@ -379,7 +423,11 @@ describe("Character Avatar Routes (Integration)", () => {
 
       // Upload initial avatar
       const formData1 = new FormData();
-      formData1.append("avatar", new Blob([minimalPng]), "avatar1.png");
+      formData1.append(
+        "avatar",
+        new Blob([minimalPng], { type: "image/png" }),
+        "avatar1.png"
+      );
 
       const firstResponse = await fastify.inject({
         method: "POST",
@@ -392,7 +440,9 @@ describe("Character Avatar Routes (Integration)", () => {
 
       expect(firstResponse.statusCode).toBe(200);
       const firstBody = firstResponse.json();
-      expect(firstBody.avatarUrl).toMatch(/^uploads\/avatars\/[\w-]+\.webp$/);
+      expect(firstBody.avatarUrl).toMatch(
+        /^(\/[\w-]+)*\/uploads\/avatars\/[\w-]+\.webp$/
+      );
 
       const firstAvatarUrl = firstBody.avatarUrl;
       const firstAvatarFilename = path.basename(firstAvatarUrl);
@@ -403,7 +453,11 @@ describe("Character Avatar Routes (Integration)", () => {
 
       // Upload replacement avatar
       const formData2 = new FormData();
-      formData2.append("avatar", new Blob([minimalPng]), "avatar2.png");
+      formData2.append(
+        "avatar",
+        new Blob([minimalPng], { type: "image/png" }),
+        "avatar2.png"
+      );
 
       const secondResponse = await fastify.inject({
         method: "POST",
@@ -416,7 +470,9 @@ describe("Character Avatar Routes (Integration)", () => {
 
       expect(secondResponse.statusCode).toBe(200);
       const secondBody = secondResponse.json();
-      expect(secondBody.avatarUrl).toMatch(/^uploads\/avatars\/[\w-]+\.webp$/);
+      expect(secondBody.avatarUrl).toMatch(
+        /^(\/[\w-]+)*\/uploads\/avatars\/[\w-]+\.webp$/
+      );
 
       const secondAvatarUrl = secondBody.avatarUrl;
 
@@ -430,7 +486,8 @@ describe("Character Avatar Routes (Integration)", () => {
         .where(eq(characters.id, characterId))
         .limit(1);
 
-      expect(updatedChar.avatarUrl).toBe(secondAvatarUrl);
+      // The database stores just the filename, while the API returns the full URL
+      expect(updatedChar.avatarUrl).toBe(path.basename(secondAvatarUrl));
 
       // Verify the old file no longer exists
       await expect(fs.access(firstAvatarFullPath)).rejects.toThrow();
@@ -446,7 +503,11 @@ describe("Character Avatar Routes (Integration)", () => {
 
       // Upload initial avatar
       const formData1 = new FormData();
-      formData1.append("avatar", new Blob([minimalPng]), "avatar1.png");
+      formData1.append(
+        "avatar",
+        new Blob([minimalPng], { type: "image/png" }),
+        "avatar1.png"
+      );
 
       const firstResponse = await fastify.inject({
         method: "POST",
@@ -459,23 +520,29 @@ describe("Character Avatar Routes (Integration)", () => {
 
       expect(firstResponse.statusCode).toBe(200);
       const firstBody = firstResponse.json();
-      const firstAvatarFullPath = getAvatarFullPath(path.basename(firstBody.avatarUrl));
+      const firstAvatarFullPath = getAvatarFullPath(
+        path.basename(firstBody.avatarUrl)
+      );
 
       // Verify the first file exists
       await expect(fs.access(firstAvatarFullPath)).resolves.not.toThrow();
 
-      // Mock fs.copyFile to simulate a permission error (EACCES)
-      const originalCopyFile = fs.copyFile;
-      const copyFileSpy = vi.spyOn(fs, "copyFile").mockImplementation(async () => {
-        const error = new Error("Permission denied") as NodeJS.ErrnoException;
-        error.code = "EACCES";
-        throw error;
-      });
+      const copyFileSpy = vi
+        .spyOn(fs, "copyFile")
+        .mockImplementation(async () => {
+          const error = new Error("Permission denied") as NodeJS.ErrnoException;
+          error.code = "EACCES";
+          throw error;
+        });
 
       try {
         // Try to upload replacement avatar - should fail due to backup error
         const formData2 = new FormData();
-        formData2.append("avatar", new Blob([minimalPng]), "avatar2.png");
+        formData2.append(
+          "avatar",
+          new Blob([minimalPng], { type: "image/png" }),
+          "avatar2.png"
+        );
 
         const secondResponse = await fastify.inject({
           method: "POST",
@@ -498,14 +565,13 @@ describe("Character Avatar Routes (Integration)", () => {
           .where(eq(characters.id, characterId))
           .limit(1);
 
-        expect(character.avatarUrl).toBe(firstBody.avatarUrl);
+        // The database stores just the filename, while the API returns the full URL
+        expect(character.avatarUrl).toBe(path.basename(firstBody.avatarUrl));
 
         // Verify the original file still exists
         await expect(fs.access(firstAvatarFullPath)).resolves.not.toThrow();
       } finally {
         copyFileSpy.mockRestore();
-        // Restore original in case of other test failures
-        fs.copyFile = originalCopyFile;
       }
     });
   });
@@ -516,7 +582,11 @@ describe("Character Avatar Routes (Integration)", () => {
 
       // First upload an avatar
       const formData = new FormData();
-      formData.append("avatar", new Blob([minimalPng]), "avatar.png");
+      formData.append(
+        "avatar",
+        new Blob([minimalPng], { type: "image/png" }),
+        "avatar.png"
+      );
 
       const uploadResponse = await fastify.inject({
         method: "POST",
@@ -529,7 +599,9 @@ describe("Character Avatar Routes (Integration)", () => {
 
       expect(uploadResponse.statusCode).toBe(200);
       const uploadBody = uploadResponse.json();
-      expect(uploadBody.avatarUrl).toMatch(/^uploads\/avatars\/[\w-]+\.webp$/);
+      expect(uploadBody.avatarUrl).toMatch(
+        /^(\/[\w-]+)*\/uploads\/avatars\/[\w-]+\.webp$/
+      );
 
       // Capture the avatar file path before deletion
       const avatarFilename = path.basename(uploadBody.avatarUrl);
@@ -615,7 +687,11 @@ describe("Character Avatar Routes (Integration)", () => {
 
       // Upload an avatar
       const formData = new FormData();
-      formData.append("avatar", new Blob([minimalPng]), "avatar.png");
+      formData.append(
+        "avatar",
+        new Blob([minimalPng], { type: "image/png" }),
+        "avatar.png"
+      );
 
       const uploadResponse = await fastify.inject({
         method: "POST",

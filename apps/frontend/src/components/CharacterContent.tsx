@@ -9,6 +9,10 @@ import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import isEqual from "fast-deep-equal";
 import { Loader2, Plus, Trash2, Pencil, Heart, Upload } from "lucide-react";
 import type { Character } from "@branchforge/shared";
+import {
+  AVATAR_MAX_SIZE,
+  AVATAR_MAX_SIZE_MB,
+} from "@branchforge/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -422,8 +426,8 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
         error("Please select a PNG, JPEG, WEBP, or GIF image");
         return;
       }
-      if (file.size > 2 * 1024 * 1024) {
-        error("Image must be smaller than 2MB");
+      if (file.size > AVATAR_MAX_SIZE) {
+        error(`Image must be smaller than ${AVATAR_MAX_SIZE_MB}MB`);
         return;
       }
 
@@ -764,7 +768,7 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
                                 }}
                               />
                               <p className="text-xs text-muted-foreground">
-                                PNG, JPEG, WebP, or GIF (max 2MB)
+                                PNG, JPEG, WebP, or GIF (max {AVATAR_MAX_SIZE_MB}MB)
                               </p>
                               {(character.avatarPreview || character.avatarUrl) && (
                                 <Button
