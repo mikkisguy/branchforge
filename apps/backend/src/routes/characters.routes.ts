@@ -21,7 +21,10 @@ import {
   validateParams,
   validateBody,
 } from "../middleware/validation.middleware.js";
-import { HttpError, ValidationError } from "../middleware/error-handler.middleware.js";
+import {
+  HttpError,
+  ValidationError,
+} from "../middleware/error-handler.middleware.js";
 import {
   characterIdParamsSchema,
   projectIdParamsSchema,
@@ -157,6 +160,32 @@ async function getProjectSettings(projectId: string) {
 function buildAvatarUrl(filename: string | null): string | null {
   if (!filename) return null;
   return getAvatarPath(filename, getBasePath());
+}
+
+/**
+ * Normalize multipart file-size errors from Fastify/Busboy variants.
+ */
+function isMultipartFileTooLargeError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const code = "code" in error ? String(error.code) : "";
+  if (
+    code === "LIMIT_FILE_SIZE" ||
+    code === "FST_REQ_FILE_TOO_LARGE" ||
+    code === "FST_FILES_LIMIT" ||
+    code === "FST_PARTS_LIMIT"
+  ) {
+    return true;
+  }
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("file too large") ||
+    message.includes("filesize limit") ||
+    message.includes("file size")
+  );
 }
 
 // ============================================================================
@@ -908,9 +937,19 @@ async function uploadCharacterAvatarHandler(
     }
 
     // Parse multipart form data with fileSize limit enforced at stream creation
-    const data = await request.file({
-      limits: { fileSize: AVATAR_MAX_SIZE },
-    });
+    let data;
+    try {
+      data = await request.file({
+        limits: { fileSize: AVATAR_MAX_SIZE },
+      });
+    } catch (error) {
+      if (isMultipartFileTooLargeError(error)) {
+        throw new ValidationError(
+          `File must be smaller than ${AVATAR_MAX_SIZE_MB}MB`
+        );
+      }
+      throw error;
+    }
     if (!data) {
       reply.status(400).send({ error: "No file uploaded" } as ErrorResponse);
       return;
@@ -924,12 +963,10 @@ async function uploadCharacterAvatarHandler(
     } catch (err: unknown) {
       // Handle multipart plugin errors like file size limit exceeded
       // The error may be thrown by busboy when fileSize limit is exceeded
-      if (err instanceof Error && (
-        'code' in err && (err.code === 'LIMIT_FILE_SIZE' || err.code === 'LIMIT_UNEXPECTED_FILE') ||
-        err.message.includes('File size') ||
-        err.message.includes('file size')
-      )) {
-        throw new ValidationError(`File must be smaller than ${AVATAR_MAX_SIZE_MB}MB`);
+      if (isMultipartFileTooLargeError(err)) {
+        throw new ValidationError(
+          `File must be smaller than ${AVATAR_MAX_SIZE_MB}MB`
+        );
       }
       throw err; // Re-throw other errors to be caught by outer catch block
     }
@@ -937,12 +974,16 @@ async function uploadCharacterAvatarHandler(
     // Check if file was truncated due to size limit after buffering
     // The truncated property is on the BusboyFileStream, not MultipartFile
     if (file.file.truncated) {
-      throw new ValidationError(`File must be smaller than ${AVATAR_MAX_SIZE_MB}MB`);
+      throw new ValidationError(
+        `File must be smaller than ${AVATAR_MAX_SIZE_MB}MB`
+      );
     }
 
     // Validate the buffered file size as the authoritative check
     if (buffer.length > AVATAR_MAX_SIZE) {
-      throw new ValidationError(`File must be smaller than ${AVATAR_MAX_SIZE_MB}MB`);
+      throw new ValidationError(
+        `File must be smaller than ${AVATAR_MAX_SIZE_MB}MB`
+      );
     }
 
     // Validate and process image
@@ -1068,8 +1109,10 @@ async function uploadCharacterAvatarHandler(
       throw error;
     }
     // Handle multipart file size limit errors (from busboy)
-    if (error instanceof Error && 'code' in error && error.code === 'LIMIT_FILE_SIZE') {
-      throw new ValidationError(`File must be smaller than ${AVATAR_MAX_SIZE_MB}MB`);
+    if (isMultipartFileTooLargeError(error)) {
+      throw new ValidationError(
+        `File must be smaller than ${AVATAR_MAX_SIZE_MB}MB`
+      );
     }
     request.log.error(error);
     reply.status(500).send({ error: "Internal server error" } as ErrorResponse);

@@ -105,6 +105,7 @@ describe("Character Avatar Routes (Integration)", () => {
   let db: ReturnType<typeof getDb>;
   let fastify: ReturnType<typeof Fastify>;
   let characterId: string;
+  let originalBasePath: string | undefined;
 
   // Helper to clean up all test data
   async function cleanupTestData() {
@@ -164,6 +165,8 @@ describe("Character Avatar Routes (Integration)", () => {
   }
 
   beforeAll(async () => {
+    originalBasePath = process.env.BASE_PATH;
+    process.env.BASE_PATH = "/api/";
     db = getDb();
   });
 
@@ -176,6 +179,12 @@ describe("Character Avatar Routes (Integration)", () => {
     }
     // Close database connection
     await closeDb();
+
+    if (originalBasePath === undefined) {
+      delete process.env.BASE_PATH;
+    } else {
+      process.env.BASE_PATH = originalBasePath;
+    }
   });
 
   beforeEach(async () => {
