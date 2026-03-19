@@ -77,9 +77,18 @@ const options: LoggerOptions = {
   timestamp: pino.stdTimeFunctions.isoTime,
   // Redact sensitive fields from logs - includes top-level, nested, and HTTP-specific paths
   redact: [...redactPaths, ...ADDITIONAL_REDACT_PATHS],
-  // Use pretty print for development (requires pino-pretty to be installed)
-  // If pino-pretty is not available, falls back to JSON logging
-  // To enable pretty logging: pnpm add -D pino-pretty
+  // Use pretty print for development
+  transport:
+    process.env.NODE_ENV === "development"
+      ? {
+          target: "pino-pretty",
+          options: {
+            colorize: true,
+            translateTime: "HH:MM:ss Z",
+            ignore: "pid,hostname",
+          },
+        }
+      : undefined,
 };
 
 /**
