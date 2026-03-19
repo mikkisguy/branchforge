@@ -11,6 +11,7 @@ import {
   timestamp,
   integer,
   index,
+  unique,
 } from "drizzle-orm/pg-core";
 import { projects } from "./projects.js";
 import { characters } from "./characters.js";
@@ -36,6 +37,7 @@ export const meters = pgTable(
   (table) => [
     index("meters_project_id_idx").on(table.projectId),
     index("meters_character_id_idx").on(table.characterId),
+    unique("meters_project_key_idx").on(table.projectId, table.key),
   ]
 );
 

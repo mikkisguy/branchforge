@@ -11,6 +11,7 @@
  */
 
 import type { FastifyError, FastifyRequest, FastifyReply } from "fastify";
+import { UPLOAD_MAX_SIZE_MB } from "@branchforge/shared";
 
 // ============================================================================
 // Custom Error Classes
@@ -258,6 +259,17 @@ export function globalErrorHandler(
       details: error.validation,
     };
 
+    reply.status(400).send(response);
+    return;
+  }
+
+  // Handle multipart plugin file size limit errors (from busboy)
+  if (error.code === "LIMIT_FILE_SIZE") {
+    logError(route, error);
+    const response: ErrorResponse = {
+      error: "ValidationError",
+      message: `File must be smaller than ${UPLOAD_MAX_SIZE_MB}MB`,
+    };
     reply.status(400).send(response);
     return;
   }

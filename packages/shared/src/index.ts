@@ -477,10 +477,68 @@ export interface Character {
   displayName: string;
   renpyTag: string;
   color: string;
+  avatarUrl: string | null;
   routeAffiliation: string | null;
   isLoveInterest: boolean;
   dialogueStyle: string | null;
   conditionalPrefix: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+// ============================================================================
+// File Upload Configuration
+// ============================================================================
+
+/**
+ * Generic maximum file size for multipart uploads in megabytes.
+ * This is the default limit used by the multipart plugin and global error handler.
+ * Specific upload types (e.g., avatars) may have their own limits.
+ */
+export const UPLOAD_MAX_SIZE_MB = 5;
+
+/**
+ * Generic maximum file size for multipart uploads in bytes.
+ * This is the default limit used by the multipart plugin.
+ */
+export const UPLOAD_MAX_SIZE = UPLOAD_MAX_SIZE_MB * 1024 * 1024; // 5MB in bytes
+
+// ============================================================================
+// Avatar Upload Configuration
+// ============================================================================
+
+/**
+ * Allowed MIME types for avatar uploads
+ */
+export const AVATAR_ALLOWED_MIME_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+] as const;
+
+/**
+ * Maximum file size for avatar uploads in megabytes
+ */
+export const AVATAR_MAX_SIZE_MB = 2;
+
+/**
+ * Maximum file size for avatar uploads in bytes
+ */
+export const AVATAR_MAX_SIZE = AVATAR_MAX_SIZE_MB * 1024 * 1024; // 2MB in bytes
+
+/**
+ * Validates if a MIME type is allowed for avatar uploads
+ * @param mimeType - The MIME type to validate (can be undefined, null, or empty string)
+ * @returns true if the MIME type is allowed
+ */
+export function isValidAvatarMimeType(
+  mimeType: string | undefined | null
+): boolean {
+  if (!mimeType || typeof mimeType !== "string") {
+    return false;
+  }
+  return AVATAR_ALLOWED_MIME_TYPES.includes(
+    mimeType.toLowerCase() as (typeof AVATAR_ALLOWED_MIME_TYPES)[number]
+  );
 }

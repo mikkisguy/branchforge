@@ -24,6 +24,7 @@ import {
   jsonb,
   index,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import {
   labelStatusEnum,
   labelVisibilityEnum,
@@ -54,8 +55,9 @@ export const labels = pgTable(
     status: labelStatusEnum("status").default("DRAFT"),
     prerequisites: jsonb("prerequisites")
       .notNull()
+      .default({})
       .$type<{ stateVariables?: string[]; meters?: Record<string, number> }>(), // {stateVariables: [], meters: {}}
-    effects: jsonb("effects").notNull().$type<{
+    effects: jsonb("effects").notNull().default({}).$type<{
       stateVariablesSet?: string[];
       stateVariablesUnset?: string[];
       meters?: Record<string, number>;
@@ -99,21 +101,23 @@ export const labels = pgTable(
   (table) => [
     index("labels_duo_pair_id_idx").on(table.duoPairId),
     index("labels_gitlab_file_id_idx").on(table.gitlabFileId),
-    // Composite indexes for common query patterns
-    // Used by listLabels when filtering by route
-    index("labels_project_route_idx").on(table.projectId, table.route),
-    // Used by listLabels when filtering by status
-    index("labels_project_status_idx").on(table.projectId, table.status),
+    // Composite indexes for common query patterns - partial indexes for active (non-deleted) labels
+    // Used by listLabels when filtering by route on active labels
+    index("labels_project_route_idx")
+      .on(table.projectId, table.route)
+      .where(sql`deleted_at IS NULL`),
+    // Used by listLabels when filtering by status on active labels
+    index("labels_project_status_idx")
+      .on(table.projectId, table.status)
+      .where(sql`deleted_at IS NULL`),
     // Used for ordering labels within a project
-    index("labels_project_sequence_idx").on(
-      table.projectId,
-      table.sequenceOrder
-    ),
+    index("labels_project_sequence_idx")
+      .on(table.projectId, table.sequenceOrder)
+      .where(sql`deleted_at IS NULL`),
     // Used for ordering by label number within a project
-    index("labels_project_label_number_idx").on(
-      table.projectId,
-      table.labelNumber
-    ),
+    index("labels_project_label_number_idx")
+      .on(table.projectId, table.labelNumber)
+      .where(sql`deleted_at IS NULL`),
     // Sync status indexes
     index("labels_sync_status_idx").on(table.syncStatus),
     index("labels_deleted_at_idx").on(table.deletedAt),

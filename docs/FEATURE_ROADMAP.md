@@ -26,15 +26,18 @@
 ### 1. Users ✅ Fully Implemented
 
 **Schema**: `users` table
+
 - `id`, `email`, `password_hash`, `role`, `created_at`, `updated_at`
 
 **Implementation Status**:
+
 - ✅ Backend routes: `auth.routes.ts` (login, register)
 - ✅ Backend service: `auth.service.ts`
 - ✅ Frontend pages: `pages/auth/login`, `pages/auth/register`
 - ✅ Frontend hooks: `useAuth.ts`
 
 **Missing**:
+
 - Role management UI (can't change user role from UI)
 - User profile management
 
@@ -43,9 +46,11 @@
 ### 2. Sessions ✅ Fully Implemented
 
 **Schema**: `user_sessions` table
+
 - `id`, `user_id`, `data`, `expires_at`, `created_at`, `updated_at`
 
 **Implementation Status**:
+
 - ✅ Database-backed session store
 - ✅ Session middleware
 - ✅ Session cleanup service
@@ -55,10 +60,12 @@
 ### 3. User Settings 🟡 Partially Implemented
 
 **Schema**: `user_settings` table
+
 - `id`, `user_id`, `avatar_url`, `username`, `language`, `theme`
 - `created_at`, `updated_at`
 
 **Implementation Status**:
+
 - ✅ Schema exists
 - ❌ No dedicated backend routes for user settings
 - 🟡 Theme is handled via `ThemeContext` (not persisted to DB)
@@ -67,11 +74,12 @@
 - ❌ No username management
 
 **TODO**:
+
 ```typescript
 // Backend routes needed
-GET    /api/settings          // Get current user settings
-PUT    /api/settings          // Update settings
-POST   /api/settings/avatar   // Upload avatar
+GET / api / settings; // Get current user settings
+PUT / api / settings; // Update settings
+POST / api / settings / avatar; // Upload avatar
 ```
 
 ---
@@ -79,15 +87,18 @@ POST   /api/settings/avatar   // Upload avatar
 ### 4. Admin Settings ✅ Fully Implemented
 
 **Schema**: `admin_settings` table
+
 - Key-value store for application settings
 
 **Implementation Status**:
+
 - ✅ Backend routes: `admin-settings.routes.ts`
 - ✅ Backend service: `admin-settings.service.ts`
 - ✅ Frontend hooks: `useSettings.ts`
 - ✅ Sign-ups enabled/disabled toggle
 
 **Missing**:
+
 - Settings UI page for admins (only hook exists)
 
 ---
@@ -95,15 +106,18 @@ POST   /api/settings/avatar   // Upload avatar
 ### 5. Projects ✅ Fully Implemented
 
 **Schema**: `projects` & `project_users` tables
+
 - Project CRUD
 - Beta reader access control (junction table)
 
 **Implementation Status**:
+
 - ✅ Backend routes: `projects.routes.ts`
 - ✅ Backend service: `projects.service.ts`
 - ✅ Frontend hooks: `useProject.ts`
 
 **Missing**:
+
 - ❌ Project update/delete routes (only create and list)
 - ❌ **Beta reader management** - No routes for `project_users` junction table:
   - No UI to invite readers
@@ -111,6 +125,7 @@ POST   /api/settings/avatar   // Upload avatar
   - No role assignment interface
 
 **TODO**:
+
 ```typescript
 // Missing project user routes
 GET    /api/projects/:id/users      // List project users
@@ -124,15 +139,18 @@ PUT    /api/projects/:id/users/:uid // Change role
 ### 6. Visual Systems 🔧 Needs Enhancement
 
 **Schema**: `visual_systems` table (1:1 with projects)
+
 - `naming_template`, `group_prefixes`, `scene_padding`, etc.
 
 **Implementation Status**:
+
 - ✅ Schema exists
 - ✅ Shared package types: `VisualSystemConfig`, `generateVisualName()`
 - ❌ No backend routes for visual system CRUD
 - ❌ No UI for configuring visual systems
 
 **TODO**:
+
 ```typescript
 // Visual system routes needed
 GET    /api/projects/:id/visual-system  // Get config
@@ -144,9 +162,11 @@ PUT    /api/projects/:id/visual-system  // Update config
 ### 7. Route Configurations ✅ Fully Implemented
 
 **Schema**: `route_configs` table
+
 - User-defined routes per project (replaces hardcoded enums)
 
 **Implementation Status**:
+
 - ✅ Backend routes: `route-configs.routes.ts`
 - ✅ Backend service: `route-configs.service.ts`
 - ✅ Frontend component: `RouteConfigDialog.tsx`
@@ -157,10 +177,12 @@ PUT    /api/projects/:id/visual-system  // Update config
 ### 8. Ren'Py Definitions ✅ Fully Implemented
 
 **Schema**: `renpy_definitions` table
+
 - `category`, `tag`, `display_name`, `definition_code`
 - For CHARACTER, TRANSFORM, IMAGE, INIT definitions
 
 **Implementation Status**:
+
 - ✅ Schema exists
 - ✅ Backend routes: `renpy-definitions.routes.ts` (full CRUD)
 - ✅ Backend service: `renpy-definitions.service.ts`
@@ -171,6 +193,7 @@ PUT    /api/projects/:id/visual-system  // Update config
 **Purpose**: Store custom Ren'Py code definitions that get exported at the top of RPY files.
 
 **Routes Implemented**:
+
 ```typescript
 GET    /api/projects/:projectId/renpy-definitions     // List definitions
 POST   /api/projects/:projectId/renpy-definitions     // Create definition
@@ -184,9 +207,11 @@ DELETE /api/renpy-definitions/:renpyDefinitionId      // Delete definition
 ### 8.2. State Variables ✅ Fully Implemented
 
 **Schema**: `state_variables` table
+
 - Boolean story state tracking (simpler alternative to flags)
 
 **Implementation Status**:
+
 - ✅ Schema exists
 - ✅ Backend routes: `state-variables.routes.ts` (full CRUD)
 - ✅ Backend service: `state_variables.service.ts`
@@ -197,6 +222,7 @@ DELETE /api/renpy-definitions/:renpyDefinitionId      // Delete definition
 **Purpose**: Track boolean state variables for story progression without the complexity of flags.
 
 **Routes Implemented**:
+
 ```typescript
 GET    /api/projects/:projectId/state-variables     // List state variables
 POST   /api/projects/:projectId/state-variables     // Create state variable
@@ -207,49 +233,63 @@ DELETE /api/state-variables/:stateVariableId        // Delete state variable
 
 ---
 
-### 9. Characters ❌ Not Implemented
+### 9. Characters ✅ Fully Implemented
 
 **Schema**: `characters` table
+
 - `name`, `display_name`, `renpy_tag`, `color`, `dialogue_style`
 - `route_affiliation`, `is_love_interest`, `pair_group_id`
+- `avatar_url` for character profile images
 
 **Implementation Status**:
-- ✅ Schema exists
-- ✅ Referenced by `label_characters` and `label_lines`
-- ❌ No backend routes for character CRUD
-- ❌ No character management UI
-- ❌ No sprite variant configuration (`conditional_prefix`)
 
-**TODO**:
+- ✅ Backend routes: `characters.routes.ts` (full CRUD + avatar upload/delete)
+- ✅ Backend service: Image processing with WebP conversion (200px, quality 95)
+- ✅ Frontend hooks: `useCharacters.ts` with avatar mutations
+- ✅ Frontend UI: `CharacterDialog.tsx` with avatar upload, preview, and display
+- ✅ File validation: 500KB limit, image type checking (PNG, JPEG, WebP, GIF)
+- ✅ Static file serving: `@fastify/static` at `/public/avatars/`
+- ✅ Cleanup: Avatar files deleted on character deletion
+
+**Routes Implemented**:
+
 ```typescript
-// Character routes needed
-GET    /api/projects/:id/characters       // List characters
-POST   /api/projects/:id/characters       // Create character
-PUT    /api/projects/:id/characters/:id   // Update character
-DELETE /api/projects/:id/characters/:id   // Delete character
-GET    /api/projects/:id/characters/export // Export character definitions
+GET    /api/projects/:projectId/characters     // List characters
+POST   /api/projects/:projectId/characters     // Create character
+GET    /api/characters/:characterId             // Get single character
+PUT    /api/characters/:characterId             // Update character
+DELETE /api/characters/:characterId             // Delete character
+POST   /api/characters/:characterId/avatar      // Upload avatar
+DELETE /api/characters/:characterId/avatar      // Remove avatar
 ```
 
-**Impact**:
-- Can't associate dialogue lines with actual characters
-- `label_lines.speaker_id` is always `null`
-- Can't generate character definitions for export
+**Avatar Specifications**:
+
+- Format: WebP (converted from any input format)
+- Max file size: 2MB
+- Dimensions: 200px width (proportional height)
+- Quality: 85
+- Display: Circular with colored border matching `character.color`
+- Fallback: Color circle displayed when no avatar
 
 ---
 
 ### 10. Pair Groups ❌ Not Implemented
 
 **Schema**: `pair_groups` table
+
 - Sequel duo tracking (character_a_id, character_b_id)
 - `duo_ending_label`, `threshold`
 
 **Implementation Status**:
+
 - ✅ Schema exists
 - ✅ Referenced by `labels.duo_pair_id`
 - ❌ No backend routes
 - ❌ No UI
 
 **TODO**:
+
 ```typescript
 // Pair group routes needed
 GET    /api/projects/:id/pairs       // List pair groups
@@ -263,16 +303,19 @@ DELETE /api/projects/:id/pairs/:id   // Delete pair group
 ### 11. Meters ❌ Not Implemented
 
 **Schema**: `meters` table
+
 - `key`, `name`, `min_value`, `max_value`, `description`
 - Optional `character_id` (null for global meters)
 
 **Implementation Status**:
+
 - ✅ Schema exists
 - ❌ No backend routes
 - ❌ No UI
 - ❌ No meter effect calculation in labels service
 
 **TODO**:
+
 ```typescript
 // Meter routes needed
 GET    /api/projects/:id/meters       // List meters
@@ -286,11 +329,13 @@ DELETE /api/projects/:id/meters/:id   // Delete meter
 ### 12. Flags 🔄 Superseded by State Variables
 
 **Schema**: `flags` table
+
 - `key`, `description`, `category`
 
 **Status**: The `flags` table schema still exists but is no longer needed. Boolean story state is now tracked via **State Variables** (section 8.2), which provides a simpler and more intuitive interface for managing story progression conditions.
 
 **Implementation Note**:
+
 - ✅ Schema exists (kept for backwards compatibility)
 - ✅ Referenced in `labels.prerequisites` JSONB (legacy support)
 - ✅ Referenced in `labels.effects` JSONB (legacy support)
@@ -301,15 +346,18 @@ DELETE /api/projects/:id/meters/:id   // Delete meter
 ### 13. Labels ✅ Fully Implemented
 
 **Schema**: `labels` table
+
 - Main content container for visual novel scenes
 
 **Implementation Status**:
+
 - ✅ Backend routes: `labels.routes.ts` (full CRUD)
 - ✅ Backend service: `labels.service.ts`
 - ✅ Frontend hooks: `useLabels.ts`
 - ✅ Frontend pages: Script Mode, Write Mode
 
 **Features**:
+
 - List labels with filters (route, status)
 - Get label detail with lines and characters
 - Create/update/delete labels
@@ -321,15 +369,18 @@ DELETE /api/projects/:id/meters/:id   // Delete meter
 ### 14. Label Lines ✅ Implemented
 
 **Schema**: `label_lines` table
+
 - Atomic content lines within labels
 
 **Implementation Status**:
+
 - ✅ Part of labels service
 - ✅ Fetched with label detail
 - ✅ Updated via dialogue save endpoint
 
 **Known Issues**:
-- `speakerId` is always `null` (no character management yet)
+
+- `speakerId` population requires running character detection/import to link speakers to lines
 - `visualSlugOverride` not configurable in UI
 - No manual visual type selection
 
@@ -338,15 +389,18 @@ DELETE /api/projects/:id/meters/:id   // Delete meter
 ### 15. Label Characters 🟡 Partially Implemented
 
 **Schema**: `label_characters` junction table
+
 - Links labels to characters with role and emotion
 
 **Implementation Status**:
+
 - ✅ Schema exists
 - ✅ Fetched in label detail (via service)
 - ❌ No routes to manage label-character relationships
 - ❌ No UI to add/remove characters from labels
 
 **TODO**:
+
 ```typescript
 // Label character routes needed
 GET    /api/labels/:id/characters       // Get label characters
@@ -360,14 +414,17 @@ DELETE /api/labels/:id/characters/:cid  // Remove character from label
 ### 16. World Elements ❌ Not Implemented
 
 **Schema**: `world_elements` table
+
 - World bible: locations, items, concepts, events
 
 **Implementation Status**:
+
 - ✅ Schema exists
 - ❌ No backend routes
 - ❌ No UI
 
 **TODO**:
+
 ```typescript
 // World element routes needed
 GET    /api/projects/:id/world-elements     // List elements
@@ -381,9 +438,11 @@ DELETE /api/projects/:id/world-elements/:id // Delete element
 ### 17. AI Suggestions ❌ Not Implemented
 
 **Schema**: `ai_suggestions` table
+
 - AI-generated suggestions with audit trail
 
 **Implementation Status**:
+
 - ✅ Schema exists
 - ❌ No backend service
 - ❌ No routes
@@ -391,6 +450,7 @@ DELETE /api/projects/:id/world-elements/:id // Delete element
 - ❌ No OpenRouter integration
 
 **TODO**:
+
 ```typescript
 // AI suggestion routes needed
 POST   /api/labels/:id/suggestions/generate  // Generate suggestions
@@ -400,6 +460,7 @@ DELETE /api/suggestions/:id/reject           // Reject suggestion
 ```
 
 **Required Services**:
+
 - OpenRouter API client
 - Prompt builder (anonymizes context)
 - Response parser
@@ -410,9 +471,11 @@ DELETE /api/suggestions/:id/reject           // Reject suggestion
 ### 18. Exports ❌ Not Implemented
 
 **Schema**: `exports` table
+
 - Generated export files tracking
 
 **Implementation Status**:
+
 - ✅ Schema exists
 - ❌ No export generation service
 - ❌ No export routes
@@ -421,6 +484,7 @@ DELETE /api/suggestions/:id/reject           // Reject suggestion
 **Purpose**: Generate `.rpy`, `.md`, or `.json` exports of project content.
 
 **TODO**:
+
 ```typescript
 // Export routes needed
 POST   /api/projects/:id/export              // Generate export
@@ -433,14 +497,17 @@ GET    /api/projects/:id/exports/:id/download // Download export file
 ### 19. Import Logs ❌ Not Implemented
 
 **Schema**: `import_logs` table
+
 - One-time migration tracking (e.g., from Google Docs)
 
 **Implementation Status**:
+
 - ✅ Schema exists
 - ❌ No import service
 - ❌ No import routes
 
 **TODO**:
+
 ```typescript
 // Import routes needed
 POST   /api/projects/:id/import        // Import from external source
@@ -452,9 +519,11 @@ GET    /api/projects/:id/import-logs   // List import logs
 ### 20. Demo Sessions ❌ Not Implemented
 
 **Schema**: `demo_sessions` table
+
 - Playback sessions for beta readers and testing
 
 **Implementation Status**:
+
 - ✅ Schema exists
 - ❌ No demo/playback service
 - ❌ No demo routes
@@ -463,6 +532,7 @@ GET    /api/projects/:id/import-logs   // List import logs
 **Purpose**: Allow beta readers to play through the visual novel with simulated flag/meter state.
 
 **TODO**:
+
 ```typescript
 // Demo session routes needed
 POST   /api/projects/:id/demo/start       // Start demo session
@@ -473,6 +543,7 @@ POST   /api/demo/:id/end                  // End session
 ```
 
 **Required Features**:
+
 - Player UI (next/prev, choices display)
 - State variable/meter state tracking
 - Route locking logic
@@ -483,9 +554,11 @@ POST   /api/demo/:id/end                  // End session
 ### 21. GitLab Integrations ✅ Fully Implemented
 
 **Schema**: `gitlab_integrations` table
+
 - User-level GitLab credentials (encrypted PAT)
 
 **Implementation Status**:
+
 - ✅ Backend routes: Full CRUD in `gitlab.routes.ts`
 - ✅ Backend service: `gitlab.service.ts`
 - ✅ Frontend hooks: `useGitLab.ts`, `useGitLabSync.ts`, `useGitLabFiles.ts`
@@ -496,9 +569,11 @@ POST   /api/demo/:id/end                  // End session
 ### 22. GitLab Files ✅ Fully Implemented
 
 **Schema**: `gitlab_files` table
+
 - File tracking with full RPY content
 
 **Implementation Status**:
+
 - ✅ Backend routes included in `gitlab.routes.ts`
 - ✅ File content update endpoint
 - ✅ Script mode editing
@@ -509,9 +584,11 @@ POST   /api/demo/:id/end                  // End session
 ### 23. GitLab File Sync State ✅ Fully Implemented
 
 **Schema**: `gitlab_file_sync_state` table
+
 - Track sync operations per file
 
 **Implementation Status**:
+
 - ✅ Service: `gitlab-file-sync.service.ts`
 - ✅ Idempotency handling
 - ✅ Concurrent sync prevention
@@ -522,9 +599,11 @@ POST   /api/demo/:id/end                  // End session
 ### 24. GitLab Repositories ✅ Fully Implemented
 
 **Schema**: `gitlab_repositories` table
+
 - Project-to-repository mapping
 
 **Implementation Status**:
+
 - ✅ Link/unlink routes
 - ✅ Branch listing
 - ✅ File listing
@@ -535,9 +614,11 @@ POST   /api/demo/:id/end                  // End session
 ### 25. GitLab Sync Operations ✅ Fully Implemented
 
 **Schema**: `gitlab_sync_operations` table
+
 - Sync operations tracking
 
 **Implementation Status**:
+
 - ✅ Export/Import routes
 - ✅ Conflict detection
 - ✅ Operation status polling
@@ -549,38 +630,43 @@ POST   /api/demo/:id/end                  // End session
 
 ### High Priority (Core Features)
 
-1. **Character Management** (Characters table)
-   - Impact: Can't properly tag dialogue speakers
+1. **Character Management** (Characters table - ✅ IMPLEMENTED)
+
+   - Fully implemented: CRUD, avatar upload, GitLab detection/import
+   - Impact: Now available for tagging dialogue speakers
+
+2. **Meter Management** (Meters table)
+
+   - Impact: Can't track relationship stats, core to sequel story structure
    - Effort: Medium
    - Dependencies: None
 
-2. **Meter Management** (Meters table)
-   - Impact: Can't track relationship stats, core to sequel story structure
-   - Effort: Medium
-   - Dependencies: Characters (optional)
-
 3. **State Variables** (State Variables table - ✅ IMPLEMENTED)
+
    - Already fully implemented as boolean story state tracking
    - Provides simpler alternative to traditional flag systems
 
 4. **Label-Character Relationships** (Label Characters junction)
+
    - Impact: Can't associate characters with labels
    - Effort: Low
-   - Dependencies: Characters
+   - Dependencies: None
 
 5. **Export Generation** (Exports table)
    - Impact: Can't generate final RPY files
    - Effort: Medium
-   - Dependencies: Visual Systems, Characters
+   - Dependencies: Visual Systems
 
 ### Medium Priority (Enhanced Features)
 
 6. **User Settings** (User Settings table)
+
    - Impact: No profile customization
    - Effort: Low
    - Dependencies: None
 
 7. **Beta Reader Management** (Project Users junction)
+
    - Impact: Can't share projects with testers
    - Effort: Medium
    - Dependencies: None
@@ -593,21 +679,25 @@ POST   /api/demo/:id/end                  // End session
 ### Lower Priority (Advanced Features)
 
 10. **World Elements** (World Elements table)
+
     - Impact: No world bible tracking
     - Effort: Low
     - Dependencies: None
 
 11. **Pair Groups** (Pair Groups table)
+
     - Impact: Can't track duo endings
     - Effort: Low
     - Dependencies: Characters, Meters
 
 12. **Demo/Playback Mode** (Demo Sessions table)
+
     - Impact: Can't test interactive novel
     - Effort: High
     - Dependencies: Flags, Meters, Labels
 
 13. **AI Suggestions** (AI Suggestions table)
+
     - Impact: No AI-assisted writing
     - Effort: High
     - Dependencies: OpenRouter integration
@@ -622,21 +712,25 @@ POST   /api/demo/:id/end                  // End session
 ## Implementation Order Suggestion
 
 ### Phase 1: Core Story Elements
+
 1. State Variables (✅ Already implemented - replaces traditional flags)
-2. Character CRUD
+2. Character CRUD (✅ IMPLEMENTED)
 3. Label-Character Relationships
 4. Meter Management
 5. Pair Groups
 
 ### Phase 2: Export & Configuration
+
 6. Visual System Configuration
 7. Export Generation
 
 ### Phase 3: Collaboration
+
 9. User Settings
 10. Beta Reader Management (Project Users)
 
 ### Phase 4: Advanced Features
+
 11. World Elements
 12. Import from External Sources
 13. AI Suggestions (OpenRouter integration)
@@ -665,10 +759,17 @@ POST   /api/demo/:id/end                  // End session
 │   ├── GET    /:id
 │   ├── PUT    /:id
 │   ├── DELETE /:id
-│   ├── GET    /:id/characters      # [NEW] Character management
+│   ├── GET    /:id/characters      # ✅ Character management
 │   ├── POST   /:id/characters
-│   ├── PUT    /:id/characters/:cid
-│   ├── DELETE /:id/characters/:cid
+│   ├── GET    /characters/:characterId      # Get single character
+│   ├── PUT    /characters/:characterId      # Update character
+│   ├── DELETE /characters/:characterId      # Delete character
+│   ├── POST   /characters/:characterId/avatar   # Upload avatar
+│   ├── DELETE /characters/:characterId/avatar  # Delete avatar
+│   ├── GET    /:id/character-settings       # Get project character settings
+│   ├── PUT    /:id/character-settings       # Update project character settings
+│   ├── GET    /:id/characters/detect         # Detect characters from GitLab files
+│   ├── POST   /:id/characters/import         # Import characters after review
 │   ├── GET    /:id/meters          # [NEW] Meter management
 │   ├── POST   /:id/meters
 │   ├── PUT    /:id/meters/:mid
@@ -751,24 +852,31 @@ POST   /api/demo/:id/end                  // End session
 ## Notes
 
 ### Schema Terminology Change
+
 The database uses "labels" (formerly "scenes") for Ren'Py label statements. This is distinct from Ren'Py's "scene" command for background changes.
 
 ### GitLab Integration
+
 GitLab integration is fully implemented with:
+
 - Encrypted PAT storage
 - Repository linking
 - Import/export with conflict detection
 - Script mode editing with auto-sync to labels
 
 ### Soft Delete Pattern
+
 Several tables use soft delete (`deleted_at` timestamp):
+
 - `labels`
 - `label_lines`
 
 When implementing new features, follow this pattern for user-deletable content.
 
 ### Audit Trail
+
 The `labels` table includes audit fields:
+
 - `createdBy`, `updatedBy` (user references)
 - `version` (integer)
 

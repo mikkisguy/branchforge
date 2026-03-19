@@ -10,6 +10,11 @@ import { charactersApi } from "@/lib/api/characters";
 import { characterKeys } from "@/lib/query-keys";
 import { useToast } from "@/contexts/ToastContext";
 import type { Character } from "@branchforge/shared";
+import {
+  AVATAR_MAX_SIZE,
+  AVATAR_MAX_SIZE_MB,
+  isValidAvatarMimeType,
+} from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -46,6 +51,8 @@ export interface UseCharactersReturn {
   isCreatingCharacter: boolean;
   isUpdatingCharacter: boolean;
   isDeletingCharacter: boolean;
+  isUploadingAvatar: boolean;
+  isDeletingAvatar: boolean;
 
   // Methods
   refreshCharacters: () => Promise<unknown>;
@@ -55,6 +62,11 @@ export interface UseCharactersReturn {
     input: UpdateCharacterInput
   ) => Promise<Character>;
   deleteCharacter: (characterId: string) => Promise<void>;
+  uploadAvatar: (
+    characterId: string,
+    file: File
+  ) => Promise<{ avatarUrl: string }>;
+  deleteAvatar: (characterId: string) => Promise<void>;
 }
 
 // ============================================================================
@@ -137,6 +149,59 @@ export function useCharacters(projectId: string): UseCharactersReturn {
     },
   });
 
+  // Upload avatar mutation
+  const uploadAvatarMutation = useMutation({
+    mutationFn: async ({
+      characterId,
+      file,
+    }: {
+      characterId: string;
+      file: File;
+    }) => {
+      // Client-side validation before upload (must match backend limits from shared package)
+      if (!isValidAvatarMimeType(file.type)) {
+        throw new Error(
+          `Invalid file type. Please upload a PNG, JPEG, WebP, or GIF image.`
+        );
+      }
+
+      if (file.size > AVATAR_MAX_SIZE) {
+        throw new Error(
+          `File size exceeds ${AVATAR_MAX_SIZE_MB}MB limit. Please choose a smaller image.`
+        );
+      }
+
+      return charactersApi.uploadAvatar(characterId, file);
+    },
+    onSuccess: () => {
+      // Invalidate and refetch characters list
+      queryClient.invalidateQueries({
+        queryKey: characterKeys.lists(projectId),
+      });
+      toast.success("Avatar uploaded successfully", "Success");
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to upload avatar: ${error.message}`, "Error");
+    },
+  });
+
+  // Delete avatar mutation
+  const deleteAvatarMutation = useMutation({
+    mutationFn: async (characterId: string) => {
+      await charactersApi.deleteAvatar(characterId);
+    },
+    onSuccess: () => {
+      // Invalidate and refetch characters list
+      queryClient.invalidateQueries({
+        queryKey: characterKeys.lists(projectId),
+      });
+      toast.success("Avatar removed successfully", "Success");
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to remove avatar: ${error.message}`, "Error");
+    },
+  });
+
   // Create character method
   const createCharacter = async (
     input: CreateCharacterInput
@@ -153,10 +218,21 @@ export function useCharacters(projectId: string): UseCharactersReturn {
   };
 
   // Delete character method
-  const deleteCharacter = async (
-    characterId: string
-  ): Promise<void> => {
+  const deleteCharacter = async (characterId: string): Promise<void> => {
     return deleteCharacterMutation.mutateAsync(characterId);
+  };
+
+  // Upload avatar method
+  const uploadAvatar = async (
+    characterId: string,
+    file: File
+  ): Promise<{ avatarUrl: string }> => {
+    return uploadAvatarMutation.mutateAsync({ characterId, file });
+  };
+
+  // Delete avatar method
+  const deleteAvatar = async (characterId: string): Promise<void> => {
+    return deleteAvatarMutation.mutateAsync(characterId);
   };
 
   return {
@@ -166,9 +242,13 @@ export function useCharacters(projectId: string): UseCharactersReturn {
     isCreatingCharacter: createCharacterMutation.isPending,
     isUpdatingCharacter: updateCharacterMutation.isPending,
     isDeletingCharacter: deleteCharacterMutation.isPending,
+    isUploadingAvatar: uploadAvatarMutation.isPending,
+    isDeletingAvatar: deleteAvatarMutation.isPending,
     refreshCharacters,
     createCharacter,
     updateCharacter,
     deleteCharacter,
+    uploadAvatar,
+    deleteAvatar,
   };
 }

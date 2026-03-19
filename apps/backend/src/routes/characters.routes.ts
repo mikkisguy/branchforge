@@ -22,6 +22,10 @@ import {
   validateBody,
 } from "../middleware/validation.middleware.js";
 import {
+  HttpError,
+  ValidationError,
+} from "../middleware/error-handler.middleware.js";
+import {
   characterIdParamsSchema,
   projectIdParamsSchema,
   createCharacterSchema,
@@ -38,6 +42,19 @@ import {
   type DetectedCharacter,
 } from "../services/character-parser.service.js";
 import { characterLinkerService } from "../services/character-linker.service.js";
+import {
+  validateAndProcessAvatar,
+  deleteAvatar,
+} from "../services/image-processing.service.js";
+import {
+  ensureAvatarDir,
+  getAvatarPath,
+  getAvatarFullPath,
+} from "../lib/storage.js";
+import { getBasePath } from "../lib/config.js";
+import { promises as fs } from "node:fs";
+import type { MultipartFile } from "@fastify/multipart";
+import { AVATAR_MAX_SIZE, AVATAR_MAX_SIZE_MB } from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -72,6 +89,7 @@ interface ListCharactersResponse {
     color: string;
     routeAffiliation: string | null;
     isLoveInterest: boolean;
+    avatarUrl: string | null;
   }>;
 }
 
@@ -86,12 +104,17 @@ interface GetCharacterResponse {
     isLoveInterest: boolean;
     dialogueStyle: string | null;
     conditionalPrefix: string | null;
+    avatarUrl: string | null;
   };
 }
 
 interface ProjectSettingsResponse {
   excludedCharacterTags: string[];
   autoLinkSpeakers: boolean;
+}
+
+interface UploadAvatarResponse {
+  avatarUrl: string;
 }
 
 interface ErrorResponse {
@@ -127,6 +150,42 @@ async function getProjectSettings(projectId: string) {
   }
 
   return settings;
+}
+
+/**
+ * Build avatar URL from stored filename
+ * @param filename - The filename from database
+ * @returns Full URL path for client access
+ */
+function buildAvatarUrl(filename: string | null): string | null {
+  if (!filename) return null;
+  return getAvatarPath(filename, getBasePath());
+}
+
+/**
+ * Normalize multipart file-size errors from Fastify/Busboy variants.
+ */
+function isMultipartFileTooLargeError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const code = "code" in error ? String(error.code) : "";
+  if (
+    code === "LIMIT_FILE_SIZE" ||
+    code === "FST_REQ_FILE_TOO_LARGE" ||
+    code === "FST_FILES_LIMIT" ||
+    code === "FST_PARTS_LIMIT"
+  ) {
+    return true;
+  }
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("file too large") ||
+    message.includes("filesize limit") ||
+    message.includes("file size")
+  );
 }
 
 // ============================================================================
@@ -429,14 +488,21 @@ async function listCharactersHandler(
         color: characters.color,
         routeAffiliation: characters.routeAffiliation,
         isLoveInterest: characters.isLoveInterest,
+        avatarUrl: characters.avatarUrl,
       })
       .from(characters)
       .where(eq(characters.projectId, projectId))
       .orderBy(characters.renpyTag);
 
+    // Build full avatar URLs for each character
+    const charactersWithUrls = projectCharacters.map((character) => ({
+      ...character,
+      avatarUrl: buildAvatarUrl(character.avatarUrl),
+    }));
+
     reply
       .status(200)
-      .send({ characters: projectCharacters } as ListCharactersResponse);
+      .send({ characters: charactersWithUrls } as ListCharactersResponse);
   } catch (error) {
     request.log.error(error);
     reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
@@ -493,6 +559,7 @@ async function getCharacterHandler(
         isLoveInterest: character.isLoveInterest,
         dialogueStyle: character.dialogueStyle,
         conditionalPrefix: character.conditionalPrefix,
+        avatarUrl: buildAvatarUrl(character.avatarUrl),
       },
     } as GetCharacterResponse);
   } catch (error) {
@@ -578,6 +645,7 @@ async function createCharacterHandler(
         isLoveInterest: newCharacter.isLoveInterest,
         dialogueStyle: newCharacter.dialogueStyle,
         conditionalPrefix: newCharacter.conditionalPrefix,
+        avatarUrl: buildAvatarUrl(newCharacter.avatarUrl),
       },
     } as GetCharacterResponse);
   } catch (error) {
@@ -649,6 +717,7 @@ async function updateCharacterHandler(
         isLoveInterest: updatedCharacter.isLoveInterest,
         dialogueStyle: updatedCharacter.dialogueStyle,
         conditionalPrefix: updatedCharacter.conditionalPrefix,
+        avatarUrl: buildAvatarUrl(updatedCharacter.avatarUrl),
       },
     } as GetCharacterResponse);
   } catch (error) {
@@ -696,7 +765,19 @@ async function deleteCharacterHandler(
       return;
     }
 
+    // Delete database record first (if this fails, we keep the file)
     await db.delete(characters).where(eq(characters.id, characterId));
+
+    // Attempt to delete avatar file after successful DB deletion
+    if (character.avatarUrl) {
+      try {
+        await deleteAvatar(getAvatarFullPath(character.avatarUrl));
+      } catch {
+        request.log.warn(
+          `Failed to delete avatar file: ${character.avatarUrl}`
+        );
+      }
+    }
 
     reply.status(204).send();
   } catch (error) {
@@ -815,6 +896,300 @@ async function updateProjectSettingsHandler(
   }
 }
 
+/**
+ * Upload character avatar
+ *
+ * POST /characters/:characterId/avatar
+ * Requires authentication
+ */
+async function uploadCharacterAvatarHandler(
+  request: FastifyRequest<{ Params: { characterId: string } }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { characterId } = request.params;
+  const user = request.user!;
+
+  try {
+    const db = getDb();
+
+    // Get character
+    const [character] = await db
+      .select()
+      .from(characters)
+      .where(eq(characters.id, characterId))
+      .limit(1);
+
+    if (!character) {
+      reply.status(404).send({ error: "Character not found" } as ErrorResponse);
+      return;
+    }
+
+    // Verify project access
+    const [project] = await db
+      .select({ userId: projects.userId })
+      .from(projects)
+      .where(eq(projects.id, character.projectId))
+      .limit(1);
+
+    if (!project || project.userId !== user.id) {
+      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      return;
+    }
+
+    // Parse multipart form data with fileSize limit enforced at stream creation
+    let data;
+    try {
+      data = await request.file({
+        limits: { fileSize: AVATAR_MAX_SIZE },
+      });
+    } catch (error) {
+      if (isMultipartFileTooLargeError(error)) {
+        throw new ValidationError(
+          `File must be smaller than ${AVATAR_MAX_SIZE_MB}MB`
+        );
+      }
+      throw error;
+    }
+    if (!data) {
+      reply.status(400).send({ error: "No file uploaded" } as ErrorResponse);
+      return;
+    }
+
+    const file = data as MultipartFile;
+
+    let buffer: Buffer;
+    try {
+      buffer = await file.toBuffer();
+    } catch (err: unknown) {
+      // Handle multipart plugin errors like file size limit exceeded
+      // The error may be thrown by busboy when fileSize limit is exceeded
+      if (isMultipartFileTooLargeError(err)) {
+        throw new ValidationError(
+          `File must be smaller than ${AVATAR_MAX_SIZE_MB}MB`
+        );
+      }
+      throw err; // Re-throw other errors to be caught by outer catch block
+    }
+
+    // Check if file was truncated due to size limit after buffering
+    // The truncated property is on the BusboyFileStream, not MultipartFile
+    if (file.file.truncated) {
+      throw new ValidationError(
+        `File must be smaller than ${AVATAR_MAX_SIZE_MB}MB`
+      );
+    }
+
+    // Validate the buffered file size as the authoritative check
+    if (buffer.length > AVATAR_MAX_SIZE) {
+      throw new ValidationError(
+        `File must be smaller than ${AVATAR_MAX_SIZE_MB}MB`
+      );
+    }
+
+    // Validate and process image
+    const result = await validateAndProcessAvatar(buffer, file.mimetype);
+
+    // Ensure upload directory exists
+    await ensureAvatarDir();
+
+    // Backup the existing avatar file if it exists, so we can restore on DB failure.
+    // Treat backup creation as a hard failure (except ENOENT - file doesn't exist is ok).
+    let previousAvatarBackupPath: string | undefined;
+    if (character.avatarUrl) {
+      const previousAvatarPath = getAvatarFullPath(character.avatarUrl);
+      try {
+        await fs.access(previousAvatarPath);
+        // Create a backup of the existing avatar before we overwrite/delete it
+        previousAvatarBackupPath = `${previousAvatarPath}.backup-${Date.now()}-${process.pid}`;
+        await fs.copyFile(previousAvatarPath, previousAvatarBackupPath);
+      } catch (accessError) {
+        // If file doesn't exist, that's fine - no backup needed
+        // For any other error (permissions, disk full, etc.), fail fast
+        if ((accessError as NodeJS.ErrnoException).code !== "ENOENT") {
+          request.log.error(
+            accessError,
+            `Failed to create backup of previous avatar: ${character.avatarUrl}`
+          );
+          return reply.status(500).send({
+            error: "Failed to backup existing avatar file",
+          } as ErrorResponse);
+        }
+        // File doesn't exist - proceed without backup
+        request.log.info(
+          `Previous avatar file does not exist, skipping backup: ${character.avatarUrl}`
+        );
+      }
+    }
+
+    // Write processed file to disk
+    const filePath = getAvatarFullPath(result.filename);
+    await fs.writeFile(filePath, result.buffer);
+
+    // Delete old avatar file if exists (after we've backed it up).
+    // Log failure but don't affect previousAvatarBackupPath - preserve it for potential restore.
+    if (character.avatarUrl) {
+      try {
+        await deleteAvatar(getAvatarFullPath(character.avatarUrl));
+      } catch (deleteError) {
+        request.log.warn(
+          deleteError,
+          `Failed to delete old avatar file (keeping backup): ${character.avatarUrl}`
+        );
+      }
+    }
+
+    // Store only the filename in the database.
+    let updatedCharacter;
+    try {
+      [updatedCharacter] = await db
+        .update(characters)
+        .set({
+          avatarUrl: result.filename,
+          updatedAt: new Date(),
+        })
+        .where(eq(characters.id, characterId))
+        .returning();
+    } catch (error) {
+      request.log.error(error, "Failed to update character avatar in database");
+
+      // Restore previous avatar from backup if we have one
+      if (previousAvatarBackupPath) {
+        const previousAvatarPath = getAvatarFullPath(character.avatarUrl!);
+        try {
+          await fs.copyFile(previousAvatarBackupPath, previousAvatarPath);
+          request.log.info(
+            `Restored previous avatar file: ${character.avatarUrl}`
+          );
+        } catch (restoreError) {
+          request.log.error(
+            restoreError,
+            `Failed to restore previous avatar file: ${character.avatarUrl}`
+          );
+        }
+      }
+
+      // Clean up the new uploaded file since DB update failed
+      try {
+        await deleteAvatar(filePath);
+      } catch {
+        request.log.warn(`Failed to delete avatar file: ${result.filename}`);
+      }
+
+      throw error;
+    }
+
+    // Success: clean up the backup file if it exists
+    if (previousAvatarBackupPath) {
+      try {
+        await deleteAvatar(previousAvatarBackupPath);
+      } catch {
+        request.log.warn(
+          `Failed to delete avatar backup file: ${previousAvatarBackupPath}`
+        );
+      }
+    }
+
+    // Return the full URL for client access
+    const avatarUrl = buildAvatarUrl(updatedCharacter.avatarUrl);
+    if (!avatarUrl) {
+      request.log.error(
+        { characterId: updatedCharacter.id },
+        "avatarUrl unexpectedly null for updatedCharacter after successful upload"
+      );
+      return reply
+        .status(500)
+        .send({ error: "Internal server error" } as ErrorResponse);
+    }
+    reply.status(200).send({
+      avatarUrl,
+    } as UploadAvatarResponse);
+  } catch (error) {
+    // Re-throw HttpError instances (e.g., ValidationError) so the global error handler can use their status code
+    if (error instanceof HttpError) {
+      throw error;
+    }
+    // Handle multipart file size limit errors (from busboy)
+    if (isMultipartFileTooLargeError(error)) {
+      throw new ValidationError(
+        `File must be smaller than ${AVATAR_MAX_SIZE_MB}MB`
+      );
+    }
+    request.log.error(error);
+    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+  }
+}
+
+/**
+ * Delete character avatar
+ *
+ * DELETE /characters/:characterId/avatar
+ * Requires authentication
+ */
+async function deleteCharacterAvatarHandler(
+  request: FastifyRequest<{ Params: { characterId: string } }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { characterId } = request.params;
+  const user = request.user!;
+
+  try {
+    const db = getDb();
+
+    // Get character
+    const [character] = await db
+      .select()
+      .from(characters)
+      .where(eq(characters.id, characterId))
+      .limit(1);
+
+    if (!character) {
+      reply.status(404).send({ error: "Character not found" } as ErrorResponse);
+      return;
+    }
+
+    // Verify project access
+    const [project] = await db
+      .select({ userId: projects.userId })
+      .from(projects)
+      .where(eq(projects.id, character.projectId))
+      .limit(1);
+
+    if (!project || project.userId !== user.id) {
+      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      return;
+    }
+
+    // Update character to remove avatar URL first (DB consistency)
+    await db
+      .update(characters)
+      .set({
+        avatarUrl: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(characters.id, characterId));
+
+    // Delete avatar file after successful DB update
+    if (character.avatarUrl) {
+      try {
+        await deleteAvatar(getAvatarFullPath(character.avatarUrl));
+      } catch {
+        request.log.warn(
+          `Failed to delete avatar file: ${character.avatarUrl}`
+        );
+      }
+    }
+
+    reply.status(204).send();
+  } catch (error) {
+    // Re-throw HttpError instances (e.g., ValidationError) so the global error handler can use their status code
+    if (error instanceof HttpError) {
+      throw error;
+    }
+    request.log.error(error);
+    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+  }
+}
+
 // ============================================================================
 // Routes Registration
 // ============================================================================
@@ -924,5 +1299,32 @@ export async function charactersRoutes(
       preValidation: validateParams(characterIdParamsSchema),
     },
     deleteCharacterHandler
+  );
+}
+
+/**
+ * Avatar routes (separate export for registration with multipart plugin)
+ */
+export async function characterAvatarRoutes(
+  fastify: FastifyInstance
+): Promise<void> {
+  // Upload avatar
+  fastify.post<{ Params: { characterId: string } }>(
+    "/characters/:characterId/avatar",
+    {
+      onRequest: authenticate,
+      preValidation: validateParams(characterIdParamsSchema),
+    },
+    uploadCharacterAvatarHandler
+  );
+
+  // Delete avatar
+  fastify.delete<{ Params: { characterId: string } }>(
+    "/characters/:characterId/avatar",
+    {
+      onRequest: authenticate,
+      preValidation: validateParams(characterIdParamsSchema),
+    },
+    deleteCharacterAvatarHandler
   );
 }

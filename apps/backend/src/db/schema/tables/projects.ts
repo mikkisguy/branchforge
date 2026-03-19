@@ -13,7 +13,7 @@ import {
   index,
   primaryKey,
 } from "drizzle-orm/pg-core";
-import { userRoleEnum } from "../enums.js";
+import { userRoleEnum, projectVisibilityEnum } from "../enums.js";
 import { users } from "./users.js";
 
 /**
@@ -25,11 +25,11 @@ export const projects = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
     description: text("description"),
     maxMeterDelta: integer("max_meter_delta").default(10),
-    visibility: userRoleEnum("visibility").default("OWNER"),
+    visibility: projectVisibilityEnum("visibility").default("PRIVATE"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -51,9 +51,11 @@ export const projectUsers = pgTable(
     role: userRoleEnum("role").notNull(),
     addedAt: timestamp("added_at").defaultNow().notNull(),
   },
-  (table) => ({
-    pk: primaryKey({ columns: [table.projectId, table.userId] }),
-  })
+  (table) => [
+    primaryKey({ columns: [table.projectId, table.userId] }),
+    // Standalone index for reverse lookups by user_id (e.g., "find all projects for a user")
+    index("project_users_user_id_idx").on(table.userId),
+  ]
 );
 
 // Types
