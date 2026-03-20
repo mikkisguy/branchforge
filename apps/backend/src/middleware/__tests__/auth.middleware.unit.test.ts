@@ -4,11 +4,16 @@ import cookie from "@fastify/cookie";
 import session from "@fastify/session";
 import { authenticate, optionalAuth, requireRole } from "../auth.middleware.js";
 import type { PublicUser } from "../auth.middleware.js";
+import * as logger from "../../lib/logger.js";
 
 describe("Auth Middleware", () => {
   let fastify: ReturnType<typeof Fastify>;
 
   beforeEach(async () => {
+    // Mock logger functions
+    vi.spyOn(logger, "logSecurityEvent").mockImplementation(() => {});
+    vi.spyOn(logger, "logError").mockImplementation(() => {});
+
     fastify = Fastify();
     await fastify.register(cookie);
     await fastify.register(session, {
@@ -52,14 +57,14 @@ describe("Auth Middleware", () => {
       fastify.get(
         "/protected",
         {
-          onRequest: (request, reply, done) => {
+          onRequest: (request: any, reply: any, done: any) => {
             (request.session as any).user = mockUser;
             return authenticate(request as any, reply as any)
               .then(done)
               .catch(done);
           },
         },
-        async (request) => {
+        async (request: any) => {
           requestUser = (request as any).user;
           return { ok: true };
         }
@@ -83,7 +88,7 @@ describe("Auth Middleware", () => {
       fastify.get(
         "/protected",
         {
-          onRequest: (request, reply, done) => {
+          onRequest: (request: any, reply: any, done: any) => {
             (request.session as any).user = invalidUser;
             return authenticate(request as any, reply as any)
               .then(done)
@@ -108,13 +113,10 @@ describe("Auth Middleware", () => {
     });
 
     it("should return 500 when session is undefined", async () => {
-      const originalConsoleError = console.error;
-      console.error = vi.fn();
-
       fastify.get(
         "/protected",
         {
-          onRequest: async (request, reply, done) => {
+          onRequest: async (request: any, reply: any, done: any) => {
             // Temporarily remove session
             const originalSession = (request as any).session;
             delete (request as any).session;
@@ -143,18 +145,16 @@ describe("Auth Middleware", () => {
         error: "Internal Server Error",
         message: "Unable to verify authentication",
       });
-      expect(console.error).toHaveBeenCalledWith(
-        "Auth error [authenticate]:",
-        "Session object is undefined"
+      expect(logger.logSecurityEvent).toHaveBeenCalledWith(
+        logger.LogEventType.AUTH_SESSION_INVALID,
+        {
+          context: "authenticate",
+          reason: "Session object is undefined",
+        }
       );
-
-      console.error = originalConsoleError;
     });
 
     it("should handle errors when accessing session properties", async () => {
-      const originalConsoleError = console.error;
-      console.error = vi.fn();
-
       // Create a mock session that throws when accessing user
       const throwingSession = {
         get user() {
@@ -165,7 +165,7 @@ describe("Auth Middleware", () => {
       fastify.get(
         "/protected",
         {
-          onRequest: async (request, reply, done) => {
+          onRequest: async (request: any, reply: any, done: any) => {
             // Replace session with throwing mock
             const originalSession = (request as any).session;
             (request as any).session = throwingSession;
@@ -193,9 +193,11 @@ describe("Auth Middleware", () => {
         error: "Internal Server Error",
         message: "Unable to verify authentication",
       });
-      expect(console.error).toHaveBeenCalled();
-
-      console.error = originalConsoleError;
+      expect(logger.logError).toHaveBeenCalledWith(
+        logger.LogEventType.AUTH_SESSION_INVALID,
+        { context: "authenticate" },
+        expect.any(Error)
+      );
     });
   });
 
@@ -206,7 +208,7 @@ describe("Auth Middleware", () => {
         {
           onRequest: optionalAuth,
         },
-        async (request) => {
+        async (request: any) => {
           return { authenticated: !!(request as any).user };
         }
       );
@@ -232,14 +234,14 @@ describe("Auth Middleware", () => {
       fastify.get(
         "/optional",
         {
-          onRequest: (request, reply, done) => {
+          onRequest: (request: any, reply: any, done: any) => {
             (request.session as any).user = mockUser;
             return optionalAuth(request as any, reply as any)
               .then(done)
               .catch(done);
           },
         },
-        async (request) => {
+        async (request: any) => {
           requestUser = (request as any).user;
           return { ok: true };
         }
@@ -265,14 +267,14 @@ describe("Auth Middleware", () => {
       fastify.get(
         "/optional",
         {
-          onRequest: (request, reply, done) => {
+          onRequest: (request: any, reply: any, done: any) => {
             (request.session as any).user = invalidUser;
             return optionalAuth(request as any, reply as any)
               .then(done)
               .catch(done);
           },
         },
-        async (request) => {
+        async (request: any) => {
           requestUser = (request as any).user;
           return { ok: true };
         }
@@ -288,13 +290,10 @@ describe("Auth Middleware", () => {
     });
 
     it("should continue without error when session is undefined", async () => {
-      const originalConsoleError = console.error;
-      console.error = vi.fn();
-
       fastify.get(
         "/optional",
         {
-          onRequest: async (request, reply, done) => {
+          onRequest: async (request: any, reply: any, done: any) => {
             const originalSession = (request as any).session;
             delete (request as any).session;
 
@@ -319,14 +318,9 @@ describe("Auth Middleware", () => {
       // optionalAuth handles undefined session gracefully - no error thrown, just returns early
       expect(response.statusCode).toBe(200);
       // No error logging for undefined session - early return is expected behavior
-
-      console.error = originalConsoleError;
     });
 
     it("should handle errors gracefully and continue", async () => {
-      const originalConsoleError = console.error;
-      console.error = vi.fn();
-
       // Create a mock session that throws when accessing user
       const throwingSession = {
         get user() {
@@ -337,7 +331,7 @@ describe("Auth Middleware", () => {
       fastify.get(
         "/optional",
         {
-          onRequest: async (request, reply, done) => {
+          onRequest: async (request: any, reply: any, done: any) => {
             const originalSession = (request as any).session;
             (request as any).session = throwingSession;
 
@@ -361,9 +355,11 @@ describe("Auth Middleware", () => {
 
       // Should continue without error (optionalAuth never blocks)
       expect(response.statusCode).toBe(200);
-      expect(console.error).toHaveBeenCalled();
-
-      console.error = originalConsoleError;
+      expect(logger.logError).toHaveBeenCalledWith(
+        logger.LogEventType.AUTH_SESSION_INVALID,
+        { context: "optionalAuth" },
+        expect.any(Error)
+      );
     });
   });
 
@@ -399,7 +395,7 @@ describe("Auth Middleware", () => {
       fastify.get(
         "/admin",
         {
-          onRequest: (request, reply, done) => {
+          onRequest: (request: any, reply: any, done: any) => {
             (request.session as any).user = mockUser;
             return ownerAuth(request as any, reply as any)
               .then(done)
@@ -435,14 +431,14 @@ describe("Auth Middleware", () => {
       fastify.get(
         "/admin",
         {
-          onRequest: (request, reply, done) => {
+          onRequest: (request: any, reply: any, done: any) => {
             (request.session as any).user = mockUser;
             return ownerAuth(request as any, reply as any)
               .then(done)
               .catch(done);
           },
         },
-        async (request) => {
+        async (request: any) => {
           requestUser = (request as any).user;
           return { ok: true };
         }
@@ -469,7 +465,7 @@ describe("Auth Middleware", () => {
       fastify.get(
         "/content",
         {
-          onRequest: (request, reply, done) => {
+          onRequest: (request: any, reply: any, done: any) => {
             (request.session as any).user = readerUser;
             return multiRoleAuth(request as any, reply as any)
               .then(done)
@@ -498,7 +494,7 @@ describe("Auth Middleware", () => {
       fastify.get(
         "/admin",
         {
-          onRequest: (request, reply, done) => {
+          onRequest: (request: any, reply: any, done: any) => {
             (request.session as any).user = invalidUser;
             return ownerAuth(request as any, reply as any)
               .then(done)
@@ -523,13 +519,10 @@ describe("Auth Middleware", () => {
     });
 
     it("should return 500 when session is undefined", async () => {
-      const originalConsoleError = console.error;
-      console.error = vi.fn();
-
       fastify.get(
         "/admin",
         {
-          onRequest: async (request, reply, done) => {
+          onRequest: async (request: any, reply: any, done: any) => {
             const originalSession = (request as any).session;
             delete (request as any).session;
 
@@ -552,18 +545,20 @@ describe("Auth Middleware", () => {
       });
 
       expect(response.statusCode).toBe(500);
-      expect(console.error).toHaveBeenCalledWith(
-        "Auth error [requireRole]:",
-        "Session object is undefined"
+      expect(JSON.parse(response.payload)).toEqual({
+        error: "Internal Server Error",
+        message: "Unable to verify authentication",
+      });
+      expect(logger.logSecurityEvent).toHaveBeenCalledWith(
+        logger.LogEventType.AUTH_SESSION_INVALID,
+        {
+          context: "requireRole",
+          reason: "Session object is undefined",
+        }
       );
-
-      console.error = originalConsoleError;
     });
 
     it("should handle errors when accessing session properties", async () => {
-      const originalConsoleError = console.error;
-      console.error = vi.fn();
-
       const throwingSession = {
         get user() {
           throw new Error("Session storage error");
@@ -573,7 +568,7 @@ describe("Auth Middleware", () => {
       fastify.get(
         "/admin",
         {
-          onRequest: async (request, reply, done) => {
+          onRequest: async (request: any, reply: any, done: any) => {
             const originalSession = (request as any).session;
             (request as any).session = throwingSession;
 
@@ -598,11 +593,13 @@ describe("Auth Middleware", () => {
       expect(response.statusCode).toBe(500);
       expect(JSON.parse(response.payload)).toEqual({
         error: "Internal Server Error",
-        message: "Unable to verify authorization",
+        message: "Unable to verify authentication",
       });
-      expect(console.error).toHaveBeenCalled();
-
-      console.error = originalConsoleError;
+      expect(logger.logError).toHaveBeenCalledWith(
+        logger.LogEventType.AUTH_SESSION_INVALID,
+        { context: "requireRole" },
+        expect.any(Error)
+      );
     });
   });
 });

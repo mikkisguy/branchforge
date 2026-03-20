@@ -16,6 +16,7 @@ import type { Session } from "fastify";
 import { getDb } from "../db/index.js";
 import { userSessions } from "../db/schema/index.js";
 import { eq, lt } from "drizzle-orm";
+import { logError, logWarn, logInfo, LogEventType, redactSensitiveKey } from "../lib/logger.js";
 
 type Callback = (err?: Error | null) => void;
 type CallbackSession = (err: Error | null, result?: Session | null) => void;
@@ -76,7 +77,9 @@ class DeadLetterQueue {
         this.alertCallback(entry);
       } catch (err) {
         // Log but don't throw - alert callback failures shouldn't disrupt session flow
-        console.error("DeadLetterQueue alert callback error:", err);
+        logError(LogEventType.SESSION_STORE_ERROR, {
+          event: "dead_letter_alert_callback_failed",
+        }, err);
       }
     }
   }
@@ -105,7 +108,11 @@ function validateSessionData(
   for (const [key, value] of Object.entries(data)) {
     // Only allow whitelisted keys
     if (!ALLOWED_SESSION_KEYS.has(key)) {
-      console.warn(`Session store: Skipping unknown session key "${key}"`);
+      logWarn(LogEventType.SESSION_STORE_VALIDATION, {
+        event: "session_validation_skipped",
+        reason: "unknown_key",
+        key: redactSensitiveKey(key),
+      });
       continue;
     }
 
@@ -118,15 +125,22 @@ function validateSessionData(
       for (const [nestedKey, nestedValue] of Object.entries(nestedObj)) {
         // Limit nested object size and key length
         if (Object.keys(sanitizedNested).length >= 50) {
-          console.warn(
-            `Session store: Too many keys in nested object "${key}"`
-          );
+          logWarn(LogEventType.SESSION_STORE_VALIDATION, {
+            event: "session_validation_skipped",
+            reason: "too_many_nested_keys",
+            key: redactSensitiveKey(key),
+            maxKeys: 50,
+          });
           break;
         }
         if (nestedKey.length > 100) {
-          console.warn(
-            `Session store: Nested key too long in "${key}.${nestedKey}"`
-          );
+          logWarn(LogEventType.SESSION_STORE_VALIDATION, {
+            event: "session_validation_skipped",
+            reason: "nested_key_too_long",
+            key: redactSensitiveKey(key),
+            nestedKey: redactSensitiveKey(nestedKey),
+            maxLength: 100,
+          });
           continue;
         }
 
@@ -154,7 +168,11 @@ function validateSessionData(
       // Allow primitive values
       sanitized[key] = value;
     } else {
-      console.warn(`Session store: Skipping invalid value for key "${key}"`);
+      logWarn(LogEventType.SESSION_STORE_VALIDATION, {
+        event: "session_validation_skipped",
+        reason: "invalid_value_type",
+        key: redactSensitiveKey(key),
+      });
     }
   }
 
@@ -298,10 +316,11 @@ export class DrizzleSessionStore implements SessionStore {
         retryCount: this.retryOptions.maxRetries,
       });
 
-      console.error(
-        `Session store: Failed to save session "${sessionId}" after ${this.retryOptions.maxRetries} retries:`,
-        err
-      );
+      logError(LogEventType.SESSION_STORE_ERROR, {
+        event: "session_set_failed",
+        sessionId,
+        retryCount: this.retryOptions.maxRetries,
+      }, err);
     });
   }
 
@@ -343,7 +362,10 @@ export class DrizzleSessionStore implements SessionStore {
           },
         });
     } catch (error) {
-      console.error("Session store set error:", error);
+      logWarn(LogEventType.SESSION_STORE_ERROR, {
+        event: "session_set_async_error",
+        sessionId,
+      }); // Log warning for retriable failures - final exhaustion logged by set()
       throw error;
     }
   }
@@ -360,7 +382,10 @@ export class DrizzleSessionStore implements SessionStore {
     this.getAsync(sessionId)
       .then((session) => callback(null, session))
       .catch((err) => {
-        console.error("Session store get error:", err);
+        logError(LogEventType.SESSION_STORE_ERROR, {
+          event: "session_get_error",
+          sessionId,
+        }, err);
         // Return null on error - session will be treated as not found
         callback(null, null);
       });
@@ -393,8 +418,7 @@ export class DrizzleSessionStore implements SessionStore {
 
       return dbDataToSession(row as SessionRow);
     } catch (error) {
-      console.error("Session store get error:", error);
-      throw error;
+      throw error; // Rethrow without logging - get() handles the error logging
     }
   }
 
@@ -426,10 +450,11 @@ export class DrizzleSessionStore implements SessionStore {
         retryCount: this.retryOptions.maxRetries,
       });
 
-      console.error(
-        `Session store: Failed to destroy session "${sessionId}" after ${this.retryOptions.maxRetries} retries:`,
-        err
-      );
+      logError(LogEventType.SESSION_STORE_ERROR, {
+        event: "session_destroy_failed",
+        sessionId,
+        retryCount: this.retryOptions.maxRetries,
+      }, err);
     });
   }
 
@@ -441,7 +466,10 @@ export class DrizzleSessionStore implements SessionStore {
       const db = getDb();
       await db.delete(userSessions).where(eq(userSessions.id, sessionId));
     } catch (error) {
-      console.error("Session store destroy error:", error);
+      logWarn(LogEventType.SESSION_STORE_ERROR, {
+        event: "session_destroy_async_error",
+        sessionId,
+      }); // Log warning for retriable failures - final exhaustion logged by destroy()
       throw error;
     }
   }
@@ -463,7 +491,9 @@ export class DrizzleSessionStore implements SessionStore {
 
       return result.rowCount ?? 0;
     } catch (error) {
-      console.error("Session store cleanup error:", error);
+      logError(LogEventType.SESSION_STORE_ERROR, {
+        event: "session_cleanup_error",
+      }, error);
       return 0;
     }
   }
@@ -481,9 +511,10 @@ export class DrizzleSessionStore implements SessionStore {
       const count = await this.cleanExpiredSessions();
       const duration = Date.now() - startTime;
       if (count > 0) {
-        console.log(
-          `Session store: Cleaned up ${count} expired sessions (${duration}ms)`
-        );
+        logInfo(LogEventType.SESSION_STORE_CLEANUP, {
+          sessionsCleaned: count,
+          durationMs: duration,
+        });
       }
     }, this.cleanupIntervalMs);
 

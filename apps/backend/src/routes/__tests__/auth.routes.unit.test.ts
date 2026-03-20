@@ -6,6 +6,7 @@ import { authRoutes } from "../auth.routes.js";
 import * as authService from "../../services/auth.service.js";
 import * as rateLimiter from "../../services/rate-limiter.service.js";
 import type { PublicUser } from "../../middleware/auth.middleware.js";
+import * as logger from "../../lib/logger.js";
 
 // Mock the auth service and rate limiter
 vi.mock("../../services/auth.service.js", () => ({
@@ -18,14 +19,13 @@ vi.mock("../../services/rate-limiter.service.js", () => ({
   clearRateLimit: vi.fn(),
 }));
 
-// Mock console.error to avoid noise in tests
-const originalConsoleError = console.error;
 beforeEach(() => {
-  console.error = vi.fn();
+  // Mock logger functions
+  vi.spyOn(logger, "logSecurityEvent").mockImplementation(() => {});
+  vi.spyOn(logger, "logInfo").mockImplementation(() => {});
 });
 
 afterEach(() => {
-  console.error = originalConsoleError;
   vi.clearAllMocks();
 });
 
@@ -89,9 +89,12 @@ describe("Auth Routes (Unit)", () => {
       expect(JSON.parse(response.payload)).toEqual({
         error: "Invalid registration data",
       });
-      expect(console.error).toHaveBeenCalledWith(
-        "Registration error:",
-        "Invalid email format"
+      expect(logger.logSecurityEvent).toHaveBeenCalledWith(
+        logger.LogEventType.AUTH_REGISTRATION_FAILURE,
+        {
+          message: "Invalid email format",
+        },
+        expect.any(Error)
       );
     });
 
@@ -113,9 +116,12 @@ describe("Auth Routes (Unit)", () => {
       expect(JSON.parse(response.payload)).toEqual({
         error: "Invalid registration data",
       });
-      expect(console.error).toHaveBeenCalledWith(
-        "Registration error:",
-        "Password must be at least 8 characters"
+      expect(logger.logSecurityEvent).toHaveBeenCalledWith(
+        logger.LogEventType.AUTH_REGISTRATION_FAILURE,
+        {
+          message: "Password must be at least 8 characters",
+        },
+        expect.any(Error)
       );
     });
 
@@ -137,9 +143,12 @@ describe("Auth Routes (Unit)", () => {
       expect(JSON.parse(response.payload)).toEqual({
         error: "Invalid registration data",
       });
-      expect(console.error).toHaveBeenCalledWith(
-        "Registration error:",
-        "Email already registered"
+      expect(logger.logSecurityEvent).toHaveBeenCalledWith(
+        logger.LogEventType.AUTH_REGISTRATION_FAILURE,
+        {
+          message: "Email already registered",
+        },
+        expect.any(Error)
       );
     });
 
@@ -161,9 +170,12 @@ describe("Auth Routes (Unit)", () => {
       expect(JSON.parse(response.payload)).toEqual({
         error: "Invalid registration data",
       });
-      expect(console.error).toHaveBeenCalledWith(
-        "Registration error:",
-        "Registration is currently disabled"
+      expect(logger.logSecurityEvent).toHaveBeenCalledWith(
+        logger.LogEventType.AUTH_REGISTRATION_FAILURE,
+        {
+          message: "Registration is currently disabled",
+        },
+        expect.any(Error)
       );
     });
   });

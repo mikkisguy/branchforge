@@ -8,6 +8,7 @@
 
 import type { FastifyRequest, FastifyReply } from "fastify";
 import type { PublicUser, UserRole } from "@branchforge/shared";
+import { logSecurityEvent, logError, LogEventType } from "../lib/logger.js";
 
 export type { PublicUser };
 
@@ -41,22 +42,6 @@ interface InternalError {
 }
 
 /**
- * Log authentication errors for debugging
- * In production, consider using a structured logging service
- */
-function logAuthError(context: string, error: unknown): void {
-  if (error instanceof Error) {
-    console.error(`Auth error [${context}]:`, error.message);
-    // Don't log stack traces in production to avoid leaking implementation details
-    if (process.env.NODE_ENV !== "production") {
-      console.error(error.stack);
-    }
-  } else {
-    console.error(`Auth error [${context}]:`, error);
-  }
-}
-
-/**
  * onRequest hook to verify user is authenticated
  *
  * Checks if a user object exists in the session. If not, returns 401 Unauthorized.
@@ -76,7 +61,10 @@ export async function authenticate(
 
     // Check if session exists
     if (!session) {
-      logAuthError("authenticate", "Session object is undefined");
+      logSecurityEvent(LogEventType.AUTH_SESSION_INVALID, {
+        context: "authenticate",
+        reason: "Session object is undefined",
+      });
       const error: InternalError = {
         error: "Internal Server Error",
         message: "Unable to verify authentication",
@@ -97,7 +85,10 @@ export async function authenticate(
 
     // Validate session user data structure
     if (!session.user.id || !session.user.email || !session.user.role) {
-      logAuthError("authenticate", "Invalid session user data structure");
+      logSecurityEvent(LogEventType.AUTH_SESSION_INVALID, {
+        context: "authenticate",
+        reason: "Invalid session user data structure",
+      });
       // Treat invalid session data as not authenticated
       const error: AuthError = {
         error: "Unauthorized",
@@ -111,7 +102,9 @@ export async function authenticate(
     request.user = session.user;
   } catch (error) {
     // Handle unexpected errors (session storage issues, etc.)
-    logAuthError("authenticate", error);
+    logError(LogEventType.AUTH_SESSION_INVALID, {
+      context: "authenticate",
+    }, error);
     const internalError: InternalError = {
       error: "Internal Server Error",
       message: "Unable to verify authentication",
@@ -151,7 +144,9 @@ export async function optionalAuth(
     // If no user in session or invalid data, continue without error
   } catch (error) {
     // Log error but don't block the request
-    logAuthError("optionalAuth", error);
+    logError(LogEventType.AUTH_SESSION_INVALID, {
+      context: "optionalAuth",
+    }, error);
     // Continue without authentication
   }
 }
@@ -179,7 +174,10 @@ export function requireRole(...allowedRoles: UserRole[]) {
 
       // Check if session exists
       if (!session) {
-        logAuthError("requireRole", "Session object is undefined");
+        logSecurityEvent(LogEventType.AUTH_SESSION_INVALID, {
+          context: "requireRole",
+          reason: "Session object is undefined",
+        });
         const error: InternalError = {
           error: "Internal Server Error",
           message: "Unable to verify authentication",
@@ -200,7 +198,10 @@ export function requireRole(...allowedRoles: UserRole[]) {
 
       // Validate session user data structure
       if (!session.user.id || !session.user.email || !session.user.role) {
-        logAuthError("requireRole", "Invalid session user data structure");
+        logSecurityEvent(LogEventType.AUTH_SESSION_INVALID, {
+          context: "requireRole",
+          reason: "Invalid session user data structure",
+        });
         const error: AuthError = {
           error: "Unauthorized",
           message: "Invalid session",
@@ -223,10 +224,12 @@ export function requireRole(...allowedRoles: UserRole[]) {
       request.user = session.user;
     } catch (error) {
       // Handle unexpected errors
-      logAuthError("requireRole", error);
+      logError(LogEventType.AUTH_SESSION_INVALID, {
+        context: "requireRole",
+      }, error);
       const internalError: InternalError = {
         error: "Internal Server Error",
-        message: "Unable to verify authorization",
+        message: "Unable to verify authentication",
       };
       reply.status(500).send(internalError);
     }

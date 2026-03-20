@@ -15,6 +15,7 @@ import type { FastifyInstance } from "fastify";
 import type { DrizzleSessionStore } from "../services/session-store.service.js";
 import { closeDb } from "../db/index.js";
 import { cleanupRateLimiter as cleanupRateLimiterService } from "../services/rate-limiter.service.js";
+import { logInfo, logError, logWarn, LogEventType } from "./logger.js";
 
 /**
  * Shutdown state tracking
@@ -62,25 +63,33 @@ export async function gracefulShutdown(
   exitCode = 0
 ): Promise<void> {
   if (isShuttingDown) {
-    console.log("Shutdown already in progress, ignoring duplicate signal");
+    logWarn(LogEventType.SERVICE_SHUTDOWN_ERROR, {
+      reason: "duplicate_signal",
+    });
     return;
   }
 
   isShuttingDown = true;
-  const signalMsg = signal ? ` (${signal})` : "";
-  console.log(
-    `\n${new Date().toISOString()} - Starting graceful shutdown${signalMsg}`
-  );
+
+  logInfo(LogEventType.SERVICE_SHUTDOWN_START, {
+    signal: signal ?? null,
+  });
 
   const startTime = Date.now();
   const SHUTDOWN_TIMEOUT = 10000; // 10 seconds max
 
   try {
     // Step 1: Stop accepting new connections
-    console.log("  [1/4] Stopping HTTP server...");
+    logInfo(LogEventType.SERVICE_SHUTDOWN_STEP, {
+      step: 1,
+      total: 4,
+      action: "stopping_http_server",
+    });
     await new Promise<void>((resolve) => {
       const timeout = setTimeout(() => {
-        console.warn("    Server close timeout, forcing shutdown");
+        logWarn(LogEventType.SERVICE_SHUTDOWN_ERROR, {
+          reason: "server_close_timeout",
+        });
         resolve();
       }, SHUTDOWN_TIMEOUT);
 
@@ -88,33 +97,52 @@ export async function gracefulShutdown(
         clearTimeout(timeout);
         if (err) {
           // Ignore errors during shutdown (server might already be closing)
-          console.warn("    Server close error:", err);
+          logWarn(LogEventType.SERVICE_SHUTDOWN_ERROR, {
+            reason: "server_close_error",
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
-        console.log("    HTTP server stopped");
         resolve();
       });
     });
 
     // Step 2: Cleanup rate limiter
-    console.log("  [2/4] Cleaning up rate limiter...");
+    logInfo(LogEventType.SERVICE_SHUTDOWN_STEP, {
+      step: 2,
+      total: 4,
+      action: "cleaning_rate_limiter",
+    });
     cleanupRateLimiterService();
-    console.log("    Rate limiter cleaned up");
 
     // Step 3: Cleanup session store
-    console.log("  [3/4] Cleaning up session store...");
+    logInfo(LogEventType.SERVICE_SHUTDOWN_STEP, {
+      step: 3,
+      total: 4,
+      action: "cleaning_session_store",
+    });
     sessionStore.cleanup();
-    console.log("    Session store cleaned up");
 
     // Step 4: Close database connections
-    console.log("  [4/4] Closing database connections...");
+    logInfo(LogEventType.SERVICE_SHUTDOWN_STEP, {
+      step: 4,
+      total: 4,
+      action: "closing_database",
+    });
     await closeDb();
-    console.log("    Database connections closed");
 
     const duration = Date.now() - startTime;
-    console.log(`✓ Graceful shutdown completed in ${duration}ms`);
+    logInfo(LogEventType.SERVICE_SHUTDOWN_COMPLETE, {
+      durationMs: duration,
+    });
     process.exit(exitCode);
   } catch (error) {
-    console.error("✗ Error during graceful shutdown:", error);
+    logError(
+      LogEventType.SERVICE_SHUTDOWN_ERROR,
+      {
+        phase: "graceful_shutdown",
+      },
+      error
+    );
     process.exit(1);
   }
 }
@@ -138,7 +166,13 @@ export function setupShutdownHandlers(
   // Handle SIGTERM (standard termination signal from Docker, systemd, etc.)
   process.on("SIGTERM", () => {
     gracefulShutdown(server, sessionStore, "SIGTERM").catch((err) => {
-      console.error("Error during SIGTERM shutdown:", err);
+      logError(
+        LogEventType.SERVICE_SHUTDOWN_ERROR,
+        {
+          signal: "SIGTERM",
+        },
+        err
+      );
       process.exit(1);
     });
   });
@@ -146,29 +180,56 @@ export function setupShutdownHandlers(
   // Handle SIGINT (Ctrl+C)
   process.on("SIGINT", () => {
     gracefulShutdown(server, sessionStore, "SIGINT").catch((err) => {
-      console.error("Error during SIGINT shutdown:", err);
+      logError(
+        LogEventType.SERVICE_SHUTDOWN_ERROR,
+        {
+          signal: "SIGINT",
+        },
+        err
+      );
       process.exit(1);
     });
   });
 
   // Handle uncaught exceptions
   process.on("uncaughtException", (err) => {
-    console.error("Uncaught Exception:", err);
+    logError(
+      LogEventType.SERVICE_SHUTDOWN_ERROR,
+      {
+        signal: "uncaughtException",
+      },
+      err
+    );
     // Attempt graceful shutdown, but exit with error code
     gracefulShutdown(server, sessionStore, "uncaughtException", 1).catch(
       (shutdownErr) => {
-        console.error("Error during uncaughtException shutdown:", shutdownErr);
+        logError(
+          LogEventType.SERVICE_SHUTDOWN_ERROR,
+          {
+            signal: "uncaughtException",
+            phase: "shutdown",
+          },
+          shutdownErr
+        );
         process.exit(1);
       }
     );
   });
 
   // Handle unhandled promise rejections
-  process.on("unhandledRejection", (reason, promise) => {
-    console.error("Unhandled Rejection at:", promise, "reason:", reason);
+  process.on("unhandledRejection", (reason, _promise) => {
+    logError(
+      LogEventType.SERVICE_SHUTDOWN_ERROR,
+      {
+        signal: "unhandledRejection",
+      },
+      reason
+    );
     // Log but don't exit - some promise rejections are non-fatal
     // However, if too many occur, we should shut down
-    console.warn("Continuing execution despite unhandled rejection");
+    logWarn(LogEventType.SERVICE_SHUTDOWN_ERROR, {
+      note: "continuing_execution_despite_unhandled_rejection",
+    });
   });
 }
 
@@ -195,7 +256,10 @@ export async function shutdownForTest(
   await new Promise<void>((resolve) => {
     server.close((err?: Error) => {
       if (err) {
-        console.warn("Error closing server in test:", err.message);
+        logWarn(LogEventType.SERVICE_SHUTDOWN_ERROR, {
+          context: "test_shutdown",
+          error: err.message,
+        });
       }
       resolve();
     });

@@ -115,7 +115,7 @@ const start = async () => {
 
     const port = parseInt(process.env.PORT ?? "3000", 10);
     await server.listen({ port, host: "0.0.0.0" });
-    console.log(`Server listening on port ${port}`);
+    server.log.info(`Server listening on port ${port}`);
 
     // Setup graceful shutdown handlers after server is ready
     setupShutdownHandlers(server, sessionStore);

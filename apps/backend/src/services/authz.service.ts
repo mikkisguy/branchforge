@@ -21,6 +21,7 @@ import {
   ForbiddenError,
 } from "../middleware/error-handler.middleware.js";
 import { UserRole, isValidUserRole, ROLE_HIERARCHY } from "@branchforge/shared";
+import { logWarn, LogEventType } from "../lib/logger.js";
 
 // ============================================================================
 // Project Authorization
@@ -148,9 +149,11 @@ export async function getProjectRole(
       return role;
     }
     // Log unexpected role value and treat as no access
-    console.error(
-      `[authz.service] Unexpected role value in project_users: "${role}" for project ${projectId}, user ${userId}`
-    );
+    logWarn(LogEventType.AUTHZ_UNEXPECTED_ROLE, {
+      role,
+      projectId,
+      userId,
+    });
     return null;
   }
 
@@ -318,9 +321,12 @@ export async function getLabelRole(
       return role;
     }
     // Log unexpected role value and treat as no access
-    console.error(
-      `[authz.service] Unexpected role value in project_users: "${role}" for label ${labelId}, user ${userId}`
-    );
+    logWarn(LogEventType.AUTHZ_UNEXPECTED_ROLE, {
+      role,
+      labelId,
+      projectId,
+      userId,
+    });
     return null;
   }
 
