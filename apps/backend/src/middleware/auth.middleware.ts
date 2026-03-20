@@ -229,7 +229,7 @@ export function requireRole(...allowedRoles: UserRole[]) {
       }, error);
       const internalError: InternalError = {
         error: "Internal Server Error",
-        message: "Unable to verify authorization",
+        message: "Unable to verify authentication",
       };
       reply.status(500).send(internalError);
     }

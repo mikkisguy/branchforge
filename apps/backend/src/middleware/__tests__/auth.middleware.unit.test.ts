@@ -547,7 +547,7 @@ describe("Auth Middleware", () => {
       expect(response.statusCode).toBe(500);
       expect(JSON.parse(response.payload)).toEqual({
         error: "Internal Server Error",
-        message: "Unable to verify authorization",
+        message: "Unable to verify authentication",
       });
       expect(logger.logSecurityEvent).toHaveBeenCalledWith(
         logger.LogEventType.AUTH_SESSION_INVALID,
@@ -593,7 +593,7 @@ describe("Auth Middleware", () => {
       expect(response.statusCode).toBe(500);
       expect(JSON.parse(response.payload)).toEqual({
         error: "Internal Server Error",
-        message: "Unable to verify authorization",
+        message: "Unable to verify authentication",
       });
       expect(logger.logError).toHaveBeenCalledWith(
         logger.LogEventType.AUTH_SESSION_INVALID,
