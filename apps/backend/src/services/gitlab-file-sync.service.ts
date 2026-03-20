@@ -254,14 +254,12 @@ export async function syncLabelsFromGitLabFile(
   };
 
   try {
-    // Step 1: Parse RPY content
-    const parsed = parseRPYFileWithLabels(rpyContent);
-
-    // Step 2: Get file info for projectId and validate file type
+    // Step 1: Get file info for projectId, filePath, and validate file type
     const [file] = await db
       .select({
         projectId: gitlabFiles.projectId,
         fileType: gitlabFiles.fileType,
+        filePath: gitlabFiles.filePath,
       })
       .from(gitlabFiles)
       .where(eq(gitlabFiles.id, gitlabFileId))
@@ -270,6 +268,9 @@ export async function syncLabelsFromGitLabFile(
     if (!file) {
       throw new Error("GitLab file not found");
     }
+
+    // Step 2: Parse RPY content with filename for better file type detection
+    const parsed = parseRPYFileWithLabels(rpyContent, file.filePath);
 
     // Step 3: Calculate content hash
     const contentHash = calculateContentHash(rpyContent);
