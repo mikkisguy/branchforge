@@ -52,6 +52,7 @@ import {
 import { eq } from "drizzle-orm";
 import { getAvatarFullPath } from "../../lib/storage.js";
 import { AVATAR_MAX_SIZE, AVATAR_MAX_SIZE_MB } from "@branchforge/shared";
+import { getUploadsDirPath } from "../../lib/storage.js";
 
 // Test data fixtures
 const testUserId = testUuid("02000000", 1);
@@ -106,6 +107,31 @@ describe("Character Avatar Routes (Integration)", () => {
   let fastify: ReturnType<typeof Fastify>;
   let characterId: string;
   let originalBasePath: string | undefined;
+  // Track avatar filenames created during tests for cleanup
+  const createdAvatarFiles = new Set<string>();
+
+  // Helper to clean up orphaned avatar files from filesystem
+  async function cleanupAvatarFiles(): Promise<void> {
+    if (createdAvatarFiles.size === 0) {
+      return;
+    }
+
+    const avatarDirPath = path.join(getUploadsDirPath(), "avatars");
+    await Promise.all(
+      [...createdAvatarFiles].map(async (filename) => {
+        const filePath = path.join(avatarDirPath, filename);
+        try {
+          await fs.unlink(filePath);
+        } catch (error) {
+          // Ignore ENOENT (file already deleted) - this is fine
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+            console.error(`Failed to delete avatar file ${filename}:`, error);
+          }
+        }
+      })
+    );
+    createdAvatarFiles.clear();
+  }
 
   // Helper to clean up all test data
   async function cleanupTestData() {
@@ -173,6 +199,8 @@ describe("Character Avatar Routes (Integration)", () => {
   afterAll(async () => {
     // Clean up any test data that may remain if tests were interrupted
     await cleanupTestData();
+    // Clean up any orphaned avatar files from filesystem
+    await cleanupAvatarFiles();
     // Ensure fastify instance is closed
     if (fastify) {
       await fastify.close();
@@ -303,6 +331,9 @@ describe("Character Avatar Routes (Integration)", () => {
       expect(body.avatarUrl).toMatch(
         /^(\/[\w-]+)*\/uploads\/avatars\/[\w-]+\.webp$/
       );
+
+      // Track the created file for cleanup
+      createdAvatarFiles.add(path.basename(body.avatarUrl));
 
       // Verify avatar was saved to database
       const [updatedChar] = await db
@@ -453,6 +484,9 @@ describe("Character Avatar Routes (Integration)", () => {
         /^(\/[\w-]+)*\/uploads\/avatars\/[\w-]+\.webp$/
       );
 
+      // Track the created file for cleanup
+      createdAvatarFiles.add(path.basename(firstBody.avatarUrl));
+
       const firstAvatarUrl = firstBody.avatarUrl;
       const firstAvatarFilename = path.basename(firstAvatarUrl);
       const firstAvatarFullPath = getAvatarFullPath(firstAvatarFilename);
@@ -482,6 +516,9 @@ describe("Character Avatar Routes (Integration)", () => {
       expect(secondBody.avatarUrl).toMatch(
         /^(\/[\w-]+)*\/uploads\/avatars\/[\w-]+\.webp$/
       );
+
+      // Track the created file for cleanup
+      createdAvatarFiles.add(path.basename(secondBody.avatarUrl));
 
       const secondAvatarUrl = secondBody.avatarUrl;
 
@@ -529,6 +566,8 @@ describe("Character Avatar Routes (Integration)", () => {
 
       expect(firstResponse.statusCode).toBe(200);
       const firstBody = firstResponse.json();
+      // Track the created file for cleanup
+      createdAvatarFiles.add(path.basename(firstBody.avatarUrl));
       const firstAvatarFullPath = getAvatarFullPath(
         path.basename(firstBody.avatarUrl)
       );
@@ -611,6 +650,9 @@ describe("Character Avatar Routes (Integration)", () => {
       expect(uploadBody.avatarUrl).toMatch(
         /^(\/[\w-]+)*\/uploads\/avatars\/[\w-]+\.webp$/
       );
+
+      // Track the created file for cleanup (though it should be deleted by the test)
+      createdAvatarFiles.add(path.basename(uploadBody.avatarUrl));
 
       // Capture the avatar file path before deletion
       const avatarFilename = path.basename(uploadBody.avatarUrl);
@@ -713,6 +755,8 @@ describe("Character Avatar Routes (Integration)", () => {
 
       expect(uploadResponse.statusCode).toBe(200);
       const uploadBody = uploadResponse.json();
+      // Track the created file for cleanup (though it should be deleted by the test)
+      createdAvatarFiles.add(path.basename(uploadBody.avatarUrl));
       const avatarUrl = uploadBody.avatarUrl;
 
       // Extract filename from avatarUrl (format: "uploads/avatars/{filename}.webp")
