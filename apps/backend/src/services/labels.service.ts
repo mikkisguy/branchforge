@@ -26,6 +26,7 @@ import {
   NotFoundError,
   ForbiddenError,
 } from "../middleware/error-handler.middleware.js";
+import { logWarn, LogEventType } from "../lib/logger.js";
 
 // Re-export PublicLabel from shared for route handlers
 export type { PublicLabel };
@@ -424,9 +425,11 @@ export async function createLabel(
     );
     if (!routeExists) {
       // Coerce to null if route doesn't exist
-      console.warn(
-        `Label service: Route "${validatedRoute}" does not exist in route_configs for project ${data.projectId}. Coercing to null.`
-      );
+      logWarn(LogEventType.VALIDATION_WARNING, {
+        event: "invalid_route_configuration",
+        route: validatedRoute,
+        projectId: data.projectId,
+      });
       validatedRoute = null;
     }
   }
@@ -504,9 +507,11 @@ export async function updateLabel(
     );
     if (!routeExists) {
       // Coerce to null if route doesn't exist
-      console.warn(
-        `Label service: Route "${validatedRoute}" does not exist in route_configs for project ${labelWithProject.label.projectId}. Coercing to null.`
-      );
+      logWarn(LogEventType.VALIDATION_WARNING, {
+        event: "invalid_route_configuration",
+        route: validatedRoute,
+        projectId: labelWithProject.label.projectId,
+      });
       validatedRoute = null;
     }
   }

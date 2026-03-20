@@ -8,6 +8,7 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import * as schema from "./schema/index.js";
+import { logError, logInfo, LogEventType } from "../lib/logger.js";
 
 // Export the database type for use in other modules
 export type Db = ReturnType<typeof drizzle<typeof schema>>;
@@ -45,6 +46,11 @@ export function getDb() {
     });
 
     db = drizzle(pool, { schema });
+
+    // Log pool creation (not actual connection - pg.Pool is lazy)
+    logInfo(LogEventType.DB_POOL_CREATED, {
+      environment: process.env.NODE_ENV ?? "development",
+    });
   }
 
   return db;
@@ -63,7 +69,7 @@ export async function closeDb(): Promise<void> {
       pool = null;
       db = null;
     } catch (error) {
-      console.error("Error closing database pool:", error);
+      logError(LogEventType.DB_POOL_CLOSING_ERROR, {}, error);
       // Still clear references even if close fails
       pool = null;
       db = null;

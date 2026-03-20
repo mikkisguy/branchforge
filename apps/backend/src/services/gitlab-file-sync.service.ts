@@ -27,6 +27,7 @@ import {
   type ParsedRPYFileWithLabels,
 } from "./rpy-parser.service.js";
 import { calculateContentHash, calculateLinesHash } from "../lib/hash.js";
+import { logError, LogEventType } from "../lib/logger.js";
 
 // ============================================================================
 // Types
@@ -509,8 +510,10 @@ export async function syncLabelsFromGitLabFile(
       // Step 10-11: Update metadata (contentHash and syncState)
       // These operations run after the main transaction commits. If they fail,
       // we log the inconsistency but do not rethrow, since the core work is done.
+      // Each operation is isolated so that one failure doesn't block the other.
+
+      // Step 10: Update gitlabFiles contentHash and updatedAt
       try {
-        // Step 10: Update gitlabFiles contentHash and updatedAt
         await db
           .update(gitlabFiles)
           .set({
@@ -518,39 +521,48 @@ export async function syncLabelsFromGitLabFile(
             updatedAt: new Date(),
           })
           .where(eq(gitlabFiles.id, gitlabFileId));
+      } catch (gitlabFilesError) {
+        const errorMessage =
+          gitlabFilesError instanceof Error
+            ? gitlabFilesError.message
+            : "Unknown error";
+        logError(
+          LogEventType.SERVICE_ERROR,
+          {
+            event: "gitlab_files_metadata_update_failed",
+            gitlabFileId,
+            contentHash,
+            syncStateId,
+            error: errorMessage,
+          },
+          gitlabFilesError
+        );
+      }
 
-        // Step 11: Complete sync state
+      // Step 11: Complete sync state (critical for unblocking checkInProgressSync)
+      try {
         await completeSyncState(
           syncStateId,
           true,
           syncResult.labelsCreated + syncResult.labelsUpdated
         );
-      } catch (metadataError) {
-        // Metadata update failed but transaction already committed.
-        // Log the inconsistency for investigation without failing the sync.
+      } catch (syncStateError) {
+        // This is critical - if it fails, checkInProgressSync will block future syncs
         const errorMessage =
-          metadataError instanceof Error
-            ? metadataError.message
+          syncStateError instanceof Error
+            ? syncStateError.message
             : "Unknown error";
-        const errorDetails = {
-          gitlabFileId,
-          contentHash,
-          syncStateId,
-          syncResultSummary: {
-            labelsCreated: syncResult.labelsCreated,
-            labelsUpdated: syncResult.labelsUpdated,
-            labelsDeleted: syncResult.labelsDeleted,
-            linesProcessed: syncResult.linesProcessed,
-            errorCount: syncResult.errors.length,
+        logError(
+          LogEventType.SERVICE_ERROR,
+          {
+            event: "sync_state_completion_failed",
+            gitlabFileId,
+            syncStateId,
+            error: errorMessage,
+            note: "Sync state record not completed - future syncs may be blocked",
           },
-          metadataError: errorMessage,
-        };
-        console.error(
-          `[GitLabFileSync] Metadata update failed after successful transaction. Data may be inconsistent: ${JSON.stringify(
-            errorDetails
-          )}`
+          syncStateError
         );
-        // Continue to return success - the core sync work is complete
       }
 
       // Return success

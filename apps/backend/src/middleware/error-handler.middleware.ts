@@ -12,6 +12,7 @@
 
 import type { FastifyError, FastifyRequest, FastifyReply } from "fastify";
 import { UPLOAD_MAX_SIZE_MB } from "@branchforge/shared";
+import { logError, LogEventType } from "../lib/logger.js";
 
 // ============================================================================
 // Custom Error Classes
@@ -136,36 +137,31 @@ export interface RateLimitResponse extends ErrorResponse {
 // ============================================================================
 
 /**
- * Log error details for debugging
- * In production, consider using a structured logging service
+ * Log HTTP error details using the structured logger
  *
  * @param context - Where the error occurred (e.g., route name, function name)
  * @param error - The error to log
  */
-export function logError(context: string, error: unknown): void {
-  const timestamp = new Date().toISOString();
+export function logHttpError(context: string, error: unknown): void {
+  const details: Record<string, unknown> = {
+    context,
+  };
 
   if (error instanceof HttpError) {
-    // Custom HTTP errors - log with context
-    console.error(`[${timestamp}] HTTP Error [${context}]:`, {
-      name: error.name,
-      statusCode: error.statusCode,
-      message: error.message,
-      details: error instanceof ValidationError ? error.details : undefined,
-    });
-  } else if (error instanceof Error) {
-    // Standard JavaScript errors
-    console.error(`[${timestamp}] Error [${context}]:`, error.message);
-
-    // Log stack trace in non-production environments
-    if (process.env.NODE_ENV !== "production") {
-      console.error(error.stack);
+    details.name = error.name;
+    details.statusCode = error.statusCode;
+    details.message = error.message;
+    if (error instanceof ValidationError) {
+      details.validationDetails = error.details;
     }
-  } else {
-    // Unknown error types
-    console.error(`[${timestamp}] Unknown error [${context}]:`, error);
+  } else if (error instanceof Error) {
+    details.name = error.name;
+    details.message = error.message;
   }
+
+  logError(LogEventType.SERVICE_ERROR, details, error);
 }
+
 
 /**
  * Log authentication/authorization errors
@@ -175,7 +171,7 @@ export function logError(context: string, error: unknown): void {
  * @param error - The error to log
  */
 export function logAuthError(context: string, error: unknown): void {
-  logError(`auth:${context}`, error);
+  logHttpError(`auth:${context}`, error);
 }
 
 // ============================================================================
@@ -203,7 +199,7 @@ export function globalErrorHandler(
 
   // Handle custom HTTP errors
   if (error instanceof HttpError) {
-    logError(route, error);
+    logHttpError(route, error);
 
     const response: ErrorResponse = {
       error: error.name,
@@ -236,7 +232,7 @@ export function globalErrorHandler(
 
   // Handle Zod validation errors
   if (error.name === "ZodError") {
-    logError(route, error);
+    logHttpError(route, error);
 
     const validationError = new ValidationError("Invalid request data", error);
     const response: ValidationErrorResponse = {
@@ -251,7 +247,7 @@ export function globalErrorHandler(
 
   // Handle Fastify validation errors
   if (error.validation) {
-    logError(route, error);
+    logHttpError(route, error);
 
     const response: ValidationErrorResponse = {
       error: "ValidationError",
@@ -265,7 +261,7 @@ export function globalErrorHandler(
 
   // Handle multipart plugin file size limit errors (from busboy)
   if (error.code === "LIMIT_FILE_SIZE") {
-    logError(route, error);
+    logHttpError(route, error);
     const response: ErrorResponse = {
       error: "ValidationError",
       message: `File must be smaller than ${UPLOAD_MAX_SIZE_MB}MB`,
@@ -275,7 +271,7 @@ export function globalErrorHandler(
   }
 
   // Handle unknown errors
-  logError(route, error);
+  logHttpError(route, error);
 
   const response: ErrorResponse = {
     error: "InternalServerError",

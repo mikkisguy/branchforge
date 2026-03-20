@@ -15,6 +15,7 @@ import {
 } from "../services/rate-limiter.service.js";
 import { authenticate } from "../middleware/auth.middleware.js";
 import type { PublicUser } from "../middleware/auth.middleware.js";
+import { logSecurityEvent, logInfo, LogEventType } from "../lib/logger.js";
 
 // ============================================================================
 // Types
@@ -85,15 +86,15 @@ function getClientIp(request: FastifyRequest): string {
 function handleRegistrationError(error: unknown, reply: FastifyReply): boolean {
   if (error instanceof Error) {
     // Log specific error for debugging (not exposed to client)
-    // In production, consider structured logging
-    console.error("Registration error:", error.message);
+    logSecurityEvent(
+      LogEventType.AUTH_REGISTRATION_FAILURE,
+      {
+        message: error.message,
+      },
+      error
+    );
 
     // Return generic error message to prevent information leakage
-    // This prevents attackers from learning:
-    // - Whether an email is already registered
-    // - Specific password requirements
-    // - Email validation patterns
-    // - Single-user limitation
     reply
       .status(400)
       .send({ error: "Invalid registration data" } as ErrorResponse);
@@ -123,6 +124,10 @@ async function registerHandler(
 
   try {
     const user = await register(email, password);
+    logInfo(LogEventType.AUTH_REGISTRATION_SUCCESS, {
+      userId: user.id,
+      email: user.email,
+    });
     reply.status(201).send(user);
   } catch (error) {
     if (handleRegistrationError(error, reply)) {
@@ -163,6 +168,10 @@ async function loginHandler(
   const { email, password } = request.body;
 
   if (!email || !password) {
+    logSecurityEvent(LogEventType.AUTH_LOGIN_FAILURE, {
+      reason: "missing_credentials",
+      clientIp,
+    });
     reply.status(401).send({ error: "Invalid credentials" } as ErrorResponse);
     return;
   }
@@ -170,12 +179,23 @@ async function loginHandler(
   const user = await validateCredentials(email, password);
 
   if (!user) {
+    logSecurityEvent(LogEventType.AUTH_LOGIN_FAILURE, {
+      reason: "invalid_credentials",
+      clientIp,
+    });
     reply.status(401).send({ error: "Invalid credentials" } as ErrorResponse);
     return;
   }
 
   // Successful login - clear rate limit for this IP
   clearRateLimit(clientIp);
+
+  // Log successful login
+  logInfo(LogEventType.AUTH_LOGIN_SUCCESS, {
+    userId: user.id,
+    email: user.email,
+    clientIp,
+  });
 
   // Session rotation: regenerate session ID before storing user data
   // This prevents session fixation attacks where an attacker could set a known session ID
@@ -200,8 +220,10 @@ async function logoutHandler(
   request: FastifyRequest,
   reply: FastifyReply
 ): Promise<void> {
+  const userId = request.user?.id;
   // Destroy the session completely (removes from database)
   await request.session.destroy();
+  logInfo(LogEventType.AUTH_LOGOUT, { userId });
 
   reply.status(204).send();
 }

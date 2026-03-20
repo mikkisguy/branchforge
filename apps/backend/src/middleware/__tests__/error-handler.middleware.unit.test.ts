@@ -5,7 +5,7 @@
  * in src/middleware/error-handler.middleware.ts
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   HttpError,
   ValidationError,
@@ -14,11 +14,11 @@ import {
   UnauthorizedError,
   ConflictError,
   RateLimitError,
-  logError,
   logAuthError,
   globalErrorHandler,
 } from "../error-handler.middleware.js";
 import type { FastifyRequest, FastifyReply } from "fastify";
+import * as logger from "../../lib/logger.js";
 
 // Mock Fastify request and reply
 const createMockRequest = (overrides = {}) =>
@@ -176,59 +176,46 @@ describe("Custom Error Classes", () => {
 });
 
 describe("Logging Functions", () => {
-  describe("logError", () => {
-    it("should log HttpError with context", () => {
-      const consoleSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+  beforeEach(() => {
+    // Mock logger functions
+    vi.spyOn(logger, "logError").mockImplementation(() => {});
+  });
 
-      const error = new NotFoundError("Project");
-      logError("testContext", error);
-
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
-    });
-
-    it("should log standard Error with context", () => {
-      const consoleSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
-
-      const error = new Error("Standard error");
-      logError("testContext", error);
-
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
-    });
-
-    it("should log unknown error types", () => {
-      const consoleSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
-
-      logError("testContext", "string error");
-
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
-    });
+  afterEach(() => {
+    // Restore mocks to ensure test isolation
+    vi.restoreAllMocks();
   });
 
   describe("logAuthError", () => {
     it("should log auth errors with auth: prefix", () => {
-      const consoleSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
-
       const error = new UnauthorizedError();
       logAuthError("login", error);
 
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
+      expect(logger.logError).toHaveBeenCalledWith(
+        logger.LogEventType.SERVICE_ERROR,
+        {
+          context: "auth:login",
+          name: "UnauthorizedError",
+          statusCode: 401,
+          message: "Authentication required",
+        },
+        error
+      );
     });
   });
 });
 
 describe("Global Error Handler", () => {
+  let originalEnv: string | undefined;
+
+  beforeEach(() => {
+    originalEnv = process.env.NODE_ENV;
+  });
+
+  afterEach(() => {
+    process.env.NODE_ENV = originalEnv;
+  });
+
   it("should handle HttpError and send appropriate response", () => {
     const request = createMockRequest();
     const reply = createMockReply();
@@ -325,7 +312,6 @@ describe("Global Error Handler", () => {
   });
 
   it("should use generic error message in production", () => {
-    const originalEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = "production";
 
     const request = createMockRequest();
@@ -339,7 +325,5 @@ describe("Global Error Handler", () => {
       error: "InternalServerError",
       message: "An unexpected error occurred",
     });
-
-    process.env.NODE_ENV = originalEnv;
   });
 });
