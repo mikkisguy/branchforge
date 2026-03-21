@@ -269,6 +269,13 @@ export async function syncLabelsFromGitLabFile(
       throw new Error("GitLab file not found");
     }
 
+    // Validate filePath is not null/empty before passing to parser
+    if (!file.filePath) {
+      throw new Error(
+        `GitLab file path is missing for gitlabFileId: ${gitlabFileId}`
+      );
+    }
+
     // Step 2: Parse RPY content with filename for better file type detection
     const parsed = parseRPYFileWithLabels(rpyContent, file.filePath);
 

@@ -724,7 +724,10 @@ label title:
 
       const result = parseRPYFileWithLabels(screensFile);
 
-      // Should be classified as SETTINGS, not STORY
+      // Heuristic: parseRPYFileWithLabels classifies files as SETTINGS when
+      // screenCount > labelCount * 2 (more than 2:1 screens-to-labels ratio)
+      // This case: 8 screens, 1 label → 8 > 1 * 2 → triggers SETTINGS classification
+      // which filters out the UI label, resulting in empty labels array
       expect(result.fileType).toBe("SETTINGS");
       expect(result.labels).toHaveLength(0);
     });
@@ -739,13 +742,22 @@ label title:
       const resultWithoutFilename = parseRPYFileWithLabels(contentWithLabel);
       expect(resultWithoutFilename.fileType).toBe("STORY");
 
-      // With "screen" in filename, should be classified as SETTINGS
+      // With exact screen definition filename, should be classified as SETTINGS
       const resultWithFilename = parseRPYFileWithLabels(contentWithLabel, "screens.rpy");
       expect(resultWithFilename.fileType).toBe("SETTINGS");
 
-      // Case insensitive
-      const resultWithCaps = parseRPYFileWithLabels(contentWithLabel, "Screen_File.rpy");
+      // Case insensitive for exact match
+      const resultWithCaps = parseRPYFileWithLabels(contentWithLabel, "Screens.rpy");
       expect(resultWithCaps.fileType).toBe("SETTINGS");
+
+      // Singular "screen.rpy" is also recognized
+      const resultWithSingular = parseRPYFileWithLabels(contentWithLabel, "screen.rpy");
+      expect(resultWithSingular.fileType).toBe("SETTINGS");
+
+      // Files with "screen" in name but not exact match are NOT classified as SETTINGS
+      // This prevents misclassifying files like "screenshot.rpy" or "my-screen-scene.rpy"
+      const resultWithPartial = parseRPYFileWithLabels(contentWithLabel, "screenshot.rpy");
+      expect(resultWithPartial.fileType).toBe("STORY");
     });
   });
 
