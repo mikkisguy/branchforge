@@ -172,7 +172,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
         });
       }
     }
-  }, [operation, pollStartTime, queryClient]);
+  }, [operation, pollStartTime, queryClient, updateActiveOperationId]);
 
   // Reset state function
   const reset = useCallback(() => {
@@ -186,7 +186,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
       progress: 0,
       error: null,
     });
-  }, []);
+  }, [updateActiveOperationId]);
 
   // Export mutation
   const exportMutation = useMutation({

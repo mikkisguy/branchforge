@@ -349,7 +349,7 @@ describe("ToastContext", () => {
     });
 
     it("should provide success, error, and info methods", () => {
-      let capturedContext: any;
+      let capturedContext: unknown;
 
       function TestCaptureComponent() {
         capturedContext = useToast();
@@ -365,9 +365,9 @@ describe("ToastContext", () => {
       expect(capturedContext).toHaveProperty("success");
       expect(capturedContext).toHaveProperty("error");
       expect(capturedContext).toHaveProperty("info");
-      expect(typeof capturedContext.success).toBe("function");
-      expect(typeof capturedContext.error).toBe("function");
-      expect(typeof capturedContext.info).toBe("function");
+      expect(typeof (capturedContext as { success: unknown }).success).toBe("function");
+      expect(typeof (capturedContext as { error: unknown }).error).toBe("function");
+      expect(typeof (capturedContext as { info: unknown }).info).toBe("function");
     });
   });
 
