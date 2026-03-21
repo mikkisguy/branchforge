@@ -1296,7 +1296,7 @@ describe("Ren'Py Definition Schemas", () => {
           category: "INIT" as const,
           tag: "debug_config",
           displayName: "Debug Configuration",
-          definitionCode: 'init python: config.debug = True',
+          definitionCode: "init python: config.debug = True",
           referenceTag: null,
         };
 
@@ -1309,7 +1309,7 @@ describe("Ren'Py Definition Schemas", () => {
           category: "INIT" as const,
           tag: "debug config",
           displayName: "Debug Config",
-          definitionCode: 'init python: config.debug = True',
+          definitionCode: "init python: config.debug = True",
           referenceTag: null,
         };
 

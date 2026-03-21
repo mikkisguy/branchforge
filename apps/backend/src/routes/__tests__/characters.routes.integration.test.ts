@@ -13,7 +13,15 @@
  * - Test database must exist and have proper schema
  */
 
-import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  beforeAll,
+  afterAll,
+} from "vitest";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import cookie from "@fastify/cookie";
 import session from "@fastify/session";
@@ -109,8 +117,12 @@ describe("CharactersRoutes (Integration)", () => {
 
   // Helper to clean up all test data
   async function cleanupTestData() {
-    await db.delete(characters).where(eq(characters.projectId, testProject.id!));
-    await db.delete(characters).where(eq(characters.projectId, otherProject.id!));
+    await db
+      .delete(characters)
+      .where(eq(characters.projectId, testProject.id!));
+    await db
+      .delete(characters)
+      .where(eq(characters.projectId, otherProject.id!));
     await db.delete(projects).where(eq(projects.id, testProject.id!));
     await db.delete(projects).where(eq(projects.id, otherProject.id!));
     await db.delete(userSessions).where(eq(userSessions.userId, testUserId));
@@ -140,7 +152,9 @@ describe("CharactersRoutes (Integration)", () => {
     // Verify the test-login request succeeded before attempting to read cookies
     if (loginResponse.statusCode !== 200) {
       throw new Error(
-        `Test login request failed with status ${loginResponse.statusCode}: ${JSON.stringify(loginResponse.json())}`
+        `Test login request failed with status ${
+          loginResponse.statusCode
+        }: ${JSON.stringify(loginResponse.json())}`
       );
     }
 
@@ -367,7 +381,10 @@ describe("CharactersRoutes (Integration)", () => {
     });
 
     it("should return character data for valid ID", async () => {
-      const [char] = await db.insert(characters).values(testCharacter1).returning();
+      const [char] = await db
+        .insert(characters)
+        .values(testCharacter1)
+        .returning();
 
       const auth = await createAuthenticatedRequest(testUserId);
 
@@ -621,7 +638,10 @@ describe("CharactersRoutes (Integration)", () => {
     });
 
     it("should update character with valid data", async () => {
-      const [char] = await db.insert(characters).values(testCharacter1).returning();
+      const [char] = await db
+        .insert(characters)
+        .values(testCharacter1)
+        .returning();
 
       const auth = await createAuthenticatedRequest(testUserId);
 
@@ -657,7 +677,10 @@ describe("CharactersRoutes (Integration)", () => {
     });
 
     it("should allow partial updates", async () => {
-      const [char] = await db.insert(characters).values(testCharacter1).returning();
+      const [char] = await db
+        .insert(characters)
+        .values(testCharacter1)
+        .returning();
 
       const auth = await createAuthenticatedRequest(testUserId);
 
@@ -733,7 +756,10 @@ describe("CharactersRoutes (Integration)", () => {
     });
 
     it("should delete character successfully", async () => {
-      const [char] = await db.insert(characters).values(testCharacter1).returning();
+      const [char] = await db
+        .insert(characters)
+        .values(testCharacter1)
+        .returning();
 
       const auth = await createAuthenticatedRequest(testUserId);
 

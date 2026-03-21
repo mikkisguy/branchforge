@@ -223,7 +223,10 @@ export const charactersApi = {
   /**
    * Upload avatar image for a character
    */
-  async uploadAvatar(characterId: string, file: File): Promise<{ avatarUrl: string }> {
+  async uploadAvatar(
+    characterId: string,
+    file: File
+  ): Promise<{ avatarUrl: string }> {
     const formData = new FormData();
     formData.append("avatar", file);
 

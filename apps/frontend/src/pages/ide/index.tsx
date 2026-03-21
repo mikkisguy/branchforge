@@ -91,7 +91,11 @@ export function HomePageIDE() {
       />
 
       {/* Main content area */}
-      <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? "ml-14" : "ml-56"}`}>
+      <div
+        className={`flex-1 transition-all duration-300 ${
+          isSidebarCollapsed ? "ml-14" : "ml-56"
+        }`}
+      >
         {mode === "write" ? (
           <WriteMode setMode={setMode} />
         ) : (

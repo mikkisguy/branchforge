@@ -4,7 +4,14 @@
  * Boolean story state tracking.
  */
 
-import { pgTable, uuid, text, timestamp, index, unique } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  uuid,
+  text,
+  timestamp,
+  index,
+  unique,
+} from "drizzle-orm/pg-core";
 import { projects } from "./projects.js";
 
 export const stateVariables = pgTable(

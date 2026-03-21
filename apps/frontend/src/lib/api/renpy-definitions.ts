@@ -6,7 +6,10 @@
  */
 
 import { request, requestVoid } from "./client";
-import type { RenpyDefinition, RenpyDefinitionCategory } from "@branchforge/shared";
+import type {
+  RenpyDefinition,
+  RenpyDefinitionCategory,
+} from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -59,7 +62,9 @@ export const renpyDefinitionsApi = {
   /**
    * Get a single Ren'Py definition by ID
    */
-  async getRenpyDefinition(renpyDefinitionId: string): Promise<RenpyDefinition> {
+  async getRenpyDefinition(
+    renpyDefinitionId: string
+  ): Promise<RenpyDefinition> {
     const response = await request<GetRenpyDefinitionResponse>(
       `/renpy-definitions/${encodeURIComponent(renpyDefinitionId)}`,
       {

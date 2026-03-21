@@ -83,13 +83,19 @@ describe("GitLabService (Integration)", () => {
   // Helper to clean up all test data in reverse dependency order
   async function cleanupTestData() {
     const testUserIds = [testUserId, otherUserId];
-    const projectIds = [ownedProject.id!, otherProject.id!, ...additionalProjectIds];
+    const projectIds = [
+      ownedProject.id!,
+      otherProject.id!,
+      ...additionalProjectIds,
+    ];
 
     // Delete in reverse dependency order
     await db
       .delete(gitlabRepositories)
       .where(inArray(gitlabRepositories.projectId, projectIds));
-    await db.delete(gitlabIntegrations).where(inArray(gitlabIntegrations.userId, testUserIds));
+    await db
+      .delete(gitlabIntegrations)
+      .where(inArray(gitlabIntegrations.userId, testUserIds));
     await db.delete(projects).where(inArray(projects.id, projectIds));
     await db.delete(users).where(inArray(users.id, testUserIds));
 
@@ -251,7 +257,9 @@ describe("GitLabService (Integration)", () => {
       };
 
       // This should throw due to unique constraint
-      await expect(db.insert(gitlabIntegrations).values(integration2)).rejects.toThrow();
+      await expect(
+        db.insert(gitlabIntegrations).values(integration2)
+      ).rejects.toThrow();
     });
 
     it("should allow different users to have integrations", async () => {
@@ -298,7 +306,9 @@ describe("GitLabService (Integration)", () => {
       expect(result).not.toBeNull();
 
       // Delete it
-      await db.delete(gitlabIntegrations).where(eq(gitlabIntegrations.userId, testUserId));
+      await db
+        .delete(gitlabIntegrations)
+        .where(eq(gitlabIntegrations.userId, testUserId));
 
       // Verify it's gone
       result = await getGitlabIntegration(testUserId);
@@ -340,7 +350,9 @@ describe("GitLabService (Integration)", () => {
       await db.insert(gitlabRepositories).values(repository);
 
       // Delete integration
-      await db.delete(gitlabIntegrations).where(eq(gitlabIntegrations.userId, testUserId));
+      await db
+        .delete(gitlabIntegrations)
+        .where(eq(gitlabIntegrations.userId, testUserId));
 
       // Repository should still exist (no cascade)
       const repos = await db
@@ -412,7 +424,9 @@ describe("GitLabService (Integration)", () => {
         gitlabUrl: "https://gitlab.com",
       };
 
-      await expect(db.insert(gitlabRepositories).values(repository2)).rejects.toThrow();
+      await expect(
+        db.insert(gitlabRepositories).values(repository2)
+      ).rejects.toThrow();
     });
 
     it("should allow same GitLab project for different BranchForge projects", async () => {
@@ -491,7 +505,9 @@ describe("GitLabService (Integration)", () => {
       expect(result).not.toBeNull();
 
       // Unlink it
-      await db.delete(gitlabRepositories).where(eq(gitlabRepositories.projectId, ownedProject.id!));
+      await db
+        .delete(gitlabRepositories)
+        .where(eq(gitlabRepositories.projectId, ownedProject.id!));
 
       // Verify it's gone
       result = await getRepositoryLink(ownedProject.id!);
@@ -530,7 +546,9 @@ describe("GitLabService (Integration)", () => {
       await db.insert(gitlabRepositories).values([repository1, repository2]);
 
       // Unlink only the first project
-      await db.delete(gitlabRepositories).where(eq(gitlabRepositories.projectId, ownedProject.id!));
+      await db
+        .delete(gitlabRepositories)
+        .where(eq(gitlabRepositories.projectId, ownedProject.id!));
 
       // First project should be unlinked
       let result = await getRepositoryLink(ownedProject.id!);
@@ -695,7 +713,7 @@ describe("GitLabService (Integration)", () => {
       expect(result).toHaveLength(1);
       expect(result[0].lastSyncedAt).toBeInstanceOf(Date);
       const delta = Math.abs(
-        (result[0].lastSyncedAt!.getTime() - syncedAt.getTime())
+        result[0].lastSyncedAt!.getTime() - syncedAt.getTime()
       );
       expect(delta).toBeLessThanOrEqual(100); // Allow 100ms delta for DB round-trip precision
     });

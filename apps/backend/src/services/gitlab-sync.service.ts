@@ -276,9 +276,7 @@ export async function exportToGitlab(
         gitlabFileId: labels.gitlabFileId,
       })
       .from(labels)
-      .where(
-        and(eq(labels.projectId, projectId), isNull(labels.deletedAt))
-      );
+      .where(and(eq(labels.projectId, projectId), isNull(labels.deletedAt)));
 
     // Create a map of file ID to labels for that file
     const labelsByFile = new Map<string, typeof projectLabels>();

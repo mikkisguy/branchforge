@@ -88,7 +88,8 @@ describe("RenpyDefinitionsService (Integration)", () => {
     sortOrder: 1,
     tag: "fade_in",
     displayName: "Fade In",
-    definitionCode: "transform fade_in:\n    alpha 0.0\n    linear 0.5 alpha 1.0",
+    definitionCode:
+      "transform fade_in:\n    alpha 0.0\n    linear 0.5 alpha 1.0",
     referenceTag: null,
   };
 
@@ -247,10 +248,7 @@ describe("RenpyDefinitionsService (Integration)", () => {
 
   describe("getRenpyDefinition", () => {
     it("should return definition when user has access", async () => {
-      const result = await getRenpyDefinition(
-        testDefinition1.id!,
-        testUserId
-      );
+      const result = await getRenpyDefinition(testDefinition1.id!, testUserId);
 
       expect(result).not.toBeNull();
       expect(result).toMatchObject({
@@ -275,19 +273,13 @@ describe("RenpyDefinitionsService (Integration)", () => {
     });
 
     it("should return null when user does not have access", async () => {
-      const result = await getRenpyDefinition(
-        testDefinition1.id!,
-        otherUserId
-      );
+      const result = await getRenpyDefinition(testDefinition1.id!, otherUserId);
 
       expect(result).toBeNull();
     });
 
     it("should return definition with null referenceTag", async () => {
-      const result = await getRenpyDefinition(
-        testDefinition2.id!,
-        testUserId
-      );
+      const result = await getRenpyDefinition(testDefinition2.id!, testUserId);
 
       expect(result).not.toBeNull();
       expect(result?.referenceTag).toBeNull();

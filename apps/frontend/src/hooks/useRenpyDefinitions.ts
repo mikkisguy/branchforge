@@ -97,7 +97,10 @@ export function useRenpyDefinitions(
       toast.success("Ren'Py definition created successfully", "Success");
     },
     onError: (error: Error) => {
-      toast.error(`Failed to create Ren'Py definition: ${error.message}`, "Error");
+      toast.error(
+        `Failed to create Ren'Py definition: ${error.message}`,
+        "Error"
+      );
     },
   });
 
@@ -123,7 +126,10 @@ export function useRenpyDefinitions(
       toast.success("Ren'Py definition updated successfully", "Success");
     },
     onError: (error: Error) => {
-      toast.error(`Failed to update Ren'Py definition: ${error.message}`, "Error");
+      toast.error(
+        `Failed to update Ren'Py definition: ${error.message}`,
+        "Error"
+      );
     },
   });
 
@@ -140,7 +146,10 @@ export function useRenpyDefinitions(
       toast.success("Ren'Py definition deleted successfully", "Success");
     },
     onError: (error: Error) => {
-      toast.error(`Failed to delete Ren'Py definition: ${error.message}`, "Error");
+      toast.error(
+        `Failed to delete Ren'Py definition: ${error.message}`,
+        "Error"
+      );
     },
   });
 

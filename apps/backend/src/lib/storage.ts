@@ -118,7 +118,10 @@ export function getAvatarFullPath(filename: string): string {
     ? uploadsDirPath
     : uploadsDirPath + path.sep;
 
-  if (fullPath !== uploadsDirPath && !fullPath.startsWith(normalizedUploadsPath)) {
+  if (
+    fullPath !== uploadsDirPath &&
+    !fullPath.startsWith(normalizedUploadsPath)
+  ) {
     throw new AvatarFilenameError(
       "Resolved path escapes the uploads directory"
     );

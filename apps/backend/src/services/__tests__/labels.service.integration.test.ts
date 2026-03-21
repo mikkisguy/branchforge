@@ -106,12 +106,38 @@ describe("LabelsService (Integration)", () => {
     const projectIds = [ownedProject.id!, sharedProject.id!];
 
     // Delete in reverse dependency order
-    await db.delete(labelLines).where(inArray(labelLines.labelId, db.select({ id: labels.id }).from(labels).where(inArray(labels.projectId, projectIds))));
-    await db.delete(labelCharacters).where(inArray(labelCharacters.labelId, db.select({ id: labels.id }).from(labels).where(inArray(labels.projectId, projectIds))));
+    await db
+      .delete(labelLines)
+      .where(
+        inArray(
+          labelLines.labelId,
+          db
+            .select({ id: labels.id })
+            .from(labels)
+            .where(inArray(labels.projectId, projectIds))
+        )
+      );
+    await db
+      .delete(labelCharacters)
+      .where(
+        inArray(
+          labelCharacters.labelId,
+          db
+            .select({ id: labels.id })
+            .from(labels)
+            .where(inArray(labels.projectId, projectIds))
+        )
+      );
     await db.delete(labels).where(inArray(labels.projectId, projectIds));
-    await db.delete(characters).where(inArray(characters.projectId, projectIds));
-    await db.delete(routeConfigs).where(inArray(routeConfigs.projectId, projectIds));
-    await db.delete(projectUsers).where(inArray(projectUsers.userId, testUserIds));
+    await db
+      .delete(characters)
+      .where(inArray(characters.projectId, projectIds));
+    await db
+      .delete(routeConfigs)
+      .where(inArray(routeConfigs.projectId, projectIds));
+    await db
+      .delete(projectUsers)
+      .where(inArray(projectUsers.userId, testUserIds));
     await db.delete(projects).where(inArray(projects.id, projectIds));
     await db.delete(users).where(inArray(users.id, testUserIds));
   }

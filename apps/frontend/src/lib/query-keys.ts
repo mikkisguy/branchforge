@@ -93,8 +93,7 @@ export const routeConfigKeys = {
 
 export const stateVariableKeys = {
   all: ["stateVariables"] as const,
-  lists: (projectId: string) =>
-    ["stateVariables", projectId, "list"] as const,
+  lists: (projectId: string) => ["stateVariables", projectId, "list"] as const,
   detail: (stateVariableId: string) =>
     ["stateVariables", "detail", stateVariableId] as const,
 } as const;
@@ -105,8 +104,7 @@ export const stateVariableKeys = {
 
 export const characterKeys = {
   all: ["characters"] as const,
-  lists: (projectId: string) =>
-    ["characters", projectId, "list"] as const,
+  lists: (projectId: string) => ["characters", projectId, "list"] as const,
   detail: (characterId: string) =>
     ["characters", "detail", characterId] as const,
 } as const;

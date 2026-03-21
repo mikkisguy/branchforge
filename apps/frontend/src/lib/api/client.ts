@@ -32,7 +32,7 @@ async function fetchInternal(
     ...options,
     credentials: "include",
     headers: isFormData
-      ? options.headers  // Don't add Content-Type for FormData
+      ? options.headers // Don't add Content-Type for FormData
       : {
           "Content-Type": "application/json",
           ...options.headers,

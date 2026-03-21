@@ -1000,7 +1000,9 @@ async function uploadCharacterAvatarHandler(
       try {
         await fs.access(previousAvatarPath);
         // Create a backup of the existing avatar before we overwrite/delete it
-        previousAvatarBackupPath = `${previousAvatarPath}.backup-${Date.now()}-${process.pid}`;
+        previousAvatarBackupPath = `${previousAvatarPath}.backup-${Date.now()}-${
+          process.pid
+        }`;
         await fs.copyFile(previousAvatarPath, previousAvatarBackupPath);
       } catch (accessError) {
         // If file doesn't exist, that's fine - no backup needed

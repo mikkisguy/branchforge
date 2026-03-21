@@ -168,7 +168,7 @@ function trackBlocks(
 
     // Handle blank/whitespace-only lines early - they shouldn't affect block tracking.
     // Blank lines inside blocks are skipped but don't affect stack state.
-    if (trimmed === '') {
+    if (trimmed === "") {
       if (screenStack.length > 0 || initOffsetStack.length > 0) {
         skipLines.add(i);
       }
@@ -836,7 +836,9 @@ export function parseRPYFileWithLabels(
   // Check if filename indicates this is a screens/settings file
   // Files named "screens.rpy" or "screen.rpy" are always SETTINGS
   // We extract the basename to avoid matching directory paths like "gui/screens/dialogue.rpy"
-  const basename = filename ? filename.split('/').pop()!.split('\\').pop()! : '';
+  const basename = filename
+    ? filename.split("/").pop()!.split("\\").pop()!
+    : "";
   const isScreenFile = /^screens?\.rpy$/i.test(basename);
 
   if (isScreenFile) {

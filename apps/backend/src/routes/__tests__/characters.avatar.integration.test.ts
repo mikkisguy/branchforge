@@ -166,7 +166,9 @@ describe("Character Avatar Routes (Integration)", () => {
     // Verify the test-login request succeeded before attempting to read cookies
     if (loginResponse.statusCode !== 200) {
       throw new Error(
-        `Test login request failed with status ${loginResponse.statusCode}: ${JSON.stringify(loginResponse.json())}`
+        `Test login request failed with status ${
+          loginResponse.statusCode
+        }: ${JSON.stringify(loginResponse.json())}`
       );
     }
 

@@ -25,7 +25,9 @@ export const labelCharacters = pgTable(
   (table) => ({
     pk: primaryKey({ columns: [table.labelId, table.characterId] }),
     // Standalone index for reverse lookups by character_id
-    characterIdIdx: index("label_characters_character_id_idx").on(table.characterId),
+    characterIdIdx: index("label_characters_character_id_idx").on(
+      table.characterId
+    ),
   })
 );
 

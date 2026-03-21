@@ -157,7 +157,10 @@ export function StateVariablesDialog({
     (index: number, field: keyof StateVariableForm, value: string) => {
       setStateVariablesList((prev) => {
         const newStateVariables = [...prev];
-        newStateVariables[index] = { ...newStateVariables[index], [field]: value };
+        newStateVariables[index] = {
+          ...newStateVariables[index],
+          [field]: value,
+        };
         return newStateVariables;
       });
     },
@@ -174,9 +177,7 @@ export function StateVariablesDialog({
         // Delete existing state variable
         try {
           await deleteStateVariable(stateVariable.id);
-          setStateVariablesList((prev) =>
-            prev.filter((_, i) => i !== index)
-          );
+          setStateVariablesList((prev) => prev.filter((_, i) => i !== index));
         } catch {
           // Error is handled by the hook's toast
         }
@@ -286,8 +287,9 @@ export function StateVariablesDialog({
           <div>
             <h2 className="text-lg font-medium">State Variables Management</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              State variables are boolean state variables used in conditional branching logic.
-              They control label accessibility, menu visibility, and story state changes.
+              State variables are boolean state variables used in conditional
+              branching logic. They control label accessibility, menu
+              visibility, and story state changes.
             </p>
           </div>
           <button
@@ -313,7 +315,8 @@ export function StateVariablesDialog({
               {stateVariablesList.length === 0 ? (
                 <div className="p-8 border border-dashed border-border/30 rounded-md text-center">
                   <p className="text-sm text-muted-foreground mb-4">
-                    No state variables configured yet. Add your first state variable to get started.
+                    No state variables configured yet. Add your first state
+                    variable to get started.
                   </p>
                   <Button
                     type="button"
@@ -334,9 +337,8 @@ export function StateVariablesDialog({
                         </h3>
                         <div className="space-y-2">
                           {categoryStateVariables.map((stateVariable) => {
-                            const index = stateVariablesList.indexOf(
-                              stateVariable
-                            );
+                            const index =
+                              stateVariablesList.indexOf(stateVariable);
                             const isEditing = editingIndex === index;
                             const validationError =
                               validateStateVariable(stateVariable);

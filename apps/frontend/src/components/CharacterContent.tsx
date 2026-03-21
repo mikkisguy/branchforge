@@ -9,10 +9,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import isEqual from "fast-deep-equal";
 import { Loader2, Plus, Trash2, Pencil, Heart, Upload } from "lucide-react";
 import type { Character } from "@branchforge/shared";
-import {
-  AVATAR_MAX_SIZE,
-  AVATAR_MAX_SIZE_MB,
-} from "@branchforge/shared";
+import { AVATAR_MAX_SIZE, AVATAR_MAX_SIZE_MB } from "@branchforge/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -122,7 +119,10 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
     }
 
     // Only update if characters actually changed
-    if (prevCharactersRef.current !== null && isEqual(prevCharactersRef.current, characters)) {
+    if (
+      prevCharactersRef.current !== null &&
+      isEqual(prevCharactersRef.current, characters)
+    ) {
       return;
     }
 
@@ -167,7 +167,9 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
    * Add new character
    */
   const addCharacter = useCallback(() => {
-    const clientId = `new-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const clientId = `new-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 9)}`;
     setCharactersList((prev) => [
       ...prev,
       {
@@ -209,9 +211,7 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
         // Delete existing character
         try {
           await deleteCharacter(character.id);
-          setCharactersList((prev) =>
-            prev.filter((_, i) => i !== index)
-          );
+          setCharactersList((prev) => prev.filter((_, i) => i !== index));
           // Update editingIndex to account for the removed item
           setEditingIndex((prev) => {
             if (prev === null) return null;
@@ -254,7 +254,10 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
           // Step 1: Upload new avatar first if present
           let uploadedAvatarUrl: string | undefined;
           if (character.avatarFile) {
-            const result = await uploadAvatar(character.id, character.avatarFile);
+            const result = await uploadAvatar(
+              character.id,
+              character.avatarFile
+            );
             uploadedAvatarUrl = result.avatarUrl;
           }
 
@@ -315,7 +318,10 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
           // Upload avatar after creation and get the new URL
           let uploadedAvatarUrl: string | undefined;
           if (character.avatarFile) {
-            const result = await uploadAvatar(newCharacter.id, character.avatarFile);
+            const result = await uploadAvatar(
+              newCharacter.id,
+              character.avatarFile
+            );
             uploadedAvatarUrl = result.avatarUrl;
           }
 
@@ -333,7 +339,8 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
               isLoveInterest: newCharacter.isLoveInterest,
               dialogueStyle: newCharacter.dialogueStyle ?? "",
               conditionalPrefix: newCharacter.conditionalPrefix ?? "",
-              avatarUrl: uploadedAvatarUrl ?? newCharacter.avatarUrl ?? undefined,
+              avatarUrl:
+                uploadedAvatarUrl ?? newCharacter.avatarUrl ?? undefined,
               avatarFile: undefined,
               avatarPreview: undefined,
             };
@@ -352,7 +359,14 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
         // Error is handled by the hook's toast
       }
     },
-    [charactersList, createCharacter, updateCharacter, uploadAvatar, deleteAvatar, error]
+    [
+      charactersList,
+      createCharacter,
+      updateCharacter,
+      uploadAvatar,
+      deleteAvatar,
+      error,
+    ]
   );
 
   /**
@@ -421,7 +435,12 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
       if (!file) return;
 
       // Client-side validation
-      const allowedMimeTypes = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+      const allowedMimeTypes = [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/gif",
+      ];
       if (!allowedMimeTypes.includes(file.type)) {
         error("Please select a PNG, JPEG, WEBP, or GIF image");
         return;
@@ -458,41 +477,37 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
   /**
    * Handle avatar removal
    */
-  const handleAvatarRemove = useCallback(
-    (index: number) => {
-      // Perform side effects first using the current state from ref
-      const character = charactersListRef.current[index];
-      if (character?.avatarPreview) {
-        URL.revokeObjectURL(character.avatarPreview);
-        createdUrlsRef.current.delete(character.avatarPreview);
-      }
-      // Clear the file input so selecting the same file again works
-      if (fileInputRefsRef.current[index]) {
-        fileInputRefsRef.current[index].value = '';
-      }
+  const handleAvatarRemove = useCallback((index: number) => {
+    // Perform side effects first using the current state from ref
+    const character = charactersListRef.current[index];
+    if (character?.avatarPreview) {
+      URL.revokeObjectURL(character.avatarPreview);
+      createdUrlsRef.current.delete(character.avatarPreview);
+    }
+    // Clear the file input so selecting the same file again works
+    if (fileInputRefsRef.current[index]) {
+      fileInputRefsRef.current[index].value = "";
+    }
 
-      // Update state (updater only returns new state)
-      setCharactersList((prev) => {
-        const newCharacters = [...prev];
-        newCharacters[index] = {
-          ...newCharacters[index],
-          avatarFile: undefined,
-          avatarPreview: undefined,
-          avatarUrl: undefined,
-          removedAvatar: true,
-        };
-        return newCharacters;
-      });
-    },
-    []
-  );
+    // Update state (updater only returns new state)
+    setCharactersList((prev) => {
+      const newCharacters = [...prev];
+      newCharacters[index] = {
+        ...newCharacters[index],
+        avatarFile: undefined,
+        avatarPreview: undefined,
+        avatarUrl: undefined,
+        removedAvatar: true,
+      };
+      return newCharacters;
+    });
+  }, []);
 
   /**
    * Check if a character is valid
    */
   const isCharacterValid = useMemo(() => {
-    return (index: number) =>
-      validateCharacter(charactersList[index]) === null;
+    return (index: number) => validateCharacter(charactersList[index]) === null;
   }, [charactersList]);
 
   // ============================================================================
@@ -511,24 +526,22 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
 
       {isLoadingCharacters ? (
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" role="status" />
+          <Loader2
+            className="w-6 h-6 animate-spin text-muted-foreground"
+            role="status"
+          />
         </div>
       ) : charactersError ? (
-        <InlineMessage variant="error">
-          Failed to load characters
-        </InlineMessage>
+        <InlineMessage variant="error">Failed to load characters</InlineMessage>
       ) : (
         <>
           {charactersList.length === 0 ? (
             <div className="p-8 border border-dashed border-border/30 rounded-md text-center">
               <p className="text-sm text-muted-foreground mb-4">
-                No characters configured yet. Add your first character to get started.
+                No characters configured yet. Add your first character to get
+                started.
               </p>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={addCharacter}
-              >
+              <Button type="button" variant="outline" onClick={addCharacter}>
                 <Plus className="w-4 h-4 mr-2" />
                 Add Character
               </Button>
@@ -567,7 +580,9 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
                               <span className="font-medium text-sm">
-                                {character.displayName || character.name || "(unnamed)"}
+                                {character.displayName ||
+                                  character.name ||
+                                  "(unnamed)"}
                               </span>
                               {character.isLoveInterest && (
                                 <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300">
@@ -582,12 +597,16 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
                               )}
                             </div>
                             <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                              <span className="font-mono">{character.renpyTag || "(no tag)"}</span>
+                              <span className="font-mono">
+                                {character.renpyTag || "(no tag)"}
+                              </span>
                               {character.dialogueStyle && (
                                 <span>Style: {character.dialogueStyle}</span>
                               )}
                               {character.conditionalPrefix && (
-                                <span>Prefix: {character.conditionalPrefix}</span>
+                                <span>
+                                  Prefix: {character.conditionalPrefix}
+                                </span>
                               )}
                             </div>
                           </div>
@@ -733,13 +752,22 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
 
                         {/* Avatar Upload Section */}
                         <div className="space-y-2">
-                          <Label htmlFor={`character-avatar-${index}`} className="text-xs">Avatar Image</Label>
+                          <Label
+                            htmlFor={`character-avatar-${index}`}
+                            className="text-xs"
+                          >
+                            Avatar Image
+                          </Label>
                           <div className="flex items-center gap-4">
                             {/* Preview */}
                             <div className="relative w-20 h-20 flex-shrink-0">
-                              {character.avatarPreview || character.avatarUrl ? (
+                              {character.avatarPreview ||
+                              character.avatarUrl ? (
                                 <img
-                                  src={character.avatarPreview || character.avatarUrl}
+                                  src={
+                                    character.avatarPreview ||
+                                    character.avatarUrl
+                                  }
                                   alt={`${character.displayName} avatar`}
                                   className="w-full h-full rounded-full object-cover border-4"
                                   style={{ borderColor: character.color }}
@@ -768,9 +796,11 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
                                 }}
                               />
                               <p className="text-xs text-muted-foreground">
-                                PNG, JPEG, WebP, or GIF (max {AVATAR_MAX_SIZE_MB}MB)
+                                PNG, JPEG, WebP, or GIF (max{" "}
+                                {AVATAR_MAX_SIZE_MB}MB)
                               </p>
-                              {(character.avatarPreview || character.avatarUrl) && (
+                              {(character.avatarPreview ||
+                                character.avatarUrl) && (
                                 <Button
                                   type="button"
                                   variant="ghost"
@@ -902,10 +932,7 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
                             type="button"
                             size="sm"
                             onClick={() => saveCharacter(index)}
-                            disabled={
-                              !isCharacterValid(index) ||
-                              isSaving
-                            }
+                            disabled={!isCharacterValid(index) || isSaving}
                           >
                             {isSaving && (
                               <Loader2 className="w-4 h-4 animate-spin mr-2" />

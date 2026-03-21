@@ -34,7 +34,10 @@ export const renpyDefinitions = pgTable(
   },
   (table) => [
     index("renpy_definitions_project_id_idx").on(table.projectId),
-    unique("renpy_definitions_project_tag_unique").on(table.projectId, table.tag),
+    unique("renpy_definitions_project_tag_unique").on(
+      table.projectId,
+      table.tag
+    ),
   ]
 );
 

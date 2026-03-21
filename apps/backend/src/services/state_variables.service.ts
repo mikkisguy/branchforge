@@ -104,7 +104,9 @@ export async function getStateVariable(
     })
     .from(stateVariables)
     .innerJoin(projects, eq(stateVariables.projectId, projects.id))
-    .where(and(eq(stateVariables.id, stateVariableId), eq(projects.userId, userId)))
+    .where(
+      and(eq(stateVariables.id, stateVariableId), eq(projects.userId, userId))
+    )
     .limit(1);
 
   if (result.length === 0) {
@@ -162,7 +164,9 @@ export async function createStateVariable(
   } catch (err) {
     // Handle unique constraint violation (PostgreSQL error code 23505)
     if (err instanceof Error && "code" in err && err.code === "23505") {
-      throw new ConflictError("State variable key already exists for this project");
+      throw new ConflictError(
+        "State variable key already exists for this project"
+      );
     }
     throw err;
   }
@@ -189,7 +193,9 @@ export async function updateStateVariable(
     })
     .from(stateVariables)
     .innerJoin(projects, eq(stateVariables.projectId, projects.id))
-    .where(and(eq(stateVariables.id, stateVariableId), eq(projects.userId, userId)))
+    .where(
+      and(eq(stateVariables.id, stateVariableId), eq(projects.userId, userId))
+    )
     .limit(1);
 
   if (accessCheck.length === 0) {
@@ -205,14 +211,13 @@ export async function updateStateVariable(
     } = {};
 
     if (body.key !== undefined) updateData.key = body.key;
-    if (body.description !== undefined) updateData.description = body.description;
+    if (body.description !== undefined)
+      updateData.description = body.description;
     if (body.category !== undefined) updateData.category = body.category;
 
     // Guard against empty update payload
     if (Object.keys(updateData).length === 0) {
-      throw new ValidationError(
-        "No valid fields provided for update"
-      );
+      throw new ValidationError("No valid fields provided for update");
     }
 
     // Update the state variable
@@ -232,7 +237,9 @@ export async function updateStateVariable(
   } catch (err) {
     // Handle unique constraint violation (PostgreSQL error code 23505)
     if (err instanceof Error && "code" in err && err.code === "23505") {
-      throw new ConflictError("State variable key already exists for this project");
+      throw new ConflictError(
+        "State variable key already exists for this project"
+      );
     }
     throw err;
   }
@@ -255,7 +262,9 @@ export async function deleteStateVariable(
     .select({ id: stateVariables.id })
     .from(stateVariables)
     .innerJoin(projects, eq(stateVariables.projectId, projects.id))
-    .where(and(eq(stateVariables.id, stateVariableId), eq(projects.userId, userId)))
+    .where(
+      and(eq(stateVariables.id, stateVariableId), eq(projects.userId, userId))
+    )
     .limit(1);
 
   if (accessCheck.length === 0) {

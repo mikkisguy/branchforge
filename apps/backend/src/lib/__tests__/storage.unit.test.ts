@@ -35,7 +35,10 @@ describe("validateAvatarFilename", () => {
     { input: "/absolute/path.webp", reason: "absolute path" },
     { input: "C:\\Windows\\System32", reason: "Windows absolute path" },
     { input: "tëst.webp", reason: "contains non-ASCII Latin character" },
-    { input: "アバター.webp", reason: "contains non-ASCII Japanese characters" },
+    {
+      input: "アバター.webp",
+      reason: "contains non-ASCII Japanese characters",
+    },
     { input: "file\x00.webp", reason: "contains null byte injection" },
   ];
 
@@ -87,7 +90,6 @@ describe("validateAvatarFilename", () => {
       );
     });
   });
-
 });
 
 describe("getAvatarPath", () => {
