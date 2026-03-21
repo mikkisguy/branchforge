@@ -179,9 +179,9 @@ export function ScriptMode({
   }
 
   return (
-    <div className="flex-1 flex flex-col pt-16">
+    <div className="h-screen flex flex-col">
       {/* Main Editor Layout */}
-      <div className="flex-1 flex gap-4 px-8 pb-4 overflow-visible">
+      <div className="flex-1 flex gap-4 px-4 py-4 overflow-hidden">
         {/* Sidebar - File Tree */}
         <div className="w-56">
           <StoryPanel className="h-full">
@@ -234,7 +234,7 @@ export function ScriptMode({
           </div>
 
           {/* Editor */}
-          <StoryPanel className="flex-1 !mt-0">
+          <StoryPanel className="flex-1 !mt-0 overflow-hidden">
             {activeGitLabFile ? (
               <ScriptEditor content={activeFileLines} language="Ren'Py" />
             ) : activeLabel ? (

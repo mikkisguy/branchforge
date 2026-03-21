@@ -6,7 +6,7 @@ interface EditorProps {
 
 export function ScriptEditor({ content = [] }: EditorProps) {
   return (
-    <div className="font-mono text-sm h-full overflow-auto">
+    <div className="font-mono text-sm h-full overflow-auto p-2">
       <div className="flex">
         <div
           className="text-muted-foreground/30 pr-3 py-2 select-none text-right"
