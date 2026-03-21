@@ -535,7 +535,11 @@ export const renpyDefinitionTagSchema = z
 export const createRenpyDefinitionSchema = z
   .object({
     category: renpyDefinitionCategorySchema,
-    tag: z.string().trim().min(1, "Tag is required").max(100, "Tag is too long"),
+    tag: z
+      .string()
+      .trim()
+      .min(1, "Tag is required")
+      .max(100, "Tag is too long"),
     displayName: z.string().trim().min(1).max(200, "Display name is too long"),
     definitionCode: z.string().trim().min(1, "Definition code is required"),
     referenceTag: z.string().max(100).nullable().optional(),
@@ -557,7 +561,9 @@ export const createRenpyDefinitionSchema = z
       }
     } else {
       // Other categories require strict identifier format (no spaces)
-      const strictTagResult = renpyDefinitionTagStrictSchema.safeParse(data.tag);
+      const strictTagResult = renpyDefinitionTagStrictSchema.safeParse(
+        data.tag
+      );
       if (!strictTagResult.success) {
         strictTagResult.error.issues.forEach((issue) => {
           ctx.addIssue({
@@ -596,7 +602,9 @@ export const updateRenpyDefinitionSchema = z
     // If category is also provided, use category-aware validation
     if (data.category !== undefined) {
       if (data.category === "IMAGE") {
-        const imageTagResult = renpyDefinitionTagImageSchema.safeParse(data.tag);
+        const imageTagResult = renpyDefinitionTagImageSchema.safeParse(
+          data.tag
+        );
         if (!imageTagResult.success) {
           imageTagResult.error.issues.forEach((issue) => {
             ctx.addIssue({
@@ -607,7 +615,9 @@ export const updateRenpyDefinitionSchema = z
           });
         }
       } else {
-        const strictTagResult = renpyDefinitionTagStrictSchema.safeParse(data.tag);
+        const strictTagResult = renpyDefinitionTagStrictSchema.safeParse(
+          data.tag
+        );
         if (!strictTagResult.success) {
           strictTagResult.error.issues.forEach((issue) => {
             ctx.addIssue({
@@ -621,7 +631,9 @@ export const updateRenpyDefinitionSchema = z
     } else {
       // If only tag is provided (no category), use strict validation as safe default
       // The service layer will look up the existing category for full validation
-      const strictTagResult = renpyDefinitionTagStrictSchema.safeParse(data.tag);
+      const strictTagResult = renpyDefinitionTagStrictSchema.safeParse(
+        data.tag
+      );
       if (!strictTagResult.success) {
         strictTagResult.error.issues.forEach((issue) => {
           ctx.addIssue({

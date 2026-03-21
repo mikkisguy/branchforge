@@ -162,7 +162,6 @@ export function logHttpError(context: string, error: unknown): void {
   logError(LogEventType.SERVICE_ERROR, details, error);
 }
 
-
 /**
  * Log authentication/authorization errors
  * Reuses the pattern from auth.middleware.ts for consistency

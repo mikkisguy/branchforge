@@ -55,7 +55,11 @@ describe("ThemeContext", () => {
   function TestComponent() {
     const { theme, setTheme, colors } = useTheme();
     return (
-      <div data-theme={theme} data-primary={colors.primary} data-hover={colors.hover}>
+      <div
+        data-theme={theme}
+        data-primary={colors.primary}
+        data-hover={colors.hover}
+      >
         <button onClick={() => setTheme("forest")}>Set Forest</button>
       </div>
     );

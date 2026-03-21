@@ -102,9 +102,13 @@ export async function authenticate(
     request.user = session.user;
   } catch (error) {
     // Handle unexpected errors (session storage issues, etc.)
-    logError(LogEventType.AUTH_SESSION_INVALID, {
-      context: "authenticate",
-    }, error);
+    logError(
+      LogEventType.AUTH_SESSION_INVALID,
+      {
+        context: "authenticate",
+      },
+      error
+    );
     const internalError: InternalError = {
       error: "Internal Server Error",
       message: "Unable to verify authentication",
@@ -144,9 +148,13 @@ export async function optionalAuth(
     // If no user in session or invalid data, continue without error
   } catch (error) {
     // Log error but don't block the request
-    logError(LogEventType.AUTH_SESSION_INVALID, {
-      context: "optionalAuth",
-    }, error);
+    logError(
+      LogEventType.AUTH_SESSION_INVALID,
+      {
+        context: "optionalAuth",
+      },
+      error
+    );
     // Continue without authentication
   }
 }
@@ -224,9 +232,13 @@ export function requireRole(...allowedRoles: UserRole[]) {
       request.user = session.user;
     } catch (error) {
       // Handle unexpected errors
-      logError(LogEventType.AUTH_SESSION_INVALID, {
-        context: "requireRole",
-      }, error);
+      logError(
+        LogEventType.AUTH_SESSION_INVALID,
+        {
+          context: "requireRole",
+        },
+        error
+      );
       const internalError: InternalError = {
         error: "Internal Server Error",
         message: "Unable to verify authentication",

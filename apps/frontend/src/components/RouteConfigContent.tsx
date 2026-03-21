@@ -334,10 +334,7 @@ export function RouteConfigContent({ projectId }: RouteConfigContentProps) {
                   {/* Route Fields */}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <Label
-                        htmlFor={`route-key-${index}`}
-                        className="text-xs"
-                      >
+                      <Label htmlFor={`route-key-${index}`} className="text-xs">
                         Route Key *
                       </Label>
                       <Input
@@ -400,10 +397,7 @@ export function RouteConfigContent({ projectId }: RouteConfigContentProps) {
                     </div>
 
                     <div className="space-y-1">
-                      <Label
-                        htmlFor={`is-shared-${index}`}
-                        className="text-xs"
-                      >
+                      <Label htmlFor={`is-shared-${index}`} className="text-xs">
                         Route Type
                       </Label>
                       <select
@@ -448,7 +442,9 @@ export function RouteConfigContent({ projectId }: RouteConfigContentProps) {
                   onClick={handleSave}
                   disabled={!isValid || isSaving || isLoadingRouteConfigs}
                 >
-                  {isSaving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                  {isSaving && (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  )}
                   Save Routes
                 </Button>
               </div>

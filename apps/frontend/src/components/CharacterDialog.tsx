@@ -36,8 +36,8 @@ export function CharacterDialog({
           <div>
             <h2 className="text-lg font-medium">Character Management</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Manage characters for your visual novel project. Characters are NPCs
-              and love interests that appear in dialogue.
+              Manage characters for your visual novel project. Characters are
+              NPCs and love interests that appear in dialogue.
             </p>
           </div>
           <button

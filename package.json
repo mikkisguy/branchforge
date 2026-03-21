@@ -15,6 +15,7 @@
     "test:integration": "pnpm -r --filter './apps/*' test:integration",
     "test:e2e": "echo \"E2E tests not yet implemented\"",
     "dev": "VITE_API_ENV=development pnpm --parallel -r --filter './apps/*' dev",
+    "start": "pnpm --filter @branchforge/backend start",
     "build": "pnpm -r --filter './packages/*' --filter './apps/*' build",
     "lint": "pnpm --filter @branchforge/shared --filter @branchforge/backend lint",
     "lint:fix": "pnpm --filter @branchforge/shared --filter @branchforge/backend lint:fix",
@@ -28,8 +29,8 @@
     "pnpm": ">=9.0.0"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.29.8",
-    "@types/node": "^22.10.0",
+    "@changesets/cli": "^2.30.0",
+    "@types/node": "^22.19.15",
     "typescript": "^5.7.0"
   }
 }

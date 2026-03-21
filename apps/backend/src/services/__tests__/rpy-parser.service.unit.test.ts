@@ -639,6 +639,141 @@ label a:
       expect(result.labels).toEqual([]);
       expect(result.characters).toEqual([]);
     });
+
+    it("should skip labels inside screen blocks", () => {
+      const rpyWithScreens = `# Settings file
+define s = Character("Sylvie")
+
+screen game_menu():
+    tag menu
+    frame:
+        ## These should NOT be parsed as story labels
+        for i in range(3):
+            $ file_text = "slot"
+            button:
+                text file_text
+
+screen about():
+    text "About"
+    ## Internal identifiers should not be labels
+    $ page_label = "about"
+
+# This should be the only parsed label
+label start:
+    "Hello, world!"
+    s "Welcome!"
+`;
+
+      const result = parseRPYFileWithLabels(rpyWithScreens);
+
+      // Should only parse the actual story label, not screen internals
+      expect(result.labels).toHaveLength(1);
+      expect(result.labels[0].label).toBe("start");
+      expect(result.labels[0].dialogue).toHaveLength(2);
+    });
+
+    it("should skip labels inside init offset blocks", () => {
+      const rpyWithInitOffset = `label start:
+    "Before init"
+
+init 1:
+    label internal_init_label:
+        "This should be skipped"
+
+label after_init:
+    "After init"
+`;
+
+      const result = parseRPYFileWithLabels(rpyWithInitOffset);
+
+      // Should skip the label inside init offset block
+      expect(result.labels).toHaveLength(2);
+      expect(result.labels.map((l) => l.label)).toEqual([
+        "start",
+        "after_init",
+      ]);
+    });
+
+    it("should classify files with many screens and few labels as SETTINGS", () => {
+      // Simulates screens.rpy: many screen definitions, few/no story labels
+      const screensFile = `screen main_menu():
+    pass
+
+screen game_menu():
+    pass
+
+screen about():
+    pass
+
+screen preferences():
+    pass
+
+screen save():
+    pass
+
+screen load():
+    pass
+
+screen choices():
+    pass
+
+screen say():
+    pass
+
+label title:
+    # This is a UI label, not a story label
+    pass
+`;
+
+      const result = parseRPYFileWithLabels(screensFile);
+
+      // Heuristic: parseRPYFileWithLabels classifies files as SETTINGS when
+      // screenCount > labelCount * 2 (more than 2:1 screens-to-labels ratio)
+      // This case: 8 screens, 1 label → 8 > 1 * 2 → triggers SETTINGS classification
+      // which filters out the UI label, resulting in empty labels array
+      expect(result.fileType).toBe("SETTINGS");
+      expect(result.labels).toHaveLength(0);
+    });
+
+    it("should classify files with 'screen' in filename as SETTINGS regardless of content", () => {
+      const contentWithLabel = `label start:
+    "This is actual dialogue"
+    s "More dialogue"
+`;
+
+      // Without filename, would be classified as STORY
+      const resultWithoutFilename = parseRPYFileWithLabels(contentWithLabel);
+      expect(resultWithoutFilename.fileType).toBe("STORY");
+
+      // With exact screen definition filename, should be classified as SETTINGS
+      const resultWithFilename = parseRPYFileWithLabels(
+        contentWithLabel,
+        "screens.rpy"
+      );
+      expect(resultWithFilename.fileType).toBe("SETTINGS");
+
+      // Case insensitive for exact match
+      const resultWithCaps = parseRPYFileWithLabels(
+        contentWithLabel,
+        "Screens.rpy"
+      );
+      expect(resultWithCaps.fileType).toBe("SETTINGS");
+
+      // Singular "screen.rpy" is also recognized
+      const resultWithSingular = parseRPYFileWithLabels(
+        contentWithLabel,
+        "screen.rpy"
+      );
+      expect(resultWithSingular.fileType).toBe("SETTINGS");
+
+      // Files with "screen" in name but not exact match are NOT classified as SETTINGS
+      // This prevents misclassifying files like "screenshot.rpy" or "my-screen-scene.rpy"
+      const resultWithPartial = parseRPYFileWithLabels(
+        contentWithLabel,
+        "screenshot.rpy"
+      );
+      expect(resultWithPartial.fileType).toBe("STORY");
+    });
   });
 
   describe("convertToBranchForgeFormatFromLabels", () => {

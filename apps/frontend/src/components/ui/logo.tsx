@@ -6,7 +6,11 @@ interface LogoProps {
   size?: "xs" | "sm" | "md" | "lg";
 }
 
-export function Logo({ className = "", compact = false, size = "lg" }: LogoProps) {
+export function Logo({
+  className = "",
+  compact = false,
+  size = "lg",
+}: LogoProps) {
   const sizeClasses = {
     xs: compact ? "text-lg" : "text-xl",
     sm: compact ? "text-xl" : "text-2xl",
@@ -16,9 +20,7 @@ export function Logo({ className = "", compact = false, size = "lg" }: LogoProps
 
   return (
     <h1
-      className={`font-display tracking-wide leading-tight pb-2 ${className} ${
-        sizeClasses[size]
-      }`}
+      className={`font-display tracking-wide leading-tight pb-2 ${className} ${sizeClasses[size]}`}
       style={{
         background:
           "linear-gradient(135deg, var(--theme-color) 0%, white 50%, var(--theme-color) 100%)",

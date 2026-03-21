@@ -126,6 +126,102 @@ function isValidLabel(label: string): boolean {
 }
 
 /**
+ * Result of block tracking: which lines are inside screen/init offset blocks.
+ */
+interface BlockTrackingResult {
+  /** Set of line indices (0-based) that are inside screen or init offset blocks */
+  skipLines: Set<number>;
+  /** Number of top-level screen definitions found */
+  screenCount: number;
+  /** Number of top-level label definitions found */
+  labelCount: number;
+}
+
+/**
+ * Track screen and init offset blocks in RPY content.
+ *
+ * This shared helper is used by both computeSkipLines (for skip logic) and
+ * parseRPYFileWithLabels (for file type detection), eliminating code duplication
+ * and ensuring consistent blank-line handling.
+ *
+ * RPY files use Python-like indentation for block nesting. Screen blocks and
+ * init offset blocks should be skipped during label/dialogue extraction since
+ * they define UI elements or initialization code, not story content.
+ *
+ * @param lines - Array of RPY file lines
+ * @param countLabels - Whether to count label definitions (default: false)
+ * @returns BlockTrackingResult with skip lines set and optional counts
+ */
+function trackBlocks(
+  lines: string[],
+  countLabels: boolean = false
+): BlockTrackingResult {
+  const skipLines = new Set<number>();
+  const screenStack: number[] = [];
+  const initOffsetStack: number[] = [];
+  let screenCount = 0;
+  let labelCount = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Handle blank/whitespace-only lines early - they shouldn't affect block tracking.
+    // Blank lines inside blocks are skipped but don't affect stack state.
+    if (trimmed === "") {
+      if (screenStack.length > 0 || initOffsetStack.length > 0) {
+        skipLines.add(i);
+      }
+      continue;
+    }
+
+    const lineIndent = line.search(/\S/);
+
+    // Track screen blocks (UI definitions)
+    if (/^screen\s+[a-zA-Z_][a-zA-Z0-9_-]*/.test(trimmed)) {
+      screenStack.push(lineIndent);
+      skipLines.add(i);
+      screenCount++;
+      continue;
+    }
+
+    // Track init offset blocks (initialization with priority)
+    if (/^init\s+\d+\s*:/.test(trimmed)) {
+      initOffsetStack.push(lineIndent);
+      skipLines.add(i);
+      continue;
+    }
+
+    // Pop from stack when we exit blocks (indentation decreased to block level or below)
+    while (
+      screenStack.length > 0 &&
+      lineIndent <= screenStack[screenStack.length - 1]
+    ) {
+      screenStack.pop();
+    }
+    while (
+      initOffsetStack.length > 0 &&
+      lineIndent <= initOffsetStack[initOffsetStack.length - 1]
+    ) {
+      initOffsetStack.pop();
+    }
+
+    // Skip if we're inside a block
+    if (screenStack.length > 0 || initOffsetStack.length > 0) {
+      skipLines.add(i);
+      continue;
+    }
+
+    // Count top-level labels (not inside screens/init blocks)
+    if (countLabels && /^label\s+([a-zA-Z_][a-zA-Z0-9_]*)/.test(trimmed)) {
+      labelCount++;
+    }
+  }
+
+  return { skipLines, screenCount, labelCount };
+}
+
+/**
  * Options for reconstructing RPY file with updated dialogue
  * Used for Write Mode saves to merge dialogue changes with original keywords
  */
@@ -712,9 +808,13 @@ function extractCharacters(
  *
  * For Script Mode: Full file content is used directly without parsing
  * For Write Mode: This function provides label-specific dialogue for editing
+ *
+ * @param content - The RPY file content
+ * @param filename - Optional filename to help with file type detection
  */
 export function parseRPYFileWithLabels(
-  content: string
+  content: string,
+  filename?: string
 ): ParsedRPYFileWithLabels {
   const lines = content.split("\n");
   const result: ParsedRPYFileWithLabels = {
@@ -728,7 +828,28 @@ export function parseRPYFileWithLabels(
   const hasScreenDefinitions = /^\s*screen\s+\w+/m.test(content);
   const hasLabelDefinitions = /^\s*label\s+/m.test(content);
 
-  if (hasCharacterDefinitions || hasScreenDefinitions) {
+  // Count actual screen and label definitions (excluding those inside blocks)
+  // Use shared trackBlocks helper to avoid duplicating block-tracking logic
+  // Also capture skipLines for reuse below (avoid redundant computeSkipLines call)
+  const { screenCount, labelCount, skipLines } = trackBlocks(lines, true);
+
+  // Check if filename indicates this is a screens/settings file
+  // Files named "screens.rpy" or "screen.rpy" are always SETTINGS
+  // We extract the basename to avoid matching directory paths like "gui/screens/dialogue.rpy"
+  const basename = filename
+    ? filename.split("/").pop()!.split("\\").pop()!
+    : "";
+  const isScreenFile = /^screens?\.rpy$/i.test(basename);
+
+  if (isScreenFile) {
+    // Filename-based detection: files named with "screen" are SETTINGS
+    result.fileType = "SETTINGS";
+  } else if (screenCount > 0 && screenCount > labelCount * 2) {
+    // Fallback: Files with significantly more screens than labels are SETTINGS files
+    // This prevents importing UI labels like "title" from screens.rpy as story content
+    // We use a 2:1 ratio: if screens > labels * 2, it's primarily a screen file
+    result.fileType = "SETTINGS";
+  } else if (hasCharacterDefinitions || hasScreenDefinitions) {
     // If file has characters/screens but no labels, it's a SETTINGS file
     // If it has both, we'll treat it as SETTINGS but still parse labels if present
     if (!hasLabelDefinitions) {
@@ -753,10 +874,15 @@ export function parseRPYFileWithLabels(
     let labelStartLine = 0;
 
     for (let i = 0; i < lines.length; i++) {
+      // Skip lines inside screen/init blocks
+      if (skipLines.has(i)) {
+        continue;
+      }
+
       const line = lines[i];
       const trimmed = line.trim();
 
-      // Check for label definition
+      // Check for label definition (only top-level labels)
       const labelMatch = line.match(/^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
       if (labelMatch) {
         const matchedLabel = labelMatch[1];
@@ -845,7 +971,14 @@ export function parseRPYFileWithLabels(
     // Now extract choices and jumps for each label
     // We need to track which label we're in and associate choices/jumps with it
     let currentLabelForTracking = "";
+
+    // Reuse the pre-computed skipLines to avoid duplicating screen block logic
     for (let i = 0; i < lines.length; i++) {
+      // Skip lines inside screen/init blocks
+      if (skipLines.has(i)) {
+        continue;
+      }
+
       const line = lines[i];
       const trimmed = line.trim();
 

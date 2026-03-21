@@ -134,6 +134,14 @@ export async function gracefulShutdown(
     logInfo(LogEventType.SERVICE_SHUTDOWN_COMPLETE, {
       durationMs: duration,
     });
+
+    // Give pending promises a chance to complete before exiting
+    // This is especially important for the session store's background retry operations
+    // that run without being awaited
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Force exit - in dev mode, tsx wrapper may still report "force killing"
+    // but the actual cleanup has completed successfully
     process.exit(exitCode);
   } catch (error) {
     logError(

@@ -276,9 +276,7 @@ export async function exportToGitlab(
         gitlabFileId: labels.gitlabFileId,
       })
       .from(labels)
-      .where(
-        and(eq(labels.projectId, projectId), isNull(labels.deletedAt))
-      );
+      .where(and(eq(labels.projectId, projectId), isNull(labels.deletedAt)));
 
     // Create a map of file ID to labels for that file
     const labelsByFile = new Map<string, typeof projectLabels>();
@@ -528,8 +526,8 @@ export async function importFromGitlab(
 
       const { file, content } = result.value;
 
-      // Parse with new label-aware parser
-      const parsed = parseRPYFileWithLabels(content);
+      // Parse with new label-aware parser, passing filename for better detection
+      const parsed = parseRPYFileWithLabels(content, file.path);
 
       // Create or update gitlab_files record with full content for Script Mode
       const [gitlabFile] = await db
@@ -985,8 +983,8 @@ export async function detectConflicts(
 
       const { gitlabFile, content } = result.value;
 
-      // Parse with new label-aware parser
-      const parsed = parseRPYFileWithLabels(content);
+      // Parse with new label-aware parser, passing filename for better detection
+      const parsed = parseRPYFileWithLabels(content, gitlabFile.filePath);
       const remoteLabels = new Set(parsed.labels.map((l) => l.label));
       const localLabels = localLabelsByFile.get(gitlabFile.id) || new Set();
 

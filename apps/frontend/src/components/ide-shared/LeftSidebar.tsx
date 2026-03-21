@@ -132,11 +132,15 @@ export function LeftSidebar({
 
           {/* Mode Switcher - vertical when collapsed, horizontal when expanded */}
           <div
-            className={`${isCollapsed ? "flex-col gap-1" : "flex"} bg-muted/50 rounded-md p-0.5`}
+            className={`${
+              isCollapsed ? "flex-col gap-1" : "flex"
+            } bg-muted/50 rounded-md p-0.5`}
           >
             <button
               onClick={() => setMode("write")}
-              className={`flex ${isCollapsed ? "w-full px-2.5 py-2.5" : "flex-1 px-2 py-1.5"} items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-sm font-medium transition-all ${
+              className={`flex ${
+                isCollapsed ? "w-full px-2.5 py-2.5" : "flex-1 px-2 py-1.5"
+              } items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-sm font-medium transition-all ${
                 mode === "write"
                   ? "text-white bg-[var(--theme-color)]"
                   : "text-muted-foreground hover:text-foreground"
@@ -148,7 +152,9 @@ export function LeftSidebar({
             </button>
             <button
               onClick={() => setMode("script")}
-              className={`flex ${isCollapsed ? "w-full px-2.5 py-2.5" : "flex-1 px-2 py-1.5"} items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-all ${
+              className={`flex ${
+                isCollapsed ? "w-full px-2.5 py-2.5" : "flex-1 px-2 py-1.5"
+              } items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-all ${
                 mode === "script"
                   ? "text-white bg-[var(--theme-color)]"
                   : "text-muted-foreground hover:text-foreground"
@@ -251,7 +257,9 @@ export function LeftSidebar({
             <button
               onClick={() => setIsRoutesOpen(true)}
               disabled={!projectId}
-              className={`flex items-center ${isCollapsed ? "justify-center px-2.5 py-2.5" : "gap-3 px-2 py-2"} rounded-md text-sm font-medium transition-colors ${
+              className={`flex items-center ${
+                isCollapsed ? "justify-center px-2.5 py-2.5" : "gap-3 px-2 py-2"
+              } rounded-md text-sm font-medium transition-colors ${
                 !projectId
                   ? "text-muted-foreground/50 cursor-not-allowed"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -266,7 +274,9 @@ export function LeftSidebar({
             <button
               onClick={() => setIsStateVarsOpen(true)}
               disabled={!projectId}
-              className={`flex items-center ${isCollapsed ? "justify-center px-2.5 py-2.5" : "gap-3 px-2 py-2"} rounded-md text-sm font-medium transition-colors ${
+              className={`flex items-center ${
+                isCollapsed ? "justify-center px-2.5 py-2.5" : "gap-3 px-2 py-2"
+              } rounded-md text-sm font-medium transition-colors ${
                 !projectId
                   ? "text-muted-foreground/50 cursor-not-allowed"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -281,7 +291,9 @@ export function LeftSidebar({
             <button
               onClick={() => setIsCharactersOpen(true)}
               disabled={!projectId}
-              className={`flex items-center ${isCollapsed ? "justify-center px-2.5 py-2.5" : "gap-3 px-2 py-2"} rounded-md text-sm font-medium transition-colors ${
+              className={`flex items-center ${
+                isCollapsed ? "justify-center px-2.5 py-2.5" : "gap-3 px-2 py-2"
+              } rounded-md text-sm font-medium transition-colors ${
                 !projectId
                   ? "text-muted-foreground/50 cursor-not-allowed"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -299,7 +311,9 @@ export function LeftSidebar({
           {/* Collapse/Expand Toggle */}
           <button
             onClick={handleToggleCollapse}
-            className={`flex items-center ${isCollapsed ? "justify-center px-2.5 py-2.5" : "gap-3 px-2 py-2"} rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors`}
+            className={`flex items-center ${
+              isCollapsed ? "justify-center px-2.5 py-2.5" : "gap-3 px-2 py-2"
+            } rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors`}
             title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {isCollapsed ? (
@@ -379,7 +393,9 @@ export function LeftSidebar({
           {/* Settings */}
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className={`flex items-center ${isCollapsed ? "justify-center px-2.5 py-2.5" : "gap-3 px-2 py-2"} rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors`}
+            className={`flex items-center ${
+              isCollapsed ? "justify-center px-2.5 py-2.5" : "gap-3 px-2 py-2"
+            } rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors`}
             title="Settings"
           >
             <Settings className="w-4 h-4 flex-shrink-0" />
@@ -389,7 +405,9 @@ export function LeftSidebar({
           {/* Logout */}
           <button
             onClick={onLogout}
-            className={`flex items-center ${isCollapsed ? "justify-center px-2.5 py-2.5" : "gap-3 px-2 py-2"} rounded-md text-sm font-medium text-muted-foreground hover:text-destructive-muted hover:bg-destructive/10 transition-colors`}
+            className={`flex items-center ${
+              isCollapsed ? "justify-center px-2.5 py-2.5" : "gap-3 px-2 py-2"
+            } rounded-md text-sm font-medium text-muted-foreground hover:text-destructive-muted hover:bg-destructive/10 transition-colors`}
             title="Logout"
           >
             <LogOut className="w-4 h-4 flex-shrink-0" />

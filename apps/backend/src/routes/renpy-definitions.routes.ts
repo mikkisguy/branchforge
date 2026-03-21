@@ -84,9 +84,7 @@ async function listRenpyDefinitionsByProjectHandler(
 
   const renpyDefinitions = await listRenpyDefinitions(projectId, user.id);
 
-  reply
-    .status(200)
-    .send({ renpyDefinitions } as ListRenpyDefinitionsResponse);
+  reply.status(200).send({ renpyDefinitions } as ListRenpyDefinitionsResponse);
 }
 
 /**
@@ -102,10 +100,7 @@ async function getRenpyDefinitionHandler(
   const { renpyDefinitionId } = request.params;
   const user = request.user!;
 
-  const renpyDefinition = await getRenpyDefinition(
-    renpyDefinitionId,
-    user.id
-  );
+  const renpyDefinition = await getRenpyDefinition(renpyDefinitionId, user.id);
 
   if (!renpyDefinition) {
     reply
@@ -114,9 +109,7 @@ async function getRenpyDefinitionHandler(
     return;
   }
 
-  reply
-    .status(200)
-    .send({ renpyDefinition } as GetRenpyDefinitionResponse);
+  reply.status(200).send({ renpyDefinition } as GetRenpyDefinitionResponse);
 }
 
 /**
@@ -136,15 +129,9 @@ async function createRenpyDefinitionByProjectHandler(
   const user = request.user!;
   const body = request.body;
 
-  const renpyDefinition = await createRenpyDefinition(
-    user.id,
-    projectId,
-    body
-  );
+  const renpyDefinition = await createRenpyDefinition(user.id, projectId, body);
 
-  reply
-    .status(201)
-    .send({ renpyDefinition } as CreateRenpyDefinitionResponse);
+  reply.status(201).send({ renpyDefinition } as CreateRenpyDefinitionResponse);
 }
 
 /**
@@ -177,9 +164,7 @@ async function updateRenpyDefinitionHandler(
     return;
   }
 
-  reply
-    .status(200)
-    .send({ renpyDefinition } as UpdateRenpyDefinitionResponse);
+  reply.status(200).send({ renpyDefinition } as UpdateRenpyDefinitionResponse);
 }
 
 /**

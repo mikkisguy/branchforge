@@ -16,7 +16,13 @@ import type { Session } from "fastify";
 import { getDb } from "../db/index.js";
 import { userSessions } from "../db/schema/index.js";
 import { eq, lt } from "drizzle-orm";
-import { logError, logWarn, logInfo, LogEventType, redactSensitiveKey } from "../lib/logger.js";
+import {
+  logError,
+  logWarn,
+  logInfo,
+  LogEventType,
+  redactSensitiveKey,
+} from "../lib/logger.js";
 
 type Callback = (err?: Error | null) => void;
 type CallbackSession = (err: Error | null, result?: Session | null) => void;
@@ -77,9 +83,13 @@ class DeadLetterQueue {
         this.alertCallback(entry);
       } catch (err) {
         // Log but don't throw - alert callback failures shouldn't disrupt session flow
-        logError(LogEventType.SESSION_STORE_ERROR, {
-          event: "dead_letter_alert_callback_failed",
-        }, err);
+        logError(
+          LogEventType.SESSION_STORE_ERROR,
+          {
+            event: "dead_letter_alert_callback_failed",
+          },
+          err
+        );
       }
     }
   }
@@ -316,11 +326,15 @@ export class DrizzleSessionStore implements SessionStore {
         retryCount: this.retryOptions.maxRetries,
       });
 
-      logError(LogEventType.SESSION_STORE_ERROR, {
-        event: "session_set_failed",
-        sessionId,
-        retryCount: this.retryOptions.maxRetries,
-      }, err);
+      logError(
+        LogEventType.SESSION_STORE_ERROR,
+        {
+          event: "session_set_failed",
+          sessionId,
+          retryCount: this.retryOptions.maxRetries,
+        },
+        err
+      );
     });
   }
 
@@ -382,10 +396,14 @@ export class DrizzleSessionStore implements SessionStore {
     this.getAsync(sessionId)
       .then((session) => callback(null, session))
       .catch((err) => {
-        logError(LogEventType.SESSION_STORE_ERROR, {
-          event: "session_get_error",
-          sessionId,
-        }, err);
+        logError(
+          LogEventType.SESSION_STORE_ERROR,
+          {
+            event: "session_get_error",
+            sessionId,
+          },
+          err
+        );
         // Return null on error - session will be treated as not found
         callback(null, null);
       });
@@ -450,11 +468,15 @@ export class DrizzleSessionStore implements SessionStore {
         retryCount: this.retryOptions.maxRetries,
       });
 
-      logError(LogEventType.SESSION_STORE_ERROR, {
-        event: "session_destroy_failed",
-        sessionId,
-        retryCount: this.retryOptions.maxRetries,
-      }, err);
+      logError(
+        LogEventType.SESSION_STORE_ERROR,
+        {
+          event: "session_destroy_failed",
+          sessionId,
+          retryCount: this.retryOptions.maxRetries,
+        },
+        err
+      );
     });
   }
 
@@ -491,9 +513,13 @@ export class DrizzleSessionStore implements SessionStore {
 
       return result.rowCount ?? 0;
     } catch (error) {
-      logError(LogEventType.SESSION_STORE_ERROR, {
-        event: "session_cleanup_error",
-      }, error);
+      logError(
+        LogEventType.SESSION_STORE_ERROR,
+        {
+          event: "session_cleanup_error",
+        },
+        error
+      );
       return 0;
     }
   }

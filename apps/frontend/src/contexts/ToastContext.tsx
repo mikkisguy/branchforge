@@ -117,7 +117,9 @@ function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
           className="pointer-events-auto animate-in slide-in-from-right-4 fade-in-50 duration-300"
         >
           <div
-            className={`flex items-start gap-3 rounded-md border p-4 shadow-lg min-w-[300px] max-w-md ${getToastClasses(toast.variant)}`}
+            className={`flex items-start gap-3 rounded-md border p-4 shadow-lg min-w-[300px] max-w-md ${getToastClasses(
+              toast.variant
+            )}`}
           >
             <div className="flex-1">
               {toast.title && (

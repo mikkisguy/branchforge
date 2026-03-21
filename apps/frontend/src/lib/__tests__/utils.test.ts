@@ -13,7 +13,11 @@ describe("cn (className utility)", () => {
   });
 
   it("should handle conditional classes", () => {
-    expect(cn("base", true && "active", false && "inactive")).toBe("base active");
+    const isActive = true;
+    const isInactive = false;
+    expect(cn("base", isActive && "active", isInactive && "inactive")).toBe(
+      "base active"
+    );
   });
 
   it("should handle undefined and null values", () => {
@@ -29,9 +33,7 @@ describe("cn (className utility)", () => {
   });
 
   it("should handle objects with boolean values", () => {
-    expect(cn({ "px-2": true, "py-1": false, "block": true })).toBe(
-      "px-2 block"
-    );
+    expect(cn({ "px-2": true, "py-1": false, block: true })).toBe("px-2 block");
   });
 
   it("should merge Tailwind classes correctly (later wins for conflicting classes)", () => {
@@ -51,10 +53,7 @@ describe("cn (className utility)", () => {
   it("should handle deeply nested class conflicts", () => {
     // Test that tailwind-merge handles conflicts properly
     expect(
-      cn(
-        "text-sm font-medium text-gray-700",
-        "text-lg font-bold text-gray-900"
-      )
+      cn("text-sm font-medium text-gray-700", "text-lg font-bold text-gray-900")
     ).toBe("text-lg font-bold text-gray-900");
   });
 

@@ -108,9 +108,9 @@ export function RenpyDefinitionsDialog({
   const { error } = useToast();
 
   // Form state
-  const [definitionsList, setDefinitionsList] = useState<
-    RenpyDefinitionForm[]
-  >([]);
+  const [definitionsList, setDefinitionsList] = useState<RenpyDefinitionForm[]>(
+    []
+  );
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<
     RenpyDefinitionCategory | "ALL"
@@ -194,7 +194,11 @@ export function RenpyDefinitionsDialog({
    * Update Ren'Py definition field
    */
   const updateDefinitionField = useCallback(
-    (index: number, field: keyof RenpyDefinitionForm, value: string | number) => {
+    (
+      index: number,
+      field: keyof RenpyDefinitionForm,
+      value: string | number
+    ) => {
       setDefinitionsList((prev) => {
         const newDefinitions = [...prev];
         newDefinitions[index] = {
@@ -217,9 +221,7 @@ export function RenpyDefinitionsDialog({
         // Delete existing definition
         try {
           await deleteRenpyDefinition(definition.id);
-          setDefinitionsList((prev) =>
-            prev.filter((_, i) => i !== index)
-          );
+          setDefinitionsList((prev) => prev.filter((_, i) => i !== index));
         } catch {
           // Error is handled by the hook's toast
         }
@@ -336,10 +338,13 @@ export function RenpyDefinitionsDialog({
         {/* Header */}
         <div className="p-6 border-b border-border/30 flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-medium">Ren'Py Definitions Management</h2>
+            <h2 className="text-lg font-medium">
+              Ren'Py Definitions Management
+            </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Ren'Py definitions are static declarations exported to definitions.rpy.
-              Manage characters, transforms, images, and init statements for your project.
+              Ren'Py definitions are static declarations exported to
+              definitions.rpy. Manage characters, transforms, images, and init
+              statements for your project.
             </p>
           </div>
           <button
@@ -397,7 +402,9 @@ export function RenpyDefinitionsDialog({
                   <p className="text-sm text-muted-foreground mb-4">
                     {selectedCategory === "ALL"
                       ? "No Ren'Py definitions configured yet. Add your first definition to get started."
-                      : `No ${CATEGORIES.find((c) => c.value === selectedCategory)?.label.toLowerCase()} configured yet.`}
+                      : `No ${CATEGORIES.find(
+                          (c) => c.value === selectedCategory
+                        )?.label.toLowerCase()} configured yet.`}
                   </p>
                   <Button
                     type="button"
@@ -410,252 +417,259 @@ export function RenpyDefinitionsDialog({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {filteredDefinitionsWithIndices.map(({ definition, originalIndex }) => {
-                    const isEditing = editingIndex === originalIndex;
-                    const validationError =
-                      validateRenpyDefinition(definition);
+                  {filteredDefinitionsWithIndices.map(
+                    ({ definition, originalIndex }) => {
+                      const isEditing = editingIndex === originalIndex;
+                      const validationError =
+                        validateRenpyDefinition(definition);
 
-                    return (
-                      <div
-                        key={definition.id || originalIndex}
-                        className="border border-border/30 rounded-md p-4 space-y-3"
-                      >
-                        {/* View Mode */}
-                        {!isEditing ? (
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2">
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                                  {definition.category}
-                                </span>
-                                <span className="font-medium font-mono text-sm">
-                                  {definition.displayName}
-                                </span>
-                                {definition.tag && (
-                                  <span className="text-xs text-muted-foreground font-mono">
-                                    ({definition.tag})
+                      return (
+                        <div
+                          key={definition.id || originalIndex}
+                          className="border border-border/30 rounded-md p-4 space-y-3"
+                        >
+                          {/* View Mode */}
+                          {!isEditing ? (
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                    {definition.category}
                                   </span>
-                                )}
+                                  <span className="font-medium font-mono text-sm">
+                                    {definition.displayName}
+                                  </span>
+                                  {definition.tag && (
+                                    <span className="text-xs text-muted-foreground font-mono">
+                                      ({definition.tag})
+                                    </span>
+                                  )}
+                                </div>
+                                <pre className="text-xs bg-muted p-2 rounded overflow-x-auto">
+                                  <code>{definition.definitionCode}</code>
+                                </pre>
                               </div>
-                              <pre className="text-xs bg-muted p-2 rounded overflow-x-auto">
-                                <code>{definition.definitionCode}</code>
-                              </pre>
-                            </div>
-                            <div className="flex items-center gap-2 ml-4">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setEditingIndex(originalIndex)}
-                                disabled={isSaving}
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeDefinition(originalIndex)}
-                                disabled={isSaving}
-                                className="text-destructive hover:text-destructive"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          /* Edit Mode */
-                          <div className="space-y-3">
-                            <div className="grid grid-cols-4 gap-3">
-                              <div className="space-y-1">
-                                <Label
-                                  htmlFor={`definition-category-${originalIndex}`}
-                                  className="text-xs"
+                              <div className="flex items-center gap-2 ml-4">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setEditingIndex(originalIndex)}
+                                  disabled={isSaving}
                                 >
-                                  Category *
-                                </Label>
-                                <select
-                                  id={`definition-category-${originalIndex}`}
-                                  value={definition.category}
-                                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                                    updateDefinitionField(
-                                      originalIndex,
-                                      "category",
-                                      e.target.value
-                                    )
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() =>
+                                    removeDefinition(originalIndex)
                                   }
                                   disabled={isSaving}
-                                  className="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background"
+                                  className="text-destructive hover:text-destructive"
                                 >
-                                  {CATEGORIES.map((cat) => (
-                                    <option key={cat.value} value={cat.value}>
-                                      {cat.label}
-                                    </option>
-                                  ))}
-                                </select>
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            /* Edit Mode */
+                            <div className="space-y-3">
+                              <div className="grid grid-cols-4 gap-3">
+                                <div className="space-y-1">
+                                  <Label
+                                    htmlFor={`definition-category-${originalIndex}`}
+                                    className="text-xs"
+                                  >
+                                    Category *
+                                  </Label>
+                                  <select
+                                    id={`definition-category-${originalIndex}`}
+                                    value={definition.category}
+                                    onChange={(
+                                      e: React.ChangeEvent<HTMLSelectElement>
+                                    ) =>
+                                      updateDefinitionField(
+                                        originalIndex,
+                                        "category",
+                                        e.target.value
+                                      )
+                                    }
+                                    disabled={isSaving}
+                                    className="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background"
+                                  >
+                                    {CATEGORIES.map((cat) => (
+                                      <option key={cat.value} value={cat.value}>
+                                        {cat.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <Label
+                                    htmlFor={`definition-tag-${originalIndex}`}
+                                    className="text-xs"
+                                  >
+                                    Tag *
+                                  </Label>
+                                  <Input
+                                    id={`definition-tag-${originalIndex}`}
+                                    type="text"
+                                    placeholder={
+                                      definition.category === "IMAGE"
+                                        ? "bg cafe"
+                                        : "my_character"
+                                    }
+                                    value={definition.tag}
+                                    onChange={(e) =>
+                                      updateDefinitionField(
+                                        originalIndex,
+                                        "tag",
+                                        e.target.value
+                                      )
+                                    }
+                                    disabled={isSaving}
+                                  />
+                                  <p className="text-xs text-muted-foreground">
+                                    {definition.category === "IMAGE"
+                                      ? "Space-separated identifiers (e.g., bg cafe)"
+                                      : "Unique identifier (no spaces)"}
+                                  </p>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <Label
+                                    htmlFor={`definition-name-${originalIndex}`}
+                                    className="text-xs"
+                                  >
+                                    Display Name *
+                                  </Label>
+                                  <Input
+                                    id={`definition-name-${originalIndex}`}
+                                    type="text"
+                                    placeholder="My Character"
+                                    value={definition.displayName}
+                                    onChange={(e) =>
+                                      updateDefinitionField(
+                                        originalIndex,
+                                        "displayName",
+                                        e.target.value
+                                      )
+                                    }
+                                    disabled={isSaving}
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <Label
+                                    htmlFor={`definition-sort-${originalIndex}`}
+                                    className="text-xs"
+                                  >
+                                    Sort Order
+                                  </Label>
+                                  <Input
+                                    id={`definition-sort-${originalIndex}`}
+                                    type="number"
+                                    min="0"
+                                    value={definition.sortOrder}
+                                    onChange={(e) =>
+                                      updateDefinitionField(
+                                        originalIndex,
+                                        "sortOrder",
+                                        parseInt(e.target.value) || 0
+                                      )
+                                    }
+                                    disabled={isSaving}
+                                  />
+                                </div>
                               </div>
 
                               <div className="space-y-1">
                                 <Label
-                                  htmlFor={`definition-tag-${originalIndex}`}
+                                  htmlFor={`definition-code-${originalIndex}`}
                                   className="text-xs"
                                 >
-                                  Tag *
+                                  Definition Code *
                                 </Label>
-                                <Input
-                                  id={`definition-tag-${originalIndex}`}
-                                  type="text"
-                                  placeholder={
-                                    definition.category === "IMAGE"
-                                      ? "bg cafe"
-                                      : "my_character"
-                                  }
-                                  value={definition.tag}
+                                <Textarea
+                                  id={`definition-code-${originalIndex}`}
+                                  placeholder='define my_character = Character("My Name", color="#cfcfcf")'
+                                  value={definition.definitionCode}
                                   onChange={(e) =>
                                     updateDefinitionField(
                                       originalIndex,
-                                      "tag",
+                                      "definitionCode",
+                                      e.target.value
+                                    )
+                                  }
+                                  disabled={isSaving}
+                                  rows={3}
+                                  className="font-mono text-sm"
+                                />
+                              </div>
+
+                              <div className="space-y-1">
+                                <Label
+                                  htmlFor={`definition-ref-${originalIndex}`}
+                                  className="text-xs"
+                                >
+                                  Reference Tag
+                                </Label>
+                                <Input
+                                  id={`definition-ref-${originalIndex}`}
+                                  type="text"
+                                  placeholder="Optional reference tag"
+                                  value={definition.referenceTag}
+                                  onChange={(e) =>
+                                    updateDefinitionField(
+                                      originalIndex,
+                                      "referenceTag",
                                       e.target.value
                                     )
                                   }
                                   disabled={isSaving}
                                 />
-                                <p className="text-xs text-muted-foreground">
-                                  {definition.category === "IMAGE"
-                                    ? "Space-separated identifiers (e.g., bg cafe)"
-                                    : "Unique identifier (no spaces)"}
+                              </div>
+
+                              {validationError && (
+                                <p className="text-xs text-destructive">
+                                  {validationError}
                                 </p>
-                              </div>
+                              )}
 
-                              <div className="space-y-1">
-                                <Label
-                                  htmlFor={`definition-name-${originalIndex}`}
-                                  className="text-xs"
-                                >
-                                  Display Name *
-                                </Label>
-                                <Input
-                                  id={`definition-name-${originalIndex}`}
-                                  type="text"
-                                  placeholder="My Character"
-                                  value={definition.displayName}
-                                  onChange={(e) =>
-                                    updateDefinitionField(
-                                      originalIndex,
-                                      "displayName",
-                                      e.target.value
-                                    )
-                                  }
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => cancelEdit(originalIndex)}
                                   disabled={isSaving}
-                                />
-                              </div>
-
-                              <div className="space-y-1">
-                                <Label
-                                  htmlFor={`definition-sort-${originalIndex}`}
-                                  className="text-xs"
                                 >
-                                  Sort Order
-                                </Label>
-                                <Input
-                                  id={`definition-sort-${originalIndex}`}
-                                  type="number"
-                                  min="0"
-                                  value={definition.sortOrder}
-                                  onChange={(e) =>
-                                    updateDefinitionField(
-                                      originalIndex,
-                                      "sortOrder",
-                                      parseInt(e.target.value) || 0
-                                    )
+                                  Cancel
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() => saveDefinition(originalIndex)}
+                                  disabled={
+                                    !isDefinitionValid(originalIndex) ||
+                                    isSaving
                                   }
-                                  disabled={isSaving}
-                                />
+                                >
+                                  {isSaving && (
+                                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                  )}
+                                  Save
+                                </Button>
                               </div>
                             </div>
-
-                            <div className="space-y-1">
-                              <Label
-                                htmlFor={`definition-code-${originalIndex}`}
-                                className="text-xs"
-                              >
-                                Definition Code *
-                              </Label>
-                              <Textarea
-                                id={`definition-code-${originalIndex}`}
-                                placeholder='define my_character = Character("My Name", color="#cfcfcf")'
-                                value={definition.definitionCode}
-                                onChange={(e) =>
-                                  updateDefinitionField(
-                                    originalIndex,
-                                    "definitionCode",
-                                    e.target.value
-                                  )
-                                }
-                                disabled={isSaving}
-                                rows={3}
-                                className="font-mono text-sm"
-                              />
-                            </div>
-
-                            <div className="space-y-1">
-                              <Label
-                                htmlFor={`definition-ref-${originalIndex}`}
-                                className="text-xs"
-                              >
-                                Reference Tag
-                              </Label>
-                              <Input
-                                id={`definition-ref-${originalIndex}`}
-                                type="text"
-                                placeholder="Optional reference tag"
-                                value={definition.referenceTag}
-                                onChange={(e) =>
-                                  updateDefinitionField(
-                                    originalIndex,
-                                    "referenceTag",
-                                    e.target.value
-                                  )
-                                }
-                                disabled={isSaving}
-                              />
-                            </div>
-
-                            {validationError && (
-                              <p className="text-xs text-destructive">
-                                {validationError}
-                              </p>
-                            )}
-
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => cancelEdit(originalIndex)}
-                                disabled={isSaving}
-                              >
-                                Cancel
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                onClick={() => saveDefinition(originalIndex)}
-                                disabled={
-                                  !isDefinitionValid(originalIndex) || isSaving
-                                }
-                              >
-                                {isSaving && (
-                                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                                )}
-                                Save
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                          )}
+                        </div>
+                      );
+                    }
+                  )}
                 </div>
               )}
 

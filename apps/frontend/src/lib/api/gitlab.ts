@@ -519,32 +519,27 @@ export const gitlabApi = {
       });
     };
 
-    try {
-      while (true) {
-        // Check if aborted before doing any work
-        if (signal?.aborted) {
-          throw new DOMException("Polling was cancelled", "AbortError");
-        }
-
-        // Check timeout
-        if (Date.now() - startTime > timeout) {
-          throw new Error("Operation polling timed out");
-        }
-
-        const operation = await this.getOperationStatus(operationId, signal);
-        onUpdate(operation);
-
-        // Stop polling if operation is complete or failed
-        if (operation.status === "COMPLETED" || operation.status === "FAILED") {
-          return operation;
-        }
-
-        // Wait before next poll (abortable)
-        await abortableDelay(interval, signal);
+    while (true) {
+      // Check if aborted before doing any work
+      if (signal?.aborted) {
+        throw new DOMException("Polling was cancelled", "AbortError");
       }
-    } catch (error) {
-      // All errors (including AbortError) are propagated to caller
-      throw error;
+
+      // Check timeout
+      if (Date.now() - startTime > timeout) {
+        throw new Error("Operation polling timed out");
+      }
+
+      const operation = await this.getOperationStatus(operationId, signal);
+      onUpdate(operation);
+
+      // Stop polling if operation is complete or failed
+      if (operation.status === "COMPLETED" || operation.status === "FAILED") {
+        return operation;
+      }
+
+      // Wait before next poll (abortable)
+      await abortableDelay(interval, signal);
     }
   },
 };
