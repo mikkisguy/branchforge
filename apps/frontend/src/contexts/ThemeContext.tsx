@@ -48,14 +48,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       );
     }
 
-    // Syntax highlighting color - brighter variant for better contrast
-    const syntaxRgb = hexToRgb(colors.hover);
-    if (syntaxRgb) {
-      root.style.setProperty(
-        "--syntax-color",
-        `rgb(${syntaxRgb.r}, ${syntaxRgb.g}, ${syntaxRgb.b})`
-      );
-    }
   }, [theme, colors]);
 
   const setTheme = (newTheme: ThemePalette) => {

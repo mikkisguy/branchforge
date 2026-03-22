@@ -1,32 +1,41 @@
 import CodeMirror from "@uiw/react-codemirror";
 import { EditorView } from "@codemirror/view";
 import { useMemo } from "react";
-import { renpy } from "@/lib/codemirror-renpy";
-import {
-  branchforgeTheme,
-  branchforgeSyntaxHighlighting,
-} from "@/lib/codemirror-theme";
 
 interface ScriptEditorProps {
   content: string;
   onChange?: (value: string) => void;
 }
 
+/**
+ * Strip BOM (Byte Order Mark) from content if present
+ * The BOM character (U+FEFF) sometimes appears at the start of files
+ * from GitLab, especially those created on Windows systems.
+ */
+function stripBOM(content: string): string {
+  // U+FEFF is the BOM character
+  return content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
+}
+
 export function ScriptEditor({ content, onChange }: ScriptEditorProps) {
   const extensions = useMemo(
     () => [
-      renpy(),
-      branchforgeTheme,
-      branchforgeSyntaxHighlighting,
       EditorView.theme({
         ".cm-editor": {
           height: "100%",
           width: "100%",
           maxWidth: "100%",
+          fontFamily: "'Fira Code', monospace",
         },
         ".cm-scroller": {
           overflowX: "auto",
           overflowY: "auto",
+        },
+        ".cm-content": {
+          fontFamily: "'Fira Code', monospace",
+        },
+        ".cm-line": {
+          fontFamily: "'Fira Code', monospace",
         },
       }),
     ],
@@ -36,7 +45,7 @@ export function ScriptEditor({ content, onChange }: ScriptEditorProps) {
   return (
     <div className="h-full w-full overflow-hidden min-h-0 min-w-0 flex">
       <CodeMirror
-        value={content}
+        value={stripBOM(content)}
         height="100%"
         className="h-full w-full min-w-0"
         editable={true}
