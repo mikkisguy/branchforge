@@ -220,9 +220,9 @@ export function decryptPAT(encryptedToken: string): string {
     return decrypted;
   } catch (error) {
     if (error instanceof Error) {
-      throw new Error(`Failed to decrypt PAT: ${error.message}`);
+      throw new Error(`Failed to decrypt PAT: ${error.message}`, { cause: error });
     }
-    throw new Error("Failed to decrypt PAT: Unknown error");
+    throw new Error("Failed to decrypt PAT: Unknown error", { cause: error });
   }
 }
 

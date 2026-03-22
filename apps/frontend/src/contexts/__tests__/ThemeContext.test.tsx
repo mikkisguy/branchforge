@@ -6,8 +6,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { ThemeProvider, useTheme } from "../ThemeContext";
-import type { ThemePalette } from "../ThemeContext";
+import { ThemeProvider } from "../ThemeContext";
+import { useTheme, type ThemePalette } from "../useTheme";
 
 // Mock localStorage
 const localStorageMock = (() => {

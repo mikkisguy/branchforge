@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Download } from "lucide-react";
 import { StoryPanel } from "@/components/ide-shared";
 import {
@@ -11,7 +11,7 @@ import { GitLabFileTree } from "@/components/script-mode/GitLabFileTree";
 import { useLabels } from "@/hooks/useLabels";
 import { useGitLab } from "@/hooks/useGitLab";
 import { useGitLabFiles } from "@/hooks/useGitLabFiles";
-import { generateRpyContent, generateFileTree } from "@/lib/rpy-generator";
+import { generateRpyPlainText, generateFileTree } from "@/lib/rpy-generator";
 import { GitLabSyncDialog } from "@/components/script-mode/GitLabSyncDialog";
 import { Button } from "@/components/ui/button";
 
@@ -50,12 +50,13 @@ export function ScriptMode({
   );
 
   // Generate file tree from labels
-  const { flatFiles: files, fileNameToSceneId } = useMemo(() => {
+  const { flatFiles: files, fileNameToSceneId, sceneIdToFileName } = useMemo(() => {
     const fileTree = generateFileTree(labels);
 
     // Build flat file list with folder separators and scene ID mapping
     const flatFiles: { name: string; type: "file" | "folder" }[] = [];
     const fileNameToSceneId = new Map<string, string>();
+    const sceneIdToFileName = new Map<string, string>();
 
     for (const folder of fileTree) {
       flatFiles.push({ name: folder.name, type: "folder" });
@@ -63,17 +64,18 @@ export function ScriptMode({
         flatFiles.push({ name: file.name, type: "file" });
         if (file.labelId) {
           fileNameToSceneId.set(file.name, file.labelId);
+          sceneIdToFileName.set(file.labelId, file.name);
         }
       }
     }
 
-    return { flatFiles, fileNameToSceneId };
+    return { flatFiles, fileNameToSceneId, sceneIdToFileName };
   }, [labels]);
 
-  // Generate RPY content for active scene
-  const activeLabelContent = useMemo(() => {
-    if (!activeLabel) return [];
-    return generateRpyContent(activeLabel);
+  // Generate RPY content for active scene (plain text for CodeMirror)
+  const activeLabelPlainText = useMemo(() => {
+    if (!activeLabel) return "";
+    return generateRpyPlainText(activeLabel);
   }, [activeLabel]);
 
   // Get active file content directly for Script Mode editing
@@ -83,23 +85,20 @@ export function ScriptMode({
     () => activeFileContent.split("\n"),
     [activeFileContent]
   );
+  // Memoize label lines to avoid repeated split operations
+  const activeLabelLines = useMemo(
+    () => activeLabelPlainText.split("\n"),
+    [activeLabelPlainText]
+  );
 
-  // Track active file (scene) - for non-GitLab labels
-  const [activeFile, setActiveFile] = useState<string | null>(null);
-
-  // Sync active file with active scene ID
-  useEffect(() => {
-    if (activeLabelId) {
-      const fileEntry = Array.from(fileNameToSceneId.entries()).find(
-        ([, sceneId]) => sceneId === activeLabelId
-      );
-      if (fileEntry) {
-        setActiveFile(fileEntry[0]);
-      }
-    } else {
-      setActiveFile(null);
+  // Derive active file (scene) from active scene ID for non-GitLab labels
+  const activeFile = useMemo(() => {
+    if (!activeLabelId) {
+      return null;
     }
-  }, [activeLabelId, fileNameToSceneId]);
+
+    return sceneIdToFileName.get(activeLabelId) ?? null;
+  }, [activeLabelId, sceneIdToFileName]);
 
   // Handle file selection (matches FileTree's onSelectFile signature)
   const handleFileSelect = (fileName: string) => {
@@ -120,6 +119,18 @@ export function ScriptMode({
   const handleGitLabSceneSelect = (sceneId: string) => {
     setActiveLabelId(sceneId);
   };
+
+  // Determine which folders should be expanded by default
+  const initialExpandedFolders = useMemo(() => {
+    const folders = new Set<string>();
+    for (const file of gitLabFiles) {
+      const parts = file.filePath.split("/");
+      if (parts.length > 1) {
+        folders.add(parts[0]);
+      }
+    }
+    return Array.from(folders);
+  }, [gitLabFiles]);
 
   // Character panel data
   const characters = useMemo(() => {
@@ -179,11 +190,11 @@ export function ScriptMode({
   }
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-screen flex flex-col overflow-hidden">
       {/* Main Editor Layout */}
-      <div className="flex-1 flex gap-4 px-4 py-4 overflow-hidden">
+      <div className="flex-1 flex gap-4 px-4 py-4 overflow-hidden min-h-0 min-w-0">
         {/* Sidebar - File Tree */}
-        <div className="w-56">
+        <div className="w-56 min-h-0 shrink-0">
           <StoryPanel className="h-full">
             <button
               className="w-full py-2 px-3 rounded text-sm font-medium mb-4 transition-colors"
@@ -199,6 +210,7 @@ export function ScriptMode({
                 activeSceneId={activeLabelId ?? undefined}
                 onFileSelect={handleGitLabFileSelect}
                 onSceneSelect={handleGitLabSceneSelect}
+                initialExpandedFolders={initialExpandedFolders}
               />
             ) : (
               <FileTree
@@ -211,7 +223,7 @@ export function ScriptMode({
         </div>
 
         {/* Main Editor Area */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
           {/* Tabs */}
           <div className="flex items-end mb-0">
             {activeGitLabFile && (
@@ -234,23 +246,54 @@ export function ScriptMode({
           </div>
 
           {/* Editor */}
-          <StoryPanel className="flex-1 !mt-0 overflow-hidden">
-            {activeGitLabFile ? (
-              <ScriptEditor content={activeFileLines} language="Ren'Py" />
-            ) : activeLabel ? (
-              <ScriptEditor content={activeLabelContent} language="Ren'Py" />
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                {gitLabFiles.length > 0
-                  ? "Select a file or scene to view its content"
-                  : "Select a scene to view its content"}
-              </div>
-            )}
-          </StoryPanel>
+          <div className="flex-1 !mt-0 relative min-h-0 min-w-0 overflow-hidden">
+            {/* Decorative corners */}
+            <div
+              className="absolute -top-1 -left-1 w-8 h-8 border-t-2 border-l-2 rounded-tl-lg pointer-events-none"
+              style={{ borderColor: "var(--theme-color)", opacity: 0.5 }}
+            />
+            <div
+              className="absolute -top-1 -right-1 w-8 h-8 border-t-2 border-r-2 rounded-tr-lg pointer-events-none"
+              style={{ borderColor: "var(--theme-color)", opacity: 0.5 }}
+            />
+            <div
+              className="absolute -bottom-1 -left-1 w-8 h-8 border-b-2 border-l-2 rounded-bl-lg pointer-events-none"
+              style={{ borderColor: "var(--theme-color)", opacity: 0.5 }}
+            />
+            <div
+              className="absolute -bottom-1 -right-1 w-8 h-8 border-b-2 border-r-2 rounded-br-lg pointer-events-none"
+              style={{ borderColor: "var(--theme-color)", opacity: 0.5 }}
+            />
+
+            <div className="bg-card/80 backdrop-blur border border-border/30 rounded-lg h-full overflow-hidden min-h-0 min-w-0">
+              {activeGitLabFile ? (
+                <ScriptEditor
+                  content={activeFileContent}
+                  onChange={(value) =>
+                    console.log("GitLab file content changed:", value)
+                  }
+                />
+              ) : activeLabel ? (
+                <ScriptEditor
+                  content={activeLabelPlainText}
+                  onChange={(value) =>
+                    // TODO: Implement content persistence for GitLab files
+                    console.log("Label content changed:", value)
+                  }
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  {gitLabFiles.length > 0
+                    ? "Select a file or scene to view its content"
+                    : "Select a scene to view its content"}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Right Panel - Character Reference */}
-        <div className="w-64">
+        <div className="w-64 min-h-0 shrink-0">
           <StoryPanel className="h-full">
             {characters.length > 0 ? (
               <div className="space-y-4">
@@ -325,8 +368,8 @@ export function ScriptMode({
           activeGitLabFile
             ? activeFileLines.length
             : activeLabel
-            ? activeLabelContent.length || 0
-            : 0
+              ? activeLabelLines.length
+              : 0
         }
         language="Ren'Py"
         themeName={themeName}

@@ -871,7 +871,6 @@ export function parseRPYFileWithLabels(
   if (result.fileType === "STORY") {
     let currentLabel: string | null = null;
     let currentLabelData: LabeledDialogue | null = null;
-    let labelStartLine = 0;
 
     for (let i = 0; i < lines.length; i++) {
       // Skip lines inside screen/init blocks
@@ -894,10 +893,9 @@ export function parseRPYFileWithLabels(
 
         // Start new label (but skip if invalid)
         currentLabel = matchedLabel;
-        labelStartLine = i + 1;
         currentLabelData = {
           label: currentLabel,
-          lineNumber: labelStartLine,
+          lineNumber: i + 1,
           dialogue: [],
           choices: [],
           jumps: [],

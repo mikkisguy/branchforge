@@ -30,6 +30,17 @@
     /* Theme accent color (default) */
     --theme-accent: 108 30% 40%;
     --theme-accent-hover: 108 30% 45%;
+
+    /* Syntax highlighting colors
+       Note: These use hsl() wrapper because CodeMirror's HighlightStyle.define
+       requires complete CSS color values (unlike Tailwind which wraps with hsl() when used)
+    */
+    --syntax-comment: hsl(0 0% 45%);
+    --syntax-string: hsl(105 39% 76%);
+    --syntax-number: hsl(287 72% 77%);
+    --syntax-tag: hsl(11 78% 80%);
+    --syntax-attribute: hsl(24 74% 80%);
+    --syntax-property: hsl(21 74% 77%);
   }
 
   .light {
@@ -54,6 +65,14 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
+
+    /* Syntax highlighting colors (light theme) */
+    --syntax-comment: hsl(215.4 10% 60%);
+    --syntax-string: hsl(105 35% 45%);
+    --syntax-number: hsl(287 70% 50%);
+    --syntax-tag: hsl(11 75% 52%);
+    --syntax-attribute: hsl(24 70% 48%);
+    --syntax-property: hsl(21 70% 45%);
   }
 }
 
