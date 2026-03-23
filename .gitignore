@@ -40,6 +40,7 @@ coverage/
 *.tgz
 cache/
 uploads/
+_other/
 
 tsconfig.tsbuildinfo
 tsconfig.schema.tsbuildinfo

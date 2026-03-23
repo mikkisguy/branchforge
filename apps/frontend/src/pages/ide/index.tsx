@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useTheme } from "@/contexts/ThemeContext";
+import { useTheme } from "@/contexts/useTheme";
 import { useAuth } from "@/hooks/useAuth";
 import { useProject } from "@/hooks/useProject";
 import { useGitLab } from "@/hooks/useGitLab";
@@ -71,7 +71,7 @@ export function HomePageIDE() {
   const gitlabBranch = gitlabRepo?.defaultBranch;
 
   return (
-    <div className="min-h-screen relative flex">
+    <div className="h-screen relative overflow-hidden">
       <FloatingParticles />
 
       {/* Left Sidebar */}
@@ -92,12 +92,14 @@ export function HomePageIDE() {
 
       {/* Main content area */}
       <div
-        className={`flex-1 transition-all duration-300 ${
-          isSidebarCollapsed ? "ml-14" : "ml-56"
+        className={`h-full overflow-hidden transition-all duration-300 ${
+          isSidebarCollapsed
+            ? "ml-14 w-[calc(100%-3.5rem)]"
+            : "ml-56 w-[calc(100%-14rem)]"
         }`}
       >
         {mode === "write" ? (
-          <WriteMode setMode={setMode} />
+          <WriteMode setMode={handleSetMode} />
         ) : (
           <ScriptMode
             themeName={themeInfo?.name || ""}

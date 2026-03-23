@@ -413,31 +413,27 @@ export class DrizzleSessionStore implements SessionStore {
    * Async version of get for internal use
    */
   private async getAsync(sessionId: string): Promise<Session | null> {
-    try {
-      const db = getDb();
-      const result = await db
-        .select()
-        .from(userSessions)
-        .where(eq(userSessions.id, sessionId))
-        .limit(1);
+    const db = getDb();
+    const result = await db
+      .select()
+      .from(userSessions)
+      .where(eq(userSessions.id, sessionId))
+      .limit(1);
 
-      if (result.length === 0) {
-        return null;
-      }
-
-      const row = result[0];
-
-      // Check if session has expired
-      if (row.expiresAt < new Date()) {
-        // Clean up expired session
-        await this.destroyAsync(sessionId);
-        return null;
-      }
-
-      return dbDataToSession(row as SessionRow);
-    } catch (error) {
-      throw error; // Rethrow without logging - get() handles the error logging
+    if (result.length === 0) {
+      return null;
     }
+
+    const row = result[0];
+
+    // Check if session has expired
+    if (row.expiresAt < new Date()) {
+      // Clean up expired session
+      await this.destroyAsync(sessionId);
+      return null;
+    }
+
+    return dbDataToSession(row as SessionRow);
   }
 
   /**

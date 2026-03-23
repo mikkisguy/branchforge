@@ -1,21 +1,9 @@
+import { useEffect, useState, type ReactNode } from "react";
 import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  ReactNode,
-} from "react";
-
-export type ThemePalette =
-  | "forest"
-  | "periwinkle"
-  | "dark-amethyst"
-  | "graphite";
-
-interface ThemeColors {
-  primary: string;
-  hover: string;
-}
+  ThemeContext,
+  type ThemePalette,
+  type ThemeColors,
+} from "./useTheme";
 
 const themeConfigs: Record<ThemePalette, ThemeColors> = {
   forest: { primary: "#40bb82", hover: "#52c992" },
@@ -23,14 +11,6 @@ const themeConfigs: Record<ThemePalette, ThemeColors> = {
   "dark-amethyst": { primary: "#9549b6", hover: "#a960c7" },
   graphite: { primary: "#9ca3af", hover: "#b0b7c4" },
 };
-
-interface ThemeContextType {
-  theme: ThemePalette;
-  setTheme: (theme: ThemePalette) => void;
-  colors: ThemeColors;
-}
-
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 // Type guard to validate if a string is a valid ThemePalette
 function isValidTheme(value: string): value is ThemePalette {
@@ -67,6 +47,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`
       );
     }
+
   }, [theme, colors]);
 
   const setTheme = (newTheme: ThemePalette) => {
@@ -106,10 +87,5 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   return { r, g, b };
 }
 
-export function useTheme() {
-  const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error("useTheme must be used within ThemeProvider");
-  }
-  return context;
-}
+// Re-export type for convenience
+export type { ThemePalette } from "./useTheme";

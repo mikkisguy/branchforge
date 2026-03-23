@@ -39,7 +39,7 @@ export function StoryPanel({
         </div>
       )}
 
-      <div className="bg-card/80 backdrop-blur border border-border/30 rounded-lg p-4 h-full">
+      <div className="bg-card/80 backdrop-blur border border-border/30 rounded-lg p-1 h-full overflow-hidden">
         {children}
       </div>
     </div>

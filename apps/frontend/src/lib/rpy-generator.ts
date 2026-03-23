@@ -8,6 +8,27 @@
 import type { LabelDetail, PublicLabel } from "@branchforge/shared";
 
 /**
+ * Sanitize a title to a valid Ren'Py label name
+ * Only allows [a-z0-9_], replaces invalid chars with underscore
+ * Ren'Py labels must start with a letter or underscore (not a number)
+ * @param title - The title to sanitize
+ * @returns A valid Ren'Py label name, or "untitled" if sanitization fails
+ */
+function sanitizeLabelName(title: string): string {
+  let labelName = title
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, ""); // Trim leading/trailing underscores
+
+  // Fallback if sanitization resulted in empty string or starts with invalid char
+  if (!labelName || /^[0-9]/.test(labelName)) {
+    labelName = "untitled";
+  }
+
+  return labelName;
+}
+
+/**
  * Generate RPY content as HTML fragments with syntax highlighting
  * @param label - The label detail to convert
  * @returns Array of HTML strings with syntax highlighting classes
@@ -38,11 +59,7 @@ export function generateRpyContent(label: LabelDetail): string[] {
   lines.push("");
 
   // Label definition (convert title to valid Ren'Py label)
-  // Sanitize: only allow [a-z0-9_], replace invalid chars with underscore
-  const labelName = label.title
-    .toLowerCase()
-    .replace(/[^a-z0-9_]+/g, "_")
-    .replace(/^_+|_+$/g, ""); // Trim leading/trailing underscores
+  const labelName = sanitizeLabelName(label.title);
   lines.push(
     `<span class="text-purple-400">label</span> <span class="text-blue-400">${escapeHtml(
       labelName
@@ -93,6 +110,53 @@ export function generateRpyContent(label: LabelDetail): string[] {
 }
 
 /**
+ * Generate RPY content as plain text (no HTML)
+ * @param label - The label detail to convert
+ * @returns Plain text string with proper indentation and whitespace
+ */
+export function generateRpyPlainText(label: LabelDetail): string {
+  const lines: string[] = [];
+
+  // Header comments
+  lines.push(`# Label: ${label.title}`);
+  if (label.groupType && label.groupValue) {
+    lines.push(`# ${label.groupType}: ${label.groupValue}`);
+  }
+  if (label.routeKey) {
+    lines.push(`# Route: ${label.routeKey}`);
+  }
+  lines.push("");
+
+  // Label definition (convert title to valid Ren'Py label)
+  const labelName = sanitizeLabelName(label.title);
+
+  lines.push(`label ${labelName}:`);
+  lines.push("");
+
+  // Label lines with proper indentation
+  for (const line of label.lines) {
+    if (line.contentType === "DIALOGUE" && line.speakerTag) {
+      lines.push(
+        `    ${line.speakerTag} "${escapeRenpyString(line.content)}"`
+      );
+    } else if (line.contentType === "NARRATION") {
+      lines.push(`    "${escapeRenpyString(line.content)}"`);
+    } else if (line.contentType === "JUMP") {
+      lines.push(`    ${line.content}`);
+    } else if (line.contentType === "MENU") {
+      lines.push(`    menu:`);
+    } else if (line.contentType === "CHOICE") {
+      lines.push(`        "${escapeRenpyString(line.content)}":`);
+    }
+  }
+
+  lines.push("");
+  lines.push("return");
+
+  return lines.join("\n");
+}
+
+/**
  * Escape HTML special characters in content
  */
 function escapeHtml(text: string): string {
@@ -102,6 +166,38 @@ function escapeHtml(text: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+/**
+ * Escape Ren'Py string content for double-quoted strings
+ * Escapes backslashes, double quotes, and control characters
+ */
+function escapeRenpyString(text: string): string {
+  let result = text;
+
+  // Escape backslashes first (must be first to avoid double-escaping)
+  result = result.replace(/\\/g, "\\\\");
+  // Escape double quotes
+  result = result.replace(/"/g, '\\"');
+  // Escape common control characters
+  result = result.replace(/\n/g, "\\n");
+  result = result.replace(/\r/g, "\\r");
+  result = result.replace(/\t/g, "\\t");
+  result = result.replace(/\f/g, "\\f");
+  result = result.replace(/\v/g, "\\v");
+  result = result.replace(/\b/g, "\\b");
+
+  // Escape remaining ASCII control characters (0x00-0x1F) except already handled
+  // Manual iteration to avoid regex control character lint errors
+  result = result.replace(/./g, (ch) => {
+    const code = ch.charCodeAt(0);
+    if (code < 32 && !"\n\r\t\f\v\b".includes(ch)) {
+      return `\\u${code.toString(16).padStart(4, "0")}`;
+    }
+    return ch;
+  });
+
+  return result;
 }
 
 /**
