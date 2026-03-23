@@ -48,7 +48,7 @@ export function PaletteSwitcher() {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="px-3 py-1.5 text-xs font-mono bg-muted/50 hover:bg-muted border border-border rounded flex items-center gap-2 transition-colors"
+        className="px-3 py-1.5 text-xs font-code bg-muted/50 hover:bg-muted border border-border rounded flex items-center gap-2 transition-colors"
         title="Change syntax colors"
       >
         <span
@@ -84,7 +84,7 @@ export function PaletteSwitcher() {
                   <button
                     key={palette.originalIndex}
                     onClick={() => handleSelect(palette.originalIndex)}
-                    className={`w-full px-3 py-2 text-left text-xs font-mono hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2 ${
+                    className={`w-full px-3 py-2 text-left text-xs font-code hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2 ${
                       palette.originalIndex === selectedIndex
                         ? "bg-accent/50"
                         : ""

@@ -39,6 +39,7 @@ export const renPyBaseTheme = EditorView.theme({
     height: "100%",
     width: "100%",
     maxWidth: "100%",
+    fontSize: "var(--editor-font-size, 14px)",
     fontFamily: "'Fira Code', monospace",
     backgroundColor: "hsl(var(--background))",
   },

@@ -1,11 +1,14 @@
 import CodeMirror from "@uiw/react-codemirror";
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
+import type { Extension } from "@codemirror/state";
 import { renPy } from "../../lib/codemirror/renpy";
 import {
   renPyBaseTheme,
   renPySyntaxHighlighting,
 } from "../../lib/codemirror/renpy-theme";
 import { PaletteSwitcher } from "./PaletteSwitcher";
+import { FontSizeSwitcher } from "./FontSizeSwitcher";
+import { LineWrapSwitcher } from "./LineWrapSwitcher";
 
 interface ScriptEditorProps {
   content: string;
@@ -23,9 +26,26 @@ function stripBOM(content: string): string {
 }
 
 export function ScriptEditor({ content, onChange }: ScriptEditorProps) {
-  const extensions = useMemo(
-    () => [renPy, renPyBaseTheme, renPySyntaxHighlighting],
+  const [lineWrapExtension, setLineWrapExtension] = useState<
+    Extension | readonly Extension[]
+  >([]);
+
+  const handleLineWrapChange = useCallback(
+    (extension: Extension | readonly Extension[]) => {
+      setLineWrapExtension(extension);
+    },
     []
+  );
+
+  const extensions = useMemo(
+    () =>
+      [
+        renPy,
+        renPyBaseTheme,
+        renPySyntaxHighlighting,
+        lineWrapExtension,
+      ].flat(),
+    [lineWrapExtension]
   );
 
   const cleanContent = useMemo(() => stripBOM(content), [content]);
@@ -51,8 +71,13 @@ export function ScriptEditor({ content, onChange }: ScriptEditorProps) {
           }}
         />
       </div>
-      <div className="flex items-center justify-between px-2 py-1 border-t border-border bg-muted/20">
-        <PaletteSwitcher />
+      <div className="flex items-center justify-between px-2 py-1 border-t border-border bg-muted/20 font-code">
+        <div className="flex items-center gap-2">
+          <FontSizeSwitcher />
+          <LineWrapSwitcher onChange={handleLineWrapChange} />
+          <PaletteSwitcher />
+        </div>
+        <p>asdd</p>
       </div>
     </div>
   );

@@ -26,6 +26,7 @@ export default {
       fontFamily: {
         sans: ["Kanit", "sans-serif"],
         display: ["Sirin Stencil", "cursive"],
+        code: ["Fira Code", "monospace"],
       },
       letterSpacing: {
         tighter: "-0.05em",
