@@ -1,6 +1,7 @@
 import CodeMirror from "@uiw/react-codemirror";
-import { EditorView } from "@codemirror/view";
 import { useMemo } from "react";
+import { renPy } from "../../lib/codemirror/renpy";
+import { renPyBaseTheme, renPySyntaxHighlighting } from "../../lib/codemirror/renpy-theme";
 
 interface ScriptEditorProps {
   content: string;
@@ -20,24 +21,9 @@ function stripBOM(content: string): string {
 export function ScriptEditor({ content, onChange }: ScriptEditorProps) {
   const extensions = useMemo(
     () => [
-      EditorView.theme({
-        ".cm-editor": {
-          height: "100%",
-          width: "100%",
-          maxWidth: "100%",
-          fontFamily: "'Fira Code', monospace",
-        },
-        ".cm-scroller": {
-          overflowX: "auto",
-          overflowY: "auto",
-        },
-        ".cm-content": {
-          fontFamily: "'Fira Code', monospace",
-        },
-        ".cm-line": {
-          fontFamily: "'Fira Code', monospace",
-        },
-      }),
+      renPy,
+      renPyBaseTheme,
+      renPySyntaxHighlighting,
     ],
     []
   );
@@ -49,7 +35,6 @@ export function ScriptEditor({ content, onChange }: ScriptEditorProps) {
         height="100%"
         className="h-full w-full min-w-0"
         editable={true}
-        theme="none"
         extensions={extensions}
         onChange={onChange}
         basicSetup={{

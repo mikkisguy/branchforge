@@ -30,6 +30,19 @@
     /* Theme accent color (default) */
     --theme-accent: 108 30% 40%;
     --theme-accent-hover: 108 30% 45%;
+
+    /* Ren'Py syntax highlighting colors (dark theme) */
+    --keyword: hsl(280 70% 65%);
+    --string: hsl(150 60% 60%);
+    --comment: hsl(0 0% 45%);
+    --number: hsl(287 72% 77%);
+    --variable: hsl(190 50% 65%);
+    --atom: hsl(30 80% 60%);
+    --property: hsl(200 50% 65%);
+    --operator: hsl(0 0% 75%);
+    --punctuation: hsl(0 0% 65%);
+    --config-keyword: hsl(258, 60%, 60%);
+    --audio-keyword: hsl(200 70% 60%);
   }
 
   .light {
@@ -54,6 +67,19 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
+
+    /* Ren'Py syntax highlighting colors (light theme) */
+    --keyword: hsl(280 60% 45%);
+    --string: hsl(150 70% 35%);
+    --comment: hsl(220 10% 45%);
+    --number: hsl(30 70% 40%);
+    --variable: hsl(190 60% 40%);
+    --atom: hsl(30 70% 40%);
+    --property: hsl(200 60% 45%);
+    --operator: hsl(0 0% 30%);
+    --punctuation: hsl(0 0% 40%);
+    --config-keyword: hsl(180 60% 35%);
+    --audio-keyword: hsl(200 70% 40%);
   }
 }
 
