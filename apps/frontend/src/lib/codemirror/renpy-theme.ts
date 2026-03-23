@@ -50,7 +50,6 @@ export const renPyBaseTheme = EditorView.theme({
   },
   ".cm-content": {
     fontFamily: "'Fira Code', monospace",
-    backgroundColor: "hsl(var(--background))",
   },
   ".cm-line": {
     fontFamily: "'Fira Code', monospace",
@@ -75,17 +74,18 @@ export const renPyBaseTheme = EditorView.theme({
     color: "hsl(var(--foreground))",
   },
   // Selection
-  ".cm-selectionBackground": {
-    backgroundColor: "rgba(var(--theme-color-rgb), 0.75) !important",
+  ".cm-selectionBackground, .cm-selectionLayer .cm-selectionBackground": {
+    backgroundColor:
+      "rgba(var(--theme-color-rgb, 61, 74, 194), 0.38) !important",
   },
-  "&.cm-focused .cm-selectionBackground": {
-    backgroundColor: "rgba(var(--theme-color-rgb), 0.9) !important",
-  },
-  "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground": {
-    backgroundColor: "rgba(var(--theme-color-rgb), 0.9) !important",
-  },
-  ".cm-content ::selection": {
-    backgroundColor: "rgba(var(--theme-color-rgb), 0.75) !important",
+  "&.cm-focused .cm-selectionBackground, &.cm-focused .cm-selectionLayer .cm-selectionBackground":
+    {
+      backgroundColor:
+        "rgba(var(--theme-color-rgb, 61, 74, 194), 0.52) !important",
+    },
+  ".cm-content::selection, .cm-line::selection, .cm-content *::selection": {
+    backgroundColor:
+      "rgba(var(--theme-color-rgb, 61, 74, 194), 0.38) !important",
   },
   // Cursor
   ".cm-cursor": {
