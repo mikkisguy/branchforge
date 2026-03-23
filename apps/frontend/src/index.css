@@ -31,6 +31,10 @@
     --theme-accent: 108 30% 40%;
     --theme-accent-hover: 108 30% 45%;
 
+    /* Theme UI colors */
+    --theme-border: 0 0% 20%;
+    --theme-color: 108 30% 40%;
+
     /* Ren'Py syntax highlighting colors (dark theme) */
     --keyword: hsl(280, 70%, 65%);
     --string: hsl(150, 60%, 60%);
@@ -121,5 +125,281 @@
   * {
     scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
     scrollbar-width: thin;
+  }
+}
+
+/* CodeMirror find/replace panel */
+.cm-editor .cm-panels {
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+}
+
+.cm-editor .cm-panels-bottom {
+  border-top: 1px solid var(--theme-border);
+}
+
+.cm-editor .cm-panels-top {
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.cm-editor .cm-panel.cm-search {
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  padding: 0.5rem;
+  font-family: "Fira Code", monospace;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.cm-editor .cm-panel.cm-search input,
+.cm-editor .cm-panel.cm-search button,
+.cm-editor .cm-panel.cm-search label {
+  margin: 0 !important;
+}
+
+.cm-editor .cm-panel.cm-search .-search-row-primary,
+.cm-editor .cm-panel.cm-search .-search-row-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.5rem;
+  width: 100%;
+}
+
+.cm-editor .cm-panel.cm-search .-search-row-primary {
+  margin-bottom: 0.45rem;
+}
+
+.cm-editor .cm-panel.cm-search .-search-row-primary input[name="search"] {
+  flex: 0 1 clamp(16rem, 42vw, 30rem);
+  min-width: 14rem;
+  max-width: 30rem;
+}
+
+.cm-editor .cm-panel.cm-search .-search-row-secondary input[name="replace"] {
+  flex: 0 1 clamp(16rem, 56vw, 30rem);
+  min-width: 14rem;
+  max-width: 30rem;
+}
+
+.cm-editor .cm-panel.cm-search label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.12rem 0.28rem;
+  border-radius: calc(var(--radius) - 3px);
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  user-select: none;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.cm-editor .cm-panel.cm-search label:hover {
+  color: hsl(var(--foreground));
+  background: hsl(var(--muted) / 0.45);
+}
+
+.cm-editor .cm-panel.cm-search input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-grid;
+  place-content: center;
+  width: 1.02rem;
+  height: 1.02rem;
+  margin: 0;
+  flex-shrink: 0;
+  align-self: center;
+  position: relative;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.22rem;
+  background: hsl(var(--input));
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.cm-editor .cm-panel.cm-search input[type="checkbox"]:hover {
+  border-color: hsl(var(--ring) / 0.6);
+}
+
+.cm-editor .cm-panel.cm-search input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.25);
+}
+
+.cm-editor .cm-panel.cm-search input[type="checkbox"]:checked {
+  background: var(--theme-color);
+  border-color: var(--theme-color);
+}
+
+.cm-editor .cm-panel.cm-search input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 0.26rem;
+  height: 0.52rem;
+  border: solid hsl(var(--background));
+  border-width: 0 2px 2px 0;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.cm-editor .cm-panel.cm-search .cm-textfield {
+  background: hsl(var(--input));
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: calc(var(--radius) - 2px);
+  min-height: 2rem;
+  padding: 0.3rem 0.55rem;
+  outline: none;
+}
+
+.cm-editor .cm-panel.cm-search .cm-textfield:focus,
+.cm-editor .cm-panel.cm-search .cm-textfield:focus-visible {
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
+}
+
+.cm-editor .cm-panel.cm-search .cm-textfield::placeholder {
+  color: hsl(var(--muted-foreground));
+}
+
+.cm-editor .cm-panel.cm-search .cm-button {
+  background: hsl(var(--muted) / 0.5) !important;
+  background-image: none !important;
+  color: hsl(var(--foreground)) !important;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: calc(var(--radius) - 2px);
+  min-height: 2.05rem;
+  padding: 0.3rem 0.65rem;
+  font-family: "Fira Code", monospace;
+  font-size: 0.8125rem;
+  line-height: 1.2rem;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.cm-editor .cm-panel.cm-search .cm-button:hover {
+  background: hsl(var(--muted)) !important;
+  border-color: var(--theme-color) !important;
+}
+
+.cm-editor .cm-panel.cm-search .cm-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.25);
+}
+
+.cm-editor .cm-panel.cm-search .cm-button[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cm-editor .cm-panel.cm-search .cm-closeButton,
+.cm-editor .cm-panel.cm-search button[name="close"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  margin: 0;
+  padding: 0;
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: calc(var(--radius) - 2px);
+  background: hsl(var(--muted) / 0.5);
+  color: hsl(var(--foreground));
+  font-size: 1.25rem;
+  line-height: 1;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.cm-editor .cm-panel.cm-search .cm-closeButton:hover,
+.cm-editor .cm-panel.cm-search button[name="close"]:hover {
+  background: hsl(var(--muted));
+  border-color: var(--theme-color) !important;
+}
+
+.cm-editor .cm-panel.cm-search .cm-closeButton:focus-visible,
+.cm-editor .cm-panel.cm-search button[name="close"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.25);
+}
+
+.cm-editor .cm-panel.cm-search button[name="close"] {
+  text-indent: 0;
+}
+
+.cm-editor .cm-panel.cm-search .cm-searchMatch,
+.cm-editor .cm-panel.cm-search .cm-searchMatch-count {
+  color: hsl(var(--muted-foreground));
+}
+
+.cm-editor .cm-panel.cm-search .-search-match-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  min-width: 5.2rem;
+  padding: 0 0.5rem;
+  margin: 0;
+  border-radius: calc(var(--radius) - 3px);
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted) / 0.35);
+  border: 1px solid var(--theme-border);
+  font-size: 0.78rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.cm-editor .cm-panel.cm-search .-search-utility {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.cm-editor .cm-panel.cm-search .-search-match-count:empty {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  .cm-editor .cm-panel.cm-search .-search-row-primary,
+  .cm-editor .cm-panel.cm-search .-search-row-secondary {
+    margin-bottom: 0.4rem;
+  }
+
+  .cm-editor .cm-panel.cm-search .-search-row-secondary {
+    margin-bottom: 0;
+  }
+
+  .cm-editor .cm-panel.cm-search .-search-match-count {
+    min-width: 4.75rem;
+    margin: 0;
+  }
+
+  .cm-editor .cm-panel.cm-search .-search-row-primary input[name="search"],
+  .cm-editor
+    .cm-panel.cm-search
+    .-search-row-secondary
+    input[name="replace"] {
+    flex: 1 1 100%;
+    max-width: none;
   }
 }

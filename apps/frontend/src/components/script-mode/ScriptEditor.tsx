@@ -1,12 +1,14 @@
 import CodeMirror from "@uiw/react-codemirror";
-import { useMemo, useState, useCallback, useEffect } from "react";
+import { useMemo, useState, useCallback } from "react";
 import type { Extension } from "@codemirror/state";
-import { EditorView } from "@codemirror/view";
+import { highlightSelectionMatches, search } from "@codemirror/search";
 import { renPy } from "../../lib/codemirror/renpy";
 import {
   renPyBaseTheme,
   renPySyntaxHighlighting,
 } from "../../lib/codemirror/renpy-theme";
+import { stripBOM } from "../../lib/codemirror/utils";
+import { useEditorCursor } from "../../lib/codemirror/useEditorCursor";
 import { PaletteSwitcher } from "./PaletteSwitcher";
 import { FontSizeSwitcher } from "./FontSizeSwitcher";
 import { LineWrapSwitcher } from "./LineWrapSwitcher";
@@ -16,64 +18,23 @@ interface ScriptEditorProps {
   onChange?: (value: string) => void;
 }
 
-/**
- * Strip BOM (Byte Order Mark) from content if present
- * The BOM character (U+FEFF) sometimes appears at the start of files
- * from GitLab, especially those created on Windows systems.
- */
-function stripBOM(content: string): string {
-  // U+FEFF is the BOM character
-  return content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
-}
-
 export function ScriptEditor({ content, onChange }: ScriptEditorProps) {
   const [lineWrapExtension, setLineWrapExtension] = useState<
     Extension | readonly Extension[]
   >([]);
-  const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 });
-  const [selectionInfo, setSelectionInfo] = useState<string | null>(null);
-  const [totalLines, setTotalLines] = useState(1);
+  const cleanContent = useMemo(() => stripBOM(content), [content]);
+
+  const {
+    cursorPosition,
+    selectionInfo,
+    totalLines,
+    updateListener,
+  } = useEditorCursor({ initialContent: cleanContent });
 
   const handleLineWrapChange = useCallback(
     (extension: Extension | readonly Extension[]) => {
       setLineWrapExtension(extension);
     },
-    []
-  );
-
-  // Extension to track cursor position and selection
-  const updateListener = useMemo(
-    () =>
-      EditorView.updateListener.of((update) => {
-        if (update.docChanged || update.selectionSet) {
-          const state = update.state;
-          const pos = state.selection.main.head;
-          const line = state.doc.lineAt(pos);
-
-          setCursorPosition({ line: line.number, col: pos - line.from + 1 });
-
-          // Update total lines when document changes
-          if (update.docChanged) {
-            setTotalLines(state.doc.lines);
-          }
-
-          // Track selection info
-          const selection = state.selection.main;
-          if (selection.from !== selection.to) {
-            const selectedText = state.doc.sliceString(
-              selection.from,
-              selection.to
-            );
-            const charCount = selectedText.length;
-            const lineCount = selectedText.split("\n").length;
-            setSelectionInfo(
-              `${charCount} char${charCount !== 1 ? "s" : ""}${lineCount > 1 ? ` in ${lineCount} lines` : ""} selected`
-            );
-          } else {
-            setSelectionInfo(null);
-          }
-        }
-      }),
     []
   );
 
@@ -85,16 +46,13 @@ export function ScriptEditor({ content, onChange }: ScriptEditorProps) {
         renPySyntaxHighlighting,
         lineWrapExtension,
         updateListener,
+        // Explicitly add search extension with default configuration
+        search({}),
+        // Highlight matches of the current selection
+        highlightSelectionMatches(),
       ].flat(),
     [lineWrapExtension, updateListener]
   );
-
-  const cleanContent = useMemo(() => stripBOM(content), [content]);
-
-  // Initialize totalLines from content on mount/when content changes externally
-  useEffect(() => {
-    setTotalLines(cleanContent.split("\n").length);
-  }, [cleanContent]);
 
   return (
     <div className="h-full w-full overflow-hidden min-h-0 min-w-0 flex flex-col">
@@ -114,7 +72,7 @@ export function ScriptEditor({ content, onChange }: ScriptEditorProps) {
             bracketMatching: true,
             closeBrackets: true,
             autocompletion: false,
-            searchKeymap: true,
+            // searchKeymap is removed since we add search extension explicitly
           }}
         />
       </div>

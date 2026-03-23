@@ -114,6 +114,63 @@ export const renPyBaseTheme = EditorView.theme({
   },
   ".cm-panel.cm-search": {
     padding: "4px 8px",
+    gap: "8px",
+    "& > *": {
+      marginRight: "4px",
+      "&:last-child": {
+        marginRight: "0",
+      },
+    },
+  },
+  // Search panel input fields
+  ".cm-textfield": {
+    backgroundColor: "hsl(var(--input))",
+    color: "hsl(var(--foreground))",
+    border: "1px solid hsl(var(--border))",
+    borderRadius: "calc(var(--radius, 0.5rem) - 2px)",
+    padding: "4px 8px",
+    fontSize: "inherit",
+    fontFamily: "inherit",
+    outline: "none",
+    "&:focus": {
+      borderColor: "hsl(var(--ring))",
+      boxShadow: "0 0 0 2px hsl(var(--ring) / 0.2)",
+    },
+  },
+  // Search panel buttons
+  ".cm-button": {
+    backgroundColor: "transparent !important",
+    backgroundImage: "none !important",
+    color: "hsl(var(--foreground)) !important",
+    border: "1px solid hsl(var(--border))",
+    borderRadius: "calc(var(--radius, 0.5rem) - 2px)",
+    padding: "4px 10px",
+    fontSize: "inherit",
+    fontFamily: "inherit",
+    cursor: "pointer",
+    transition: "background-color 150ms, border-color 150ms",
+    "&:hover": {
+      backgroundColor: "hsl(var(--accent))",
+      color: "hsl(var(--accent-foreground))",
+    },
+    "&:active": {
+      backgroundColor: "hsl(var(--muted))",
+    },
+    // Primary action button style (for "replace all" etc.)
+    "&.cm-primary-button": {
+      backgroundColor: "hsl(var(--theme-accent))",
+      color: "hsl(var(--background))",
+      border: "none",
+      "&:hover": {
+        backgroundColor: "hsl(var(--theme-accent-hover))",
+      },
+    },
+  },
+  // Search query info (e.g., "1 of 5 matches")
+  ".cm-searchMatch-count": {
+    color: "hsl(var(--muted-foreground))",
+    fontSize: "0.85em",
+    padding: "0 4px",
   },
   // Tooltip
   ".cm-tooltip": {
