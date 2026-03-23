@@ -4,6 +4,18 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.6.0 - 2026-03-23
+
+- 51d9927: Added CodeMirror for code editing and syntax highlighting options
+- bd774a8: Added character dialog
+- 428a22c: Added font size and line wrap to script editor
+- 0c68594: Updated search functionality for script editor
+- fe28c8b: Added left sidebar for better usability
+- cace201: Integrated CodeMirror for RenPy syntax highlighting
+- Updated dependencies [bd774a8]
+  - @branchforge/shared@0.6.0
+- 0077a58: Excluded screens.rpy from dialogue line import to avoid processing UI definitions
+
 ## v0.5.1 - 2026-03-15
 
 - 4078ffb: Added Ren'Py definitions management service and UI components
