@@ -99,7 +99,7 @@ export function HomePageIDE() {
         }`}
       >
         {mode === "write" ? (
-          <WriteMode setMode={handleSetMode} />
+          <WriteMode projectName={currentProject?.name} />
         ) : (
           <ScriptMode
             themeName={themeInfo?.name || ""}

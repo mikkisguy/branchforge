@@ -10,7 +10,7 @@ import {
 import { stripBOM } from "../../lib/codemirror/utils";
 import { useEditorCursor } from "../../lib/codemirror/useEditorCursor";
 import { PaletteSwitcher } from "./PaletteSwitcher";
-import { FontSizeSwitcher } from "./FontSizeSwitcher";
+import { FontSizeSwitcher } from "../FontSizeSwitcher";
 import { LineWrapSwitcher } from "./LineWrapSwitcher";
 
 interface ScriptEditorProps {
@@ -78,7 +78,7 @@ export function ScriptEditor({ content, onChange }: ScriptEditorProps) {
       </div>
       <div className="flex items-center justify-between px-2 py-1 border-t border-border bg-muted/20 font-code text-xs text-muted-foreground">
         <div className="flex items-center gap-2">
-          <FontSizeSwitcher />
+          <FontSizeSwitcher mode="script" direction="up" />
           <LineWrapSwitcher onChange={handleLineWrapChange} />
           <PaletteSwitcher />
         </div>

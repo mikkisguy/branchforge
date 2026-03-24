@@ -1,72 +1,135 @@
-import { useEffect, useState } from "react";
-import { StoryPanel } from "@/components/ide-shared";
-import { Logo } from "@/components/ui/logo";
+/**
+ * WriteMode Page
+ *
+ * Prose-focused writing interface for dialogue and narration.
+ * Features character context, distraction-free focus mode, and line-by-line editing.
+ */
+
+import { useState, useCallback, useEffect } from "react";
+import {
+  ProseEditor,
+  SceneNavigator,
+  CharacterReferencePanel,
+  FocusModeToggle,
+} from "@/components/write-mode";
+import { useLabels } from "@/hooks/useLabels";
+import { useCharacters } from "@/hooks/useCharacters";
+import { useProject } from "@/hooks/useProject";
+import type { DialogueEntry } from "@/lib/prose-types";
 
 interface WriteModeProps {
-  setMode: (mode: "write" | "script") => void;
+  projectName?: string;
 }
 
-const welcomeText = "Welcome, writer. Your story awaits...";
+export function WriteMode({ projectName }: WriteModeProps) {
+  const { currentProject } = useProject();
+  const {
+    labels,
+    activeLabel,
+    activeLabelId,
+    setActiveLabelId,
+    isLoadingLabels,
+  } = useLabels();
 
-export function WriteMode({ setMode }: WriteModeProps) {
-  const [dialogueText, setDialogueText] = useState("");
+  // Get all project characters
+  const { characters } = useCharacters(currentProject?.id ?? "");
 
-  // Typewriter effect
-  useEffect(() => {
-    setDialogueText("");
-    let i = 0;
-    const timer = setInterval(() => {
-      if (i <= welcomeText.length) {
-        setDialogueText(welcomeText.slice(0, i));
-        i++;
-      } else {
-        clearInterval(timer);
-      }
-    }, 50);
-    return () => clearInterval(timer);
+  // Focus mode state - controls whether panels are visible
+  const [isFocusMode, setIsFocusMode] = useState(false);
+
+  // Handle focus mode toggle - use functional update to avoid stale closure
+  const handleFocusModeToggle = useCallback(() => {
+    setIsFocusMode((prev) => !prev);
   }, []);
 
+  // Handle content change
+  const handleContentChange = useCallback((entries: DialogueEntry[]) => {
+    // TODO: Implement saving logic
+    console.log("WriteMode content changed:", entries);
+  }, []);
+
+  // Handle keyboard shortcut for focus mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyF") {
+        e.preventDefault();
+        handleFocusModeToggle();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleFocusModeToggle]);
+
+  // Loading state
+  if (isLoadingLabels) {
+    return (
+      <div className="flex-1 flex items-center justify-center h-full">
+        <p className="text-muted-foreground">Loading scenes...</p>
+      </div>
+    );
+  }
+
+  // No labels state
+  if (!labels.length) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 h-full">
+        <p className="text-muted-foreground">No scenes found in this project</p>
+        <p className="text-sm text-muted-foreground">
+          Create scenes to start writing
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex-1 flex items-center justify-center p-8 pt-20">
-      <div className="max-w-2xl w-full space-y-8">
-        {/* Title */}
-        <div className="text-center space-y-4">
-          <Logo />
-          <p className="text-xl tracking-widest uppercase text-muted-foreground">
-            Visual Novel IDE
-          </p>
+    <div className="h-screen flex flex-col overflow-hidden">
+      {/* Transparent Header with Focus Mode Toggle */}
+      <div className="px-6 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-foreground/70">
+            {projectName || currentProject?.name || "Write Mode"}
+          </span>
         </div>
+        <FocusModeToggle
+          isFocusMode={isFocusMode}
+          onToggle={handleFocusModeToggle}
+        />
+      </div>
 
-        {/* Dialogue Box */}
-        <StoryPanel title="???">
-          <div className="text-lg leading-relaxed">
-            <span className="text-foreground">
-              {dialogueText}
-              <span className="animate-pulse">|</span>
-            </span>
-          </div>
-        </StoryPanel>
-
-        {/* Start Button */}
-        <div className="flex justify-center pt-4">
-          <button
-            onClick={() => setMode("script")}
-            className="group relative px-12 py-4 font-display text-lg tracking-widest uppercase transition-all hover:scale-105"
-            style={{ background: "var(--theme-color)", color: "white" }}
-          >
-            <span className="relative z-10">Start Writing</span>
-            <div
-              className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-30 transition-opacity"
-              style={{ background: "white" }}
+      {/* Main Editor Layout */}
+      <div className="flex-1 flex gap-6 px-6 pb-6 overflow-hidden min-h-0 min-w-0">
+        {/* Left Sidebar - Scene Navigator (transparent) */}
+        {!isFocusMode && (
+          <div className="w-48 min-h-0 shrink-0">
+            <SceneNavigator
+              labels={labels}
+              activeLabelId={activeLabelId}
+              onSelect={setActiveLabelId}
             />
-          </button>
+          </div>
+        )}
+
+        {/* Main Editor Area - centered with max-width */}
+        <div className="flex-1 flex justify-center min-h-0 min-w-0">
+          <div className="w-full max-w-3xl min-h-0">
+            <ProseEditor
+              activeLabel={activeLabel}
+              characters={characters}
+              onChange={handleContentChange}
+            />
+          </div>
         </div>
 
-        <div className="text-center pt-8">
-          <p className="text-sm text-muted-foreground/60 italic">
-            "Every great story begins with a single choice..."
-          </p>
-        </div>
+        {/* Right Sidebar - Character Reference (transparent) */}
+        {!isFocusMode && (
+          <div className="w-56 min-h-0 shrink-0">
+            <CharacterReferencePanel
+              characters={characters}
+              activeLabel={activeLabel}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
