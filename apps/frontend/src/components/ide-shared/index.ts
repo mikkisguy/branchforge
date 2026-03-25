@@ -8,4 +8,14 @@ export { StateVariablesModal } from "./StateVariablesModal";
 export { CharactersModal } from "./CharactersModal";
 export { GitLabSettingsContent } from "./GitLabSettingsContent";
 export { GitLabRepositoryLinkingDialog } from "./GitLabRepositoryLinkingDialog";
+
+// Re-export write-mode components for convenience
+export {
+  ProseEditor,
+  DialogueLine,
+  SceneNavigator,
+  CharacterReferencePanel,
+  FocusModeToggle,
+} from "../write-mode";
+
 export type { ThemePaletteOption } from "./ThemeSwitcher";

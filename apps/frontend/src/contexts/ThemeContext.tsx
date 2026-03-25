@@ -12,6 +12,12 @@ const themeConfigs: Record<ThemePalette, ThemeColors> = {
   graphite: { primary: "#9ca3af", hover: "#b0b7c4" },
 };
 
+// Status colors (theme-independent for semantic consistency)
+const STATUS_COLORS = {
+  review: "#f59e0b", // amber for review needed
+  draft: "#64748b", // slate for draft/pending
+} as const;
+
 // Type guard to validate if a string is a valid ThemePalette
 function isValidTheme(value: string): value is ThemePalette {
   return ["forest", "periwinkle", "dark-amethyst", "graphite"].includes(value);
@@ -47,6 +53,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`
       );
     }
+
+    // Status colors for scene navigation
+    root.style.setProperty("--theme-review-color", STATUS_COLORS.review);
+    root.style.setProperty("--theme-draft-color", STATUS_COLORS.draft);
 
   }, [theme, colors]);
 

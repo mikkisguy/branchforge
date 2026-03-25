@@ -1,2 +1,9 @@
-// WriteMode-specific components
-// Currently empty - WriteMode uses shared components from ide-shared
+/**
+ * WriteMode Components
+ */
+
+export { ProseEditor } from "./ProseEditor";
+export { DialogueLine } from "./DialogueLine";
+export { SceneNavigator } from "./SceneNavigator";
+export { CharacterReferencePanel } from "./CharacterReferencePanel";
+export { FocusModeToggle } from "./FocusModeToggle";
