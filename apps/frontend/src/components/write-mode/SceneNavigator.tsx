@@ -101,7 +101,7 @@ export function SceneNavigator({
                                   ? "var(--theme-review-color)"
                                   : "var(--theme-draft-color)",
                           }}
-                          aria-label={`${label.status.toLowerCase()} status`}
+                          aria-label={`${label.status?.toLowerCase() ?? "draft"} status`}
                         />
                         <span className="truncate">{label.title}</span>
                       </div>
