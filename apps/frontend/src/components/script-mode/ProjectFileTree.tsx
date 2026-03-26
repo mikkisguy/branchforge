@@ -1,23 +1,24 @@
 import { useState, useMemo } from "react";
 import { ChevronRight, ChevronDown, File, Folder } from "lucide-react";
-import type { GitLabFileNode } from "@/hooks/useGitLabFiles";
+import type { ProjectFileNode } from "@/hooks/useProjectFiles";
 
-interface GitLabFileTreeProps {
-  files: GitLabFileNode[];
+interface ProjectFileTreeProps {
+  files: ProjectFileNode[];
   activeFileId?: string;
   activeSceneId?: string;
   onFileSelect: (fileId: string) => void;
   onSceneSelect: (sceneId: string) => void;
   initialExpandedFolders?: string[];
+  initialExpandedFiles?: string[];
 }
 
 /**
  * Group files by folder structure
  */
 function groupFilesByFolder(
-  files: GitLabFileNode[]
-): Map<string, GitLabFileNode[]> {
-  const grouped = new Map<string, GitLabFileNode[]>();
+  files: ProjectFileNode[]
+): Map<string, ProjectFileNode[]> {
+  const grouped = new Map<string, ProjectFileNode[]>();
 
   for (const file of files) {
     const parts = file.filePath.split("/");
@@ -38,19 +39,22 @@ function getFileName(filePath: string): string {
   return parts[parts.length - 1] || filePath;
 }
 
-export function GitLabFileTree({
+export function ProjectFileTree({
   files,
   activeFileId,
   activeSceneId,
   onFileSelect,
   onSceneSelect,
   initialExpandedFolders,
-}: GitLabFileTreeProps) {
+  initialExpandedFiles,
+}: ProjectFileTreeProps) {
   // Track expanded folders and files
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
     () => new Set(initialExpandedFolders ?? [])
   );
-  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
+  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(
+    () => new Set(initialExpandedFiles ?? [])
+  );
 
   const toggleFolder = (folder: string) => {
     setExpandedFolders((prev) => {
@@ -79,12 +83,12 @@ export function GitLabFileTree({
   const groupedFiles = useMemo(() => groupFilesByFolder(files), [files]);
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1" role="tree">
       <div
         className="text-s font-display tracking-wider text-muted-foreground mb-3 pb-2 border-b border-dashed"
         style={{ borderColor: "var(--theme-color)" }}
       >
-        GitLab Files
+        Project Files
       </div>
 
       {Array.from(groupedFiles.entries()).map(([folder, folderFiles]) => (
@@ -92,6 +96,9 @@ export function GitLabFileTree({
           {folder && (
             <button
               onClick={() => toggleFolder(folder)}
+              role="treeitem"
+              aria-expanded={expandedFolders.has(folder)}
+              aria-level={1}
               className="w-full flex items-center gap-1 py-1 px-2 rounded text-sm text-foreground/70 hover:text-foreground hover:bg-muted/20 transition-all"
             >
               {expandedFolders.has(folder) ? (
@@ -105,28 +112,42 @@ export function GitLabFileTree({
           )}
 
           {(!folder || expandedFolders.has(folder)) && (
-            <div className={folder ? "ml-4 space-y-1" : "space-y-1"}>
+            <div
+              className={folder ? "ml-4 space-y-1" : "space-y-1"}
+              role="group"
+            >
               {folderFiles.map((file) => (
                 <div key={file.id}>
                   <button
-                    onClick={() => {
-                      onFileSelect(file.id);
-                      if (file.fileType === "STORY" && file.scenes.length > 0) {
-                        toggleFile(file.id);
-                      }
-                    }}
+                    onClick={() => onFileSelect(file.id)}
+                    role="treeitem"
+                    aria-expanded={
+                      file.fileType === "STORY" && file.labels.length > 0
+                        ? expandedFiles.has(file.id)
+                        : undefined
+                    }
+                    aria-level={folder ? 2 : 1}
                     className={`w-full flex items-center gap-1 py-1 px-2 rounded text-sm transition-all ${
                       activeFileId === file.id
                         ? "bg-muted/50 text-foreground"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
                     }`}
                   >
-                    {file.fileType === "STORY" && file.scenes.length > 0 ? (
-                      expandedFiles.has(file.id) ? (
-                        <ChevronDown className="w-3 h-3" />
-                      ) : (
-                        <ChevronRight className="w-3 h-3" />
-                      )
+                    {file.fileType === "STORY" && file.labels.length > 0 ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFile(file.id);
+                        }}
+                        className="flex items-center hover:bg-muted/30 rounded p-0.5 -ml-1"
+                        aria-label="Toggle labels"
+                      >
+                        {expandedFiles.has(file.id) ? (
+                          <ChevronDown className="w-3 h-3" />
+                        ) : (
+                          <ChevronRight className="w-3 h-3" />
+                        )}
+                      </button>
                     ) : (
                       <File className="w-3 h-3 ml-2" />
                     )}
@@ -138,23 +159,25 @@ export function GitLabFileTree({
                     )}
                   </button>
 
-                  {/* Show scenes (labels) for STORY files */}
+                  {/* Show labels for STORY files */}
                   {file.fileType === "STORY" &&
                     expandedFiles.has(file.id) &&
-                    file.scenes.length > 0 && (
-                      <div className="ml-6 space-y-0.5 mt-0.5">
-                        {file.scenes.map((scene) => (
+                    file.labels.length > 0 && (
+                      <div className="ml-6 space-y-0.5 mt-0.5" role="group">
+                        {file.labels.map((label) => (
                           <button
-                            key={scene.id}
-                            onClick={() => onSceneSelect(scene.id)}
+                            key={label.id}
+                            onClick={() => onSceneSelect(label.id)}
+                            role="treeitem"
+                            aria-level={folder ? 3 : 2}
                             className={`w-full flex items-center gap-1 py-0.5 px-2 rounded text-xs transition-all ${
-                              activeSceneId === scene.id
+                              activeSceneId === label.id
                                 ? "bg-muted/50 text-foreground"
                                 : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
                             }`}
                           >
                             <span className="ml-1">
-                              {scene.labelName || scene.title}
+                              {label.labelName || label.title}
                             </span>
                           </button>
                         ))}

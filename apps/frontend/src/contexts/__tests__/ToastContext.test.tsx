@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, renderHook } from "@testing-library/react";
 import { ToastProvider, useToast } from "../ToastContext";
 
 describe("ToastContext", () => {
@@ -349,25 +349,13 @@ describe("ToastContext", () => {
     });
 
     it("should provide success, error, and info methods", () => {
-      let capturedContext: unknown;
+      const { result } = renderHook(() => useToast(), {
+        wrapper: ToastProvider,
+      });
 
-      function TestCaptureComponent() {
-        capturedContext = useToast();
-        return null;
-      }
-
-      render(
-        <ToastProvider>
-          <TestCaptureComponent />
-        </ToastProvider>
-      );
-
-      expect(capturedContext).toHaveProperty("success");
-      expect(capturedContext).toHaveProperty("error");
-      expect(capturedContext).toHaveProperty("info");
-      expect(typeof (capturedContext as { success: unknown }).success).toBe("function");
-      expect(typeof (capturedContext as { error: unknown }).error).toBe("function");
-      expect(typeof (capturedContext as { info: unknown }).info).toBe("function");
+      expect(result.current.success).toBeInstanceOf(Function);
+      expect(result.current.error).toBeInstanceOf(Function);
+      expect(result.current.info).toBeInstanceOf(Function);
     });
   });
 

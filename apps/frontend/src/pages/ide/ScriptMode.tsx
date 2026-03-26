@@ -1,18 +1,18 @@
 import { useState, useMemo } from "react";
-import { Download } from "lucide-react";
+import { Download, Package } from "lucide-react";
 import { StoryPanel } from "@/components/ide-shared";
 import {
-  FileTree,
   BookmarkTab,
   StatusBar,
   ScriptEditor,
 } from "@/components/script-mode";
-import { GitLabFileTree } from "@/components/script-mode/GitLabFileTree";
+import { ProjectFileTree } from "@/components/script-mode/ProjectFileTree";
 import { useLabels } from "@/hooks/useLabels";
 import { useGitLab } from "@/hooks/useGitLab";
-import { useGitLabFiles } from "@/hooks/useGitLabFiles";
-import { generateRpyPlainText, generateFileTree } from "@/lib/rpy-generator";
+import { useProjectFiles } from "@/hooks/useProjectFiles";
+import { generateRpyPlainText } from "@/lib/rpy-generator";
 import { GitLabSyncDialog } from "@/components/script-mode/GitLabSyncDialog";
+import { ZipImportDialog } from "@/components/zip-import";
 import { Button } from "@/components/ui/button";
 
 interface ScriptModeProps {
@@ -29,7 +29,6 @@ export function ScriptMode({
   gitlabBranch,
 }: ScriptModeProps) {
   const {
-    labels,
     activeLabel,
     activeLabelId,
     setActiveLabelId,
@@ -37,40 +36,18 @@ export function ScriptMode({
   } = useLabels();
 
   const { isProjectLinked, getLinkedRepository } = useGitLab();
-  const { files: gitLabFiles, isLoadingFiles } = useGitLabFiles(projectId);
+  const { files: projectFiles, isLoadingFiles } = useProjectFiles(projectId);
 
   // Sync dialog state
   const [showSyncDialog, setShowSyncDialog] = useState(false);
+  const [showZipImportDialog, setShowZipImportDialog] = useState(false);
 
   // Track active file for Script Mode
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
-  const activeGitLabFile = useMemo(
-    () => gitLabFiles.find((f) => f.id === activeFileId) || null,
-    [gitLabFiles, activeFileId]
+  const activeProjectFile = useMemo(
+    () => projectFiles.find((f) => f.id === activeFileId) || null,
+    [projectFiles, activeFileId]
   );
-
-  // Generate file tree from labels
-  const { flatFiles: files, fileNameToSceneId, sceneIdToFileName } = useMemo(() => {
-    const fileTree = generateFileTree(labels);
-
-    // Build flat file list with folder separators and scene ID mapping
-    const flatFiles: { name: string; type: "file" | "folder" }[] = [];
-    const fileNameToSceneId = new Map<string, string>();
-    const sceneIdToFileName = new Map<string, string>();
-
-    for (const folder of fileTree) {
-      flatFiles.push({ name: folder.name, type: "folder" });
-      for (const file of folder.children || []) {
-        flatFiles.push({ name: file.name, type: "file" });
-        if (file.labelId) {
-          fileNameToSceneId.set(file.name, file.labelId);
-          sceneIdToFileName.set(file.labelId, file.name);
-        }
-      }
-    }
-
-    return { flatFiles, fileNameToSceneId, sceneIdToFileName };
-  }, [labels]);
 
   // Generate RPY content for active scene (plain text for CodeMirror)
   const activeLabelPlainText = useMemo(() => {
@@ -79,7 +56,7 @@ export function ScriptMode({
   }, [activeLabel]);
 
   // Get active file content directly for Script Mode editing
-  const activeFileContent = activeGitLabFile?.content || "";
+  const activeFileContent = activeProjectFile?.content || "";
   // Memoize file lines to avoid repeated split operations
   const activeFileLines = useMemo(
     () => activeFileContent.split("\n"),
@@ -90,23 +67,6 @@ export function ScriptMode({
     () => activeLabelPlainText.split("\n"),
     [activeLabelPlainText]
   );
-
-  // Derive active file (scene) from active scene ID for non-GitLab labels
-  const activeFile = useMemo(() => {
-    if (!activeLabelId) {
-      return null;
-    }
-
-    return sceneIdToFileName.get(activeLabelId) ?? null;
-  }, [activeLabelId, sceneIdToFileName]);
-
-  // Handle file selection (matches FileTree's onSelectFile signature)
-  const handleFileSelect = (fileName: string) => {
-    const sceneId = fileNameToSceneId.get(fileName);
-    if (sceneId) {
-      setActiveLabelId(sceneId);
-    }
-  };
 
   // Handle GitLab file selection
   const handleGitLabFileSelect = (fileId: string) => {
@@ -123,14 +83,14 @@ export function ScriptMode({
   // Determine which folders should be expanded by default
   const initialExpandedFolders = useMemo(() => {
     const folders = new Set<string>();
-    for (const file of gitLabFiles) {
+    for (const file of projectFiles) {
       const parts = file.filePath.split("/");
       if (parts.length > 1) {
         folders.add(parts[0]);
       }
     }
     return Array.from(folders);
-  }, [gitLabFiles]);
+  }, [projectFiles]);
 
   // Character panel data
   const characters = useMemo(() => {
@@ -148,8 +108,8 @@ export function ScriptMode({
     );
   }
 
-  // No labels state
-  if (!labels.length && !gitLabFiles.length) {
+  // No files state
+  if (!projectFiles.length) {
     const isLinked = projectId ? isProjectLinked(projectId) : false;
     const linkedRepo = projectId ? getLinkedRepository(projectId) : null;
 
@@ -157,21 +117,31 @@ export function ScriptMode({
       <div className="flex-1 flex flex-col pt-16">
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
           <p className="text-muted-foreground">
-            No labels found in this project
+            No files imported yet
           </p>
           <p className="text-sm text-muted-foreground">
-            Create labels in Write Mode or import from GitLab
+            Import from GitLab or import from a zip file to get started
           </p>
-          {isLinked && (
+          <div className="flex gap-2">
+            {isLinked && (
+              <Button
+                variant="outline"
+                onClick={() => setShowSyncDialog(true)}
+                className="mt-2"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Import from GitLab
+              </Button>
+            )}
             <Button
               variant="outline"
-              onClick={() => setShowSyncDialog(true)}
+              onClick={() => setShowZipImportDialog(true)}
               className="mt-2"
             >
-              <Download className="w-4 h-4 mr-2" />
-              Import from GitLab
+              <Package className="w-4 h-4 mr-2" />
+              Import from Zip
             </Button>
-          )}
+          </div>
         </div>
 
         {/* Sync Dialog */}
@@ -183,6 +153,16 @@ export function ScriptMode({
             projectId={projectId}
             projectName={projectName}
             defaultBranch={linkedRepo.defaultBranch}
+          />
+        )}
+
+        {/* Zip Import Dialog */}
+        {projectId && (
+          <ZipImportDialog
+            open={showZipImportDialog}
+            onOpenChange={setShowZipImportDialog}
+            projectId={projectId}
+            projectName={projectName}
           />
         )}
       </div>
@@ -197,28 +177,29 @@ export function ScriptMode({
         <div className="w-56 min-h-0 shrink-0">
           <StoryPanel className="h-full">
             <button
-              className="w-full py-2 px-3 rounded text-sm font-medium mb-4 transition-colors"
+              className="w-full py-2 px-3 rounded text-sm font-medium mb-2 transition-colors"
               style={{ background: "var(--theme-color)", color: "white" }}
             >
               + New Chapter
             </button>
 
-            {gitLabFiles.length > 0 ? (
-              <GitLabFileTree
-                files={gitLabFiles}
-                activeFileId={activeFileId ?? undefined}
-                activeSceneId={activeLabelId ?? undefined}
-                onFileSelect={handleGitLabFileSelect}
-                onSceneSelect={handleGitLabSceneSelect}
-                initialExpandedFolders={initialExpandedFolders}
-              />
-            ) : (
-              <FileTree
-                files={files}
-                activeFile={activeFile ?? ""}
-                onSelectFile={handleFileSelect}
-              />
-            )}
+            <button
+              onClick={() => setShowZipImportDialog(true)}
+              className="w-full py-2 px-3 rounded text-sm font-medium mb-4 transition-colors border border-dashed hover:bg-muted/50 text-muted-foreground"
+              type="button"
+            >
+              <Package className="w-4 h-4 mr-2 inline" />
+              Import Zip
+            </button>
+
+            <ProjectFileTree
+              files={projectFiles}
+              activeFileId={activeFileId ?? undefined}
+              activeSceneId={activeLabelId ?? undefined}
+              onFileSelect={handleGitLabFileSelect}
+              onSceneSelect={handleGitLabSceneSelect}
+              initialExpandedFolders={initialExpandedFolders}
+            />
           </StoryPanel>
         </div>
 
@@ -226,19 +207,12 @@ export function ScriptMode({
         <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
           {/* Tabs */}
           <div className="flex items-end mb-0">
-            {activeGitLabFile && (
+            {activeProjectFile && (
               <BookmarkTab
                 name={
-                  activeGitLabFile.filePath.split("/").pop() ||
-                  activeGitLabFile.filePath
+                  activeProjectFile.filePath.split("/").pop() ||
+                  activeProjectFile.filePath
                 }
-                isActive={true}
-                onClick={() => {}}
-              />
-            )}
-            {!activeGitLabFile && activeFile && (
-              <BookmarkTab
-                name={activeFile}
                 isActive={true}
                 onClick={() => {}}
               />
@@ -266,7 +240,7 @@ export function ScriptMode({
             />
 
             <div className="bg-card/80 backdrop-blur border border-border/30 rounded-lg h-full overflow-hidden min-h-0 min-w-0">
-              {activeGitLabFile ? (
+              {activeProjectFile ? (
                 <ScriptEditor
                   content={activeFileContent}
                   onChange={(value) =>
@@ -283,9 +257,7 @@ export function ScriptMode({
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
-                  {gitLabFiles.length > 0
-                    ? "Select a file or scene to view its content"
-                    : "Select a scene to view its content"}
+                  Select a file or scene to view its content
                 </div>
               )}
             </div>
@@ -365,7 +337,7 @@ export function ScriptMode({
       {/* Status Bar */}
       <StatusBar
         lineCount={
-          activeGitLabFile
+          activeProjectFile
             ? activeFileLines.length
             : activeLabel
               ? activeLabelLines.length
@@ -377,6 +349,16 @@ export function ScriptMode({
         projectName={projectName}
         gitlabBranch={gitlabBranch}
       />
+
+      {/* Zip Import Dialog (always available for non-empty projects too) */}
+      {projectId && (
+        <ZipImportDialog
+          open={showZipImportDialog}
+          onOpenChange={setShowZipImportDialog}
+          projectId={projectId}
+          projectName={projectName}
+        />
+      )}
     </div>
   );
 }

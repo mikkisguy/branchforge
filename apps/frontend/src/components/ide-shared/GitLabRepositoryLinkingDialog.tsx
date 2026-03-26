@@ -227,7 +227,6 @@ export function GitLabRepositoryLinkingDialog({
     isCreatingNewProject,
     newProjectName,
     projects,
-    closeDialog,
     onLinkSuccess,
     refreshIntegration,
     createProject,

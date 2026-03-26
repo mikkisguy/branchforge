@@ -6,7 +6,7 @@
  * NOTE: Database operation tests (listLabels, getLabel, createLabel, updateLabel, deleteLabel)
  * have been migrated to integration tests. These unit tests now focus on:
  * - Data transformation logic (mapToPublicLabel)
- * - GitLab file sync integration (RPY parser)
+ * - Project file sync integration (RPY parser)
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -24,11 +24,7 @@ vi.mock("../../db/schema/tables/label-characters.js", () => ({
 }));
 
 // Now import the service after the mock is set up
-import {
-  listLabels,
-  deleteLabel,
-  type LabelLineWithSpeaker,
-} from "../labels.service.js";
+import { listLabels, deleteLabel } from "../labels.service.js";
 
 // Mock the RPY parser service
 const mockRemoveLabelFromRPYContent = vi
@@ -76,7 +72,7 @@ const createMockChain = (resolveValue: any) => {
 const createEmptyMockChain = () => createMockChain([]);
 const mockSelect = vi.fn(createEmptyMockChain);
 
-// Additional mocks for deleteLabel tests (GitLab file sync)
+// Additional mocks for deleteLabel tests (project file sync)
 const mockUpdate = vi.fn();
 const mockTransaction = vi.fn();
 
@@ -113,26 +109,6 @@ describe("LabelsService", () => {
     duoPairId: null,
     createdAt: new Date("2024-01-01"),
     updatedAt: new Date("2024-01-01"),
-  };
-
-  const _mockLabelLine: LabelLineWithSpeaker = {
-    id: "line-1",
-    labelId,
-    sequence: 1,
-    contentType: "DIALOGUE",
-    content: "Hello world!",
-    speakerId: "char-1",
-    speakerName: "Eileen",
-    speakerTag: "a",
-    visualType: "GENERATED",
-    visualSlugOverride: null,
-    customVisualName: null,
-    menuOptions: null,
-    wordCount: null,
-    demoPlaceholderColor: null,
-    demoNotes: null,
-    createdAt: new Date("2024-01-01").toISOString(),
-    updatedAt: new Date("2024-01-01").toISOString(),
   };
 
   beforeEach(() => {
@@ -215,19 +191,19 @@ describe("LabelsService", () => {
   });
 
   // ============================================================================
-  // GitLab file sync tests (deleteLabel with RPY parser integration)
-  // These tests verify the GitLab file sync behavior when deleting labels
+  // Project file sync tests (deleteLabel with RPY parser integration)
+  // These tests verify the project file sync behavior when deleting labels
   // ============================================================================
 
-  describe("deleteLabel - GitLab file sync", () => {
+  describe("deleteLabel - project file sync", () => {
     beforeEach(() => {
       mockSelect.mockImplementation(createEmptyMockChain);
     });
 
-    it("should update gitlab_files.content when label has a gitlabFileId", async () => {
+    it("should update project_files.content when label has a projectFileId", async () => {
       const mockContent =
         'label chapter1_label1:\n    "Test content"\n    return\nlabel chapter1_label2:\n    "Other content"\n    return';
-      const mockLabelWithGitlab = {
+      const mockLabelWithProjectFile = {
         ...mockLabel,
         labelName: "chapter1_label1",
       };
@@ -235,10 +211,10 @@ describe("LabelsService", () => {
       mockSelect.mockImplementation(() =>
         createMockChain([
           {
-            label: mockLabelWithGitlab,
+            label: mockLabelWithProjectFile,
             projectOwnerId: userId,
-            gitlabFileId: "gitlab-file-123",
-            gitlabFileContent: mockContent,
+            projectFileId: "project-file-123",
+            projectFileContent: mockContent,
           },
         ])
       );
@@ -271,7 +247,7 @@ describe("LabelsService", () => {
 
       await deleteLabel(labelId, userId);
 
-      // Should have called update 3 times (label + label lines + gitlab_files)
+      // Should have called update 3 times (label + label lines + project_files)
       expect(updateCalls).toHaveLength(3);
 
       // Verify the removeLabelFromRPYContent function was called
@@ -281,20 +257,19 @@ describe("LabelsService", () => {
       );
     });
 
-    it("should not update gitlab_files when label has no gitlabFileId", async () => {
-      const mockLabelWithoutGitlab = {
+    it("should not update project_files when label has no projectFileId", async () => {
+      const mockLabelWithoutProjectFile = {
         ...mockLabel,
         labelName: "chapter1_label1",
-        gitlabFileId: null,
       };
 
       mockSelect.mockImplementation(() =>
         createMockChain([
           {
-            label: mockLabelWithoutGitlab,
+            label: mockLabelWithoutProjectFile,
             projectOwnerId: userId,
-            gitlabFileId: null,
-            gitlabFileContent: null,
+            projectFileId: null,
+            projectFileContent: null,
           },
         ])
       );

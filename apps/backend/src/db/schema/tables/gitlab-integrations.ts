@@ -18,10 +18,10 @@ import {
   syncOperationEnum,
   syncStatusEnum,
   syncOperationStatusEnum,
-  gitlabFileTypeEnum,
 } from "../enums.js";
 import { users } from "./users.js";
 import { projects } from "./projects.js";
+import { projectFiles } from "./project-files.js";
 
 /**
  * GitLab Integrations - User-level GitLab integration (stores encrypted PAT)
@@ -40,51 +40,24 @@ export const gitlabIntegrations = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [unique("gitlab_integrations_user_id_unique").on(table.userId)]
+  // TODO: Consider adding an index on project_files.project_id.
+  // The project_files table has no indexes defined, but project_id is frequently queried for project-scoped file lookups.
+  // Adding this index in your schema definition would improve query performance as data grows.
 );
 
 /**
- * GitLab Files - File tracking for GitLab integration
- *
- * Stores full RPY file content for Script Mode editing and links to scenes.
- * Files can be STORY (labels/*.rpy with dialogue) or SETTINGS (gui/*.rpy, etc.).
- */
-export const gitlabFiles = pgTable(
-  "gitlab_files",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    projectId: uuid("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
-    filePath: text("file_path").notNull(), // e.g., "labels/act_i.rpy" or "gui/screens.rpy"
-    fileType: gitlabFileTypeEnum("file_type").notNull(),
-    content: text("content").notNull(), // Full RPY file content for Script Mode
-    lastSyncedAt: timestamp("last_synced_at"),
-    lastCommitSha: text("last_commit_sha"),
-    contentHash: text("content_hash"), // SHA-256 hash for idempotency
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  },
-  (table) => [
-    index("gitlab_files_project_id_idx").on(table.projectId),
-    unique("gitlab_files_project_file_uidx").on(
-      table.projectId,
-      table.filePath
-    ),
-  ]
-);
-
-/**
- * GitLab File Sync State - Track sync operations for individual files
+ * Project File Sync State - Track sync operations for individual files
  *
  * Prevents concurrent syncs, enables idempotent retry, provides audit trail.
+ * References project_files table (which includes GitLab and zip sources).
  */
-export const gitlabFileSyncState = pgTable(
-  "gitlab_file_sync_state",
+export const projectFileSyncState = pgTable(
+  "project_file_sync_state",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    gitlabFileId: uuid("gitlab_file_id")
+    projectFileId: uuid("project_file_id")
       .notNull()
-      .references(() => gitlabFiles.id, { onDelete: "cascade" }),
+      .references(() => projectFiles.id, { onDelete: "cascade" }),
     contentHash: text("content_hash").notNull(), // SHA-256 for idempotency
     status: syncStatusEnum("status").notNull(), // 'synced', 'modified_local', 'conflict'
     startedAt: timestamp("started_at").defaultNow().notNull(),
@@ -94,8 +67,8 @@ export const gitlabFileSyncState = pgTable(
     dbLabelCount: integer("db_label_count"),
   },
   (table) => [
-    index("gitlab_file_sync_state_gitlab_file_id_idx").on(table.gitlabFileId),
-    index("gitlab_file_sync_state_status_idx").on(table.status),
+    index("project_file_sync_state_project_file_id_idx").on(table.projectFileId),
+    index("project_file_sync_state_status_idx").on(table.status),
   ]
 );
 
@@ -162,8 +135,5 @@ export type NewGitlabRepository = typeof gitlabRepositories.$inferInsert;
 export type GitlabSyncOperation = typeof gitlabSyncOperations.$inferSelect;
 export type NewGitlabSyncOperation = typeof gitlabSyncOperations.$inferInsert;
 
-export type GitlabFile = typeof gitlabFiles.$inferSelect;
-export type NewGitlabFile = typeof gitlabFiles.$inferInsert;
-
-export type GitlabFileSyncState = typeof gitlabFileSyncState.$inferSelect;
-export type NewGitlabFileSyncState = typeof gitlabFileSyncState.$inferInsert;
+export type ProjectFileSyncState = typeof projectFileSyncState.$inferSelect;
+export type NewProjectFileSyncState = typeof projectFileSyncState.$inferInsert;

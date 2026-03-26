@@ -49,6 +49,23 @@ export const gitlabKeys = {
 } as const;
 
 // ============================================================================
+// Project Files Keys
+// ============================================================================
+
+export const projectFilesKeys = {
+  all: ["projectFiles"] as const,
+  lists: (projectId: string) => ["projectFiles", projectId, "list"] as const,
+  listsWithSource: (
+    projectId: string,
+    source?: "GITLAB" | "ZIP"
+  ) => ["projectFiles", projectId, "list", source] as const,
+  detail: (projectId: string, fileId: string) =>
+    ["projectFiles", projectId, "detail", fileId] as const,
+  content: (projectId: string, filePath: string, source: "GITLAB" | "ZIP") =>
+    ["projectFiles", projectId, "content", filePath, source] as const,
+} as const;
+
+// ============================================================================
 // Project Keys
 // ============================================================================
 

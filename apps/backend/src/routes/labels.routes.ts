@@ -43,7 +43,7 @@ import {
   projects,
   labels,
   labelLines,
-  gitlabFiles,
+  projectFiles,
 } from "../db/schema/index.js";
 import { eq, asc, inArray, isNull, and } from "drizzle-orm";
 import { reconstructRPYFile } from "../services/rpy-parser.service.js";
@@ -196,7 +196,7 @@ async function updateLabelDialogueHandler(
       .select({
         id: labels.id,
         projectId: labels.projectId,
-        gitlabFileId: labels.gitlabFileId,
+        projectFileId: labels.projectFileId,
         version: labels.version,
         labelPosition: labels.labelPosition,
       })
@@ -204,21 +204,21 @@ async function updateLabelDialogueHandler(
       .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
       .limit(1);
 
-    if (!label || !label.gitlabFileId) {
+    if (!label || !label.projectFileId) {
       reply
         .status(404)
         .send({ error: "Label or file not found" } as ErrorResponse);
       return;
     }
 
-    // Get the gitlab file
-    const [gitlabFile] = await db
+    // Get the project file
+    const [projectFile] = await db
       .select()
-      .from(gitlabFiles)
-      .where(eq(gitlabFiles.id, label.gitlabFileId))
+      .from(projectFiles)
+      .where(eq(projectFiles.id, label.projectFileId))
       .limit(1);
 
-    if (!gitlabFile) {
+    if (!projectFile) {
       reply.status(404).send({ error: "File not found" } as ErrorResponse);
       return;
     }
@@ -251,7 +251,7 @@ async function updateLabelDialogueHandler(
         speakerId: null, // TODO: Lookup character by speaker tag to get UUID
         demoNotes: entry.speaker || null, // Store raw speaker tag for reconstruction
         isDirty: true, // Mark as modified since last sync
-        gitlabFileId: label.gitlabFileId,
+        projectFileId: label.projectFileId,
         linePosition: (label.labelPosition ?? 0) + index,
         contentHash: calculateContentHash(entry.text),
         lastSyncedHash: null, // No synced hash for newly created/modified lines
@@ -283,7 +283,7 @@ async function updateLabelDialogueHandler(
       })
       .from(labels)
       .where(
-        and(eq(labels.gitlabFileId, gitlabFile.id), isNull(labels.deletedAt))
+        and(eq(labels.projectFileId, projectFile.id), isNull(labels.deletedAt))
       )
       .orderBy(asc(labels.labelPosition));
 
@@ -342,18 +342,18 @@ async function updateLabelDialogueHandler(
 
     // Reconstruct file
     const newContent = reconstructRPYFile({
-      originalContent: gitlabFile.content,
+      originalContent: projectFile.content,
       updatedDialogue,
     });
 
     // Update file content
     await db
-      .update(gitlabFiles)
+      .update(projectFiles)
       .set({
         content: newContent,
         updatedAt: new Date(),
       })
-      .where(eq(gitlabFiles.id, gitlabFile.id));
+      .where(eq(projectFiles.id, projectFile.id));
 
     reply.send({ success: true } as UpdateLabelDialogueResponse);
   } catch (error) {

@@ -32,7 +32,7 @@ import {
 } from "../enums.js";
 import { projects } from "./projects.js";
 import { pairGroups } from "./pair-groups.js";
-import { gitlabFiles } from "./gitlab-integrations.js";
+import { projectFiles } from "./project-files.js";
 import { users } from "./users.js";
 
 export const labels = pgTable(
@@ -65,8 +65,8 @@ export const labels = pgTable(
     crossRouteContext: text("cross_route_context"), // Prequel: "Lucas_Friend_Mode"
     readerNotes: text("reader_notes"), // Beta feedback
 
-    // GitLab integration fields
-    gitlabFileId: uuid("gitlab_file_id").references(() => gitlabFiles.id, {
+    // GitLab integration fields (references project_files table)
+    projectFileId: uuid("project_file_id").references(() => projectFiles.id, {
       onDelete: "set null",
     }),
     labelName: text("label_name"), // The actual label name in the RPY file
@@ -100,7 +100,7 @@ export const labels = pgTable(
   },
   (table) => [
     index("labels_duo_pair_id_idx").on(table.duoPairId),
-    index("labels_gitlab_file_id_idx").on(table.gitlabFileId),
+    index("labels_project_file_id_idx").on(table.projectFileId),
     // Composite indexes for common query patterns - partial indexes for active (non-deleted) labels
     // Used by listLabels when filtering by route on active labels
     index("labels_project_route_idx")

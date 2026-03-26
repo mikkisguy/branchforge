@@ -18,7 +18,7 @@ import { sql } from "drizzle-orm";
 import { contentTypeEnum, visualTypeEnum } from "../enums.js";
 import { labels } from "./labels.js";
 import { characters } from "./characters.js";
-import { gitlabFiles } from "./gitlab-integrations.js";
+import { projectFiles } from "./project-files.js";
 
 export const labelLines = pgTable(
   "label_lines",
@@ -47,8 +47,8 @@ export const labelLines = pgTable(
     demoPlaceholderColor: text("demo_placeholder_color"), // Black screen fallback hex
     demoNotes: text("demo_notes"), // "Character enters from left"
 
-    // GitLab file reference
-    gitlabFileId: uuid("gitlab_file_id").references(() => gitlabFiles.id, {
+    // GitLab file reference (references project_files table)
+    projectFileId: uuid("project_file_id").references(() => projectFiles.id, {
       onDelete: "set null",
     }),
     linePosition: integer("line_position"), // Position within the RPY file
@@ -78,9 +78,9 @@ export const labelLines = pgTable(
     // Leftmost prefix (labelId) serves queries filtering by labelId alone
     index("label_lines_label_sequence_idx").on(table.labelId, table.sequence),
     // GitLab file reference indexes
-    index("label_lines_gitlab_file_id_idx").on(table.gitlabFileId),
-    index("label_lines_gitlab_file_position_idx").on(
-      table.gitlabFileId,
+    index("label_lines_project_file_id_idx").on(table.projectFileId),
+    index("label_lines_project_file_position_idx").on(
+      table.projectFileId,
       table.linePosition
     ),
     // Sync status indexes - use partial indexes for sparse/poorly-selective columns

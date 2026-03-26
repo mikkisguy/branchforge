@@ -14,7 +14,7 @@ import {
   projects,
   projectUsers,
   routeConfigs,
-  gitlabFiles,
+  projectFiles,
 } from "../db/schema/index.js";
 import { labelCharacters as labelCharactersTable } from "../db/schema/tables/label-characters.js";
 import { eq, and, asc, or, isNull } from "drizzle-orm";
@@ -553,17 +553,17 @@ export async function deleteLabel(
   // Import the removeLabelFromRPYContent function dynamically
   const { removeLabelFromRPYContent } = await import("./rpy-parser.service.js");
 
-  // Get label with project owner info and gitlabFileId
+  // Get label with project owner info and projectFileId
   const [labelWithProject] = await db
     .select({
       label: labels,
       projectOwnerId: projects.userId,
-      gitlabFileContent: gitlabFiles.content,
-      gitlabFileId: labels.gitlabFileId,
+      projectFileContent: projectFiles.content,
+      projectFileId: labels.projectFileId,
     })
     .from(labels)
     .innerJoin(projects, eq(labels.projectId, projects.id))
-    .leftJoin(gitlabFiles, eq(labels.gitlabFileId, gitlabFiles.id))
+    .leftJoin(projectFiles, eq(labels.projectFileId, projectFiles.id))
     .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
     .limit(1);
 
@@ -595,27 +595,27 @@ export async function deleteLabel(
         and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt))
       );
 
-    // If the label has a gitlabFileId and a valid labelName, rebuild the file content without this label
+    // If the label has a projectFileId and a valid labelName, rebuild the file content without this label
     // This ensures exports don't re-publish the deleted label.
     // UI-created labels have null labelName and should skip this step since they don't exist in RPY files.
     if (
-      labelWithProject.gitlabFileId &&
-      labelWithProject.gitlabFileContent &&
+      labelWithProject.projectFileId &&
+      labelWithProject.projectFileContent &&
       labelName !== null
     ) {
       const updatedContent = removeLabelFromRPYContent(
-        labelWithProject.gitlabFileContent,
+        labelWithProject.projectFileContent,
         labelName
       );
 
-      // Update the gitlab_files.content with the new content (without the deleted label)
+      // Update the project_files.content with the new content (without the deleted label)
       await tx
-        .update(gitlabFiles)
+        .update(projectFiles)
         .set({
           content: updatedContent,
           updatedAt: new Date(),
         })
-        .where(eq(gitlabFiles.id, labelWithProject.gitlabFileId));
+        .where(eq(projectFiles.id, labelWithProject.projectFileId));
     }
   });
 }

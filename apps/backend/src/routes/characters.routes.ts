@@ -12,7 +12,7 @@ import {
   characters,
   projectSettings,
   labels,
-  gitlabFiles,
+  projectFiles,
   projects,
 } from "../db/schema/index.js";
 import { eq, and } from "drizzle-orm";
@@ -193,7 +193,7 @@ function isMultipartFileTooLargeError(error: unknown): boolean {
 // ============================================================================
 
 /**
- * Detect characters from GitLab RPY files
+ * Detect characters from project RPY files
  *
  * GET /projects/:projectId/characters/detect
  * Requires authentication
@@ -232,15 +232,15 @@ async function detectCharactersHandler(
       return;
     }
 
-    // Get all GitLab files for this project
-    const projectFiles = await db
+    // Get all project files for this project
+    const allProjectFiles = await db
       .select()
-      .from(gitlabFiles)
-      .where(eq(gitlabFiles.projectId, projectId));
+      .from(projectFiles)
+      .where(eq(projectFiles.projectId, projectId));
 
     // Parse characters from all files
     const allDetected: DetectedCharacter[] = [];
-    for (const file of projectFiles) {
+    for (const file of allProjectFiles) {
       if (file.content) {
         request.log.info(
           { filePath: file.filePath, contentLength: file.content.length },

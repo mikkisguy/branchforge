@@ -235,7 +235,7 @@ function deriveLightColor(hslString: string): string {
 
   // For light theme: reduce lightness significantly for contrast
   // Adjust saturation based on original saturation to maintain color character
-  let newL = Math.max(25, l - 25); // Reduce lightness by ~25%, min 25%
+  const newL = Math.max(25, l - 25); // Reduce lightness by ~25%, min 25%
   let newS = s;
 
   // Increase saturation slightly for low-lightness colors to prevent washing out
