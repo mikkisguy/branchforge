@@ -469,40 +469,54 @@ describe("GitLabSyncService (Integration)", () => {
       });
       await db.insert(projectFiles).values(newGitlabFile);
 
-      // Mock GitLab API to return different content AND a new label
-      vi.spyOn(gitlabService, "getFileContent")
-        .mockResolvedValueOnce('label start:\n    "Remote change"\n    return')
-        .mockResolvedValueOnce('label chapter2:\n    "New remote"\n    return');
+      // Mock GitLab API to return different content based on file path (order-independent)
+      vi.spyOn(gitlabService, "getFileContent").mockImplementation(
+        async (_projectId, filePath) => {
+          if (filePath === "game/script.rpy") {
+            return 'label start:\n    "Remote change"\n    return';
+          } else if (filePath === "game/chapter2.rpy") {
+            return 'label chapter2:\n    "New remote"\n    return';
+          }
+          return "";
+        }
+      );
 
-      vi.spyOn(rpyParserService, "parseRPYFileWithLabels")
-        .mockReturnValueOnce({
-          labels: [
-            {
-              label: "start",
-              lineNumber: 1,
-              dialogue: [
-                { speaker: null, text: "Remote change", lineNumber: 2 },
+      vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockImplementation(
+        (content) => {
+          if (content.includes("Remote change")) {
+            return {
+              labels: [
+                {
+                  label: "start",
+                  lineNumber: 1,
+                  dialogue: [
+                    { speaker: null, text: "Remote change", lineNumber: 2 },
+                  ],
+                  choices: [],
+                  jumps: [],
+                },
               ],
-              choices: [],
-              jumps: [],
-            },
-          ],
-          characters: [],
-          fileType: "STORY",
-        })
-        .mockReturnValueOnce({
-          labels: [
-            {
-              label: "chapter2",
-              lineNumber: 1,
-              dialogue: [{ speaker: null, text: "New remote", lineNumber: 2 }],
-              choices: [],
-              jumps: [],
-            },
-          ],
-          characters: [],
-          fileType: "STORY",
-        });
+              characters: [],
+              fileType: "STORY",
+            };
+          } else if (content.includes("New remote")) {
+            return {
+              labels: [
+                {
+                  label: "chapter2",
+                  lineNumber: 1,
+                  dialogue: [{ speaker: null, text: "New remote", lineNumber: 2 }],
+                  choices: [],
+                  jumps: [],
+                },
+              ],
+              characters: [],
+              fileType: "STORY",
+            };
+          }
+          return { labels: [], characters: [], fileType: "STORY" };
+        }
+      );
 
       const result = await detectConflicts(testProjectId, testBranch);
 
@@ -594,48 +608,58 @@ describe("GitLabSyncService (Integration)", () => {
         },
       ]);
 
-      // Mock GitLab API to return matching content for each scene
-      vi.spyOn(gitlabService, "getFileContent")
-        .mockResolvedValueOnce(
-          'label start:\n    "Line 1"\n    "Line 2"\n    return'
-        )
-        .mockResolvedValueOnce(
-          'label chapter1:\n    "Chapter 1 Line 1"\n    return'
-        );
+      // Mock GitLab API to return matching content based on file path (order-independent)
+      vi.spyOn(gitlabService, "getFileContent").mockImplementation(
+        async (_projectId, filePath) => {
+          if (filePath === "game/script.rpy") {
+            return 'label start:\n    "Line 1"\n    "Line 2"\n    return';
+          } else if (filePath === "game/chapter1.rpy") {
+            return 'label chapter1:\n    "Chapter 1 Line 1"\n    return';
+          }
+          return "";
+        }
+      );
 
-      // Mock separate file parses for each scene
-      vi.spyOn(rpyParserService, "parseRPYFileWithLabels")
-        .mockReturnValueOnce({
-          labels: [
-            {
-              label: "start",
-              lineNumber: 1,
-              dialogue: [
-                { speaker: null, text: "Line 1", lineNumber: 2 },
-                { speaker: null, text: "Line 2", lineNumber: 3 },
+      // Mock separate file parses for each scene based on content
+      vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockImplementation(
+        (content) => {
+          if (content.includes("Line 1") && content.includes("Line 2")) {
+            return {
+              labels: [
+                {
+                  label: "start",
+                  lineNumber: 1,
+                  dialogue: [
+                    { speaker: null, text: "Line 1", lineNumber: 2 },
+                    { speaker: null, text: "Line 2", lineNumber: 3 },
+                  ],
+                  choices: [],
+                  jumps: [],
+                },
               ],
-              choices: [],
-              jumps: [],
-            },
-          ],
-          characters: [],
-          fileType: "STORY",
-        })
-        .mockReturnValueOnce({
-          labels: [
-            {
-              label: "chapter1",
-              lineNumber: 1,
-              dialogue: [
-                { speaker: null, text: "Chapter 1 Line 1", lineNumber: 2 },
+              characters: [],
+              fileType: "STORY",
+            };
+          } else if (content.includes("Chapter 1 Line 1")) {
+            return {
+              labels: [
+                {
+                  label: "chapter1",
+                  lineNumber: 1,
+                  dialogue: [
+                    { speaker: null, text: "Chapter 1 Line 1", lineNumber: 2 },
+                  ],
+                  choices: [],
+                  jumps: [],
+                },
               ],
-              choices: [],
-              jumps: [],
-            },
-          ],
-          characters: [],
-          fileType: "STORY",
-        });
+              characters: [],
+              fileType: "STORY",
+            };
+          }
+          return { labels: [], characters: [], fileType: "STORY" };
+        }
+      );
 
       const result = await detectConflicts(testProjectId, testBranch);
 
