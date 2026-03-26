@@ -15,8 +15,11 @@
 | `renpy_definition_category` | `CHARACTER`, `TRANSFORM`, `IMAGE`, `INIT`                          | Ren'Py definition types                           |
 | `scene_visibility`          | `EXCLUSIVE`, `SHARED`, `DUO_PAIR`                                  | Scene visibility across routes                    |
 | `sync_operation`            | `export`, `import`                                                 | GitLab sync operation type                        |
-| `sync_state`                | `pending`, `in_progress`, `completed`, `failed`                    | GitLab sync status                                |
+| `sync_state`                | `pending`, `in_progress`, `completed`, `failed`                    | GitLab sync operation status (for sync operations tracking) |
+| `sync_status`               | `SYNCED`, `MODIFIED_LOCAL`, `CONFLICT`                             | File sync state (for labels and file sync state)  |
 | `gitlab_file_type`          | `STORY`, `SETTINGS`                                                | GitLab file type (story labels or settings files) |
+| `project_file_type`         | `STORY`, `SETTINGS`                                                | Project file type (unified for all sources)       |
+| `file_source`               | `GITLAB`, `ZIP`                                                    | File source type (where files come from)          |
 
 ---
 
@@ -426,42 +429,43 @@ User-level GitLab integration storing encrypted PAT.
 
 ---
 
-### 22. GitLab Files
+### 22. Project Files
 
-File tracking for GitLab integration.
+Unified file storage for all project sources (GitLab, zip, etc.). Replaces the old `gitlab_files` table with a source-agnostic approach. Stores full RPY file content for Script Mode editing and links to labels.
 
-| Column            | Type                         | Notes                                             |
-| ----------------- | ---------------------------- | ------------------------------------------------- |
-| `id`              | uuid PK                      |                                                   |
-| `project_id`      | uuid FK → projects           |                                                   |
-| `file_path`       | text, not null               | e.g., `"labels/act_i.rpy"` or `"gui/screens.rpy"` |
-| `file_type`       | `gitlab_file_type`, not null | `STORY` (story labels) or `SETTINGS` (gui, etc.)  |
-| `content`         | text, not null               | Full RPY file content for Script Mode             |
-| `last_synced_at`  | timestamp, nullable          | Last sync timestamp                               |
-| `last_commit_sha` | text, nullable               | Last commit SHA                                   |
-| `content_hash`    | text, nullable               | SHA-256 hash for idempotency                      |
-| `created_at`      | timestamp                    |                                                   |
-| `updated_at`      | timestamp                    |                                                   |
+| Column            | Type                            | Notes                                                           |
+| ----------------- | ------------------------------- | --------------------------------------------------------------- |
+| `id`              | uuid PK                         |                                                                 |
+| `project_id`      | uuid FK → projects              |                                                                 |
+| `source`          | `file_source`, not null         | `GITLAB` or `ZIP` (where the file came from)                    |
+| `file_path`       | text, not null                  | e.g., `"labels/act_i.rpy"` or `"gui/screens.rpy"`               |
+| `file_type`       | `project_file_type`, not null   | `STORY` (story labels) or `SETTINGS` (gui, etc.)                |
+| `content`         | text, not null                  | Full RPY file content for Script Mode                           |
+| `content_hash`    | text, not null                  | SHA-256 hash for idempotency                                    |
+| `last_synced_at`  | timestamp, nullable             | Last sync timestamp (GitLab-specific, null for non-GitLab)       |
+| `last_commit_sha` | text, nullable                  | Last commit SHA (GitLab-specific, null for non-GitLab)           |
+| `created_at`      | timestamp                       |                                                                 |
+| `updated_at`      | timestamp                       |                                                                 |
 
-Unique constraint: `(project_id, file_path)`
+Unique constraint: `(project_id, source, file_path)`
 
 ---
 
-### 23. GitLab File Sync State
+### 23. Project File Sync State
 
-Track sync operations for individual files.
+Track sync operations for individual files (supports all file sources: GitLab, zip, etc.).
 
-| Column           | Type                    | Notes                                           |
-| ---------------- | ----------------------- | ----------------------------------------------- |
-| `id`             | uuid PK                 |                                                 |
-| `gitlab_file_id` | uuid FK → gitlab_files  |                                                 |
-| `content_hash`   | text, not null          | SHA-256 for idempotency                         |
-| `status`         | `sync_status`, not null | `pending`, `in_progress`, `completed`, `failed` |
-| `started_at`     | timestamp               |                                                 |
-| `completed_at`   | timestamp, nullable     |                                                 |
-| `error_message`  | text, nullable          |                                                 |
-| `label_count`    | integer, nullable       | Number of labels parsed                         |
-| `scene_count`    | integer, nullable       | Number of scenes created                        |
+| Column            | Type                    | Notes                                           |
+| ----------------- | ----------------------- | ----------------------------------------------- |
+| `id`              | uuid PK                 |                                                 |
+| `project_file_id` | uuid FK → project_files |                                                 |
+| `content_hash`    | text, not null          | SHA-256 for idempotency                         |
+| `status`          | `sync_status`, not null | `synced`, `modified_local`, `conflict`          |
+| `started_at`      | timestamp               |                                                 |
+| `completed_at`    | timestamp, nullable     |                                                 |
+| `error_message`   | text, nullable          |                                                 |
+| `rpy_label_count` | integer, nullable       | Number of labels parsed                         |
+| `db_label_count`  | integer, nullable       | Number of labels created/updated                |
 
 ---
 
@@ -557,9 +561,9 @@ route_configs
 ├── projects (1:m)
 └── scenes.route (soft reference from scenes within same project)
 
-gitlab_files
-├── gitlab_file_sync_state (1:m)
-└── scenes (1:m, via gitlab_file_id)
+project_files
+├── project_file_sync_state (1:m)
+└── labels (1:m, via project_file_id)
 
 gitlab_repositories
 └── projects (1:m)

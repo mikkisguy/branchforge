@@ -24,7 +24,7 @@ import {
   labels as labelsTable,
   labelLines,
   projectFiles,
-  gitlabFileSyncState,
+  projectFileSyncState,
 } from "../../db/schema/index.js";
 import { eq, isNull, and } from "drizzle-orm";
 import {
@@ -81,8 +81,8 @@ describe("GitLabFileSyncService (Integration)", () => {
   // Helper to clean up all test data
   async function cleanupTestData() {
     await db
-      .delete(gitlabFileSyncState)
-      .where(eq(gitlabFileSyncState.projectFileId, testGitlabFileId));
+      .delete(projectFileSyncState)
+      .where(eq(projectFileSyncState.projectFileId, testGitlabFileId));
     await db
       .delete(labelLines)
       .where(eq(labelLines.projectFileId, testGitlabFileId));
@@ -219,7 +219,7 @@ describe("GitLabFileSyncService (Integration)", () => {
     });
 
     it("should return true when sync is in progress", async () => {
-      await db.insert(gitlabFileSyncState).values({
+      await db.insert(projectFileSyncState).values({
         id: testUuid("67000000", 1),
         projectFileId: testGitlabFileId,
         contentHash: "hash123",
@@ -232,12 +232,12 @@ describe("GitLabFileSyncService (Integration)", () => {
       expect(hasInProgress).toBe(true);
 
       await db
-        .delete(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.projectFileId, testGitlabFileId));
+        .delete(projectFileSyncState)
+        .where(eq(projectFileSyncState.projectFileId, testGitlabFileId));
     });
 
     it("should return false when sync is completed", async () => {
-      await db.insert(gitlabFileSyncState).values({
+      await db.insert(projectFileSyncState).values({
         id: testUuid("67000000", 1),
         projectFileId: testGitlabFileId,
         contentHash: "hash123",
@@ -251,8 +251,8 @@ describe("GitLabFileSyncService (Integration)", () => {
       expect(hasInProgress).toBe(false);
 
       await db
-        .delete(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.projectFileId, testGitlabFileId));
+        .delete(projectFileSyncState)
+        .where(eq(projectFileSyncState.projectFileId, testGitlabFileId));
     });
   });
 
@@ -268,7 +268,7 @@ describe("GitLabFileSyncService (Integration)", () => {
 
     it("should return false when only failed sync exists", async () => {
       const contentHash = "hash123";
-      await db.insert(gitlabFileSyncState).values({
+      await db.insert(projectFileSyncState).values({
         id: testUuid("67000000", 1),
         projectFileId: testGitlabFileId,
         contentHash,
@@ -286,13 +286,13 @@ describe("GitLabFileSyncService (Integration)", () => {
       expect(alreadySynced).toBe(false);
 
       await db
-        .delete(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.projectFileId, testGitlabFileId));
+        .delete(projectFileSyncState)
+        .where(eq(projectFileSyncState.projectFileId, testGitlabFileId));
     });
 
     it("should return true when content was already synced", async () => {
       const contentHash = "hash123";
-      await db.insert(gitlabFileSyncState).values({
+      await db.insert(projectFileSyncState).values({
         id: testUuid("67000000", 1),
         projectFileId: testGitlabFileId,
         contentHash,
@@ -309,12 +309,12 @@ describe("GitLabFileSyncService (Integration)", () => {
       expect(alreadySynced).toBe(true);
 
       await db
-        .delete(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.projectFileId, testGitlabFileId));
+        .delete(projectFileSyncState)
+        .where(eq(projectFileSyncState.projectFileId, testGitlabFileId));
     });
 
     it("should return false for different content hash", async () => {
-      await db.insert(gitlabFileSyncState).values({
+      await db.insert(projectFileSyncState).values({
         id: testUuid("67000000", 1),
         projectFileId: testGitlabFileId,
         contentHash: "hash123",
@@ -331,8 +331,8 @@ describe("GitLabFileSyncService (Integration)", () => {
       expect(alreadySynced).toBe(false);
 
       await db
-        .delete(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.projectFileId, testGitlabFileId));
+        .delete(projectFileSyncState)
+        .where(eq(projectFileSyncState.projectFileId, testGitlabFileId));
     });
   });
 
@@ -351,8 +351,8 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       const [syncState] = await db
         .select()
-        .from(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.id, syncStateId))
+        .from(projectFileSyncState)
+        .where(eq(projectFileSyncState.id, syncStateId))
         .limit(1);
 
       expect(syncState).toBeDefined();
@@ -364,13 +364,13 @@ describe("GitLabFileSyncService (Integration)", () => {
       expect(syncState.completedAt).toBeNull();
 
       await db
-        .delete(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.id, syncStateId));
+        .delete(projectFileSyncState)
+        .where(eq(projectFileSyncState.id, syncStateId));
     });
 
     it("should complete sync state successfully", async () => {
       const [syncState] = await db
-        .insert(gitlabFileSyncState)
+        .insert(projectFileSyncState)
         .values({
           id: testUuid("67000000", 1),
           projectFileId: testGitlabFileId,
@@ -385,8 +385,8 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       const [updated] = await db
         .select()
-        .from(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.id, syncState.id))
+        .from(projectFileSyncState)
+        .where(eq(projectFileSyncState.id, syncState.id))
         .limit(1);
 
       expect(updated.status).toBe("SYNCED");
@@ -395,13 +395,13 @@ describe("GitLabFileSyncService (Integration)", () => {
       expect(updated.errorMessage).toBeNull();
 
       await db
-        .delete(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.id, syncState.id));
+        .delete(projectFileSyncState)
+        .where(eq(projectFileSyncState.id, syncState.id));
     });
 
     it("should complete sync state with failure", async () => {
       const [syncState] = await db
-        .insert(gitlabFileSyncState)
+        .insert(projectFileSyncState)
         .values({
           id: testUuid("67000000", 1),
           projectFileId: testGitlabFileId,
@@ -416,8 +416,8 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       const [updated] = await db
         .select()
-        .from(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.id, syncState.id))
+        .from(projectFileSyncState)
+        .where(eq(projectFileSyncState.id, syncState.id))
         .limit(1);
 
       expect(updated.status).toBe("CONFLICT");
@@ -426,8 +426,8 @@ describe("GitLabFileSyncService (Integration)", () => {
       expect(updated.errorMessage).toBe("Sync failed");
 
       await db
-        .delete(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.id, syncState.id));
+        .delete(projectFileSyncState)
+        .where(eq(projectFileSyncState.id, syncState.id));
     });
   });
 
@@ -584,7 +584,7 @@ describe("GitLabFileSyncService (Integration)", () => {
   describe("syncLabelsFromGitLabFile - Concurrent Sync Prevention", () => {
     it("should return error when sync is already in progress", async () => {
       // Create an in-progress sync state
-      await db.insert(gitlabFileSyncState).values({
+      await db.insert(projectFileSyncState).values({
         id: testUuid("67000000", 1),
         projectFileId: testGitlabFileId,
         contentHash: "hash123",
@@ -602,8 +602,8 @@ describe("GitLabFileSyncService (Integration)", () => {
       expect(result.errors[0].error).toContain("already in progress");
 
       await db
-        .delete(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.projectFileId, testGitlabFileId));
+        .delete(projectFileSyncState)
+        .where(eq(projectFileSyncState.projectFileId, testGitlabFileId));
     });
   });
 
@@ -777,8 +777,8 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       const syncStates = await db
         .select()
-        .from(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.projectFileId, testGitlabFileId));
+        .from(projectFileSyncState)
+        .where(eq(projectFileSyncState.projectFileId, testGitlabFileId));
 
       expect(syncStates.length).toBeGreaterThanOrEqual(1);
 
@@ -801,8 +801,8 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       const syncStates = await db
         .select()
-        .from(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.projectFileId, testGitlabFileId));
+        .from(projectFileSyncState)
+        .where(eq(projectFileSyncState.projectFileId, testGitlabFileId));
 
       expect(syncStates.length).toBeGreaterThanOrEqual(1);
 

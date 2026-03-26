@@ -46,13 +46,13 @@ export const gitlabIntegrations = pgTable(
 );
 
 /**
- * GitLab File Sync State - Track sync operations for individual files
+ * Project File Sync State - Track sync operations for individual files
  *
  * Prevents concurrent syncs, enables idempotent retry, provides audit trail.
  * References project_files table (which includes GitLab and zip sources).
  */
-export const gitlabFileSyncState = pgTable(
-  "gitlab_file_sync_state",
+export const projectFileSyncState = pgTable(
+  "project_file_sync_state",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     projectFileId: uuid("project_file_id")
@@ -67,8 +67,8 @@ export const gitlabFileSyncState = pgTable(
     dbLabelCount: integer("db_label_count"),
   },
   (table) => [
-    index("gitlab_file_sync_state_project_file_id_idx").on(table.projectFileId),
-    index("gitlab_file_sync_state_status_idx").on(table.status),
+    index("project_file_sync_state_project_file_id_idx").on(table.projectFileId),
+    index("project_file_sync_state_status_idx").on(table.status),
   ]
 );
 
@@ -135,5 +135,5 @@ export type NewGitlabRepository = typeof gitlabRepositories.$inferInsert;
 export type GitlabSyncOperation = typeof gitlabSyncOperations.$inferSelect;
 export type NewGitlabSyncOperation = typeof gitlabSyncOperations.$inferInsert;
 
-export type GitlabFileSyncState = typeof gitlabFileSyncState.$inferSelect;
-export type NewGitlabFileSyncState = typeof gitlabFileSyncState.$inferInsert;
+export type ProjectFileSyncState = typeof projectFileSyncState.$inferSelect;
+export type NewProjectFileSyncState = typeof projectFileSyncState.$inferInsert;

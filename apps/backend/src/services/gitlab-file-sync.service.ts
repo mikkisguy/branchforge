@@ -16,7 +16,7 @@
 import { getDb } from "../db/index.js";
 import {
   projectFiles,
-  gitlabFileSyncState,
+  projectFileSyncState,
   labels,
   labelLines,
 } from "../db/schema/index.js";
@@ -109,12 +109,12 @@ export async function checkInProgressSync(
 
   const [inProgress] = await db
     .select()
-    .from(gitlabFileSyncState)
+    .from(projectFileSyncState)
     .where(
       and(
-        eq(gitlabFileSyncState.projectFileId, projectFileId),
-        eq(gitlabFileSyncState.status, "MODIFIED_LOCAL"),
-        isNull(gitlabFileSyncState.completedAt)
+        eq(projectFileSyncState.projectFileId, projectFileId),
+        eq(projectFileSyncState.status, "MODIFIED_LOCAL"),
+        isNull(projectFileSyncState.completedAt)
       )
     )
     .limit(1);
@@ -133,15 +133,15 @@ export async function checkContentAlreadySynced(
 
   const [lastSynced] = await db
     .select()
-    .from(gitlabFileSyncState)
+    .from(projectFileSyncState)
     .where(
       and(
-        eq(gitlabFileSyncState.projectFileId, projectFileId),
-        eq(gitlabFileSyncState.status, "SYNCED"),
-        eq(gitlabFileSyncState.contentHash, contentHash)
+        eq(projectFileSyncState.projectFileId, projectFileId),
+        eq(projectFileSyncState.status, "SYNCED"),
+        eq(projectFileSyncState.contentHash, contentHash)
       )
     )
-    .orderBy(desc(gitlabFileSyncState.completedAt))
+    .orderBy(desc(projectFileSyncState.completedAt))
     .limit(1);
 
   return !!lastSynced;
@@ -158,7 +158,7 @@ export async function createSyncState(
   const db = getDb();
 
   const [syncState] = await db
-    .insert(gitlabFileSyncState)
+    .insert(projectFileSyncState)
     .values({
       projectFileId,
       contentHash,
@@ -183,14 +183,14 @@ export async function completeSyncState(
   const db = getDb();
 
   await db
-    .update(gitlabFileSyncState)
+    .update(projectFileSyncState)
     .set({
       status: success ? "SYNCED" : "CONFLICT",
       completedAt: new Date(),
       dbLabelCount,
       errorMessage,
     })
-    .where(eq(gitlabFileSyncState.id, syncStateId));
+    .where(eq(projectFileSyncState.id, syncStateId));
 }
 
 // ============================================================================
