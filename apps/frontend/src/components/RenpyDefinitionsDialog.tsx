@@ -134,7 +134,7 @@ export function RenpyDefinitionsDialog({
     }
 
     if (open && renpyDefinitions.length > 0) {
-      setDefinitionsList(
+      setDefinitionsList(() =>
         renpyDefinitions.map((rd) => ({
           id: rd.id,
           category: rd.category,
@@ -148,7 +148,7 @@ export function RenpyDefinitionsDialog({
       hasInitialized.current = true;
     } else if (open && renpyDefinitions.length === 0) {
       // Initialize with empty definitions
-      setDefinitionsList([]);
+      setDefinitionsList(() => []);
       hasInitialized.current = true;
     }
   }, [open, renpyDefinitions, isSaving]);

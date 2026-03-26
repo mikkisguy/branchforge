@@ -2,7 +2,7 @@
  * GitLab Sync Service Integration Tests
  *
  * Tests for the GitLab sync service against a real database.
- * Tests cover the new file-based architecture with gitlabFiles table.
+ * Tests cover the new file-based architecture with projectFiles table.
  *
  * Prerequisites:
  * - DATABASE_URL_TEST environment variable must be set
@@ -28,7 +28,7 @@ import {
   labels as labelsTable,
   labelLines,
   characters,
-  gitlabFiles,
+  projectFiles,
   gitlabSyncOperations,
 } from "../../db/schema/index.js";
 import { eq } from "drizzle-orm";
@@ -53,6 +53,30 @@ describe("GitLabSyncService (Integration)", () => {
   const testGitlabFileId = testUuid("56000000", 1);
   const testBranch = "main";
 
+  // Factory helper for creating project file fixtures
+  let projectFileFixtureCounter = 1;
+  function createProjectFileFixture(overrides: {
+    id?: string;
+    filePath?: string;
+    content?: string;
+    contentHash?: string;
+  } = {}) {
+    const id = overrides.id ?? testUuid("56000000", projectFileFixtureCounter);
+    // Only increment counter for auto-generated IDs
+    if (!overrides.id) {
+      projectFileFixtureCounter++;
+    }
+    return {
+      id,
+      projectId: testProjectId,
+      source: "GITLAB" as const,
+      filePath: overrides.filePath ?? `game/script${projectFileFixtureCounter}.rpy`,
+      fileType: "STORY" as const,
+      content: overrides.content ?? 'label start:\n    "Content"\n    return',
+      contentHash: overrides.contentHash ?? `hash${projectFileFixtureCounter}`,
+    };
+  }
+
   const testUser = {
     id: testUserId,
     email: testEmail("gitlab-sync-service", "owner"),
@@ -69,13 +93,11 @@ describe("GitLabSyncService (Integration)", () => {
     maxMeterDelta: 10,
   };
 
-  const testGitlabFile = {
+  const testGitlabFile = createProjectFileFixture({
     id: testGitlabFileId,
-    projectId: testProjectId,
     filePath: "game/script.rpy",
-    fileType: "STORY" as const,
-    content: 'label start:\n    "Content"\n    return',
-  };
+    contentHash: "hash123",
+  });
 
   const testScene = {
     id: testUuid("26000000", 1),
@@ -89,7 +111,7 @@ describe("GitLabSyncService (Integration)", () => {
     status: "DRAFT" as const,
     prerequisites: {},
     effects: {},
-    gitlabFileId: testGitlabFileId,
+    projectFileId: testGitlabFileId,
     labelName: "start",
     labelPosition: 0,
   };
@@ -111,8 +133,8 @@ describe("GitLabSyncService (Integration)", () => {
     await db.delete(labelsTable).where(eq(labelsTable.id, testScene.id));
     await db.delete(characters).where(eq(characters.id, testCharacter.id));
     await db
-      .delete(gitlabFiles)
-      .where(eq(gitlabFiles.projectId, testProjectId));
+      .delete(projectFiles)
+      .where(eq(projectFiles.projectId, testProjectId));
     await db
       .delete(gitlabSyncOperations)
       .where(eq(gitlabSyncOperations.projectId, testProjectId));
@@ -134,7 +156,7 @@ describe("GitLabSyncService (Integration)", () => {
     await db.insert(users).values(testUser);
     await db.insert(projects).values(testProject);
     if (includeGitlabFile) {
-      await db.insert(gitlabFiles).values(testGitlabFile);
+      await db.insert(projectFiles).values(testGitlabFile);
     }
   }
 
@@ -142,6 +164,7 @@ describe("GitLabSyncService (Integration)", () => {
     vi.clearAllMocks();
     nock.cleanAll();
     nock.disableNetConnect();
+    projectFileFixtureCounter = 2; // Reset counter (1 is used by testGitlabFile)
     await cleanupTestData();
     await setupTestData(true); // Include gitlabFile by default
   });
@@ -241,17 +264,14 @@ describe("GitLabSyncService (Integration)", () => {
 
     it("should detect new remote labels", async () => {
       // First, clean up the default gitlab file to avoid extra conflicts
-      await db.delete(gitlabFiles).where(eq(gitlabFiles.id, testGitlabFileId));
+      await db.delete(projectFiles).where(eq(projectFiles.id, testGitlabFileId));
 
       // Create a gitlab file with a new label that doesn't exist locally
-      const newGitlabFile = {
-        id: testUuid("56000000", 2),
-        projectId: testProjectId,
+      const newGitlabFile = createProjectFileFixture({
         filePath: "game/chapter2.rpy",
-        fileType: "STORY" as const,
         content: 'label chapter2:\n    "New chapter"\n    return',
-      };
-      await db.insert(gitlabFiles).values(newGitlabFile);
+      });
+      await db.insert(projectFiles).values(newGitlabFile);
 
       // Mock GitLab API to return the new label content
       vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
@@ -282,9 +302,9 @@ describe("GitLabSyncService (Integration)", () => {
       });
 
       // Cleanup
-      await db.delete(gitlabFiles).where(eq(gitlabFiles.id, newGitlabFile.id));
+      await db.delete(projectFiles).where(eq(projectFiles.id, newGitlabFile.id));
       // Restore the default gitlab file
-      await db.insert(gitlabFiles).values(testGitlabFile);
+      await db.insert(projectFiles).values(testGitlabFile);
     });
 
     it("should detect deleted remote labels", async () => {
@@ -443,14 +463,11 @@ describe("GitLabSyncService (Integration)", () => {
       });
 
       // Create another gitlab file for a new label
-      const newGitlabFile = {
-        id: testUuid("56000000", 2),
-        projectId: testProjectId,
+      const newGitlabFile = createProjectFileFixture({
         filePath: "game/chapter2.rpy",
-        fileType: "STORY" as const,
         content: 'label chapter2:\n    "New remote"\n    return',
-      };
-      await db.insert(gitlabFiles).values(newGitlabFile);
+      });
+      await db.insert(projectFiles).values(newGitlabFile);
 
       // Mock GitLab API to return different content AND a new label
       vi.spyOn(gitlabService, "getFileContent")
@@ -501,7 +518,7 @@ describe("GitLabSyncService (Integration)", () => {
       expect(conflictTypes).toContain("new_remote_label");
 
       // Cleanup
-      await db.delete(gitlabFiles).where(eq(gitlabFiles.id, newGitlabFile.id));
+      await db.delete(projectFiles).where(eq(projectFiles.id, newGitlabFile.id));
     });
 
     it("should handle API errors gracefully", async () => {
@@ -524,14 +541,11 @@ describe("GitLabSyncService (Integration)", () => {
 
     it("should handle multiple scenes and lines correctly", async () => {
       // Create another gitlab file for the second scene
-      const testGitlabFile2 = {
-        id: testUuid("56000000", 2),
-        projectId: testProjectId,
+      const testGitlabFile2 = createProjectFileFixture({
         filePath: "game/chapter1.rpy",
-        fileType: "STORY" as const,
         content: 'label chapter1:\n    "Chapter 1 Line 1"\n    return',
-      };
-      await db.insert(gitlabFiles).values(testGitlabFile2);
+      });
+      await db.insert(projectFiles).values(testGitlabFile2);
 
       // Set up two local scenes with multiple lines
       const testScene2 = {
@@ -546,7 +560,7 @@ describe("GitLabSyncService (Integration)", () => {
         status: "DRAFT" as const,
         prerequisites: {},
         effects: {},
-        gitlabFileId: testGitlabFile2.id,
+        projectFileId: testGitlabFile2.id, // Uses the dynamically generated ID
         labelName: "chapter1",
         labelPosition: 0,
       };
@@ -634,8 +648,8 @@ describe("GitLabSyncService (Integration)", () => {
       await db.delete(labelLines).where(eq(labelLines.labelId, testScene2.id));
       await db.delete(labelsTable).where(eq(labelsTable.id, testScene2.id));
       await db
-        .delete(gitlabFiles)
-        .where(eq(gitlabFiles.id, testGitlabFile2.id));
+        .delete(projectFiles)
+        .where(eq(projectFiles.id, testGitlabFile2.id));
     });
   });
 
@@ -671,7 +685,7 @@ describe("GitLabSyncService (Integration)", () => {
 
     it("should handle export when no files exist", async () => {
       // Delete the gitlab file first
-      await db.delete(gitlabFiles).where(eq(gitlabFiles.id, testGitlabFileId));
+      await db.delete(projectFiles).where(eq(projectFiles.id, testGitlabFileId));
 
       // Mock the GitLab service (should not be called)
       const createOrUpdateFileSpy = vi
@@ -736,14 +750,11 @@ describe("GitLabSyncService (Integration)", () => {
 
     it("should export multiple files", async () => {
       // Create additional gitlab files
-      const testGitlabFile2 = {
-        id: testUuid("56000000", 2),
-        projectId: testProjectId,
+      const testGitlabFile2 = createProjectFileFixture({
         filePath: "game/chapter1.rpy",
-        fileType: "STORY" as const,
         content: 'label chapter1:\n    "Content"\n    return',
-      };
-      await db.insert(gitlabFiles).values(testGitlabFile2);
+      });
+      await db.insert(projectFiles).values(testGitlabFile2);
 
       const createOrUpdateFileSpy = vi
         .spyOn(gitlabService, "createOrUpdateFile")
@@ -767,8 +778,8 @@ describe("GitLabSyncService (Integration)", () => {
 
       // Cleanup
       await db
-        .delete(gitlabFiles)
-        .where(eq(gitlabFiles.id, testGitlabFile2.id));
+        .delete(projectFiles)
+        .where(eq(projectFiles.id, testGitlabFile2.id));
     });
 
     it("should advance lastSyncedHash baseline after successful export", async () => {
@@ -885,8 +896,8 @@ describe("GitLabSyncService (Integration)", () => {
       // Verify gitlab file was created
       const [gitlabFile] = await db
         .select()
-        .from(gitlabFiles)
-        .where(eq(gitlabFiles.filePath, "game/script.rpy"));
+        .from(projectFiles)
+        .where(eq(projectFiles.filePath, "game/script.rpy"));
       expect(gitlabFile).toBeDefined();
       expect(gitlabFile?.content).toBe(
         'label start:\n    "Imported content"\n    return'
@@ -898,7 +909,7 @@ describe("GitLabSyncService (Integration)", () => {
         .from(labelsTable)
         .where(eq(labelsTable.title, "start"));
       expect(scene).toBeDefined();
-      expect(scene?.gitlabFileId).toBe(gitlabFile?.id);
+      expect(scene?.projectFileId).toBe(gitlabFile?.id);
       expect(scene?.labelName).toBe("start");
 
       // Cleanup
@@ -907,7 +918,7 @@ describe("GitLabSyncService (Integration)", () => {
         await db.delete(labelsTable).where(eq(labelsTable.id, scene.id));
       }
       if (gitlabFile) {
-        await db.delete(gitlabFiles).where(eq(gitlabFiles.id, gitlabFile.id));
+        await db.delete(projectFiles).where(eq(projectFiles.id, gitlabFile.id));
       }
     });
 

@@ -189,7 +189,9 @@ export function RouteConfigContent({ projectId }: RouteConfigContentProps) {
           ({ route, result }) =>
             `Route "${route.routeKey}" (${route.id}): ${
               result.status === "rejected"
-                ? result.reason.message
+                ? result.reason instanceof Error
+                  ? result.reason.message
+                  : String(result.reason)
                 : "Unknown error"
             }`
         );
@@ -233,7 +235,9 @@ export function RouteConfigContent({ projectId }: RouteConfigContentProps) {
           ({ route, result }) =>
             `Route "${route.routeKey}": ${
               result.status === "rejected"
-                ? result.reason.message
+                ? result.reason instanceof Error
+                  ? result.reason.message
+                  : String(result.reason)
                 : "Unknown error"
             }`
         );

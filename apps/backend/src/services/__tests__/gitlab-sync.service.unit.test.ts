@@ -183,9 +183,9 @@ describe("GitLabSyncService", () => {
   /*
    * Complex operations are covered by integration tests:
    *
-   * - exportToGitlab: Tests reading from gitlabFiles table and pushing to GitLab API
-   * - importFromGitlab: Tests creating gitlabFiles records and linked scenes
-   * - detectConflicts: Tests querying gitlabFiles and comparing with remote content
+   * - exportToGitlab: Tests reading from project_files table and pushing to GitLab API
+   * - importFromGitlab: Tests creating project_files records and linked scenes
+   * - detectConflicts: Tests querying project_files and comparing with remote content
    *
    * These operations involve complex database queries and external service calls,
    * making unit tests with mocks more fragile than valuable. Integration tests

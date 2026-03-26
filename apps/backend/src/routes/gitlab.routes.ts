@@ -12,7 +12,7 @@ import { getDb } from "../db/index.js";
 import {
   projects,
   gitlabSyncOperations,
-  gitlabFiles,
+  projectFiles,
   labels,
 } from "../db/schema/index.js";
 import { eq, inArray } from "drizzle-orm";
@@ -905,8 +905,8 @@ async function getGitLabFilesHandler(
     // Get all GitLab files for the project
     const files = await db
       .select()
-      .from(gitlabFiles)
-      .where(eq(gitlabFiles.projectId, projectId));
+      .from(projectFiles)
+      .where(eq(projectFiles.projectId, projectId));
 
     // Batch fetch all scenes for all files at once to avoid N+1 queries
     const fileIds = files.map((f) => f.id);
@@ -916,7 +916,7 @@ async function getGitLabFilesHandler(
       id: string;
       labelName: string | null;
       title: string;
-      gitlabFileId: string | null;
+      projectFileId: string | null;
     };
 
     const allScenes: SceneWithFileId[] =
@@ -926,23 +926,23 @@ async function getGitLabFilesHandler(
               id: labels.id,
               labelName: labels.labelName,
               title: labels.title,
-              gitlabFileId: labels.gitlabFileId,
+              projectFileId: labels.projectFileId,
             })
             .from(labels)
-            .where(inArray(labels.gitlabFileId, fileIds))
+            .where(inArray(labels.projectFileId, fileIds))
         : [];
 
-    // Create a lookup keyed by gitlabFileId
+    // Create a lookup keyed by projectFileId
     const scenesByFileId = new Map<string, SceneWithFileId[]>();
     for (const scene of allScenes) {
-      // Skip scenes without a gitlabFileId (defensive check)
-      if (!scene.gitlabFileId) {
+      // Skip scenes without a projectFileId (defensive check)
+      if (!scene.projectFileId) {
         continue;
       }
-      if (!scenesByFileId.has(scene.gitlabFileId)) {
-        scenesByFileId.set(scene.gitlabFileId, []);
+      if (!scenesByFileId.has(scene.projectFileId)) {
+        scenesByFileId.set(scene.projectFileId, []);
       }
-      scenesByFileId.get(scene.gitlabFileId)!.push(scene);
+      scenesByFileId.get(scene.projectFileId)!.push(scene);
     }
 
     // Attach scenes to each file using the lookup
@@ -1001,8 +1001,8 @@ async function updateGitLabFileHandler(
     // Get file to check project access
     const [file] = await db
       .select()
-      .from(gitlabFiles)
-      .where(eq(gitlabFiles.id, fileId))
+      .from(projectFiles)
+      .where(eq(projectFiles.id, fileId))
       .limit(1);
 
     if (!file) {
@@ -1017,12 +1017,12 @@ async function updateGitLabFileHandler(
 
     // Update file content directly (Script Mode)
     await db
-      .update(gitlabFiles)
+      .update(projectFiles)
       .set({
         content,
         updatedAt: new Date(),
       })
-      .where(eq(gitlabFiles.id, fileId));
+      .where(eq(projectFiles.id, fileId));
 
     const syncResult = await syncLabelsFromGitLabFile(fileId, content);
 

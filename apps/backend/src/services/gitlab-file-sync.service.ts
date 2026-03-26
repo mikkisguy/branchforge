@@ -1,8 +1,8 @@
 /**
  * GitLab File Sync Service
  *
- * Handles reliable synchronization between gitlab_files (raw RPY content)
- * and scenes/scene_lines (parsed representation).
+ * Handles reliable synchronization between project_files (raw RPY content)
+ * and labels/label_lines (parsed representation).
  *
  * Features:
  * - Atomic transactions for all-or-nothing sync
@@ -15,7 +15,7 @@
 
 import { getDb } from "../db/index.js";
 import {
-  gitlabFiles,
+  projectFiles,
   gitlabFileSyncState,
   labels,
   labelLines,
@@ -103,7 +103,7 @@ export function validateFileType(fileType: string): void {
  * Uses completedAt = null with status 'modified_local' to indicate in-progress
  */
 export async function checkInProgressSync(
-  gitlabFileId: string
+  projectFileId: string
 ): Promise<boolean> {
   const db = getDb();
 
@@ -112,7 +112,7 @@ export async function checkInProgressSync(
     .from(gitlabFileSyncState)
     .where(
       and(
-        eq(gitlabFileSyncState.gitlabFileId, gitlabFileId),
+        eq(gitlabFileSyncState.projectFileId, projectFileId),
         eq(gitlabFileSyncState.status, "MODIFIED_LOCAL"),
         isNull(gitlabFileSyncState.completedAt)
       )
@@ -126,7 +126,7 @@ export async function checkInProgressSync(
  * Check if content has already been synced (idempotency check)
  */
 export async function checkContentAlreadySynced(
-  gitlabFileId: string,
+  projectFileId: string,
   contentHash: string
 ): Promise<boolean> {
   const db = getDb();
@@ -136,7 +136,7 @@ export async function checkContentAlreadySynced(
     .from(gitlabFileSyncState)
     .where(
       and(
-        eq(gitlabFileSyncState.gitlabFileId, gitlabFileId),
+        eq(gitlabFileSyncState.projectFileId, projectFileId),
         eq(gitlabFileSyncState.status, "SYNCED"),
         eq(gitlabFileSyncState.contentHash, contentHash)
       )
@@ -151,7 +151,7 @@ export async function checkContentAlreadySynced(
  * Create a new sync state record
  */
 export async function createSyncState(
-  gitlabFileId: string,
+  projectFileId: string,
   contentHash: string,
   labelCount: number
 ): Promise<string> {
@@ -160,7 +160,7 @@ export async function createSyncState(
   const [syncState] = await db
     .insert(gitlabFileSyncState)
     .values({
-      gitlabFileId,
+      projectFileId,
       contentHash,
       status: "MODIFIED_LOCAL",
       rpyLabelCount: labelCount,
@@ -202,7 +202,7 @@ export async function completeSyncState(
  */
 function mapEntryToDbType(entry: {
   type: string;
-}): "NARRATION" | "DIALOGUE" | "CHOICE" | "MENU" | "JUMP" {
+}): "NARRATION" | "DIALOGUE" | "JUMP" {
   if (entry.type === "FLAG") {
     return "JUMP";
   }
@@ -219,7 +219,7 @@ function mapEntryToDbType(entry: {
 }
 
 /**
- * Sync labels from GitLab file content
+ * Sync labels from project file content
  *
  * This is the main sync function that:
  * 1. Validates input
@@ -230,13 +230,13 @@ function mapEntryToDbType(entry: {
  * 6. Executes atomic sync transaction
  * 7. Updates sync state on completion
  *
- * @param gitlabFileId - The GitLab file ID to sync
+ * @param projectFileId - The project file ID to sync
  * @param rpyContent - The RPY file content
  * @param options - Sync options (skipCleanup)
  * @returns Sync result with statistics
  */
 export async function syncLabelsFromGitLabFile(
-  gitlabFileId: string,
+  projectFileId: string,
   rpyContent: string,
   options?: SyncLabelsOptions
 ): Promise<SyncLabelsResult> {
@@ -257,22 +257,22 @@ export async function syncLabelsFromGitLabFile(
     // Step 1: Get file info for projectId, filePath, and validate file type
     const [file] = await db
       .select({
-        projectId: gitlabFiles.projectId,
-        fileType: gitlabFiles.fileType,
-        filePath: gitlabFiles.filePath,
+        projectId: projectFiles.projectId,
+        fileType: projectFiles.fileType,
+        filePath: projectFiles.filePath,
       })
-      .from(gitlabFiles)
-      .where(eq(gitlabFiles.id, gitlabFileId))
+      .from(projectFiles)
+      .where(eq(projectFiles.id, projectFileId))
       .limit(1);
 
     if (!file) {
-      throw new Error("GitLab file not found");
+      throw new Error("Project file not found");
     }
 
     // Validate filePath is not null/empty before passing to parser
     if (!file.filePath) {
       throw new Error(
-        `GitLab file path is missing for gitlabFileId: ${gitlabFileId}`
+        `Project file path is missing for projectFileId: ${projectFileId}`
       );
     }
 
@@ -283,7 +283,7 @@ export async function syncLabelsFromGitLabFile(
     const contentHash = calculateContentHash(rpyContent);
 
     // Step 4: Check for in-progress sync (concurrent sync prevention)
-    const hasInProgressSync = await checkInProgressSync(gitlabFileId);
+    const hasInProgressSync = await checkInProgressSync(projectFileId);
     if (hasInProgressSync) {
       result.errors.push({
         label: "",
@@ -294,7 +294,7 @@ export async function syncLabelsFromGitLabFile(
 
     // Step 5: Check idempotency (same content already synced?)
     const alreadySynced = await checkContentAlreadySynced(
-      gitlabFileId,
+      projectFileId,
       contentHash
     );
     if (alreadySynced) {
@@ -305,7 +305,7 @@ export async function syncLabelsFromGitLabFile(
 
     // Step 6: Create sync state record (before validation to track all attempts)
     const syncStateId = await createSyncState(
-      gitlabFileId,
+      projectFileId,
       contentHash,
       parsed.labels.length
     );
@@ -324,7 +324,7 @@ export async function syncLabelsFromGitLabFile(
         const existingLabels = await tx
           .select()
           .from(labels)
-          .where(eq(labels.gitlabFileId, gitlabFileId));
+          .where(eq(labels.projectFileId, projectFileId));
 
         const existingLabelsByName = new Map<
           string,
@@ -379,7 +379,7 @@ export async function syncLabelsFromGitLabFile(
                     contentType,
                     content,
                     visualType: "GENERATED" as const,
-                    gitlabFileId: gitlabFileId,
+                    projectFileId,
                     linePosition: index,
                     contentHash: lineHash,
                     lastSyncedHash: lineHash,
@@ -414,7 +414,7 @@ export async function syncLabelsFromGitLabFile(
                 .values({
                   projectId: file.projectId,
                   title: label.label,
-                  gitlabFileId: gitlabFileId,
+                  projectFileId: projectFileId,
                   labelName: label.label,
                   labelPosition: i,
                   sequenceOrder: i,
@@ -445,7 +445,7 @@ export async function syncLabelsFromGitLabFile(
                     contentType,
                     content,
                     visualType: "GENERATED" as const,
-                    gitlabFileId: gitlabFileId,
+                    projectFileId,
                     linePosition: index,
                     contentHash: lineHash,
                     lastSyncedHash: lineHash,
@@ -520,30 +520,30 @@ export async function syncLabelsFromGitLabFile(
       // we log the inconsistency but do not rethrow, since the core work is done.
       // Each operation is isolated so that one failure doesn't block the other.
 
-      // Step 10: Update gitlabFiles contentHash and updatedAt
+      // Step 10: Update projectFiles contentHash and updatedAt
       try {
         await db
-          .update(gitlabFiles)
+          .update(projectFiles)
           .set({
             contentHash,
             updatedAt: new Date(),
           })
-          .where(eq(gitlabFiles.id, gitlabFileId));
-      } catch (gitlabFilesError) {
+          .where(eq(projectFiles.id, projectFileId));
+      } catch (projectFilesError) {
         const errorMessage =
-          gitlabFilesError instanceof Error
-            ? gitlabFilesError.message
+          projectFilesError instanceof Error
+            ? projectFilesError.message
             : "Unknown error";
         logError(
           LogEventType.SERVICE_ERROR,
           {
-            event: "gitlab_files_metadata_update_failed",
-            gitlabFileId,
+            event: "project_files_metadata_update_failed",
+            projectFileId,
             contentHash,
             syncStateId,
             error: errorMessage,
           },
-          gitlabFilesError
+          projectFilesError
         );
       }
 
@@ -564,7 +564,7 @@ export async function syncLabelsFromGitLabFile(
           LogEventType.SERVICE_ERROR,
           {
             event: "sync_state_completion_failed",
-            gitlabFileId,
+            projectFileId,
             syncStateId,
             error: errorMessage,
             note: "Sync state record not completed - future syncs may be blocked",

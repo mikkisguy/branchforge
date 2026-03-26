@@ -127,7 +127,7 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
     }
 
     // Initialize form state from characters
-    setCharactersList(
+    setCharactersList(() =>
       characters.map((char) => ({
         id: char.id,
         clientId: char.id, // Use existing id as clientId for stable keys

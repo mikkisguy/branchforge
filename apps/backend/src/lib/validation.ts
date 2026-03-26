@@ -300,6 +300,15 @@ export const projectIdParamsSchema = z.object({
   projectId: uuidSchema,
 });
 
+/**
+ * Project files query validation
+ */
+export const projectFilesQuerySchema = z.object({
+  source: z.enum(["GITLAB", "ZIP"]).optional(),
+});
+
+export type ProjectFilesQuery = z.infer<typeof projectFilesQuerySchema>;
+
 // ============================================================================
 // Label Schemas
 // ============================================================================

@@ -1,13 +1,20 @@
 // Floating particles for dreamy effect
+import { useMemo } from "react";
+
 export function FloatingParticles() {
-  const particles = Array.from({ length: 15 }, (_, i) => ({
-    id: i,
-    size: Math.random() * 4 + 2,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    delay: Math.random() * 5,
-    duration: Math.random() * 10 + 10,
-  }));
+  // Generate random particle data on mount
+  const particles = useMemo(
+    () =>
+      Array.from({ length: 15 }, (_, i) => ({
+        id: i,
+        size: Math.random() * 4 + 2,
+        x: Math.random() * 100,
+        y: Math.random() * 100,
+        delay: Math.random() * 5,
+        duration: Math.random() * 10 + 10,
+      })),
+    []
+  );
 
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden">

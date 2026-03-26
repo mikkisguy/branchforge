@@ -1,7 +1,7 @@
 /**
  * GitLab File Sync Service Integration Tests
  *
- * Tests for reliable sync between gitlab_files and labels/label_lines.
+ * Tests for reliable sync between project_files and labels/label_lines.
  *
  * Prerequisites:
  * - DATABASE_URL_TEST environment variable must be set
@@ -23,7 +23,7 @@ import {
   projects,
   labels as labelsTable,
   labelLines,
-  gitlabFiles,
+  projectFiles,
   gitlabFileSyncState,
 } from "../../db/schema/index.js";
 import { eq, isNull, and } from "drizzle-orm";
@@ -71,21 +71,26 @@ describe("GitLabFileSyncService (Integration)", () => {
   const testGitlabFile = {
     id: testGitlabFileId,
     projectId: testProjectId,
+    source: "GITLAB" as const,
     filePath: "game/script.rpy",
     fileType: "STORY" as const,
     content: 'label start:\n    "Content"\n    return',
-    contentHash: null,
+    contentHash: "hash123",
   };
 
   // Helper to clean up all test data
   async function cleanupTestData() {
     await db
       .delete(gitlabFileSyncState)
-      .where(eq(gitlabFileSyncState.gitlabFileId, testGitlabFileId));
-    await db.delete(labelLines);
-    await db.delete(labelsTable);
-    // Delete and reinsert gitlab file to ensure clean state
-    await db.delete(gitlabFiles).where(eq(gitlabFiles.id, testGitlabFileId));
+      .where(eq(gitlabFileSyncState.projectFileId, testGitlabFileId));
+    await db
+      .delete(labelLines)
+      .where(eq(labelLines.projectFileId, testGitlabFileId));
+    await db
+      .delete(labelsTable)
+      .where(eq(labelsTable.projectFileId, testGitlabFileId));
+    // Delete and re-insert gitlab file to ensure clean state
+    await db.delete(projectFiles).where(eq(projectFiles.id, testGitlabFileId));
     await db.delete(projects).where(eq(projects.id, testProjectId));
     await db.delete(users).where(eq(users.id, testUserId));
   }
@@ -95,7 +100,7 @@ describe("GitLabFileSyncService (Integration)", () => {
     await db.insert(users).values(testUser);
     await db.insert(projects).values(testProject);
     if (includeGitlabFile) {
-      await db.insert(gitlabFiles).values(testGitlabFile);
+      await db.insert(projectFiles).values(testGitlabFile);
     }
   }
 
@@ -216,7 +221,7 @@ describe("GitLabFileSyncService (Integration)", () => {
     it("should return true when sync is in progress", async () => {
       await db.insert(gitlabFileSyncState).values({
         id: testUuid("67000000", 1),
-        gitlabFileId: testGitlabFileId,
+        projectFileId: testGitlabFileId,
         contentHash: "hash123",
         status: "MODIFIED_LOCAL",
         rpyLabelCount: 1,
@@ -228,13 +233,13 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       await db
         .delete(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.gitlabFileId, testGitlabFileId));
+        .where(eq(gitlabFileSyncState.projectFileId, testGitlabFileId));
     });
 
     it("should return false when sync is completed", async () => {
       await db.insert(gitlabFileSyncState).values({
         id: testUuid("67000000", 1),
-        gitlabFileId: testGitlabFileId,
+        projectFileId: testGitlabFileId,
         contentHash: "hash123",
         status: "SYNCED",
         rpyLabelCount: 1,
@@ -247,7 +252,7 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       await db
         .delete(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.gitlabFileId, testGitlabFileId));
+        .where(eq(gitlabFileSyncState.projectFileId, testGitlabFileId));
     });
   });
 
@@ -265,7 +270,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       const contentHash = "hash123";
       await db.insert(gitlabFileSyncState).values({
         id: testUuid("67000000", 1),
-        gitlabFileId: testGitlabFileId,
+        projectFileId: testGitlabFileId,
         contentHash,
         status: "CONFLICT",
         rpyLabelCount: 1,
@@ -282,14 +287,14 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       await db
         .delete(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.gitlabFileId, testGitlabFileId));
+        .where(eq(gitlabFileSyncState.projectFileId, testGitlabFileId));
     });
 
     it("should return true when content was already synced", async () => {
       const contentHash = "hash123";
       await db.insert(gitlabFileSyncState).values({
         id: testUuid("67000000", 1),
-        gitlabFileId: testGitlabFileId,
+        projectFileId: testGitlabFileId,
         contentHash,
         status: "SYNCED",
         rpyLabelCount: 1,
@@ -305,13 +310,13 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       await db
         .delete(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.gitlabFileId, testGitlabFileId));
+        .where(eq(gitlabFileSyncState.projectFileId, testGitlabFileId));
     });
 
     it("should return false for different content hash", async () => {
       await db.insert(gitlabFileSyncState).values({
         id: testUuid("67000000", 1),
-        gitlabFileId: testGitlabFileId,
+        projectFileId: testGitlabFileId,
         contentHash: "hash123",
         status: "SYNCED",
         rpyLabelCount: 1,
@@ -327,7 +332,7 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       await db
         .delete(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.gitlabFileId, testGitlabFileId));
+        .where(eq(gitlabFileSyncState.projectFileId, testGitlabFileId));
     });
   });
 
@@ -351,7 +356,7 @@ describe("GitLabFileSyncService (Integration)", () => {
         .limit(1);
 
       expect(syncState).toBeDefined();
-      expect(syncState.gitlabFileId).toBe(testGitlabFileId);
+      expect(syncState.projectFileId).toBe(testGitlabFileId);
       expect(syncState.contentHash).toBe(contentHash);
       expect(syncState.status).toBe("MODIFIED_LOCAL");
       expect(syncState.rpyLabelCount).toBe(labelCount);
@@ -368,7 +373,7 @@ describe("GitLabFileSyncService (Integration)", () => {
         .insert(gitlabFileSyncState)
         .values({
           id: testUuid("67000000", 1),
-          gitlabFileId: testGitlabFileId,
+          projectFileId: testGitlabFileId,
           contentHash: "hash123",
           status: "MODIFIED_LOCAL",
           rpyLabelCount: 1,
@@ -399,7 +404,7 @@ describe("GitLabFileSyncService (Integration)", () => {
         .insert(gitlabFileSyncState)
         .values({
           id: testUuid("67000000", 1),
-          gitlabFileId: testGitlabFileId,
+          projectFileId: testGitlabFileId,
           contentHash: "hash123",
           status: "MODIFIED_LOCAL",
           rpyLabelCount: 1,
@@ -450,7 +455,7 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       expect(label).toBeDefined();
       expect(label?.title).toBe("start");
-      expect(label?.gitlabFileId).toBe(testGitlabFileId);
+      expect(label?.projectFileId).toBe(testGitlabFileId);
       expect(label?.labelName).toBe("start");
       expect(label?.labelPosition).toBe(0);
 
@@ -481,7 +486,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       const labels = await db
         .select()
         .from(labelsTable)
-        .where(eq(labelsTable.gitlabFileId, testGitlabFileId));
+        .where(eq(labelsTable.projectFileId, testGitlabFileId));
 
       expect(labels).toHaveLength(2);
       expect(labels.map((s) => s.labelName).sort()).toEqual([
@@ -581,7 +586,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       // Create an in-progress sync state
       await db.insert(gitlabFileSyncState).values({
         id: testUuid("67000000", 1),
-        gitlabFileId: testGitlabFileId,
+        projectFileId: testGitlabFileId,
         contentHash: "hash123",
         status: "MODIFIED_LOCAL",
         rpyLabelCount: 1,
@@ -598,7 +603,7 @@ describe("GitLabFileSyncService (Integration)", () => {
 
       await db
         .delete(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.gitlabFileId, testGitlabFileId));
+        .where(eq(gitlabFileSyncState.projectFileId, testGitlabFileId));
     });
   });
 
@@ -618,7 +623,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       const labels = await db
         .select()
         .from(labelsTable)
-        .where(eq(labelsTable.gitlabFileId, testGitlabFileId));
+        .where(eq(labelsTable.projectFileId, testGitlabFileId));
 
       expect(labels).toHaveLength(2);
 
@@ -639,7 +644,7 @@ describe("GitLabFileSyncService (Integration)", () => {
         .from(labelsTable)
         .where(
           and(
-            eq(labelsTable.gitlabFileId, testGitlabFileId),
+            eq(labelsTable.projectFileId, testGitlabFileId),
             isNull(labelsTable.deletedAt)
           )
         );
@@ -677,7 +682,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       const labels = await db
         .select()
         .from(labelsTable)
-        .where(eq(labelsTable.gitlabFileId, testGitlabFileId));
+        .where(eq(labelsTable.projectFileId, testGitlabFileId));
 
       expect(labels).toHaveLength(2);
     });
@@ -714,9 +719,9 @@ describe("GitLabFileSyncService (Integration)", () => {
     it("should return error for SETTINGS file type", async () => {
       // Update file to SETTINGS type
       await db
-        .update(gitlabFiles)
+        .update(projectFiles)
         .set({ fileType: "SETTINGS" })
-        .where(eq(gitlabFiles.id, testGitlabFileId));
+        .where(eq(projectFiles.id, testGitlabFileId));
 
       const content = 'label start:\n    "Content"\n    return';
 
@@ -747,7 +752,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       const labelsBefore = await db
         .select()
         .from(labelsTable)
-        .where(eq(labelsTable.gitlabFileId, testGitlabFileId));
+        .where(eq(labelsTable.projectFileId, testGitlabFileId));
 
       // Now try to sync with empty content (should fail)
       const result2 = await syncLabelsFromGitLabFile(testGitlabFileId, "");
@@ -758,7 +763,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       const labelsAfter = await db
         .select()
         .from(labelsTable)
-        .where(eq(labelsTable.gitlabFileId, testGitlabFileId));
+        .where(eq(labelsTable.projectFileId, testGitlabFileId));
 
       expect(labelsAfter).toHaveLength(labelsBefore.length);
     });
@@ -773,7 +778,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       const syncStates = await db
         .select()
         .from(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.gitlabFileId, testGitlabFileId));
+        .where(eq(gitlabFileSyncState.projectFileId, testGitlabFileId));
 
       expect(syncStates.length).toBeGreaterThanOrEqual(1);
 
@@ -797,7 +802,7 @@ describe("GitLabFileSyncService (Integration)", () => {
       const syncStates = await db
         .select()
         .from(gitlabFileSyncState)
-        .where(eq(gitlabFileSyncState.gitlabFileId, testGitlabFileId));
+        .where(eq(gitlabFileSyncState.projectFileId, testGitlabFileId));
 
       expect(syncStates.length).toBeGreaterThanOrEqual(1);
 

@@ -1,0 +1,271 @@
+/**
+ * Zip Import Routes
+ *
+ * Routes for importing Ren'Py projects from zip files.
+ * These routes must be registered after the multipart plugin is loaded.
+ */
+
+import type { FastifyInstance } from "fastify";
+import type { FastifyRequest, FastifyReply } from "fastify";
+import { getDb } from "../db/index.js";
+import { projects } from "../db/schema/index.js";
+import { eq } from "drizzle-orm";
+import { authenticate } from "../middleware/auth.middleware.js";
+import { validateParams } from "../middleware/validation.middleware.js";
+import { projectIdParamsSchema } from "../lib/validation.js";
+import {
+  importZipFile,
+  type ImportZipResult,
+} from "../services/zip-import.service.js";
+import type { MultipartFile } from "@fastify/multipart";
+import {
+  HttpError,
+  ValidationError,
+} from "../middleware/error-handler.middleware.js";
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/**
+ * Maximum zip file size for import (50MB)
+ * Ren'Py projects can be large, so we allow a reasonable size.
+ */
+export const ZIP_IMPORT_MAX_SIZE_MB = 50;
+export const ZIP_IMPORT_MAX_SIZE = ZIP_IMPORT_MAX_SIZE_MB * 1024 * 1024;
+
+/**
+ * Allowed MIME types for zip files
+ *
+ * Note: MIME types can be unreliable, so the .zip extension check
+ * (isZipFile) is the primary validation. This list includes common
+ * zip MIME types that some systems send.
+ */
+const ZIP_ALLOWED_MIME_TYPES = [
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/x-zip",
+  "application/octet-stream",
+];
+
+// ============================================================================
+// Types
+// ============================================================================
+
+interface ImportZipParams {
+  projectId: string;
+}
+
+interface ImportZipResponse {
+  success: boolean;
+  filesImported: number;
+  filesUpdated: number;
+  filesSkipped: number;
+  labelsCreated: number;
+  error?: string;
+}
+
+interface ErrorResponse {
+  error: string;
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Validate MIME type for zip files
+ */
+function isValidZipMimeType(mimeType: string | undefined | null): boolean {
+  if (!mimeType || typeof mimeType !== "string") {
+    return false;
+  }
+  return ZIP_ALLOWED_MIME_TYPES.includes(
+    mimeType.toLowerCase() as (typeof ZIP_ALLOWED_MIME_TYPES)[number]
+  );
+}
+
+/**
+ * Normalize multipart file-size errors from Fastify/Busboy variants.
+ */
+function isMultipartFileTooLargeError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const code = "code" in error ? String(error.code) : "";
+  if (
+    code === "LIMIT_FILE_SIZE" ||
+    code === "FST_REQ_FILE_TOO_LARGE" ||
+    code === "FST_FILES_LIMIT" ||
+    code === "FST_PARTS_LIMIT"
+  ) {
+    return true;
+  }
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("file too large") ||
+    message.includes("filesize limit") ||
+    message.includes("file size")
+  );
+}
+
+/**
+ * Check if the uploaded file has a .zip extension
+ */
+function isZipFile(filename: string | undefined): boolean {
+  if (!filename) {
+    return false;
+  }
+  return filename.toLowerCase().endsWith(".zip");
+}
+
+// ============================================================================
+// Route Handlers
+// ============================================================================
+
+/**
+ * Import a Ren'Py project from a zip file
+ *
+ * POST /projects/:projectId/import/zip
+ * Requires authentication
+ * Accepts multipart/form-data with a zip file
+ */
+async function importZipHandler(
+  request: FastifyRequest<{ Params: ImportZipParams }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { projectId } = request.params;
+  const user = request.user!;
+
+  try {
+    const db = getDb();
+
+    // Verify project access
+    const [project] = await db
+      .select({ userId: projects.userId })
+      .from(projects)
+      .where(eq(projects.id, projectId))
+      .limit(1);
+
+    if (!project) {
+      reply.status(404).send({ error: "Not Found" } as ErrorResponse);
+      return;
+    }
+
+    if (project.userId !== user.id) {
+      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      return;
+    }
+
+    // Parse multipart form data with fileSize limit enforced at stream creation
+    let data;
+    try {
+      data = await request.file({
+        limits: { fileSize: ZIP_IMPORT_MAX_SIZE },
+      });
+    } catch (error) {
+      if (isMultipartFileTooLargeError(error)) {
+        throw new ValidationError(
+          `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`
+        );
+      }
+      throw error;
+    }
+
+    if (!data) {
+      reply.status(400).send({ error: "No file uploaded" } as ErrorResponse);
+      return;
+    }
+
+    const file = data as MultipartFile;
+
+    // Check file extension
+    if (!isZipFile(file.filename)) {
+      throw new ValidationError("File must be a .zip file");
+    }
+
+    // Validate MIME type (optional, since it can be unreliable)
+    if (file.mimetype && !isValidZipMimeType(file.mimetype)) {
+      throw new ValidationError("File must be a valid zip file");
+    }
+
+    // Read file into buffer
+    let buffer: Buffer;
+    try {
+      buffer = await file.toBuffer();
+    } catch (err: unknown) {
+      // Handle multipart plugin errors like file size limit exceeded
+      if (isMultipartFileTooLargeError(err)) {
+        throw new ValidationError(
+          `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`
+        );
+      }
+      throw err;
+    }
+
+    // Check if file was truncated due to size limit after buffering
+    if (file.file.truncated) {
+      throw new ValidationError(
+        `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`
+      );
+    }
+
+    // Validate the buffered file size as the authoritative check
+    if (buffer.length > ZIP_IMPORT_MAX_SIZE) {
+      throw new ValidationError(
+        `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`
+      );
+    }
+
+    // Import the zip file
+    const result: ImportZipResult = await importZipFile(
+      projectId,
+      buffer
+    );
+
+    if (!result.success) {
+      reply.status(400).send({
+        error: result.error || "Failed to import zip file",
+      } as ErrorResponse);
+      return;
+    }
+
+    reply.status(200).send(result as ImportZipResponse);
+  } catch (error) {
+    // Re-throw HttpError instances (e.g., ValidationError) so the global error handler can use their status code
+    if (error instanceof HttpError) {
+      throw error;
+    }
+    // Handle multipart file size limit errors (from busboy)
+    if (isMultipartFileTooLargeError(error)) {
+      throw new ValidationError(
+        `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`
+      );
+    }
+    request.log.error(error);
+    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+  }
+}
+
+// ============================================================================
+// Routes Registration
+// ============================================================================
+
+/**
+ * Zip import routes (must be registered after multipart plugin)
+ */
+export async function zipImportRoutes(
+  fastify: FastifyInstance
+): Promise<void> {
+  // Import zip file
+  fastify.post<{ Params: ImportZipParams }>(
+    "/projects/:projectId/import/zip",
+    {
+      onRequest: authenticate,
+      preValidation: validateParams(projectIdParamsSchema),
+    },
+    importZipHandler
+  );
+}

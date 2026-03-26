@@ -1,33 +1,37 @@
 /**
- * useGitLabFiles Hook
+ * useProjectFiles Hook
  *
- * Provides GitLab file management operations using TanStack Query.
- * Simplified with stable query keys and proper refetch behavior.
+ * Provides project file management operations using TanStack Query.
+ * Unified hook for all file sources (GitLab, zip, etc.).
  */
 
 import { useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { gitlabApi } from "@/lib/api/gitlab";
-import { gitlabKeys } from "@/lib/query-keys";
-import type { GitLabFile } from "@branchforge/shared";
+import { projectFilesApi } from "@/lib/api/project-files";
+import { projectFilesKeys } from "@/lib/query-keys";
+import type { ProjectFile } from "@branchforge/shared";
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export interface GitLabFileScene {
+export interface ProjectFileLabel {
   id: string;
   labelName: string | null;
   title: string;
 }
 
-export interface GitLabFileNode extends GitLabFile {
-  scenes: GitLabFileScene[];
+export interface ProjectFileNode extends ProjectFile {
+  labels: ProjectFileLabel[];
 }
 
-export interface UseGitLabFilesReturn {
+export interface UseProjectFilesOptions {
+  source?: "GITLAB" | "ZIP";
+}
+
+export interface UseProjectFilesReturn {
   // File state
-  files: GitLabFileNode[];
+  files: ProjectFileNode[];
   isLoadingFiles: boolean;
   filesError: Error | null;
 
@@ -41,23 +45,27 @@ export interface UseGitLabFilesReturn {
 // Hook
 // ============================================================================
 
-export function useGitLabFiles(
-  projectId: string | undefined
-): UseGitLabFilesReturn {
+export function useProjectFiles(
+  projectId: string | undefined,
+  options?: UseProjectFilesOptions
+): UseProjectFilesReturn {
   const queryClient = useQueryClient();
 
-  // Query for GitLab files with stable key and refetch on mount
+  // Query for project files with stable key
   const {
     data: files = [],
     isLoading: isLoadingFiles,
     error: filesError,
     refetch: refreshFiles,
   } = useQuery({
-    queryKey: projectId
-      ? gitlabKeys.importedFiles(projectId)
-      : ["gitlab", "files", "__disabled__"],
+    queryKey:
+      projectId && options?.source
+        ? projectFilesKeys.listsWithSource(projectId, options.source)
+        : projectId
+          ? projectFilesKeys.lists(projectId)
+          : ["projectFiles", "__disabled__"],
     queryFn: async () => {
-      return gitlabApi.getGitLabFiles(projectId!);
+      return projectFilesApi.listFiles(projectId!, options);
     },
     enabled: !!projectId,
     refetchOnMount: "always",
@@ -73,13 +81,15 @@ export function useGitLabFiles(
       fileId: string;
       content: string;
     }) => {
-      await gitlabApi.updateGitLabFile(fileId, content);
+      await projectFilesApi.updateFile(fileId, content);
     },
     onSuccess: () => {
-      // Invalidate files queries
+      // Invalidate files queries for this project
       if (projectId) {
         queryClient.invalidateQueries({
-          queryKey: gitlabKeys.importedFiles(projectId),
+          queryKey: options?.source
+            ? projectFilesKeys.listsWithSource(projectId, options.source)
+            : projectFilesKeys.lists(projectId),
         });
       }
     },

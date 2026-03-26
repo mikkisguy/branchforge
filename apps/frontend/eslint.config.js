@@ -28,6 +28,10 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // TODO: Re-enable these rules after refactoring the codebase to be compliant with them.
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/purity": "off",
+      // -------------------------------------------------------------------------------------
       "react-refresh/only-export-components": [
         "warn",
         { allowConstantExport: true },

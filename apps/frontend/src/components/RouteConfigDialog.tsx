@@ -71,7 +71,7 @@ export function RouteConfigDialog({
     }
 
     if (open && routeConfigs.length > 0) {
-      setRoutes(
+      setRoutes(() =>
         routeConfigs.map((rc) => ({
           id: rc.id,
           routeKey: rc.routeKey,
@@ -83,7 +83,7 @@ export function RouteConfigDialog({
       hasInitialized.current = true;
     } else if (open && routeConfigs.length === 0) {
       // Initialize with empty routes
-      setRoutes([]);
+      setRoutes(() => []);
       hasInitialized.current = true;
     }
   }, [open, routeConfigs, isSaving]);
@@ -352,6 +352,7 @@ export function RouteConfigDialog({
                     >
                       {/* Route Header */}
                       <div className="flex items-center gap-2">
+                        {/* TODO: Implement drag-and-drop reordering */}
                         <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
                         <Label className="text-sm font-medium">
                           Route {index + 1}

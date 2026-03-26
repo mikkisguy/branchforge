@@ -108,8 +108,11 @@ export const syncOperationStatusEnum = pgEnum("sync_operation_status", [
   "FAILED",
 ]);
 
-// GitLab file types
-export const gitlabFileTypeEnum = pgEnum("gitlab_file_type", [
+// Project file types (unified for all file sources)
+export const projectFileTypeEnum = pgEnum("project_file_type", [
   "STORY",
   "SETTINGS",
 ]);
+
+// File source types (where files come from)
+export const fileSourceEnum = pgEnum("file_source", ["GITLAB", "ZIP"]);

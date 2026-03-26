@@ -27,6 +27,9 @@ export * from "./tables/admin-settings.js";
 export * from "./tables/projects.js";
 export * from "./tables/project-settings.js";
 
+// Project Files (unified for all sources)
+export * from "./tables/project-files.js";
+
 // Visual system tables
 export * from "./tables/visual-systems.js";
 export * from "./tables/route-configs.js";

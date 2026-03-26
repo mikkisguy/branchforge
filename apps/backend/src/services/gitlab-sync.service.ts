@@ -8,7 +8,7 @@
 import { getDb, type Db } from "../db/index.js";
 import {
   gitlabSyncOperations,
-  gitlabFiles,
+  projectFiles,
   labels,
   labelLines,
   characters,
@@ -108,7 +108,7 @@ interface LabelLineInsertValues {
   contentType: "NARRATION" | "DIALOGUE" | "CHOICE" | "MENU" | "JUMP";
   content: string;
   speakerId?: string | null; // Optional speaker ID for dialogue lines
-  gitlabFileId?: string;
+  projectFileId?: string;
   linePosition?: number;
   contentHash?: string;
   lastSyncedHash?: string;
@@ -240,7 +240,7 @@ async function updateSyncOperation(
 
 /**
  * Export scenes from BranchForge to GitLab
- * Uses stored full content from gitlabFiles table for Script Mode
+ * Uses stored full content from project_files table for Script Mode
  * Each file's stored content is pushed directly to GitLab
  */
 export async function exportToGitlab(
@@ -261,19 +261,24 @@ export async function exportToGitlab(
   );
 
   try {
-    // Get all gitlab_files for this project
-    const projectFiles = await db
+    // Get all project_files for this project (GitLab source only)
+    const files = await db
       .select()
-      .from(gitlabFiles)
-      .where(eq(gitlabFiles.projectId, projectId));
+      .from(projectFiles)
+      .where(
+        and(
+          eq(projectFiles.projectId, projectId),
+          eq(projectFiles.source, "GITLAB")
+        )
+      );
 
-    // Get all labels with gitlabFileId, prerequisites and effects for state variable patching
+    // Get all labels with projectFileId, prerequisites and effects for state variable patching
     const projectLabels = await db
       .select({
         title: labels.title,
         prerequisites: labels.prerequisites,
         effects: labels.effects,
-        gitlabFileId: labels.gitlabFileId,
+        projectFileId: labels.projectFileId,
       })
       .from(labels)
       .where(and(eq(labels.projectId, projectId), isNull(labels.deletedAt)));
@@ -281,16 +286,16 @@ export async function exportToGitlab(
     // Create a map of file ID to labels for that file
     const labelsByFile = new Map<string, typeof projectLabels>();
     for (const label of projectLabels) {
-      if (label.gitlabFileId) {
-        if (!labelsByFile.has(label.gitlabFileId)) {
-          labelsByFile.set(label.gitlabFileId, []);
+      if (label.projectFileId) {
+        if (!labelsByFile.has(label.projectFileId)) {
+          labelsByFile.set(label.projectFileId, []);
         }
-        labelsByFile.get(label.gitlabFileId)!.push(label);
+        labelsByFile.get(label.projectFileId)!.push(label);
       }
     }
 
     // Export each file - Script Mode uses stored content directly
-    for (const file of projectFiles) {
+    for (const file of files) {
       if (file.content) {
         let contentToExport = file.content;
 
@@ -362,8 +367,8 @@ export async function exportToGitlab(
     }
 
     // Update labels with export metadata (commitSha tracking not yet implemented)
-    // Only update labels that were actually exported (linked to the exported gitlab_files)
-    const exportedFileIds = projectFiles.map((f) => f.id);
+    // Only update labels that were actually exported (linked to the exported project_files)
+    const exportedFileIds = files.map((f) => f.id);
 
     const exportedLabels = await db
       .select({ id: labels.id, contentHash: labels.contentHash })
@@ -371,7 +376,7 @@ export async function exportToGitlab(
       .where(
         and(
           eq(labels.projectId, projectId),
-          inArray(labels.gitlabFileId, exportedFileIds),
+          inArray(labels.projectFileId, exportedFileIds),
           isNull(labels.deletedAt)
         )
       );
@@ -504,7 +509,7 @@ export async function importFromGitlab(
       file: (typeof rpyFiles)[0];
       content: string;
       parsed: ParsedRPYFileWithLabels;
-      gitlabFile: { id: string };
+      projectFile: { id: string };
     }> = [];
 
     for (const result of fileFetchResults) {
@@ -529,27 +534,37 @@ export async function importFromGitlab(
       // Parse with new label-aware parser, passing filename for better detection
       const parsed = parseRPYFileWithLabels(content, file.path);
 
-      // Create or update gitlab_files record with full content for Script Mode
-      const [gitlabFile] = await db
-        .insert(gitlabFiles)
+      // Create or update project_files record with full content for Script Mode
+      const contentHash = calculateContentHash(content);
+      const [projectFile] = await db
+        .insert(projectFiles)
         .values({
           projectId,
+          source: "GITLAB",
           filePath: file.path,
           fileType: parsed.fileType,
           content: content, // Store full RPY content for Script Mode
+          contentHash,
           lastSyncedAt: new Date(),
+          lastCommitSha: importCommitSha,
         })
         .onConflictDoUpdate({
-          target: [gitlabFiles.projectId, gitlabFiles.filePath],
+          target: [
+            projectFiles.projectId,
+            projectFiles.source,
+            projectFiles.filePath,
+          ],
           set: {
             content: content, // Update full content on sync
+            contentHash,
             lastSyncedAt: new Date(),
+            lastCommitSha: importCommitSha,
             updatedAt: new Date(),
           },
         })
         .returning();
 
-      parsedFiles.push({ file, content, parsed, gitlabFile });
+      parsedFiles.push({ file, content, parsed, projectFile });
     }
 
     // Phase 2: Import/update all detected characters
@@ -640,14 +655,14 @@ export async function importFromGitlab(
     });
 
     // Phase 3: Process parsed files to create labels with speaker linking
-    for (const { parsed, gitlabFile, content } of parsedFiles) {
+    for (const { parsed, projectFile, content } of parsedFiles) {
       // For STORY files, import labels as scenes
       if (parsed.fileType === "STORY") {
         // Fetch all scenes for this file once to avoid N+1 queries
         const fileScenes = await db
           .select()
           .from(labels)
-          .where(eq(labels.gitlabFileId, gitlabFile.id));
+          .where(eq(labels.projectFileId, projectFile.id));
 
         // Build a Map keyed by labelName for O(1) lookups
         const scenesByLabel = new Map<string, (typeof fileScenes)[0]>();
@@ -699,7 +714,7 @@ export async function importFromGitlab(
                     contentType: mapped.contentType,
                     content: mapped.content,
                     speakerId,
-                    gitlabFileId: gitlabFile.id,
+                    projectFileId: projectFile.id,
                     linePosition: index,
                     contentHash: entryContentHash,
                     lastSyncedHash: entryContentHash,
@@ -735,7 +750,7 @@ export async function importFromGitlab(
                 .values({
                   projectId,
                   title: label.label,
-                  gitlabFileId: gitlabFile.id,
+                  projectFileId: projectFile.id,
                   labelName: label.label,
                   labelPosition: i,
                   sequenceOrder: i,
@@ -770,7 +785,7 @@ export async function importFromGitlab(
                     contentType: mapped.contentType,
                     content: mapped.content,
                     speakerId,
-                    gitlabFileId: gitlabFile.id,
+                    projectFileId: projectFile.id,
                     linePosition: index,
                     contentHash: entryContentHash,
                     lastSyncedHash: entryContentHash,
@@ -890,17 +905,17 @@ export async function detectConflicts(
       .from(labels)
       .where(and(eq(labels.projectId, projectId), isNull(labels.deletedAt)));
 
-    // Filter to only scenes with gitlabFileId (imported from GitLab)
-    const gitlabScenes = localScenes.filter((s) => s.gitlabFileId);
+    // Filter to only scenes with projectFileId (imported from GitLab)
+    const gitlabScenes = localScenes.filter((s) => s.projectFileId);
     const localLabelsByFile = new Map<string, Set<string>>();
     const gitlabSceneIds = new Set<string>();
     for (const scene of gitlabScenes) {
-      if (scene.gitlabFileId && scene.labelName) {
-        const existing = localLabelsByFile.get(scene.gitlabFileId);
+      if (scene.projectFileId && scene.labelName) {
+        const existing = localLabelsByFile.get(scene.projectFileId);
         if (existing) {
           existing.add(scene.labelName);
         } else {
-          localLabelsByFile.set(scene.gitlabFileId, new Set([scene.labelName]));
+          localLabelsByFile.set(scene.projectFileId, new Set([scene.labelName]));
         }
         gitlabSceneIds.add(scene.id);
       }
@@ -938,23 +953,28 @@ export async function detectConflicts(
       }
     }
 
-    // Get all gitlab_files for this project
-    const projectFiles = await db
+    // Get all project_files for this project (GitLab source only)
+    const files = await db
       .select()
-      .from(gitlabFiles)
-      .where(eq(gitlabFiles.projectId, projectId));
+      .from(projectFiles)
+      .where(
+        and(
+          eq(projectFiles.projectId, projectId),
+          eq(projectFiles.source, "GITLAB")
+        )
+      );
 
     // Fetch file contents in parallel with concurrency limit
     const limiter = new ConcurrencyLimiter(5); // Limit to 5 concurrent requests
     const fileFetchResults = await Promise.allSettled(
-      projectFiles.map((gitlabFile) =>
+      files.map((projectFile) =>
         limiter.run(async () => {
           const content = await getFileContent(
             projectId,
-            gitlabFile.filePath,
+            projectFile.filePath,
             branch
           );
-          return { gitlabFile, content };
+          return { projectFile, content };
         })
       )
     );
@@ -981,12 +1001,12 @@ export async function detectConflicts(
       }
       anySuccess = true;
 
-      const { gitlabFile, content } = result.value;
+      const { projectFile, content } = result.value;
 
       // Parse with new label-aware parser, passing filename for better detection
-      const parsed = parseRPYFileWithLabels(content, gitlabFile.filePath);
+      const parsed = parseRPYFileWithLabels(content, projectFile.filePath);
       const remoteLabels = new Set(parsed.labels.map((l) => l.label));
-      const localLabels = localLabelsByFile.get(gitlabFile.id) || new Set();
+      const localLabels = localLabelsByFile.get(projectFile.id) || new Set();
 
       // Check for new remote labels
       for (const label of parsed.labels) {
@@ -1000,7 +1020,7 @@ export async function detectConflicts(
           // Compare local and remote content
           const localScene = localScenes.find(
             (s) =>
-              s.gitlabFileId === gitlabFile.id && s.labelName === label.label
+              s.projectFileId === projectFile.id && s.labelName === label.label
           );
           if (localScene) {
             // Use pre-fetched scene lines from map to avoid N+1 queries
