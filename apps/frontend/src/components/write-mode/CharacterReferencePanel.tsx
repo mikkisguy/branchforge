@@ -2,9 +2,11 @@
  * CharacterReferencePanel Component
  *
  * Right sidebar for character context in WriteMode.
+ * Matches app design system with theme colors and simple styling.
  */
 
 import { useMemo } from "react";
+import { Heart } from "lucide-react";
 import type { Character, LabelDetail } from "@branchforge/shared";
 
 interface CharacterReferencePanelProps {
@@ -16,105 +18,124 @@ export function CharacterReferencePanel({
   characters,
   activeLabel,
 }: CharacterReferencePanelProps) {
-  // Get characters in current scene
-  const sceneCharacters = activeLabel?.characters ?? [];
+  const sceneCharacters = useMemo(() => {
+    return activeLabel?.characters ?? [];
+  }, [activeLabel?.characters]);
 
-  // O(1) character lookup
   const characterById = useMemo(() => {
     return new Map(characters.map((c) => [c.id, c]));
   }, [characters]);
 
+  const sceneCharacterIds = useMemo(() => {
+    return new Set(sceneCharacters.map((sc) => sc.id));
+  }, [sceneCharacters]);
+
+  const otherCharacters = useMemo(() => {
+    return characters.filter((c) => !sceneCharacterIds.has(c.id));
+  }, [characters, sceneCharacterIds]);
+
+  const resolvedSceneChars = useMemo(() => {
+    return sceneCharacters
+      .map((sc) => characterById.get(sc.id))
+      .filter((c): c is Character => c !== undefined);
+  }, [sceneCharacters, characterById]);
+
   return (
-    <div className="space-y-6 py-4">
-      {/* Scene Characters */}
-      <div>
-        <div className="text-xs font-display tracking-wider text-foreground/50 mb-4 pb-2 border-b border-border/30">
-          IN SCENE
-        </div>
-
-        {sceneCharacters.length === 0 ? (
-          <p className="text-sm text-foreground/40 text-center py-4">
-            No characters
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {sceneCharacters.map((character) => {
-              const fullChar = characterById.get(character.id);
-              return (
-                <div key={character.id} className="text-center">
-                  {/* Avatar/Initial */}
-                  <div className="flex justify-center mb-2">
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center text-white font-medium text-lg shadow-sm"
-                      style={{
-                        backgroundColor:
-                          fullChar?.color || "var(--muted-foreground)",
-                      }}
-                    >
-                      {character.displayName[0] || "?"}
-                    </div>
-                  </div>
-
-                  {/* Name */}
-                  <p className="text-sm font-medium text-foreground/90">
-                    {character.displayName}
-                  </p>
-
-                  {/* Dialogue Style */}
-                  {fullChar?.dialogueStyle && (
-                    <p className="text-xs text-foreground/50 mt-1 italic line-clamp-2">
-                      {fullChar.dialogueStyle}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+    <div className="h-full overflow-y-auto">
+      <div className="sticky top-0 z-10 bg-card border-b border-border px-4 py-3">
+        <h2 className="text-sm font-semibold tracking-wide">Characters</h2>
+        <p className="text-xs text-muted-foreground mt-1">
+          {resolvedSceneChars.length} in scene · {characters.length} total
+        </p>
       </div>
 
-      {/* All Project Characters */}
-      <div className="pt-4 border-t border-border/30">
-        <div className="text-xs font-display tracking-wider text-foreground/50 mb-4 pb-2 border-b border-border/30">
-          ALL CHARACTERS
+      <div className="p-3 space-y-4">
+        {/* Scene Characters */}
+        <div>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
+            In This Scene
+          </h3>
+
+          {resolvedSceneChars.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-2">
+                <span className="text-2xl opacity-40">👥</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                No characters in this scene
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {resolvedSceneChars.map((character) => (
+                <div
+                  key={character.id}
+                  className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-muted transition-colors focus-within:bg-muted group"
+                >
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0 shadow-sm"
+                    style={{ backgroundColor: character.color }}
+                  >
+                    {character.displayName[0] || "?"}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">
+                      {character.displayName}
+                    </p>
+                    {character.dialogueStyle && (
+                      <p className="text-xs text-muted-foreground truncate italic">
+                        "{character.dialogueStyle}"
+                      </p>
+                    )}
+                  </div>
+                  {character.isLoveInterest && (
+                    <Heart className="w-4 h-4 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {characters.length === 0 ? (
-          <p className="text-sm text-foreground/40 text-center py-4">
-            No characters
-          </p>
-        ) : (
-          <div className="space-y-1 max-h-64 overflow-y-auto">
-            {characters.map((character) => (
-              <div
-                key={character.id}
-                className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-foreground/5 transition-colors"
-              >
-                {/* Color swatch */}
+        {/* Other Characters */}
+        {otherCharacters.length > 0 && (
+          <div className="pt-4 border-t border-border">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
+              Other Characters
+            </h3>
+
+            <div className="space-y-1">
+              {otherCharacters.map((character) => (
                 <div
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{
-                    backgroundColor:
-                      character.color || "var(--muted-foreground)",
-                  }}
-                />
+                  key={character.id}
+                  className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted transition-colors focus-within:bg-muted group"
+                >
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs shrink-0 shadow-sm"
+                    style={{ backgroundColor: character.color }}
+                  >
+                    {character.displayName[0] || "?"}
+                  </div>
+                  <span className="text-sm text-muted-foreground truncate flex-1">
+                    {character.displayName}
+                  </span>
+                  {character.isLoveInterest && (
+                    <Heart className="w-3.5 h-3.5 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
-                {/* Name */}
-                <span className="text-sm text-foreground/70 truncate">
-                  {character.displayName}
-                </span>
-
-                {/* Love interest indicator */}
-                {character.isLoveInterest && (
-                  <span
-                    className="w-1.5 h-1.5 rounded-full bg-pink-400/70 shrink-0"
-                    title="Love Interest"
-                    role="img"
-                    aria-label="Love Interest"
-                  />
-                )}
-              </div>
-            ))}
+        {characters.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-2">
+              <span className="text-2xl opacity-40">👤</span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              No characters in project
+            </p>
           </div>
         )}
       </div>

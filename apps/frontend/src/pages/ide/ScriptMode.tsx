@@ -220,25 +220,7 @@ export function ScriptMode({
           </div>
 
           {/* Editor */}
-          <div className="flex-1 !mt-0 relative min-h-0 min-w-0 overflow-hidden">
-            {/* Decorative corners */}
-            <div
-              className="absolute -top-1 -left-1 w-8 h-8 border-t-2 border-l-2 rounded-tl-lg pointer-events-none"
-              style={{ borderColor: "var(--theme-color)", opacity: 0.5 }}
-            />
-            <div
-              className="absolute -top-1 -right-1 w-8 h-8 border-t-2 border-r-2 rounded-tr-lg pointer-events-none"
-              style={{ borderColor: "var(--theme-color)", opacity: 0.5 }}
-            />
-            <div
-              className="absolute -bottom-1 -left-1 w-8 h-8 border-b-2 border-l-2 rounded-bl-lg pointer-events-none"
-              style={{ borderColor: "var(--theme-color)", opacity: 0.5 }}
-            />
-            <div
-              className="absolute -bottom-1 -right-1 w-8 h-8 border-b-2 border-r-2 rounded-br-lg pointer-events-none"
-              style={{ borderColor: "var(--theme-color)", opacity: 0.5 }}
-            />
-
+          <div className="flex-1 !mt-0 min-h-0 min-w-0 overflow-hidden">
             <div className="bg-card/80 backdrop-blur border border-border/30 rounded-lg h-full overflow-hidden min-h-0 min-w-0">
               {activeProjectFile ? (
                 <ScriptEditor
