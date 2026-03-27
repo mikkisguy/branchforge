@@ -35,6 +35,9 @@
     --theme-border: 0 0% 20%;
     --theme-color: 108 30% 40%;
 
+    /* Prose editor defaults */
+    --prose-editor-font-family: var(--font-sans);
+
     /* Ren'Py syntax highlighting colors (dark theme) */
     --keyword: hsl(280, 70%, 65%);
     --string: hsl(150, 60%, 60%);

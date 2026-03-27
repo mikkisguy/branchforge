@@ -2,6 +2,7 @@
  * FocusModeToggle Component
  *
  * Button to toggle focus mode for distraction-free writing.
+ * Matches app design system with theme colors.
  */
 
 import { useEffect, useCallback, useRef } from "react";
@@ -18,10 +19,8 @@ export function FocusModeToggle({
   isFocusMode,
   onToggle,
 }: FocusModeToggleProps) {
-  // Track if we've initialized from localStorage to avoid double-toggling
   const initializedRef = useRef(false);
 
-  // Load focus mode preference from localStorage (only on mount)
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
@@ -34,10 +33,8 @@ export function FocusModeToggle({
     } catch {
       console.warn("Could not load focus mode preference from localStorage");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run on mount
+  }, []);
 
-  // Save focus mode preference to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -49,7 +46,6 @@ export function FocusModeToggle({
     }
   }, [isFocusMode]);
 
-  // Handle keyboard shortcut (Ctrl+Shift+F) - stable callback
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && e.key === "F") {
@@ -68,10 +64,11 @@ export function FocusModeToggle({
   return (
     <button
       onClick={onToggle}
-      className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-all hover:bg-foreground/5"
-      style={{
-        color: isFocusMode ? "var(--theme-color)" : "var(--muted-foreground)",
-      }}
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-all ${
+        isFocusMode
+          ? "bg-[var(--theme-color)]/20 text-[var(--theme-color)]"
+          : "hover:bg-muted text-muted-foreground"
+      }`}
       title={
         isFocusMode
           ? "Exit focus mode (Ctrl+Shift+F)"

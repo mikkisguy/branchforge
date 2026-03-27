@@ -1,7 +1,8 @@
 /**
  * DialogueLine Component
  *
- * Individual dialogue/narration line component with speaker dropdown on hover.
+ * Individual dialogue/narration line component with speaker dropdown.
+ * Matches app design system with theme colors and simple styling.
  */
 
 import { useState, useCallback, useRef, useEffect, useId } from "react";
@@ -55,18 +56,15 @@ export function DialogueLine({
     textarea.style.height = `${textarea.scrollHeight}px`;
   }, []);
 
-  // Auto-resize textarea based on content
   useEffect(() => {
     resizeTextarea();
   }, [entry.text, resizeTextarea]);
 
-  // Recalculate heights on viewport changes to avoid stale wrapped-line heights
   useEffect(() => {
     window.addEventListener("resize", resizeTextarea);
     return () => window.removeEventListener("resize", resizeTextarea);
   }, [resizeTextarea]);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -84,7 +82,6 @@ export function DialogueLine({
     }
   }, [isDropdownOpen]);
 
-  // Shared helper: computes available space above/below the dropdown trigger
   const computeDropdownSpaces = useCallback(() => {
     const trigger = dropdownRef.current;
     if (!trigger) return null;
@@ -111,7 +108,7 @@ export function DialogueLine({
     const spaces = computeDropdownSpaces();
     if (!spaces) return;
 
-    const menuHeight = Math.min(menu.scrollHeight, 240) + 8;
+    const menuHeight = Math.min(menu.scrollHeight, 280) + 8;
     setOpenUpward(
       spaces.spaceBelow < menuHeight && spaces.spaceAbove > spaces.spaceBelow
     );
@@ -130,10 +127,10 @@ export function DialogueLine({
   );
 
   const estimateDropdownHeight = useCallback(() => {
-    const rowHeight = 36;
+    const rowHeight = 40;
     const dividerHeight = 8;
     const estimated = rowHeight * (characters.length + 1) + dividerHeight;
-    return Math.min(estimated, 240) + 8;
+    return Math.min(estimated, 280) + 8;
   }, [characters.length]);
 
   const handleSpeakerToggle = useCallback(() => {
@@ -143,10 +140,8 @@ export function DialogueLine({
         return false;
       }
 
-      // Precompute direction before first paint to avoid open-then-flip flicker.
       const estimatedHeight = estimateDropdownHeight();
       setOpenUpward(getShouldOpenUpward(estimatedHeight));
-      // Set initial focus to the current speaker or Narration
       const initialIndex = entry.speaker
         ? characters.findIndex((c) => c.displayName === entry.speaker) + 1
         : 0;
@@ -155,7 +150,6 @@ export function DialogueLine({
     });
   }, [estimateDropdownHeight, getShouldOpenUpward, entry.speaker, characters]);
 
-  // Open dropdown upward when there is not enough room below in the editor area
   useEffect(() => {
     if (!isDropdownOpen) return;
 
@@ -177,7 +171,6 @@ export function DialogueLine({
     };
   }, [isDropdownOpen, updateDropdownDirection]);
 
-  // Scroll focused option into view
   useEffect(() => {
     if (isDropdownOpen && focusedOptionIndex >= 0) {
       const option = document.getElementById(
@@ -206,7 +199,6 @@ export function DialogueLine({
     wasDropdownOpenRef.current = isDropdownOpen;
   }, [isDropdownOpen]);
 
-  // Handle speaker selection from dropdown
   const handleSpeakerSelect = useCallback(
     (speaker: string | null) => {
       onChange({ ...entry, speaker });
@@ -216,7 +208,6 @@ export function DialogueLine({
     [entry, onChange]
   );
 
-  // Handle text change
   const handleTextChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       onChange({ ...entry, text: e.target.value });
@@ -224,22 +215,18 @@ export function DialogueLine({
     [entry, onChange]
   );
 
-  // Handle keyboard shortcuts
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      // Enter to add new line (handled by parent)
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         onAddLine?.(index);
       }
 
-      // Backspace on empty line to delete
       if (e.key === "Backspace" && entry.text === "" && totalEntries > 1) {
         e.preventDefault();
         onDelete();
       }
 
-      // Arrow up/down with ctrl/cmd to move lines
       if ((e.ctrlKey || e.metaKey) && e.key === "ArrowUp" && index > 0) {
         e.preventDefault();
         onMoveUp();
@@ -256,10 +243,9 @@ export function DialogueLine({
     [entry, index, totalEntries, onDelete, onMoveUp, onMoveDown, onAddLine]
   );
 
-  // Handle dropdown keyboard navigation
   const handleDropdownKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
-      const totalOptions = characters.length + 1; // +1 for Narration
+      const totalOptions = characters.length + 1;
 
       switch (e.key) {
         case "Escape":
@@ -319,42 +305,17 @@ export function DialogueLine({
     []
   );
 
-  // Get character color for speaker
   const character = entry.speaker
     ? characters.find((c) => c.displayName === entry.speaker)
     : null;
-  const speakerColor = character?.color || "var(--theme-color)";
+  const speakerColor = character?.color;
   const isStacked = layoutMode === "stacked";
   const isSpeakerInteractive = isHovered || isDropdownOpen;
   const hasSpeaker = Boolean(entry.speaker);
 
-  // Start with the non-speaker baseline, then override it for speaker states.
-  let speakerButtonBackgroundColor = "transparent";
-  let speakerButtonColor = "var(--foreground/50)";
-  let speakerButtonBorderColor = "transparent";
-  let speakerButtonOpacity = 0.62;
-  let speakerButtonFontStyle: "normal" | "italic" = "italic";
-
-  if (hasSpeaker) {
-    // Speaker lines use the character color and lose the italic narration style.
-    speakerButtonColor = speakerColor;
-    speakerButtonFontStyle = "normal";
-    speakerButtonOpacity = isSpeakerInteractive ? 0.88 : 0.82;
-
-    if (isSpeakerInteractive) {
-      // Hovering or opening the dropdown adds a subtle colored chip and border.
-      speakerButtonBackgroundColor = withAlpha(speakerColor, 15);
-      speakerButtonBorderColor = withAlpha(speakerColor, 30);
-    }
-  } else if (isSpeakerInteractive) {
-    // Narration stays muted, but interactive hover still reveals the border.
-    speakerButtonBorderColor = "hsl(var(--border))";
-    speakerButtonOpacity = 0.72;
-  }
-
   return (
     <div
-      className={`group relative ${
+      className={`group relative transition-colors ${
         isStacked
           ? "flex flex-col gap-1.5 py-2"
           : "flex items-start gap-3 py-1.5"
@@ -368,7 +329,6 @@ export function DialogueLine({
         ref={dropdownRef}
         onBlur={handleDropdownBlur}
       >
-        {/* Stable speaker control prevents vertical jumps between hover states */}
         <button
           ref={speakerButtonRef}
           type="button"
@@ -377,17 +337,27 @@ export function DialogueLine({
           aria-expanded={isDropdownOpen}
           aria-controls={dropdownId}
           aria-label={`Change speaker: ${entry.speaker || "Narration"}`}
-          className={`flex gap-1 rounded-md text-sm font-normal transition-all border tracking-normal ${
+          className={`flex items-center gap-1.5 rounded-md transition-all border tracking-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
             isStacked
-              ? "inline-flex items-center h-8 py-1.5 px-3 -ml-3"
-              : "items-start h-auto py-0 px-3 leading-8"
+              ? "inline-flex h-8 py-1.5 px-2.5 -ml-2.5"
+              : "items-start h-auto py-1.5 px-2.5"
           }`}
           style={{
-            backgroundColor: speakerButtonBackgroundColor,
-            color: speakerButtonColor,
-            borderColor: speakerButtonBorderColor,
-            opacity: speakerButtonOpacity,
-            fontStyle: speakerButtonFontStyle,
+            fontSize: "var(--prose-editor-font-size, 14px)",
+            backgroundColor: isSpeakerInteractive
+              ? hasSpeaker && speakerColor
+                ? withAlpha(speakerColor, 8)
+                : "hsl(var(--muted) / 0.5)"
+              : "transparent",
+            borderColor: isSpeakerInteractive
+              ? hasSpeaker && speakerColor
+                ? withAlpha(speakerColor, 25)
+                : "hsl(var(--border))"
+              : "transparent",
+            color: hasSpeaker && speakerColor
+              ? speakerColor
+              : "hsl(var(--muted-foreground))",
+            fontStyle: hasSpeaker ? "normal" : "italic",
           }}
           title={
             entry.speaker
@@ -395,16 +365,15 @@ export function DialogueLine({
               : "Narration"
           }
         >
-          <span>{entry.speaker || "Narration"}</span>
+          <span className="truncate">{entry.speaker || "Narration"}</span>
           <ChevronDown
-            className={`w-3 h-3 transition-opacity ${
-              isStacked ? "" : "self-center"
+            className={`w-3 h-3 transition-transform duration-200 flex-shrink-0 ${
+              isDropdownOpen ? "rotate-180" : ""
             }`}
             style={{ opacity: isSpeakerInteractive ? 0.5 : 0 }}
           />
         </button>
 
-        {/* Dropdown Menu (opens on click) */}
         {isDropdownOpen && (
           <div
             ref={dropdownMenuRef}
@@ -418,13 +387,12 @@ export function DialogueLine({
             }
             onKeyDown={handleDropdownKeyDown}
             tabIndex={0}
-            className={`absolute z-50 bg-popover border border-border rounded-md shadow-lg py-1 min-w-[160px] max-h-[240px] overflow-y-auto animate-in fade-in-50 zoom-in-95 duration-150 ${
+            className={`absolute z-50 bg-popover border border-border rounded-md shadow-lg shadow-black/10 py-1 min-w-[160px] max-h-[280px] overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] animate-in fade-in-0 zoom-in-95 duration-200 ease-out ${
               openUpward ? "bottom-full mb-1" : "top-full mt-1"
             } ${
               openUpward ? "slide-in-from-bottom-1" : "slide-in-from-top-1"
-            } ${isStacked ? "-left-3" : "left-0"}`}
+            } ${isStacked ? "-left-2.5" : "left-0"}`}
           >
-            {/* Narration option */}
             <button
               id={`${dropdownId}-option-0`}
               type="button"
@@ -432,8 +400,8 @@ export function DialogueLine({
               aria-selected={!entry.speaker}
               onClick={() => handleSpeakerSelect(null)}
               tabIndex={-1}
-              className={`w-full text-left px-3 py-2 text-sm hover:bg-muted/50 transition-colors ${
-                focusedOptionIndex === 0 ? "bg-muted/70" : ""
+              className={`w-full text-left px-3 py-2 text-sm transition-colors duration-150 ${
+                focusedOptionIndex === 0 ? "bg-muted" : "hover:bg-muted"
               }`}
               style={{
                 fontStyle: "italic",
@@ -443,9 +411,8 @@ export function DialogueLine({
               Narration
             </button>
 
-            <div className="my-1 border-t border-border/50" role="separator" />
+            <div className="my-1 border-t border-border" role="separator" />
 
-            {/* Character options */}
             {characters.map((char, idx) => (
               <button
                 key={char.id}
@@ -455,11 +422,11 @@ export function DialogueLine({
                 aria-selected={entry.speaker === char.displayName}
                 onClick={() => handleSpeakerSelect(char.displayName)}
                 tabIndex={-1}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-muted/50 transition-colors flex items-center gap-2 ${
-                  focusedOptionIndex === idx + 1 ? "bg-muted/70" : ""
+                className={`w-full text-left px-3 py-2 text-sm transition-colors duration-150 flex items-center gap-2 ${
+                  focusedOptionIndex === idx + 1 ? "bg-muted" : "hover:bg-muted"
                 }`}
                 style={{
-                  color: char.color,
+                  color: entry.speaker === char.displayName ? char.color : undefined,
                   fontWeight:
                     entry.speaker === char.displayName ? "600" : "normal",
                 }}
@@ -485,12 +452,14 @@ export function DialogueLine({
         onChange={handleTextChange}
         onKeyDown={handleKeyDown}
         placeholder={entry.speaker ? "Dialogue..." : "Narration..."}
-        className={`min-h-[52px] p-0 resize-none overflow-hidden bg-transparent border-0 outline-none font-light tracking-normal text-foreground placeholder:text-muted-foreground/28 leading-8 ${
+        className={`min-h-[52px] p-0 resize-none overflow-hidden bg-transparent border-0 outline-none focus-visible:outline-none focus-visible:ring-0 font-light tracking-normal leading-8 placeholder:text-muted-foreground/50 ${
           isStacked ? "w-full pr-7" : "flex-1"
         }`}
         style={{
-          fontSize: `var(--prose-editor-font-size, 16px)`,
+          fontSize: "var(--prose-editor-font-size, 16px)",
+          fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
           fontStyle: !entry.speaker ? "italic" : "normal",
+          color: "hsl(var(--foreground))",
         }}
       />
 
@@ -498,7 +467,7 @@ export function DialogueLine({
       {(isHovered || entry.text === "") && totalEntries > 1 && (
         <button
           onClick={onDelete}
-          className={`p-1 text-muted-foreground/30 hover:text-destructive transition-colors ${
+          className={`p-1 rounded text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
             isStacked ? "absolute right-0 top-2" : "shrink-0"
           }`}
           title="Delete line (Backspace)"
