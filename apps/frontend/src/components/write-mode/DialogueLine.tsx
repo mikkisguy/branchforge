@@ -337,12 +337,13 @@ export function DialogueLine({
           aria-expanded={isDropdownOpen}
           aria-controls={dropdownId}
           aria-label={`Change speaker: ${entry.speaker || "Narration"}`}
-          className={`flex items-center gap-1.5 rounded-md text-sm transition-all border tracking-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+          className={`flex items-center gap-1.5 rounded-md transition-all border tracking-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
             isStacked
               ? "inline-flex h-8 py-1.5 px-2.5 -ml-2.5"
               : "items-start h-auto py-1.5 px-2.5"
           }`}
           style={{
+            fontSize: "var(--prose-editor-font-size, 14px)",
             backgroundColor: isSpeakerInteractive
               ? hasSpeaker && speakerColor
                 ? withAlpha(speakerColor, 8)
