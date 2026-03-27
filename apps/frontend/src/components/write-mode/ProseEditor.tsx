@@ -10,6 +10,7 @@ import { DialogueLine } from "./DialogueLine";
 import { WritingGoalPill } from "./WritingGoalPill";
 import { SaveIndicator } from "./SaveIndicator";
 import { FontSizeSwitcher } from "../FontSizeSwitcher";
+import { FontFamilySwitcher } from "./FontFamilySwitcher";
 import { BookOpen, Target, PenLine } from "lucide-react";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { Character, LabelDetail } from "@branchforge/shared";
@@ -323,6 +324,7 @@ export function ProseEditor({
             <Target className="w-4 h-4 text-muted-foreground" />
           </button>
 
+          <FontFamilySwitcher />
           <FontSizeSwitcher mode="write" direction="down" />
 
           <button

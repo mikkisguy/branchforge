@@ -456,6 +456,7 @@ export function DialogueLine({
         }`}
         style={{
           fontSize: "var(--prose-editor-font-size, 16px)",
+          fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
           fontStyle: !entry.speaker ? "italic" : "normal",
           color: "hsl(var(--foreground))",
         }}
