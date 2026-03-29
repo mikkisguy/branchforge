@@ -6,21 +6,45 @@
  */
 
 interface WritingGoalPillProps {
-  current: number;
-  goal: number;
-  type: "words" | "lines";
+  current: number; // Current word count for today
+  goal: number; // Daily word goal
+  onClick?: () => void; // Optional click handler to open stats dialog
 }
 
-export function WritingGoalPill({ current, goal, type }: WritingGoalPillProps) {
+export function WritingGoalPill({
+  current,
+  goal,
+  onClick,
+}: WritingGoalPillProps) {
   const remaining = Math.max(0, goal - current);
   const progress = goal > 0 ? Math.min(current / goal, 1) : 0;
   const progressPercent = Math.round(progress * 100);
   const radius = 10;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - progress);
+  const isComplete = progress >= 1;
 
   return (
-    <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3 py-1.5">
+    <div
+      className={`flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3 py-1.5 transition-all duration-200 outline-none ${
+        onClick
+          ? "cursor-pointer hover:bg-accent/50 hover:border-border focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          : ""
+      }`}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+    >
       {/* Circular progress */}
       <div className="relative h-6 w-6 shrink-0">
         <svg className="h-6 w-6 -rotate-90" viewBox="0 0 24 24" aria-hidden>
@@ -35,7 +59,9 @@ export function WritingGoalPill({ current, goal, type }: WritingGoalPillProps) {
             cx="12"
             cy="12"
             r={radius}
-            className="fill-none stroke-[var(--theme-color)] transition-all duration-500 ease-out"
+            className={`fill-none transition-all duration-500 ease-out ${
+              isComplete ? "stroke-green-500" : "stroke-[var(--theme-color)]"
+            }`}
             strokeWidth="2"
             strokeLinecap="round"
             strokeDasharray={circumference}
@@ -46,7 +72,7 @@ export function WritingGoalPill({ current, goal, type }: WritingGoalPillProps) {
 
       {/* Text indicator */}
       <span className="text-xs font-medium shrink-0 text-muted-foreground whitespace-nowrap">
-        {remaining} {type} to go
+        {remaining} words to go
       </span>
 
       {/* Percentage indicator */}
@@ -54,16 +80,17 @@ export function WritingGoalPill({ current, goal, type }: WritingGoalPillProps) {
         {progressPercent}%
       </span>
 
-      {/* Goal setting hint */}
-      <button
-        className="text-xs text-muted-foreground/60 hover:text-foreground transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-ring rounded px-1"
-        title={`Goal: ${goal} ${type}`}
-        onClick={() => {
-          // TODO: Implement goal setting popover
-        }}
-      >
-        {goal} {type}
-      </button>
+      {/* Goal indicator */}
+      <span className="text-xs text-muted-foreground/60 shrink-0">
+        {goal} words
+      </span>
+
+      {/* Click hint */}
+      {onClick && (
+        <span className="text-xs text-muted-foreground/40 shrink-0">
+          Click for stats
+        </span>
+      )}
     </div>
   );
 }

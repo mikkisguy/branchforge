@@ -54,4 +54,17 @@ export const labelsApi = {
     const response = await request<GetLabelResponse>(`/labels/${labelId}`);
     return response.label;
   },
+
+  /**
+   * Update dialogue for a label (Write Mode)
+   */
+  async updateDialogue(
+    labelId: string,
+    dialogue: Array<{ speaker: string | null; text: string }>
+  ): Promise<{ success: boolean }> {
+    return await request<{ success: boolean }>(`/labels/${labelId}/dialogue`, {
+      method: "PUT",
+      body: JSON.stringify({ dialogue }),
+    });
+  },
 };

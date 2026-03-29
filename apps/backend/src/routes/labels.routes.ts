@@ -44,12 +44,21 @@ import {
   labels,
   labelLines,
   projectFiles,
+  userSettings,
 } from "../db/schema/index.js";
-import { eq, asc, inArray, isNull, and } from "drizzle-orm";
+import { eq, asc, inArray, isNull, and, sql } from "drizzle-orm";
 import { reconstructRPYFile } from "../services/rpy-parser.service.js";
 import { calculateDialogueHash } from "../lib/hash.js";
 import { updateAuditFields } from "../lib/audit.js";
 import { calculateContentHash } from "../lib/hash.js";
+import {
+  getTodayDateKey,
+  updateTodayWordCount,
+  countWordsFromDialogue,
+  calculateNetNewWords,
+  parseLabelWordCounts,
+  parseDailyWordCounts,
+} from "../lib/date-utils.js";
 
 // ============================================================================
 // Types
@@ -355,6 +364,81 @@ async function updateLabelDialogueHandler(
       })
       .where(eq(projectFiles.id, projectFile.id));
 
+    // Track word counts for daily writing goals
+    // This is non-critical: if tracking fails, the dialogue save is still successful
+    try {
+      // Get user settings
+      const [settings] = await db
+        .select()
+        .from(userSettings)
+        .where(eq(userSettings.userId, user.id))
+        .limit(1);
+
+      // Only track if user has daily writing goal enabled
+      if (settings && settings.dailyWritingGoal !== null) {
+        const resetHour = settings.dailyWordResetHour ?? 0;
+        const timezone = settings.timezone ?? "UTC";
+        const todayDateKey = getTodayDateKey(resetHour, timezone);
+
+        // Count words from saved dialogue
+        const wordCount = countWordsFromDialogue(dialogue);
+
+        // Calculate net new words using per-label tracking
+        // This prevents double-counting when editing and re-saving the same content
+        // Validate and sanitize the JSON data before use
+        const labelWordCounts = parseLabelWordCounts(
+          settings.labelWordCounts
+        );
+
+
+        const { wordsToAdd, updatedTracking } = calculateNetNewWords(
+          labelWordCounts,
+          labelId,
+          todayDateKey,
+          wordCount
+        );
+
+        // Only update if there are actually new words to count
+        if (wordsToAdd > 0) {
+          const dailyWordCounts = parseDailyWordCounts(settings.dailyWordCounts);
+          const updatedWordCounts = updateTodayWordCount(
+            dailyWordCounts,
+            todayDateKey,
+            wordsToAdd
+          );
+
+          // Save both daily word counts and per-label tracking
+          await db
+            .update(userSettings)
+            .set({
+              dailyWordCounts: updatedWordCounts,
+              labelWordCounts: updatedTracking,
+              updatedAt: new Date(),
+            })
+            .where(eq(userSettings.userId, user.id));
+        } else {
+          // Still update the per-label tracking even if no new words (to record current state)
+          await db
+            .update(userSettings)
+            .set({
+              labelWordCounts: updatedTracking,
+              updatedAt: new Date(),
+            })
+            .where(eq(userSettings.userId, user.id));
+        }
+      }
+    } catch (error) {
+      // Log the error but don't fail the request - the dialogue was already saved successfully
+      request.log.error(
+        {
+          error,
+          userId: user.id,
+          labelId,
+        },
+        "Failed to track word count for daily writing goal"
+      );
+    }
+
     reply.send({ success: true } as UpdateLabelDialogueResponse);
   } catch (error) {
     request.log.error(error);
@@ -447,6 +531,30 @@ async function deleteLabelHandler(
 
   try {
     await deleteLabel(labelId, user.id);
+
+    // Clean up labelWordCounts in userSettings when a label is deleted
+    // This prevents orphaned entries from accumulating over time
+    // This is non-critical: if cleanup fails, the delete is still successful
+    try {
+      const db = getDb();
+      await db
+        .update(userSettings)
+        .set({
+          labelWordCounts: sql`COALESCE(label_word_counts, '{}'::jsonb) - ${labelId}`,
+        })
+        .where(eq(userSettings.userId, user.id));
+    } catch (error) {
+      // Log the error but don't fail the request - the label was already deleted successfully
+      request.log.error(
+        {
+          error,
+          userId: user.id,
+          labelId,
+        },
+        "Failed to clean up labelWordCounts after label deletion"
+      );
+    }
+
     reply.status(204).send();
   } catch (error) {
     request.log.error(error);

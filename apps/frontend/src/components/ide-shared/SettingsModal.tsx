@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import { useSettings } from "@/hooks/useSettings";
 import { GitLabSettingsContent } from "@/components/ide-shared/GitLabSettingsContent";
+import { WritingGoalSettings } from "@/components/write-mode/WritingGoalSettings";
 import { cn } from "@/lib/utils";
 import { APP_NAME, APP_VERSION } from "@/lib/version";
 
@@ -109,14 +110,22 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
           {/* Tab Content */}
           <div className="flex-1 overflow-y-auto p-6">
             {activeTab === "user" && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">User Information</h3>
-                <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground">Email</label>
-                  <p className="text-sm font-mono bg-muted/50 px-3 py-2 rounded-md">
-                    {user?.email || "Not available"}
-                  </p>
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">User Information</h3>
+                  <div className="space-y-2">
+                    <label className="text-sm text-muted-foreground">
+                      Email
+                    </label>
+                    <p className="text-sm font-mono bg-muted/50 px-3 py-2 rounded-md">
+                      {user?.email || "Not available"}
+                    </p>
+                  </div>
                 </div>
+
+                <hr className="border-border/30" />
+
+                <WritingGoalSettings />
               </div>
             )}
 

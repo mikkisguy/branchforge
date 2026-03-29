@@ -5,7 +5,7 @@
  * Matches app design system with theme colors and simple styling.
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   ProseEditor,
   SceneNavigator,
@@ -30,18 +30,81 @@ export function WriteMode({ projectName }: WriteModeProps) {
     activeLabelId,
     setActiveLabelId,
     isLoadingLabels,
+    updateDialogue,
   } = useLabels();
 
   const { characters } = useCharacters(currentProject?.id ?? "");
   const [isFocusMode, setIsFocusMode] = useState(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSaveRef = useRef<{
+    labelId: string | null;
+    entries: DialogueEntry[] | null;
+  }>({ labelId: null, entries: null });
 
   const handleFocusModeToggle = useCallback(() => {
     setIsFocusMode((prev) => !prev);
   }, []);
 
-  const handleContentChange = useCallback((_entries: DialogueEntry[]) => {
-    // TODO: Content change handling - entries will be saved to backend
-  }, []);
+  // Debounced save function
+  const handleContentChange = useCallback(
+    (entries: DialogueEntry[]) => {
+      // If switching labels, flush pending save for previous label
+      if (
+        saveTimeoutRef.current &&
+        pendingSaveRef.current.labelId &&
+        pendingSaveRef.current.labelId !== activeLabelId &&
+        pendingSaveRef.current.entries
+      ) {
+        clearTimeout(saveTimeoutRef.current);
+        const dialogue = pendingSaveRef.current.entries.map((entry) => ({
+          speaker: entry.speaker,
+          text: entry.text,
+        }));
+        updateDialogue(pendingSaveRef.current.labelId, dialogue);
+      }
+
+      // Store pending save for flush on unmount/label switch
+      pendingSaveRef.current = { labelId: activeLabelId, entries };
+
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+
+      saveTimeoutRef.current = setTimeout(() => {
+        if (activeLabelId) {
+          // Convert DialogueEntry[] to the format expected by the API
+          // Empty arrays are explicitly persisted to allow clearing dialogue
+          const dialogue = entries.map((entry) => ({
+            speaker: entry.speaker,
+            text: entry.text,
+          }));
+          updateDialogue(activeLabelId, dialogue);
+          pendingSaveRef.current = { labelId: null, entries: null }; // Clear after successful save
+        }
+      }, 1000); // 1 second debounce
+    },
+    [activeLabelId, updateDialogue]
+  );
+
+  // Clean up timeout on unmount, flushing any pending changes
+  useEffect(() => {
+    return () => {
+      // Flush pending changes before clearing
+      if (
+        saveTimeoutRef.current &&
+        pendingSaveRef.current.entries &&
+        pendingSaveRef.current.labelId
+      ) {
+        clearTimeout(saveTimeoutRef.current);
+        const dialogue = pendingSaveRef.current.entries.map((entry) => ({
+          speaker: entry.speaker,
+          text: entry.text,
+        }));
+        updateDialogue(pendingSaveRef.current.labelId, dialogue);
+      }
+      pendingSaveRef.current = { labelId: null, entries: null };
+    };
+  }, [activeLabelId, updateDialogue]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

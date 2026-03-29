@@ -8,10 +8,12 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { DialogueLine } from "./DialogueLine";
 import { WritingGoalPill } from "./WritingGoalPill";
+import { WritingStatsDialog } from "./WritingStatsDialog";
 import { SaveIndicator } from "./SaveIndicator";
 import { FontSizeSwitcher } from "../FontSizeSwitcher";
 import { FontFamilySwitcher } from "./FontFamilySwitcher";
-import { BookOpen, Target, PenLine } from "lucide-react";
+import { useWritingGoals } from "@/hooks/useWritingGoals";
+import { BookOpen, PenLine } from "lucide-react";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { Character, LabelDetail } from "@branchforge/shared";
 
@@ -25,10 +27,6 @@ interface ProseEditorProps {
 type LineLayoutMode = "inline" | "stacked";
 const LINE_LAYOUT_STORAGE_KEY = "writemode-line-layout";
 const NEW_LINE_BOTTOM_SAFE_OFFSET = 96;
-
-// Writing goal settings
-const DEFAULT_WORD_GOAL = 500;
-const DEFAULT_LINE_GOAL = 30;
 
 // Helper function to convert label lines to dialogue entries
 function convertLabelLinesToEntries(
@@ -55,6 +53,9 @@ export function ProseEditor({
 }: ProseEditorProps) {
   const labelId = activeLabel?.id ?? "none";
 
+  // Writing goals from backend
+  const { settings: writingGoalSettings } = useWritingGoals();
+
   // Hover state for focus mode dimming
   const [isTopBarHovered, setIsTopBarHovered] = useState(false);
   const [isBottomBarHovered, setIsBottomBarHovered] = useState(false);
@@ -66,10 +67,8 @@ export function ProseEditor({
     return saved === "stacked" ? "stacked" : "inline";
   });
 
-  // Writing goals state
-  const [wordGoal] = useState(DEFAULT_WORD_GOAL);
-  const [lineGoal] = useState(DEFAULT_LINE_GOAL);
-  const [goalType, setGoalType] = useState<"words" | "lines">("words");
+  // Writing stats dialog state
+  const [statsDialogOpen, setStatsDialogOpen] = useState(false);
 
   // Auto-save simulation state
   const [isSaving, setIsSaving] = useState(false);
@@ -231,6 +230,15 @@ export function ProseEditor({
   }, 0);
   const lineCount = entries.length;
 
+  // Get today's word count from daily word counts
+  // Normalize both dates to local timezone before comparing
+  const todayWordCount =
+    writingGoalSettings?.dailyWordCounts?.find((entry) => {
+      const entryDate = new Date(entry.date);
+      const today = new Date();
+      return entryDate.toLocaleDateString() === today.toLocaleDateString();
+    })?.count ?? 0;
+
   if (!activeLabel) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
@@ -313,17 +321,6 @@ export function ProseEditor({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {/* Goal toggle */}
-          <button
-            onClick={() =>
-              setGoalType(goalType === "words" ? "lines" : "words")
-            }
-            className="p-2 rounded-lg hover:bg-muted transition-colors"
-            title="Toggle goal type"
-          >
-            <Target className="w-4 h-4 text-muted-foreground" />
-          </button>
-
           <FontFamilySwitcher />
           <FontSizeSwitcher mode="write" direction="down" />
 
@@ -375,20 +372,22 @@ export function ProseEditor({
       </div>
 
       {/* Goal Pill */}
-      <div
-        className="relative z-10 -mt-12 px-4 pt-10 pb-2 border-b border-border bg-gradient-to-b from-transparent via-card/30 to-card/80 transition-opacity duration-300 ease-out"
-        style={{
-          opacity: isFocusMode ? (isBottomBarHovered ? 1 : 0.4) : 1,
-        }}
-        onMouseEnter={() => setIsBottomBarHovered(true)}
-        onMouseLeave={() => setIsBottomBarHovered(false)}
-      >
-        <WritingGoalPill
-          current={goalType === "words" ? wordCount : lineCount}
-          goal={goalType === "words" ? wordGoal : lineGoal}
-          type={goalType}
-        />
-      </div>
+      {writingGoalSettings?.dailyWritingGoal != null && (
+          <div
+            className="relative z-10 -mt-12 px-4 pt-10 pb-2 border-b border-border bg-gradient-to-b from-transparent via-card/30 to-card/80 transition-opacity duration-300 ease-out"
+            style={{
+              opacity: isFocusMode ? (isBottomBarHovered ? 1 : 0.4) : 1,
+            }}
+            onMouseEnter={() => setIsBottomBarHovered(true)}
+            onMouseLeave={() => setIsBottomBarHovered(false)}
+          >
+            <WritingGoalPill
+              current={todayWordCount}
+              goal={writingGoalSettings.dailyWritingGoal}
+              onClick={() => setStatsDialogOpen(true)}
+            />
+          </div>
+        )}
 
       {/* Status Bar */}
       <div
@@ -417,6 +416,14 @@ export function ProseEditor({
           </div>
         </div>
       </div>
+
+      {/* Writing Stats Dialog */}
+      <WritingStatsDialog
+        open={statsDialogOpen}
+        onOpenChange={setStatsDialogOpen}
+        dailyGoal={writingGoalSettings?.dailyWritingGoal ?? 500}
+        dailyWordCounts={writingGoalSettings?.dailyWordCounts ?? []}
+      />
     </div>
   );
 }

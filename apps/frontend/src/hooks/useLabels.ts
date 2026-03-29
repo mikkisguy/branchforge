@@ -6,7 +6,7 @@
  */
 
 import { useState, useCallback, useMemo } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { labelKeys } from "@/lib/query-keys";
 import { labelsApi } from "@/lib/api/labels";
 import { useProject } from "@/hooks/useProject";
@@ -32,6 +32,11 @@ export interface UseLabelsReturn {
   // Methods
   setActiveLabelId: (labelId: string | null) => void;
   invalidateLabels: () => Promise<void>;
+  updateDialogue: (
+    labelId: string,
+    dialogue: Array<{ speaker: string | null; text: string }>
+  ) => void;
+  isUpdatingDialogue: boolean;
 }
 
 // ============================================================================
@@ -75,6 +80,32 @@ export function useLabels(): UseLabelsReturn {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Update dialogue mutation
+  const updateDialogueMutation = useMutation({
+    mutationFn: ({
+      labelId,
+      dialogue,
+    }: {
+      labelId: string;
+      dialogue: Array<{ speaker: string | null; text: string }>;
+    }) => labelsApi.updateDialogue(labelId, dialogue),
+    onSuccess: () => {
+      // Invalidate labels query and writing goals query
+      if (currentProject) {
+        queryClient.invalidateQueries({
+          queryKey: labelKeys.lists(currentProject.id),
+        });
+        // Also invalidate detail query if the active label was updated
+        if (localActiveLabelId) {
+          queryClient.invalidateQueries({
+            queryKey: labelKeys.detail(currentProject.id, localActiveLabelId),
+          });
+        }
+      }
+      queryClient.invalidateQueries({ queryKey: ["writingGoals"] });
+    },
+  });
+
   // Memoized map for efficient lookups (like useProject pattern)
   const labelsMap = useMemo(
     () => new Map(labels.map((l) => [l.id, l])),
@@ -104,6 +135,17 @@ export function useLabels(): UseLabelsReturn {
     }
   }, [currentProject, queryClient]);
 
+  // Update dialogue method
+  const updateDialogue = useCallback(
+    (
+      labelId: string,
+      dialogue: Array<{ speaker: string | null; text: string }>
+    ) => {
+      updateDialogueMutation.mutate({ labelId, dialogue });
+    },
+    [updateDialogueMutation]
+  );
+
   return {
     labels,
     labelsMap,
@@ -113,5 +155,7 @@ export function useLabels(): UseLabelsReturn {
     isLoadingLabel,
     setActiveLabelId,
     invalidateLabels,
+    updateDialogue,
+    isUpdatingDialogue: updateDialogueMutation.isPending,
   };
 }
