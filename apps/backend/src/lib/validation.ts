@@ -369,13 +369,23 @@ export const updateLabelDialogueBodySchema = z
     dialogue: z
       .array(
         z.object({
-          speaker: z.string().nullable(),
+          speakerId: z.string().uuid().nullable(),
           text: z.string().min(1, "Dialogue text cannot be empty"),
         })
       )
       .min(1, "At least one dialogue entry is required"),
   })
   .strict();
+
+/**
+ * Undo label request validation
+ */
+export const undoLabelBodySchema = z
+  .object({
+    versionId: uuidSchema.optional(),
+  })
+  .strict()
+  .optional();
 
 // ============================================================================
 // Route Configuration Schemas
@@ -921,6 +931,7 @@ export type UpdateLabelInput = z.infer<typeof updateLabelSchema>;
 export type UpdateLabelDialogueInput = z.infer<
   typeof updateLabelDialogueBodySchema
 >;
+export type UndoLabelInput = z.infer<typeof undoLabelBodySchema>;
 
 export type CreateCharacterInput = z.infer<typeof createCharacterSchema>;
 export type UpdateCharacterInput = z.infer<typeof updateCharacterSchema>;
@@ -947,6 +958,94 @@ export type CreateRenpyDefinitionInput = z.infer<
 export type UpdateRenpyDefinitionInput = z.infer<
   typeof updateRenpyDefinitionSchema
 >;
+
+// ============================================================================
+// User Settings Schemas
+// ============================================================================
+
+/**
+ * Cache of valid IANA timezone identifiers
+ * Populated on first access using Intl.supportedValuesOf where available
+ */
+let validTimezones: Set<string> | null = null;
+
+/**
+ * Get the set of valid IANA timezone identifiers supported by the runtime
+ * Falls back to UTC if Intl.supportedValuesOf is not available
+ */
+function getValidTimezones(): Set<string> {
+  if (validTimezones !== null) {
+    return validTimezones;
+  }
+
+  try {
+    // Intl.supportedValuesOf is available in Node.js 18+ and modern browsers
+    if (typeof Intl !== "undefined" && "supportedValuesOf" in Intl) {
+      const zones = (
+        Intl as unknown as { supportedValuesOf: (key: string) => string[] }
+      ).supportedValuesOf("timeZone");
+      validTimezones = new Set(zones);
+      return validTimezones;
+    }
+  } catch {
+    // Fallback to UTC only if supportedValuesOf fails
+  }
+
+  // Fallback: Only allow UTC if we can't get the full list
+  validTimezones = new Set(["UTC"]);
+  return validTimezones;
+}
+
+/**
+ * Check if a string is a valid IANA timezone identifier
+ * @param timezone - The timezone string to validate
+ * @returns true if the timezone is valid, false otherwise
+ */
+export function isValidTimezone(timezone: string): boolean {
+  const trimmed = timezone.trim();
+  return getValidTimezones().has(trimmed);
+}
+
+/**
+ * Daily word count entry schema
+ */
+export const dailyWordCountEntrySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format"),
+  count: z.number().int().min(0),
+});
+
+/**
+ * Timezone validation schema
+ * Validates that the value is a valid IANA timezone identifier
+ * Examples: "UTC", "America/New_York", "Europe/London", "Asia/Tokyo"
+ */
+export const timezoneSchema = z
+  .string()
+  .trim()
+  .min(1, "Timezone is required")
+  .max(64, "Timezone is too long")
+  .refine((val) => isValidTimezone(val), {
+    message:
+      "Invalid IANA timezone identifier. Examples: UTC, America/New_York, Europe/London",
+  });
+
+/**
+ * Update writing goal settings request validation
+ */
+export const updateWritingGoalSchema = z
+  .object({
+    dailyWritingGoal: z.number().int().positive().nullable().optional(),
+    dailyWordResetHour: z
+      .number()
+      .int()
+      .min(0, "Reset hour must be between 0 and 23")
+      .max(23, "Reset hour must be between 0 and 23")
+      .optional(),
+    timezone: timezoneSchema.optional(),
+  })
+  .strict();
+
+export type UpdateWritingGoalInput = z.infer<typeof updateWritingGoalSchema>;
 
 // ============================================================================
 // Helper Functions

@@ -27,7 +27,7 @@ describe("DialogueLine", () => {
   it("speaker dropdown options have tabindex=-1 to prevent direct tab navigation", async () => {
     const entry: DialogueEntry = {
       id: "entry-1",
-      speaker: null,
+      speakerId: null,
       text: "Narration text",
     };
 

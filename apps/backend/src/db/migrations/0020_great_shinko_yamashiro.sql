@@ -1,0 +1,1 @@
+ALTER TABLE "user_settings" ADD CONSTRAINT "daily_word_reset_hour_range" CHECK ("user_settings"."daily_word_reset_hour" >= 0 AND "user_settings"."daily_word_reset_hour" <= 23);

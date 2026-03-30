@@ -118,8 +118,7 @@ export function ProjectFileTree({
             >
               {folderFiles.map((file) => (
                 <div key={file.id}>
-                  <button
-                    onClick={() => onFileSelect(file.id)}
+                  <div
                     role="treeitem"
                     aria-expanded={
                       file.fileType === "STORY" && file.labels.length > 0
@@ -141,6 +140,7 @@ export function ProjectFileTree({
                         }}
                         className="flex items-center hover:bg-muted/30 rounded p-0.5 -ml-1"
                         aria-label="Toggle labels"
+                        tabIndex={-1}
                       >
                         {expandedFiles.has(file.id) ? (
                           <ChevronDown className="w-3 h-3" />
@@ -151,13 +151,18 @@ export function ProjectFileTree({
                     ) : (
                       <File className="w-3 h-3 ml-2" />
                     )}
-                    <span className="ml-1">{getFileName(file.filePath)}</span>
-                    {file.fileType === "SETTINGS" && (
-                      <span className="text-xs text-muted-foreground ml-auto">
-                        Settings
-                      </span>
-                    )}
-                  </button>
+                    <button
+                      onClick={() => onFileSelect(file.id)}
+                      className="flex-1 text-left flex items-center gap-1 py-1 px-1 -my-1 rounded hover:bg-muted/30 transition-all"
+                    >
+                      <span className="ml-1">{getFileName(file.filePath)}</span>
+                      {file.fileType === "SETTINGS" && (
+                        <span className="text-xs text-muted-foreground ml-auto">
+                          Settings
+                        </span>
+                      )}
+                    </button>
+                  </div>
 
                   {/* Show labels for STORY files */}
                   {file.fileType === "STORY" &&

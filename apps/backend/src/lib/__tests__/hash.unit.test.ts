@@ -42,9 +42,9 @@ describe("calculateContentHash", () => {
 
 describe("calculateDialogueHash", () => {
   it("should include speaker information in hash", () => {
-    const dialogueWithSpeaker = [{ speaker: "alice", text: "Hello" }];
-    const dialogueWithDifferentSpeaker = [{ speaker: "bob", text: "Hello" }];
-    const dialogueWithoutSpeaker = [{ speaker: null, text: "Hello" }];
+    const dialogueWithSpeaker = [{ speakerId: "uuid-alice", text: "Hello" }];
+    const dialogueWithDifferentSpeaker = [{ speakerId: "uuid-bob", text: "Hello" }];
+    const dialogueWithoutSpeaker = [{ speakerId: null, text: "Hello" }];
 
     const hash1 = calculateDialogueHash(dialogueWithSpeaker);
     const hash2 = calculateDialogueHash(dialogueWithDifferentSpeaker);
@@ -63,9 +63,9 @@ describe("calculateDialogueHash", () => {
 
   it("should handle multiple dialogue entries", () => {
     const dialogue = [
-      { speaker: "alice", text: "Hello" },
-      { speaker: "bob", text: "Hi there" },
-      { speaker: null, text: "Narration here" },
+      { speakerId: "uuid-alice", text: "Hello" },
+      { speakerId: "uuid-bob", text: "Hi there" },
+      { speakerId: null, text: "Narration here" },
     ];
     const hash = calculateDialogueHash(dialogue);
     expect(hash).toMatch(/^[a-f0-9]{64}$/);
@@ -179,21 +179,21 @@ describe("calculateLinesHash - Cross-format compatibility", () => {
     });
   });
 
-  describe("Dialogue format ({ speaker: string | null, text: string })", () => {
-    it("should hash dialogue with speaker", () => {
-      const lines = [{ speaker: "alice", text: "Hello" }];
+  describe("Dialogue format ({ speakerId: string | null, text: string })", () => {
+    it("should hash dialogue with speakerId", () => {
+      const lines = [{ speakerId: "uuid-alice", text: "Hello" }];
       const hash = calculateLinesHash(lines);
       expect(hash).toMatch(/^[a-f0-9]{64}$/);
     });
 
-    it("should hash narration (null speaker)", () => {
-      const lines = [{ speaker: null, text: "This is narration" }];
+    it("should hash narration (null speakerId)", () => {
+      const lines = [{ speakerId: null, text: "This is narration" }];
       const hash = calculateLinesHash(lines);
       expect(hash).toMatch(/^[a-f0-9]{64}$/);
     });
 
-    it("should handle empty string speaker", () => {
-      const lines = [{ speaker: "", text: "Hello" }];
+    it("should handle empty string speakerId", () => {
+      const lines = [{ speakerId: "", text: "Hello" }];
       const hash = calculateLinesHash(lines);
       expect(hash).toMatch(/^[a-f0-9]{64}$/);
     });
@@ -202,19 +202,16 @@ describe("calculateLinesHash - Cross-format compatibility", () => {
 
 describe("Cross-format hash consistency", () => {
   describe("Dialogue content - speaker included", () => {
-    it("should produce same hash for DIALOGUE type and dialogue format with speaker", () => {
+    it("should produce same hash for DIALOGUE type and database format", () => {
       const branchForgeFormat = [
         { type: "DIALOGUE", speaker: "alice", text: "Hello world" },
       ];
-      const dialogueFormat = [{ speaker: "alice", text: "Hello world" }];
       const databaseFormat = [{ content: "alice:Hello world" }];
 
       const hash1 = calculateLinesHash(branchForgeFormat);
-      const hash2 = calculateLinesHash(dialogueFormat);
-      const hash3 = calculateLinesHash(databaseFormat);
+      const hash2 = calculateLinesHash(databaseFormat);
 
       expect(hash1).toBe(hash2);
-      expect(hash2).toBe(hash3);
     });
 
     it("should detect speaker-only changes across formats", () => {
@@ -239,19 +236,16 @@ describe("Cross-format hash consistency", () => {
   });
 
   describe("Narration content - no speaker", () => {
-    it("should produce same hash for NARRATION type and dialogue format with null speaker", () => {
+    it("should produce same hash for NARRATION type and database format", () => {
       const branchForgeFormat = [
         { type: "NARRATION", text: "This is narration" },
       ];
-      const dialogueFormat = [{ speaker: null, text: "This is narration" }];
       const databaseFormat = [{ content: ":This is narration" }];
 
       const hash1 = calculateLinesHash(branchForgeFormat);
-      const hash2 = calculateLinesHash(dialogueFormat);
-      const hash3 = calculateLinesHash(databaseFormat);
+      const hash2 = calculateLinesHash(databaseFormat);
 
       expect(hash1).toBe(hash2);
-      expect(hash2).toBe(hash3);
     });
   });
 
@@ -269,14 +263,14 @@ describe("Cross-format hash consistency", () => {
       expect(hash2).toBe(hash3);
     });
 
-    it("should treat jump statements distinctly from dialogue", () => {
+    it("should treat jump statements distinctly from narration", () => {
       const jumpFormat = [{ type: "JUMP", target: "next_label" }];
-      const dialogueFormat = [{ speaker: null, text: "next_label" }];
+      const narrationFormat = [{ type: "NARRATION", text: "next_label" }];
 
       const hashJump = calculateLinesHash(jumpFormat);
-      const hashDialogue = calculateLinesHash(dialogueFormat);
+      const hashNarration = calculateLinesHash(narrationFormat);
 
-      expect(hashJump).not.toBe(hashDialogue);
+      expect(hashJump).not.toBe(hashNarration);
     });
   });
 
@@ -290,14 +284,6 @@ describe("Cross-format hash consistency", () => {
         { type: "JUMP", target: "next_scene" },
       ];
 
-      // Local edit format (from frontend)
-      const localEditFormat = [
-        { speaker: "alice", text: "Hello" },
-        { speaker: null, text: "Scene description" },
-        { speaker: "bob", text: "Hi Alice" },
-        { type: "JUMP", target: "next_scene" },
-      ];
-
       // Database format
       const databaseFormat = [
         { content: "alice:Hello" },
@@ -307,11 +293,9 @@ describe("Cross-format hash consistency", () => {
       ];
 
       const hash1 = calculateLinesHash(importFormat);
-      const hash2 = calculateLinesHash(localEditFormat);
-      const hash3 = calculateLinesHash(databaseFormat);
+      const hash2 = calculateLinesHash(databaseFormat);
 
       expect(hash1).toBe(hash2);
-      expect(hash2).toBe(hash3);
     });
 
     it("should handle empty arrays consistently", () => {
@@ -328,8 +312,8 @@ describe("Cross-format hash consistency", () => {
 describe("calculateDialogueHash delegates to calculateLinesHash", () => {
   it("should use same hash implementation as calculateLinesHash", () => {
     const dialogue = [
-      { speaker: "alice", text: "Hello" },
-      { speaker: null, text: "Narration" },
+      { speakerId: "uuid-alice", text: "Hello" },
+      { speakerId: null, text: "Narration" },
     ];
 
     const hashViaDialogue = calculateDialogueHash(dialogue);

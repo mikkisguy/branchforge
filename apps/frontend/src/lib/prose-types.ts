@@ -14,7 +14,7 @@
  */
 export interface DialogueEntry {
   id: string; // UUID for the entry
-  speaker: string | null; // Character displayName (null = narration)
+  speakerId: string | null; // Character UUID (null = narration)
   text: string; // Content text
 }
 

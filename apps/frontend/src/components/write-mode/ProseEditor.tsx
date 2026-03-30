@@ -8,10 +8,15 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { DialogueLine } from "./DialogueLine";
 import { WritingGoalPill } from "./WritingGoalPill";
+import { WritingStatsDialog } from "./WritingStatsDialog";
 import { SaveIndicator } from "./SaveIndicator";
 import { FontSizeSwitcher } from "../FontSizeSwitcher";
 import { FontFamilySwitcher } from "./FontFamilySwitcher";
-import { BookOpen, Target, PenLine } from "lucide-react";
+import { useWritingGoals } from "@/hooks/useWritingGoals";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
+import { useInMemoryUndo } from "./useInMemoryUndo";
+import { UndoRedoControls } from "./UndoRedoControls";
+import { BookOpen, PenLine } from "lucide-react";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { Character, LabelDetail } from "@branchforge/shared";
 
@@ -25,10 +30,7 @@ interface ProseEditorProps {
 type LineLayoutMode = "inline" | "stacked";
 const LINE_LAYOUT_STORAGE_KEY = "writemode-line-layout";
 const NEW_LINE_BOTTOM_SAFE_OFFSET = 96;
-
-// Writing goal settings
-const DEFAULT_WORD_GOAL = 500;
-const DEFAULT_LINE_GOAL = 30;
+const TEXT_HISTORY_DEBOUNCE_MS = 450;
 
 // Helper function to convert label lines to dialogue entries
 function convertLabelLinesToEntries(
@@ -42,9 +44,33 @@ function convertLabelLinesToEntries(
     )
     .map((line) => ({
       id: line.id,
-      speaker: line.speakerName,
+      speakerId: line.speakerId,
       text: line.content,
     }));
+}
+
+function cloneEntries(entries: DialogueEntry[]): DialogueEntry[] {
+  return entries.map((entry) => ({ ...entry }));
+}
+
+function areEntriesEquivalent(
+  left: DialogueEntry[],
+  right: DialogueEntry[]
+): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  for (let i = 0; i < left.length; i += 1) {
+    if (
+      left[i].speakerId !== right[i].speakerId ||
+      left[i].text !== right[i].text
+    ) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export function ProseEditor({
@@ -54,6 +80,9 @@ export function ProseEditor({
   isFocusMode = false,
 }: ProseEditorProps) {
   const labelId = activeLabel?.id ?? "none";
+
+  // Writing goals from backend
+  const { settings: writingGoalSettings } = useWritingGoals();
 
   // Hover state for focus mode dimming
   const [isTopBarHovered, setIsTopBarHovered] = useState(false);
@@ -66,33 +95,127 @@ export function ProseEditor({
     return saved === "stacked" ? "stacked" : "inline";
   });
 
-  // Writing goals state
-  const [wordGoal] = useState(DEFAULT_WORD_GOAL);
-  const [lineGoal] = useState(DEFAULT_LINE_GOAL);
-  const [goalType, setGoalType] = useState<"words" | "lines">("words");
+  // Writing stats dialog state
+  const [statsDialogOpen, setStatsDialogOpen] = useState(false);
 
   // Auto-save simulation state
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasUserEditedRef = useRef(false);
-
-  const textareaRefs = useRef<Map<number, HTMLTextAreaElement>>(new Map());
+  const pendingTextHistoryRef = useRef<DialogueEntry[] | null>(null);
+  const textHistoryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const onChangeRef = useRef(onChange);
+  const entriesRef = useRef(entries);
 
-  // Update the ref when onChange changes
+  useEffect(() => {
+    entriesRef.current = entries;
+  }, [entries]);
+
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
 
+  const handleInMemoryHistoryChange = useCallback(
+    (nextEntries: DialogueEntry[]) => {
+      hasUserEditedRef.current = true;
+      setEntries(nextEntries);
+      onChangeRef.current(nextEntries);
+    },
+    []
+  );
+
+  // In-memory undo for immediate response
+  const inMemoryUndo = useInMemoryUndo(
+    entries,
+    handleInMemoryHistoryChange,
+    50 // Max 50 in-memory undo steps
+  );
+
+  // Server-side undo for persistence
+  const { canUndo, canRedo, undo, redo, isUndoing, isRedoing } = useUndoRedo(
+    activeLabel?.id ?? null
+  );
+
+  const textareaRefs = useRef<Map<number, HTMLTextAreaElement>>(new Map());
+
+  const commitHistorySnapshot = useCallback(
+    (snapshot: DialogueEntry[]) => {
+      inMemoryUndo.recordChange(cloneEntries(snapshot));
+    },
+    [inMemoryUndo]
+  );
+
+  const flushPendingTextHistory = useCallback(() => {
+    if (textHistoryTimerRef.current) {
+      clearTimeout(textHistoryTimerRef.current);
+      textHistoryTimerRef.current = null;
+    }
+
+    if (pendingTextHistoryRef.current) {
+      commitHistorySnapshot(pendingTextHistoryRef.current);
+      pendingTextHistoryRef.current = null;
+    }
+  }, [commitHistorySnapshot]);
+
+  const scheduleTextHistorySnapshot = useCallback(
+    (snapshot: DialogueEntry[]) => {
+      pendingTextHistoryRef.current = cloneEntries(snapshot);
+
+      if (textHistoryTimerRef.current) {
+        clearTimeout(textHistoryTimerRef.current);
+      }
+
+      textHistoryTimerRef.current = setTimeout(() => {
+        flushPendingTextHistory();
+      }, TEXT_HISTORY_DEBOUNCE_MS);
+    },
+    [flushPendingTextHistory]
+  );
+
+  const recordImmediateHistorySnapshot = useCallback(
+    (snapshot: DialogueEntry[]) => {
+      flushPendingTextHistory();
+      commitHistorySnapshot(snapshot);
+    },
+    [flushPendingTextHistory, commitHistorySnapshot]
+  );
+
   useEffect(() => {
     const newEntries = convertLabelLinesToEntries(activeLabel);
+    flushPendingTextHistory();
     setEntries(newEntries);
-    onChangeRef.current(newEntries);
     // Reset user edit flag when loading a new label
     hasUserEditedRef.current = false;
+    // Clear in-memory history when switching labels
+    inMemoryUndo.clear(cloneEntries(newEntries));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [labelId]);
+
+  useEffect(() => {
+    if (!activeLabel) {
+      return;
+    }
+
+    const newEntries = convertLabelLinesToEntries(activeLabel);
+    if (areEntriesEquivalent(entriesRef.current, newEntries)) {
+      return;
+    }
+
+    flushPendingTextHistory();
+    setEntries(newEntries);
+    hasUserEditedRef.current = false;
+    inMemoryUndo.clear(cloneEntries(newEntries));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [labelId, activeLabel?.lines]);
+
+  useEffect(() => {
+    return () => {
+      if (textHistoryTimerRef.current) {
+        clearTimeout(textHistoryTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(LINE_LAYOUT_STORAGE_KEY, layoutMode);
@@ -125,11 +248,13 @@ export function ProseEditor({
       setEntries((prev) => {
         const newEntries = [...prev];
         newEntries[index] = updatedEntry;
+        // Batch text edits into meaningful undo chunks.
+        scheduleTextHistorySnapshot(newEntries);
         onChange(newEntries);
         return newEntries;
       });
     },
-    [onChange]
+    [onChange, scheduleTextHistorySnapshot]
   );
 
   const handleAddLine = useCallback(
@@ -138,7 +263,7 @@ export function ProseEditor({
         const newEntries = [...prev];
         const newEntry: DialogueEntry = {
           id: crypto.randomUUID(),
-          speaker: prev[index]?.speaker || null,
+          speakerId: prev[index]?.speakerId || null,
           text: "",
         };
         newEntries.splice(index + 1, 0, newEntry);
@@ -167,11 +292,12 @@ export function ProseEditor({
             }
           }
         }, 0);
+        recordImmediateHistorySnapshot(newEntries);
         onChange(newEntries);
         return newEntries;
       });
     },
-    [onChange]
+    [onChange, recordImmediateHistorySnapshot]
   );
 
   const handleDeleteLine = useCallback(
@@ -185,11 +311,12 @@ export function ProseEditor({
             textareaToFocus.focus();
           }
         }, 0);
+        recordImmediateHistorySnapshot(newEntries);
         onChange(newEntries);
         return newEntries;
       });
     },
-    [onChange]
+    [onChange, recordImmediateHistorySnapshot]
   );
 
   const handleMoveUp = useCallback(
@@ -201,11 +328,12 @@ export function ProseEditor({
           newEntries[index],
           newEntries[index - 1],
         ];
+        recordImmediateHistorySnapshot(newEntries);
         onChange(newEntries);
         return newEntries;
       });
     },
-    [onChange]
+    [onChange, recordImmediateHistorySnapshot]
   );
 
   const handleMoveDown = useCallback(
@@ -217,12 +345,33 @@ export function ProseEditor({
           newEntries[index + 1],
           newEntries[index],
         ];
+        recordImmediateHistorySnapshot(newEntries);
         onChange(newEntries);
         return newEntries;
       });
     },
-    [onChange]
+    [onChange, recordImmediateHistorySnapshot]
   );
+
+  const handleImmediateUndo = useCallback(() => {
+    flushPendingTextHistory();
+    inMemoryUndo.undo();
+  }, [flushPendingTextHistory, inMemoryUndo]);
+
+  const handleImmediateRedo = useCallback(() => {
+    flushPendingTextHistory();
+    inMemoryUndo.redo();
+  }, [flushPendingTextHistory, inMemoryUndo]);
+
+  const handleServerUndo = useCallback(() => {
+    flushPendingTextHistory();
+    void undo();
+  }, [flushPendingTextHistory, undo]);
+
+  const handleServerRedo = useCallback(() => {
+    flushPendingTextHistory();
+    void redo();
+  }, [flushPendingTextHistory, redo]);
 
   const wordCount = entries.reduce((count, entry) => {
     const trimmed = entry.text?.trim();
@@ -230,6 +379,15 @@ export function ProseEditor({
     return count + words;
   }, 0);
   const lineCount = entries.length;
+
+  // Get today's word count from daily word counts
+  // Normalize both dates to local timezone before comparing
+  const todayWordCount =
+    writingGoalSettings?.dailyWordCounts?.find((entry) => {
+      const entryDate = new Date(entry.date);
+      const today = new Date();
+      return entryDate.toLocaleDateString() === today.toLocaleDateString();
+    })?.count ?? 0;
 
   if (!activeLabel) {
     return (
@@ -259,11 +417,11 @@ export function ProseEditor({
             const newEntries = [
               {
                 id: crypto.randomUUID(),
-                speaker:
-                  characters.length > 0 ? characters[0].displayName : null,
+                speakerId: characters.length > 0 ? characters[0].id : null,
                 text: "",
               },
             ];
+            recordImmediateHistorySnapshot(newEntries);
             setEntries(newEntries);
             onChange(newEntries);
           }}
@@ -313,17 +471,6 @@ export function ProseEditor({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {/* Goal toggle */}
-          <button
-            onClick={() =>
-              setGoalType(goalType === "words" ? "lines" : "words")
-            }
-            className="p-2 rounded-lg hover:bg-muted transition-colors"
-            title="Toggle goal type"
-          >
-            <Target className="w-4 h-4 text-muted-foreground" />
-          </button>
-
           <FontFamilySwitcher />
           <FontSizeSwitcher mode="write" direction="down" />
 
@@ -375,20 +522,22 @@ export function ProseEditor({
       </div>
 
       {/* Goal Pill */}
-      <div
-        className="relative z-10 -mt-12 px-4 pt-10 pb-2 border-b border-border bg-gradient-to-b from-transparent via-card/30 to-card/80 transition-opacity duration-300 ease-out"
-        style={{
-          opacity: isFocusMode ? (isBottomBarHovered ? 1 : 0.4) : 1,
-        }}
-        onMouseEnter={() => setIsBottomBarHovered(true)}
-        onMouseLeave={() => setIsBottomBarHovered(false)}
-      >
-        <WritingGoalPill
-          current={goalType === "words" ? wordCount : lineCount}
-          goal={goalType === "words" ? wordGoal : lineGoal}
-          type={goalType}
-        />
-      </div>
+      {writingGoalSettings?.dailyWritingGoal != null && (
+        <div
+          className="relative z-10 -mt-12 px-4 pt-10 pb-2 border-b border-border bg-gradient-to-b from-transparent via-card/30 to-card/80 transition-opacity duration-300 ease-out"
+          style={{
+            opacity: isFocusMode ? (isBottomBarHovered ? 1 : 0.4) : 1,
+          }}
+          onMouseEnter={() => setIsBottomBarHovered(true)}
+          onMouseLeave={() => setIsBottomBarHovered(false)}
+        >
+          <WritingGoalPill
+            current={todayWordCount}
+            goal={writingGoalSettings.dailyWritingGoal}
+            onClick={() => setStatsDialogOpen(true)}
+          />
+        </div>
+      )}
 
       {/* Status Bar */}
       <div
@@ -413,10 +562,30 @@ export function ProseEditor({
           </div>
 
           <div className="flex items-center gap-4">
+            <UndoRedoControls
+              canUndo={canUndo}
+              canRedo={canRedo}
+              canUndoImmediate={inMemoryUndo.canUndo}
+              canRedoImmediate={inMemoryUndo.canRedo}
+              onUndo={handleServerUndo}
+              onRedo={handleServerRedo}
+              onUndoImmediate={handleImmediateUndo}
+              onRedoImmediate={handleImmediateRedo}
+              isUndoing={isUndoing}
+              isRedoing={isRedoing}
+            />
             <SaveIndicator isSaving={isSaving} lastSaved={lastSaved} />
           </div>
         </div>
       </div>
+
+      {/* Writing Stats Dialog */}
+      <WritingStatsDialog
+        open={statsDialogOpen}
+        onOpenChange={setStatsDialogOpen}
+        dailyGoal={writingGoalSettings?.dailyWritingGoal ?? 500}
+        dailyWordCounts={writingGoalSettings?.dailyWordCounts ?? []}
+      />
     </div>
   );
 }

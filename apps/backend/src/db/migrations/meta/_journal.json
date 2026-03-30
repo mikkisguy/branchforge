@@ -127,6 +127,34 @@
       "when": 1774472952451,
       "tag": "0017_majestic_devos",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1774707741373,
+      "tag": "0018_pale_black_panther",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1774709948343,
+      "tag": "0019_modern_purple_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1774723872435,
+      "tag": "0020_great_shinko_yamashiro",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1774786376188,
+      "tag": "0021_flashy_valeria_richards",
+      "breakpoints": true
     }
   ]
 }

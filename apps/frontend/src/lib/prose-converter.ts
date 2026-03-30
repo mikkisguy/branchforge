@@ -23,7 +23,7 @@ export function labelLinesToDialogue(lines: LabelLine[]): DialogueEntry[] {
     .filter((line) => line.contentType === "DIALOGUE" || line.contentType === "NARRATION")
     .map((line) => ({
       id: line.id,
-      speaker: line.speakerName,
+      speakerId: line.speakerId,
       text: line.content,
     }));
 }
@@ -31,16 +31,19 @@ export function labelLinesToDialogue(lines: LabelLine[]): DialogueEntry[] {
 /**
  * Converts DialogueEntry[] to backend dialogue payload format
  * This converts prose editor entries to the format expected by the backend API
+ * Filters out entries with empty or whitespace-only text
  *
  * @param entries - Dialogue entries from the prose editor
  * @returns Backend dialogue payload
  */
 export function dialogueToPayload(entries: DialogueEntry[]): Array<{
-  speaker: string | null;
+  speakerId: string | null;
   text: string;
 }> {
-  return entries.map((entry) => ({
-    speaker: entry.speaker,
-    text: entry.text,
-  }));
+  return entries
+    .filter((entry) => entry.text.trim().length > 0)
+    .map((entry) => ({
+      speakerId: entry.speakerId,
+      text: entry.text,
+    }));
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "user_settings" ADD COLUMN "label_word_counts" jsonb DEFAULT '{}'::jsonb;

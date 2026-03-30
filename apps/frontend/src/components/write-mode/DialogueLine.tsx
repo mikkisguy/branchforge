@@ -142,13 +142,13 @@ export function DialogueLine({
 
       const estimatedHeight = estimateDropdownHeight();
       setOpenUpward(getShouldOpenUpward(estimatedHeight));
-      const initialIndex = entry.speaker
-        ? characters.findIndex((c) => c.displayName === entry.speaker) + 1
+      const initialIndex = entry.speakerId
+        ? characters.findIndex((c) => c.id === entry.speakerId) + 1
         : 0;
       setFocusedOptionIndex(initialIndex);
       return true;
     });
-  }, [estimateDropdownHeight, getShouldOpenUpward, entry.speaker, characters]);
+  }, [estimateDropdownHeight, getShouldOpenUpward, entry.speakerId, characters]);
 
   useEffect(() => {
     if (!isDropdownOpen) return;
@@ -200,8 +200,8 @@ export function DialogueLine({
   }, [isDropdownOpen]);
 
   const handleSpeakerSelect = useCallback(
-    (speaker: string | null) => {
-      onChange({ ...entry, speaker });
+    (speakerId: string | null) => {
+      onChange({ ...entry, speakerId });
       setIsDropdownOpen(false);
       setFocusedOptionIndex(-1);
     },
@@ -305,13 +305,13 @@ export function DialogueLine({
     []
   );
 
-  const character = entry.speaker
-    ? characters.find((c) => c.displayName === entry.speaker)
+  const character = entry.speakerId
+    ? characters.find((c) => c.id === entry.speakerId)
     : null;
   const speakerColor = character?.color;
   const isStacked = layoutMode === "stacked";
   const isSpeakerInteractive = isHovered || isDropdownOpen;
-  const hasSpeaker = Boolean(entry.speaker);
+  const hasSpeaker = Boolean(entry.speakerId);
 
   return (
     <div
@@ -336,7 +336,7 @@ export function DialogueLine({
           aria-haspopup="listbox"
           aria-expanded={isDropdownOpen}
           aria-controls={dropdownId}
-          aria-label={`Change speaker: ${entry.speaker || "Narration"}`}
+          aria-label={`Change speaker: ${character?.displayName || "Narration"}`}
           className={`flex items-center gap-1.5 rounded-md transition-all border tracking-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
             isStacked
               ? "inline-flex h-8 py-1.5 px-2.5 -ml-2.5"
@@ -360,12 +360,12 @@ export function DialogueLine({
             fontStyle: hasSpeaker ? "normal" : "italic",
           }}
           title={
-            entry.speaker
+            hasSpeaker
               ? character?.dialogueStyle || "Character dialogue"
               : "Narration"
           }
         >
-          <span className="truncate">{entry.speaker || "Narration"}</span>
+          <span className="truncate">{character?.displayName || "Narration"}</span>
           <ChevronDown
             className={`w-3 h-3 transition-transform duration-200 flex-shrink-0 ${
               isDropdownOpen ? "rotate-180" : ""
@@ -397,7 +397,7 @@ export function DialogueLine({
               id={`${dropdownId}-option-0`}
               type="button"
               role="option"
-              aria-selected={!entry.speaker}
+              aria-selected={!entry.speakerId}
               onClick={() => handleSpeakerSelect(null)}
               tabIndex={-1}
               className={`w-full text-left px-3 py-2 text-sm transition-colors duration-150 ${
@@ -405,7 +405,7 @@ export function DialogueLine({
               }`}
               style={{
                 fontStyle: "italic",
-                fontWeight: !entry.speaker ? "600" : "normal",
+                fontWeight: !entry.speakerId ? "600" : "normal",
               }}
             >
               Narration
@@ -419,16 +419,16 @@ export function DialogueLine({
                 id={`${dropdownId}-option-${idx + 1}`}
                 type="button"
                 role="option"
-                aria-selected={entry.speaker === char.displayName}
-                onClick={() => handleSpeakerSelect(char.displayName)}
+                aria-selected={entry.speakerId === char.id}
+                onClick={() => handleSpeakerSelect(char.id)}
                 tabIndex={-1}
                 className={`w-full text-left px-3 py-2 text-sm transition-colors duration-150 flex items-center gap-2 ${
                   focusedOptionIndex === idx + 1 ? "bg-muted" : "hover:bg-muted"
                 }`}
                 style={{
-                  color: entry.speaker === char.displayName ? char.color : undefined,
+                  color: entry.speakerId === char.id ? char.color : undefined,
                   fontWeight:
-                    entry.speaker === char.displayName ? "600" : "normal",
+                    entry.speakerId === char.id ? "600" : "normal",
                 }}
               >
                 <span
@@ -451,14 +451,14 @@ export function DialogueLine({
         value={entry.text}
         onChange={handleTextChange}
         onKeyDown={handleKeyDown}
-        placeholder={entry.speaker ? "Dialogue..." : "Narration..."}
+        placeholder={entry.speakerId ? "Dialogue..." : "Narration..."}
         className={`min-h-[52px] p-0 resize-none overflow-hidden bg-transparent border-0 outline-none focus-visible:outline-none focus-visible:ring-0 font-light tracking-normal leading-8 placeholder:text-muted-foreground/50 ${
           isStacked ? "w-full pr-7" : "flex-1"
         }`}
         style={{
           fontSize: "var(--prose-editor-font-size, 16px)",
           fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
-          fontStyle: !entry.speaker ? "italic" : "normal",
+          fontStyle: !entry.speakerId ? "italic" : "normal",
           color: "hsl(var(--foreground))",
         }}
       />

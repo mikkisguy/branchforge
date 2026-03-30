@@ -11,3 +11,4 @@ export { CharacterReferencePanel } from "./CharacterReferencePanel";
 export { FocusModeToggle } from "./FocusModeToggle";
 export { SaveIndicator as BreathingSaveIndicator } from "./SaveIndicator";
 export { WritingGoalPill } from "./WritingGoalPill";
+export { UndoRedoControls } from "./UndoRedoControls";
