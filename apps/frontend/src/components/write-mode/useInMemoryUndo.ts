@@ -5,7 +5,7 @@
  * Works in tandem with server-side undo for persistence.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import type { DialogueEntry } from "@/lib/prose-types";
 
 interface UndoState {
@@ -19,107 +19,102 @@ export function useInMemoryUndo(
   onChange: (entries: DialogueEntry[]) => void,
   maxHistory: number = 50
 ) {
-  const [state, setState] = useState<UndoState>({
+  const initialState: UndoState = {
     past: [],
     present: entries,
     future: [],
-  });
+  };
 
-  // Update present when entries change from external source (e.g., server update)
-  const updatePresent = useCallback((newEntries: DialogueEntry[]) => {
-    setState((prev) => ({
-      ...prev,
-      present: newEntries,
-      future: [], // Clear future when we get a new state from server
-    }));
+  const [state, setState] = useState<UndoState>(initialState);
+  const stateRef = useRef<UndoState>(initialState);
+
+  const commitState = useCallback((nextState: UndoState) => {
+    stateRef.current = nextState;
+    setState(nextState);
   }, []);
 
-  const undo = useCallback((): boolean => {
-    let previousToApply: DialogueEntry[] | undefined;
-    let didUndo = false;
-
-    setState((prev) => {
-      const { past, present, future } = prev;
-
-      if (past.length === 0 || !present) return prev;
-
-      const previous = past[past.length - 1];
-      previousToApply = previous;
-      const newPast = past.slice(0, past.length - 1);
-      const newState = {
-        past: newPast,
-        present: previous,
-        future: [present, ...future],
+  // Update present when entries change from external source (e.g., server update)
+  const updatePresent = useCallback(
+    (newEntries: DialogueEntry[]) => {
+      const nextState: UndoState = {
+        ...stateRef.current,
+        present: newEntries,
+        future: [], // Clear future when we get a new state from server
       };
 
-      didUndo = true;
-      return newState;
-    });
+      commitState(nextState);
+    },
+    [commitState]
+  );
 
-    if (didUndo && previousToApply) {
-      onChange(previousToApply);
-    }
+  const undo = useCallback((): boolean => {
+    const current = stateRef.current;
+    const { past, present, future } = current;
 
-    return didUndo;
-  }, [onChange]);
+    if (past.length === 0 || !present) return false;
+
+    const previous = past[past.length - 1];
+    const newPast = past.slice(0, past.length - 1);
+    const nextState: UndoState = {
+      past: newPast,
+      present: previous,
+      future: [present, ...future],
+    };
+
+    commitState(nextState);
+    onChange(previous);
+
+    return true;
+  }, [commitState, onChange]);
 
   const redo = useCallback((): boolean => {
-    let nextValue: DialogueEntry[] | undefined;
-    let didRedo = false;
+    const current = stateRef.current;
+    const { past, present, future } = current;
 
-    setState((prev) => {
-      const { past, present, future } = prev;
+    if (future.length === 0) return false;
 
-      if (future.length === 0) return prev;
+    const next = future[0];
+    const newFuture = future.slice(1);
+    const nextState: UndoState = {
+      past: present ? [...past, present] : past,
+      present: next,
+      future: newFuture,
+    };
 
-      const next = future[0];
-      nextValue = next;
-      const newFuture = future.slice(1);
-      const newState = {
-        past: present ? [...past, present] : past,
-        present: next,
-        future: newFuture,
-      };
+    commitState(nextState);
+    onChange(next);
 
-      didRedo = true;
-      return newState;
-    });
-
-    if (didRedo && nextValue) {
-      onChange(nextValue);
-    }
-
-    return didRedo;
-  }, [onChange]);
+    return true;
+  }, [commitState, onChange]);
 
   const recordChange = useCallback(
     (newEntries: DialogueEntry[]) => {
-      setState((prev) => {
-        const { past, present } = prev;
+      const current = stateRef.current;
+      const { past, present } = current;
 
-        if (!present) {
-          return { ...prev, present: newEntries };
-        }
+      if (!present) {
+        commitState({ ...current, present: newEntries });
+        return;
+      }
 
-        // Check if content actually changed (compare JSON strings)
-        if (JSON.stringify(present) === JSON.stringify(newEntries)) {
-          return prev; // No change, don't record
-        }
+      // Check if content actually changed (compare JSON strings)
+      if (JSON.stringify(present) === JSON.stringify(newEntries)) {
+        return; // No change, don't record
+      }
 
-        const newPast = [...past, present];
-        // Limit history size
-        if (newPast.length > maxHistory) {
-          newPast.shift();
-        }
+      const newPast = [...past, present];
+      // Limit history size
+      if (newPast.length > maxHistory) {
+        newPast.shift();
+      }
 
-        return {
-          past: newPast,
-          present: newEntries,
-          future: [], // Clear future on new change
-        };
+      commitState({
+        past: newPast,
+        present: newEntries,
+        future: [], // Clear future on new change
       });
     },
-    [maxHistory]
+    [commitState, maxHistory]
   );
 
   // Clear history (call when switching labels)
@@ -127,13 +122,13 @@ export function useInMemoryUndo(
     (initialEntries?: DialogueEntry[]) => {
       const nextPresent = initialEntries ?? entries;
 
-      setState({
+      commitState({
         past: [],
         present: nextPresent,
         future: [],
       });
     },
-    [entries]
+    [commitState, entries]
   );
 
   return {

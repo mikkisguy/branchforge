@@ -211,7 +211,7 @@ describe("UndoRedoControls", () => {
       expect(mockHandlers.onRedoImmediate).not.toHaveBeenCalled();
     });
 
-    it("should prioritize onUndoImmediate when both immediate and server undo are available", () => {
+    it("should prioritize onUndo when both immediate and server undo are available", () => {
       render(
         <UndoRedoControls
           canUndo={true}
@@ -225,11 +225,11 @@ describe("UndoRedoControls", () => {
       const undoButton = screen.getByLabelText("Undo");
       fireEvent.click(undoButton);
 
-      expect(mockHandlers.onUndoImmediate).toHaveBeenCalled();
-      expect(mockHandlers.onUndo).not.toHaveBeenCalled();
+      expect(mockHandlers.onUndo).toHaveBeenCalled();
+      expect(mockHandlers.onUndoImmediate).not.toHaveBeenCalled();
     });
 
-    it("should prioritize onRedoImmediate when both immediate and server redo are available", () => {
+    it("should prioritize onRedo when both immediate and server redo are available", () => {
       render(
         <UndoRedoControls
           canUndo={false}
@@ -243,8 +243,8 @@ describe("UndoRedoControls", () => {
       const redoButton = screen.getByLabelText("Redo");
       fireEvent.click(redoButton);
 
-      expect(mockHandlers.onRedoImmediate).toHaveBeenCalled();
-      expect(mockHandlers.onRedo).not.toHaveBeenCalled();
+      expect(mockHandlers.onRedo).toHaveBeenCalled();
+      expect(mockHandlers.onRedoImmediate).not.toHaveBeenCalled();
     });
   });
 

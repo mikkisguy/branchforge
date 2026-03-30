@@ -47,11 +47,18 @@ export async function createDialogueSnapshot(
   const contentHash = calculateDialogueHash(dialogue);
 
   return await db.transaction(async (tx) => {
-    // Get max version number and latest content hash in a single query
-    const [versionInfo] = await tx
+    // Get max version number
+    const [maxVersionResult] = await tx
       .select({
         maxVersionNumber: sql<number | null>`MAX(${labelDialogueVersions.versionNumber})`,
-        latestContentHash: labelDialogueVersions.contentHash,
+      })
+      .from(labelDialogueVersions)
+      .where(eq(labelDialogueVersions.labelId, labelId));
+
+    // Get latest version's content hash separately
+    const [latestVersion] = await tx
+      .select({
+        contentHash: labelDialogueVersions.contentHash,
       })
       .from(labelDialogueVersions)
       .where(eq(labelDialogueVersions.labelId, labelId))
@@ -59,11 +66,11 @@ export async function createDialogueSnapshot(
       .limit(1);
 
     // Skip snapshot if content hasn't changed
-    if (versionInfo && versionInfo.latestContentHash === contentHash) {
+    if (latestVersion && latestVersion.contentHash === contentHash) {
       return false;
     }
 
-    const maxVersionNumber = versionInfo?.maxVersionNumber ?? 0;
+    const maxVersionNumber = maxVersionResult?.maxVersionNumber ?? 0;
     const newVersionNumber = maxVersionNumber + 1;
 
     await tx.insert(labelDialogueVersions).values({

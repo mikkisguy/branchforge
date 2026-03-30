@@ -121,15 +121,15 @@ export function UndoRedoControls({
             onRedoImmediate();
           }
         }}
-        disabled={!hasRedo || isRedoing}
+        disabled={!hasRedo || isRedoing || isUndoing}
         className={`p-1.5 rounded-md transition-all ${
-          hasRedo
+          hasRedo && !isUndoing && !isRedoing
             ? "hover:bg-muted text-foreground hover:text-[var(--theme-color)]"
             : "text-muted-foreground/30 cursor-not-allowed"
         }`}
         title="Redo (Ctrl+Shift+Z)"
         aria-label="Redo"
-        aria-disabled={!hasRedo || isRedoing}
+        aria-disabled={!hasRedo || isRedoing || isUndoing}
       >
         <Redo2 className="w-4 h-4" />
       </button>
