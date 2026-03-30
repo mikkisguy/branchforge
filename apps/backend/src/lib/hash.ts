@@ -30,7 +30,7 @@ export function calculateContentHash(content: string): string {
  * - Database format ({ content: string }) - used as-is (already canonical)
  * - RPY parser format ({ text?: string; target?: string })
  * - BranchForge format ({ type, speaker?, text?, target? })
- * - Dialogue format ({ speaker: string | null, text: string })
+ * - Dialogue format with speakerId ({ speakerId: string | null, text: string })
  *
  * @param entry - Entry in any supported format
  * @returns Canonical string for hashing
@@ -40,7 +40,7 @@ function normalizeToCanonicalString(
     | { content: string }
     | { text?: string; target?: string }
     | { type?: string; speaker?: string; text?: string; target?: string }
-    | { speaker: string | null; text: string }
+    | { speakerId: string | null; text: string }
 ): string {
   // Handle database canonical format ({ content: string })
   // Content is already in canonical format, use as-is
@@ -70,9 +70,11 @@ function normalizeToCanonicalString(
     return `jump ${entry.target}`;
   }
 
-  // Handle dialogue format ({ speaker: string | null, text: string })
-  if ("speaker" in entry && "text" in entry) {
-    return `${entry.speaker ?? ""}:${entry.text}`;
+  // Handle dialogue format with speakerId ({ speakerId: string | null, text: string })
+  // When speakerId is present, hash based on the UUID (not the display name)
+  // This ensures hash changes when character association changes
+  if ("speakerId" in entry && "text" in entry) {
+    return `${entry.speakerId ?? ""}:${entry.text}`;
   }
 
   // Fallback: try to extract text from whatever format we have
@@ -92,7 +94,7 @@ function normalizeToCanonicalString(
  * - Database format: Array<{ content: string }>
  * - RPY parser format: Array<{ text?: string; target?: string }>
  * - BranchForge format: Array<{ type: string; speaker?: string; text?: string; target?: string }>
- * - Dialogue format: Array<{ speaker: string | null; text: string }>
+ * - Dialogue format with speakerId: Array<{ speakerId: string | null, text: string }>
  *
  * @param lines - Array of entries in any supported format
  * @returns Hex string of SHA-256 hash
@@ -112,11 +114,10 @@ function normalizeToCanonicalString(
  * ]);
  * // hash1 === hash2 (same content, same hash)
  *
- * // Dialogue format (local edit)
+ * // Dialogue format with speakerId (Write Mode format)
  * const hash3 = calculateLinesHash([
- *   { speaker: "alice", text: "Hello" },
+ *   { speakerId: "uuid-123", text: "Hello" },
  * ]);
- * // hash3 matches equivalent content in other formats
  * ```
  */
 export function calculateLinesHash(
@@ -124,7 +125,7 @@ export function calculateLinesHash(
     | { content: string }
     | { text?: string; target?: string }
     | { type?: string; speaker?: string; text?: string; target?: string }
-    | { speaker: string | null; text: string }
+    | { speakerId: string | null; text: string }
   >
 ): string {
   const combined = lines.map(normalizeToCanonicalString).join("\n");
@@ -133,22 +134,21 @@ export function calculateLinesHash(
 
 /**
  * Calculate hash of dialogue array.
- * Legacy function maintained for backward compatibility.
  * Delegates to calculateLinesHash for consistent hashing.
  *
- * @param dialogue - Array of dialogue entries with speaker and text
+ * @param dialogue - Array of dialogue entries with speakerId and text
  * @returns Hex string of SHA-256 hash
  *
  * @example
  * ```ts
  * const hash = calculateDialogueHash([
- *   { speaker: "alice", text: "Hello" },
- *   { speaker: null, text: "Narration" },
+ *   { speakerId: "uuid-123", text: "Hello" },
+ *   { speakerId: null, text: "Narration" },
  * ]);
  * ```
  */
 export function calculateDialogueHash(
-  dialogue: Array<{ speaker: string | null; text: string }>
+  dialogue: Array<{ speakerId: string | null; text: string }>
 ): string {
   return calculateLinesHash(dialogue);
 }

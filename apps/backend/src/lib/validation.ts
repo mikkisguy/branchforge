@@ -369,13 +369,23 @@ export const updateLabelDialogueBodySchema = z
     dialogue: z
       .array(
         z.object({
-          speaker: z.string().nullable(),
+          speakerId: z.string().uuid().nullable(),
           text: z.string().min(1, "Dialogue text cannot be empty"),
         })
       )
       .min(1, "At least one dialogue entry is required"),
   })
   .strict();
+
+/**
+ * Undo label request validation
+ */
+export const undoLabelBodySchema = z
+  .object({
+    versionId: uuidSchema.optional(),
+  })
+  .strict()
+  .optional();
 
 // ============================================================================
 // Route Configuration Schemas
@@ -921,6 +931,7 @@ export type UpdateLabelInput = z.infer<typeof updateLabelSchema>;
 export type UpdateLabelDialogueInput = z.infer<
   typeof updateLabelDialogueBodySchema
 >;
+export type UndoLabelInput = z.infer<typeof undoLabelBodySchema>;
 
 export type CreateCharacterInput = z.infer<typeof createCharacterSchema>;
 export type UpdateCharacterInput = z.infer<typeof updateCharacterSchema>;

@@ -49,6 +49,7 @@ export * from "./tables/state_variables.js";
 export * from "./tables/labels.js";
 export * from "./tables/label-lines.js";
 export * from "./tables/label-characters.js";
+export * from "./tables/label-dialogue-versions.js";
 
 // World building
 export * from "./tables/world-elements.js";

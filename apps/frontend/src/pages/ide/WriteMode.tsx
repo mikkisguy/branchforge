@@ -16,6 +16,7 @@ import { useLabels } from "@/hooks/useLabels";
 import { useCharacters } from "@/hooks/useCharacters";
 import { useProject } from "@/hooks/useProject";
 import type { DialogueEntry } from "@/lib/prose-types";
+import { dialogueToPayload } from "@/lib/prose-converter";
 import { Loader2, Sparkles, FileQuestion } from "lucide-react";
 
 interface WriteModeProps {
@@ -56,10 +57,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
         pendingSaveRef.current.entries
       ) {
         clearTimeout(saveTimeoutRef.current);
-        const dialogue = pendingSaveRef.current.entries.map((entry) => ({
-          speaker: entry.speaker,
-          text: entry.text,
-        }));
+        const dialogue = dialogueToPayload(pendingSaveRef.current.entries);
         updateDialogue(pendingSaveRef.current.labelId, dialogue);
       }
 
@@ -74,10 +72,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
         if (activeLabelId) {
           // Convert DialogueEntry[] to the format expected by the API
           // Empty arrays are explicitly persisted to allow clearing dialogue
-          const dialogue = entries.map((entry) => ({
-            speaker: entry.speaker,
-            text: entry.text,
-          }));
+          const dialogue = dialogueToPayload(entries);
           updateDialogue(activeLabelId, dialogue);
           pendingSaveRef.current = { labelId: null, entries: null }; // Clear after successful save
         }
@@ -96,10 +91,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
         pendingSaveRef.current.labelId
       ) {
         clearTimeout(saveTimeoutRef.current);
-        const dialogue = pendingSaveRef.current.entries.map((entry) => ({
-          speaker: entry.speaker,
-          text: entry.text,
-        }));
+        const dialogue = dialogueToPayload(pendingSaveRef.current.entries);
         updateDialogue(pendingSaveRef.current.labelId, dialogue);
       }
       pendingSaveRef.current = { labelId: null, entries: null };

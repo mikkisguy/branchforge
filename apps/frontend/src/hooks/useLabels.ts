@@ -12,6 +12,14 @@ import { labelsApi } from "@/lib/api/labels";
 import { useProject } from "@/hooks/useProject";
 import type { PublicLabel, LabelDetail } from "@branchforge/shared";
 
+function clearHistoryCursor(labelId: string): void {
+  try {
+    localStorage.removeItem(`label-history-cursor:${labelId}`);
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -34,7 +42,7 @@ export interface UseLabelsReturn {
   invalidateLabels: () => Promise<void>;
   updateDialogue: (
     labelId: string,
-    dialogue: Array<{ speaker: string | null; text: string }>
+    dialogue: Array<{ speakerId: string | null; text: string }>
   ) => void;
   isUpdatingDialogue: boolean;
 }
@@ -87,9 +95,11 @@ export function useLabels(): UseLabelsReturn {
       dialogue,
     }: {
       labelId: string;
-      dialogue: Array<{ speaker: string | null; text: string }>;
+      dialogue: Array<{ speakerId: string | null; text: string }>;
     }) => labelsApi.updateDialogue(labelId, dialogue),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      clearHistoryCursor(variables.labelId);
+
       // Invalidate labels query and writing goals query
       if (currentProject) {
         queryClient.invalidateQueries({
@@ -101,6 +111,10 @@ export function useLabels(): UseLabelsReturn {
             queryKey: labelKeys.detail(currentProject.id, localActiveLabelId),
           });
         }
+
+        queryClient.invalidateQueries({
+          queryKey: ["labels", variables.labelId, "versions"],
+        });
       }
       queryClient.invalidateQueries({ queryKey: ["writingGoals"] });
     },
@@ -139,7 +153,7 @@ export function useLabels(): UseLabelsReturn {
   const updateDialogue = useCallback(
     (
       labelId: string,
-      dialogue: Array<{ speaker: string | null; text: string }>
+      dialogue: Array<{ speakerId: string | null; text: string }>
     ) => {
       updateDialogueMutation.mutate({ labelId, dialogue });
     },

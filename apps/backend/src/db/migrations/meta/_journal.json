@@ -148,6 +148,13 @@
       "when": 1774723872435,
       "tag": "0020_great_shinko_yamashiro",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1774786376188,
+      "tag": "0021_flashy_valeria_richards",
+      "breakpoints": true
     }
   ]
 }

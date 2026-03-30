@@ -259,20 +259,20 @@ export function pruneOldEntries(entries: DailyWordCount[]): DailyWordCount[] {
  * It counts total activity (all words on every save), not net changes.
  * This rewards all writing effort including editing.
  *
- * @param dialogue - Array of dialogue entries with speaker and text
+ * @param dialogue - Array of dialogue entries with speakerId and text
  * @returns Total word count
  *
  * @example
  * ```ts
  * const dialogue = [
- *   { speaker: "Alice", text: "Hello world" },
- *   { speaker: null, text: "This is narration." },
+ *   { speakerId: "uuid-123", text: "Hello world" },
+ *   { speakerId: null, text: "This is narration." },
  * ];
  * countWordsFromDialogue(dialogue); // Returns 6
  * ```
  */
 export function countWordsFromDialogue(
-  dialogue: Array<{ speaker: string | null; text: string }>
+  dialogue: Array<{ speakerId: string | null; text: string }>
 ): number {
   return dialogue.reduce((count, entry) => {
     const trimmed = entry.text?.trim();

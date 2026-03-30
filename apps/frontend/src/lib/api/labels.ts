@@ -60,7 +60,7 @@ export const labelsApi = {
    */
   async updateDialogue(
     labelId: string,
-    dialogue: Array<{ speaker: string | null; text: string }>
+    dialogue: Array<{ speakerId: string | null; text: string }>
   ): Promise<{ success: boolean }> {
     return await request<{ success: boolean }>(`/labels/${labelId}/dialogue`, {
       method: "PUT",
