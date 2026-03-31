@@ -55,7 +55,10 @@ export const userSettings = pgTable(
   (table) => [
     unique("user_settings_user_id_unique").on(table.userId),
     index("user_settings_username_idx").on(table.username),
-    check("daily_word_reset_hour_range", sql`${table.dailyWordResetHour} >= 0 AND ${table.dailyWordResetHour} <= 23`),
+    check(
+      "daily_word_reset_hour_range",
+      sql`${table.dailyWordResetHour} >= 0 AND ${table.dailyWordResetHour} <= 23`
+    ),
   ]
 );
 

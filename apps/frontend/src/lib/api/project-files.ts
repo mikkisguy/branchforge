@@ -113,7 +113,9 @@ export const projectFilesApi = {
     }
 
     return request<ProjectFile>(
-      `/projects/${projectId}/files/file?path=${encodeURIComponent(filePath)}&source=${source}`
+      `/projects/${projectId}/files/file?path=${encodeURIComponent(
+        filePath
+      )}&source=${source}`
     );
   },
 

@@ -97,23 +97,20 @@ export function ZipImportDialog({
    * Validate a zip file
    * Returns the file if valid, or an error message string if invalid
    */
-  const validateZipFile = useCallback(
-    (file: File): File | string => {
-      // Validate file extension
-      if (!file.name.toLowerCase().endsWith(".zip")) {
-        return "Please select a .zip file";
-      }
+  const validateZipFile = useCallback((file: File): File | string => {
+    // Validate file extension
+    if (!file.name.toLowerCase().endsWith(".zip")) {
+      return "Please select a .zip file";
+    }
 
-      // Validate file size (30MB max)
-      const maxSize = 30 * 1024 * 1024;
-      if (file.size > maxSize) {
-        return "File must be smaller than 30MB";
-      }
+    // Validate file size (30MB max)
+    const maxSize = 30 * 1024 * 1024;
+    if (file.size > maxSize) {
+      return "File must be smaller than 30MB";
+    }
 
-      return file;
-    },
-    []
-  );
+    return file;
+  }, []);
 
   /**
    * Handle file selection
@@ -174,21 +171,17 @@ export function ZipImportDialog({
     });
 
     try {
-      const result = await projectFilesApi.importZip(
-        projectId,
-        selectedFile,
-        {
-          onProgress: (loaded, total) => {
-            const progress = total > 0 ? Math.round((loaded / total) * 100) : 0;
-            setImportState((prev) => ({
-              ...prev,
-              status: "uploading",
-              progress,
-              message: `Uploading... ${progress}%`,
-            }));
-          },
-        }
-      );
+      const result = await projectFilesApi.importZip(projectId, selectedFile, {
+        onProgress: (loaded, total) => {
+          const progress = total > 0 ? Math.round((loaded / total) * 100) : 0;
+          setImportState((prev) => ({
+            ...prev,
+            status: "uploading",
+            progress,
+            message: `Uploading... ${progress}%`,
+          }));
+        },
+      });
 
       if (result.success) {
         setImportState({

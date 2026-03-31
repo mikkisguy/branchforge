@@ -20,7 +20,10 @@ import type { DialogueEntry } from "./prose-types";
  */
 export function labelLinesToDialogue(lines: LabelLine[]): DialogueEntry[] {
   return lines
-    .filter((line) => line.contentType === "DIALOGUE" || line.contentType === "NARRATION")
+    .filter(
+      (line) =>
+        line.contentType === "DIALOGUE" || line.contentType === "NARRATION"
+    )
     .map((line) => ({
       id: line.id,
       speakerId: line.speakerId,

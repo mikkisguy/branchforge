@@ -220,10 +220,7 @@ async function importZipHandler(
     }
 
     // Import the zip file
-    const result: ImportZipResult = await importZipFile(
-      projectId,
-      buffer
-    );
+    const result: ImportZipResult = await importZipFile(projectId, buffer);
 
     if (!result.success) {
       reply.status(400).send({
@@ -256,9 +253,7 @@ async function importZipHandler(
 /**
  * Zip import routes (must be registered after multipart plugin)
  */
-export async function zipImportRoutes(
-  fastify: FastifyInstance
-): Promise<void> {
+export async function zipImportRoutes(fastify: FastifyInstance): Promise<void> {
   // Import zip file
   fastify.post<{ Params: ImportZipParams }>(
     "/projects/:projectId/import/zip",

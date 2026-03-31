@@ -294,7 +294,9 @@ describe("UndoRedoControls", () => {
       );
 
       expect(screen.getByTitle(/Undo \((Ctrl|Cmd)\+Z\)/)).toBeInTheDocument();
-      expect(screen.getByTitle(/Redo \((Ctrl|Cmd)\+Shift\+Z\)/)).toBeInTheDocument();
+      expect(
+        screen.getByTitle(/Redo \((Ctrl|Cmd)\+Shift\+Z\)/)
+      ).toBeInTheDocument();
     });
   });
 });

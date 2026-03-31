@@ -55,12 +55,14 @@ describe("GitLabSyncService (Integration)", () => {
 
   // Factory helper for creating project file fixtures
   let projectFileFixtureCounter = 1;
-  function createProjectFileFixture(overrides: {
-    id?: string;
-    filePath?: string;
-    content?: string;
-    contentHash?: string;
-  } = {}) {
+  function createProjectFileFixture(
+    overrides: {
+      id?: string;
+      filePath?: string;
+      content?: string;
+      contentHash?: string;
+    } = {}
+  ) {
     const id = overrides.id ?? testUuid("56000000", projectFileFixtureCounter);
     // Only increment counter for auto-generated IDs
     if (!overrides.id) {
@@ -70,7 +72,8 @@ describe("GitLabSyncService (Integration)", () => {
       id,
       projectId: testProjectId,
       source: "GITLAB" as const,
-      filePath: overrides.filePath ?? `game/script${projectFileFixtureCounter}.rpy`,
+      filePath:
+        overrides.filePath ?? `game/script${projectFileFixtureCounter}.rpy`,
       fileType: "STORY" as const,
       content: overrides.content ?? 'label start:\n    "Content"\n    return',
       contentHash: overrides.contentHash ?? `hash${projectFileFixtureCounter}`,
@@ -264,7 +267,9 @@ describe("GitLabSyncService (Integration)", () => {
 
     it("should detect new remote labels", async () => {
       // First, clean up the default gitlab file to avoid extra conflicts
-      await db.delete(projectFiles).where(eq(projectFiles.id, testGitlabFileId));
+      await db
+        .delete(projectFiles)
+        .where(eq(projectFiles.id, testGitlabFileId));
 
       // Create a gitlab file with a new label that doesn't exist locally
       const newGitlabFile = createProjectFileFixture({
@@ -302,7 +307,9 @@ describe("GitLabSyncService (Integration)", () => {
       });
 
       // Cleanup
-      await db.delete(projectFiles).where(eq(projectFiles.id, newGitlabFile.id));
+      await db
+        .delete(projectFiles)
+        .where(eq(projectFiles.id, newGitlabFile.id));
       // Restore the default gitlab file
       await db.insert(projectFiles).values(testGitlabFile);
     });
@@ -505,7 +512,9 @@ describe("GitLabSyncService (Integration)", () => {
                 {
                   label: "chapter2",
                   lineNumber: 1,
-                  dialogue: [{ speaker: null, text: "New remote", lineNumber: 2 }],
+                  dialogue: [
+                    { speaker: null, text: "New remote", lineNumber: 2 },
+                  ],
                   choices: [],
                   jumps: [],
                 },
@@ -532,7 +541,9 @@ describe("GitLabSyncService (Integration)", () => {
       expect(conflictTypes).toContain("new_remote_label");
 
       // Cleanup
-      await db.delete(projectFiles).where(eq(projectFiles.id, newGitlabFile.id));
+      await db
+        .delete(projectFiles)
+        .where(eq(projectFiles.id, newGitlabFile.id));
     });
 
     it("should handle API errors gracefully", async () => {
@@ -709,7 +720,9 @@ describe("GitLabSyncService (Integration)", () => {
 
     it("should handle export when no files exist", async () => {
       // Delete the gitlab file first
-      await db.delete(projectFiles).where(eq(projectFiles.id, testGitlabFileId));
+      await db
+        .delete(projectFiles)
+        .where(eq(projectFiles.id, testGitlabFileId));
 
       // Mock the GitLab service (should not be called)
       const createOrUpdateFileSpy = vi

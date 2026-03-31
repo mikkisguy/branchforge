@@ -148,7 +148,12 @@ export function DialogueLine({
       setFocusedOptionIndex(initialIndex);
       return true;
     });
-  }, [estimateDropdownHeight, getShouldOpenUpward, entry.speakerId, characters]);
+  }, [
+    estimateDropdownHeight,
+    getShouldOpenUpward,
+    entry.speakerId,
+    characters,
+  ]);
 
   useEffect(() => {
     if (!isDropdownOpen) return;
@@ -336,7 +341,9 @@ export function DialogueLine({
           aria-haspopup="listbox"
           aria-expanded={isDropdownOpen}
           aria-controls={dropdownId}
-          aria-label={`Change speaker: ${character?.displayName || "Narration"}`}
+          aria-label={`Change speaker: ${
+            character?.displayName || "Narration"
+          }`}
           className={`flex items-center gap-1.5 rounded-md transition-all border tracking-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
             isStacked
               ? "inline-flex h-8 py-1.5 px-2.5 -ml-2.5"
@@ -354,9 +361,10 @@ export function DialogueLine({
                 ? withAlpha(speakerColor, 25)
                 : "hsl(var(--border))"
               : "transparent",
-            color: hasSpeaker && speakerColor
-              ? speakerColor
-              : "hsl(var(--muted-foreground))",
+            color:
+              hasSpeaker && speakerColor
+                ? speakerColor
+                : "hsl(var(--muted-foreground))",
             fontStyle: hasSpeaker ? "normal" : "italic",
           }}
           title={
@@ -365,7 +373,9 @@ export function DialogueLine({
               : "Narration"
           }
         >
-          <span className="truncate">{character?.displayName || "Narration"}</span>
+          <span className="truncate">
+            {character?.displayName || "Narration"}
+          </span>
           <ChevronDown
             className={`w-3 h-3 transition-transform duration-200 flex-shrink-0 ${
               isDropdownOpen ? "rotate-180" : ""
@@ -427,8 +437,7 @@ export function DialogueLine({
                 }`}
                 style={{
                   color: entry.speakerId === char.id ? char.color : undefined,
-                  fontWeight:
-                    entry.speakerId === char.id ? "600" : "normal",
+                  fontWeight: entry.speakerId === char.id ? "600" : "normal",
                 }}
               >
                 <span

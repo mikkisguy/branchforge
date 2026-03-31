@@ -2,24 +2,24 @@
 
 ### Enums
 
-| Enum                        | Values                                                             | Notes                                             |
-| --------------------------- | ------------------------------------------------------------------ | ------------------------------------------------- |
-| `user_role`                 | `OWNER`, `READER`, `TESTER`                                        | Beta reader support                               |
-| `scene_status`              | `DRAFT`, `REVIEW`, `FINAL`                                         | Scene workflow status                             |
-| `content_type`              | `NARRATION`, `DIALOGUE`, `CHOICE`, `MENU`, `JUMP`                  | For line-level export logic                       |
-| `visual_type`               | `GENERATED`, `BLACK`, `CUSTOM`                                     | Image handling per line                           |
-| `element_type`              | `LOCATION`, `ITEM`, `CONCEPT`, `EVENT`                             | World bible                                       |
-| `suggestion_type`           | `CONSISTENCY`, `FLAG_SUGGEST`, `METER_SUGGEST`, `DIALOGUE_VARIANT` | AI suggestion types                               |
-| `suggestion_status`         | `PENDING`, `ACCEPTED`, `REJECTED`                                  | AI suggestion workflow status                     |
-| `character_role`            | `PRIMARY`, `SECONDARY`, `BACKGROUND`, `MENTIONED`                  | Character role in scene                           |
-| `renpy_definition_category` | `CHARACTER`, `TRANSFORM`, `IMAGE`, `INIT`                          | Ren'Py definition types                           |
-| `scene_visibility`          | `EXCLUSIVE`, `SHARED`, `DUO_PAIR`                                  | Scene visibility across routes                    |
-| `sync_operation`            | `export`, `import`                                                 | GitLab sync operation type                        |
+| Enum                        | Values                                                             | Notes                                                       |
+| --------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------- |
+| `user_role`                 | `OWNER`, `READER`, `TESTER`                                        | Beta reader support                                         |
+| `scene_status`              | `DRAFT`, `REVIEW`, `FINAL`                                         | Scene workflow status                                       |
+| `content_type`              | `NARRATION`, `DIALOGUE`, `CHOICE`, `MENU`, `JUMP`                  | For line-level export logic                                 |
+| `visual_type`               | `GENERATED`, `BLACK`, `CUSTOM`                                     | Image handling per line                                     |
+| `element_type`              | `LOCATION`, `ITEM`, `CONCEPT`, `EVENT`                             | World bible                                                 |
+| `suggestion_type`           | `CONSISTENCY`, `FLAG_SUGGEST`, `METER_SUGGEST`, `DIALOGUE_VARIANT` | AI suggestion types                                         |
+| `suggestion_status`         | `PENDING`, `ACCEPTED`, `REJECTED`                                  | AI suggestion workflow status                               |
+| `character_role`            | `PRIMARY`, `SECONDARY`, `BACKGROUND`, `MENTIONED`                  | Character role in scene                                     |
+| `renpy_definition_category` | `CHARACTER`, `TRANSFORM`, `IMAGE`, `INIT`                          | Ren'Py definition types                                     |
+| `scene_visibility`          | `EXCLUSIVE`, `SHARED`, `DUO_PAIR`                                  | Scene visibility across routes                              |
+| `sync_operation`            | `export`, `import`                                                 | GitLab sync operation type                                  |
 | `sync_state`                | `pending`, `in_progress`, `completed`, `failed`                    | GitLab sync operation status (for sync operations tracking) |
-| `sync_status`               | `SYNCED`, `MODIFIED_LOCAL`, `CONFLICT`                             | File sync state (for labels and file sync state)  |
-| `gitlab_file_type`          | `STORY`, `SETTINGS`                                                | GitLab file type (story labels or settings files) |
-| `project_file_type`         | `STORY`, `SETTINGS`                                                | Project file type (unified for all sources)       |
-| `file_source`               | `GITLAB`, `ZIP`                                                    | File source type (where files come from)          |
+| `sync_status`               | `SYNCED`, `MODIFIED_LOCAL`, `CONFLICT`                             | File sync state (for labels and file sync state)            |
+| `gitlab_file_type`          | `STORY`, `SETTINGS`                                                | GitLab file type (story labels or settings files)           |
+| `project_file_type`         | `STORY`, `SETTINGS`                                                | Project file type (unified for all sources)                 |
+| `file_source`               | `GITLAB`, `ZIP`                                                    | File source type (where files come from)                    |
 
 ---
 
@@ -433,19 +433,19 @@ User-level GitLab integration storing encrypted PAT.
 
 Unified file storage for all project sources (GitLab, zip, etc.). Replaces the old `gitlab_files` table with a source-agnostic approach. Stores full RPY file content for Script Mode editing and links to labels.
 
-| Column            | Type                            | Notes                                                           |
-| ----------------- | ------------------------------- | --------------------------------------------------------------- |
-| `id`              | uuid PK                         |                                                                 |
-| `project_id`      | uuid FK → projects              |                                                                 |
-| `source`          | `file_source`, not null         | `GITLAB` or `ZIP` (where the file came from)                    |
-| `file_path`       | text, not null                  | e.g., `"labels/act_i.rpy"` or `"gui/screens.rpy"`               |
-| `file_type`       | `project_file_type`, not null   | `STORY` (story labels) or `SETTINGS` (gui, etc.)                |
-| `content`         | text, not null                  | Full RPY file content for Script Mode                           |
-| `content_hash`    | text, not null                  | SHA-256 hash for idempotency                                    |
-| `last_synced_at`  | timestamp, nullable             | Last sync timestamp (GitLab-specific, null for non-GitLab)       |
-| `last_commit_sha` | text, nullable                  | Last commit SHA (GitLab-specific, null for non-GitLab)           |
-| `created_at`      | timestamp                       |                                                                 |
-| `updated_at`      | timestamp                       |                                                                 |
+| Column            | Type                          | Notes                                                      |
+| ----------------- | ----------------------------- | ---------------------------------------------------------- |
+| `id`              | uuid PK                       |                                                            |
+| `project_id`      | uuid FK → projects            |                                                            |
+| `source`          | `file_source`, not null       | `GITLAB` or `ZIP` (where the file came from)               |
+| `file_path`       | text, not null                | e.g., `"labels/act_i.rpy"` or `"gui/screens.rpy"`          |
+| `file_type`       | `project_file_type`, not null | `STORY` (story labels) or `SETTINGS` (gui, etc.)           |
+| `content`         | text, not null                | Full RPY file content for Script Mode                      |
+| `content_hash`    | text, not null                | SHA-256 hash for idempotency                               |
+| `last_synced_at`  | timestamp, nullable           | Last sync timestamp (GitLab-specific, null for non-GitLab) |
+| `last_commit_sha` | text, nullable                | Last commit SHA (GitLab-specific, null for non-GitLab)     |
+| `created_at`      | timestamp                     |                                                            |
+| `updated_at`      | timestamp                     |                                                            |
 
 Unique constraint: `(project_id, source, file_path)`
 
@@ -455,17 +455,17 @@ Unique constraint: `(project_id, source, file_path)`
 
 Track sync operations for individual files (supports all file sources: GitLab, zip, etc.).
 
-| Column            | Type                    | Notes                                           |
-| ----------------- | ----------------------- | ----------------------------------------------- |
-| `id`              | uuid PK                 |                                                 |
-| `project_file_id` | uuid FK → project_files |                                                 |
-| `content_hash`    | text, not null          | SHA-256 for idempotency                         |
-| `status`          | `sync_status`, not null | `synced`, `modified_local`, `conflict`          |
-| `started_at`      | timestamp               |                                                 |
-| `completed_at`    | timestamp, nullable     |                                                 |
-| `error_message`   | text, nullable          |                                                 |
-| `rpy_label_count` | integer, nullable       | Number of labels parsed                         |
-| `db_label_count`  | integer, nullable       | Number of labels created/updated                |
+| Column            | Type                    | Notes                                  |
+| ----------------- | ----------------------- | -------------------------------------- |
+| `id`              | uuid PK                 |                                        |
+| `project_file_id` | uuid FK → project_files |                                        |
+| `content_hash`    | text, not null          | SHA-256 for idempotency                |
+| `status`          | `sync_status`, not null | `synced`, `modified_local`, `conflict` |
+| `started_at`      | timestamp               |                                        |
+| `completed_at`    | timestamp, nullable     |                                        |
+| `error_message`   | text, nullable          |                                        |
+| `rpy_label_count` | integer, nullable       | Number of labels parsed                |
+| `db_label_count`  | integer, nullable       | Number of labels created/updated       |
 
 ---
 

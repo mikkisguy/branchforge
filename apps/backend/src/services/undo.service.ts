@@ -50,7 +50,9 @@ export async function createDialogueSnapshot(
     // Get max version number
     const [maxVersionResult] = await tx
       .select({
-        maxVersionNumber: sql<number | null>`MAX(${labelDialogueVersions.versionNumber})`,
+        maxVersionNumber: sql<
+          number | null
+        >`MAX(${labelDialogueVersions.versionNumber})`,
       })
       .from(labelDialogueVersions)
       .where(eq(labelDialogueVersions.labelId, labelId));

@@ -23,10 +23,10 @@ export function SaveIndicator({
   const status: SaveStatus = error
     ? "error"
     : isSaving
-      ? "saving"
-      : lastSaved
-        ? "saved"
-        : "idle";
+    ? "saving"
+    : lastSaved
+    ? "saved"
+    : "idle";
 
   const getStatusText = () => {
     switch (status) {
@@ -92,8 +92,8 @@ export function SaveIndicator({
           status === "error"
             ? "text-destructive"
             : status === "saving" || status === "saved"
-              ? "text-[var(--theme-color)]"
-              : "text-muted-foreground"
+            ? "text-[var(--theme-color)]"
+            : "text-muted-foreground"
         }`}
       >
         {text}

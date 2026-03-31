@@ -136,9 +136,7 @@ export function generateRpyPlainText(label: LabelDetail): string {
   // Label lines with proper indentation
   for (const line of label.lines) {
     if (line.contentType === "DIALOGUE" && line.speakerTag) {
-      lines.push(
-        `    ${line.speakerTag} "${escapeRenpyString(line.content)}"`
-      );
+      lines.push(`    ${line.speakerTag} "${escapeRenpyString(line.content)}"`);
     } else if (line.contentType === "NARRATION") {
       lines.push(`    "${escapeRenpyString(line.content)}"`);
     } else if (line.contentType === "JUMP") {

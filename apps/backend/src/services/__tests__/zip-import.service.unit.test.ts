@@ -347,7 +347,9 @@ describe("ZipImportService", () => {
       };
 
       vi.mocked(JSZip.loadAsync).mockResolvedValue(mockZip as any);
-      mockTx.limit.mockResolvedValueOnce([{ contentHash: existingHash, id: "file-id", content: mockContent }]);
+      mockTx.limit.mockResolvedValueOnce([
+        { contentHash: existingHash, id: "file-id", content: mockContent },
+      ]);
 
       const result = await importZipFile(mockProjectId, mockBuffer);
 
@@ -371,7 +373,12 @@ describe("ZipImportService", () => {
       vi.mocked(JSZip.loadAsync).mockResolvedValue(mockZip as any);
       // Return existing file for the select query
       mockTx.limit.mockResolvedValueOnce([
-        { id: "file-id", contentHash: existingHash, content: "old content", filePath: "game/script.rpy" },
+        {
+          id: "file-id",
+          contentHash: existingHash,
+          content: "old content",
+          filePath: "game/script.rpy",
+        },
       ]);
 
       const result = await importZipFile(mockProjectId, mockBuffer);
