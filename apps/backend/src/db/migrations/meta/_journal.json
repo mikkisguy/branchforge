@@ -162,6 +162,13 @@
       "when": 1774971152575,
       "tag": "0022_majestic_big_bertha",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1775056000000,
+      "tag": "0023_rename_gitlab_file_sync_state",
+      "breakpoints": true
     }
   ]
 }
