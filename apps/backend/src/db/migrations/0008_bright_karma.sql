@@ -26,7 +26,7 @@
 --    - Application must implement ownership transfer before hard deletion
 --
 -- Creating new enum for project visibility
-CREATE TYPE "public"."project_visibility" AS ENUM( 'PRIVATE', 'TEAM');--> statement-breakpoint
+CREATE TYPE "public"."project_visibility" AS ENUM('PUBLIC', 'PRIVATE', 'TEAM');--> statement-breakpoint
 -- First, convert existing visibility values to new enum values
 -- OWNER -> PRIVATE (only owner can view)
 -- READER -> TEAM (team members can view)
