@@ -26,7 +26,7 @@ export function hashDialogueEntry(entry: DialogueEntry): string {
  * Note: hashing and comparison are both O(n) in total string length
  */
 export function hashDialogueEntries(entries: DialogueEntry[]): string {
-  return entries.map(hashDialogueEntry).join('|');
+  return entries.map(hashDialogueEntry).join("|");
 }
 
 /**

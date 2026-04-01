@@ -16,10 +16,7 @@ import { useLabels } from "@/hooks/useLabels";
 import { useCharacters } from "@/hooks/useCharacters";
 import { useProject } from "@/hooks/useProject";
 import type { DialogueEntry } from "@/lib/prose-types";
-import {
-  dialogueToPayload,
-  hashDialogueEntries,
-} from "@/lib/prose-converter";
+import { dialogueToPayload, hashDialogueEntries } from "@/lib/prose-converter";
 import { Loader2, Sparkles, FileQuestion } from "lucide-react";
 import type { LabelDetail } from "@branchforge/shared";
 
@@ -77,7 +74,12 @@ export function WriteMode({ projectName }: WriteModeProps) {
     entries: DialogueEntry[] | null;
     cachedPayload: DialoguePayloadEntry[] | null;
     shouldPersist: boolean;
-  }>({ labelId: null, entries: null, cachedPayload: null, shouldPersist: false });
+  }>({
+    labelId: null,
+    entries: null,
+    cachedPayload: null,
+    shouldPersist: false,
+  });
 
   const handleFocusModeToggle = useCallback(() => {
     setIsFocusMode((prev) => !prev);

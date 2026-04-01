@@ -5,14 +5,7 @@
  * Matches app design system with theme colors and simple styling.
  */
 
-import {
-  memo,
-  useState,
-  useCallback,
-  useRef,
-  useEffect,
-  useId,
-} from "react";
+import { memo, useState, useCallback, useRef, useEffect, useId } from "react";
 import { X, ChevronDown } from "lucide-react";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { Character } from "@branchforge/shared";
@@ -564,4 +557,5 @@ export const DialogueLine = memo(function DialogueLine({
       )}
     </div>
   );
-}, areDialogueLinePropsEqual);
+},
+areDialogueLinePropsEqual);
