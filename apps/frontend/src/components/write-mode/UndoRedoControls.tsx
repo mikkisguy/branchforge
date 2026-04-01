@@ -67,6 +67,7 @@ export function UndoRedoControls({
       <button
         onClick={onUndo}
         disabled={!canUndo}
+        aria-disabled={!canUndo}
         className={`p-1.5 rounded-md transition-all ${
           canUndo
             ? "hover:bg-muted text-foreground hover:text-[var(--theme-color)]"
@@ -80,6 +81,7 @@ export function UndoRedoControls({
       <button
         onClick={onRedo}
         disabled={!canRedo}
+        aria-disabled={!canRedo}
         className={`p-1.5 rounded-md transition-all ${
           canRedo
             ? "hover:bg-muted text-foreground hover:text-[var(--theme-color)]"

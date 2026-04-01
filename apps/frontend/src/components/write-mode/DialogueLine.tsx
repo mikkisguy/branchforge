@@ -5,7 +5,13 @@
  * Matches app design system with theme colors and simple styling.
  */
 
-import { useState, useCallback, useRef, useEffect, useId, useMemo } from "react";
+import {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  useId,
+} from "react";
 import { X, ChevronDown } from "lucide-react";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { Character } from "@branchforge/shared";
@@ -50,7 +56,6 @@ export function DialogueLine({
   const dropdownId = useId();
   const textOnChangeRef = useRef(onChange);
   const previousTextRef = useRef(entry.text);
-  const isLocalChangeRef = useRef(false);
 
   const resizeTextarea = useCallback(() => {
     const textarea = internalTextareaRef.current;
@@ -83,7 +88,11 @@ export function DialogueLine({
     const isFocused = document.activeElement === textarea;
 
     // Only sync if this is an external change and textarea is not focused
-    if (!isFocused && entry.text !== previousTextRef.current && entry.text !== textarea.value) {
+    if (
+      !isFocused &&
+      entry.text !== previousTextRef.current &&
+      entry.text !== textarea.value
+    ) {
       textarea.value = entry.text;
       previousTextRef.current = entry.text;
       resizeTextarea();
@@ -248,7 +257,11 @@ export function DialogueLine({
       // Update the ref so we know this change came from user input
       previousTextRef.current = e.target.value;
       // Call onChange with updated entry (using ref to avoid stale closure)
-      textOnChangeRef.current({ id: entry.id, speakerId: entry.speakerId, text: e.target.value });
+      textOnChangeRef.current({
+        id: entry.id,
+        speakerId: entry.speakerId,
+        text: e.target.value,
+      });
       // Resize immediately for smooth typing experience
       resizeTextarea();
     },
@@ -263,7 +276,11 @@ export function DialogueLine({
       }
 
       // Check if textarea is empty using the ref instead of entry.text
-      if (e.key === "Backspace" && internalTextareaRef.current?.value === "" && totalEntries > 1) {
+      if (
+        e.key === "Backspace" &&
+        internalTextareaRef.current?.value === "" &&
+        totalEntries > 1
+      ) {
         e.preventDefault();
         onDelete();
       }

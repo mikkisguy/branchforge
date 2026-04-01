@@ -41,10 +41,10 @@ export const SaveIndicator = memo(function SaveIndicator({
   const status: SaveStatus = error
     ? "error"
     : isSaving
-      ? "saving"
-      : lastSaved
-        ? "saved"
-        : "idle";
+    ? "saving"
+    : lastSaved
+    ? "saved"
+    : "idle";
 
   const text = STATUS_TEXT[status];
   if (!text) return null;
@@ -72,9 +72,7 @@ export const SaveIndicator = memo(function SaveIndicator({
       {/* Status icon */}
       {status === "error" && (
         <span
-          className={`flex items-center justify-center w-3 h-3 rounded-full text-white ${
-            ERROR_DOT_COLOR
-          }`}
+          className={`flex items-center justify-center w-3 h-3 rounded-full text-white ${ERROR_DOT_COLOR}`}
         >
           {icon}
         </span>

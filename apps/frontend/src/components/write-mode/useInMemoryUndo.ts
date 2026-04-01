@@ -13,10 +13,7 @@ import type { DialogueEntry } from "@/lib/prose-types";
 function areEntriesEqual(a: DialogueEntry[], b: DialogueEntry[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
-    if (
-      a[i].speakerId !== b[i].speakerId ||
-      a[i].text !== b[i].text
-    ) {
+    if (a[i].speakerId !== b[i].speakerId || a[i].text !== b[i].text) {
       return false;
     }
   }

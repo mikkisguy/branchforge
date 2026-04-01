@@ -362,7 +362,9 @@ async function updateLabelDialogueHandler(
 
       if (invalidSpeakerIds.length > 0) {
         reply.status(400).send({
-          error: `Invalid speakerId(s): ${invalidSpeakerIds.join(", ")}. Character(s) not found in this project.`,
+          error: `Invalid speakerId(s): ${invalidSpeakerIds.join(
+            ", "
+          )}. Character(s) not found in this project.`,
         } as ErrorResponse);
         return;
       }

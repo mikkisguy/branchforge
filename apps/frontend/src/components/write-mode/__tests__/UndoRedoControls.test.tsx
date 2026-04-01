@@ -15,11 +15,7 @@ describe("UndoRedoControls", () => {
   describe("button states", () => {
     it("should enable undo button when undo is available", () => {
       render(
-        <UndoRedoControls
-          canUndo={true}
-          canRedo={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
       );
 
       const undoButton = screen.getByLabelText("Undo");
@@ -28,11 +24,7 @@ describe("UndoRedoControls", () => {
 
     it("should disable undo button when undo is not available", () => {
       render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
       );
 
       const undoButton = screen.getByLabelText("Undo");
@@ -41,11 +33,7 @@ describe("UndoRedoControls", () => {
 
     it("should enable redo button when redo is available", () => {
       render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={true}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={false} canRedo={true} {...mockHandlers} />
       );
 
       const redoButton = screen.getByLabelText("Redo");
@@ -54,11 +42,7 @@ describe("UndoRedoControls", () => {
 
     it("should disable redo button when redo is not available", () => {
       render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
       );
 
       const redoButton = screen.getByLabelText("Redo");
@@ -69,11 +53,7 @@ describe("UndoRedoControls", () => {
   describe("click handlers", () => {
     it("should call onUndo when undo button is clicked", () => {
       render(
-        <UndoRedoControls
-          canUndo={true}
-          canRedo={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
       );
 
       const undoButton = screen.getByLabelText("Undo");
@@ -84,11 +64,7 @@ describe("UndoRedoControls", () => {
 
     it("should call onRedo when redo button is clicked", () => {
       render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={true}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={false} canRedo={true} {...mockHandlers} />
       );
 
       const redoButton = screen.getByLabelText("Redo");
@@ -99,11 +75,7 @@ describe("UndoRedoControls", () => {
 
     it("should not call onUndo when undo button is clicked but disabled", () => {
       render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
       );
 
       const undoButton = screen.getByLabelText("Undo");
@@ -114,11 +86,7 @@ describe("UndoRedoControls", () => {
 
     it("should not call onRedo when redo button is clicked but disabled", () => {
       render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
       );
 
       const redoButton = screen.getByLabelText("Redo");
@@ -131,11 +99,7 @@ describe("UndoRedoControls", () => {
   describe("keyboard shortcuts", () => {
     it("should call onUndo when Ctrl+Z is pressed", () => {
       render(
-        <UndoRedoControls
-          canUndo={true}
-          canRedo={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
       );
 
       fireEvent.keyDown(document, { key: "z", ctrlKey: true });
@@ -145,11 +109,7 @@ describe("UndoRedoControls", () => {
 
     it("should call onUndo when Cmd+Z is pressed (Mac)", () => {
       render(
-        <UndoRedoControls
-          canUndo={true}
-          canRedo={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
       );
 
       fireEvent.keyDown(document, { key: "z", metaKey: true });
@@ -159,11 +119,7 @@ describe("UndoRedoControls", () => {
 
     it("should not call onUndo when Ctrl+Z is pressed but disabled", () => {
       render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
       );
 
       fireEvent.keyDown(document, { key: "z", ctrlKey: true });
@@ -173,11 +129,7 @@ describe("UndoRedoControls", () => {
 
     it("should call onRedo when Ctrl+Shift+Z is pressed", () => {
       render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={true}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={false} canRedo={true} {...mockHandlers} />
       );
 
       fireEvent.keyDown(document, { key: "z", ctrlKey: true, shiftKey: true });
@@ -187,11 +139,7 @@ describe("UndoRedoControls", () => {
 
     it("should call onRedo when Ctrl+Y is pressed", () => {
       render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={true}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={false} canRedo={true} {...mockHandlers} />
       );
 
       fireEvent.keyDown(document, { key: "y", ctrlKey: true });
@@ -201,11 +149,7 @@ describe("UndoRedoControls", () => {
 
     it("should not call onRedo when Ctrl+Shift+Z is pressed but disabled", () => {
       render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
       );
 
       fireEvent.keyDown(document, { key: "z", ctrlKey: true, shiftKey: true });
@@ -215,11 +159,7 @@ describe("UndoRedoControls", () => {
 
     it("should not trigger undo when typing in an input element", () => {
       render(
-        <UndoRedoControls
-          canUndo={true}
-          canRedo={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
       );
 
       const input = document.createElement("input");
@@ -234,11 +174,7 @@ describe("UndoRedoControls", () => {
 
     it("should not trigger undo when typing in a textarea", () => {
       render(
-        <UndoRedoControls
-          canUndo={true}
-          canRedo={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
       );
 
       const textarea = document.createElement("textarea");
@@ -253,11 +189,7 @@ describe("UndoRedoControls", () => {
 
     it("should not trigger undo when typing in a contenteditable element", () => {
       render(
-        <UndoRedoControls
-          canUndo={true}
-          canRedo={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
       );
 
       const div = document.createElement("div");
@@ -278,11 +210,7 @@ describe("UndoRedoControls", () => {
   describe("accessibility", () => {
     it("should have proper ARIA labels", () => {
       render(
-        <UndoRedoControls
-          canUndo={true}
-          canRedo={true}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={true} canRedo={true} {...mockHandlers} />
       );
 
       expect(screen.getByLabelText("Undo")).toBeInTheDocument();
@@ -291,11 +219,7 @@ describe("UndoRedoControls", () => {
 
     it("should have aria-disabled attribute when button is disabled", () => {
       render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
       );
 
       const undoButton = screen.getByLabelText("Undo");
@@ -307,11 +231,7 @@ describe("UndoRedoControls", () => {
 
     it("should have proper title attributes for tooltips", () => {
       render(
-        <UndoRedoControls
-          canUndo={true}
-          canRedo={true}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={true} canRedo={true} {...mockHandlers} />
       );
 
       expect(screen.getByTitle(/Undo \((Ctrl|Cmd)\+Z\)/)).toBeInTheDocument();
