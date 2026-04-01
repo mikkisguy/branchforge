@@ -7,18 +7,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { DialogueEntry } from "@/lib/prose-types";
-
-// Simple deep comparison for DialogueEntry arrays (more efficient than JSON.stringify)
-// Note: We DON'T compare 'id' because the id is stable - we only care about content changes
-function areEntriesEqual(a: DialogueEntry[], b: DialogueEntry[]): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i].speakerId !== b[i].speakerId || a[i].text !== b[i].text) {
-      return false;
-    }
-  }
-  return true;
-}
+import { areDialogueEntriesEqual } from "@/lib/prose-converter";
 
 interface UndoState {
   past: DialogueEntry[][];
@@ -119,7 +108,7 @@ export function useInMemoryUndo(
       // Check if content actually changed compared to last synced state
       // We compare with lastSyncedEntriesRef instead of present because the effect
       // may have already updated present to match newEntries
-      if (areEntriesEqual(lastSyncedEntriesRef.current, newEntries)) {
+      if (areDialogueEntriesEqual(lastSyncedEntriesRef.current, newEntries)) {
         return; // No change, don't record
       }
 
@@ -163,7 +152,7 @@ export function useInMemoryUndo(
   // We detect external changes by comparing with lastSyncedEntriesRef
   useEffect(() => {
     // Check if this is an external change (entries prop changed but we didn't record it)
-    if (!areEntriesEqual(entries, lastSyncedEntriesRef.current)) {
+    if (!areDialogueEntriesEqual(entries, lastSyncedEntriesRef.current)) {
       // External change detected - update present and clear future
       // NOTE: Don't update lastSyncedEntriesRef here - let recordChange do that
       // so that debounced changes are still recorded properly

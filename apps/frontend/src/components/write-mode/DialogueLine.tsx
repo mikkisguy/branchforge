@@ -6,6 +6,7 @@
  */
 
 import {
+  memo,
   useState,
   useCallback,
   useRef,
@@ -31,7 +32,28 @@ interface DialogueLineProps {
   textareaRef?: (el: HTMLTextAreaElement | null) => void;
 }
 
-export function DialogueLine({
+function areDialogueLinePropsEqual(
+  prev: DialogueLineProps,
+  next: DialogueLineProps
+): boolean {
+  return (
+    prev.entry.id === next.entry.id &&
+    prev.entry.speakerId === next.entry.speakerId &&
+    prev.entry.text === next.entry.text &&
+    prev.index === next.index &&
+    prev.totalEntries === next.totalEntries &&
+    prev.layoutMode === next.layoutMode &&
+    prev.characters === next.characters &&
+    prev.onChange === next.onChange &&
+    prev.onDelete === next.onDelete &&
+    prev.onMoveUp === next.onMoveUp &&
+    prev.onMoveDown === next.onMoveDown &&
+    prev.onAddLine === next.onAddLine &&
+    prev.textareaRef === next.textareaRef
+  );
+}
+
+export const DialogueLine = memo(function DialogueLine({
   entry,
   characters,
   layoutMode,
@@ -542,4 +564,4 @@ export function DialogueLine({
       )}
     </div>
   );
-}
+}, areDialogueLinePropsEqual);

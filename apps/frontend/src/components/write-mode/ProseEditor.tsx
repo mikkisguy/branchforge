@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { DialogueLine } from "./DialogueLine";
+import { areDialogueEntriesEqual } from "@/lib/prose-converter";
 import { WritingGoalPill } from "./WritingGoalPill";
 import { WritingStatsDialog } from "./WritingStatsDialog";
 import { SaveIndicator } from "./SaveIndicator";
@@ -53,26 +54,6 @@ function convertLabelLinesToEntries(
 
 function cloneEntries(entries: DialogueEntry[]): DialogueEntry[] {
   return entries.map((entry) => ({ ...entry }));
-}
-
-function areEntriesEquivalent(
-  left: DialogueEntry[],
-  right: DialogueEntry[]
-): boolean {
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  for (let i = 0; i < left.length; i += 1) {
-    if (
-      left[i].speakerId !== right[i].speakerId ||
-      left[i].text !== right[i].text
-    ) {
-      return false;
-    }
-  }
-
-  return true;
 }
 
 export function ProseEditor({
@@ -278,7 +259,7 @@ export function ProseEditor({
       inMemoryUndo.clear(cloneEntries(newEntries));
     } else {
       // Only update state if content actually changed (handles external updates)
-      if (areEntriesEquivalent(entriesRef.current, newEntries)) {
+      if (areDialogueEntriesEqual(entriesRef.current, newEntries)) {
         return;
       }
 
@@ -325,7 +306,7 @@ export function ProseEditor({
     }
 
     // Notify if entries actually changed
-    if (!areEntriesEquivalent(prevEntriesRef.current, entries)) {
+    if (!areDialogueEntriesEqual(prevEntriesRef.current, entries)) {
       scheduleTextHistorySnapshot(entries);
       onChange(entries);
     }

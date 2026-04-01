@@ -65,9 +65,10 @@ export const SaveIndicator = memo(function SaveIndicator({
 
   return (
     <div
-      className="flex items-center gap-1.5 text-xs transition-colors duration-300"
+      className="flex items-center justify-center text-xs transition-colors duration-300"
       role="status"
       aria-live="polite"
+      title={text}
     >
       {/* Status icon */}
       {status === "error" && (
@@ -85,13 +86,6 @@ export const SaveIndicator = memo(function SaveIndicator({
       {status === "saved" && (
         <span className={STATUS_TEXT_COLORS.saved}>{icon}</span>
       )}
-
-      {/* Status text */}
-      <span
-        className={`transition-colors duration-300 ${STATUS_TEXT_COLORS[status]}`}
-      >
-        {text}
-      </span>
     </div>
   );
 });

@@ -16,7 +16,10 @@ import { useLabels } from "@/hooks/useLabels";
 import { useCharacters } from "@/hooks/useCharacters";
 import { useProject } from "@/hooks/useProject";
 import type { DialogueEntry } from "@/lib/prose-types";
-import { dialogueToPayload } from "@/lib/prose-converter";
+import {
+  dialogueToPayload,
+  hashDialogueEntries,
+} from "@/lib/prose-converter";
 import { Loader2, Sparkles, FileQuestion } from "lucide-react";
 import type { LabelDetail } from "@branchforge/shared";
 
@@ -48,26 +51,6 @@ function getPersistedDialogueFromLabel(
     }));
 }
 
-function areDialoguePayloadsEqual(
-  left: DialoguePayloadEntry[],
-  right: DialoguePayloadEntry[]
-): boolean {
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  for (let i = 0; i < left.length; i += 1) {
-    if (
-      left[i].speakerId !== right[i].speakerId ||
-      left[i].text !== right[i].text
-    ) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 export function WriteMode({ projectName }: WriteModeProps) {
   const { currentProject } = useProject();
   const {
@@ -87,15 +70,14 @@ export function WriteMode({ projectName }: WriteModeProps) {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wasUpdatingDialogueRef = useRef(false);
-  // Track the actual state that was last saved to the backend (per label)
-  const persistedStateRef = useRef<Map<string, DialoguePayloadEntry[]>>(
-    new Map()
-  );
+  // Track hash of last saved content per label (O(1) comparison)
+  const persistedStateRef = useRef<Map<string, string>>(new Map());
   const pendingSaveRef = useRef<{
     labelId: string | null;
     entries: DialogueEntry[] | null;
+    cachedPayload: DialoguePayloadEntry[] | null;
     shouldPersist: boolean;
-  }>({ labelId: null, entries: null, shouldPersist: false });
+  }>({ labelId: null, entries: null, cachedPayload: null, shouldPersist: false });
 
   const handleFocusModeToggle = useCallback(() => {
     setIsFocusMode((prev) => !prev);
@@ -115,23 +97,31 @@ export function WriteMode({ projectName }: WriteModeProps) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
         setIsSaveQueued(false);
-        const dialogue = dialogueToPayload(pendingSaveRef.current.entries);
-        updateDialogue(pendingSaveRef.current.labelId, dialogue);
+        const dialogue =
+          pendingSaveRef.current.cachedPayload ??
+          dialogueToPayload(pendingSaveRef.current.entries);
+        // Skip if there's already a save in progress
+        if (!isUpdatingDialogue) {
+          updateDialogue(pendingSaveRef.current.labelId, dialogue);
+        }
       }
 
-      const nextDialogue = dialogueToPayload(entries);
-      // Use tracked persisted state instead of activeLabel to avoid stale state after save
-      const persistedDialogue =
-        persistedStateRef.current.get(activeLabelId ?? "") ?? [];
-      const shouldPersist = !areDialoguePayloadsEqual(
-        nextDialogue,
-        persistedDialogue
-      );
+      const nextHash = hashDialogueEntries(entries);
+      const persistedHash =
+        persistedStateRef.current.get(activeLabelId ?? "") ?? "";
+      const shouldPersist = nextHash !== persistedHash;
 
-      // Store pending save for flush on unmount/label switch
+      // Compute payload only if changed or not cached
+      let nextPayload = pendingSaveRef.current.cachedPayload;
+      if (shouldPersist || !nextPayload) {
+        nextPayload = dialogueToPayload(entries);
+      }
+
+      // Store pending save with cached payload
       pendingSaveRef.current = {
         labelId: activeLabelId,
         entries,
+        cachedPayload: nextPayload,
         shouldPersist,
       };
       setIsSaveQueued(shouldPersist);
@@ -144,15 +134,18 @@ export function WriteMode({ projectName }: WriteModeProps) {
       saveTimeoutRef.current = setTimeout(() => {
         if (activeLabelId && pendingSaveRef.current.shouldPersist) {
           setIsSaveQueued(false);
-          // Convert DialogueEntry[] to the format expected by the API
-          // Empty arrays are explicitly persisted to allow clearing dialogue
-          const dialogue = dialogueToPayload(
-            pendingSaveRef.current.entries ?? entries
-          );
-          updateDialogue(activeLabelId, dialogue);
+          // Use cached payload if available, otherwise compute
+          const dialogue =
+            pendingSaveRef.current.cachedPayload ??
+            dialogueToPayload(pendingSaveRef.current.entries ?? []);
+          // Skip if there's already a save in progress (prevents duplicates from StrictMode)
+          if (!isUpdatingDialogue) {
+            updateDialogue(activeLabelId, dialogue);
+          }
           pendingSaveRef.current = {
             labelId: null,
             entries: null,
+            cachedPayload: null,
             shouldPersist: false,
           }; // Clear after successful save
         } else {
@@ -160,9 +153,9 @@ export function WriteMode({ projectName }: WriteModeProps) {
         }
 
         saveTimeoutRef.current = null;
-      }, 1000); // 1 second debounce
+      }, 2000); // 2 second debounce
     },
-    [activeLabelId, updateDialogue]
+    [activeLabelId, updateDialogue, isUpdatingDialogue]
   );
 
   // Track persisted state per label, pruning stale entries when labels change
@@ -177,7 +170,16 @@ export function WriteMode({ projectName }: WriteModeProps) {
         return;
       }
       const persistedDialogue = getPersistedDialogueFromLabel(activeLabel);
-      persistedStateRef.current.set(activeLabel.id, persistedDialogue);
+      // Convert payload to DialogueEntry[] for hashing
+      const dialogueEntries: DialogueEntry[] = persistedDialogue.map(
+        (p, i) => ({
+          id: `${activeLabel.id}-${i}`,
+          speakerId: p.speakerId,
+          text: p.text,
+        })
+      );
+      const persistedHash = hashDialogueEntries(dialogueEntries);
+      persistedStateRef.current.set(activeLabel.id, persistedHash);
     }
   }, [activeLabel, isUpdatingDialogue]);
 
@@ -214,10 +216,10 @@ export function WriteMode({ projectName }: WriteModeProps) {
       setLastSaved(new Date());
       // After successful save, update the persisted state with what was actually saved
       if (pendingSaveRef.current.labelId && pendingSaveRef.current.entries) {
-        const savedDialogue = dialogueToPayload(pendingSaveRef.current.entries);
+        const savedHash = hashDialogueEntries(pendingSaveRef.current.entries);
         persistedStateRef.current.set(
           pendingSaveRef.current.labelId,
-          savedDialogue
+          savedHash
         );
       }
     }
@@ -238,12 +240,18 @@ export function WriteMode({ projectName }: WriteModeProps) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
         setIsSaveQueued(false);
-        const dialogue = dialogueToPayload(pendingSaveRef.current.entries);
-        updateDialogue(pendingSaveRef.current.labelId, dialogue);
+        const dialogue =
+          pendingSaveRef.current.cachedPayload ??
+          dialogueToPayload(pendingSaveRef.current.entries);
+        // Skip if there's already a save in progress
+        if (!isUpdatingDialogue) {
+          updateDialogue(pendingSaveRef.current.labelId, dialogue);
+        }
       }
       pendingSaveRef.current = {
         labelId: null,
         entries: null,
+        cachedPayload: null,
         shouldPersist: false,
       };
       setIsSaveQueued(false);
