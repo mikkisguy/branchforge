@@ -2,7 +2,7 @@
  * UndoRedoControls Component
  *
  * Undo/redo buttons with keyboard shortcuts (Ctrl+Z / Ctrl+Shift+Z).
- * Works with both in-memory and server-side undo/redo.
+ * Uses local in-memory undo only for instant response.
  */
 
 import { useEffect, useCallback } from "react";
@@ -11,27 +11,15 @@ import { Undo2, Redo2 } from "lucide-react";
 interface UndoRedoControlsProps {
   canUndo: boolean;
   canRedo: boolean;
-  canUndoImmediate: boolean;
-  canRedoImmediate: boolean;
   onUndo: () => void;
   onRedo: () => void;
-  onUndoImmediate: () => void;
-  onRedoImmediate: () => void;
-  isUndoing?: boolean;
-  isRedoing?: boolean;
 }
 
 export function UndoRedoControls({
   canUndo,
   canRedo,
-  canUndoImmediate,
-  canRedoImmediate,
   onUndo,
   onRedo,
-  onUndoImmediate,
-  onRedoImmediate,
-  isUndoing = false,
-  isRedoing = false,
 }: UndoRedoControlsProps) {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -45,16 +33,15 @@ export function UndoRedoControls({
         return;
       }
 
-      // Ctrl+Z for undo - prefer persisted server history when available
+      // Ctrl+Z for undo
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "z") {
         e.preventDefault();
-        if (canUndo && !isUndoing) {
+        if (canUndo) {
           onUndo();
-        } else if (canUndoImmediate && !isUndoing) {
-          onUndoImmediate();
         }
       }
-      // Ctrl+Shift+Z or Ctrl+Y for redo - prefer persisted server history when available
+
+      // Ctrl+Shift+Z or Ctrl+Y for redo
       if (
         ((e.ctrlKey || e.metaKey) &&
           e.shiftKey &&
@@ -62,25 +49,12 @@ export function UndoRedoControls({
         ((e.ctrlKey || e.metaKey) && e.key === "y")
       ) {
         e.preventDefault();
-        if (canRedo && !isRedoing) {
+        if (canRedo) {
           onRedo();
-        } else if (canRedoImmediate && !isRedoing) {
-          onRedoImmediate();
         }
       }
     },
-    [
-      canUndo,
-      canRedo,
-      canUndoImmediate,
-      canRedoImmediate,
-      isUndoing,
-      isRedoing,
-      onUndo,
-      onRedo,
-      onUndoImmediate,
-      onRedoImmediate,
-    ]
+    [canUndo, canRedo, onUndo, onRedo]
   );
 
   useEffect(() => {
@@ -88,48 +62,31 @@ export function UndoRedoControls({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
-  const hasUndo = canUndoImmediate || canUndo;
-  const hasRedo = canRedoImmediate || canRedo;
-
   return (
     <div className="flex items-center gap-1">
       <button
-        onClick={() => {
-          if (canUndo) {
-            onUndo();
-          } else {
-            onUndoImmediate();
-          }
-        }}
-        disabled={!hasUndo || isUndoing}
+        onClick={onUndo}
+        disabled={!canUndo}
         className={`p-1.5 rounded-md transition-all ${
-          hasUndo
+          canUndo
             ? "hover:bg-muted text-foreground hover:text-[var(--theme-color)]"
             : "text-muted-foreground/30 cursor-not-allowed"
         }`}
         title="Undo (Ctrl+Z)"
         aria-label="Undo"
-        aria-disabled={!hasUndo || isUndoing}
       >
         <Undo2 className="w-4 h-4" />
       </button>
       <button
-        onClick={() => {
-          if (canRedo) {
-            onRedo();
-          } else {
-            onRedoImmediate();
-          }
-        }}
-        disabled={!hasRedo || isRedoing || isUndoing}
+        onClick={onRedo}
+        disabled={!canRedo}
         className={`p-1.5 rounded-md transition-all ${
-          hasRedo && !isUndoing && !isRedoing
+          canRedo
             ? "hover:bg-muted text-foreground hover:text-[var(--theme-color)]"
             : "text-muted-foreground/30 cursor-not-allowed"
         }`}
         title="Redo (Ctrl+Shift+Z)"
         aria-label="Redo"
-        aria-disabled={!hasRedo || isRedoing || isUndoing}
       >
         <Redo2 className="w-4 h-4" />
       </button>

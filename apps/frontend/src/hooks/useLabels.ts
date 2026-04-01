@@ -45,6 +45,7 @@ export interface UseLabelsReturn {
     dialogue: Array<{ speakerId: string | null; text: string }>
   ) => void;
   isUpdatingDialogue: boolean;
+  isUpdateError: boolean;
 }
 
 // ============================================================================
@@ -171,5 +172,6 @@ export function useLabels(): UseLabelsReturn {
     invalidateLabels,
     updateDialogue,
     isUpdatingDialogue: updateDialogueMutation.isPending,
+    isUpdateError: updateDialogueMutation.isError,
   };
 }

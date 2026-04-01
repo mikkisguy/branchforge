@@ -5,8 +5,23 @@
  * Works in tandem with server-side undo for persistence.
  */
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import type { DialogueEntry } from "@/lib/prose-types";
+
+// Simple deep comparison for DialogueEntry arrays (more efficient than JSON.stringify)
+// Note: We DON'T compare 'id' because the id is stable - we only care about content changes
+function areEntriesEqual(a: DialogueEntry[], b: DialogueEntry[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (
+      a[i].speakerId !== b[i].speakerId ||
+      a[i].text !== b[i].text
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
 
 interface UndoState {
   past: DialogueEntry[][];
@@ -28,6 +43,9 @@ export function useInMemoryUndo(
   const [state, setState] = useState<UndoState>(initialState);
   const stateRef = useRef<UndoState>(initialState);
 
+  // Track the last entries we recorded/synced to detect external changes
+  const lastSyncedEntriesRef = useRef<DialogueEntry[]>(entries);
+
   const commitState = useCallback((nextState: UndoState) => {
     stateRef.current = nextState;
     setState(nextState);
@@ -43,6 +61,7 @@ export function useInMemoryUndo(
       };
 
       commitState(nextState);
+      lastSyncedEntriesRef.current = newEntries;
     },
     [commitState]
   );
@@ -63,6 +82,7 @@ export function useInMemoryUndo(
 
     commitState(nextState);
     onChange(previous);
+    lastSyncedEntriesRef.current = previous;
 
     return true;
   }, [commitState, onChange]);
@@ -83,6 +103,7 @@ export function useInMemoryUndo(
 
     commitState(nextState);
     onChange(next);
+    lastSyncedEntriesRef.current = next;
 
     return true;
   }, [commitState, onChange]);
@@ -94,15 +115,21 @@ export function useInMemoryUndo(
 
       if (!present) {
         commitState({ ...current, present: newEntries });
+        lastSyncedEntriesRef.current = newEntries;
         return;
       }
 
-      // Check if content actually changed (compare JSON strings)
-      if (JSON.stringify(present) === JSON.stringify(newEntries)) {
+      // Check if content actually changed compared to last synced state
+      // We compare with lastSyncedEntriesRef instead of present because the effect
+      // may have already updated present to match newEntries
+      if (areEntriesEqual(lastSyncedEntriesRef.current, newEntries)) {
         return; // No change, don't record
       }
 
-      const newPast = [...past, present];
+      // Use the current present as the state to save in history (before effect updated it)
+      const previousState = lastSyncedEntriesRef.current;
+
+      const newPast = [...past, previousState];
       // Limit history size
       if (newPast.length > maxHistory) {
         newPast.shift();
@@ -113,6 +140,9 @@ export function useInMemoryUndo(
         present: newEntries,
         future: [], // Clear future on new change
       });
+
+      // Track that we've recorded this state
+      lastSyncedEntriesRef.current = newEntries;
     },
     [commitState, maxHistory]
   );
@@ -127,9 +157,27 @@ export function useInMemoryUndo(
         present: nextPresent,
         future: [],
       });
+      lastSyncedEntriesRef.current = nextPresent;
     },
     [commitState, entries]
   );
+
+  // Sync internal state with entries prop when it changes from external sources
+  // We detect external changes by comparing with lastSyncedEntriesRef
+  useEffect(() => {
+    // Check if this is an external change (entries prop changed but we didn't record it)
+    if (!areEntriesEqual(entries, lastSyncedEntriesRef.current)) {
+      // External change detected - update present and clear future
+      // NOTE: Don't update lastSyncedEntriesRef here - let recordChange do that
+      // so that debounced changes are still recorded properly
+      const nextState: UndoState = {
+        ...stateRef.current,
+        present: entries,
+        future: [],
+      };
+      commitState(nextState);
+    }
+  }, [entries, commitState]);
 
   return {
     undo,

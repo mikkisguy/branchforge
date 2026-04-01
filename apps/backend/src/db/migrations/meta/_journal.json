@@ -155,6 +155,13 @@
       "when": 1774786376188,
       "tag": "0021_flashy_valeria_richards",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1774971152575,
+      "tag": "0022_majestic_big_bertha",
+      "breakpoints": true
     }
   ]
 }

@@ -5,7 +5,7 @@
  * Matches app design system with theme colors and simple styling.
  */
 
-import { useState, useCallback, useRef, useEffect, useId } from "react";
+import { useState, useCallback, useRef, useEffect, useId, useMemo } from "react";
 import { X, ChevronDown } from "lucide-react";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { Character } from "@branchforge/shared";
@@ -48,6 +48,9 @@ export function DialogueLine({
   const speakerButtonRef = useRef<HTMLButtonElement>(null);
   const wasDropdownOpenRef = useRef(false);
   const dropdownId = useId();
+  const textOnChangeRef = useRef(onChange);
+  const previousTextRef = useRef(entry.text);
+  const isLocalChangeRef = useRef(false);
 
   const resizeTextarea = useCallback(() => {
     const textarea = internalTextareaRef.current;
@@ -56,9 +59,36 @@ export function DialogueLine({
     textarea.style.height = `${textarea.scrollHeight}px`;
   }, []);
 
+  // Keep track of the latest onChange function
   useEffect(() => {
-    resizeTextarea();
-  }, [entry.text, resizeTextarea]);
+    textOnChangeRef.current = onChange;
+  }, [onChange]);
+
+  // Initialize textarea value on mount
+  useEffect(() => {
+    const textarea = internalTextareaRef.current;
+    if (textarea && textarea.value !== entry.text) {
+      textarea.value = entry.text;
+      previousTextRef.current = entry.text;
+      resizeTextarea();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
+
+  // Sync external text changes (e.g., from undo/redo or label switch)
+  useEffect(() => {
+    const textarea = internalTextareaRef.current;
+    if (!textarea) return;
+
+    const isFocused = document.activeElement === textarea;
+
+    // Only sync if this is an external change and textarea is not focused
+    if (!isFocused && entry.text !== previousTextRef.current && entry.text !== textarea.value) {
+      textarea.value = entry.text;
+      previousTextRef.current = entry.text;
+      resizeTextarea();
+    }
+  }, [entry.id, entry.text, resizeTextarea]); // Also depend on entry.id to detect label switches
 
   useEffect(() => {
     window.addEventListener("resize", resizeTextarea);
@@ -206,18 +236,23 @@ export function DialogueLine({
 
   const handleSpeakerSelect = useCallback(
     (speakerId: string | null) => {
-      onChange({ ...entry, speakerId });
+      onChange({ id: entry.id, speakerId, text: entry.text });
       setIsDropdownOpen(false);
       setFocusedOptionIndex(-1);
     },
-    [entry, onChange]
+    [entry.id, entry.text, onChange]
   );
 
   const handleTextChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      onChange({ ...entry, text: e.target.value });
+      // Update the ref so we know this change came from user input
+      previousTextRef.current = e.target.value;
+      // Call onChange with updated entry (using ref to avoid stale closure)
+      textOnChangeRef.current({ id: entry.id, speakerId: entry.speakerId, text: e.target.value });
+      // Resize immediately for smooth typing experience
+      resizeTextarea();
     },
-    [entry, onChange]
+    [entry.id, entry.speakerId, resizeTextarea]
   );
 
   const handleKeyDown = useCallback(
@@ -227,7 +262,8 @@ export function DialogueLine({
         onAddLine?.(index);
       }
 
-      if (e.key === "Backspace" && entry.text === "" && totalEntries > 1) {
+      // Check if textarea is empty using the ref instead of entry.text
+      if (e.key === "Backspace" && internalTextareaRef.current?.value === "" && totalEntries > 1) {
         e.preventDefault();
         onDelete();
       }
@@ -245,7 +281,7 @@ export function DialogueLine({
         onMoveDown();
       }
     },
-    [entry, index, totalEntries, onDelete, onMoveUp, onMoveDown, onAddLine]
+    [index, totalEntries, onDelete, onMoveUp, onMoveDown, onAddLine]
   );
 
   const handleDropdownKeyDown = useCallback(
@@ -303,8 +339,11 @@ export function DialogueLine({
   const handleDropdownBlur = useCallback(
     (e: React.FocusEvent<HTMLDivElement>) => {
       if (!e.currentTarget.contains(e.relatedTarget)) {
-        setIsDropdownOpen(false);
-        setFocusedOptionIndex(-1);
+        // Small delay to handle React 19's focus event timing during transitions
+        setTimeout(() => {
+          setIsDropdownOpen(false);
+          setFocusedOptionIndex(-1);
+        }, 0);
       }
     },
     []
@@ -457,7 +496,7 @@ export function DialogueLine({
           internalTextareaRef.current = el;
           if (textareaRef) textareaRef(el);
         }}
-        value={entry.text}
+        defaultValue={entry.text}
         onChange={handleTextChange}
         onKeyDown={handleKeyDown}
         placeholder={entry.speakerId ? "Dialogue..." : "Narration..."}

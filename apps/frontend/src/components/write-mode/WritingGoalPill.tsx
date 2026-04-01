@@ -5,13 +5,15 @@
  * Matches app design system with theme colors and gentle feedback.
  */
 
+import { memo } from "react";
+
 interface WritingGoalPillProps {
   current: number; // Current word count for today
   goal: number; // Daily word goal
   onClick?: () => void; // Optional click handler to open stats dialog
 }
 
-export function WritingGoalPill({
+export const WritingGoalPill = memo(function WritingGoalPill({
   current,
   goal,
   onClick,
@@ -93,4 +95,4 @@ export function WritingGoalPill({
       )}
     </div>
   );
-}
+});

@@ -377,16 +377,6 @@ export const updateLabelDialogueBodySchema = z
   })
   .strict();
 
-/**
- * Undo label request validation
- */
-export const undoLabelBodySchema = z
-  .object({
-    versionId: uuidSchema.optional(),
-  })
-  .strict()
-  .optional();
-
 // ============================================================================
 // Route Configuration Schemas
 // ============================================================================
@@ -931,7 +921,6 @@ export type UpdateLabelInput = z.infer<typeof updateLabelSchema>;
 export type UpdateLabelDialogueInput = z.infer<
   typeof updateLabelDialogueBodySchema
 >;
-export type UndoLabelInput = z.infer<typeof undoLabelBodySchema>;
 
 export type CreateCharacterInput = z.infer<typeof createCharacterSchema>;
 export type UpdateCharacterInput = z.infer<typeof updateCharacterSchema>;
