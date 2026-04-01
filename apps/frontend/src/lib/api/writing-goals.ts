@@ -49,7 +49,9 @@ export const writingGoalsApi = {
    * Only fields that are provided will be updated.
    * Set dailyWritingGoal to null to disable the feature.
    */
-  async updateGoal(params: UpdateWritingGoalParams): Promise<WritingGoalSettings> {
+  async updateGoal(
+    params: UpdateWritingGoalParams
+  ): Promise<WritingGoalSettings> {
     return await request<WritingGoalSettings>("/user/settings", {
       method: "PUT",
       body: JSON.stringify(params),
@@ -61,9 +63,12 @@ export const writingGoalsApi = {
    * Clears all daily word counts and per-label tracking.
    */
   async resetStats(): Promise<ResetWritingStatsResponse> {
-    return await request<ResetWritingStatsResponse>("/user/settings/reset-stats", {
-      method: "POST",
-      body: JSON.stringify({}),
-    });
+    return await request<ResetWritingStatsResponse>(
+      "/user/settings/reset-stats",
+      {
+        method: "POST",
+        body: JSON.stringify({}),
+      }
+    );
   },
 };

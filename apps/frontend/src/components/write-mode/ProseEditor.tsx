@@ -5,15 +5,15 @@
  * Matches app design system with theme colors and simple styling.
  */
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { DialogueLine } from "./DialogueLine";
+import { areDialogueEntriesEqual } from "@/lib/prose-converter";
 import { WritingGoalPill } from "./WritingGoalPill";
 import { WritingStatsDialog } from "./WritingStatsDialog";
 import { SaveIndicator } from "./SaveIndicator";
 import { FontSizeSwitcher } from "../FontSizeSwitcher";
 import { FontFamilySwitcher } from "./FontFamilySwitcher";
 import { useWritingGoals } from "@/hooks/useWritingGoals";
-import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { useInMemoryUndo } from "./useInMemoryUndo";
 import { UndoRedoControls } from "./UndoRedoControls";
 import { BookOpen, PenLine } from "lucide-react";
@@ -25,6 +25,9 @@ interface ProseEditorProps {
   characters: Character[];
   onChange: (entries: DialogueEntry[]) => void;
   isFocusMode?: boolean;
+  isSaving?: boolean;
+  lastSaved?: Date | null;
+  saveError?: boolean;
 }
 
 type LineLayoutMode = "inline" | "stacked";
@@ -53,31 +56,14 @@ function cloneEntries(entries: DialogueEntry[]): DialogueEntry[] {
   return entries.map((entry) => ({ ...entry }));
 }
 
-function areEntriesEquivalent(
-  left: DialogueEntry[],
-  right: DialogueEntry[]
-): boolean {
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  for (let i = 0; i < left.length; i += 1) {
-    if (
-      left[i].speakerId !== right[i].speakerId ||
-      left[i].text !== right[i].text
-    ) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 export function ProseEditor({
   activeLabel,
   characters,
   onChange,
   isFocusMode = false,
+  isSaving = false,
+  lastSaved = null,
+  saveError = false,
 }: ProseEditorProps) {
   const labelId = activeLabel?.id ?? "none";
 
@@ -98,15 +84,17 @@ export function ProseEditor({
   // Writing stats dialog state
   const [statsDialogOpen, setStatsDialogOpen] = useState(false);
 
-  // Auto-save simulation state
-  const [isSaving, setIsSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const hasUserEditedRef = useRef(false);
+  // Refs for tracking pending history snapshots and focus operations
   const pendingTextHistoryRef = useRef<DialogueEntry[] | null>(null);
   const textHistoryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const onChangeRef = useRef(onChange);
   const entriesRef = useRef(entries);
+  const previousLabelIdRef = useRef(labelId);
+
+  // Track when entries change from user input (not from external sources)
+  const isExternalUpdateRef = useRef(false);
+  const prevEntriesRef = useRef<DialogueEntry[]>([]);
+  const isInitialMountRef = useRef(true);
 
   useEffect(() => {
     entriesRef.current = entries;
@@ -118,9 +106,8 @@ export function ProseEditor({
 
   const handleInMemoryHistoryChange = useCallback(
     (nextEntries: DialogueEntry[]) => {
-      hasUserEditedRef.current = true;
+      isExternalUpdateRef.current = true;
       setEntries(nextEntries);
-      onChangeRef.current(nextEntries);
     },
     []
   );
@@ -132,12 +119,31 @@ export function ProseEditor({
     50 // Max 50 in-memory undo steps
   );
 
-  // Server-side undo for persistence
-  const { canUndo, canRedo, undo, redo, isUndoing, isRedoing } = useUndoRedo(
-    activeLabel?.id ?? null
-  );
-
   const textareaRefs = useRef<Map<number, HTMLTextAreaElement>>(new Map());
+
+  const isEditorTextareaFocused = useCallback(() => {
+    const activeElement = document.activeElement;
+    if (!(activeElement instanceof HTMLTextAreaElement)) {
+      return false;
+    }
+
+    for (const textarea of textareaRefs.current.values()) {
+      if (textarea === activeElement) {
+        return true;
+      }
+    }
+
+    return false;
+  }, []);
+
+  // Queue for immediate history snapshots (for add/delete/move line operations)
+  const pendingImmediateSnapshotRef = useRef<DialogueEntry[] | null>(null);
+
+  // Track pending focus operations (for add/delete line operations)
+  const pendingFocusRef = useRef<{
+    index: number;
+    scrollIntoView: boolean;
+  } | null>(null);
 
   const commitHistorySnapshot = useCallback(
     (snapshot: DialogueEntry[]) => {
@@ -176,108 +182,35 @@ export function ProseEditor({
   const recordImmediateHistorySnapshot = useCallback(
     (snapshot: DialogueEntry[]) => {
       flushPendingTextHistory();
-      commitHistorySnapshot(snapshot);
+      pendingImmediateSnapshotRef.current = snapshot;
     },
-    [flushPendingTextHistory, commitHistorySnapshot]
+    [flushPendingTextHistory]
   );
 
+  // Process pending immediate snapshots after entries have been updated
   useEffect(() => {
-    const newEntries = convertLabelLinesToEntries(activeLabel);
-    flushPendingTextHistory();
-    setEntries(newEntries);
-    // Reset user edit flag when loading a new label
-    hasUserEditedRef.current = false;
-    // Clear in-memory history when switching labels
-    inMemoryUndo.clear(cloneEntries(newEntries));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [labelId]);
-
-  useEffect(() => {
-    if (!activeLabel) {
-      return;
+    if (pendingImmediateSnapshotRef.current) {
+      commitHistorySnapshot(pendingImmediateSnapshotRef.current);
+      pendingImmediateSnapshotRef.current = null;
     }
+  }, [entries, commitHistorySnapshot]);
 
-    const newEntries = convertLabelLinesToEntries(activeLabel);
-    if (areEntriesEquivalent(entriesRef.current, newEntries)) {
-      return;
-    }
-
-    flushPendingTextHistory();
-    setEntries(newEntries);
-    hasUserEditedRef.current = false;
-    inMemoryUndo.clear(cloneEntries(newEntries));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [labelId, activeLabel?.lines]);
-
+  // Process pending focus operations after entries have been updated
   useEffect(() => {
-    return () => {
-      if (textHistoryTimerRef.current) {
-        clearTimeout(textHistoryTimerRef.current);
-      }
-    };
-  }, []);
+    if (pendingFocusRef.current) {
+      const { index, scrollIntoView } = pendingFocusRef.current;
+      requestAnimationFrame(() => {
+        const textarea = textareaRefs.current.get(index);
+        if (textarea) {
+          textarea.focus({ preventScroll: true });
 
-  useEffect(() => {
-    localStorage.setItem(LINE_LAYOUT_STORAGE_KEY, layoutMode);
-  }, [layoutMode]);
-
-  useEffect(() => {
-    // Only run auto-save simulation when user has actually edited
-    if (!hasUserEditedRef.current) {
-      return;
-    }
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    setIsSaving(true);
-    saveTimeoutRef.current = setTimeout(() => {
-      setIsSaving(false);
-      setLastSaved(new Date());
-      hasUserEditedRef.current = false;
-    }, 800);
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, [entries]);
-
-  const handleEntryChange = useCallback(
-    (index: number, updatedEntry: DialogueEntry) => {
-      hasUserEditedRef.current = true;
-      setEntries((prev) => {
-        const newEntries = [...prev];
-        newEntries[index] = updatedEntry;
-        // Batch text edits into meaningful undo chunks.
-        scheduleTextHistorySnapshot(newEntries);
-        onChange(newEntries);
-        return newEntries;
-      });
-    },
-    [onChange, scheduleTextHistorySnapshot]
-  );
-
-  const handleAddLine = useCallback(
-    (index: number) => {
-      setEntries((prev) => {
-        const newEntries = [...prev];
-        const newEntry: DialogueEntry = {
-          id: crypto.randomUUID(),
-          speakerId: prev[index]?.speakerId || null,
-          text: "",
-        };
-        newEntries.splice(index + 1, 0, newEntry);
-        setTimeout(() => {
-          const newTextarea = textareaRefs.current.get(index + 1);
-          if (newTextarea) {
-            newTextarea.focus({ preventScroll: true });
-
-            const scrollArea = newTextarea.closest(
+          if (scrollIntoView) {
+            const scrollArea = textarea.closest(
               '[data-prose-editor-scroll="true"]'
             ) as HTMLElement | null;
 
             if (scrollArea) {
-              const textareaRect = newTextarea.getBoundingClientRect();
+              const textareaRect = textarea.getBoundingClientRect();
               const scrollAreaRect = scrollArea.getBoundingClientRect();
               const targetBottom =
                 scrollAreaRect.bottom - NEW_LINE_BOTTOM_SAFE_OFFSET;
@@ -291,13 +224,127 @@ export function ProseEditor({
               }
             }
           }
-        }, 0);
-        recordImmediateHistorySnapshot(newEntries);
-        onChange(newEntries);
+        }
+      });
+      pendingFocusRef.current = null;
+    }
+  }, [entries]);
+
+  // Consolidated label-change effect: handles both label switches and external updates
+  useEffect(() => {
+    const hasSwitchedLabel = previousLabelIdRef.current !== labelId;
+    previousLabelIdRef.current = labelId;
+
+    if (!activeLabel) {
+      isExternalUpdateRef.current = true;
+      setEntries([]);
+
+      if (hasSwitchedLabel) {
+        flushPendingTextHistory();
+        inMemoryUndo.clear([]);
+      }
+
+      return;
+    }
+
+    const newEntries = convertLabelLinesToEntries(activeLabel);
+
+    flushPendingTextHistory();
+
+    if (hasSwitchedLabel) {
+      // Always reset undo history when switching labels, even if content is identical
+      // This prevents undo history from one label bleeding into another
+      isExternalUpdateRef.current = true;
+      setEntries(newEntries);
+      inMemoryUndo.clear(cloneEntries(newEntries));
+    } else {
+      // Only update state if content actually changed (handles external updates)
+      if (areDialogueEntriesEqual(entriesRef.current, newEntries)) {
+        return;
+      }
+
+      // Ignore server echo updates while a textarea is focused to avoid remount-driven blur.
+      // Local editor state remains the source of truth during active typing.
+      if (isEditorTextareaFocused()) {
+        return;
+      }
+
+      isExternalUpdateRef.current = true;
+      setEntries(newEntries);
+      inMemoryUndo.updatePresent(cloneEntries(newEntries));
+    }
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [labelId, activeLabel]);
+
+  useEffect(() => {
+    return () => {
+      if (textHistoryTimerRef.current) {
+        clearTimeout(textHistoryTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(LINE_LAYOUT_STORAGE_KEY, layoutMode);
+  }, [layoutMode]);
+
+  // Notify parent of changes (but not from external updates)
+  useEffect(() => {
+    // Skip initial mount and external updates
+    if (isExternalUpdateRef.current) {
+      isExternalUpdateRef.current = false;
+      prevEntriesRef.current = entries;
+      return;
+    }
+
+    // Skip the very first mount, but allow all subsequent changes including empty→non-empty
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      prevEntriesRef.current = entries;
+      return;
+    }
+
+    // Notify if entries actually changed
+    if (!areDialogueEntriesEqual(prevEntriesRef.current, entries)) {
+      scheduleTextHistorySnapshot(entries);
+      onChange(entries);
+    }
+    prevEntriesRef.current = entries;
+  }, [entries, scheduleTextHistorySnapshot, onChange]);
+
+  const handleEntryChange = useCallback(
+    (index: number, updatedEntry: DialogueEntry) => {
+      setEntries((prev) => {
+        const newEntries = [...prev];
+        newEntries[index] = updatedEntry;
         return newEntries;
       });
     },
-    [onChange, recordImmediateHistorySnapshot]
+    []
+  );
+
+  const handleAddLine = useCallback(
+    (index: number) => {
+      setEntries((prev) => {
+        const newEntries = [...prev];
+        const newEntry: DialogueEntry = {
+          id: crypto.randomUUID(),
+          speakerId: prev[index]?.speakerId || null,
+          text: "",
+        };
+        newEntries.splice(index + 1, 0, newEntry);
+
+        // Record history snapshot
+        recordImmediateHistorySnapshot(newEntries);
+
+        // Queue focus operation
+        pendingFocusRef.current = { index: index + 1, scrollIntoView: true };
+
+        return newEntries;
+      });
+    },
+    [recordImmediateHistorySnapshot]
   );
 
   const handleDeleteLine = useCallback(
@@ -305,18 +352,17 @@ export function ProseEditor({
       setEntries((prev) => {
         const newEntries = prev.filter((_, i) => i !== index);
         const focusIndex = index > 0 ? index - 1 : 0;
-        setTimeout(() => {
-          const textareaToFocus = textareaRefs.current.get(focusIndex);
-          if (textareaToFocus) {
-            textareaToFocus.focus();
-          }
-        }, 0);
+
+        // Record history snapshot
         recordImmediateHistorySnapshot(newEntries);
-        onChange(newEntries);
+
+        // Queue focus operation
+        pendingFocusRef.current = { index: focusIndex, scrollIntoView: false };
+
         return newEntries;
       });
     },
-    [onChange, recordImmediateHistorySnapshot]
+    [recordImmediateHistorySnapshot]
   );
 
   const handleMoveUp = useCallback(
@@ -329,11 +375,10 @@ export function ProseEditor({
           newEntries[index - 1],
         ];
         recordImmediateHistorySnapshot(newEntries);
-        onChange(newEntries);
         return newEntries;
       });
     },
-    [onChange, recordImmediateHistorySnapshot]
+    [recordImmediateHistorySnapshot]
   );
 
   const handleMoveDown = useCallback(
@@ -346,32 +391,21 @@ export function ProseEditor({
           newEntries[index],
         ];
         recordImmediateHistorySnapshot(newEntries);
-        onChange(newEntries);
         return newEntries;
       });
     },
-    [onChange, recordImmediateHistorySnapshot]
+    [recordImmediateHistorySnapshot]
   );
 
-  const handleImmediateUndo = useCallback(() => {
+  const handleUndo = useCallback(() => {
     flushPendingTextHistory();
     inMemoryUndo.undo();
   }, [flushPendingTextHistory, inMemoryUndo]);
 
-  const handleImmediateRedo = useCallback(() => {
+  const handleRedo = useCallback(() => {
     flushPendingTextHistory();
     inMemoryUndo.redo();
   }, [flushPendingTextHistory, inMemoryUndo]);
-
-  const handleServerUndo = useCallback(() => {
-    flushPendingTextHistory();
-    void undo();
-  }, [flushPendingTextHistory, undo]);
-
-  const handleServerRedo = useCallback(() => {
-    flushPendingTextHistory();
-    void redo();
-  }, [flushPendingTextHistory, redo]);
 
   const wordCount = entries.reduce((count, entry) => {
     const trimmed = entry.text?.trim();
@@ -380,14 +414,21 @@ export function ProseEditor({
   }, 0);
   const lineCount = entries.length;
 
-  // Get today's word count from daily word counts
-  // Normalize both dates to local timezone before comparing
-  const todayWordCount =
-    writingGoalSettings?.dailyWordCounts?.find((entry) => {
-      const entryDate = new Date(entry.date);
-      const today = new Date();
-      return entryDate.toLocaleDateString() === today.toLocaleDateString();
-    })?.count ?? 0;
+  // Get today's word count from daily word counts (memoized)
+  const todayWordCount = useMemo(() => {
+    const today = new Date();
+    return (
+      writingGoalSettings?.dailyWordCounts?.find((entry) => {
+        const entryDate = new Date(entry.date);
+        // Direct date comparison for better performance (avoid toLocaleDateString)
+        return (
+          entryDate.getFullYear() === today.getFullYear() &&
+          entryDate.getMonth() === today.getMonth() &&
+          entryDate.getDate() === today.getDate()
+        );
+      })?.count ?? 0
+    );
+  }, [writingGoalSettings?.dailyWordCounts]);
 
   if (!activeLabel) {
     return (
@@ -423,7 +464,6 @@ export function ProseEditor({
             ];
             recordImmediateHistorySnapshot(newEntries);
             setEntries(newEntries);
-            onChange(newEntries);
           }}
           className="group px-6 py-3 rounded-lg bg-[var(--theme-color)] text-white hover:bg-[var(--theme-color-hover)] transition-all duration-200 hover:shadow-lg hover:shadow-[var(--theme-color)]/20 focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)] focus:ring-offset-2 focus:ring-offset-background"
         >
@@ -454,8 +494,8 @@ export function ProseEditor({
               activeLabel.status === "FINAL"
                 ? "bg-[var(--theme-color)]/20 text-[var(--theme-color)] border-[var(--theme-border)]"
                 : activeLabel.status === "REVIEW"
-                  ? "bg-[var(--theme-review-color)]/20 text-[var(--theme-review-color)] border-[var(--theme-review-color)]/30"
-                  : "bg-[var(--theme-draft-color)]/20 text-[var(--theme-draft-color)] border-[var(--theme-draft-color)]/30"
+                ? "bg-[var(--theme-review-color)]/20 text-[var(--theme-review-color)] border-[var(--theme-review-color)]/30"
+                : "bg-[var(--theme-draft-color)]/20 text-[var(--theme-draft-color)] border-[var(--theme-draft-color)]/30"
             }`}
           >
             {activeLabel.status?.toLowerCase() || "draft"}
@@ -563,18 +603,16 @@ export function ProseEditor({
 
           <div className="flex items-center gap-4">
             <UndoRedoControls
-              canUndo={canUndo}
-              canRedo={canRedo}
-              canUndoImmediate={inMemoryUndo.canUndo}
-              canRedoImmediate={inMemoryUndo.canRedo}
-              onUndo={handleServerUndo}
-              onRedo={handleServerRedo}
-              onUndoImmediate={handleImmediateUndo}
-              onRedoImmediate={handleImmediateRedo}
-              isUndoing={isUndoing}
-              isRedoing={isRedoing}
+              canUndo={inMemoryUndo.canUndo}
+              canRedo={inMemoryUndo.canRedo}
+              onUndo={handleUndo}
+              onRedo={handleRedo}
             />
-            <SaveIndicator isSaving={isSaving} lastSaved={lastSaved} />
+            <SaveIndicator
+              isSaving={isSaving}
+              lastSaved={lastSaved}
+              error={saveError}
+            />
           </div>
         </div>
       </div>

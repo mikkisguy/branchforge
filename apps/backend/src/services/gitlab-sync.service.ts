@@ -915,7 +915,10 @@ export async function detectConflicts(
         if (existing) {
           existing.add(scene.labelName);
         } else {
-          localLabelsByFile.set(scene.projectFileId, new Set([scene.labelName]));
+          localLabelsByFile.set(
+            scene.projectFileId,
+            new Set([scene.labelName])
+          );
         }
         gitlabSceneIds.add(scene.id);
       }

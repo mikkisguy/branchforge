@@ -36,7 +36,10 @@ export async function getProjectFiles(
   const db = getDb();
 
   const whereConditions = options?.source
-    ? and(eq(projectFiles.projectId, projectId), eq(projectFiles.source, options.source))
+    ? and(
+        eq(projectFiles.projectId, projectId),
+        eq(projectFiles.source, options.source)
+      )
     : eq(projectFiles.projectId, projectId);
 
   const files = await db
@@ -102,7 +105,12 @@ export async function updateFileContent(fileId: string, content: string) {
       contentHash,
       updatedAt: new Date(),
     })
-    .where(and(eq(projectFiles.id, fileId), ne(projectFiles.contentHash, contentHash)))
+    .where(
+      and(
+        eq(projectFiles.id, fileId),
+        ne(projectFiles.contentHash, contentHash)
+      )
+    )
     .returning();
 
   const [updated] = result;

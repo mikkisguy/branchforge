@@ -41,7 +41,10 @@ const WordCountEntrySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
     message: "Date must be in YYYY-MM-DD format",
   }),
-  count: z.number().int().nonnegative({ message: "Count must be non-negative" }),
+  count: z
+    .number()
+    .int()
+    .nonnegative({ message: "Count must be non-negative" }),
 });
 
 /**

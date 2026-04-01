@@ -26,17 +26,19 @@
 --    - Application must implement ownership transfer before hard deletion
 --
 -- Creating new enum for project visibility
-CREATE TYPE "public"."project_visibility" AS ENUM( 'PRIVATE', 'TEAM');--> statement-breakpoint
+CREATE TYPE "public"."project_visibility" AS ENUM('PUBLIC', 'PRIVATE', 'TEAM');--> statement-breakpoint
 -- First, convert existing visibility values to new enum values
 -- OWNER -> PRIVATE (only owner can view)
--- READER -> TEAM (team members can view)  
+-- READER -> TEAM (team members can view)
 -- TESTER -> TEAM (testers are team members)
 ALTER TABLE "projects" DROP CONSTRAINT IF EXISTS "projects_user_id_users_id_fk";
 --> statement-breakpoint
-UPDATE "projects" SET "visibility" = 'PRIVATE' WHERE "visibility" = 'OWNER';--> statement-breakpoint
-UPDATE "projects" SET "visibility" = 'TEAM' WHERE "visibility" IN ('READER', 'TESTER');--> statement-breakpoint
 ALTER TABLE "projects" ALTER COLUMN "visibility" DROP DEFAULT;--> statement-breakpoint
-ALTER TABLE "projects" ALTER COLUMN "visibility" SET DATA TYPE "public"."project_visibility" USING "visibility"::text::"public"."project_visibility";--> statement-breakpoint
+ALTER TABLE "projects" ALTER COLUMN "visibility" SET DATA TYPE "public"."project_visibility" USING (CASE "visibility"::text
+  WHEN 'OWNER' THEN 'PRIVATE'
+  WHEN 'READER' THEN 'TEAM'
+  WHEN 'TESTER' THEN 'TEAM'
+END)::"public"."project_visibility";--> statement-breakpoint
 ALTER TABLE "projects" ALTER COLUMN "visibility" SET DEFAULT 'PRIVATE';--> statement-breakpoint
 ALTER TABLE "users" ADD COLUMN "deleted_at" timestamp;--> statement-breakpoint
 ALTER TABLE "projects" ADD CONSTRAINT "projects_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint

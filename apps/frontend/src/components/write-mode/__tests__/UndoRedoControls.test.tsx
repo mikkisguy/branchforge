@@ -6,8 +6,6 @@ describe("UndoRedoControls", () => {
   const mockHandlers = {
     onUndo: vi.fn(),
     onRedo: vi.fn(),
-    onUndoImmediate: vi.fn(),
-    onRedoImmediate: vi.fn(),
   };
 
   beforeEach(() => {
@@ -15,122 +13,36 @@ describe("UndoRedoControls", () => {
   });
 
   describe("button states", () => {
-    it("should enable undo button when immediate undo is available", () => {
+    it("should enable undo button when undo is available", () => {
       render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={false}
-          canUndoImmediate={true}
-          canRedoImmediate={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
       );
 
       const undoButton = screen.getByLabelText("Undo");
       expect(undoButton).not.toBeDisabled();
     });
 
-    it("should enable undo button when server undo is available", () => {
+    it("should disable undo button when undo is not available", () => {
       render(
-        <UndoRedoControls
-          canUndo={true}
-          canRedo={false}
-          canUndoImmediate={false}
-          canRedoImmediate={false}
-          {...mockHandlers}
-        />
-      );
-
-      const undoButton = screen.getByLabelText("Undo");
-      expect(undoButton).not.toBeDisabled();
-    });
-
-    it("should disable undo button when neither undo is available", () => {
-      render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={false}
-          canUndoImmediate={false}
-          canRedoImmediate={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
       );
 
       const undoButton = screen.getByLabelText("Undo");
       expect(undoButton).toBeDisabled();
     });
 
-    it("should disable undo button when undoing", () => {
+    it("should enable redo button when redo is available", () => {
       render(
-        <UndoRedoControls
-          canUndo={true}
-          canRedo={false}
-          canUndoImmediate={false}
-          canRedoImmediate={false}
-          isUndoing={true}
-          {...mockHandlers}
-        />
-      );
-
-      const undoButton = screen.getByLabelText("Undo");
-      expect(undoButton).toBeDisabled();
-    });
-
-    it("should enable redo button when immediate redo is available", () => {
-      render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={false}
-          canUndoImmediate={false}
-          canRedoImmediate={true}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={false} canRedo={true} {...mockHandlers} />
       );
 
       const redoButton = screen.getByLabelText("Redo");
       expect(redoButton).not.toBeDisabled();
     });
 
-    it("should enable redo button when server redo is available", () => {
+    it("should disable redo button when redo is not available", () => {
       render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={true}
-          canUndoImmediate={false}
-          canRedoImmediate={false}
-          {...mockHandlers}
-        />
-      );
-
-      const redoButton = screen.getByLabelText("Redo");
-      expect(redoButton).not.toBeDisabled();
-    });
-
-    it("should disable redo button when neither redo is available", () => {
-      render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={false}
-          canUndoImmediate={false}
-          canRedoImmediate={false}
-          {...mockHandlers}
-        />
-      );
-
-      const redoButton = screen.getByLabelText("Redo");
-      expect(redoButton).toBeDisabled();
-    });
-
-    it("should disable redo button when undoing", () => {
-      render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={true}
-          canUndoImmediate={false}
-          canRedoImmediate={false}
-          isUndoing={true}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
       );
 
       const redoButton = screen.getByLabelText("Redo");
@@ -139,125 +51,166 @@ describe("UndoRedoControls", () => {
   });
 
   describe("click handlers", () => {
-    it("should call onUndoImmediate when immediate undo is available", () => {
+    it("should call onUndo when undo button is clicked", () => {
       render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={false}
-          canUndoImmediate={true}
-          canRedoImmediate={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
       );
 
       const undoButton = screen.getByLabelText("Undo");
       fireEvent.click(undoButton);
 
-      expect(mockHandlers.onUndoImmediate).toHaveBeenCalled();
+      expect(mockHandlers.onUndo).toHaveBeenCalledOnce();
+    });
+
+    it("should call onRedo when redo button is clicked", () => {
+      render(
+        <UndoRedoControls canUndo={false} canRedo={true} {...mockHandlers} />
+      );
+
+      const redoButton = screen.getByLabelText("Redo");
+      fireEvent.click(redoButton);
+
+      expect(mockHandlers.onRedo).toHaveBeenCalledOnce();
+    });
+
+    it("should not call onUndo when undo button is clicked but disabled", () => {
+      render(
+        <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
+      );
+
+      const undoButton = screen.getByLabelText("Undo");
+      fireEvent.click(undoButton);
+
       expect(mockHandlers.onUndo).not.toHaveBeenCalled();
     });
 
-    it("should call onUndo when server undo is available and immediate is not", () => {
+    it("should not call onRedo when redo button is clicked but disabled", () => {
       render(
-        <UndoRedoControls
-          canUndo={true}
-          canRedo={false}
-          canUndoImmediate={false}
-          canRedoImmediate={false}
-          {...mockHandlers}
-        />
-      );
-
-      const undoButton = screen.getByLabelText("Undo");
-      fireEvent.click(undoButton);
-
-      expect(mockHandlers.onUndo).toHaveBeenCalled();
-      expect(mockHandlers.onUndoImmediate).not.toHaveBeenCalled();
-    });
-
-    it("should call onRedoImmediate when immediate redo is available", () => {
-      render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={false}
-          canUndoImmediate={false}
-          canRedoImmediate={true}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
       );
 
       const redoButton = screen.getByLabelText("Redo");
       fireEvent.click(redoButton);
 
-      expect(mockHandlers.onRedoImmediate).toHaveBeenCalled();
+      expect(mockHandlers.onRedo).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("keyboard shortcuts", () => {
+    it("should call onUndo when Ctrl+Z is pressed", () => {
+      render(
+        <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
+      );
+
+      fireEvent.keyDown(document, { key: "z", ctrlKey: true });
+
+      expect(mockHandlers.onUndo).toHaveBeenCalledOnce();
+    });
+
+    it("should call onUndo when Cmd+Z is pressed (Mac)", () => {
+      render(
+        <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
+      );
+
+      fireEvent.keyDown(document, { key: "z", metaKey: true });
+
+      expect(mockHandlers.onUndo).toHaveBeenCalledOnce();
+    });
+
+    it("should not call onUndo when Ctrl+Z is pressed but disabled", () => {
+      render(
+        <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
+      );
+
+      fireEvent.keyDown(document, { key: "z", ctrlKey: true });
+
+      expect(mockHandlers.onUndo).not.toHaveBeenCalled();
+    });
+
+    it("should call onRedo when Ctrl+Shift+Z is pressed", () => {
+      render(
+        <UndoRedoControls canUndo={false} canRedo={true} {...mockHandlers} />
+      );
+
+      fireEvent.keyDown(document, { key: "z", ctrlKey: true, shiftKey: true });
+
+      expect(mockHandlers.onRedo).toHaveBeenCalledOnce();
+    });
+
+    it("should call onRedo when Ctrl+Y is pressed", () => {
+      render(
+        <UndoRedoControls canUndo={false} canRedo={true} {...mockHandlers} />
+      );
+
+      fireEvent.keyDown(document, { key: "y", ctrlKey: true });
+
+      expect(mockHandlers.onRedo).toHaveBeenCalledOnce();
+    });
+
+    it("should not call onRedo when Ctrl+Shift+Z is pressed but disabled", () => {
+      render(
+        <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
+      );
+
+      fireEvent.keyDown(document, { key: "z", ctrlKey: true, shiftKey: true });
+
       expect(mockHandlers.onRedo).not.toHaveBeenCalled();
     });
 
-    it("should call onRedo when server redo is available and immediate is not", () => {
+    it("should not trigger undo when typing in an input element", () => {
       render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={true}
-          canUndoImmediate={false}
-          canRedoImmediate={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
       );
 
-      const redoButton = screen.getByLabelText("Redo");
-      fireEvent.click(redoButton);
+      const input = document.createElement("input");
+      document.body.appendChild(input);
 
-      expect(mockHandlers.onRedo).toHaveBeenCalled();
-      expect(mockHandlers.onRedoImmediate).not.toHaveBeenCalled();
+      fireEvent.keyDown(input, { key: "z", ctrlKey: true });
+
+      expect(mockHandlers.onUndo).not.toHaveBeenCalled();
+
+      document.body.removeChild(input);
     });
 
-    it("should prioritize onUndo when both immediate and server undo are available", () => {
+    it("should not trigger undo when typing in a textarea", () => {
       render(
-        <UndoRedoControls
-          canUndo={true}
-          canRedo={false}
-          canUndoImmediate={true}
-          canRedoImmediate={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
       );
 
-      const undoButton = screen.getByLabelText("Undo");
-      fireEvent.click(undoButton);
+      const textarea = document.createElement("textarea");
+      document.body.appendChild(textarea);
 
-      expect(mockHandlers.onUndo).toHaveBeenCalled();
-      expect(mockHandlers.onUndoImmediate).not.toHaveBeenCalled();
+      fireEvent.keyDown(textarea, { key: "z", ctrlKey: true });
+
+      expect(mockHandlers.onUndo).not.toHaveBeenCalled();
+
+      document.body.removeChild(textarea);
     });
 
-    it("should prioritize onRedo when both immediate and server redo are available", () => {
+    it("should not trigger undo when typing in a contenteditable element", () => {
       render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={true}
-          canUndoImmediate={false}
-          canRedoImmediate={true}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
       );
 
-      const redoButton = screen.getByLabelText("Redo");
-      fireEvent.click(redoButton);
+      const div = document.createElement("div");
+      Object.defineProperty(div, "isContentEditable", {
+        value: true,
+        writable: false,
+      });
+      document.body.appendChild(div);
 
-      expect(mockHandlers.onRedo).toHaveBeenCalled();
-      expect(mockHandlers.onRedoImmediate).not.toHaveBeenCalled();
+      fireEvent.keyDown(div, { key: "z", ctrlKey: true });
+
+      expect(mockHandlers.onUndo).not.toHaveBeenCalled();
+
+      document.body.removeChild(div);
     });
   });
 
   describe("accessibility", () => {
     it("should have proper ARIA labels", () => {
       render(
-        <UndoRedoControls
-          canUndo={true}
-          canRedo={true}
-          canUndoImmediate={false}
-          canRedoImmediate={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={true} canRedo={true} {...mockHandlers} />
       );
 
       expect(screen.getByLabelText("Undo")).toBeInTheDocument();
@@ -266,13 +219,7 @@ describe("UndoRedoControls", () => {
 
     it("should have aria-disabled attribute when button is disabled", () => {
       render(
-        <UndoRedoControls
-          canUndo={false}
-          canRedo={false}
-          canUndoImmediate={false}
-          canRedoImmediate={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
       );
 
       const undoButton = screen.getByLabelText("Undo");
@@ -284,17 +231,13 @@ describe("UndoRedoControls", () => {
 
     it("should have proper title attributes for tooltips", () => {
       render(
-        <UndoRedoControls
-          canUndo={true}
-          canRedo={true}
-          canUndoImmediate={false}
-          canRedoImmediate={false}
-          {...mockHandlers}
-        />
+        <UndoRedoControls canUndo={true} canRedo={true} {...mockHandlers} />
       );
 
       expect(screen.getByTitle(/Undo \((Ctrl|Cmd)\+Z\)/)).toBeInTheDocument();
-      expect(screen.getByTitle(/Redo \((Ctrl|Cmd)\+Shift\+Z\)/)).toBeInTheDocument();
+      expect(
+        screen.getByTitle(/Redo \((Ctrl|Cmd)\+Shift\+Z\)/)
+      ).toBeInTheDocument();
     });
   });
 });

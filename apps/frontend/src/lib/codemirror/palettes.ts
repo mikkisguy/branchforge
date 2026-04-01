@@ -214,16 +214,28 @@ export const PALETTES: SyntaxPalette[] = [
  * Supports both "hsl(h, s%, l%)" and "hsl(h s% l%)" formats
  */
 function parseHSL(hslString: string): { h: number; s: number; l: number } {
-  const match = hslString.match(/hsl\((\d+(?:\.\d+)?)\s*[,]\s*(\d+(?:\.\d+)?)%\s*[,]\s*(\d+(?:\.\d+)?)%\)/);
+  const match = hslString.match(
+    /hsl\((\d+(?:\.\d+)?)\s*[,]\s*(\d+(?:\.\d+)?)%\s*[,]\s*(\d+(?:\.\d+)?)%\)/
+  );
   if (!match) {
     // Fallback for space-separated format (shouldn't happen after our fixes)
-    const spaceMatch = hslString.match(/hsl\((\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)%\s+(\d+(?:\.\d+)?)%\)/);
+    const spaceMatch = hslString.match(
+      /hsl\((\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)%\s+(\d+(?:\.\d+)?)%\)/
+    );
     if (spaceMatch) {
-      return { h: parseFloat(spaceMatch[1]), s: parseFloat(spaceMatch[2]), l: parseFloat(spaceMatch[3]) };
+      return {
+        h: parseFloat(spaceMatch[1]),
+        s: parseFloat(spaceMatch[2]),
+        l: parseFloat(spaceMatch[3]),
+      };
     }
     return { h: 0, s: 0, l: 50 };
   }
-  return { h: parseFloat(match[1]), s: parseFloat(match[2]), l: parseFloat(match[3]) };
+  return {
+    h: parseFloat(match[1]),
+    s: parseFloat(match[2]),
+    l: parseFloat(match[3]),
+  };
 }
 
 /**

@@ -62,8 +62,8 @@ export function useProjectFiles(
       projectId && options?.source
         ? projectFilesKeys.listsWithSource(projectId, options.source)
         : projectId
-          ? projectFilesKeys.lists(projectId)
-          : ["projectFiles", "__disabled__"],
+        ? projectFilesKeys.lists(projectId)
+        : ["projectFiles", "__disabled__"],
     queryFn: async () => {
       return projectFilesApi.listFiles(projectId!, options);
     },

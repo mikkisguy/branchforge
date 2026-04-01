@@ -43,7 +43,9 @@ describe("calculateContentHash", () => {
 describe("calculateDialogueHash", () => {
   it("should include speaker information in hash", () => {
     const dialogueWithSpeaker = [{ speakerId: "uuid-alice", text: "Hello" }];
-    const dialogueWithDifferentSpeaker = [{ speakerId: "uuid-bob", text: "Hello" }];
+    const dialogueWithDifferentSpeaker = [
+      { speakerId: "uuid-bob", text: "Hello" },
+    ];
     const dialogueWithoutSpeaker = [{ speakerId: null, text: "Hello" }];
 
     const hash1 = calculateDialogueHash(dialogueWithSpeaker);

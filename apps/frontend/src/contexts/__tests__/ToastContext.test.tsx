@@ -5,7 +5,13 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, act, renderHook } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  act,
+  renderHook,
+} from "@testing-library/react";
 import { ToastProvider, useToast } from "../ToastContext";
 
 describe("ToastContext", () => {

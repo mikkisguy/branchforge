@@ -1,9 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import {
-  ThemeContext,
-  type ThemePalette,
-  type ThemeColors,
-} from "./useTheme";
+import { ThemeContext, type ThemePalette, type ThemeColors } from "./useTheme";
 
 const themeConfigs: Record<ThemePalette, ThemeColors> = {
   forest: { primary: "#40bb82", hover: "#52c992" },
@@ -57,7 +53,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // Status colors for scene navigation
     root.style.setProperty("--theme-review-color", STATUS_COLORS.review);
     root.style.setProperty("--theme-draft-color", STATUS_COLORS.draft);
-
   }, [theme, colors]);
 
   const setTheme = (newTheme: ThemePalette) => {

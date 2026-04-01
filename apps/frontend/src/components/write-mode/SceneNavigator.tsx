@@ -101,8 +101,8 @@ export function SceneNavigator({
                                   label.status === "FINAL"
                                     ? "var(--theme-color)"
                                     : label.status === "REVIEW"
-                                      ? "var(--theme-review-color)"
-                                      : "var(--theme-draft-color)",
+                                    ? "var(--theme-review-color)"
+                                    : "var(--theme-draft-color)",
                               }}
                             />
                             <span className="truncate">{label.title}</span>

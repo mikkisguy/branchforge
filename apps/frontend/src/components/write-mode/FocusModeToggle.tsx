@@ -5,7 +5,7 @@
  * Matches app design system with theme colors.
  */
 
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef, memo } from "react";
 import { Maximize2, Minimize2 } from "lucide-react";
 
 interface FocusModeToggleProps {
@@ -15,7 +15,7 @@ interface FocusModeToggleProps {
 
 const FOCUS_MODE_STORAGE_KEY = "writemode-focus-mode";
 
-export function FocusModeToggle({
+export const FocusModeToggle = memo(function FocusModeToggle({
   isFocusMode,
   onToggle,
 }: FocusModeToggleProps) {
@@ -88,4 +88,4 @@ export function FocusModeToggle({
       )}
     </button>
   );
-}
+});

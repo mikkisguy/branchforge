@@ -58,7 +58,9 @@ export function useEditorCursor(options?: UseEditorCursorOptions) {
             const charCount = selectedText.length;
             const lineCount = selectedText.split("\n").length;
             setSelectionInfo(
-              `${charCount} char${charCount !== 1 ? "s" : ""}${lineCount > 1 ? ` in ${lineCount} lines` : ""} selected`
+              `${charCount} char${charCount !== 1 ? "s" : ""}${
+                lineCount > 1 ? ` in ${lineCount} lines` : ""
+              } selected`
             );
           } else {
             setSelectionInfo(null);

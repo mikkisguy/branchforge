@@ -67,7 +67,9 @@ export const projectFileSyncState = pgTable(
     dbLabelCount: integer("db_label_count"),
   },
   (table) => [
-    index("project_file_sync_state_project_file_id_idx").on(table.projectFileId),
+    index("project_file_sync_state_project_file_id_idx").on(
+      table.projectFileId
+    ),
     index("project_file_sync_state_status_idx").on(table.status),
   ]
 );

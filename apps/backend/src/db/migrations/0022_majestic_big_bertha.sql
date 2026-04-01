@@ -1,0 +1,1 @@
+DROP TABLE "label_dialogue_versions" CASCADE;

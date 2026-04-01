@@ -24,12 +24,8 @@ export function ScriptEditor({ content, onChange }: ScriptEditorProps) {
   >([]);
   const cleanContent = useMemo(() => stripBOM(content), [content]);
 
-  const {
-    cursorPosition,
-    selectionInfo,
-    totalLines,
-    updateListener,
-  } = useEditorCursor({ initialContent: cleanContent });
+  const { cursorPosition, selectionInfo, totalLines, updateListener } =
+    useEditorCursor({ initialContent: cleanContent });
 
   const handleLineWrapChange = useCallback(
     (extension: Extension | readonly Extension[]) => {

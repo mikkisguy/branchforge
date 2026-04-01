@@ -5,7 +5,7 @@
  * Matches app design system with theme colors and simple styling.
  */
 
-import { useState, useCallback, useRef, useEffect, useId } from "react";
+import { memo, useState, useCallback, useRef, useEffect, useId } from "react";
 import { X, ChevronDown } from "lucide-react";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { Character } from "@branchforge/shared";
@@ -25,7 +25,28 @@ interface DialogueLineProps {
   textareaRef?: (el: HTMLTextAreaElement | null) => void;
 }
 
-export function DialogueLine({
+function areDialogueLinePropsEqual(
+  prev: DialogueLineProps,
+  next: DialogueLineProps
+): boolean {
+  return (
+    prev.entry.id === next.entry.id &&
+    prev.entry.speakerId === next.entry.speakerId &&
+    prev.entry.text === next.entry.text &&
+    prev.index === next.index &&
+    prev.totalEntries === next.totalEntries &&
+    prev.layoutMode === next.layoutMode &&
+    prev.characters === next.characters &&
+    prev.onChange === next.onChange &&
+    prev.onDelete === next.onDelete &&
+    prev.onMoveUp === next.onMoveUp &&
+    prev.onMoveDown === next.onMoveDown &&
+    prev.onAddLine === next.onAddLine &&
+    prev.textareaRef === next.textareaRef
+  );
+}
+
+export const DialogueLine = memo(function DialogueLine({
   entry,
   characters,
   layoutMode,
@@ -48,6 +69,8 @@ export function DialogueLine({
   const speakerButtonRef = useRef<HTMLButtonElement>(null);
   const wasDropdownOpenRef = useRef(false);
   const dropdownId = useId();
+  const textOnChangeRef = useRef(onChange);
+  const previousTextRef = useRef(entry.text);
 
   const resizeTextarea = useCallback(() => {
     const textarea = internalTextareaRef.current;
@@ -56,9 +79,40 @@ export function DialogueLine({
     textarea.style.height = `${textarea.scrollHeight}px`;
   }, []);
 
+  // Keep track of the latest onChange function
   useEffect(() => {
-    resizeTextarea();
-  }, [entry.text, resizeTextarea]);
+    textOnChangeRef.current = onChange;
+  }, [onChange]);
+
+  // Initialize textarea value on mount
+  useEffect(() => {
+    const textarea = internalTextareaRef.current;
+    if (textarea && textarea.value !== entry.text) {
+      textarea.value = entry.text;
+      previousTextRef.current = entry.text;
+      resizeTextarea();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
+
+  // Sync external text changes (e.g., from undo/redo or label switch)
+  useEffect(() => {
+    const textarea = internalTextareaRef.current;
+    if (!textarea) return;
+
+    const isFocused = document.activeElement === textarea;
+
+    // Only sync if this is an external change and textarea is not focused
+    if (
+      !isFocused &&
+      entry.text !== previousTextRef.current &&
+      entry.text !== textarea.value
+    ) {
+      textarea.value = entry.text;
+      previousTextRef.current = entry.text;
+      resizeTextarea();
+    }
+  }, [entry.id, entry.text, resizeTextarea]); // Also depend on entry.id to detect label switches
 
   useEffect(() => {
     window.addEventListener("resize", resizeTextarea);
@@ -148,7 +202,12 @@ export function DialogueLine({
       setFocusedOptionIndex(initialIndex);
       return true;
     });
-  }, [estimateDropdownHeight, getShouldOpenUpward, entry.speakerId, characters]);
+  }, [
+    estimateDropdownHeight,
+    getShouldOpenUpward,
+    entry.speakerId,
+    characters,
+  ]);
 
   useEffect(() => {
     if (!isDropdownOpen) return;
@@ -201,18 +260,27 @@ export function DialogueLine({
 
   const handleSpeakerSelect = useCallback(
     (speakerId: string | null) => {
-      onChange({ ...entry, speakerId });
+      onChange({ id: entry.id, speakerId, text: entry.text });
       setIsDropdownOpen(false);
       setFocusedOptionIndex(-1);
     },
-    [entry, onChange]
+    [entry.id, entry.text, onChange]
   );
 
   const handleTextChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      onChange({ ...entry, text: e.target.value });
+      // Update the ref so we know this change came from user input
+      previousTextRef.current = e.target.value;
+      // Call onChange with updated entry (using ref to avoid stale closure)
+      textOnChangeRef.current({
+        id: entry.id,
+        speakerId: entry.speakerId,
+        text: e.target.value,
+      });
+      // Resize immediately for smooth typing experience
+      resizeTextarea();
     },
-    [entry, onChange]
+    [entry.id, entry.speakerId, resizeTextarea]
   );
 
   const handleKeyDown = useCallback(
@@ -222,7 +290,12 @@ export function DialogueLine({
         onAddLine?.(index);
       }
 
-      if (e.key === "Backspace" && entry.text === "" && totalEntries > 1) {
+      // Check if textarea is empty using the ref instead of entry.text
+      if (
+        e.key === "Backspace" &&
+        internalTextareaRef.current?.value === "" &&
+        totalEntries > 1
+      ) {
         e.preventDefault();
         onDelete();
       }
@@ -240,7 +313,7 @@ export function DialogueLine({
         onMoveDown();
       }
     },
-    [entry, index, totalEntries, onDelete, onMoveUp, onMoveDown, onAddLine]
+    [index, totalEntries, onDelete, onMoveUp, onMoveDown, onAddLine]
   );
 
   const handleDropdownKeyDown = useCallback(
@@ -298,8 +371,11 @@ export function DialogueLine({
   const handleDropdownBlur = useCallback(
     (e: React.FocusEvent<HTMLDivElement>) => {
       if (!e.currentTarget.contains(e.relatedTarget)) {
-        setIsDropdownOpen(false);
-        setFocusedOptionIndex(-1);
+        // Small delay to handle React 19's focus event timing during transitions
+        setTimeout(() => {
+          setIsDropdownOpen(false);
+          setFocusedOptionIndex(-1);
+        }, 0);
       }
     },
     []
@@ -336,7 +412,9 @@ export function DialogueLine({
           aria-haspopup="listbox"
           aria-expanded={isDropdownOpen}
           aria-controls={dropdownId}
-          aria-label={`Change speaker: ${character?.displayName || "Narration"}`}
+          aria-label={`Change speaker: ${
+            character?.displayName || "Narration"
+          }`}
           className={`flex items-center gap-1.5 rounded-md transition-all border tracking-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
             isStacked
               ? "inline-flex h-8 py-1.5 px-2.5 -ml-2.5"
@@ -354,9 +432,10 @@ export function DialogueLine({
                 ? withAlpha(speakerColor, 25)
                 : "hsl(var(--border))"
               : "transparent",
-            color: hasSpeaker && speakerColor
-              ? speakerColor
-              : "hsl(var(--muted-foreground))",
+            color:
+              hasSpeaker && speakerColor
+                ? speakerColor
+                : "hsl(var(--muted-foreground))",
             fontStyle: hasSpeaker ? "normal" : "italic",
           }}
           title={
@@ -365,7 +444,9 @@ export function DialogueLine({
               : "Narration"
           }
         >
-          <span className="truncate">{character?.displayName || "Narration"}</span>
+          <span className="truncate">
+            {character?.displayName || "Narration"}
+          </span>
           <ChevronDown
             className={`w-3 h-3 transition-transform duration-200 flex-shrink-0 ${
               isDropdownOpen ? "rotate-180" : ""
@@ -427,8 +508,7 @@ export function DialogueLine({
                 }`}
                 style={{
                   color: entry.speakerId === char.id ? char.color : undefined,
-                  fontWeight:
-                    entry.speakerId === char.id ? "600" : "normal",
+                  fontWeight: entry.speakerId === char.id ? "600" : "normal",
                 }}
               >
                 <span
@@ -448,7 +528,7 @@ export function DialogueLine({
           internalTextareaRef.current = el;
           if (textareaRef) textareaRef(el);
         }}
-        value={entry.text}
+        defaultValue={entry.text}
         onChange={handleTextChange}
         onKeyDown={handleKeyDown}
         placeholder={entry.speakerId ? "Dialogue..." : "Narration..."}
@@ -477,4 +557,5 @@ export function DialogueLine({
       )}
     </div>
   );
-}
+},
+areDialogueLinePropsEqual);

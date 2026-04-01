@@ -8,6 +8,50 @@ import type { LabelLine } from "@branchforge/shared";
 import type { DialogueEntry } from "./prose-types";
 
 // ============================================================================
+// Hash Functions (for O(1) equality comparison)
+// ============================================================================
+
+/**
+ * Computes a hash for a dialogue entry (speakerId + text)
+ * Uses JSON.stringify for unambiguous encoding that won't collide
+ * even if speakerId or text contain delimiter characters
+ */
+export function hashDialogueEntry(entry: DialogueEntry): string {
+  return JSON.stringify([entry.speakerId, entry.text]);
+}
+
+/**
+ * Computes a combined hash for an array of dialogue entries
+ * Used for faster equality comparison than element-by-element comparison
+ * Note: hashing and comparison are both O(n) in total string length
+ */
+export function hashDialogueEntries(entries: DialogueEntry[]): string {
+  return entries.map(hashDialogueEntry).join("|");
+}
+
+/**
+ * Shared comparison function for dialogue entries
+ * Compares content (speakerId + text), ignoring stable 'id' field
+ */
+export function areDialogueEntriesEqual(
+  left: DialogueEntry[],
+  right: DialogueEntry[]
+): boolean {
+  if (left.length !== right.length) return false;
+
+  for (let i = 0; i < left.length; i++) {
+    if (
+      left[i].speakerId !== right[i].speakerId ||
+      left[i].text !== right[i].text
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// ============================================================================
 // Conversion Functions
 // ============================================================================
 
@@ -20,7 +64,10 @@ import type { DialogueEntry } from "./prose-types";
  */
 export function labelLinesToDialogue(lines: LabelLine[]): DialogueEntry[] {
   return lines
-    .filter((line) => line.contentType === "DIALOGUE" || line.contentType === "NARRATION")
+    .filter(
+      (line) =>
+        line.contentType === "DIALOGUE" || line.contentType === "NARRATION"
+    )
     .map((line) => ({
       id: line.id,
       speakerId: line.speakerId,

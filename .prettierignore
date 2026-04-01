@@ -8,8 +8,21 @@ dist-schema/
 build/
 *.tsbuildinfo
 
+# Database migrations
+apps/backend/src/db/migrations/
+
+# Database files
+*.db
+*.db-journal
+apps/backups/
+
+# Changesets and other
+.changeset/
+_other/
+
 # Test coverage
 coverage/
+.nyc_output/
 
 # Lock files
 package-lock.json
@@ -24,6 +37,38 @@ yarn.lock
 # Logs
 *.log
 
-# Temporary files
-*.tmp
-*.temp
+# Cache and uploads
+cache/
+uploads/
+
+# IDE
+.vscode/
+.idea/
+
+# Git
+.git/
+
+# Misc
+*.swp
+*.swo
+*~
+.DS_Store
+*.tgz
+
+# Minified files
+*.min.js
+*.min.css
+
+# Config and tooling files
+.prettierrc
+
+
+# Claude settings
+.claude/
+
+# GitHub agents
+.github/agents/
+
+# Structured markdown docs
+CLAUDE.md
+.impeccable.md

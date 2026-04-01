@@ -5,7 +5,7 @@
  * Persists selection to localStorage.
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 export type FontFamilyOption = {
   label: string;
@@ -70,13 +70,25 @@ export function FontFamilySwitcher({
   className = "",
 }: FontFamilySwitcherProps = {}) {
   const [fontFamily, setFontFamily] = useState(getSavedFontFamily);
-  const [isOpen, setIsOpen] = useState(false);
-  const [focusedIndex, setFocusedIndex] = useState<number>(-1);
-  const [isKeyboardNav, setIsKeyboardNav] = useState(false);
+
+  // Consolidated dropdown state for better clarity
+  const [dropdownState, setDropdownState] = useState({
+    isOpen: false,
+    focusedIndex: -1,
+    isKeyboardNav: false,
+    closeReason: "keyboard" as "keyboard" | "mouse",
+  });
+
   const listboxRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const focusedIndexRef = useRef<number>(-1);
-  const closeReasonRef = useRef<"keyboard" | "mouse">("keyboard");
+
+  // Helper to update dropdown state
+  const updateDropdownState = useCallback(
+    (updates: Partial<typeof dropdownState>) => {
+      setDropdownState((prev) => ({ ...prev, ...updates }));
+    },
+    []
+  );
 
   useEffect(() => {
     // Set CSS custom property on document root for persistence across remounts
@@ -91,35 +103,52 @@ export function FontFamilySwitcher({
 
   // Set focused index to current option when dropdown opens
   useEffect(() => {
-    if (isOpen) {
+    if (dropdownState.isOpen) {
       const currentIndex = FONT_FAMILY_OPTIONS.findIndex(
         (opt) => opt.value === fontFamily
       );
-      focusedIndexRef.current = currentIndex >= 0 ? currentIndex : 0;
-      closeReasonRef.current = "keyboard";
-      if (isKeyboardNav) {
-        setFocusedIndex(focusedIndexRef.current);
+      const newFocusedIndex = currentIndex >= 0 ? currentIndex : 0;
+      if (dropdownState.isKeyboardNav) {
+        if (
+          dropdownState.focusedIndex !== newFocusedIndex ||
+          dropdownState.closeReason !== "keyboard"
+        ) {
+          updateDropdownState({
+            focusedIndex: newFocusedIndex,
+            closeReason: "keyboard",
+          });
+        }
+      } else if (dropdownState.closeReason !== "keyboard") {
+        updateDropdownState({ closeReason: "keyboard" });
       }
       listboxRef.current?.focus();
     } else {
-      focusedIndexRef.current = -1;
-      setFocusedIndex(-1);
-      if (closeReasonRef.current === "keyboard") {
+      if (dropdownState.focusedIndex !== -1) {
+        updateDropdownState({ focusedIndex: -1 });
+      }
+      if (dropdownState.closeReason === "keyboard") {
         buttonRef.current?.focus();
       }
     }
-  }, [isOpen, fontFamily, isKeyboardNav]);
+  }, [
+    dropdownState.isOpen,
+    dropdownState.closeReason,
+    dropdownState.isKeyboardNav,
+    fontFamily,
+    updateDropdownState,
+    dropdownState.focusedIndex,
+  ]);
 
   const handleSelect = (value: string) => {
     setFontFamily(value);
     saveFontFamily(value);
-    setIsOpen(false);
+    updateDropdownState({ isOpen: false });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    setIsKeyboardNav(true);
+    updateDropdownState({ isKeyboardNav: true });
 
-    if (!isOpen) {
+    if (!dropdownState.isOpen) {
       if (
         e.key === "ArrowDown" ||
         e.key === "ArrowUp" ||
@@ -127,7 +156,7 @@ export function FontFamilySwitcher({
         e.key === " "
       ) {
         e.preventDefault();
-        setIsOpen(true);
+        updateDropdownState({ isOpen: true });
       }
       return;
     }
@@ -135,54 +164,58 @@ export function FontFamilySwitcher({
     switch (e.key) {
       case "Escape":
         e.preventDefault();
-        closeReasonRef.current = "keyboard";
-        setIsOpen(false);
+        updateDropdownState({
+          isOpen: false,
+          closeReason: "keyboard",
+        });
         break;
       case "ArrowDown":
         e.preventDefault();
-        focusedIndexRef.current = Math.min(
-          focusedIndexRef.current + 1,
-          FONT_FAMILY_OPTIONS.length - 1
-        );
-        setFocusedIndex(focusedIndexRef.current);
+        updateDropdownState({
+          focusedIndex: Math.min(
+            dropdownState.focusedIndex + 1,
+            FONT_FAMILY_OPTIONS.length - 1
+          ),
+        });
         break;
       case "ArrowUp":
         e.preventDefault();
-        focusedIndexRef.current = Math.max(focusedIndexRef.current - 1, 0);
-        setFocusedIndex(focusedIndexRef.current);
+        updateDropdownState({
+          focusedIndex: Math.max(dropdownState.focusedIndex - 1, 0),
+        });
         break;
       case "Enter":
       case " ":
         e.preventDefault();
         if (
-          focusedIndexRef.current >= 0 &&
-          focusedIndexRef.current < FONT_FAMILY_OPTIONS.length
+          dropdownState.focusedIndex >= 0 &&
+          dropdownState.focusedIndex < FONT_FAMILY_OPTIONS.length
         ) {
-          closeReasonRef.current = "keyboard";
-          handleSelect(FONT_FAMILY_OPTIONS[focusedIndexRef.current].value);
+          updateDropdownState({ closeReason: "keyboard" });
+          handleSelect(FONT_FAMILY_OPTIONS[dropdownState.focusedIndex].value);
         }
         break;
       case "Home":
         e.preventDefault();
-        focusedIndexRef.current = 0;
-        setFocusedIndex(0);
+        updateDropdownState({ focusedIndex: 0 });
         break;
       case "End":
         e.preventDefault();
-        focusedIndexRef.current = FONT_FAMILY_OPTIONS.length - 1;
-        setFocusedIndex(FONT_FAMILY_OPTIONS.length - 1);
+        updateDropdownState({ focusedIndex: FONT_FAMILY_OPTIONS.length - 1 });
         break;
     }
   };
 
   const handleMouseDown = () => {
-    setIsKeyboardNav(false);
+    updateDropdownState({ isKeyboardNav: false });
   };
 
   const handleBlur = (e: React.FocusEvent) => {
     if (!e.currentTarget.contains(e.relatedTarget)) {
-      closeReasonRef.current = "mouse";
-      setIsOpen(false);
+      updateDropdownState({
+        isOpen: false,
+        closeReason: "mouse",
+      });
     }
   };
 
@@ -190,8 +223,8 @@ export function FontFamilySwitcher({
     FONT_FAMILY_OPTIONS.find((opt) => opt.value === fontFamily) ??
     FONT_FAMILY_OPTIONS[0];
 
-  const currentFocusedIndex = isKeyboardNav
-    ? focusedIndex
+  const currentFocusedIndex = dropdownState.isKeyboardNav
+    ? dropdownState.focusedIndex
     : FONT_FAMILY_OPTIONS.findIndex((opt) => opt.value === fontFamily);
 
   return (
@@ -203,9 +236,11 @@ export function FontFamilySwitcher({
       <button
         ref={buttonRef}
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() =>
+          setDropdownState((prev) => ({ ...prev, isOpen: !prev.isOpen }))
+        }
         onKeyDown={handleKeyDown}
-        aria-expanded={isOpen}
+        aria-expanded={dropdownState.isOpen}
         aria-haspopup="listbox"
         aria-labelledby="font-family-label"
         className="px-2 py-1 border border-[hsl(var(--border)/0.6)] hover:bg-[hsl(var(--muted)/0.4)] text-xs text-muted-foreground hover:text-foreground rounded flex items-center gap-2 transition-colors"
@@ -230,7 +265,9 @@ export function FontFamilySwitcher({
         </span>
         <span aria-hidden="true">{currentOption.label}</span>
         <svg
-          className={`w-3 h-3 transition-transform ${isOpen ? "rotate-180" : ""}`}
+          className={`w-3 h-3 transition-transform ${
+            dropdownState.isOpen ? "rotate-180" : ""
+          }`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -245,13 +282,15 @@ export function FontFamilySwitcher({
         </svg>
       </button>
 
-      {isOpen && (
+      {dropdownState.isOpen && (
         <>
           <div
             className="fixed inset-0 z-40"
             onClick={() => {
-              closeReasonRef.current = "mouse";
-              setIsOpen(false);
+              updateDropdownState({
+                isOpen: false,
+                closeReason: "mouse",
+              });
             }}
           />
           <div
@@ -275,14 +314,14 @@ export function FontFamilySwitcher({
                 role="option"
                 aria-selected={option.value === fontFamily}
                 onClick={() => {
-                  closeReasonRef.current = "mouse";
+                  updateDropdownState({ closeReason: "mouse" });
                   handleSelect(option.value);
                 }}
                 tabIndex={-1}
                 className={`w-full px-3 py-2 text-left text-xs hover:bg-accent hover:text-accent-foreground transition-colors flex items-center justify-between ${
                   option.value === fontFamily ? "bg-accent/50" : ""
                 } ${
-                  isKeyboardNav && index === currentFocusedIndex
+                  dropdownState.isKeyboardNav && index === currentFocusedIndex
                     ? "outline outline-2 outline-offset-[-2px]"
                     : ""
                 }`}

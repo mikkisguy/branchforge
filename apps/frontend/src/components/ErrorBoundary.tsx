@@ -1,0 +1,128 @@
+import type { ReactNode } from "react";
+import { Component } from "react";
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  fallback?: ReactNode;
+  onError?: (error: Error, errorInfo: { componentStack: string }) => void;
+  /** Keys that trigger a reset when changed */
+  resetKeys?: readonly unknown[];
+  /** Callback invoked after error boundary is reset */
+  onReset?: () => void;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+}
+
+/**
+ * ErrorBoundary catches errors in React component trees, including errors from
+ * lazy-loaded components during dynamic imports.
+ *
+ * Place this around Suspense boundaries to catch lazy-load failures.
+ */
+export class ErrorBoundary extends Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: { componentStack: string }): void {
+    // Log to console in development
+    if (import.meta.env.DEV) {
+      console.error("ErrorBoundary caught an error:", error);
+      console.error("Component stack:", errorInfo.componentStack);
+    }
+
+    // Call optional onError prop for custom logging/error tracking
+    this.props.onError?.(error, errorInfo);
+  }
+
+  componentDidUpdate(prevProps: Readonly<ErrorBoundaryProps>): void {
+    const { resetKeys } = this.props;
+    const { resetKeys: prevResetKeys } = prevProps;
+
+    // Auto-reset when resetKeys change
+    if (prevResetKeys !== resetKeys) {
+      if (resetKeys && prevResetKeys) {
+        const hasKeyChanged = resetKeys.some(
+          (key, i) => !Object.is(key, prevResetKeys[i])
+        );
+        if (hasKeyChanged && this.state.hasError) {
+          this.resetErrorBoundary();
+        }
+      } else if (resetKeys !== prevResetKeys && this.state.hasError) {
+        // Handle undefined -> array or array -> undefined transitions
+        this.resetErrorBoundary();
+      }
+    }
+  }
+
+  /** Public method to programmatically reset the error boundary */
+  resetErrorBoundary(): void {
+    const { onReset } = this.props;
+
+    // Clear error state
+    this.setState({ hasError: false, error: undefined });
+
+    // Call onReset callback after state is cleared
+    onReset?.();
+  }
+
+  render(): ReactNode {
+    if (this.state.hasError) {
+      // Use custom fallback if provided, otherwise use default
+      return (
+        this.props.fallback ?? (
+          <div
+            role="alert"
+            className="flex flex-col items-center justify-center h-screen gap-4 px-4 text-center"
+          >
+            <div className="text-6xl text-slate-600">⚠️</div>
+            <h2 className="text-xl font-semibold text-slate-300">
+              Something went wrong
+            </h2>
+            <p className="text-sm text-slate-500 max-w-md">
+              The application encountered an unexpected error. Please try
+              refreshing the page.
+            </p>
+            {this.state.error && import.meta.env.DEV && (
+              <details className="mt-4 text-xs text-slate-600 text-left max-w-lg">
+                <summary className="cursor-pointer hover:text-slate-500">
+                  Error details
+                </summary>
+                <pre className="mt-2 p-3 bg-slate-900 rounded overflow-auto max-h-48">
+                  {this.state.error.stack ?? this.state.error.toString()}
+                </pre>
+              </details>
+            )}
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => this.resetErrorBoundary()}
+                className="px-4 py-2 text-slate-300 border border-slate-600 rounded hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-slate-500"
+              >
+                Try Again
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-theme-primary text-white rounded hover:opacity-90 transition-opacity"
+              >
+                Reload Page
+              </button>
+            </div>
+          </div>
+        )
+      );
+    }
+
+    return this.props.children;
+  }
+}

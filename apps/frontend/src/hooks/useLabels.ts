@@ -45,6 +45,7 @@ export interface UseLabelsReturn {
     dialogue: Array<{ speakerId: string | null; text: string }>
   ) => void;
   isUpdatingDialogue: boolean;
+  isUpdateError: boolean;
 }
 
 // ============================================================================
@@ -56,13 +57,13 @@ export function useLabels(): UseLabelsReturn {
   const { currentProject } = useProject();
 
   // Query for all labels in the current project
-  // Always runs with the project ID from useProject, refetches on mount
+  // Refetch on mount to ensure fresh data when entering Write Mode
   const { data: labels = [], isLoading: isLoadingLabels } = useQuery({
     queryKey: labelKeys.lists(currentProject?.id ?? ""),
     queryFn: () => labelsApi.listLabels({ projectId: currentProject!.id }),
     enabled: !!currentProject?.id,
-    refetchOnMount: "always",
-    staleTime: 30 * 1000, // 30 seconds (reduced from 5 min for better reload UX)
+    refetchOnMount: true, // Always fetch fresh list on mount
+    staleTime: 30 * 1000, // 30 seconds - balance freshness and performance
   });
 
   // Local state for active label ID
@@ -90,7 +91,7 @@ export function useLabels(): UseLabelsReturn {
 
   // Update dialogue mutation
   const updateDialogueMutation = useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       labelId,
       dialogue,
     }: {
@@ -100,17 +101,13 @@ export function useLabels(): UseLabelsReturn {
     onSuccess: (_data, variables) => {
       clearHistoryCursor(variables.labelId);
 
-      // Invalidate labels query and writing goals query
-      if (currentProject) {
+      // Invalidate active label detail query (dialogue content changed)
+      // Invalidate writingGoals (word count may have changed)
+      // Don't invalidate labels list - metadata hasn't changed
+      if (currentProject && localActiveLabelId) {
         queryClient.invalidateQueries({
-          queryKey: labelKeys.lists(currentProject.id),
+          queryKey: labelKeys.detail(currentProject.id, localActiveLabelId),
         });
-        // Also invalidate detail query if the active label was updated
-        if (localActiveLabelId) {
-          queryClient.invalidateQueries({
-            queryKey: labelKeys.detail(currentProject.id, localActiveLabelId),
-          });
-        }
 
         queryClient.invalidateQueries({
           queryKey: ["labels", variables.labelId, "versions"],
@@ -171,5 +168,6 @@ export function useLabels(): UseLabelsReturn {
     invalidateLabels,
     updateDialogue,
     isUpdatingDialogue: updateDialogueMutation.isPending,
+    isUpdateError: updateDialogueMutation.isError,
   };
 }

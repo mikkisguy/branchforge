@@ -143,9 +143,7 @@ function buildLineValues(
 }> {
   return entries.map((entry, index) => {
     const contentType = mapEntryToDbType(entry);
-    const content = entry.target
-      ? `jump ${entry.target}`
-      : entry.text || "";
+    const content = entry.target ? `jump ${entry.target}` : entry.text || "";
     const lineHash = calculateContentHash(content);
 
     return {

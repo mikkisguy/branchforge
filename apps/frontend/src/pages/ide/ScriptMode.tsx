@@ -1,11 +1,7 @@
 import { useState, useMemo } from "react";
 import { Download, Package } from "lucide-react";
 import { StoryPanel } from "@/components/ide-shared";
-import {
-  BookmarkTab,
-  StatusBar,
-  ScriptEditor,
-} from "@/components/script-mode";
+import { BookmarkTab, StatusBar, ScriptEditor } from "@/components/script-mode";
 import { ProjectFileTree } from "@/components/script-mode/ProjectFileTree";
 import { useLabels } from "@/hooks/useLabels";
 import { useGitLab } from "@/hooks/useGitLab";
@@ -28,12 +24,8 @@ export function ScriptMode({
   projectName,
   gitlabBranch,
 }: ScriptModeProps) {
-  const {
-    activeLabel,
-    activeLabelId,
-    setActiveLabelId,
-    isLoadingLabels,
-  } = useLabels();
+  const { activeLabel, activeLabelId, setActiveLabelId, isLoadingLabels } =
+    useLabels();
 
   const { isProjectLinked, getLinkedRepository } = useGitLab();
   const { files: projectFiles, isLoadingFiles } = useProjectFiles(projectId);
@@ -116,9 +108,7 @@ export function ScriptMode({
     return (
       <div className="flex-1 flex flex-col pt-16">
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
-          <p className="text-muted-foreground">
-            No files imported yet
-          </p>
+          <p className="text-muted-foreground">No files imported yet</p>
           <p className="text-sm text-muted-foreground">
             Import from GitLab or import from a zip file to get started
           </p>
@@ -322,8 +312,8 @@ export function ScriptMode({
           activeProjectFile
             ? activeFileLines.length
             : activeLabel
-              ? activeLabelLines.length
-              : 0
+            ? activeLabelLines.length
+            : 0
         }
         language="Ren'Py"
         themeName={themeName}

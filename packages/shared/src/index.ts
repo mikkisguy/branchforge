@@ -443,9 +443,7 @@ export const FileSourceType = {
  * @param value - The value to validate
  * @returns true if the value is a valid FileSourceType
  */
-export function isValidFileSourceType(
-  value: string
-): value is FileSourceType {
+export function isValidFileSourceType(value: string): value is FileSourceType {
   return value === "GITLAB" || value === "ZIP";
 }
 

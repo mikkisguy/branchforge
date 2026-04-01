@@ -23,10 +23,8 @@ export function WritingGoalSettings() {
   const [detectedTimezone, setDetectedTimezone] = useState<string | null>(null);
   const [showResetConfirmDialog, setShowResetConfirmDialog] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
-  // Local state for immediate feedback; debounced to sync with server
-  const [localGoalInput, setLocalGoalInput] = useState<string | undefined>(
-    undefined
-  );
+  // Explicit state: null = use server value, string = user is editing
+  const [localGoalInput, setLocalGoalInput] = useState<string | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isDisabled = isLoading || isSaving || isResetting;
@@ -60,7 +58,7 @@ export function WritingGoalSettings() {
   // Persist debounced goal changes to server
   useEffect(() => {
     // Only persist if we have a local value different from server
-    if (localGoalInput === undefined) return;
+    if (localGoalInput === null) return;
 
     const num = parseInt(localGoalInput, 10);
     if (isNaN(num)) return;
@@ -86,7 +84,7 @@ export function WritingGoalSettings() {
     if (debounceTimerRef.current) return;
 
     if (settings?.dailyWritingGoal != null) {
-      setLocalGoalInput(undefined);
+      setLocalGoalInput(null);
     }
   }, [settings?.dailyWritingGoal]);
 

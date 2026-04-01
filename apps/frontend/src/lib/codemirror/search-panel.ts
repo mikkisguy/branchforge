@@ -104,7 +104,9 @@ export function updateSearchPanel(view: EditorView): void {
 
   // Focus search input when panel is newly opened
   if (isPanelOpen && !wasPanelOpen) {
-    const searchInput = panel.querySelector('input[name="search"]') as HTMLInputElement | null;
+    const searchInput = panel.querySelector(
+      'input[name="search"]'
+    ) as HTMLInputElement | null;
     searchInput?.focus();
   }
 
@@ -170,5 +172,7 @@ export function updateSearchPanel(view: EditorView): void {
   }
 
   countElement.textContent =
-    current > 0 ? `${current} of ${displayTotal}` : `${displayTotal} ${matchLabel}`;
+    current > 0
+      ? `${current} of ${displayTotal}`
+      : `${displayTotal} ${matchLabel}`;
 }

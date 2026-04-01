@@ -57,7 +57,9 @@ export function PaletteSwitcher() {
         />
         <span>{PALETTES[selectedIndex].name}</span>
         <svg
-          className={`w-3 h-3 transition-transform ${isOpen ? "rotate-180" : ""}`}
+          className={`w-3 h-3 transition-transform ${
+            isOpen ? "rotate-180" : ""
+          }`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
