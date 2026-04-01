@@ -34,11 +34,11 @@ CREATE TYPE "public"."project_visibility" AS ENUM( 'PRIVATE', 'TEAM');--> statem
 ALTER TABLE "projects" DROP CONSTRAINT IF EXISTS "projects_user_id_users_id_fk";
 --> statement-breakpoint
 ALTER TABLE "projects" ALTER COLUMN "visibility" DROP DEFAULT;--> statement-breakpoint
-ALTER TABLE "projects" ALTER COLUMN "visibility" SET DATA TYPE "public"."project_visibility" USING CASE "visibility"::text
+ALTER TABLE "projects" ALTER COLUMN "visibility" SET DATA TYPE "public"."project_visibility" USING (CASE "visibility"::text
   WHEN 'OWNER' THEN 'PRIVATE'
   WHEN 'READER' THEN 'TEAM'
   WHEN 'TESTER' THEN 'TEAM'
-END;--> statement-breakpoint
+END)::"public"."project_visibility";--> statement-breakpoint
 ALTER TABLE "projects" ALTER COLUMN "visibility" SET DEFAULT 'PRIVATE';--> statement-breakpoint
 ALTER TABLE "users" ADD COLUMN "deleted_at" timestamp;--> statement-breakpoint
 ALTER TABLE "projects" ADD CONSTRAINT "projects_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
