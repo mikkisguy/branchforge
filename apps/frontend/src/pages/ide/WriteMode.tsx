@@ -15,6 +15,7 @@ import {
 import { useLabels } from "@/hooks/useLabels";
 import { useCharacters } from "@/hooks/useCharacters";
 import { useProject } from "@/hooks/useProject";
+import { useAutosave } from "@/hooks/useAutosave";
 import type { DialogueEntry } from "@/lib/prose-types";
 import { dialogueToPayload, hashDialogueEntries } from "@/lib/prose-converter";
 import { Loader2, Sparkles, FileQuestion } from "lucide-react";
@@ -24,14 +25,9 @@ interface WriteModeProps {
   projectName?: string;
 }
 
-interface DialoguePayloadEntry {
-  speakerId: string | null;
-  text: string;
-}
-
 function getPersistedDialogueFromLabel(
   activeLabel: LabelDetail | undefined
-): DialoguePayloadEntry[] {
+): DialogueEntry[] {
   if (!activeLabel?.lines) {
     return [];
   }
@@ -43,6 +39,7 @@ function getPersistedDialogueFromLabel(
         line.content.trim().length > 0
     )
     .map((line) => ({
+      id: line.id,
       speakerId: line.speakerId,
       text: line.content,
     }));
@@ -63,129 +60,116 @@ export function WriteMode({ projectName }: WriteModeProps) {
 
   const { characters } = useCharacters(currentProject?.id ?? "");
   const [isFocusMode, setIsFocusMode] = useState(false);
-  const [isSaveQueued, setIsSaveQueued] = useState(false);
+
+  // Track current editor entries (the source of truth for ProseEditor)
+  const [currentEntries, setCurrentEntries] = useState<DialogueEntry[]>(() =>
+    getPersistedDialogueFromLabel(activeLabel)
+  );
+
+  // Track the previous label ID for flushing pending saves on label switch
+  const prevLabelIdRef = useRef<string | null>(null);
+
+  // Track last saved timestamp for display
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Track the saved hash per label for accurate change detection
+  const savedHashesRef = useRef<Map<string, string>>(new Map());
+
+  // Track previous isUpdatingDialogue state to detect when save completes
   const wasUpdatingDialogueRef = useRef(false);
-  // Track hash of last saved content per label (O(1) comparison)
-  const persistedStateRef = useRef<Map<string, string>>(new Map());
-  const pendingSaveRef = useRef<{
-    labelId: string | null;
-    entries: DialogueEntry[] | null;
-    cachedPayload: DialoguePayloadEntry[] | null;
-    shouldPersist: boolean;
-  }>({
-    labelId: null,
-    entries: null,
-    cachedPayload: null,
-    shouldPersist: false,
-  });
+
+  // Track when we're switching labels to prevent spurious saves
+  const isSwitchingLabelsRef = useRef(false);
+  // Track pending data to reset hash for after label switch
+  const pendingResetHashRef = useRef<DialogueEntry[] | null>(null);
 
   const handleFocusModeToggle = useCallback(() => {
     setIsFocusMode((prev) => !prev);
   }, []);
 
-  // Debounced save function
-  const handleContentChange = useCallback(
-    (entries: DialogueEntry[]) => {
-      // If switching labels, flush pending save for previous label
-      if (
-        saveTimeoutRef.current &&
-        pendingSaveRef.current.labelId &&
-        pendingSaveRef.current.labelId !== activeLabelId &&
-        pendingSaveRef.current.entries &&
-        pendingSaveRef.current.shouldPersist
-      ) {
-        clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = null;
-        setIsSaveQueued(false);
-        const dialogue =
-          pendingSaveRef.current.cachedPayload ??
-          dialogueToPayload(pendingSaveRef.current.entries);
-        // Skip if there's already a save in progress
-        if (!isUpdatingDialogue) {
-          updateDialogue(pendingSaveRef.current.labelId, dialogue);
-        }
-      }
-
-      const nextHash = hashDialogueEntries(entries);
-      const persistedHash =
-        persistedStateRef.current.get(activeLabelId ?? "") ?? "";
-      const shouldPersist = nextHash !== persistedHash;
-
-      // Compute payload only if changed or not cached
-      let nextPayload = pendingSaveRef.current.cachedPayload;
-      if (shouldPersist || !nextPayload) {
-        nextPayload = dialogueToPayload(entries);
-      }
-
-      // Store pending save with cached payload
-      pendingSaveRef.current = {
-        labelId: activeLabelId,
-        entries,
-        cachedPayload: nextPayload,
-        shouldPersist,
-      };
-      setIsSaveQueued(shouldPersist);
-
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = null;
-      }
-
-      saveTimeoutRef.current = setTimeout(() => {
-        if (activeLabelId && pendingSaveRef.current.shouldPersist) {
-          setIsSaveQueued(false);
-          // Use cached payload if available, otherwise compute
-          const dialogue =
-            pendingSaveRef.current.cachedPayload ??
-            dialogueToPayload(pendingSaveRef.current.entries ?? []);
-          // Skip if there's already a save in progress (prevents duplicates from StrictMode)
-          if (!isUpdatingDialogue) {
-            updateDialogue(activeLabelId, dialogue);
-          }
-          pendingSaveRef.current = {
-            labelId: null,
-            entries: null,
-            cachedPayload: null,
-            shouldPersist: false,
-          }; // Clear after successful save
-        } else {
-          setIsSaveQueued(false);
-        }
-
-        saveTimeoutRef.current = null;
-      }, 2000); // 2 second debounce
-    },
-    [activeLabelId, updateDialogue, isUpdatingDialogue]
-  );
-
-  // Track persisted state per label, pruning stale entries when labels change
+  // Update saved hash when active label changes or save completes
   useEffect(() => {
-    if (activeLabel) {
-      // Skip resetting if there's a save in progress for this label to avoid
-      // overwriting the pending baseline that handleContentChange relies on
-      if (
-        isUpdatingDialogue &&
-        pendingSaveRef.current.labelId === activeLabel.id
-      ) {
-        return;
-      }
+    if (activeLabel && !isUpdatingDialogue) {
       const persistedDialogue = getPersistedDialogueFromLabel(activeLabel);
-      // Convert payload to DialogueEntry[] for hashing
-      const dialogueEntries: DialogueEntry[] = persistedDialogue.map(
-        (p, i) => ({
-          id: `${activeLabel.id}-${i}`,
-          speakerId: p.speakerId,
-          text: p.text,
-        })
-      );
-      const persistedHash = hashDialogueEntries(dialogueEntries);
-      persistedStateRef.current.set(activeLabel.id, persistedHash);
+      const hash = hashDialogueEntries(persistedDialogue);
+      savedHashesRef.current.set(activeLabel.id, hash);
     }
   }, [activeLabel, isUpdatingDialogue]);
 
-  // Prune stale entries from persistedStateRef when labels list changes
+  // Update lastSaved timestamp when save completes successfully
+  useEffect(() => {
+    if (wasUpdatingDialogueRef.current && !isUpdatingDialogue && !isUpdateError) {
+      setLastSaved(new Date());
+    }
+    wasUpdatingDialogueRef.current = isUpdatingDialogue;
+  }, [isUpdatingDialogue, isUpdateError]);
+
+  // Autosave hook for dialogue entries
+  const { saveStatus, triggerSave, resetSavedHash } = useAutosave<DialogueEntry[]>({
+    data: currentEntries,
+    hashFn: hashDialogueEntries,
+    debounceMs: 1000, // 1 second debounce for faster feedback
+    skipSaveRef: isSwitchingLabelsRef, // Prevent saves during label switches
+    onSave: useCallback(async (entries: DialogueEntry[]) => {
+      if (activeLabelId) {
+        const payload = dialogueToPayload(entries);
+        await updateDialogue(activeLabelId, payload);
+        // Update saved hash after successful save
+        savedHashesRef.current.set(activeLabelId, hashDialogueEntries(entries));
+      }
+    }, [activeLabelId, updateDialogue]),
+    onError: useCallback((error: Error) => {
+      console.error("Failed to save dialogue:", error);
+    }, []),
+  });
+
+  // Handle content changes from ProseEditor
+  const handleContentChange = useCallback((entries: DialogueEntry[]) => {
+    setCurrentEntries(entries);
+  }, []);
+
+  // Handle label switching - flush pending save for previous label
+  useEffect(() => {
+    const prevLabelId = prevLabelIdRef.current;
+    if (prevLabelId && prevLabelId !== activeLabelId && saveStatus === "unsaved") {
+      // Flush pending save before switching labels
+      triggerSave();
+    }
+
+    // Update current entries when switching labels
+    if (activeLabelId !== prevLabelId && activeLabel) {
+      const persistedDialogue = getPersistedDialogueFromLabel(activeLabel);
+
+      // Set flag to prevent spurious saves during label switch
+      isSwitchingLabelsRef.current = true;
+      pendingResetHashRef.current = persistedDialogue;
+
+      setCurrentEntries(persistedDialogue);
+      // Flag and hash will be reset by the useEffect below after render
+    }
+
+    prevLabelIdRef.current = activeLabelId;
+  }, [activeLabelId, activeLabel, saveStatus, triggerSave, resetSavedHash]);
+
+  // Reset saved hash and clear switching flag after currentEntries updates
+  useEffect(() => {
+    if (pendingResetHashRef.current !== null) {
+      resetSavedHash(pendingResetHashRef.current);
+      isSwitchingLabelsRef.current = false;
+      pendingResetHashRef.current = null;
+    }
+  }, [currentEntries, resetSavedHash]);
+
+  // Flush pending save on unmount
+  useEffect(() => {
+    return () => {
+      if (saveStatus === "unsaved") {
+        triggerSave();
+      }
+    };
+  }, [saveStatus, triggerSave]);
+
+  // Prune stale entries from savedHashesRef when labels list changes
   const prevLabelsRef = useRef<string[]>([]);
   useEffect(() => {
     const currentLabelIds = labels.map((l) => l.id);
@@ -194,83 +178,52 @@ export function WriteMode({ projectName }: WriteModeProps) {
     // Remove entries for labels that no longer exist
     for (const labelId of prevLabelIds) {
       if (!currentLabelIds.includes(labelId)) {
-        persistedStateRef.current.delete(labelId);
+        savedHashesRef.current.delete(labelId);
       }
     }
 
     prevLabelsRef.current = currentLabelIds;
   }, [labels]);
 
-  // Clean up persistedStateRef on unmount
+  // Clean up savedHashesRef on unmount
   useEffect(() => {
-    const map = persistedStateRef.current;
+    const map = savedHashesRef.current;
     return () => {
       map.clear();
     };
   }, []);
 
-  useEffect(() => {
-    if (
-      wasUpdatingDialogueRef.current &&
-      !isUpdatingDialogue &&
-      !isUpdateError
-    ) {
-      setLastSaved(new Date());
-      // After successful save, update the persisted state with what was actually saved
-      if (pendingSaveRef.current.labelId && pendingSaveRef.current.entries) {
-        const savedHash = hashDialogueEntries(pendingSaveRef.current.entries);
-        persistedStateRef.current.set(
-          pendingSaveRef.current.labelId,
-          savedHash
-        );
-      }
-    }
-
-    wasUpdatingDialogueRef.current = isUpdatingDialogue;
-  }, [isUpdatingDialogue, isUpdateError]);
-
-  // Clean up timeout on unmount, flushing any pending changes
-  useEffect(() => {
-    return () => {
-      // Flush pending changes before clearing
-      if (
-        saveTimeoutRef.current &&
-        pendingSaveRef.current.entries &&
-        pendingSaveRef.current.labelId &&
-        pendingSaveRef.current.shouldPersist
-      ) {
-        clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = null;
-        setIsSaveQueued(false);
-        const dialogue =
-          pendingSaveRef.current.cachedPayload ??
-          dialogueToPayload(pendingSaveRef.current.entries);
-        // Skip if there's already a save in progress
-        if (!isUpdatingDialogue) {
-          updateDialogue(pendingSaveRef.current.labelId, dialogue);
-        }
-      }
-      pendingSaveRef.current = {
-        labelId: null,
-        entries: null,
-        cachedPayload: null,
-        shouldPersist: false,
-      };
-      setIsSaveQueued(false);
+  // Convert SaveStatus to ProseEditor props
+  const saveStatusToEditorProps = useCallback((): {
+    isSaving: boolean;
+    lastSaved: Date | null;
+    hasPendingSave: boolean;
+    saveError: boolean;
+  } => {
+    return {
+      isSaving: saveStatus === "saving",
+      lastSaved: saveStatus === "saved" ? lastSaved : null,
+      hasPendingSave: saveStatus === "unsaved",
+      saveError: saveStatus === "error",
     };
-  }, [activeLabelId, updateDialogue]);
+  }, [saveStatus, lastSaved]);
 
+  // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyF") {
         e.preventDefault();
         handleFocusModeToggle();
       }
+      if ((e.ctrlKey || e.metaKey) && e.code === "KeyS") {
+        e.preventDefault();
+        triggerSave();
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleFocusModeToggle]);
+  }, [handleFocusModeToggle, triggerSave]);
 
   if (isLoadingLabels) {
     return (
@@ -309,6 +262,8 @@ export function WriteMode({ projectName }: WriteModeProps) {
       </div>
     );
   }
+
+  const editorProps = saveStatusToEditorProps();
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
@@ -360,9 +315,10 @@ export function WriteMode({ projectName }: WriteModeProps) {
               characters={characters}
               onChange={handleContentChange}
               isFocusMode={isFocusMode}
-              isSaving={isSaveQueued || isUpdatingDialogue}
-              lastSaved={lastSaved}
-              saveError={isUpdateError}
+              isSaving={editorProps.isSaving}
+              lastSaved={editorProps.lastSaved}
+              hasPendingSave={editorProps.hasPendingSave}
+              saveError={editorProps.saveError}
             />
           </div>
         </div>

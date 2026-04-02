@@ -1090,12 +1090,12 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
   let lastDialogueIndent = "    "; // Default RPY indentation
 
   // Keywords that signal the end of a label's dialogue block
-  const labelEndKeywords = new Set([
-    "return", "menu", "jump", "call"
-  ]);
+  const labelEndKeywords = new Set(["return", "menu", "jump", "call"]);
   const isLabelEndKeyword = (trimmed: string): boolean => {
     const firstWord = trimmed.split(/\s+/)[0];
-    return labelEndKeywords.has(firstWord);
+    // Normalize by stripping trailing colon and other punctuation
+    const normalized = firstWord.replace(/:$/, "").toLowerCase();
+    return labelEndKeywords.has(normalized);
   };
 
   for (const line of lines) {
@@ -1111,7 +1111,8 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
         const currentIndex = labelDialogueIndices.get(currentLabel) ?? 0;
 
         if (currentIndex < labelDialogue.length) {
-          const indent = labelIndentation.get(currentLabel) || lastDialogueIndent;
+          const indent =
+            labelIndentation.get(currentLabel) || lastDialogueIndent;
           for (let i = currentIndex; i < labelDialogue.length; i++) {
             const entry = labelDialogue[i];
             if (entry.speaker) {
@@ -1127,7 +1128,11 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
 
       // Add blank line before new label if we just inserted dialogue
       // Check if result doesn't already end with a blank line
-      if (insertedDialogue && result.length > 0 && result[result.length - 1] !== "") {
+      if (
+        insertedDialogue &&
+        result.length > 0 &&
+        result[result.length - 1] !== ""
+      ) {
         result.push("");
       }
 
@@ -1427,6 +1432,118 @@ export function removeLabelFromRPYContent(
     if (!hasLabels) {
       // No labels left, return a minimal valid RPY file
       return finalContent.trim() + "\n";
+    }
+  }
+
+  return result.join("\n");
+}
+
+/**
+ * Replace dialogue lines for a specific label in RPY content
+ * This is used by write mode to update dialogue while preserving all other content
+ *
+ * @param rpyContent - Full RPY file content
+ * @param labelName - Target label name (case-insensitive, sanitized)
+ * @param newDialogue - New dialogue entries with speaker information
+ * @returns Updated RPY content with replaced dialogue
+ */
+export function replaceLabelDialogue(
+  rpyContent: string,
+  labelName: string,
+  newDialogue: Array<{ speaker: string | null; text: string }>
+): string {
+  const lines = rpyContent.split("\n");
+  const result: string[] = [];
+  let inTargetLabel = false;
+  let labelIndent = 0;
+  let dialogueIndent: string | null = null;
+  let newDialogueInserted = false;
+
+  // Sanitize label name for comparison (same as sanitizeLabelName in frontend)
+  const sanitizedLabelName = labelName
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Check for label definition
+    const labelMatch = line.match(/^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+    if (labelMatch) {
+      const currentLabel = labelMatch[1];
+      const sanitizedCurrentLabel = currentLabel
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, "_")
+        .replace(/^_+|_+$/g, "");
+
+      if (sanitizedCurrentLabel === sanitizedLabelName) {
+        // Found the target label
+        inTargetLabel = true;
+        labelIndent = line.search(/\S/);
+        result.push(line); // Keep the label line
+        continue;
+      } else if (inTargetLabel) {
+        // Entered a different label - we're done with the target label
+        inTargetLabel = false;
+      }
+    }
+
+    if (inTargetLabel) {
+      const lineIndent = line.search(/\S/);
+
+      // Check if we've exited the label block
+      if (trimmed.length > 0 && lineIndent <= labelIndent) {
+        // Exited the label block - insert new dialogue before this line if not done
+        if (!newDialogueInserted && newDialogue.length > 0) {
+          const indent = dialogueIndent || " ".repeat(labelIndent + (labelIndent % 4 === 0 ? 4 : 2));
+          for (const entry of newDialogue) {
+            if (entry.speaker) {
+              result.push(`${indent}${entry.speaker} "${entry.text}"`);
+            } else {
+              result.push(`${indent}"${entry.text}"`);
+            }
+          }
+          newDialogueInserted = true;
+        }
+        // Add the current line (start of next label/block)
+        result.push(line);
+        continue;
+      }
+
+      // Skip dialogue lines within the target label (they'll be replaced)
+      const dialogueMatch = trimmed.match(
+        /^(?:([a-zA-Z_][a-zA-Z0-9_]*)\s+)?"((?:[^"\\]|\\.)*)"$/
+      );
+      if (dialogueMatch && trimmed !== '" "') {
+        // This is a dialogue line - skip it
+        continue;
+      }
+
+      // Keep all other lines (comments, jumps, menus, etc.)
+      if (!dialogueMatch) {
+        result.push(line);
+        // Detect dialogue indentation from first indented line
+        if (!dialogueIndent && lineIndent > labelIndent) {
+          dialogueIndent = line.substring(0, lineIndent);
+        }
+      }
+    } else {
+      // Not in target label - keep all lines
+      result.push(line);
+    }
+  }
+
+  // If target label was at the end and we haven't inserted new dialogue yet
+  if (inTargetLabel && !newDialogueInserted && newDialogue.length > 0) {
+    const indent = dialogueIndent || " ".repeat(labelIndent + (labelIndent % 4 === 0 ? 4 : 2));
+    for (const entry of newDialogue) {
+      if (entry.speaker) {
+        result.push(`${indent}${entry.speaker} "${entry.text}"`);
+      } else {
+        result.push(`${indent}"${entry.text}"`);
+      }
     }
   }
 

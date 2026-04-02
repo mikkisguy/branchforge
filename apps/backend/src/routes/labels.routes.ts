@@ -424,12 +424,14 @@ async function updateLabelDialogueHandler(
 
     // Reconstruct file content with updated dialogue
     const newContent = await reconstructFileForLabel(projectFile.id);
+    const newContentHash = calculateContentHash(newContent);
 
     // Update file content
     await db
       .update(projectFiles)
       .set({
         content: newContent,
+        contentHash: newContentHash,
         updatedAt: new Date(),
       })
       .where(eq(projectFiles.id, projectFile.id));

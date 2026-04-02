@@ -7,7 +7,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { labelKeys } from "@/lib/query-keys";
+import { labelKeys, projectFilesKeys } from "@/lib/query-keys";
 import { labelsApi } from "@/lib/api/labels";
 import { useProject } from "@/hooks/useProject";
 import type { PublicLabel, LabelDetail } from "@branchforge/shared";
@@ -98,22 +98,28 @@ export function useLabels(): UseLabelsReturn {
       labelId: string;
       dialogue: Array<{ speakerId: string | null; text: string }>;
     }) => labelsApi.updateDialogue(labelId, dialogue),
-    onSuccess: (_data, variables) => {
+    onSuccess: async (_data, variables) => {
       clearHistoryCursor(variables.labelId);
 
       // Invalidate active label detail query (dialogue content changed)
       // Invalidate writingGoals (word count may have changed)
+      // Invalidate project files (file content is reconstructed after dialogue update)
       // Don't invalidate labels list - metadata hasn't changed
       if (currentProject && localActiveLabelId) {
-        queryClient.invalidateQueries({
+        await queryClient.invalidateQueries({
           queryKey: labelKeys.detail(currentProject.id, localActiveLabelId),
         });
 
-        queryClient.invalidateQueries({
+        await queryClient.invalidateQueries({
           queryKey: ["labels", variables.labelId, "versions"],
         });
+
+        // Invalidate project files for this project and force refetch
+        await queryClient.refetchQueries({
+          queryKey: projectFilesKeys.lists(currentProject.id),
+        });
       }
-      queryClient.invalidateQueries({ queryKey: ["writingGoals"] });
+      await queryClient.invalidateQueries({ queryKey: ["writingGoals"] });
     },
   });
 

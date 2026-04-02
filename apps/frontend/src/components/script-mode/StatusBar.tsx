@@ -5,8 +5,10 @@ import {
   SyncOperationType,
 } from "@/components/script-mode/GitLabSyncDialog";
 import { ConflictReviewDialog } from "@/components/script-mode/ConflictReviewDialog";
+import { SaveIndicator } from "@/components/write-mode";
 import { useGitLab } from "@/hooks/useGitLab";
 import { cn } from "@/lib/utils";
+import type { SaveStatus } from "@/hooks/useAutosave";
 
 // Status bar styled like a storybook footer
 interface StatusBarProps {
@@ -16,6 +18,9 @@ interface StatusBarProps {
   projectId?: string;
   projectName?: string;
   gitlabBranch?: string;
+  // Save status
+  saveStatus?: SaveStatus;
+  onSaveRequest?: () => void;
 }
 
 export function StatusBar({
@@ -25,6 +30,8 @@ export function StatusBar({
   projectId,
   projectName,
   gitlabBranch,
+  saveStatus = "saved",
+  onSaveRequest,
 }: StatusBarProps) {
   const { hasIntegration, isProjectLinked } = useGitLab();
 
@@ -110,16 +117,13 @@ export function StatusBar({
             </div>
           )}
           <span className="text-muted-foreground">Line {lineCount}</span>
-          <span
-            className="flex items-center gap-1.5"
-            style={{ color: "var(--theme-color)" }}
-          >
-            <span
-              className="w-2 h-2 rounded-full animate-pulse"
-              style={{ background: "var(--theme-color)" }}
-            />
-            <span>Ready to write</span>
-          </span>
+
+          {/* Save status indicator - using unified SaveIndicator component */}
+          <SaveIndicator
+            saveStatus={saveStatus}
+            displayMode="verbose"
+            onRetry={onSaveRequest}
+          />
         </div>
       </div>
 
