@@ -323,9 +323,7 @@ export type FileIdParams = z.infer<typeof fileIdParamsSchema>;
  */
 export const updateFileContentSchema = z
   .object({
-    content: z
-      .string()
-      .max(10_000_000, "File content too large (max 10MB)"),
+    content: z.string().max(10_000_000, "File content too large (max 10MB)"),
   })
   .strict();
 

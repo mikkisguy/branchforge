@@ -1497,7 +1497,9 @@ export function replaceLabelDialogue(
       if (trimmed.length > 0 && lineIndent <= labelIndent) {
         // Exited the label block - insert new dialogue before this line if not done
         if (!newDialogueInserted && newDialogue.length > 0) {
-          const indent = dialogueIndent || " ".repeat(labelIndent + (labelIndent % 4 === 0 ? 4 : 2));
+          const indent =
+            dialogueIndent ||
+            " ".repeat(labelIndent + (labelIndent % 4 === 0 ? 4 : 2));
           for (const entry of newDialogue) {
             if (entry.speaker) {
               result.push(`${indent}${entry.speaker} "${entry.text}"`);
@@ -1537,7 +1539,9 @@ export function replaceLabelDialogue(
 
   // If target label was at the end and we haven't inserted new dialogue yet
   if (inTargetLabel && !newDialogueInserted && newDialogue.length > 0) {
-    const indent = dialogueIndent || " ".repeat(labelIndent + (labelIndent % 4 === 0 ? 4 : 2));
+    const indent =
+      dialogueIndent ||
+      " ".repeat(labelIndent + (labelIndent % 4 === 0 ? 4 : 2));
     for (const entry of newDialogue) {
       if (entry.speaker) {
         result.push(`${indent}${entry.speaker} "${entry.text}"`);

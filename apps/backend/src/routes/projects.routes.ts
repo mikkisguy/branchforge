@@ -335,7 +335,9 @@ async function updateFileContentHandler(
   } catch (error) {
     request.log.error(
       { err: error, fileId },
-      `updateFileContentHandler: Failed to update file content: ${error instanceof Error ? error.message : "Unknown error"}`
+      `updateFileContentHandler: Failed to update file content: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
     );
 
     // Handle known error types

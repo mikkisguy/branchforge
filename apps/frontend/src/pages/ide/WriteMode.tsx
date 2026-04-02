@@ -98,26 +98,38 @@ export function WriteMode({ projectName }: WriteModeProps) {
 
   // Update lastSaved timestamp when save completes successfully
   useEffect(() => {
-    if (wasUpdatingDialogueRef.current && !isUpdatingDialogue && !isUpdateError) {
+    if (
+      wasUpdatingDialogueRef.current &&
+      !isUpdatingDialogue &&
+      !isUpdateError
+    ) {
       setLastSaved(new Date());
     }
     wasUpdatingDialogueRef.current = isUpdatingDialogue;
   }, [isUpdatingDialogue, isUpdateError]);
 
   // Autosave hook for dialogue entries
-  const { saveStatus, triggerSave, resetSavedHash } = useAutosave<DialogueEntry[]>({
+  const { saveStatus, triggerSave, resetSavedHash } = useAutosave<
+    DialogueEntry[]
+  >({
     data: currentEntries,
     hashFn: hashDialogueEntries,
     debounceMs: 1000, // 1 second debounce for faster feedback
     skipSaveRef: isSwitchingLabelsRef, // Prevent saves during label switches
-    onSave: useCallback(async (entries: DialogueEntry[]) => {
-      if (activeLabelId) {
-        const payload = dialogueToPayload(entries);
-        await updateDialogue(activeLabelId, payload);
-        // Update saved hash after successful save
-        savedHashesRef.current.set(activeLabelId, hashDialogueEntries(entries));
-      }
-    }, [activeLabelId, updateDialogue]),
+    onSave: useCallback(
+      async (entries: DialogueEntry[]) => {
+        if (activeLabelId) {
+          const payload = dialogueToPayload(entries);
+          await updateDialogue(activeLabelId, payload);
+          // Update saved hash after successful save
+          savedHashesRef.current.set(
+            activeLabelId,
+            hashDialogueEntries(entries)
+          );
+        }
+      },
+      [activeLabelId, updateDialogue]
+    ),
     onError: useCallback((error: Error) => {
       console.error("Failed to save dialogue:", error);
     }, []),
@@ -131,7 +143,11 @@ export function WriteMode({ projectName }: WriteModeProps) {
   // Handle label switching - flush pending save for previous label
   useEffect(() => {
     const prevLabelId = prevLabelIdRef.current;
-    if (prevLabelId && prevLabelId !== activeLabelId && saveStatus === "unsaved") {
+    if (
+      prevLabelId &&
+      prevLabelId !== activeLabelId &&
+      saveStatus === "unsaved"
+    ) {
       // Flush pending save before switching labels
       triggerSave();
     }

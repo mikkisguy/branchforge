@@ -626,7 +626,12 @@ export function ProseEditor({
               onRedo={handleRedo}
             />
             <SaveIndicator
-              saveStatus={propsToSaveStatus(isSaving, lastSaved, hasPendingSave, saveError)}
+              saveStatus={propsToSaveStatus(
+                isSaving,
+                lastSaved,
+                hasPendingSave,
+                saveError
+              )}
               displayMode="compact"
               lastSaved={lastSaved}
             />

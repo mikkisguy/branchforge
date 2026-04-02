@@ -52,11 +52,12 @@ export function useProjectFiles(
   const queryClient = useQueryClient();
 
   // Determine the query key based on options
-  const queryKey = projectId && options?.source
-    ? projectFilesKeys.listsWithSource(projectId, options.source)
-    : projectId
-    ? projectFilesKeys.lists(projectId)
-    : ["projectFiles", "__disabled__"];
+  const queryKey =
+    projectId && options?.source
+      ? projectFilesKeys.listsWithSource(projectId, options.source)
+      : projectId
+      ? projectFilesKeys.lists(projectId)
+      : ["projectFiles", "__disabled__"];
 
   // Query for project files with stable key
   const {

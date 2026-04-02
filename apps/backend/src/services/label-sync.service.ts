@@ -134,10 +134,7 @@ async function syncLabelsInTransaction(
     .from(labels)
     .where(eq(labels.projectFileId, sourceId));
 
-  const existingLabelsByName = new Map<
-    string,
-    (typeof existingLabels)[0]
-  >();
+  const existingLabelsByName = new Map<string, (typeof existingLabels)[0]>();
   for (const labelRow of existingLabels) {
     if (labelRow.labelName) {
       existingLabelsByName.set(labelRow.labelName, labelRow);
@@ -255,7 +252,9 @@ async function syncLabelsInTransaction(
     );
 
     if (orphanedLabels.length > 0) {
-      const orphanedIds = orphanedLabels.map((s: typeof orphanedLabels[0]) => s.id);
+      const orphanedIds = orphanedLabels.map(
+        (s: (typeof orphanedLabels)[0]) => s.id
+      );
 
       // Soft delete label lines for orphaned labels
       await tx
@@ -272,9 +271,7 @@ async function syncLabelsInTransaction(
       await tx
         .update(labels)
         .set({ deletedAt: new Date() })
-        .where(
-          and(inArray(labels.id, orphanedIds), isNull(labels.deletedAt))
-        );
+        .where(and(inArray(labels.id, orphanedIds), isNull(labels.deletedAt)));
 
       labelsDeleted = orphanedIds.length;
     }
@@ -422,12 +419,25 @@ export async function syncLabelsFromFile(
     // Note: We annotate tx as `any` because Drizzle's transaction type is complex.
     // The transaction callback parameter has the same API as Db for our operations.
     const syncResult = await (externalTx
-      ? syncLabelsInTransaction(db, projectId, parsed, rpyContent, sourceId, skipCleanup)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      : db.transaction((tx: any) =>
-          syncLabelsInTransaction(tx, projectId, parsed, rpyContent, sourceId, skipCleanup)
+      ? syncLabelsInTransaction(
+          db,
+          projectId,
+          parsed,
+          rpyContent,
+          sourceId,
+          skipCleanup
         )
-    );
+      : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        db.transaction((tx: any) =>
+          syncLabelsInTransaction(
+            tx,
+            projectId,
+            parsed,
+            rpyContent,
+            sourceId,
+            skipCleanup
+          )
+        ));
 
     // Return success
     return {

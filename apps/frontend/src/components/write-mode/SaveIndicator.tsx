@@ -86,7 +86,10 @@ export const SaveIndicator = memo(function SaveIndicator({
   const isErrorWithRetry = saveStatus === "error" && onRetry;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (isErrorWithRetry && (e.key === "Enter" || e.key === " " || e.key === "Spacebar")) {
+    if (
+      isErrorWithRetry &&
+      (e.key === "Enter" || e.key === " " || e.key === "Spacebar")
+    ) {
       e.preventDefault();
       onRetry();
     }
