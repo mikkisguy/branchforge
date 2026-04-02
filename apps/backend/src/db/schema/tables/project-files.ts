@@ -26,7 +26,8 @@ export const projectFiles = pgTable(
     source: fileSourceEnum("source").notNull(),
     filePath: text("file_path").notNull(), // e.g., "labels/act_i.rpy" or "gui/screens.rpy"
     fileType: projectFileTypeEnum("file_type").notNull(),
-    content: text("content").notNull(), // Full RPY file content for Script Mode
+    content: text("content").notNull(), // Full RPY file content for Script Mode (reconstructed from label_lines)
+    originalContent: text("original_content"), // Original imported content (used as base for reconstruction)
     contentHash: text("content_hash").notNull(), // SHA-256 hash for idempotency
     // GitLab-specific (nullable for non-GitLab sources)
     lastSyncedAt: timestamp("last_synced_at"),

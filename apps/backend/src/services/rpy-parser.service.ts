@@ -1071,6 +1071,9 @@ export function parseRPYFileWithLabels(
  * Used when Write Mode saves dialogue changes - the original keywords (show, scene, play, etc.)
  * are preserved, only dialogue lines are updated.
  *
+ * Extra dialogue entries are inserted within their label's block (before return/menu/jump/next label)
+ * rather than appended at the end of the file.
+ *
  * @param options - The original content and updated dialogue map
  * @returns Reconstructed RPY file content
  */
@@ -1080,12 +1083,20 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
   const result: string[] = [];
 
   let currentLabel: string | null = null;
-  let dialogueIndex = 0;
 
-  // Track original dialogue count per label and extra entries to append
-  const originalDialogueCounts = new Map<string, number>();
-  const labelIndentation = new Map<string, string>(); // Track last indent for appending
+  // Track dialogue index per label to know how many updated entries we've output
+  const labelDialogueIndices = new Map<string, number>();
+  const labelIndentation = new Map<string, string>();
   let lastDialogueIndent = "    "; // Default RPY indentation
+
+  // Keywords that signal the end of a label's dialogue block
+  const labelEndKeywords = new Set([
+    "return", "menu", "jump", "call"
+  ]);
+  const isLabelEndKeyword = (trimmed: string): boolean => {
+    const firstWord = trimmed.split(/\s+/)[0];
+    return labelEndKeywords.has(firstWord);
+  };
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -1093,8 +1104,35 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
     // Track current label
     const labelMatch = line.match(/^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
     if (labelMatch) {
+      // Before switching to new label, insert any remaining dialogue for the previous label
+      let insertedDialogue = false;
+      if (currentLabel && updatedDialogue.has(currentLabel)) {
+        const labelDialogue = updatedDialogue.get(currentLabel)!;
+        const currentIndex = labelDialogueIndices.get(currentLabel) ?? 0;
+
+        if (currentIndex < labelDialogue.length) {
+          const indent = labelIndentation.get(currentLabel) || lastDialogueIndent;
+          for (let i = currentIndex; i < labelDialogue.length; i++) {
+            const entry = labelDialogue[i];
+            if (entry.speaker) {
+              result.push(`${indent}${entry.speaker} "${entry.text}"`);
+            } else {
+              result.push(`${indent}"${entry.text}"`);
+            }
+          }
+          labelDialogueIndices.set(currentLabel, labelDialogue.length);
+          insertedDialogue = true;
+        }
+      }
+
+      // Add blank line before new label if we just inserted dialogue
+      // Check if result doesn't already end with a blank line
+      if (insertedDialogue && result.length > 0 && result[result.length - 1] !== "") {
+        result.push("");
+      }
+
       currentLabel = labelMatch[1];
-      dialogueIndex = 0;
+      labelDialogueIndices.set(currentLabel, 0);
       result.push(line);
       continue;
     }
@@ -1111,26 +1149,20 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
       updatedDialogue.has(currentLabel)
     ) {
       const labelDialogue = updatedDialogue.get(currentLabel)!;
+      const currentIndex = labelDialogueIndices.get(currentLabel) ?? 0;
 
-      // Track original dialogue count (every dialogue line counts, even if replaced)
-      originalDialogueCounts.set(
-        currentLabel,
-        (originalDialogueCounts.get(currentLabel) || 0) + 1
-      );
-
-      // Track indentation for appending extra entries later
+      // Track indentation for inserting extra entries later
       const indent = line.match(/^(\s*)/)?.[1] || "";
       if (indent) {
         lastDialogueIndent = indent;
-        // Set label-specific indentation the first time we see dialogue for this label
-        if (currentLabel && !labelIndentation.has(currentLabel)) {
+        if (!labelIndentation.has(currentLabel)) {
           labelIndentation.set(currentLabel, indent);
         }
       }
 
-      if (dialogueIndex < labelDialogue.length) {
-        const newDialogue = labelDialogue[dialogueIndex];
-        dialogueIndex++;
+      if (currentIndex < labelDialogue.length) {
+        const newDialogue = labelDialogue[currentIndex];
+        labelDialogueIndices.set(currentLabel, currentIndex + 1);
 
         // Reconstruct dialogue line with original indentation
         if (newDialogue.speaker) {
@@ -1146,18 +1178,41 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
       // The line will be added by the fall-through below.
     }
 
+    // Before adding a line that ends the label block, insert any remaining dialogue
+    if (currentLabel && updatedDialogue.has(currentLabel)) {
+      const labelDialogue = updatedDialogue.get(currentLabel)!;
+      const currentIndex = labelDialogueIndices.get(currentLabel) ?? 0;
+
+      // If we have remaining dialogue entries and we're at a label-ending keyword, insert them first
+      if (
+        currentIndex < labelDialogue.length &&
+        trimmed.length > 0 &&
+        isLabelEndKeyword(trimmed)
+      ) {
+        const indent = labelIndentation.get(currentLabel) || lastDialogueIndent;
+        for (let i = currentIndex; i < labelDialogue.length; i++) {
+          const entry = labelDialogue[i];
+          if (entry.speaker) {
+            result.push(`${indent}${entry.speaker} "${entry.text}"`);
+          } else {
+            result.push(`${indent}"${entry.text}"`);
+          }
+        }
+        labelDialogueIndices.set(currentLabel, labelDialogue.length);
+      }
+    }
+
     // Keep all other lines as-is (keywords, etc.) - includes preserved original dialogue lines
     result.push(line);
   }
 
-  // After processing all lines, append any extra updated dialogue entries that weren't consumed.
-  // This handles the case where updatedDialogue has more entries than the original file.
+  // After processing all lines, insert any remaining dialogue entries
   for (const [label, labelDialogue] of updatedDialogue.entries()) {
-    const originalCount = originalDialogueCounts.get(label) ?? 0;
-    if (labelDialogue.length > originalCount) {
-      const extraEntries = labelDialogue.slice(originalCount);
+    const currentIndex = labelDialogueIndices.get(label) ?? 0;
+    if (currentIndex < labelDialogue.length) {
       const indent = labelIndentation.get(label) || lastDialogueIndent;
-      for (const entry of extraEntries) {
+      for (let i = currentIndex; i < labelDialogue.length; i++) {
+        const entry = labelDialogue[i];
         if (entry.speaker) {
           result.push(`${indent}${entry.speaker} "${entry.text}"`);
         } else {

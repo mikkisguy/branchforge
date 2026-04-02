@@ -9,7 +9,7 @@
 import JSZip from "jszip";
 import { getDb } from "../db/index.js";
 import { projectFiles } from "../db/schema/index.js";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { calculateContentHash } from "../lib/hash.js";
 import { parseRPYFileWithLabels } from "./rpy-parser.service.js";
 import { logError, LogEventType } from "../lib/logger.js";
@@ -272,6 +272,8 @@ export async function importZipFile(
               .update(projectFiles)
               .set({
                 content: file.content,
+                // Only set originalContent if it's null (preserve original on re-imports)
+                originalContent: sql`COALESCE(${projectFiles.originalContent}, ${file.content})`,
                 contentHash,
                 fileType,
                 updatedAt: new Date(),
@@ -288,6 +290,7 @@ export async function importZipFile(
               filePath: file.filePath,
               fileType,
               content: file.content,
+              originalContent: file.content, // Store original imported content for reconstruction
               contentHash,
             });
 

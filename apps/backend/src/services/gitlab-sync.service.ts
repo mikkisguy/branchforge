@@ -15,7 +15,7 @@ import {
   stateVariables,
   renpyDefinitions,
 } from "../db/schema/index.js";
-import { eq, and, desc, inArray, asc, isNull } from "drizzle-orm";
+import { eq, and, desc, inArray, asc, isNull, sql } from "drizzle-orm";
 import {
   listRpyFiles,
   getFileContent,
@@ -544,6 +544,7 @@ export async function importFromGitlab(
           filePath: file.path,
           fileType: parsed.fileType,
           content: content, // Store full RPY content for Script Mode
+          originalContent: content, // Store original imported content for reconstruction
           contentHash,
           lastSyncedAt: new Date(),
           lastCommitSha: importCommitSha,
@@ -556,6 +557,8 @@ export async function importFromGitlab(
           ],
           set: {
             content: content, // Update full content on sync
+            // Only set originalContent if it's null (preserve original on subsequent syncs)
+            originalContent: sql`COALESCE(${projectFiles.originalContent}, ${content})`,
             contentHash,
             lastSyncedAt: new Date(),
             lastCommitSha: importCommitSha,

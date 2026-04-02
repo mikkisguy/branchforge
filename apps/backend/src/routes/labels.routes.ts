@@ -124,7 +124,7 @@ async function reconstructFileForLabel(projectFileId: string): Promise<string> {
   // If there are no labels, return the original content as-is
   if (allLabels.length === 0) {
     return reconstructRPYFile({
-      originalContent: projectFile.content,
+      originalContent: projectFile.originalContent || projectFile.content,
       updatedDialogue: new Map(),
     });
   }
@@ -186,9 +186,9 @@ async function reconstructFileForLabel(projectFileId: string): Promise<string> {
     updatedDialogue.set(labelName, labelDialogue);
   }
 
-  // Reconstruct and return file content
+  // Reconstruct and return file content using original content as base
   return reconstructRPYFile({
-    originalContent: projectFile.content,
+    originalContent: projectFile.originalContent || projectFile.content,
     updatedDialogue,
   });
 }
