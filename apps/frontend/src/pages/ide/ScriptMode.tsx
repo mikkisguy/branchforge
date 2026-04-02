@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Download, Package } from "lucide-react";
 import { StoryPanel } from "@/components/ide-shared";
 import { BookmarkTab, StatusBar, ScriptEditor } from "@/components/script-mode";
@@ -7,6 +7,7 @@ import { useLabels } from "@/hooks/useLabels";
 import { useGitLab } from "@/hooks/useGitLab";
 import { useProjectFiles } from "@/hooks/useProjectFiles";
 import { generateRpyPlainText } from "@/lib/rpy-generator";
+import { sanitizeLabelName } from "@/lib/label-utils";
 import { GitLabSyncDialog } from "@/components/script-mode/GitLabSyncDialog";
 import { ZipImportDialog } from "@/components/zip-import";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,64 @@ export function ScriptMode({
     [projectFiles, activeFileId]
   );
 
+  // Track the line number to scroll to when switching modes
+  const [scrollToLine, setScrollToLine] = useState<number | null>(null);
+
+  // Helper: Find the line number where a label starts in the file content
+  const findLabelLineNumber = useCallback(
+    (fileContent: string, labelTitle: string): number | null => {
+      const labelName = sanitizeLabelName(labelTitle);
+      const lines = fileContent.split("\n");
+
+      // Find the line with "label {name}:" pattern
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line.startsWith("label ") && line.endsWith(":")) {
+          const extractedLabel = line.slice(6, -1).trim();
+          if (extractedLabel === labelName) {
+            return i + 1; // Line numbers are 1-indexed
+          }
+        }
+      }
+
+      return null;
+    },
+    []
+  );
+
+  // When script mode has an active label, select its file and scroll to the label line
+  useEffect(() => {
+    if (!activeLabelId) {
+      return;
+    }
+
+    const fileWithLabel = projectFiles.find((f) =>
+      f.labels.some((l) => l.id === activeLabelId)
+    );
+
+    if (!fileWithLabel) {
+      return;
+    }
+
+    setActiveFileId((currentFileId) =>
+      currentFileId === fileWithLabel.id ? currentFileId : fileWithLabel.id
+    );
+
+    const labelMetadata = fileWithLabel.labels.find(
+      (l) => l.id === activeLabelId
+    );
+    if (!labelMetadata) {
+      setScrollToLine(null);
+      return;
+    }
+
+    const lineNumber = findLabelLineNumber(
+      fileWithLabel.content,
+      labelMetadata.title
+    );
+    setScrollToLine(lineNumber);
+  }, [activeLabelId, projectFiles, findLabelLineNumber]);
+
   // Generate RPY content for active scene (plain text for CodeMirror)
   const activeLabelPlainText = useMemo(() => {
     if (!activeLabel) return "";
@@ -63,6 +122,7 @@ export function ScriptMode({
   // Handle GitLab file selection
   const handleGitLabFileSelect = (fileId: string) => {
     setActiveFileId(fileId);
+    setScrollToLine(null);
     // Also clear the active scene since we're now in file mode
     setActiveLabelId(null);
   };
@@ -215,6 +275,7 @@ export function ScriptMode({
               {activeProjectFile ? (
                 <ScriptEditor
                   content={activeFileContent}
+                  scrollToLine={scrollToLine}
                   onChange={(value) =>
                     console.log("GitLab file content changed:", value)
                   }
@@ -312,8 +373,8 @@ export function ScriptMode({
           activeProjectFile
             ? activeFileLines.length
             : activeLabel
-            ? activeLabelLines.length
-            : 0
+              ? activeLabelLines.length
+              : 0
         }
         language="Ren'Py"
         themeName={themeName}
