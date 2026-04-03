@@ -43,7 +43,7 @@ export interface UseLabelsReturn {
   updateDialogue: (
     labelId: string,
     dialogue: Array<{ speakerId: string | null; text: string }>
-  ) => void;
+  ) => Promise<{ success: boolean }>;
   isUpdatingDialogue: boolean;
   isUpdateError: boolean;
 }
@@ -173,7 +173,7 @@ export function useLabels(): UseLabelsReturn {
       labelId: string,
       dialogue: Array<{ speakerId: string | null; text: string }>
     ) => {
-      updateDialogueMutation.mutate({ labelId, dialogue });
+      return updateDialogueMutation.mutateAsync({ labelId, dialogue });
     },
     [updateDialogueMutation]
   );

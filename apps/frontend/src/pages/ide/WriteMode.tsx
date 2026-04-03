@@ -25,6 +25,11 @@ interface WriteModeProps {
   projectName?: string;
 }
 
+interface LabelDialogueDraft {
+  labelId: string | null;
+  entries: DialogueEntry[];
+}
+
 function getPersistedDialogueFromLabel(
   activeLabel: LabelDetail | undefined
 ): DialogueEntry[] {
@@ -61,10 +66,11 @@ export function WriteMode({ projectName }: WriteModeProps) {
   const { characters } = useCharacters(currentProject?.id ?? "");
   const [isFocusMode, setIsFocusMode] = useState(false);
 
-  // Track current editor entries (the source of truth for ProseEditor)
-  const [currentEntries, setCurrentEntries] = useState<DialogueEntry[]>(() =>
-    getPersistedDialogueFromLabel(activeLabel)
-  );
+  // Track current editor draft with its source label for safe autosave
+  const [currentDraft, setCurrentDraft] = useState<LabelDialogueDraft>(() => ({
+    labelId: activeLabel?.id ?? activeLabelId,
+    entries: getPersistedDialogueFromLabel(activeLabel),
+  }));
 
   // Track the previous label ID for flushing pending saves on label switch
   const prevLabelIdRef = useRef<string | null>(null);
@@ -81,7 +87,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
   // Track when we're switching labels to prevent spurious saves
   const isSwitchingLabelsRef = useRef(false);
   // Track pending data to reset hash for after label switch
-  const pendingResetHashRef = useRef<DialogueEntry[] | null>(null);
+  const pendingResetHashRef = useRef<LabelDialogueDraft | null>(null);
 
   const handleFocusModeToggle = useCallback(() => {
     setIsFocusMode((prev) => !prev);
@@ -110,34 +116,47 @@ export function WriteMode({ projectName }: WriteModeProps) {
 
   // Autosave hook for dialogue entries
   const { saveStatus, isDirty, triggerSave, resetSavedHash } = useAutosave<
-    DialogueEntry[]
+    LabelDialogueDraft
   >({
-    data: currentEntries,
-    hashFn: hashDialogueEntries,
+    data: currentDraft,
+    hashFn: (draft) =>
+      `${draft.labelId ?? "none"}:${hashDialogueEntries(draft.entries)}`,
     debounceMs: 1000, // 1 second debounce for faster feedback
     skipSaveRef: isSwitchingLabelsRef, // Prevent saves during label switches
     onSave: useCallback(
-      async (entries: DialogueEntry[]) => {
-        if (activeLabelId) {
-          const payload = dialogueToPayload(entries);
-          await updateDialogue(activeLabelId, payload);
+      async (draft: LabelDialogueDraft) => {
+        if (draft.labelId) {
+          const payload = dialogueToPayload(draft.entries);
+          await updateDialogue(draft.labelId, payload);
           // Update saved hash after successful save
           savedHashesRef.current.set(
-            activeLabelId,
-            hashDialogueEntries(entries)
+            draft.labelId,
+            hashDialogueEntries(draft.entries)
           );
         }
       },
-      [activeLabelId, updateDialogue]
+      [updateDialogue]
     ),
     onError: useCallback((error: Error) => {
       console.error("Failed to save dialogue:", error);
     }, []),
   });
 
+  // Keep latest autosave state for unmount cleanup without re-running cleanup
+  const isDirtyRef = useRef(isDirty);
+  const triggerSaveRef = useRef(triggerSave);
+
+  useEffect(() => {
+    isDirtyRef.current = isDirty;
+  }, [isDirty]);
+
+  useEffect(() => {
+    triggerSaveRef.current = triggerSave;
+  }, [triggerSave]);
+
   // Handle content changes from ProseEditor
   const handleContentChange = useCallback((entries: DialogueEntry[]) => {
-    setCurrentEntries(entries);
+    setCurrentDraft((prev) => ({ ...prev, entries }));
   }, []);
 
   // Handle label switching - flush pending save for previous label
@@ -148,20 +167,28 @@ export function WriteMode({ projectName }: WriteModeProps) {
       triggerSave();
     }
 
-    // Update current entries when switching labels
-    if (activeLabelId !== prevLabelId && activeLabel) {
+    // Update current entries when the resolved active label changes
+    if (activeLabel && activeLabel.id !== prevLabelId) {
       const persistedDialogue = getPersistedDialogueFromLabel(activeLabel);
 
       // Set flag to prevent spurious saves during label switch
       isSwitchingLabelsRef.current = true;
-      pendingResetHashRef.current = persistedDialogue;
+      const nextDraft: LabelDialogueDraft = {
+        labelId: activeLabel.id,
+        entries: persistedDialogue,
+      };
+      pendingResetHashRef.current = nextDraft;
 
-      setCurrentEntries(persistedDialogue);
+      setCurrentDraft(nextDraft);
+      prevLabelIdRef.current = activeLabel.id;
       // Flag and hash will be reset by the useEffect below after render
+      return;
     }
 
-    prevLabelIdRef.current = activeLabelId;
-  }, [activeLabelId, activeLabel, isDirty, triggerSave, resetSavedHash]);
+    if (!activeLabelId) {
+      prevLabelIdRef.current = null;
+    }
+  }, [activeLabelId, activeLabel, isDirty, triggerSave]);
 
   // Reset saved hash and clear switching flag after currentEntries updates
   useEffect(() => {
@@ -170,16 +197,16 @@ export function WriteMode({ projectName }: WriteModeProps) {
       isSwitchingLabelsRef.current = false;
       pendingResetHashRef.current = null;
     }
-  }, [currentEntries, resetSavedHash]);
+  }, [currentDraft, resetSavedHash]);
 
   // Flush pending save on unmount
   useEffect(() => {
     return () => {
-      if (isDirty) {
-        triggerSave();
+      if (isDirtyRef.current) {
+        void triggerSaveRef.current();
       }
     };
-  }, [isDirty, triggerSave]);
+  }, []);
 
   // Prune stale entries from savedHashesRef when labels list changes
   const prevLabelsRef = useRef<string[]>([]);
