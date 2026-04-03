@@ -219,6 +219,26 @@ function mapEntryToDbType(entry: {
 }
 
 /**
+ * Format entry content in RPY format for proper speaker extraction
+ * Used by characterLinkerService to parse dialogue speakers from label_lines
+ */
+function formatEntryContent(entry: {
+  target?: string | null;
+  type: string;
+  speaker?: string | null;
+  text?: string | null;
+}): string {
+  if (entry.target) {
+    return `jump ${entry.target}`;
+  }
+  if (entry.type === "DIALOGUE" && entry.speaker) {
+    const escapedText = (entry.text ?? "").replace(/"/g, '\\"');
+    return `${entry.speaker} "${escapedText}"`;
+  }
+  return entry.text ?? "";
+}
+
+/**
  * Sync labels from project file content
  *
  * This is the main sync function that:
@@ -368,9 +388,7 @@ export async function syncLabelsFromGitLabFile(
               if (labelData.entries.length > 0) {
                 const lineValues = labelData.entries.map((entry, index) => {
                   const contentType = mapEntryToDbType(entry);
-                  const content = entry.target
-                    ? `jump ${entry.target}`
-                    : entry.text || "";
+                  const content = formatEntryContent(entry);
                   const lineHash = calculateContentHash(content);
 
                   return {
@@ -434,9 +452,7 @@ export async function syncLabelsFromGitLabFile(
               if (labelData.entries.length > 0) {
                 const lineValues = labelData.entries.map((entry, index) => {
                   const contentType = mapEntryToDbType(entry);
-                  const content = entry.target
-                    ? `jump ${entry.target}`
-                    : entry.text || "";
+                  const content = formatEntryContent(entry);
                   const lineHash = calculateContentHash(content);
 
                   return {

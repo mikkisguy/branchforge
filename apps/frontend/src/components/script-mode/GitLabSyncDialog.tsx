@@ -6,6 +6,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { X, Download, Upload, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ import { type ConflictResolution } from "@/lib/api/gitlab";
 import { useGitLabSync } from "@/hooks/useGitLabSync";
 import { useToast } from "@/contexts/ToastContext";
 import { useLabels } from "@/hooks/useLabels";
+import { characterKeys } from "@/lib/query-keys";
 import { CharacterImportWizard } from "@/components/CharacterImportWizard";
 import {
   charactersApi,
@@ -69,6 +71,7 @@ export function GitLabSyncDialog({
   projectId,
   defaultBranch = "main",
 }: GitLabSyncDialogProps) {
+  const queryClient = useQueryClient();
   const { state, exportToGitlab, importFromGitlab, reset } = useGitLabSync();
   const { success, error } = useToast();
   const { invalidateLabels, labels, isLoadingLabels } = useLabels();
@@ -141,9 +144,8 @@ export function GitLabSyncDialog({
       if (operationType === "import") {
         try {
           // Get full detection info including conflicts
-          const detectionResult = await charactersApi.detectCharacters(
-            projectId
-          );
+          const detectionResult =
+            await charactersApi.detectCharacters(projectId);
           setDetectedCharacters({
             characters: detectionResult.characters,
             conflicts: detectionResult.conflicts,
@@ -426,8 +428,12 @@ export function GitLabSyncDialog({
           conflicts={detectedCharacters.conflicts}
           excludedTags={detectedCharacters.excludedTags}
           onComplete={() => {
-            // Refresh labels after character import
-            invalidateLabels();
+            // Refresh labels and characters after character import/linking
+            void invalidateLabels();
+            void queryClient.invalidateQueries({
+              queryKey: characterKeys.lists(projectId),
+              refetchType: "all",
+            });
           }}
         />
       )}

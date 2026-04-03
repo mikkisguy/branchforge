@@ -11,7 +11,7 @@ import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { useGitLabSync } from "../useGitLabSync";
 import { gitlabApi } from "@/lib/api/gitlab";
 import type { SyncOperation, ConflictResolution } from "@/lib/api/gitlab";
-import { labelKeys } from "@/lib/query-keys";
+import { characterKeys, labelKeys } from "@/lib/query-keys";
 import { createTestQueryClient } from "@/test/query-client";
 
 // Mock the gitlab API
@@ -103,6 +103,7 @@ describe("useGitLabSync", () => {
   afterEach(() => {
     queryClient.clear();
     consoleErrorSpy.mockRestore();
+    vi.restoreAllMocks();
   });
 
   describe("Initial State", () => {
@@ -587,8 +588,9 @@ describe("useGitLabSync", () => {
   });
 
   describe("Cache Invalidation", () => {
-    it("should invalidate label queries on successful export", async () => {
+    it("should invalidate and refetch relevant queries on successful export", async () => {
       const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries");
+      const refetchQueriesSpy = vi.spyOn(queryClient, "refetchQueries");
 
       vi.mocked(gitlabApi.exportToGitlab).mockResolvedValue(
         mockPendingOperation
@@ -615,6 +617,15 @@ describe("useGitLabSync", () => {
 
       expect(invalidateQueriesSpy).toHaveBeenCalledWith({
         queryKey: labelKeys.lists("project-1"),
+      });
+      // Labels are only invalidated (mark stale) - they will refetch on next access/background refetch
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+        queryKey: characterKeys.lists("project-1"),
+      });
+      // Characters are both invalidated AND immediately refetched - critical for syncing character data changes
+      expect(refetchQueriesSpy).toHaveBeenCalledWith({
+        queryKey: characterKeys.lists("project-1"),
+        type: "all",
       });
     });
   });
