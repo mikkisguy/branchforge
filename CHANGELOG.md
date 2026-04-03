@@ -4,6 +4,14 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.7.0 - 2026-04-03
+
+- b5285de: Added write mode components and functionality
+- cecbd23: Updated auto saving feature
+- 5071dea: Added undo/redo functionality to write mode
+- 27afc62: Added daily writing goal
+  - @branchforge/shared@0.7.0
+
 ## v0.6.0 - 2026-03-23
 
 - 51d9927: Added CodeMirror for code editing and syntax highlighting options
