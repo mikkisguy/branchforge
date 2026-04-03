@@ -11,7 +11,7 @@
  * Works with useAutosave hook's SaveStatus type.
  */
 
-import { Check, AlertCircle, Loader2, Save } from "lucide-react";
+import { Check, AlertCircle, Loader2 } from "lucide-react";
 import { memo } from "react";
 import type { SaveStatus } from "@/hooks/useAutosave";
 
@@ -30,17 +30,12 @@ const ERROR_DOT_COLOR = "bg-destructive";
 const STATUS_TEXT_COLORS: Record<SaveStatus, string> = {
   saved: "text-[var(--theme-color)]",
   saving: "text-[var(--theme-color)]",
-  unsaved: "text-yellow-600 dark:text-yellow-500",
   error: "text-destructive",
 };
 
 const STATUS_TEXT: Record<SaveStatus, { compact: string; verbose: string }> = {
   saved: { compact: "Saved", verbose: "All changes saved" },
   saving: { compact: "Saving...", verbose: "Saving changes..." },
-  unsaved: {
-    compact: "Unsaved",
-    verbose: "Unsaved changes",
-  },
   error: {
     compact: "Save failed",
     verbose: "Save failed - Click to retry",
@@ -64,8 +59,6 @@ export const SaveIndicator = memo(function SaveIndicator({
         return <Loader2 className="w-3 h-3 animate-spin" />;
       case "saved":
         return <Check className="w-3 h-3" />;
-      case "unsaved":
-        return <Save className="w-3 h-3" />;
     }
   })();
 

@@ -7,7 +7,7 @@
  * Features:
  * - Debounced saves (configurable delay, default 2000ms)
  * - Hash-based change detection (only saves when content actually changes)
- * - Save status tracking (saved, saving, unsaved, error)
+ * - Save status tracking (saved, saving, error)
  * - Manual save trigger and retry on error
  */
 
@@ -17,8 +17,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 // Types
 // ============================================================================
 
-// TODO: Consider removing "unsaved" status and just using "saved", "saving", and "error" for simplicity. This would simplify the logic and UI.
-export type SaveStatus = "saved" | "saving" | "unsaved" | "error";
+export type SaveStatus = "saved" | "saving" | "error";
 
 export interface UseAutosaveOptions<T> {
   data: T;
@@ -299,7 +298,6 @@ export function useAutosave<T>({
 
       if (!isSavingRef.current && currentHash !== pendingHashRef.current) {
         pendingHashRef.current = currentHash;
-        setSaveStatus("unsaved");
 
         clearSaveTimeout();
 

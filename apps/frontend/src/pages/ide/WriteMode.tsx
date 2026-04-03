@@ -109,7 +109,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
   }, [isUpdatingDialogue, isUpdateError]);
 
   // Autosave hook for dialogue entries
-  const { saveStatus, triggerSave, resetSavedHash } = useAutosave<
+  const { saveStatus, isDirty, triggerSave, resetSavedHash } = useAutosave<
     DialogueEntry[]
   >({
     data: currentEntries,
@@ -146,7 +146,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
     if (
       prevLabelId &&
       prevLabelId !== activeLabelId &&
-      saveStatus === "unsaved"
+      isDirty
     ) {
       // Flush pending save before switching labels
       triggerSave();
@@ -165,7 +165,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
     }
 
     prevLabelIdRef.current = activeLabelId;
-  }, [activeLabelId, activeLabel, saveStatus, triggerSave, resetSavedHash]);
+  }, [activeLabelId, activeLabel, isDirty, triggerSave, resetSavedHash]);
 
   // Reset saved hash and clear switching flag after currentEntries updates
   useEffect(() => {
@@ -179,11 +179,11 @@ export function WriteMode({ projectName }: WriteModeProps) {
   // Flush pending save on unmount
   useEffect(() => {
     return () => {
-      if (saveStatus === "unsaved") {
+      if (isDirty) {
         triggerSave();
       }
     };
-  }, [saveStatus, triggerSave]);
+  }, [isDirty, triggerSave]);
 
   // Prune stale entries from savedHashesRef when labels list changes
   const prevLabelsRef = useRef<string[]>([]);
@@ -213,13 +213,11 @@ export function WriteMode({ projectName }: WriteModeProps) {
   const saveStatusToEditorProps = useCallback((): {
     isSaving: boolean;
     lastSaved: Date | null;
-    hasPendingSave: boolean;
     saveError: boolean;
   } => {
     return {
       isSaving: saveStatus === "saving",
       lastSaved: saveStatus === "saved" ? lastSaved : null,
-      hasPendingSave: saveStatus === "unsaved",
       saveError: saveStatus === "error",
     };
   }, [saveStatus, lastSaved]);
@@ -333,7 +331,6 @@ export function WriteMode({ projectName }: WriteModeProps) {
               isFocusMode={isFocusMode}
               isSaving={editorProps.isSaving}
               lastSaved={editorProps.lastSaved}
-              hasPendingSave={editorProps.hasPendingSave}
               saveError={editorProps.saveError}
             />
           </div>

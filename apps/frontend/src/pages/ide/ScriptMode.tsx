@@ -62,6 +62,7 @@ export function ScriptMode({
   // Autosave hook for file content
   const {
     saveStatus: fileSaveStatus,
+    isDirty: isFileDirty,
     retrySave: retryFileSave,
     triggerSave: triggerFileSave,
     resetSavedHash,
@@ -141,10 +142,7 @@ export function ScriptMode({
       }
 
       // Save unsaved changes before switching
-      if (
-        currentEditFileId &&
-        (fileSaveStatus === "unsaved" || fileSaveStatus === "error")
-      ) {
+      if (currentEditFileId && (isFileDirty || fileSaveStatus === "error")) {
         await triggerFileSave();
       }
 
@@ -153,7 +151,13 @@ export function ScriptMode({
       setCurrentEditFileId(file.id);
       resetSavedHash(file.content);
     },
-    [currentEditFileId, fileSaveStatus, triggerFileSave, resetSavedHash]
+    [
+      currentEditFileId,
+      isFileDirty,
+      fileSaveStatus,
+      triggerFileSave,
+      resetSavedHash,
+    ]
   );
 
   // When script mode has an active label, select its file and scroll to the label line
@@ -499,8 +503,8 @@ export function ScriptMode({
           activeProjectFile
             ? activeFileLines.length
             : activeLabel
-            ? activeLabelLines.length
-            : 0
+              ? activeLabelLines.length
+              : 0
         }
         language="Ren'Py"
         themeName={themeName}

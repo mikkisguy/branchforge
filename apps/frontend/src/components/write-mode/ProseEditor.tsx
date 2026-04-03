@@ -28,7 +28,6 @@ interface ProseEditorProps {
   isFocusMode?: boolean;
   isSaving?: boolean;
   lastSaved?: Date | null;
-  hasPendingSave?: boolean;
   saveError?: boolean;
 }
 
@@ -61,15 +60,11 @@ function cloneEntries(entries: DialogueEntry[]): DialogueEntry[] {
 // Convert old ProseEditor props to SaveStatus for SaveIndicator
 function propsToSaveStatus(
   isSaving: boolean,
-  lastSaved: Date | null,
-  hasPendingSave: boolean,
   saveError: boolean
 ): SaveStatus {
   if (saveError) return "error";
   if (isSaving) return "saving";
-  if (hasPendingSave) return "unsaved";
-  if (lastSaved) return "saved";
-  return "unsaved"; // Default fallback
+  return "saved";
 }
 
 export function ProseEditor({
@@ -79,7 +74,6 @@ export function ProseEditor({
   isFocusMode = false,
   isSaving = false,
   lastSaved = null,
-  hasPendingSave = false,
   saveError = false,
 }: ProseEditorProps) {
   const labelId = activeLabel?.id ?? "none";
@@ -628,8 +622,6 @@ export function ProseEditor({
             <SaveIndicator
               saveStatus={propsToSaveStatus(
                 isSaving,
-                lastSaved,
-                hasPendingSave,
                 saveError
               )}
               displayMode="compact"
