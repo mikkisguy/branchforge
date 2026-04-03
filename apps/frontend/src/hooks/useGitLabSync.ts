@@ -17,7 +17,7 @@ import {
   type SyncOperation,
   type ConflictResolution,
 } from "@/lib/api/gitlab";
-import { gitlabKeys, labelKeys } from "@/lib/query-keys";
+import { characterKeys, gitlabKeys, labelKeys } from "@/lib/query-keys";
 
 // ============================================================================
 // Constants
@@ -159,8 +159,12 @@ export function useGitLabSync(): UseGitLabSyncReturn {
 
       // Invalidate caches on successful completion
       if (op.status === "COMPLETED" && projectId) {
+        // Invalidate list queries
         queryClient.invalidateQueries({
           queryKey: labelKeys.lists(projectId),
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["labels", projectId, "detail"],
         });
         queryClient.invalidateQueries({
           queryKey: gitlabKeys.importedFiles(projectId),
@@ -168,6 +172,21 @@ export function useGitLabSync(): UseGitLabSyncReturn {
         // Invalidate linked repositories to refresh bottom bar
         queryClient.invalidateQueries({
           queryKey: gitlabKeys.repositories(),
+        });
+
+        // Invalidate characters after sync completion.
+        // New imports can create/update characters and stale cached character
+        // lists make Write Mode speaker labels render as Narration until reload.
+        queryClient.invalidateQueries({
+          queryKey: characterKeys.lists(projectId),
+        });
+
+        // If characters were previously cached while Write Mode was open,
+        // invalidate alone may not refresh them before the next mount because
+        // refetchOnMount is disabled globally. Force refresh cached entries.
+        void queryClient.refetchQueries({
+          queryKey: characterKeys.lists(projectId),
+          type: "inactive",
         });
       }
     }

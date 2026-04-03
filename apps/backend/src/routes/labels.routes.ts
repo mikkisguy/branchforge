@@ -136,12 +136,12 @@ async function reconstructFileForLabel(projectFileId: string): Promise<string> {
   >();
 
   // Batch fetch all label lines for all labels with speaker information
-  // Join with characters to get displayName from speakerId
+  // Join with characters to get Ren'Py tag from speakerId
   const allLabelLines = await db
     .select({
       labelId: labelLines.labelId,
       speakerId: labelLines.speakerId,
-      speakerDisplayName: characters.displayName,
+      speakerTag: characters.renpyTag,
       content: labelLines.content,
       sequence: labelLines.sequence,
     })
@@ -168,8 +168,8 @@ async function reconstructFileForLabel(projectFileId: string): Promise<string> {
       linesByLabelId.set(line.labelId, []);
     }
     linesByLabelId.get(line.labelId)!.push({
-      // Use displayName from characters table if speakerId exists, otherwise null
-      speaker: line.speakerDisplayName ?? null,
+      // Use Ren'Py speaker tag for script-safe reconstruction
+      speaker: line.speakerTag ?? null,
       content: line.content,
     });
   }

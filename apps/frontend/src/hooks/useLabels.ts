@@ -43,7 +43,7 @@ export interface UseLabelsReturn {
   updateDialogue: (
     labelId: string,
     dialogue: Array<{ speakerId: string | null; text: string }>
-  ) => void;
+  ) => Promise<{ success: boolean }>;
   isUpdatingDialogue: boolean;
   isUpdateError: boolean;
 }
@@ -87,6 +87,7 @@ export function useLabels(): UseLabelsReturn {
     queryFn: () => labelsApi.getLabel(localActiveLabelId!),
     enabled: !!localActiveLabelId && !!currentProject?.id,
     staleTime: 5 * 60 * 1000,
+    refetchOnMount: true,
   });
 
   // Update dialogue mutation
@@ -146,8 +147,22 @@ export function useLabels(): UseLabelsReturn {
   // Invalidate labels method
   const invalidateLabels = useCallback(async () => {
     if (currentProject) {
+      // Invalidate list queries
       await queryClient.invalidateQueries({
         queryKey: labelKeys.lists(currentProject.id),
+      });
+      // Also invalidate all detail queries for this project
+      // This ensures Write Mode gets fresh label data after import
+      await queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey as unknown[];
+          return (
+            Array.isArray(key) &&
+            key[0] === "labels" &&
+            key[1] === currentProject.id &&
+            key[2] === "detail"
+          );
+        },
       });
     }
   }, [currentProject, queryClient]);
@@ -158,7 +173,7 @@ export function useLabels(): UseLabelsReturn {
       labelId: string,
       dialogue: Array<{ speakerId: string | null; text: string }>
     ) => {
-      updateDialogueMutation.mutate({ labelId, dialogue });
+      return updateDialogueMutation.mutateAsync({ labelId, dialogue });
     },
     [updateDialogueMutation]
   );

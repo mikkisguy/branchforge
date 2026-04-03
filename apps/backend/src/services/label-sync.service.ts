@@ -14,7 +14,7 @@
  */
 
 import { getDb } from "../db/index.js";
-import { labels, labelLines } from "../db/schema/index.js";
+import { labels, labelLines, characters } from "../db/schema/index.js";
 import { eq, and, inArray, isNull } from "drizzle-orm";
 import {
   parseRPYFileWithLabels,
@@ -134,6 +134,42 @@ async function syncLabelsInTransaction(
     .from(labels)
     .where(eq(labels.projectFileId, sourceId));
 
+  // Build character lookup maps once for robust speaker linking during sync
+  const projectCharacters = await tx
+    .select({
+      id: characters.id,
+      renpyTag: characters.renpyTag,
+      displayName: characters.displayName,
+    })
+    .from(characters)
+    .where(eq(characters.projectId, projectId));
+
+  const lookupMaps: CharacterLookupMaps = {
+    byTag: new Map<string, string | null>(),
+    byTagLower: new Map<string, string | null>(),
+    byDisplayName: new Map<string, string | null>(),
+    byDisplayNameLower: new Map<string, string | null>(),
+  };
+
+  for (const char of projectCharacters) {
+    registerLookup(lookupMaps.byTag, char.renpyTag, char.id);
+    if (char.renpyTag) {
+      registerLookup(
+        lookupMaps.byTagLower,
+        char.renpyTag.toLowerCase(),
+        char.id
+      );
+    }
+    registerLookup(lookupMaps.byDisplayName, char.displayName, char.id);
+    if (char.displayName) {
+      registerLookup(
+        lookupMaps.byDisplayNameLower,
+        char.displayName.toLowerCase(),
+        char.id
+      );
+    }
+  }
+
   const existingLabelsByName = new Map<string, (typeof existingLabels)[0]>();
   for (const labelRow of existingLabels) {
     if (labelRow.labelName) {
@@ -174,7 +210,8 @@ async function syncLabelsInTransaction(
           const lineValues = buildLineValues(
             existingLabel.id,
             labelData.entries,
-            sourceId
+            sourceId,
+            lookupMaps
           );
 
           await tx.insert(labelLines).values(lineValues);
@@ -223,7 +260,8 @@ async function syncLabelsInTransaction(
           const lineValues = buildLineValues(
             newScene.id,
             labelData.entries,
-            sourceId
+            sourceId,
+            lookupMaps
           );
 
           await tx.insert(labelLines).values(lineValues);
@@ -307,6 +345,75 @@ function mapEntryToDbType(entry: {
   throw new Error(`Unrecognized entry type: ${entry.type}`);
 }
 
+interface CharacterLookupMaps {
+  byTag: Map<string, string | null>;
+  byTagLower: Map<string, string | null>;
+  byDisplayName: Map<string, string | null>;
+  byDisplayNameLower: Map<string, string | null>;
+}
+
+function registerLookup(
+  map: Map<string, string | null>,
+  key: string,
+  value: string
+): void {
+  if (!map.has(key)) {
+    map.set(key, value);
+    return;
+  }
+
+  const existing = map.get(key);
+  if (existing !== value) {
+    // Ambiguous key - force unresolved to avoid accidental mis-linking.
+    map.set(key, null);
+  }
+}
+
+/**
+ * Resolve parsed speaker text to character ID.
+ *
+ * Match order:
+ * 1) renpyTag exact
+ * 2) renpyTag case-insensitive
+ * 3) displayName exact (compatibility with legacy reconstructed content)
+ * 4) displayName case-insensitive
+ */
+function resolveSpeakerId(
+  speakerTag: string | undefined,
+  lookupMaps: CharacterLookupMaps
+): string | null {
+  if (!speakerTag) {
+    return null;
+  }
+
+  const normalized = speakerTag.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const tagExact = lookupMaps.byTag.get(normalized);
+  if (tagExact !== undefined) {
+    return tagExact;
+  }
+
+  const tagLower = lookupMaps.byTagLower.get(normalized.toLowerCase());
+  if (tagLower !== undefined) {
+    return tagLower;
+  }
+
+  const nameExact = lookupMaps.byDisplayName.get(normalized);
+  if (nameExact !== undefined) {
+    return nameExact;
+  }
+
+  const nameLower = lookupMaps.byDisplayNameLower.get(normalized.toLowerCase());
+  if (nameLower !== undefined) {
+    return nameLower;
+  }
+
+  return null;
+}
+
 /**
  * Build label line values for batch insert.
  * Maps parsed entries to database records with hashes and metadata.
@@ -315,17 +422,20 @@ function buildLineValues(
   labelId: string,
   entries: Array<{
     type: string;
+    speaker?: string;
     target?: string;
     text?: string;
     lineNumber?: number;
     indentLevel?: number;
   }>,
-  sourceId: string
+  sourceId: string,
+  lookupMaps: CharacterLookupMaps
 ): Array<{
   labelId: string;
   sequence: number;
   contentType: "NARRATION" | "DIALOGUE" | "JUMP";
   content: string;
+  speakerId: string | null;
   visualType: "GENERATED";
   projectFileId: string;
   linePosition: number;
@@ -339,12 +449,17 @@ function buildLineValues(
     const contentType = mapEntryToDbType(entry);
     const content = entry.target ? `jump ${entry.target}` : entry.text || "";
     const lineHash = calculateContentHash(content);
+    const speakerId =
+      contentType === "DIALOGUE"
+        ? resolveSpeakerId(entry.speaker, lookupMaps)
+        : null;
 
     return {
       labelId,
       sequence: index + 1,
       contentType,
       content,
+      speakerId,
       visualType: "GENERATED" as const,
       projectFileId: sourceId,
       linePosition: index,

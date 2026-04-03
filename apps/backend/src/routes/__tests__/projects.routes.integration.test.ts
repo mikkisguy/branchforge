@@ -26,10 +26,15 @@ import {
   projects,
   projectUsers,
   userSessions,
+  projectFiles,
+  characters,
+  labels,
+  labelLines,
   type NewUser,
   type NewProject,
 } from "../../db/schema/index.js";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
+import { calculateContentHash } from "../../lib/hash.js";
 
 describe("ProjectsRoutes (Integration)", () => {
   let db: ReturnType<typeof getDb>;
@@ -79,9 +84,46 @@ describe("ProjectsRoutes (Integration)", () => {
 
   // Helper to clean up all test data
   async function cleanupTestData() {
-    await db.delete(projectUsers).where(eq(projectUsers.userId, testUserId));
-    await db.delete(projectUsers).where(eq(projectUsers.userId, otherUserId));
-    await db.delete(projectUsers).where(eq(projectUsers.userId, thirdUserId));
+    const projectFileIds = (
+      await db
+        .select({ id: projectFiles.id })
+        .from(projectFiles)
+        .where(
+          inArray(projectFiles.projectId, [ownedProject.id!, sharedProject.id!])
+        )
+    ).map((f) => f.id);
+
+    if (projectFileIds.length > 0) {
+      const labelIds = (
+        await db
+          .select({ id: labels.id })
+          .from(labels)
+          .where(inArray(labels.projectFileId, projectFileIds))
+      ).map((l) => l.id);
+
+      if (labelIds.length > 0) {
+        await db
+          .delete(labelLines)
+          .where(inArray(labelLines.labelId, labelIds));
+      }
+
+      await db
+        .delete(labels)
+        .where(inArray(labels.projectFileId, projectFileIds));
+    }
+
+    await db
+      .delete(characters)
+      .where(eq(characters.projectId, ownedProject.id!));
+    await db
+      .delete(characters)
+      .where(eq(characters.projectId, sharedProject.id!));
+    await db
+      .delete(projectFiles)
+      .where(eq(projectFiles.projectId, ownedProject.id!));
+    await db
+      .delete(projectFiles)
+      .where(eq(projectFiles.projectId, sharedProject.id!));
     await db.delete(projects).where(eq(projects.id, ownedProject.id!));
     await db.delete(projects).where(eq(projects.id, sharedProject.id!));
     await db.delete(userSessions).where(eq(userSessions.userId, testUserId));
@@ -90,6 +132,9 @@ describe("ProjectsRoutes (Integration)", () => {
     await db.delete(users).where(eq(users.id, testUserId));
     await db.delete(users).where(eq(users.id, otherUserId));
     await db.delete(users).where(eq(users.id, thirdUserId));
+    await db.delete(projectUsers).where(eq(projectUsers.userId, testUserId));
+    await db.delete(projectUsers).where(eq(projectUsers.userId, otherUserId));
+    await db.delete(projectUsers).where(eq(projectUsers.userId, thirdUserId));
   }
 
   // Helper to set up test data
@@ -480,6 +525,140 @@ describe("ProjectsRoutes (Integration)", () => {
           await db.delete(projects).where(eq(projects.id, createdProjectId));
         }
       }
+    });
+  });
+
+  describe("PUT /projects/files/:fileId", () => {
+    it("syncs speakerId from Ren'Py tag on STORY file updates", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+      const fileId = testUuid("13000000", 1);
+      const characterId = testUuid("14000000", 1);
+
+      const initialContent = ["label intro:", '    "Hello"'].join("\n");
+
+      await db.insert(projectFiles).values({
+        id: fileId,
+        projectId: ownedProject.id!,
+        source: "ZIP",
+        filePath: "story/intro.rpy",
+        fileType: "STORY",
+        content: initialContent,
+        originalContent: initialContent,
+        contentHash: calculateContentHash(initialContent),
+      });
+
+      await db.insert(characters).values({
+        id: characterId,
+        projectId: ownedProject.id!,
+        name: "Alice",
+        displayName: "Alice",
+        renpyTag: "alice",
+        color: "#ffffff",
+      });
+
+      const updatedContent = ["label intro:", '    alice "Hello there"'].join(
+        "\n"
+      );
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/files/${fileId}`,
+        payload: { content: updatedContent },
+        cookies: {
+          [SESSION_COOKIE_NAME]: auth.sessionId,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ success: true });
+
+      const syncedLabels = await db
+        .select({ id: labels.id })
+        .from(labels)
+        .where(eq(labels.projectFileId, fileId));
+
+      expect(syncedLabels).toHaveLength(1);
+
+      const syncedLines = await db
+        .select({
+          contentType: labelLines.contentType,
+          speakerId: labelLines.speakerId,
+          content: labelLines.content,
+        })
+        .from(labelLines)
+        .where(eq(labelLines.labelId, syncedLabels[0].id));
+
+      expect(syncedLines).toHaveLength(1);
+      expect(syncedLines[0]).toMatchObject({
+        contentType: "DIALOGUE",
+        speakerId: characterId,
+        content: "Hello there",
+      });
+    });
+
+    it("links speakers by display name for compatibility", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+      const fileId = testUuid("13000000", 2);
+      const characterId = testUuid("14000000", 2);
+
+      const initialContent = ["label intro:", '    "Hello"'].join("\n");
+
+      await db.insert(projectFiles).values({
+        id: fileId,
+        projectId: ownedProject.id!,
+        source: "ZIP",
+        filePath: "story/intro_display_name.rpy",
+        fileType: "STORY",
+        content: initialContent,
+        originalContent: initialContent,
+        contentHash: calculateContentHash(initialContent),
+      });
+
+      await db.insert(characters).values({
+        id: characterId,
+        projectId: ownedProject.id!,
+        name: "Alice",
+        displayName: "Alice",
+        renpyTag: "a",
+        color: "#ffffff",
+      });
+
+      const updatedContent = ["label intro:", '    Alice "Hello there"'].join(
+        "\n"
+      );
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/files/${fileId}`,
+        payload: { content: updatedContent },
+        cookies: {
+          [SESSION_COOKIE_NAME]: auth.sessionId,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ success: true });
+
+      const syncedLabels = await db
+        .select({ id: labels.id })
+        .from(labels)
+        .where(eq(labels.projectFileId, fileId));
+
+      expect(syncedLabels).toHaveLength(1);
+
+      const syncedLines = await db
+        .select({
+          contentType: labelLines.contentType,
+          speakerId: labelLines.speakerId,
+        })
+        .from(labelLines)
+        .where(eq(labelLines.labelId, syncedLabels[0].id));
+
+      expect(syncedLines).toHaveLength(1);
+      expect(syncedLines[0]).toMatchObject({
+        contentType: "DIALOGUE",
+        speakerId: characterId,
+      });
     });
   });
 });

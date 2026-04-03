@@ -503,8 +503,8 @@ export function ScriptMode({
           activeProjectFile
             ? activeFileLines.length
             : activeLabel
-              ? activeLabelLines.length
-              : 0
+            ? activeLabelLines.length
+            : 0
         }
         language="Ren'Py"
         themeName={themeName}

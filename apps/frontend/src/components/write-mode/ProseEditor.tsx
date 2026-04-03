@@ -58,10 +58,7 @@ function cloneEntries(entries: DialogueEntry[]): DialogueEntry[] {
 }
 
 // Convert old ProseEditor props to SaveStatus for SaveIndicator
-function propsToSaveStatus(
-  isSaving: boolean,
-  saveError: boolean
-): SaveStatus {
+function propsToSaveStatus(isSaving: boolean, saveError: boolean): SaveStatus {
   if (saveError) return "error";
   if (isSaving) return "saving";
   return "saved";
@@ -620,10 +617,7 @@ export function ProseEditor({
               onRedo={handleRedo}
             />
             <SaveIndicator
-              saveStatus={propsToSaveStatus(
-                isSaving,
-                saveError
-              )}
+              saveStatus={propsToSaveStatus(isSaving, saveError)}
               displayMode="compact"
               lastSaved={lastSaved}
             />

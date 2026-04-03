@@ -1,8 +1,24 @@
 /**
- * GitLab Routes Tests
+ * GitLab Routes Integration Tests
  *
- * Integration tests for GitLab integration API routes.
- * Tests are written before implementation (TDD approach).
+ * Route-level integration tests for GitLab integration API routes.
+ *
+ * This test suite exercises the GitLab routes with a real Fastify instance,
+ * registered auth/session plugins, mocked downstream services, and mocked
+ * authorization DB lookups.
+ *
+ * Why this is an integration test:
+ * - Tests route wiring, middleware chains, validation, and auth flow together
+ * - Verifies HTTP responses, error handling, and status codes end-to-end
+ * - Uses real Fastify request/response lifecycle (inject() method)
+ *
+ * What is mocked:
+ * - Database authorization lookups (projects, gitlabSyncOperations tables)
+ * - GitLab service API calls (external HTTP requests via nock)
+ * - GitLab sync service operations
+ *
+ * This provides confidence that routes are wired correctly while keeping
+ * tests fast by avoiding full DB fixture setup.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -97,7 +113,7 @@ const testGitlabProjectId = 12345;
 const testBranch = "main";
 const testOperationId = "operation-123";
 
-describe("GitLab Routes", () => {
+describe("GitLab Routes (Integration)", () => {
   let fastify: Fastify.FastifyInstance;
 
   beforeEach(async () => {

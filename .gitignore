@@ -41,6 +41,7 @@ coverage/
 cache/
 uploads/
 _other/
+plans/
 
 tsconfig.tsbuildinfo
 tsconfig.schema.tsbuildinfo
