@@ -11,7 +11,7 @@ import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { useGitLabSync } from "../useGitLabSync";
 import { gitlabApi } from "@/lib/api/gitlab";
 import type { SyncOperation, ConflictResolution } from "@/lib/api/gitlab";
-import { characterKeys, labelKeys } from "@/lib/query-keys";
+import { characterKeys, labelKeys, projectFilesKeys } from "@/lib/query-keys";
 import { createTestQueryClient } from "@/test/query-client";
 
 // Mock the gitlab API
@@ -615,10 +615,14 @@ describe("useGitLabSync", () => {
         { timeout: 5000 }
       );
 
-      expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      // Labels are immediately refetched after export to ensure data freshness
+      expect(refetchQueriesSpy).toHaveBeenCalledWith({
         queryKey: labelKeys.lists("project-1"),
       });
-      // Labels are only invalidated (mark stale) - they will refetch on next access/background refetch
+      // Project files are also refetched to reflect any file changes from export
+      expect(refetchQueriesSpy).toHaveBeenCalledWith({
+        queryKey: projectFilesKeys.lists("project-1"),
+      });
       expect(invalidateQueriesSpy).toHaveBeenCalledWith({
         queryKey: characterKeys.lists("project-1"),
       });

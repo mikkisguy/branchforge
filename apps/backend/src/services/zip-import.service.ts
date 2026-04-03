@@ -13,6 +13,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { calculateContentHash } from "../lib/hash.js";
 import { parseRPYFileWithLabels } from "./rpy-parser.service.js";
 import { logError, LogEventType } from "../lib/logger.js";
+import { syncLabelsFromFile } from "./label-sync.service.js";
 
 // ============================================================================
 // Import Guardrails
@@ -170,7 +171,7 @@ export { calculateContentHash };
  *    - If exists with same hash: skip
  *    - If exists with different hash: update
  *    - If not exists: insert
- * 5. Parse RPY content to count labels
+ * 5. Sync labels for STORY files via syncLabelsFromFile
  *
  * @param projectId - Project ID to import into
  * @param zipBuffer - Buffer containing zip file data
@@ -216,19 +217,34 @@ export async function importZipFile(
         file,
         fileType: parsed.fileType,
         contentHash: calculateContentHash(file.content),
-        labelCount: parsed.labels.length,
       };
     });
 
     // Step 4: Process all files in a single transaction with savepoints
+    const syncStoryLabels = async (
+      projectId: string,
+      file: ExtractedFile,
+      fileType: string,
+      fileId: string,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tx: any,
+      result: ImportZipResult
+    ) => {
+      if (fileType === "STORY") {
+        const syncResult = await syncLabelsFromFile(
+          projectId,
+          { filePath: file.filePath, fileType },
+          file.content,
+          fileId,
+          { skipCleanup: false, tx }
+        );
+        result.labelsCreated += syncResult.labelsCreated;
+      }
+    };
+
     await db.transaction(async (tx) => {
       let fileIndex = 0;
-      for (const {
-        file,
-        fileType,
-        contentHash,
-        labelCount,
-      } of preProcessedFiles) {
+      for (const { file, fileType, contentHash } of preProcessedFiles) {
         const savepointName = `sp_${fileIndex}`;
 
         try {
@@ -256,17 +272,6 @@ export async function importZipFile(
               continue;
             }
 
-            // Compute delta for labels (only count newly created labels)
-            const previousParsed = parseRPYFileWithLabels(
-              existing.content,
-              existing.filePath
-            );
-            const previousLabelCount = previousParsed.labels.length;
-            const newLabelsCreated = Math.max(
-              0,
-              labelCount - previousLabelCount
-            );
-
             // Update existing file
             await tx
               .update(projectFiles)
@@ -281,21 +286,46 @@ export async function importZipFile(
               .where(eq(projectFiles.id, existing.id));
 
             result.filesUpdated++;
-            result.labelsCreated += newLabelsCreated;
+
+            // Sync labels for STORY files to create/update labels in database
+            await syncStoryLabels(
+              projectId,
+              file,
+              fileType,
+              existing.id,
+              tx,
+              result
+            );
           } else {
             // Insert new file
-            await tx.insert(projectFiles).values({
-              projectId,
-              source: "ZIP",
-              filePath: file.filePath,
-              fileType,
-              content: file.content,
-              originalContent: file.content, // Store original imported content for reconstruction
-              contentHash,
-            });
+            const [newFile] = await tx
+              .insert(projectFiles)
+              .values({
+                projectId,
+                source: "ZIP",
+                filePath: file.filePath,
+                fileType,
+                content: file.content,
+                originalContent: file.content, // Store original imported content for reconstruction
+                contentHash,
+              })
+              .returning();
+
+            if (!newFile) {
+              throw new Error(`Failed to insert file: ${file.filePath}`);
+            }
 
             result.filesImported++;
-            result.labelsCreated += labelCount;
+
+            // Sync labels for STORY files to create labels in database
+            await syncStoryLabels(
+              projectId,
+              file,
+              fileType,
+              newFile.id,
+              tx,
+              result
+            );
           }
 
           // Release savepoint on success

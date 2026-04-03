@@ -80,13 +80,13 @@ export function ScriptMode({
             queryClient.invalidateQueries({
               queryKey: projectFilesKeys.lists(projectId),
             });
-            queryClient.invalidateQueries({
+            void queryClient.refetchQueries({
               queryKey: labelKeys.lists(projectId),
             });
 
             // Also invalidate the specific label detail if we're viewing a label
             if (activeLabelId) {
-              queryClient.invalidateQueries({
+              void queryClient.refetchQueries({
                 queryKey: labelKeys.detail(projectId, activeLabelId),
               });
             }
@@ -503,8 +503,8 @@ export function ScriptMode({
           activeProjectFile
             ? activeFileLines.length
             : activeLabel
-            ? activeLabelLines.length
-            : 0
+              ? activeLabelLines.length
+              : 0
         }
         language="Ren'Py"
         themeName={themeName}

@@ -112,7 +112,7 @@ export function useLabels(): UseLabelsReturn {
         });
 
         await queryClient.invalidateQueries({
-          queryKey: ["labels", variables.labelId, "versions"],
+          queryKey: labelKeys.versions(variables.labelId),
         });
 
         // Invalidate project files for this project and force refetch
@@ -147,8 +147,8 @@ export function useLabels(): UseLabelsReturn {
   // Invalidate labels method
   const invalidateLabels = useCallback(async () => {
     if (currentProject) {
-      // Invalidate list queries
-      await queryClient.invalidateQueries({
+      // Refetch list queries to ensure immediate data refresh after import
+      await queryClient.refetchQueries({
         queryKey: labelKeys.lists(currentProject.id),
       });
       // Also invalidate all detail queries for this project

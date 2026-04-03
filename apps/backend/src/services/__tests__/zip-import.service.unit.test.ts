@@ -47,6 +47,21 @@ vi.mock("../rpy-parser.service.js", () => ({
   })),
 }));
 
+// Mock label-sync.service
+import { syncLabelsFromFile } from "../label-sync.service.js";
+
+vi.mock("../label-sync.service.js", () => ({
+  syncLabelsFromFile: vi.fn().mockResolvedValue({
+    success: true,
+    labelsCreated: 1,
+    labelsUpdated: 0,
+    labelsDeleted: 0,
+    linesProcessed: 0,
+    errors: [],
+    skipped: false,
+  }),
+}));
+
 describe("ZipImportService", () => {
   const mockProjectId = "test-project-id";
 
@@ -288,6 +303,36 @@ describe("ZipImportService", () => {
       mockTx.limit.mockResolvedValue([]);
       mockTx.update.mockReturnThis();
       mockTx.execute.mockResolvedValue(undefined);
+    });
+
+    it("should handle label sync failure gracefully", async () => {
+      const mockContent = 'label start:\n    "Hello"';
+      const mockBuffer = Buffer.from("mock zip content");
+      const mockZip = {
+        files: {
+          "game/script.rpy": createMockFile("game/script.rpy", mockContent),
+        },
+      };
+
+      vi.mocked(JSZip.loadAsync).mockResolvedValue(mockZip as any);
+
+      vi.mocked(syncLabelsFromFile).mockResolvedValueOnce({
+        success: false,
+        labelsCreated: 0,
+        labelsUpdated: 0,
+        labelsDeleted: 0,
+        linesProcessed: 0,
+        errors: [{ label: "start", error: "Failed to process label" }],
+        skipped: false,
+      });
+
+      const result = await importZipFile(mockProjectId, mockBuffer);
+
+      expect(result).toMatchObject({
+        success: true,
+        filesImported: 1,
+        labelsCreated: 0,
+      });
     });
 
     it("should import zip file and create project files", async () => {

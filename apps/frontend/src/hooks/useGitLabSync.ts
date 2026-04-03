@@ -17,7 +17,12 @@ import {
   type SyncOperation,
   type ConflictResolution,
 } from "@/lib/api/gitlab";
-import { characterKeys, gitlabKeys, labelKeys } from "@/lib/query-keys";
+import {
+  characterKeys,
+  gitlabKeys,
+  labelKeys,
+  projectFilesKeys,
+} from "@/lib/query-keys";
 
 // ============================================================================
 // Constants
@@ -147,7 +152,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
       progress: calculateProgress(op.status, pollStartTime),
       isProcessing: op.status === "PENDING" || op.status === "IN_PROGRESS",
       error:
-        op.status === "FAILED" ? op.errorMessage ?? "Operation failed" : null,
+        op.status === "FAILED" ? (op.errorMessage ?? "Operation failed") : null,
     });
 
     // Stop polling on completion and invalidate caches
@@ -159,15 +164,19 @@ export function useGitLabSync(): UseGitLabSyncReturn {
 
       // Invalidate caches on successful completion
       if (op.status === "COMPLETED" && projectId) {
-        // Invalidate list queries
-        queryClient.invalidateQueries({
+        // Invalidate and refetch list queries to ensure immediate data refresh
+        void queryClient.refetchQueries({
           queryKey: labelKeys.lists(projectId),
         });
-        queryClient.invalidateQueries({
+        void queryClient.refetchQueries({
           queryKey: ["labels", projectId, "detail"],
         });
-        queryClient.invalidateQueries({
+        void queryClient.refetchQueries({
           queryKey: gitlabKeys.importedFiles(projectId),
+        });
+        // Refetch project files to ensure Script Mode shows imported files immediately
+        void queryClient.refetchQueries({
+          queryKey: projectFilesKeys.lists(projectId),
         });
         // Invalidate linked repositories to refresh bottom bar
         queryClient.invalidateQueries({
