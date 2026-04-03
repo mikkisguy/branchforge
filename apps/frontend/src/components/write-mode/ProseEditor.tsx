@@ -19,6 +19,7 @@ import { UndoRedoControls } from "./UndoRedoControls";
 import { BookOpen, PenLine } from "lucide-react";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { Character, LabelDetail } from "@branchforge/shared";
+import type { SaveStatus } from "@/hooks/useAutosave";
 
 interface ProseEditorProps {
   activeLabel: LabelDetail | undefined;
@@ -54,6 +55,16 @@ function convertLabelLinesToEntries(
 
 function cloneEntries(entries: DialogueEntry[]): DialogueEntry[] {
   return entries.map((entry) => ({ ...entry }));
+}
+
+// Convert old ProseEditor props to SaveStatus for SaveIndicator
+function propsToSaveStatus(
+  isSaving: boolean,
+  saveError: boolean
+): SaveStatus {
+  if (saveError) return "error";
+  if (isSaving) return "saving";
+  return "saved";
 }
 
 export function ProseEditor({
@@ -609,9 +620,12 @@ export function ProseEditor({
               onRedo={handleRedo}
             />
             <SaveIndicator
-              isSaving={isSaving}
+              saveStatus={propsToSaveStatus(
+                isSaving,
+                saveError
+              )}
+              displayMode="compact"
               lastSaved={lastSaved}
-              error={saveError}
             />
           </div>
         </div>

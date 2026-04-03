@@ -9,6 +9,7 @@ export { DialogueLine } from "./DialogueLine";
 export { SceneNavigator } from "./SceneNavigator";
 export { CharacterReferencePanel } from "./CharacterReferencePanel";
 export { FocusModeToggle } from "./FocusModeToggle";
-export { SaveIndicator as BreathingSaveIndicator } from "./SaveIndicator";
+export { SaveIndicator } from "./SaveIndicator";
+export type { SaveIndicatorDisplayMode } from "./SaveIndicator";
 export { WritingGoalPill } from "./WritingGoalPill";
 export { UndoRedoControls } from "./UndoRedoControls";

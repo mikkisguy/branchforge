@@ -19,6 +19,7 @@
     "db:backup": "dotenv -e ../../.env -- tsx scripts/db-backup.ts",
     "db:restore": "dotenv -e ../../.env -- tsx scripts/db-restore.ts",
     "db:list": "dotenv -e ../../.env -- tsx scripts/db-list.ts",
+    "db:reset:test": "dotenv -e ../../.env -- tsx scripts/reset-test-db.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

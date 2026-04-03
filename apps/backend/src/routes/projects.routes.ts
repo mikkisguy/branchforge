@@ -22,11 +22,21 @@ import {
   createProjectSchema,
   projectIdParamsSchema,
   projectFilesQuerySchema,
+  fileIdParamsSchema,
+  updateFileContentSchema,
   type CreateProjectInput,
+  type FileIdParams,
+  type UpdateFileContentInput,
 } from "../lib/validation.js";
 import { getDb } from "../db/index.js";
-import { projectFiles, labels } from "../db/schema/index.js";
+import { projectFiles, labels, projects } from "../db/schema/index.js";
 import { eq, inArray, and, isNull } from "drizzle-orm";
+import { syncLabelsFromFile } from "../services/label-sync.service.js";
+import { calculateContentHash } from "../lib/hash.js";
+import {
+  NotFoundError,
+  ForbiddenError,
+} from "../middleware/error-handler.middleware.js";
 
 // ============================================================================
 // Types
@@ -50,6 +60,19 @@ interface CreateProjectResponse {
 
 interface ErrorResponse {
   error: string;
+}
+
+type UpdateFileContentParams = FileIdParams;
+
+interface UpdateFileContentResponse {
+  success: boolean;
+  syncResult?: {
+    labelsCreated: number;
+    labelsUpdated: number;
+    labelsDeleted: number;
+    linesProcessed: number;
+    errors: Array<{ label: string; error: string }>;
+  };
 }
 
 // ============================================================================
@@ -222,6 +245,115 @@ async function getProjectFilesHandler(
   }
 }
 
+/**
+ * Update file content
+ *
+ * PUT /projects/files/:fileId
+ * Body: { content: string }
+ *
+ * Updates file content and syncs labels from the updated content.
+ * This is the unified endpoint used by both script mode and write mode.
+ */
+async function updateFileContentHandler(
+  request: FastifyRequest<{
+    Params: UpdateFileContentParams;
+    Body: UpdateFileContentInput;
+  }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { fileId } = request.params;
+  const { content } = request.body;
+  const user = request.user!;
+
+  try {
+    const db = getDb();
+
+    // Get the file with project information
+    const [fileWithProject] = await db
+      .select({
+        file: projectFiles,
+        projectOwnerId: projects.userId,
+      })
+      .from(projectFiles)
+      .innerJoin(projects, eq(projectFiles.projectId, projects.id))
+      .where(eq(projectFiles.id, fileId))
+      .limit(1);
+
+    if (!fileWithProject) {
+      reply.status(404).send({ error: "File not found" } as ErrorResponse);
+      return;
+    }
+
+    // Verify user owns the project
+    if (fileWithProject.projectOwnerId !== user.id) {
+      throw new ForbiddenError("Insufficient permissions");
+    }
+
+    const { file } = fileWithProject;
+
+    // Calculate new content hash
+    const newContentHash = calculateContentHash(content);
+
+    // Update file content and sync labels in a single transaction for atomicity
+    const syncResult = await db.transaction(async (tx) => {
+      // Update the file content
+      await tx
+        .update(projectFiles)
+        .set({
+          content,
+          contentHash: newContentHash,
+          updatedAt: new Date(),
+        })
+        .where(eq(projectFiles.id, fileId));
+
+      // Sync labels from updated content (only for STORY files)
+      // Pass the transaction context to ensure atomicity
+      if (file.fileType === "STORY") {
+        return await syncLabelsFromFile(
+          file.projectId,
+          { filePath: file.filePath, fileType: file.fileType },
+          content,
+          fileId,
+          { skipCleanup: false, tx }
+        );
+      }
+      return undefined;
+    });
+
+    reply.status(200).send({
+      success: true,
+      syncResult: syncResult
+        ? {
+            labelsCreated: syncResult.labelsCreated,
+            labelsUpdated: syncResult.labelsUpdated,
+            labelsDeleted: syncResult.labelsDeleted,
+            linesProcessed: syncResult.linesProcessed,
+            errors: syncResult.errors,
+          }
+        : undefined,
+    } as UpdateFileContentResponse);
+  } catch (error) {
+    request.log.error(
+      { err: error, fileId },
+      `updateFileContentHandler: Failed to update file content: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+
+    // Handle known error types
+    if (error instanceof NotFoundError) {
+      reply.status(404).send({ error: "Not found" } as ErrorResponse);
+      return;
+    }
+    if (error instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      return;
+    }
+
+    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+  }
+}
+
 // ============================================================================
 // Routes Registration
 // ============================================================================
@@ -259,5 +391,21 @@ export async function projectsRoutes(fastify: FastifyInstance): Promise<void> {
       }),
     },
     getProjectFilesHandler
+  );
+
+  // Update file content (unified endpoint for both script mode and write mode)
+  fastify.put<{
+    Params: UpdateFileContentParams;
+    Body: UpdateFileContentInput;
+  }>(
+    "/projects/files/:fileId",
+    {
+      onRequest: authenticate,
+      preValidation: validateRequest({
+        params: fileIdParamsSchema,
+        body: updateFileContentSchema,
+      }),
+    },
+    updateFileContentHandler
   );
 }

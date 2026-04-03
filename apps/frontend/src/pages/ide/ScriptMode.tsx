@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Download, Package } from "lucide-react";
 import { StoryPanel } from "@/components/ide-shared";
 import { BookmarkTab, StatusBar, ScriptEditor } from "@/components/script-mode";
@@ -6,10 +6,14 @@ import { ProjectFileTree } from "@/components/script-mode/ProjectFileTree";
 import { useLabels } from "@/hooks/useLabels";
 import { useGitLab } from "@/hooks/useGitLab";
 import { useProjectFiles } from "@/hooks/useProjectFiles";
+import { useAutosave } from "@/hooks/useAutosave";
 import { generateRpyPlainText } from "@/lib/rpy-generator";
+import { sanitizeLabelName } from "@/lib/label-utils";
 import { GitLabSyncDialog } from "@/components/script-mode/GitLabSyncDialog";
 import { ZipImportDialog } from "@/components/zip-import";
 import { Button } from "@/components/ui/button";
+import { queryClient } from "@/lib/query-client";
+import { labelKeys, projectFilesKeys } from "@/lib/query-keys";
 
 interface ScriptModeProps {
   themeName: string;
@@ -28,11 +32,73 @@ export function ScriptMode({
     useLabels();
 
   const { isProjectLinked, getLinkedRepository } = useGitLab();
-  const { files: projectFiles, isLoadingFiles } = useProjectFiles(projectId);
+  const {
+    files: projectFiles,
+    isLoadingFiles,
+    updateFileContent,
+    refreshFiles,
+  } = useProjectFiles(projectId);
 
   // Sync dialog state
   const [showSyncDialog, setShowSyncDialog] = useState(false);
   const [showZipImportDialog, setShowZipImportDialog] = useState(false);
+
+  // Track edited file content for autosave
+  const [editedFileContent, setEditedFileContent] = useState<string>("");
+  const [currentEditFileId, setCurrentEditFileId] = useState<string | null>(
+    null
+  );
+
+  // Simple hash function for file content
+  const hashFileContent = useCallback((content: string) => {
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < content.length; i++) {
+      hash ^= content.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193);
+    }
+    return (hash >>> 0).toString(36);
+  }, []);
+
+  // Autosave hook for file content
+  const {
+    saveStatus: fileSaveStatus,
+    isDirty: isFileDirty,
+    retrySave: retryFileSave,
+    triggerSave: triggerFileSave,
+    resetSavedHash,
+  } = useAutosave({
+    data: editedFileContent,
+    hashFn: hashFileContent,
+    debounceMs: 1000, // Reduced from 2000ms for faster feedback
+    onSave: useCallback(
+      async (content: string) => {
+        if (currentEditFileId) {
+          await updateFileContent(currentEditFileId, content);
+
+          // Invalidate both files and labels queries after save
+          if (projectId) {
+            queryClient.invalidateQueries({
+              queryKey: projectFilesKeys.lists(projectId),
+            });
+            queryClient.invalidateQueries({
+              queryKey: labelKeys.lists(projectId),
+            });
+
+            // Also invalidate the specific label detail if we're viewing a label
+            if (activeLabelId) {
+              queryClient.invalidateQueries({
+                queryKey: labelKeys.detail(projectId, activeLabelId),
+              });
+            }
+          }
+        }
+      },
+      [currentEditFileId, updateFileContent, projectId, activeLabelId]
+    ),
+    onError: useCallback((error: Error) => {
+      console.error("Failed to save file content:", error);
+    }, []),
+  });
 
   // Track active file for Script Mode
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
@@ -41,6 +107,118 @@ export function ScriptMode({
     [projectFiles, activeFileId]
   );
 
+  // Track the line number to scroll to when switching modes
+  const [scrollToLine, setScrollToLine] = useState<number | null>(null);
+
+  // Helper: Find the line number where a label starts in the file content
+  const findLabelLineNumber = useCallback(
+    (fileContent: string, labelTitle: string): number | null => {
+      const labelName = sanitizeLabelName(labelTitle);
+      const lines = fileContent.split("\n");
+
+      // Find the line with "label {name}:" pattern
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line.startsWith("label ") && line.endsWith(":")) {
+          const extractedLabel = line.slice(6, -1).trim();
+          if (extractedLabel === labelName) {
+            return i + 1; // Line numbers are 1-indexed
+          }
+        }
+      }
+
+      return null;
+    },
+    []
+  );
+
+  // Helper: Switch to a file with dirty state checking
+  // Auto-saves unsaved changes before switching to prevent data loss
+  const switchToFile = useCallback(
+    async (file: { id: string; content: string }) => {
+      // Skip if already on this file
+      if (currentEditFileId === file.id) {
+        return;
+      }
+
+      // Save unsaved changes before switching
+      if (currentEditFileId && (isFileDirty || fileSaveStatus === "error")) {
+        await triggerFileSave();
+      }
+
+      // Switch to the new file
+      setEditedFileContent(file.content);
+      setCurrentEditFileId(file.id);
+      resetSavedHash(file.content);
+    },
+    [
+      currentEditFileId,
+      isFileDirty,
+      fileSaveStatus,
+      triggerFileSave,
+      resetSavedHash,
+    ]
+  );
+
+  // When script mode has an active label, select its file and scroll to the label line
+  useEffect(() => {
+    if (!activeLabelId) {
+      return;
+    }
+
+    const fileWithLabel = projectFiles.find((f) =>
+      f.labels.some((l) => l.id === activeLabelId)
+    );
+
+    if (!fileWithLabel) {
+      return;
+    }
+
+    setActiveFileId((currentFileId) =>
+      currentFileId === fileWithLabel.id ? currentFileId : fileWithLabel.id
+    );
+
+    const labelMetadata = fileWithLabel.labels.find(
+      (l) => l.id === activeLabelId
+    );
+    if (!labelMetadata) {
+      setScrollToLine(null);
+      return;
+    }
+
+    const lineNumber = findLabelLineNumber(
+      fileWithLabel.content,
+      labelMetadata.title
+    );
+    setScrollToLine(lineNumber);
+
+    // Switch to the file with dirty state checking
+    void switchToFile(fileWithLabel);
+  }, [activeLabelId, projectFiles, findLabelLineNumber, switchToFile]);
+
+  // Refresh files on mount to ensure fresh data when switching from write mode
+  // This ensures that any changes made in write mode are reflected immediately
+  const hasRefreshed = useRef(false);
+  useEffect(() => {
+    if (projectId && !isLoadingFiles && !hasRefreshed.current) {
+      refreshFiles();
+      hasRefreshed.current = true;
+    }
+  }, [projectId, isLoadingFiles, refreshFiles]);
+
+  // Handle Ctrl+S for immediate save
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.code === "KeyS") {
+        e.preventDefault();
+        triggerFileSave();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [triggerFileSave]);
+
   // Generate RPY content for active scene (plain text for CodeMirror)
   const activeLabelPlainText = useMemo(() => {
     if (!activeLabel) return "";
@@ -48,7 +226,11 @@ export function ScriptMode({
   }, [activeLabel]);
 
   // Get active file content directly for Script Mode editing
-  const activeFileContent = activeProjectFile?.content || "";
+  // Use edited content if available, otherwise use original content
+  const activeFileContent =
+    activeProjectFile && currentEditFileId === activeProjectFile.id
+      ? editedFileContent
+      : activeProjectFile?.content || "";
   // Memoize file lines to avoid repeated split operations
   const activeFileLines = useMemo(
     () => activeFileContent.split("\n"),
@@ -63,9 +245,17 @@ export function ScriptMode({
   // Handle GitLab file selection
   const handleGitLabFileSelect = (fileId: string) => {
     setActiveFileId(fileId);
+    setScrollToLine(null);
     // Also clear the active scene since we're now in file mode
     setActiveLabelId(null);
   };
+
+  // Update edited content when active file changes (manual selection)
+  useEffect(() => {
+    if (activeProjectFile) {
+      void switchToFile(activeProjectFile);
+    }
+  }, [activeProjectFile, switchToFile]);
 
   // Handle GitLab scene selection (label within a file)
   const handleGitLabSceneSelect = (sceneId: string) => {
@@ -215,9 +405,10 @@ export function ScriptMode({
               {activeProjectFile ? (
                 <ScriptEditor
                   content={activeFileContent}
-                  onChange={(value) =>
-                    console.log("GitLab file content changed:", value)
-                  }
+                  scrollToLine={scrollToLine}
+                  onChange={(value) => {
+                    setEditedFileContent(value);
+                  }}
                 />
               ) : activeLabel ? (
                 <ScriptEditor
@@ -312,14 +503,16 @@ export function ScriptMode({
           activeProjectFile
             ? activeFileLines.length
             : activeLabel
-            ? activeLabelLines.length
-            : 0
+              ? activeLabelLines.length
+              : 0
         }
         language="Ren'Py"
         themeName={themeName}
         projectId={projectId}
         projectName={projectName}
         gitlabBranch={gitlabBranch}
+        saveStatus={activeProjectFile ? fileSaveStatus : undefined}
+        onSaveRequest={activeProjectFile ? retryFileSave : undefined}
       />
 
       {/* Zip Import Dialog (always available for non-empty projects too) */}

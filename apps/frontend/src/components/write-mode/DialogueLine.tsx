@@ -372,6 +372,7 @@ export const DialogueLine = memo(function DialogueLine({
     (e: React.FocusEvent<HTMLDivElement>) => {
       if (!e.currentTarget.contains(e.relatedTarget)) {
         // Small delay to handle React 19's focus event timing during transitions
+        // TODO: This is a React antipattern, consider refactoring to avoid this if possible
         setTimeout(() => {
           setIsDropdownOpen(false);
           setFocusedOptionIndex(-1);

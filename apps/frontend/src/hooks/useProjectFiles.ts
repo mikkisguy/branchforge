@@ -51,6 +51,14 @@ export function useProjectFiles(
 ): UseProjectFilesReturn {
   const queryClient = useQueryClient();
 
+  // Determine the query key based on options
+  const queryKey =
+    projectId && options?.source
+      ? projectFilesKeys.listsWithSource(projectId, options.source)
+      : projectId
+      ? projectFilesKeys.lists(projectId)
+      : ["projectFiles", "__disabled__"];
+
   // Query for project files with stable key
   const {
     data: files = [],
@@ -58,18 +66,13 @@ export function useProjectFiles(
     error: filesError,
     refetch: refreshFiles,
   } = useQuery({
-    queryKey:
-      projectId && options?.source
-        ? projectFilesKeys.listsWithSource(projectId, options.source)
-        : projectId
-        ? projectFilesKeys.lists(projectId)
-        : ["projectFiles", "__disabled__"],
+    queryKey,
     queryFn: async () => {
       return projectFilesApi.listFiles(projectId!, options);
     },
     enabled: !!projectId,
-    refetchOnMount: "always",
-    staleTime: 30 * 1000, // 30 seconds (reduced for better reload UX)
+    refetchOnMount: "always", // Always refetch on mount to ensure fresh file data
+    staleTime: 0,
   });
 
   // Update file content mutation

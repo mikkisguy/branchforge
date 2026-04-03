@@ -1,6 +1,8 @@
 import CodeMirror from "@uiw/react-codemirror";
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import type { Extension } from "@codemirror/state";
+import { EditorView, Decoration, DecorationSet } from "@codemirror/view";
+import { StateField, StateEffect } from "@codemirror/state";
 import { highlightSelectionMatches, search } from "@codemirror/search";
 import { renPy } from "../../lib/codemirror/renpy";
 import {
@@ -16,13 +18,203 @@ import { LineWrapSwitcher } from "./LineWrapSwitcher";
 interface ScriptEditorProps {
   content: string;
   onChange?: (value: string) => void;
+  scrollToLine?: number | null;
 }
 
-export function ScriptEditor({ content, onChange }: ScriptEditorProps) {
+const TARGET_LINE_HIGHLIGHT_MS = 920;
+const TARGET_LINE_HIGHLIGHT_CLEANUP_BUFFER_MS = 90;
+const TARGET_LINE_HIGHLIGHT_DEDUPE_WINDOW_MS = 180;
+
+// Create a StateField and extension for highlighting a specific line
+const createHighlightExtension = () => {
+  // Define the state effect for setting the highlighted line
+  const setHighlightEffect = StateEffect.define<number | null>();
+
+  // Create the StateField to manage the highlighted line
+  const highlightStateField = StateField.define<DecorationSet>({
+    create: () => Decoration.none,
+    update: (decorations, transaction) => {
+      // Check if there's a setHighlightEffect in the transaction
+      for (const effect of transaction.effects) {
+        if (effect.is(setHighlightEffect)) {
+          const line = effect.value;
+          if (line === null) {
+            return Decoration.none;
+          }
+          try {
+            const lineObj = transaction.state.doc.line(line);
+            const decoration = Decoration.line({
+              class: "cm-target-line-highlight",
+            });
+            return Decoration.set([decoration.range(lineObj.from)]);
+          } catch {
+            return Decoration.none;
+          }
+        }
+      }
+      return decorations;
+    },
+    provide: (f) => EditorView.decorations.from(f),
+  });
+
+  return { highlightStateField, setHighlightEffect };
+};
+
+export function ScriptEditor({
+  content,
+  onChange,
+  scrollToLine,
+}: ScriptEditorProps) {
   const [lineWrapExtension, setLineWrapExtension] = useState<
     Extension | readonly Extension[]
   >([]);
   const cleanContent = useMemo(() => stripBOM(content), [content]);
+
+  // Track if we've scrolled to avoid re-scrolling on every render
+  const hasScrolled = useRef(false);
+  // Keep a reference to the EditorView for dynamic scroll operations
+  const editorViewRef = useRef<EditorView | null>(null);
+  // Track the timeout for removing the highlight
+  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  // Track queued animation frames used to start highlight after scrolling/layout
+  const highlightRafRef = useRef<number | null>(null);
+  const highlightRafNestedRef = useRef<number | null>(null);
+  // Prevent back-to-back re-triggers from restarting the animation mid-flight.
+  const lastHighlightedLineRef = useRef<number | null>(null);
+  const lastHighlightAtRef = useRef(0);
+
+  // Create the highlight extension (only once)
+  const { highlightStateField, setHighlightEffect } = useMemo(
+    () => createHighlightExtension(),
+    []
+  );
+
+  // Helper to highlight a specific line using the StateEffect
+  const highlightLineElement = useCallback(
+    (view: EditorView, line: number) => {
+      const now = performance.now();
+      if (
+        lastHighlightedLineRef.current === line &&
+        now - lastHighlightAtRef.current <
+          TARGET_LINE_HIGHLIGHT_DEDUPE_WINDOW_MS
+      ) {
+        return;
+      }
+      lastHighlightedLineRef.current = line;
+      lastHighlightAtRef.current = now;
+
+      // Clear any existing timeout
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
+      }
+
+      // Apply the highlight effect
+      view.dispatch({
+        effects: [setHighlightEffect.of(line)],
+      });
+
+      // Remove the highlight after the pulse fully fades out
+      highlightTimeoutRef.current = setTimeout(() => {
+        view.dispatch({
+          effects: [setHighlightEffect.of(null)],
+        });
+      }, TARGET_LINE_HIGHLIGHT_MS + TARGET_LINE_HIGHLIGHT_CLEANUP_BUFFER_MS);
+    },
+    [setHighlightEffect]
+  );
+
+  // Schedule highlight on the next paint frames so scroll settles first.
+  const scheduleLineHighlight = useCallback(
+    (view: EditorView, line: number) => {
+      if (highlightRafRef.current !== null) {
+        cancelAnimationFrame(highlightRafRef.current);
+        highlightRafRef.current = null;
+      }
+      if (highlightRafNestedRef.current !== null) {
+        cancelAnimationFrame(highlightRafNestedRef.current);
+        highlightRafNestedRef.current = null;
+      }
+
+      highlightRafRef.current = requestAnimationFrame(() => {
+        highlightRafNestedRef.current = requestAnimationFrame(() => {
+          highlightLineElement(view, line);
+          highlightRafRef.current = null;
+          highlightRafNestedRef.current = null;
+        });
+      });
+    },
+    [highlightLineElement]
+  );
+
+  // Helper to scroll to a specific line with validation
+  const scrollToLineIfValid = useCallback(
+    (view: EditorView, line: number | null | undefined) => {
+      if (!line) return;
+
+      const docLines = view.state.doc.lines;
+      if (Number.isFinite(line) && line >= 1 && line <= docLines) {
+        const pos = view.state.doc.line(line).from;
+        view.dispatch({
+          effects: [
+            EditorView.scrollIntoView(pos, { y: "start", yMargin: 50 }),
+          ],
+        });
+      }
+      // Mark as scrolled even if out of bounds to avoid repeated attempts
+      hasScrolled.current = true;
+    },
+    []
+  );
+
+  // Add a handler for editor creation to store the view and handle initial scroll
+  const handleCreateEditor = useCallback(
+    (view: EditorView) => {
+      editorViewRef.current = view;
+      if (!hasScrolled.current) {
+        scrollToLineIfValid(view, scrollToLine);
+        // Trigger the highlight effect
+        if (scrollToLine) {
+          scheduleLineHighlight(view, scrollToLine);
+        }
+      }
+    },
+    [scrollToLine, scrollToLineIfValid, scheduleLineHighlight]
+  );
+
+  // Track previous scrollToLine to detect changes
+  const prevScrollToLineRef = useRef<number | null | undefined>(scrollToLine);
+
+  // Handle dynamic scrollToLine changes after the editor is created
+  useEffect(() => {
+    // Reset hasScrolled when scrollToLine changes
+    if (prevScrollToLineRef.current !== scrollToLine) {
+      hasScrolled.current = false;
+      prevScrollToLineRef.current = scrollToLine;
+    }
+
+    const view = editorViewRef.current;
+    if (scrollToLine && !hasScrolled.current && view) {
+      scrollToLineIfValid(view, scrollToLine);
+      scheduleLineHighlight(view, scrollToLine);
+    }
+  }, [scrollToLine, scrollToLineIfValid, scheduleLineHighlight]);
+
+  // Cleanup highlight timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
+      }
+      if (highlightRafRef.current !== null) {
+        cancelAnimationFrame(highlightRafRef.current);
+      }
+      if (highlightRafNestedRef.current !== null) {
+        cancelAnimationFrame(highlightRafNestedRef.current);
+      }
+    };
+  }, []);
 
   const { cursorPosition, selectionInfo, totalLines, updateListener } =
     useEditorCursor({ initialContent: cleanContent });
@@ -42,12 +234,13 @@ export function ScriptEditor({ content, onChange }: ScriptEditorProps) {
         renPySyntaxHighlighting,
         lineWrapExtension,
         updateListener,
+        highlightStateField,
         // Explicitly add search extension with default configuration
         search({}),
         // Highlight matches of the current selection
         highlightSelectionMatches(),
       ].flat(),
-    [lineWrapExtension, updateListener]
+    [lineWrapExtension, updateListener, highlightStateField]
   );
 
   return (
@@ -60,6 +253,7 @@ export function ScriptEditor({ content, onChange }: ScriptEditorProps) {
           editable={true}
           extensions={extensions}
           onChange={onChange}
+          onCreateEditor={handleCreateEditor}
           basicSetup={{
             lineNumbers: true,
             highlightActiveLine: true,

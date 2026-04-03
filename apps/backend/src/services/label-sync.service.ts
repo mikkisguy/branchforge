@@ -93,6 +93,200 @@ export function validateFileType(fileType: string): void {
 // ============================================================================
 
 /**
+ * Internal helper: Execute the label sync operations within a transaction.
+ * This function is called either within a new transaction or with an external one.
+ *
+ * TRANSACTION TYPE NOTE: We use `any` for the tx parameter because Drizzle ORM's
+ * transaction type is complex and not easily exportable. The transaction object has
+ * the same API as the regular db instance (select, insert, update, delete, etc.),
+ * but with additional transaction-specific methods (rollback, commit). Using `any`
+ * here is a pragmatic choice since:
+ * 1. The transaction API is identical to Db for our use case
+ * 2. Drizzle doesn't export a portable transaction type that works across modules
+ * 3. Attempting to extract the exact type results in unwieldy generics
+ *
+ * @param tx - The transaction context (same API as Db, passed from db.transaction())
+ * @param projectId - The project ID
+ * @param parsed - The parsed RPY file
+ * @param rpyContent - The raw RPY content
+ * @param sourceId - The source file ID
+ * @param skipCleanup - Whether to skip orphan cleanup
+ * @returns Sync statistics
+ */
+async function syncLabelsInTransaction(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tx: any,
+  projectId: string,
+  parsed: ParsedRPYFileWithLabels,
+  rpyContent: string,
+  sourceId: string,
+  skipCleanup: boolean
+): Promise<{
+  labelsCreated: number;
+  labelsUpdated: number;
+  labelsDeleted: number;
+  linesProcessed: number;
+  errors: Array<{ label: string; error: string }>;
+}> {
+  // Fetch existing labels for this source file
+  const existingLabels = await tx
+    .select()
+    .from(labels)
+    .where(eq(labels.projectFileId, sourceId));
+
+  const existingLabelsByName = new Map<string, (typeof existingLabels)[0]>();
+  for (const labelRow of existingLabels) {
+    if (labelRow.labelName) {
+      existingLabelsByName.set(labelRow.labelName, labelRow);
+    }
+  }
+
+  // Track results
+  let labelsCreated = 0;
+  let labelsUpdated = 0;
+  let linesProcessed = 0;
+  const errors: Array<{ label: string; error: string }> = [];
+
+  // Process each label
+  for (let i = 0; i < parsed.labels.length; i++) {
+    const label = parsed.labels[i];
+    const labelData = convertToBranchForgeFormatFromLabels(
+      parsed,
+      label.label,
+      rpyContent
+    );
+
+    try {
+      const existingLabel = existingLabelsByName.get(label.label);
+
+      if (existingLabel) {
+        // Update existing label
+        // Delete old lines
+        await tx
+          .delete(labelLines)
+          .where(eq(labelLines.labelId, existingLabel.id));
+
+        // Calculate label lines hash
+        const labelLinesHash = calculateLinesHash(labelData.entries);
+
+        // Insert new lines in batch
+        if (labelData.entries.length > 0) {
+          const lineValues = buildLineValues(
+            existingLabel.id,
+            labelData.entries,
+            sourceId
+          );
+
+          await tx.insert(labelLines).values(lineValues);
+          linesProcessed += lineValues.length;
+        }
+
+        // Update label sync metadata
+        await tx
+          .update(labels)
+          .set({
+            contentHash: labelLinesHash,
+            lastSyncedHash: labelLinesHash,
+            syncStatus: "SYNCED",
+            updatedAt: new Date(),
+          })
+          .where(eq(labels.id, existingLabel.id));
+
+        labelsUpdated++;
+      } else {
+        // Create new scene
+        const labelLinesHash = calculateLinesHash(labelData.entries);
+
+        const [newScene] = await tx
+          .insert(labels)
+          .values({
+            projectId,
+            title: label.label,
+            projectFileId: sourceId,
+            labelName: label.label,
+            labelPosition: i,
+            sequenceOrder: i,
+            route: null, // User will assign route later
+            labelNumber: i + 1,
+            status: "DRAFT",
+            prerequisites: {},
+            effects: {},
+            // Sync fields
+            contentHash: labelLinesHash,
+            lastSyncedHash: labelLinesHash,
+            syncStatus: "SYNCED",
+          })
+          .returning();
+
+        // Insert lines in batch
+        if (labelData.entries.length > 0) {
+          const lineValues = buildLineValues(
+            newScene.id,
+            labelData.entries,
+            sourceId
+          );
+
+          await tx.insert(labelLines).values(lineValues);
+          linesProcessed += lineValues.length;
+        }
+
+        labelsCreated++;
+      }
+    } catch (error) {
+      errors.push({
+        label: label.label,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  // Orphan cleanup (labels that no longer exist in RPY content)
+  let labelsDeleted = 0;
+  if (!skipCleanup) {
+    const currentLabelNames = new Set(parsed.labels.map((l) => l.label));
+
+    // Find orphaned labels (excluding already soft-deleted)
+    const orphanedLabels = existingLabels.filter(
+      (s: (typeof existingLabels)[0]) =>
+        s.labelName && !currentLabelNames.has(s.labelName) && !s.deletedAt
+    );
+
+    if (orphanedLabels.length > 0) {
+      const orphanedIds = orphanedLabels.map(
+        (s: (typeof orphanedLabels)[0]) => s.id
+      );
+
+      // Soft delete label lines for orphaned labels
+      await tx
+        .update(labelLines)
+        .set({ deletedAt: new Date() })
+        .where(
+          and(
+            inArray(labelLines.labelId, orphanedIds),
+            isNull(labelLines.deletedAt)
+          )
+        );
+
+      // Soft delete orphaned labels
+      await tx
+        .update(labels)
+        .set({ deletedAt: new Date() })
+        .where(and(inArray(labels.id, orphanedIds), isNull(labels.deletedAt)));
+
+      labelsDeleted = orphanedIds.length;
+    }
+  }
+
+  return {
+    labelsCreated,
+    labelsUpdated,
+    labelsDeleted,
+    linesProcessed,
+    errors,
+  };
+}
+
+/**
  * Map BranchForge entry type to content type enum
  */
 function mapEntryToDbType(entry: {
@@ -171,11 +365,19 @@ function buildLineValues(
  * 2. Parses RPY content
  * 3. Executes atomic sync transaction
  *
+ * TRANSACTION PARAMETER: The `tx` option allows passing an existing Drizzle
+ * transaction context to enable atomic operations across multiple database calls.
+ * This is essential when the caller needs the sync to be part of a larger transaction
+ * (e.g., updating file content and syncing labels atomically).
+ *
+ * We use `any` for the tx type because Drizzle ORM's transaction type is complex and
+ * not easily exportable as a portable type. The transaction has the same API as Db.
+ *
  * @param projectId - The project ID to sync labels for
  * @param fileData - The file data containing content, path, and type
  * @param rpyContent - The RPY file content
  * @param sourceId - The source file ID (for linking labels to source)
- * @param options - Sync options (skipCleanup)
+ * @param options - Sync options (skipCleanup, tx)
  * @returns Sync result with statistics
  */
 export async function syncLabelsFromFile(
@@ -183,10 +385,14 @@ export async function syncLabelsFromFile(
   fileData: { filePath: string; fileType: string },
   rpyContent: string,
   sourceId: string,
-  options?: SyncLabelsFromOptions
+  options?: SyncLabelsFromOptions & {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tx?: any; // Drizzle transaction context (same API as Db)
+  }
 ): Promise<SyncLabelsFromResult> {
-  const db = getDb();
+  const db = options?.tx ?? getDb();
   const skipCleanup = options?.skipCleanup ?? false;
+  const externalTx = !!options?.tx;
 
   const result: SyncLabelsFromResult = {
     success: false,
@@ -209,167 +415,29 @@ export async function syncLabelsFromFile(
     validateRPYContent(rpyContent, parsed);
 
     // Step 4: Execute sync in atomic transaction
-    const syncResult = await db.transaction(async (tx) => {
-      // Fetch existing labels for this source file
-      const existingLabels = await tx
-        .select()
-        .from(labels)
-        .where(eq(labels.projectFileId, sourceId));
-
-      const existingLabelsByName = new Map<
-        string,
-        (typeof existingLabels)[0]
-      >();
-      for (const labelRow of existingLabels) {
-        if (labelRow.labelName) {
-          existingLabelsByName.set(labelRow.labelName, labelRow);
-        }
-      }
-
-      // Track results
-      let labelsCreated = 0;
-      let labelsUpdated = 0;
-      let linesProcessed = 0;
-      const errors: Array<{ label: string; error: string }> = [];
-
-      // Process each label
-      for (let i = 0; i < parsed.labels.length; i++) {
-        const label = parsed.labels[i];
-        const labelData = convertToBranchForgeFormatFromLabels(
+    // If an external transaction is provided, use it directly; otherwise create a new one
+    // Note: We annotate tx as `any` because Drizzle's transaction type is complex.
+    // The transaction callback parameter has the same API as Db for our operations.
+    const syncResult = await (externalTx
+      ? syncLabelsInTransaction(
+          db,
+          projectId,
           parsed,
-          label.label,
-          rpyContent
-        );
-
-        try {
-          const existingLabel = existingLabelsByName.get(label.label);
-
-          if (existingLabel) {
-            // Update existing label
-            // Delete old lines
-            await tx
-              .delete(labelLines)
-              .where(eq(labelLines.labelId, existingLabel.id));
-
-            // Calculate label lines hash
-            const labelLinesHash = calculateLinesHash(labelData.entries);
-
-            // Insert new lines in batch
-            if (labelData.entries.length > 0) {
-              const lineValues = buildLineValues(
-                existingLabel.id,
-                labelData.entries,
-                sourceId
-              );
-
-              await tx.insert(labelLines).values(lineValues);
-              linesProcessed += lineValues.length;
-            }
-
-            // Update label sync metadata
-            await tx
-              .update(labels)
-              .set({
-                contentHash: labelLinesHash,
-                lastSyncedHash: labelLinesHash,
-                syncStatus: "SYNCED",
-                updatedAt: new Date(),
-              })
-              .where(eq(labels.id, existingLabel.id));
-
-            labelsUpdated++;
-          } else {
-            // Create new scene
-            const labelLinesHash = calculateLinesHash(labelData.entries);
-
-            const [newScene] = await tx
-              .insert(labels)
-              .values({
-                projectId,
-                title: label.label,
-                projectFileId: sourceId,
-                labelName: label.label,
-                labelPosition: i,
-                sequenceOrder: i,
-                route: null, // User will assign route later
-                labelNumber: i + 1,
-                status: "DRAFT",
-                prerequisites: {},
-                effects: {},
-                // Sync fields
-                contentHash: labelLinesHash,
-                lastSyncedHash: labelLinesHash,
-                syncStatus: "SYNCED",
-              })
-              .returning();
-
-            // Insert lines in batch
-            if (labelData.entries.length > 0) {
-              const lineValues = buildLineValues(
-                newScene.id,
-                labelData.entries,
-                sourceId
-              );
-
-              await tx.insert(labelLines).values(lineValues);
-              linesProcessed += lineValues.length;
-            }
-
-            labelsCreated++;
-          }
-        } catch (error) {
-          errors.push({
-            label: label.label,
-            error: error instanceof Error ? error.message : "Unknown error",
-          });
-        }
-      }
-
-      // Orphan cleanup (labels that no longer exist in RPY content)
-      let labelsDeleted = 0;
-      if (!skipCleanup) {
-        const currentLabelNames = new Set(parsed.labels.map((l) => l.label));
-
-        // Find orphaned labels (excluding already soft-deleted)
-        const orphanedLabels = existingLabels.filter(
-          (s) =>
-            s.labelName && !currentLabelNames.has(s.labelName) && !s.deletedAt
-        );
-
-        if (orphanedLabels.length > 0) {
-          const orphanedIds = orphanedLabels.map((s) => s.id);
-
-          // Soft delete label lines for orphaned labels
-          await tx
-            .update(labelLines)
-            .set({ deletedAt: new Date() })
-            .where(
-              and(
-                inArray(labelLines.labelId, orphanedIds),
-                isNull(labelLines.deletedAt)
-              )
-            );
-
-          // Soft delete orphaned labels
-          await tx
-            .update(labels)
-            .set({ deletedAt: new Date() })
-            .where(
-              and(inArray(labels.id, orphanedIds), isNull(labels.deletedAt))
-            );
-
-          labelsDeleted = orphanedIds.length;
-        }
-      }
-
-      return {
-        labelsCreated,
-        labelsUpdated,
-        labelsDeleted,
-        linesProcessed,
-        errors,
-      };
-    });
+          rpyContent,
+          sourceId,
+          skipCleanup
+        )
+      : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        db.transaction((tx: any) =>
+          syncLabelsInTransaction(
+            tx,
+            projectId,
+            parsed,
+            rpyContent,
+            sourceId,
+            skipCleanup
+          )
+        ));
 
     // Return success
     return {
