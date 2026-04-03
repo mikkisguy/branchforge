@@ -143,11 +143,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
   // Handle label switching - flush pending save for previous label
   useEffect(() => {
     const prevLabelId = prevLabelIdRef.current;
-    if (
-      prevLabelId &&
-      prevLabelId !== activeLabelId &&
-      isDirty
-    ) {
+    if (prevLabelId && prevLabelId !== activeLabelId && isDirty) {
       // Flush pending save before switching labels
       triggerSave();
     }
