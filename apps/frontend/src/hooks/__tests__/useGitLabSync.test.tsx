@@ -623,10 +623,13 @@ describe("useGitLabSync", () => {
         queryKey: characterKeys.lists("project-1"),
       });
       // Characters are both invalidated AND immediately refetched - critical for syncing character data changes
-      expect(refetchQueriesSpy).toHaveBeenCalledWith({
-        queryKey: characterKeys.lists("project-1"),
-        type: "all",
-      });
+      expect(refetchQueriesSpy).toHaveBeenCalledWith(
+        {
+          queryKey: characterKeys.lists("project-1"),
+          type: "active",
+        },
+        {}
+      );
     });
   });
 });

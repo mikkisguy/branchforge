@@ -115,32 +115,31 @@ export function WriteMode({ projectName }: WriteModeProps) {
   }, [isUpdatingDialogue, isUpdateError]);
 
   // Autosave hook for dialogue entries
-  const { saveStatus, isDirty, triggerSave, resetSavedHash } = useAutosave<
-    LabelDialogueDraft
-  >({
-    data: currentDraft,
-    hashFn: (draft) =>
-      `${draft.labelId ?? "none"}:${hashDialogueEntries(draft.entries)}`,
-    debounceMs: 1000, // 1 second debounce for faster feedback
-    skipSaveRef: isSwitchingLabelsRef, // Prevent saves during label switches
-    onSave: useCallback(
-      async (draft: LabelDialogueDraft) => {
-        if (draft.labelId) {
-          const payload = dialogueToPayload(draft.entries);
-          await updateDialogue(draft.labelId, payload);
-          // Update saved hash after successful save
-          savedHashesRef.current.set(
-            draft.labelId,
-            hashDialogueEntries(draft.entries)
-          );
-        }
-      },
-      [updateDialogue]
-    ),
-    onError: useCallback((error: Error) => {
-      console.error("Failed to save dialogue:", error);
-    }, []),
-  });
+  const { saveStatus, isDirty, triggerSave, resetSavedHash } =
+    useAutosave<LabelDialogueDraft>({
+      data: currentDraft,
+      hashFn: (draft) =>
+        `${draft.labelId ?? "none"}:${hashDialogueEntries(draft.entries)}`,
+      debounceMs: 1000, // 1 second debounce for faster feedback
+      skipSaveRef: isSwitchingLabelsRef, // Prevent saves during label switches
+      onSave: useCallback(
+        async (draft: LabelDialogueDraft) => {
+          if (draft.labelId) {
+            const payload = dialogueToPayload(draft.entries);
+            await updateDialogue(draft.labelId, payload);
+            // Update saved hash after successful save
+            savedHashesRef.current.set(
+              draft.labelId,
+              hashDialogueEntries(draft.entries)
+            );
+          }
+        },
+        [updateDialogue]
+      ),
+      onError: useCallback((error: Error) => {
+        console.error("Failed to save dialogue:", error);
+      }, []),
+    });
 
   // Keep latest autosave state for unmount cleanup without re-running cleanup
   const isDirtyRef = useRef(isDirty);

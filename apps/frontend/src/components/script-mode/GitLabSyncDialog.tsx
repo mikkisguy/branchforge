@@ -144,8 +144,9 @@ export function GitLabSyncDialog({
       if (operationType === "import") {
         try {
           // Get full detection info including conflicts
-          const detectionResult =
-            await charactersApi.detectCharacters(projectId);
+          const detectionResult = await charactersApi.detectCharacters(
+            projectId
+          );
           setDetectedCharacters({
             characters: detectionResult.characters,
             conflicts: detectionResult.conflicts,

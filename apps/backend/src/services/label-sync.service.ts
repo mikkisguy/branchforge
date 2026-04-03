@@ -154,7 +154,11 @@ async function syncLabelsInTransaction(
   for (const char of projectCharacters) {
     registerLookup(lookupMaps.byTag, char.renpyTag, char.id);
     if (char.renpyTag) {
-      registerLookup(lookupMaps.byTagLower, char.renpyTag.toLowerCase(), char.id);
+      registerLookup(
+        lookupMaps.byTagLower,
+        char.renpyTag.toLowerCase(),
+        char.id
+      );
     }
     registerLookup(lookupMaps.byDisplayName, char.displayName, char.id);
     if (char.displayName) {

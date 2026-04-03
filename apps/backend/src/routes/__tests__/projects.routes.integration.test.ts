@@ -102,16 +102,28 @@ describe("ProjectsRoutes (Integration)", () => {
       ).map((l) => l.id);
 
       if (labelIds.length > 0) {
-        await db.delete(labelLines).where(inArray(labelLines.labelId, labelIds));
+        await db
+          .delete(labelLines)
+          .where(inArray(labelLines.labelId, labelIds));
       }
 
-      await db.delete(labels).where(inArray(labels.projectFileId, projectFileIds));
+      await db
+        .delete(labels)
+        .where(inArray(labels.projectFileId, projectFileIds));
     }
 
-    await db.delete(characters).where(eq(characters.projectId, ownedProject.id!));
-    await db.delete(characters).where(eq(characters.projectId, sharedProject.id!));
-    await db.delete(projectFiles).where(eq(projectFiles.projectId, ownedProject.id!));
-    await db.delete(projectFiles).where(eq(projectFiles.projectId, sharedProject.id!));
+    await db
+      .delete(characters)
+      .where(eq(characters.projectId, ownedProject.id!));
+    await db
+      .delete(characters)
+      .where(eq(characters.projectId, sharedProject.id!));
+    await db
+      .delete(projectFiles)
+      .where(eq(projectFiles.projectId, ownedProject.id!));
+    await db
+      .delete(projectFiles)
+      .where(eq(projectFiles.projectId, sharedProject.id!));
     await db.delete(projects).where(eq(projects.id, ownedProject.id!));
     await db.delete(projects).where(eq(projects.id, sharedProject.id!));
     await db.delete(userSessions).where(eq(userSessions.userId, testUserId));
@@ -522,7 +534,7 @@ describe("ProjectsRoutes (Integration)", () => {
       const fileId = testUuid("13000000", 1);
       const characterId = testUuid("14000000", 1);
 
-      const initialContent = ['label intro:', '    "Hello"'].join("\n");
+      const initialContent = ["label intro:", '    "Hello"'].join("\n");
 
       await db.insert(projectFiles).values({
         id: fileId,
@@ -544,7 +556,7 @@ describe("ProjectsRoutes (Integration)", () => {
         color: "#ffffff",
       });
 
-      const updatedContent = ['label intro:', '    alice "Hello there"'].join(
+      const updatedContent = ["label intro:", '    alice "Hello there"'].join(
         "\n"
       );
 
@@ -589,7 +601,7 @@ describe("ProjectsRoutes (Integration)", () => {
       const fileId = testUuid("13000000", 2);
       const characterId = testUuid("14000000", 2);
 
-      const initialContent = ['label intro:', '    "Hello"'].join("\n");
+      const initialContent = ["label intro:", '    "Hello"'].join("\n");
 
       await db.insert(projectFiles).values({
         id: fileId,
@@ -611,7 +623,7 @@ describe("ProjectsRoutes (Integration)", () => {
         color: "#ffffff",
       });
 
-      const updatedContent = ['label intro:', '    Alice "Hello there"'].join(
+      const updatedContent = ["label intro:", '    Alice "Hello there"'].join(
         "\n"
       );
 

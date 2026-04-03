@@ -147,7 +147,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
       progress: calculateProgress(op.status, pollStartTime),
       isProcessing: op.status === "PENDING" || op.status === "IN_PROGRESS",
       error:
-        op.status === "FAILED" ? (op.errorMessage ?? "Operation failed") : null,
+        op.status === "FAILED" ? op.errorMessage ?? "Operation failed" : null,
     });
 
     // Stop polling on completion and invalidate caches
