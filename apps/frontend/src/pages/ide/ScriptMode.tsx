@@ -100,6 +100,22 @@ export function ScriptMode({
     }, []),
   });
 
+  // Keep latest autosave state for unmount cleanup without re-running cleanup
+  const triggerFileSaveRef = useRef(triggerFileSave);
+
+  useEffect(() => {
+    triggerFileSaveRef.current = triggerFileSave;
+  }, [triggerFileSave]);
+
+  // Flush pending file save on unmount (e.g., mode switch Script -> Write)
+  useEffect(() => {
+    return () => {
+      // Always trigger on unmount so we don't miss very recent edits during
+      // rapid mode switches; useAutosave will no-op if nothing changed.
+      void triggerFileSaveRef.current();
+    };
+  }, []);
+
   // Track active file for Script Mode
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const activeProjectFile = useMemo(

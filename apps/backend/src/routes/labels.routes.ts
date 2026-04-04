@@ -108,6 +108,10 @@ async function reconstructFileForLabel(projectFileId: string): Promise<string> {
     throw new NotFoundError("ProjectFile");
   }
 
+  // `content` is the single source of truth for the current file state.
+  // `originalContent` is import-time baseline only and must not be used here.
+  const reconstructionBaseContent = projectFile.content;
+
   // Fetch all labels for the project file
   const allLabels = await db
     .select({
@@ -121,10 +125,10 @@ async function reconstructFileForLabel(projectFileId: string): Promise<string> {
     )
     .orderBy(asc(labels.labelPosition));
 
-  // If there are no labels, return the original content as-is
+  // If there are no labels, return current file content as-is
   if (allLabels.length === 0) {
     return reconstructRPYFile({
-      originalContent: projectFile.originalContent || projectFile.content,
+      originalContent: reconstructionBaseContent,
       updatedDialogue: new Map(),
     });
   }
@@ -186,9 +190,9 @@ async function reconstructFileForLabel(projectFileId: string): Promise<string> {
     updatedDialogue.set(labelName, labelDialogue);
   }
 
-  // Reconstruct and return file content using original content as base
+  // Reconstruct and return file content using current file content as base
   return reconstructRPYFile({
-    originalContent: projectFile.originalContent || projectFile.content,
+    originalContent: reconstructionBaseContent,
     updatedDialogue,
   });
 }

@@ -33,9 +33,11 @@ import { projectFiles, labels, projects } from "../db/schema/index.js";
 import { eq, inArray, and, isNull } from "drizzle-orm";
 import { syncLabelsFromFile } from "../services/label-sync.service.js";
 import { calculateContentHash } from "../lib/hash.js";
+import { parseRPYFileWithLabels } from "../services/rpy-parser.service.js";
 import {
   NotFoundError,
   ForbiddenError,
+  ValidationError,
 } from "../middleware/error-handler.middleware.js";
 
 // ============================================================================
@@ -291,6 +293,23 @@ async function updateFileContentHandler(
 
     const { file } = fileWithProject;
 
+    // Re-evaluate file type from the latest content so files can transition
+    // from SETTINGS -> STORY when labels are added in Script Mode.
+    let parsed;
+    let nextFileType;
+    try {
+      parsed = parseRPYFileWithLabels(content, file.filePath);
+      nextFileType = parsed.fileType;
+    } catch (error) {
+      request.log.error(
+        { err: error, fileId },
+        `updateFileContentHandler: Failed to parse RPY file: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+      throw new ValidationError("Invalid RPY file content");
+    }
+
     // Calculate new content hash
     const newContentHash = calculateContentHash(content);
 
@@ -301,6 +320,7 @@ async function updateFileContentHandler(
         .update(projectFiles)
         .set({
           content,
+          fileType: nextFileType,
           contentHash: newContentHash,
           updatedAt: new Date(),
         })
@@ -308,10 +328,10 @@ async function updateFileContentHandler(
 
       // Sync labels from updated content (only for STORY files)
       // Pass the transaction context to ensure atomicity
-      if (file.fileType === "STORY") {
+      if (nextFileType === "STORY") {
         return await syncLabelsFromFile(
           file.projectId,
-          { filePath: file.filePath, fileType: file.fileType },
+          { filePath: file.filePath, fileType: nextFileType },
           content,
           fileId,
           { skipCleanup: false, tx }
@@ -347,6 +367,10 @@ async function updateFileContentHandler(
     }
     if (error instanceof ForbiddenError) {
       reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      return;
+    }
+    if (error instanceof ValidationError) {
+      reply.status(400).send({ error: error.userMessage } as ErrorResponse);
       return;
     }
 
