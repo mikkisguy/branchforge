@@ -7,17 +7,22 @@
 
 import { useMemo } from "react";
 import type { PublicLabel } from "@branchforge/shared";
+import { Sparkles } from "lucide-react";
 
 interface SceneNavigatorProps {
   labels: PublicLabel[];
   activeLabelId: string | null;
   onSelect: (labelId: string) => void;
+  projectName?: string;
+  projectLabelCount?: number;
 }
 
 export function SceneNavigator({
   labels,
   activeLabelId,
   onSelect,
+  projectName,
+  projectLabelCount,
 }: SceneNavigatorProps) {
   const groupedLabels = useMemo(() => {
     const groups = new Map<string, PublicLabel[]>();
@@ -55,57 +60,88 @@ export function SceneNavigator({
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="sticky top-0 z-10 bg-card border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold tracking-wide">Scenes</h2>
-        <p className="text-xs text-muted-foreground mt-1">
-          {labels.length} scenes
-        </p>
+      {/* Project Info Header */}
+      <div className="sticky top-0 z-20 bg-card border-b border-border px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 rounded bg-[var(--theme-color)] flex items-center justify-center shadow-sm shrink-0">
+            <Sparkles className="w-4 h-4 text-white" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-sm font-medium block truncate">
+              {projectName || "Write Mode"}
+            </span>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {projectLabelCount ?? labels.length} scene
+              {(projectLabelCount ?? labels.length) !== 1 ? "s" : ""}
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div className="p-3 space-y-4">
+      {/* Scene List */}
+      <div className="p-3 space-y-2">
         {groupedLabels.size === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
             No scenes yet
           </p>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {Array.from(groupedLabels.entries()).map(
               ([groupName, groupLabels]) => (
                 <div key={groupName}>
-                  <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
+                  <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 px-2">
                     {groupName}
                   </div>
 
-                  <div className="space-y-0.5">
+                  <div className="space-y-1.5">
                     {groupLabels.map((label) => {
                       const isActive = label.id === activeLabelId;
 
                       return (
                         <button
-                          type="button"
                           key={label.id}
                           onClick={() => onSelect(label.id)}
-                          className={`w-full text-left py-2 px-2 rounded text-sm transition-all ${
+                          aria-pressed={isActive}
+                          className={`group relative py-2.5 px-3 rounded-lg border transition-all cursor-pointer w-full text-left ${
                             isActive
-                              ? "bg-[var(--theme-color)]/10 text-foreground font-medium"
-                              : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                              ? "bg-[var(--theme-color)]/10 border-[var(--theme-color)] shadow-md"
+                              : "bg-card/50 border-border hover:shadow-sm"
                           }`}
                         >
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="w-1.5 h-1.5 rounded-full shrink-0"
-                              aria-label={`Status: ${label.status?.toLowerCase()}`}
-                              role="img"
-                              style={{
-                                backgroundColor:
-                                  label.status === "FINAL"
-                                    ? "var(--theme-color)"
-                                    : label.status === "REVIEW"
+                          {/* Status Indicator */}
+                          <div
+                            className="absolute left-0 top-2 bottom-2 w-1 rounded-r"
+                            style={{
+                              backgroundColor:
+                                label.status === "FINAL"
+                                  ? "var(--theme-color)"
+                                  : label.status === "REVIEW"
                                     ? "var(--theme-review-color)"
                                     : "var(--theme-draft-color)",
-                              }}
-                            />
-                            <span className="truncate">{label.title}</span>
+                              opacity: isActive ? 1 : 0.5,
+                            }}
+                          />
+
+                          {/* Scene Title */}
+                          <div className="ml-2.5" title={label.title}>
+                            <h3
+                              className={`text-sm font-medium truncate ${
+                                isActive
+                                  ? "text-foreground"
+                                  : "text-muted-foreground group-hover:text-foreground"
+                              }`}
+                            >
+                              <span
+                                className={`text-xs font-mono pr-2 ${
+                                  isActive
+                                    ? "text-[var(--theme-color)]"
+                                    : "text-muted-foreground"
+                                }`}
+                              >
+                                {String(label.labelNumber).padStart(2, "0")}
+                              </span>
+                              {label.title}
+                            </h3>
                           </div>
                         </button>
                       );

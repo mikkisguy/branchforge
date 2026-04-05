@@ -581,7 +581,7 @@ export function ProseEditor({
   }
 
   return (
-    <div className="flex flex-col h-full tracking-normal pb-4">
+    <div className="flex flex-col h-full tracking-normal pb-3">
       {/* Top Bar */}
       <div
         className="px-4 py-3 border-b border-border bg-card rounded-t-lg flex items-center justify-between gap-4 transition-opacity duration-300 ease-out"
@@ -603,14 +603,6 @@ export function ProseEditor({
             }`}
           >
             {activeLabel.status?.toLowerCase() || "draft"}
-          </span>
-
-          {/* Scene title */}
-          <span className="text-sm truncate">{activeLabel.title}</span>
-
-          {/* Scene number */}
-          <span className="text-xs text-muted-foreground font-mono shrink-0">
-            {String(activeLabel.labelNumber).padStart(2, "0")}
           </span>
         </div>
 

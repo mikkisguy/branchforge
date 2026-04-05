@@ -77,7 +77,14 @@ export function useLabels(): UseLabelsReturn {
   // Initialize from query cache on mount to persist across navigation
   const { data: activeLabelId = null } = useQuery<string | null>({
     queryKey: labelKeys.activeLabelId(projectKey),
-    queryFn: () => null,
+    queryFn: () => {
+      try {
+        const saved = localStorage.getItem(`branchforge:activeLabel:${projectKey}`);
+        return saved;
+      } catch {
+        return null;
+      }
+    },
     initialData: null,
     staleTime: Infinity,
     gcTime: Infinity,
