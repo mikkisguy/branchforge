@@ -14,6 +14,9 @@ import { ZipImportDialog } from "@/components/zip-import";
 import { Button } from "@/components/ui/button";
 import { queryClient } from "@/lib/query-client";
 import { labelKeys, projectFilesKeys } from "@/lib/query-keys";
+import { useToast } from "@/contexts/ToastContext";
+import { ApiRequestError } from "@/lib/api/client";
+import { registerModeFlushHandler } from "@/lib/editor-sync-coordinator";
 
 interface ScriptModeProps {
   themeName: string;
@@ -28,6 +31,7 @@ export function ScriptMode({
   projectName,
   gitlabBranch,
 }: ScriptModeProps) {
+  const { error: showErrorToast } = useToast();
   const { activeLabel, activeLabelId, setActiveLabelId, isLoadingLabels } =
     useLabels();
 
@@ -48,6 +52,10 @@ export function ScriptMode({
   const [currentEditFileId, setCurrentEditFileId] = useState<string | null>(
     null
   );
+  const [currentEditFileHash, setCurrentEditFileHash] = useState<string | null>(
+    null
+  );
+  const [hasSaveConflict, setHasSaveConflict] = useState(false);
 
   // Simple hash function for file content
   const hashFileContent = useCallback((content: string) => {
@@ -73,31 +81,55 @@ export function ScriptMode({
     onSave: useCallback(
       async (content: string) => {
         if (currentEditFileId) {
-          await updateFileContent(currentEditFileId, content);
+          const result = await updateFileContent(currentEditFileId, content, {
+            expectedContentHash: currentEditFileHash ?? undefined,
+          });
 
-          // Invalidate both files and labels queries after save
-          if (projectId) {
-            queryClient.invalidateQueries({
-              queryKey: projectFilesKeys.lists(projectId),
-            });
-            void queryClient.refetchQueries({
-              queryKey: labelKeys.lists(projectId),
-            });
+          if (result.success) {
+            setCurrentEditFileHash(result.contentHash);
+            setHasSaveConflict(false);
 
-            // Also invalidate the specific label detail if we're viewing a label
-            if (activeLabelId) {
-              void queryClient.refetchQueries({
-                queryKey: labelKeys.detail(projectId, activeLabelId),
+            // Invalidate both files and labels queries after save
+            if (projectId) {
+              queryClient.invalidateQueries({
+                queryKey: projectFilesKeys.lists(projectId),
               });
+              void queryClient.refetchQueries({
+                queryKey: labelKeys.lists(projectId),
+              });
+
+              // Also invalidate the specific label detail if we're viewing a label
+              if (activeLabelId) {
+                void queryClient.refetchQueries({
+                  queryKey: labelKeys.detail(projectId, activeLabelId),
+                });
+              }
             }
           }
         }
       },
-      [currentEditFileId, updateFileContent, projectId, activeLabelId]
+      [
+        currentEditFileId,
+        updateFileContent,
+        projectId,
+        activeLabelId,
+        currentEditFileHash,
+      ]
     ),
-    onError: useCallback((error: Error) => {
-      console.error("Failed to save file content:", error);
-    }, []),
+    onError: useCallback(
+      (error: Error) => {
+        if (error instanceof ApiRequestError && error.status === 409) {
+          setHasSaveConflict(true);
+          showErrorToast(
+            "This file changed elsewhere. Reload project files before editing again.",
+            "Script conflict detected"
+          );
+          return;
+        }
+        console.error("Failed to save file content:", error);
+      },
+      [showErrorToast]
+    ),
   });
 
   // Keep latest autosave state for unmount cleanup without re-running cleanup
@@ -106,6 +138,14 @@ export function ScriptMode({
   useEffect(() => {
     triggerFileSaveRef.current = triggerFileSave;
   }, [triggerFileSave]);
+
+  useEffect(() => {
+    const unregister = registerModeFlushHandler("script", async () => {
+      return await triggerFileSaveRef.current();
+    });
+
+    return unregister;
+  }, []);
 
   // Flush pending file save on unmount (e.g., mode switch Script -> Write)
   useEffect(() => {
@@ -154,18 +194,30 @@ export function ScriptMode({
     async (file: { id: string; content: string }) => {
       // Skip if already on this file
       if (currentEditFileId === file.id) {
-        return;
+        return true;
       }
 
       // Save unsaved changes before switching
       if (currentEditFileId && (isFileDirty || fileSaveStatus === "error")) {
-        await triggerFileSave();
+        const flushed = await triggerFileSave();
+        if (!flushed) {
+          showErrorToast(
+            "Could not save pending edits. Resolve the save error before switching files.",
+            "File switch blocked"
+          );
+          return false;
+        }
       }
 
       // Switch to the new file
+      setActiveFileId(file.id);
       setEditedFileContent(file.content);
       setCurrentEditFileId(file.id);
+      const nextFile = projectFiles.find((f) => f.id === file.id);
+      setCurrentEditFileHash(nextFile?.contentHash ?? null);
+      setHasSaveConflict(false);
       resetSavedHash(file.content);
+      return true;
     },
     [
       currentEditFileId,
@@ -173,6 +225,8 @@ export function ScriptMode({
       fileSaveStatus,
       triggerFileSave,
       resetSavedHash,
+      projectFiles,
+      showErrorToast,
     ]
   );
 
@@ -190,10 +244,6 @@ export function ScriptMode({
       return;
     }
 
-    setActiveFileId((currentFileId) =>
-      currentFileId === fileWithLabel.id ? currentFileId : fileWithLabel.id
-    );
-
     const labelMetadata = fileWithLabel.labels.find(
       (l) => l.id === activeLabelId
     );
@@ -206,10 +256,15 @@ export function ScriptMode({
       fileWithLabel.content,
       labelMetadata.title
     );
-    setScrollToLine(lineNumber);
 
-    // Switch to the file with dirty state checking
-    void switchToFile(fileWithLabel);
+    // Switch to the file with dirty state checking, then scroll to label
+    void (async () => {
+      const switched = await switchToFile(fileWithLabel);
+      if (!switched) {
+        return;
+      }
+      setScrollToLine(lineNumber);
+    })();
   }, [activeLabelId, projectFiles, findLabelLineNumber, switchToFile]);
 
   // Refresh files on mount to ensure fresh data when switching from write mode
@@ -221,6 +276,55 @@ export function ScriptMode({
       hasRefreshed.current = true;
     }
   }, [projectId, isLoadingFiles, refreshFiles]);
+
+  // Refs for project reset effect to avoid unwanted reruns
+  const currentEditFileIdRef = useRef(currentEditFileId);
+  const isFileDirtyRef = useRef(isFileDirty);
+  const fileSaveStatusRef = useRef(fileSaveStatus);
+  const showErrorToastRef = useRef(showErrorToast);
+
+  useEffect(() => {
+    currentEditFileIdRef.current = currentEditFileId;
+  }, [currentEditFileId]);
+
+  useEffect(() => {
+    isFileDirtyRef.current = isFileDirty;
+  }, [isFileDirty]);
+
+  useEffect(() => {
+    fileSaveStatusRef.current = fileSaveStatus;
+  }, [fileSaveStatus]);
+
+  useEffect(() => {
+    showErrorToastRef.current = showErrorToast;
+  }, [showErrorToast]);
+
+  useEffect(() => {
+    const resetProjectState = async () => {
+      if (
+        currentEditFileIdRef.current &&
+        (isFileDirtyRef.current || fileSaveStatusRef.current === "error")
+      ) {
+        const flushed = await triggerFileSaveRef.current();
+        if (!flushed) {
+          showErrorToastRef.current(
+            "Could not save pending edits. The save failed when switching projects.",
+            "Project switch warning"
+          );
+        }
+      }
+
+      hasRefreshed.current = false;
+      setActiveFileId(null);
+      setCurrentEditFileId(null);
+      setCurrentEditFileHash(null);
+      setEditedFileContent("");
+      setScrollToLine(null);
+      setHasSaveConflict(false);
+    };
+
+    void resetProjectState();
+  }, [projectId]);
 
   // Handle Ctrl+S for immediate save
   useEffect(() => {
@@ -260,10 +364,20 @@ export function ScriptMode({
 
   // Handle GitLab file selection
   const handleGitLabFileSelect = (fileId: string) => {
-    setActiveFileId(fileId);
-    setScrollToLine(null);
-    // Also clear the active scene since we're now in file mode
-    setActiveLabelId(null);
+    const file = projectFiles.find((f) => f.id === fileId);
+    if (!file) {
+      return;
+    }
+
+    void (async () => {
+      const switched = await switchToFile(file);
+      if (!switched) {
+        return;
+      }
+      setScrollToLine(null);
+      // Also clear the active scene since we're now in file mode
+      setActiveLabelId(null);
+    })();
   };
 
   // Update edited content when active file changes (manual selection)
@@ -272,6 +386,19 @@ export function ScriptMode({
       void switchToFile(activeProjectFile);
     }
   }, [activeProjectFile, switchToFile]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!isFileDirty) {
+        return;
+      }
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isFileDirty]);
 
   // Handle GitLab scene selection (label within a file)
   const handleGitLabSceneSelect = (sceneId: string) => {
@@ -528,6 +655,7 @@ export function ScriptMode({
         projectName={projectName}
         gitlabBranch={gitlabBranch}
         saveStatus={activeProjectFile ? fileSaveStatus : undefined}
+        saveConflict={activeProjectFile ? hasSaveConflict : undefined}
         onSaveRequest={activeProjectFile ? retryFileSave : undefined}
       />
 

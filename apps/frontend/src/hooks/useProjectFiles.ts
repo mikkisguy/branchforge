@@ -37,7 +37,17 @@ export interface UseProjectFilesReturn {
 
   // Methods
   refreshFiles: () => Promise<unknown>;
-  updateFileContent: (fileId: string, content: string) => Promise<void>;
+  updateFileContent: (
+    fileId: string,
+    content: string,
+    options?: { expectedContentHash?: string }
+  ) => Promise<
+    | { success: true; contentHash: string; updatedAt: string }
+    | {
+        success: false;
+        conflict: { reason: "STALE_CONTENT_HASH"; currentContentHash: string };
+      }
+  >;
   isUpdatingFile: boolean;
 }
 
@@ -80,11 +90,15 @@ export function useProjectFiles(
     mutationFn: async ({
       fileId,
       content,
+      expectedContentHash,
     }: {
       fileId: string;
       content: string;
+      expectedContentHash?: string;
     }) => {
-      await projectFilesApi.updateFile(fileId, content);
+      return await projectFilesApi.updateFile(fileId, content, {
+        expectedContentHash,
+      });
     },
     onSuccess: () => {
       // Invalidate files queries for this project
@@ -99,9 +113,24 @@ export function useProjectFiles(
   });
 
   // Update file content method
-  const updateFileContent = useCallback(
-    async (fileId: string, content: string) => {
-      await updateFileMutation.mutateAsync({ fileId, content });
+  const updateFileContent = useCallback<UseProjectFilesReturn["updateFileContent"]>(
+    async (fileId, content, updateOptions) => {
+      const result = await updateFileMutation.mutateAsync({
+        fileId,
+        content,
+        expectedContentHash: updateOptions?.expectedContentHash,
+      });
+      if (result.success) {
+        return {
+          success: true,
+          contentHash: result.contentHash,
+          updatedAt: result.updatedAt,
+        };
+      }
+      return {
+        success: false,
+        conflict: result.conflict,
+      };
     },
     [updateFileMutation]
   );

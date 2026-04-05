@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect } from "react";
+import { lazy, Suspense, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "@/contexts/useTheme";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,6 +9,8 @@ import { themePalettes, BASE_URL } from "@/lib/constants";
 import { FloatingParticles, LeftSidebar } from "@/components/ide-shared";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { WriteMode } from "./WriteMode";
+import { flushModeBeforeTransition } from "@/lib/editor-sync-coordinator";
+import { useToast } from "@/contexts/ToastContext";
 
 const ScriptMode = lazy(() =>
   import("./ScriptMode").then((m) => ({ default: m.ScriptMode }))
@@ -40,6 +42,7 @@ export function HomePageIDE() {
   const [mode, setMode] = useState<"write" | "script">(getStoredMode);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [scriptModeKey, setScriptModeKey] = useState(0);
+  const isFlushing = useRef(false);
 
   // Project context
   const { currentProject, projects, setCurrentProject, isLoadingProjects } =
@@ -50,6 +53,7 @@ export function HomePageIDE() {
 
   // Labels context - clear active label when project changes
   const { setActiveLabelId } = useLabels();
+  const { error: showErrorToast } = useToast();
 
   // Clear active label when project changes
   useEffect(() => {
@@ -65,8 +69,74 @@ export function HomePageIDE() {
 
   // Wrap setMode to persist to localStorage
   const handleSetMode = (newMode: "write" | "script") => {
-    setMode(newMode);
-    setStoredMode(newMode);
+    void (async () => {
+      if (newMode === mode) {
+        return;
+      }
+
+      if (isFlushing.current) {
+        return;
+      }
+
+      isFlushing.current = true;
+
+      try {
+        const flushed = await flushModeBeforeTransition(mode);
+        if (!flushed) {
+          showErrorToast(
+            "Could not save pending edits. Resolve the save error before switching modes.",
+            "Mode switch blocked"
+          );
+          return;
+        }
+
+        setMode(newMode);
+        setStoredMode(newMode);
+      } catch (error) {
+        showErrorToast(
+          "An error occurred while switching modes. Please try again.",
+          "Mode switch failed"
+        );
+        console.error("Error in handleSetMode:", error);
+      } finally {
+        isFlushing.current = false;
+      }
+    })();
+  };
+
+  const handleSetProject = (project: (typeof projects)[number] | null) => {
+    void (async () => {
+      if (project?.id === currentProject?.id) {
+        return;
+      }
+
+      if (isFlushing.current) {
+        return;
+      }
+
+      isFlushing.current = true;
+
+      try {
+        const flushed = await flushModeBeforeTransition(mode);
+        if (!flushed) {
+          showErrorToast(
+            "Could not save pending edits. Resolve the save error before switching projects.",
+            "Project switch blocked"
+          );
+          return;
+        }
+
+        setCurrentProject(project);
+      } catch (error) {
+        showErrorToast(
+          "An error occurred while switching projects. Please try again.",
+          "Project switch failed"
+        );
+        console.error("Error in handleSetProject:", error);
+      } finally {
+        isFlushing.current = false;
+      }
+    })();
   };
 
   // Retry handler for ScriptMode - forces re-mount by incrementing key
@@ -94,7 +164,7 @@ export function HomePageIDE() {
         onLogout={handleLogout}
         projectId={currentProject?.id}
         projects={projects}
-        setCurrentProject={setCurrentProject}
+        setCurrentProject={handleSetProject}
         isLoadingProjects={isLoadingProjects}
         isCollapsed={isSidebarCollapsed}
         onCollapsedChange={setIsSidebarCollapsed}

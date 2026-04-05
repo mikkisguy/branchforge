@@ -254,4 +254,28 @@ describe("LabelsRoutes (Integration)", () => {
     expect(updatedFile.content).toContain("label side_scene:");
     expect(updatedFile.content).toMatch(/label side_scene:\n\s+"Side old"/);
   });
+
+  it("returns 409 when expected version is stale", async () => {
+    const auth = await createAuthenticatedRequest(testUserId);
+
+    const response = await fastify.inject({
+      method: "PUT",
+      url: `/labels/${introLabelId}/dialogue`,
+      payload: {
+        dialogue: [{ speakerId: null, text: "Intro update rejected" }],
+        expectedVersion: 999,
+      },
+      cookies: {
+        [SESSION_COOKIE_NAME]: auth.sessionId,
+      },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({
+      success: false,
+      conflict: {
+        reason: "STALE_LABEL_VERSION",
+      },
+    });
+  });
 });

@@ -66,16 +66,26 @@ interface ErrorResponse {
 
 type UpdateFileContentParams = FileIdParams;
 
-interface UpdateFileContentResponse {
-  success: boolean;
-  syncResult?: {
-    labelsCreated: number;
-    labelsUpdated: number;
-    labelsDeleted: number;
-    linesProcessed: number;
-    errors: Array<{ label: string; error: string }>;
-  };
-}
+type UpdateFileContentResponse =
+  | {
+      success: true;
+      contentHash: string;
+      updatedAt: string;
+      syncResult: {
+        labelsCreated: number;
+        labelsUpdated: number;
+        labelsDeleted: number;
+        linesProcessed: number;
+        errors: Array<{ label: string; error: string }>;
+      };
+    }
+  | {
+      success: false;
+      conflict: {
+        reason: "STALE_CONTENT_HASH";
+        currentContentHash: string;
+      };
+    };
 
 // ============================================================================
 // Route Handlers
@@ -264,7 +274,7 @@ async function updateFileContentHandler(
   reply: FastifyReply
 ): Promise<void> {
   const { fileId } = request.params;
-  const { content } = request.body;
+  const { content, expectedContentHash } = request.body;
   const user = request.user!;
 
   try {
@@ -315,6 +325,38 @@ async function updateFileContentHandler(
 
     // Update file content and sync labels in a single transaction for atomicity
     const syncResult = await db.transaction(async (tx) => {
+      const [lockedFile] = await tx
+        .select({
+          contentHash: projectFiles.contentHash,
+          updatedAt: projectFiles.updatedAt,
+        })
+        .from(projectFiles)
+        .where(eq(projectFiles.id, fileId))
+        .for("update")
+        .limit(1);
+
+      if (!lockedFile) {
+        throw new NotFoundError("File");
+      }
+
+      if (
+        expectedContentHash !== undefined &&
+        lockedFile.contentHash !== expectedContentHash
+      ) {
+        return {
+          conflictPayload: {
+            success: false,
+            conflict: {
+              reason: "STALE_CONTENT_HASH",
+              currentContentHash: lockedFile.contentHash,
+            },
+          } satisfies UpdateFileContentResponse,
+          syncResultForFile: undefined,
+        };
+      }
+
+      const fileUpdatedAt = new Date();
+
       // Update the file content
       await tx
         .update(projectFiles)
@@ -322,36 +364,47 @@ async function updateFileContentHandler(
           content,
           fileType: nextFileType,
           contentHash: newContentHash,
-          updatedAt: new Date(),
+          updatedAt: fileUpdatedAt,
         })
         .where(eq(projectFiles.id, fileId));
 
       // Sync labels from updated content (only for STORY files)
       // Pass the transaction context to ensure atomicity
-      if (nextFileType === "STORY") {
-        return await syncLabelsFromFile(
-          file.projectId,
-          { filePath: file.filePath, fileType: nextFileType },
-          content,
-          fileId,
-          { skipCleanup: false, tx }
-        );
-      }
-      return undefined;
+      const syncResultForFile =
+        nextFileType === "STORY"
+          ? await syncLabelsFromFile(
+              file.projectId,
+              { filePath: file.filePath, fileType: nextFileType },
+              content,
+              fileId,
+              { skipCleanup: false, tx }
+            )
+          : undefined;
+
+      return {
+        conflictPayload: null,
+        syncResultForFile,
+        fileUpdatedAt,
+      };
     });
+
+    if (syncResult.conflictPayload) {
+      reply.status(409).send(syncResult.conflictPayload);
+      return;
+    }
 
     reply.status(200).send({
       success: true,
-      syncResult: syncResult
-        ? {
-            labelsCreated: syncResult.labelsCreated,
-            labelsUpdated: syncResult.labelsUpdated,
-            labelsDeleted: syncResult.labelsDeleted,
-            linesProcessed: syncResult.linesProcessed,
-            errors: syncResult.errors,
-          }
-        : undefined,
-    } as UpdateFileContentResponse);
+      contentHash: newContentHash,
+      updatedAt: syncResult.fileUpdatedAt.toISOString(),
+      syncResult: {
+        labelsCreated: syncResult.syncResultForFile?.labelsCreated ?? 0,
+        labelsUpdated: syncResult.syncResultForFile?.labelsUpdated ?? 0,
+        labelsDeleted: syncResult.syncResultForFile?.labelsDeleted ?? 0,
+        linesProcessed: syncResult.syncResultForFile?.linesProcessed ?? 0,
+        errors: syncResult.syncResultForFile?.errors ?? [],
+      },
+    } satisfies UpdateFileContentResponse);
   } catch (error) {
     request.log.error(
       { err: error, fileId },
@@ -373,7 +426,6 @@ async function updateFileContentHandler(
       reply.status(400).send({ error: error.userMessage } as ErrorResponse);
       return;
     }
-
     reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
   }
 }

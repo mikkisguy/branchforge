@@ -596,6 +596,45 @@ describe("ProjectsRoutes (Integration)", () => {
       });
     });
 
+    it("returns 409 when expected content hash is stale", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+      const fileId = testUuid("13000000", 8);
+
+      const initialContent = ["label intro:", '    "Hello"'].join("\n");
+
+      await db.insert(projectFiles).values({
+        id: fileId,
+        projectId: ownedProject.id!,
+        source: "ZIP",
+        filePath: "story/stale_hash.rpy",
+        fileType: "STORY",
+        content: initialContent,
+        originalContent: initialContent,
+        contentHash: calculateContentHash(initialContent),
+      });
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/files/${fileId}`,
+        payload: {
+          content: ["label intro:", '    "Updated"'].join("\n"),
+          expectedContentHash: "stale-hash-value",
+        },
+        cookies: {
+          [SESSION_COOKIE_NAME]: auth.sessionId,
+        },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({
+        success: false,
+        conflict: {
+          reason: "STALE_CONTENT_HASH",
+          currentContentHash: calculateContentHash(initialContent),
+        },
+      });
+    });
+
     it("links speakers by display name for compatibility", async () => {
       const auth = await createAuthenticatedRequest(testUserId);
       const fileId = testUuid("13000000", 2);
@@ -722,7 +761,7 @@ describe("ProjectsRoutes (Integration)", () => {
         .select({ contentType: labelLines.contentType, content: labelLines.content })
         .from(labelLines)
         .where(eq(labelLines.labelId, syncedLabels[0].id))
-        .orderBy(asc(labelLines.id));
+        .orderBy(asc(labelLines.sequence));
 
       expect(syncedLines).toHaveLength(2);
       expect(syncedLines[0]).toMatchObject({

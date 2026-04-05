@@ -29,12 +29,20 @@ interface ProseEditorProps {
   isSaving?: boolean;
   lastSaved?: Date | null;
   saveError?: boolean;
+  saveConflict?: boolean;
 }
 
 type LineLayoutMode = "inline" | "stacked";
 const LINE_LAYOUT_STORAGE_KEY = "writemode-line-layout";
 const NEW_LINE_BOTTOM_SAFE_OFFSET = 96;
 const TEXT_HISTORY_DEBOUNCE_MS = 450;
+
+interface TimezoneDateParts {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+}
 
 // Helper function to convert label lines to dialogue entries
 function convertLabelLinesToEntries(
@@ -57,6 +65,75 @@ function cloneEntries(entries: DialogueEntry[]): DialogueEntry[] {
   return entries.map((entry) => ({ ...entry }));
 }
 
+function countWordsFromEntries(entries: DialogueEntry[]): number {
+  return entries.reduce((count, entry) => {
+    const trimmed = entry.text?.trim();
+    const words = trimmed
+      ? trimmed.split(/\s+/).filter((word) => word.length > 0).length
+      : 0;
+    return count + words;
+  }, 0);
+}
+
+function formatDateKey(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function getDatePartsInTimezone(
+  date: Date,
+  timezone: string
+): TimezoneDateParts {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+  });
+
+  const parts = formatter.formatToParts(date);
+
+  const year = Number(parts.find((part) => part.type === "year")?.value) || 0;
+  const month = Number(parts.find((part) => part.type === "month")?.value) || 1;
+  const day = Number(parts.find((part) => part.type === "day")?.value) || 1;
+  const hour = Number(parts.find((part) => part.type === "hour")?.value) || 0;
+
+  return {
+    year,
+    month,
+    day,
+    hour,
+  };
+}
+
+function getWritingDateKey(resetHour: number, timezone: string): string {
+  const now = new Date();
+  const tz = timezone || "UTC";
+
+  let dateParts: TimezoneDateParts;
+  try {
+    dateParts = getDatePartsInTimezone(now, tz);
+  } catch {
+    dateParts = getDatePartsInTimezone(now, "UTC");
+  }
+
+  if (dateParts.hour >= resetHour) {
+    return formatDateKey(dateParts.year, dateParts.month, dateParts.day);
+  }
+
+  const previousDate = new Date(
+    Date.UTC(dateParts.year, dateParts.month - 1, dateParts.day)
+  );
+  previousDate.setUTCDate(previousDate.getUTCDate() - 1);
+
+  return formatDateKey(
+    previousDate.getUTCFullYear(),
+    previousDate.getUTCMonth() + 1,
+    previousDate.getUTCDate()
+  );
+}
+
 // Convert old ProseEditor props to SaveStatus for SaveIndicator
 function propsToSaveStatus(isSaving: boolean, saveError: boolean): SaveStatus {
   if (saveError) return "error";
@@ -72,6 +149,7 @@ export function ProseEditor({
   isSaving = false,
   lastSaved = null,
   saveError = false,
+  saveConflict = false,
 }: ProseEditorProps) {
   const labelId = activeLabel?.id ?? "none";
 
@@ -103,6 +181,9 @@ export function ProseEditor({
   const isExternalUpdateRef = useRef(false);
   const prevEntriesRef = useRef<DialogueEntry[]>([]);
   const isInitialMountRef = useRef(true);
+
+  // Track initial word count for the current label to calculate real-time progress
+  const initialWordCountRef = useRef<number>(0);
 
   useEffect(() => {
     entriesRef.current = entries;
@@ -256,6 +337,17 @@ export function ProseEditor({
     }
 
     const newEntries = convertLabelLinesToEntries(activeLabel);
+
+    // Calculate initial word count for this label (only on first load, not on subsequent updates)
+    if (hasSwitchedLabel) {
+      initialWordCountRef.current = countWordsFromEntries(newEntries);
+    } else {
+      const newWordCount = countWordsFromEntries(newEntries);
+
+      // Update baseline to latest persisted content from server.
+      // Any unsaved local edits remain represented by (wordCount - initialWordCountRef).
+      initialWordCountRef.current = newWordCount;
+    }
 
     flushPendingTextHistory();
 
@@ -415,28 +507,32 @@ export function ProseEditor({
     inMemoryUndo.redo();
   }, [flushPendingTextHistory, inMemoryUndo]);
 
-  const wordCount = entries.reduce((count, entry) => {
-    const trimmed = entry.text?.trim();
-    const words = trimmed ? trimmed.split(/\s+/).length : 0;
-    return count + words;
-  }, 0);
+  const wordCount = countWordsFromEntries(entries);
   const lineCount = entries.length;
 
   // Get today's word count from daily word counts (memoized)
+  // Plus real-time delta from current session (current word count - initial word count)
   const todayWordCount = useMemo(() => {
-    const today = new Date();
-    return (
-      writingGoalSettings?.dailyWordCounts?.find((entry) => {
-        const entryDate = new Date(entry.date);
-        // Direct date comparison for better performance (avoid toLocaleDateString)
-        return (
-          entryDate.getFullYear() === today.getFullYear() &&
-          entryDate.getMonth() === today.getMonth() &&
-          entryDate.getDate() === today.getDate()
-        );
-      })?.count ?? 0
-    );
-  }, [writingGoalSettings?.dailyWordCounts]);
+    const resetHour = writingGoalSettings?.dailyWordResetHour ?? 0;
+    const timezone = writingGoalSettings?.timezone ?? "UTC";
+    const todayDateKey = getWritingDateKey(resetHour, timezone);
+
+    const backendWordCount =
+      writingGoalSettings?.dailyWordCounts?.find(
+        (entry) => entry.date === todayDateKey
+      )?.count ?? 0;
+
+    // Add real-time delta: current word count minus initial word count
+    // This ensures unsaved changes are reflected in the progress display
+    const sessionDelta = wordCount - initialWordCountRef.current;
+
+    return Math.max(0, backendWordCount + sessionDelta);
+  }, [
+    writingGoalSettings?.dailyWordCounts,
+    writingGoalSettings?.dailyWordResetHour,
+    writingGoalSettings?.timezone,
+    wordCount,
+  ]);
 
   if (!activeLabel) {
     return (
@@ -502,8 +598,8 @@ export function ProseEditor({
               activeLabel.status === "FINAL"
                 ? "bg-[var(--theme-color)]/20 text-[var(--theme-color)] border-[var(--theme-border)]"
                 : activeLabel.status === "REVIEW"
-                ? "bg-[var(--theme-review-color)]/20 text-[var(--theme-review-color)] border-[var(--theme-review-color)]/30"
-                : "bg-[var(--theme-draft-color)]/20 text-[var(--theme-draft-color)] border-[var(--theme-draft-color)]/30"
+                  ? "bg-[var(--theme-review-color)]/20 text-[var(--theme-review-color)] border-[var(--theme-review-color)]/30"
+                  : "bg-[var(--theme-draft-color)]/20 text-[var(--theme-draft-color)] border-[var(--theme-draft-color)]/30"
             }`}
           >
             {activeLabel.status?.toLowerCase() || "draft"}
@@ -620,6 +716,7 @@ export function ProseEditor({
               saveStatus={propsToSaveStatus(isSaving, saveError)}
               displayMode="compact"
               lastSaved={lastSaved}
+              saveConflict={saveConflict}
             />
           </div>
         </div>

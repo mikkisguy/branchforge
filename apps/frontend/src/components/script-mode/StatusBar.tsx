@@ -20,6 +20,7 @@ interface StatusBarProps {
   gitlabBranch?: string;
   // Save status
   saveStatus?: SaveStatus;
+  saveConflict?: boolean;
   onSaveRequest?: () => void;
 }
 
@@ -31,6 +32,7 @@ export function StatusBar({
   projectName,
   gitlabBranch,
   saveStatus = "saved",
+  saveConflict = false,
   onSaveRequest,
 }: StatusBarProps) {
   const { hasIntegration, isProjectLinked } = useGitLab();
@@ -122,6 +124,7 @@ export function StatusBar({
           <SaveIndicator
             saveStatus={saveStatus}
             displayMode="verbose"
+            saveConflict={saveConflict}
             onRetry={onSaveRequest}
           />
         </div>

@@ -101,6 +101,17 @@ export const passwordSchema = z.preprocess(
 );
 
 /**
+ * Expected content hash validation schema
+ * Optional content hash for optimistic locking
+ */
+export const expectedContentHashSchema = z
+  .string()
+  .trim()
+  .min(1, "Expected content hash cannot be empty")
+  .max(128, "Expected content hash is too long")
+  .optional();
+
+/**
  * Boolean string schema
  * Accepts boolean-like strings and converts to boolean
  */
@@ -324,6 +335,7 @@ export type FileIdParams = z.infer<typeof fileIdParamsSchema>;
 export const updateFileContentSchema = z
   .object({
     content: z.string().max(10_000_000, "File content too large (max 10MB)"),
+    expectedContentHash: expectedContentHashSchema,
   })
   .strict();
 
@@ -394,6 +406,8 @@ export const updateLabelDialogueBodySchema = z
         })
       )
       .min(1, "At least one dialogue entry is required"),
+    expectedVersion: z.number().int().min(1).optional(),
+    expectedContentHash: expectedContentHashSchema,
   })
   .strict();
 

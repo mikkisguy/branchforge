@@ -328,6 +328,10 @@ export interface PublicLabel {
   routeKey: string | null;
   status: LabelStatus | null;
   visibility: LabelVisibility | null;
+  /** Version number for optimistic concurrency control */
+  version?: number | null;
+  /** SHA hash of label content for change detection */
+  contentHash?: string | null;
   createdAt: string;
   updatedAt: string;
 }

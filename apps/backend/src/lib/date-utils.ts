@@ -292,7 +292,7 @@ export function countWordsFromDialogue(
  *
  * @param entries - Existing daily word count entries
  * @param todayDateKey - Today's date key (YYYY-MM-DD)
- * @param wordsToAdd - Number of words to add to today's count
+ * @param wordsToAdd - Number of words to add to today's count (can be negative)
  * @returns Updated array of daily word count entries
  *
  * @example
@@ -316,12 +316,16 @@ export function updateTodayWordCount(
   if (todayIndex >= 0) {
     // Update existing entry
     newEntries = [...entries];
+    const nextCount = Math.max(0, newEntries[todayIndex].count + wordsToAdd);
     newEntries[todayIndex] = {
       date: todayDateKey,
-      count: newEntries[todayIndex].count + wordsToAdd,
+      count: nextCount,
     };
   } else {
-    // Add new entry for today
+    // Add new entry for today only when delta is positive
+    if (wordsToAdd <= 0) {
+      return pruneOldEntries(entries);
+    }
     newEntries = [...entries, { date: todayDateKey, count: wordsToAdd }];
   }
 
@@ -330,17 +334,16 @@ export function updateTodayWordCount(
 }
 
 /**
- * Calculate net new words to count for a label, using per-label tracking
+ * Calculate word delta for a label, using per-label tracking
  *
  * This prevents double-counting by tracking the last counted word count for each label.
- * Only positive differences (growth) are counted - editing the same content won't inflate
- * the daily total.
+ * Positive differences increase daily totals, negative differences decrease them.
  *
  * @param labelWordCounts - Existing per-label word count tracking
  * @param labelId - The label being saved
  * @param todayDateKey - Today's date key (YYYY-MM-DD)
  * @param currentWordCount - Current total word count for the label
- * @returns Object with wordsToAdd and updated labelWordCounts
+ * @returns Object with wordsToAdd delta and updated labelWordCounts
  *
  * @example
  * ```ts
@@ -352,9 +355,9 @@ export function updateTodayWordCount(
  * const result2 = calculateNetNewWords(result.updatedTracking, "label-1", "2025-01-15", 150);
  * // Returns { wordsToAdd: 0, updatedTracking: { "label-1": { date: "2025-01-15", count: 150 } } }
  *
- * // Deleting words - doesn't subtract
+ * // Deleting words - subtracts from today's total
  * const result3 = calculateNetNewWords(result2.updatedTracking, "label-1", "2025-01-15", 120);
- * // Returns { wordsToAdd: 0, updatedTracking: { "label-1": { date: "2025-01-15", count: 120 } } }
+ * // Returns { wordsToAdd: -30, updatedTracking: { "label-1": { date: "2025-01-15", count: 120 } } }
  * ```
  */
 export function calculateNetNewWords(
@@ -370,11 +373,14 @@ export function calculateNetNewWords(
     // First time tracking this label - don't count existing content
     // Only track the baseline for future growth
     wordsToAdd = 0;
+  } else if (previous.date !== todayDateKey) {
+    // Date has changed - reset baseline to current count
+    // This prevents counting changes from the previous day as today's progress
+    wordsToAdd = 0;
   } else {
-    // Count only positive growth (whether same day or different day)
-    // This prevents re-counting existing content and rewards only new words
+    // Same day - calculate the difference
     const diff = currentWordCount - previous.count;
-    wordsToAdd = Math.max(0, diff);
+    wordsToAdd = diff;
   }
 
   // Update the tracking for this label

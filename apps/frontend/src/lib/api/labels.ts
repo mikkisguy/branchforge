@@ -27,6 +27,23 @@ export interface GetLabelResponse {
   label: LabelDetail;
 }
 
+export type UpdateDialogueResponse =
+  | {
+      success: true;
+      version: number;
+      contentHash: string;
+      fileContentHash: string;
+      fileUpdatedAt: string;
+    }
+  | {
+      success: false;
+      conflict: {
+        reason: "STALE_LABEL_VERSION" | "STALE_CONTENT_HASH";
+        currentVersion: number;
+        currentContentHash: string | null;
+      };
+    };
+
 // ============================================================================
 // Labels API
 // ============================================================================
@@ -60,11 +77,23 @@ export const labelsApi = {
    */
   async updateDialogue(
     labelId: string,
-    dialogue: Array<{ speakerId: string | null; text: string }>
-  ): Promise<{ success: boolean }> {
-    return await request<{ success: boolean }>(`/labels/${labelId}/dialogue`, {
-      method: "PUT",
-      body: JSON.stringify({ dialogue }),
-    });
+    dialogue: Array<{ speakerId: string | null; text: string }>,
+    options?: {
+      expectedVersion?: number;
+      expectedContentHash?: string;
+    }
+  ): Promise<UpdateDialogueResponse> {
+    return await request<UpdateDialogueResponse>(
+      `/labels/${labelId}/dialogue`,
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          dialogue,
+          expectedVersion: options?.expectedVersion,
+          expectedContentHash: options?.expectedContentHash,
+        }),
+      },
+      true // allowConflict: true - handle 409 responses as success with success: false
+    );
   },
 };

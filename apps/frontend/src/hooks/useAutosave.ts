@@ -44,9 +44,11 @@ export interface UseAutosaveReturn<T> {
   isDirty: boolean;
 
   // Methods
-  triggerSave: () => Promise<void>;
+  // Returns true when data is persisted (or already up to date), false on save error.
+  triggerSave: () => Promise<boolean>;
   discardChanges: () => void;
-  retrySave: () => Promise<void>;
+  // Returns true when retry succeeds, false when it fails.
+  retrySave: () => Promise<boolean>;
   /**
    * Reset the saved hash to match the given data (or current data if not provided).
    * Call this when loading new data to mark it as "saved".
@@ -145,7 +147,8 @@ export function useAutosave<T>({
   const pendingDataRef = useRef<T | null>(null);
   const lastSavedDataRef = useRef<T | null>(null);
   const didMountRef = useRef(false);
-  const savePromiseRef = useRef<Promise<void> | null>(null);
+  const savePromiseRef = useRef<Promise<boolean> | null>(null);
+  const isDiscardedRef = useRef(false);
 
   /**
    * Clear the pending save timeout
@@ -159,31 +162,33 @@ export function useAutosave<T>({
 
   /**
    * Perform the save operation
+   * NOTE: This function no longer manages isSavingRef.current or savePromiseRef.current.
+   * The caller (triggerSave) is responsible for setting these refs atomically before calling
+   * this function to prevent race conditions.
    */
   const performSave = useCallback(
-    async (dataToSave: T): Promise<void> => {
-      if (isSavingRef.current) {
-        return; // Already saving
-      }
-
-      isSavingRef.current = true;
+    async (dataToSave: T): Promise<boolean> => {
       setSaveStatus("saving");
 
       try {
         await onSave(dataToSave);
 
-        // Update the saved hash
-        savedHashRef.current = hashFn(dataToSave);
-        lastSavedDataRef.current = dataToSave;
-        pendingHashRef.current = null;
-        pendingDataRef.current = null;
-        setIsDirty(false);
-        setSaveStatus("saved");
+        // Only update saved state if discard hasn't been called
+        if (!isDiscardedRef.current) {
+          savedHashRef.current = hashFn(dataToSave);
+          lastSavedDataRef.current = dataToSave;
+          pendingHashRef.current = null;
+          pendingDataRef.current = null;
+          setIsDirty(false);
+          setSaveStatus("saved");
+        }
+        return true;
       } catch (error) {
         const err = error instanceof Error ? error : new Error("Save failed");
         setSaveStatus("error");
         setIsDirty(true);
         onError?.(err);
+        return false;
       } finally {
         isSavingRef.current = false;
         savePromiseRef.current = null;
@@ -205,34 +210,43 @@ export function useAutosave<T>({
     if (currentHash === savedHashRef.current) {
       setSaveStatus("saved");
       setIsDirty(false);
-      return;
+      return true;
     }
 
     if (isSavingRef.current) {
-      pendingHashRef.current = currentHash;
-      pendingDataRef.current = dataToSave;
-      if (savePromiseRef.current) {
-        await savePromiseRef.current;
+      const localPendingHash = currentHash;
+      const localPendingData = dataToSave;
+      const priorSavedHash = savedHashRef.current;
+      pendingHashRef.current = localPendingHash;
+      pendingDataRef.current = localPendingData;
+      await (savePromiseRef.current || Promise.resolve(true));
+      if (savedHashRef.current !== priorSavedHash) {
+        pendingHashRef.current = localPendingHash;
+        pendingDataRef.current = localPendingData;
+        return await triggerSave();
       }
-      return;
+      return true;
     }
 
     pendingHashRef.current = currentHash;
-    savePromiseRef.current = performSave(dataToSave);
-    await savePromiseRef.current;
+    const savePromise = performSave(dataToSave);
+    savePromiseRef.current = savePromise;
+    isSavingRef.current = true;
+    return await savePromise;
   }, [data, hashFn, performSave, clearSaveTimeout]);
 
   /**
    * Retry a failed save
    */
   const retrySave = useCallback(async () => {
-    await triggerSave();
+    return await triggerSave();
   }, [triggerSave]);
 
   /**
    * Discard pending changes and revert to saved state
    */
   const discardChanges = useCallback(() => {
+    isDiscardedRef.current = true;
     clearSaveTimeout();
     pendingHashRef.current = null;
     pendingDataRef.current = null;
@@ -248,6 +262,7 @@ export function useAutosave<T>({
    */
   const resetSavedHash = useCallback(
     (dataToReset?: T) => {
+      isDiscardedRef.current = false;
       const dataToHash = dataToReset ?? data;
       savedHashRef.current = hashFn(dataToHash);
       lastSavedDataRef.current = dataToHash;
@@ -283,6 +298,8 @@ export function useAutosave<T>({
     const currentHash = hashFn(data);
 
     if (currentHash !== savedHashRef.current) {
+      // Reset discard flag when new changes are detected after discard
+      isDiscardedRef.current = false;
       setIsDirty(true);
       pendingDataRef.current = data;
 
@@ -303,7 +320,9 @@ export function useAutosave<T>({
 
         saveTimeoutRef.current = setTimeout(() => {
           if (!skipSaveRef?.current) {
-            savePromiseRef.current = performSave(data);
+            const savePromise = performSave(data);
+            savePromiseRef.current = savePromise;
+            isSavingRef.current = true;
           }
         }, debounceMs);
       }
