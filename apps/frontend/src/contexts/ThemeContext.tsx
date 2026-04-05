@@ -5,7 +5,7 @@ const themeConfigs: Record<ThemePalette, ThemeColors> = {
   forest: { primary: "#40bb82", hover: "#52c992" },
   periwinkle: { primary: "#3d4ac2", hover: "#515fcc" },
   "dark-amethyst": { primary: "#9549b6", hover: "#a960c7" },
-  graphite: { primary: "#9ca3af", hover: "#b0b7c4" },
+  graphite: { primary: "#72757d", hover: "#b0b7c4" },
 };
 
 // Status colors (theme-independent for semantic consistency)
@@ -48,6 +48,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         "--theme-border-subtle",
         `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`
       );
+      // Theme foreground color for buttons (always white for best contrast with theme colors)
+      root.style.setProperty("--theme-foreground", "#ffffff");
     }
 
     // Status colors for scene navigation
