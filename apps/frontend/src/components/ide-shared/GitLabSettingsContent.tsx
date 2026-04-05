@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { InlineMessage } from "@/components/ui/inline-error";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useGitLab } from "@/hooks/useGitLab";
 import { useProject } from "@/hooks/useProject";
 import { useToast } from "@/contexts/ToastContext";
@@ -437,45 +438,31 @@ export function GitLabSettingsContent() {
       />
 
       {/* Remove Confirmation Dialog */}
-      {showRemoveConfirmDialog ? (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg shadow-lg max-w-md w-full">
-            {/* Header */}
-            <div className="p-6 border-b border-border/30">
-              <h2 className="text-lg font-medium">Remove GitLab Integration</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Are you sure you want to remove your GitLab integration? This
-                will unlink all repositories.
-              </p>
-            </div>
-
-            {/* Footer */}
-            <div className="p-6 border-t border-border/30 flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={handleRemoveCancelled}
-                disabled={isRemoving}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleRemoveConfirmed}
-                disabled={isRemoving}
-              >
-                {isRemoving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    Removing...
-                  </>
-                ) : (
-                  "Remove Integration"
-                )}
-              </Button>
-            </div>
+      <Dialog
+        open={showRemoveConfirmDialog}
+        onOpenChange={setShowRemoveConfirmDialog}
+      >
+        <DialogContent className="max-w-md w-full p-0 gap-0">
+          {/* Header */}
+          <div className="p-6">
+            <h2 className="text-lg font-medium">Remove GitLab Integration</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Are you sure you want to remove your GitLab integration? This will
+              unlink all repositories.
+            </p>
           </div>
-        </div>
-      ) : null}
+
+          {/* Footer */}
+          <div className="p-6 border-t border-border/30 flex justify-end gap-2">
+            <Button variant="outline" onClick={handleRemoveCancelled}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleRemoveConfirmed}>
+              Remove Integration
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

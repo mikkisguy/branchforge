@@ -7,7 +7,7 @@
  */
 
 import { useState, useCallback, useEffect } from "react";
-import { Loader2, X, Download } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,13 +68,11 @@ export function GitLabRepositoryLinkingDialog({
   // Link state
   const [isLinking, setIsLinking] = useState(false);
 
-  // Sync prompt state
-  const [showSyncPrompt, setShowSyncPrompt] = useState(false);
+  const [showSyncDialog, setShowSyncDialog] = useState(false);
   const [linkedProjectId, setLinkedProjectId] = useState<string | null>(null);
   const [linkedProjectName, setLinkedProjectName] = useState<string | null>(
     null
   );
-  const [showSyncDialog, setShowSyncDialog] = useState(false);
 
   /**
    * Load GitLab repositories
@@ -121,6 +119,9 @@ export function GitLabRepositoryLinkingDialog({
     setProjectSearch("");
     setGitlabLoadError(null);
     setNewProjectName("");
+    setShowSyncDialog(false);
+    setLinkedProjectId(null);
+    setLinkedProjectName(null);
   }, []);
 
   /**
@@ -128,9 +129,6 @@ export function GitLabRepositoryLinkingDialog({
    */
   const closeDialog = useCallback(() => {
     reset();
-    setShowSyncPrompt(false);
-    setLinkedProjectId(null);
-    setLinkedProjectName(null);
     onOpenChange(false);
   }, [reset, onOpenChange]);
 
@@ -159,7 +157,6 @@ export function GitLabRepositoryLinkingDialog({
       try {
         const newProject = await createProject(newProjectName.trim());
         projectId = newProject.id;
-        setLinkedProjectName(newProject.name);
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Failed to create project";
@@ -182,9 +179,6 @@ export function GitLabRepositoryLinkingDialog({
         error("Please enter a branch name");
         return;
       }
-      // Get project name for the sync prompt
-      const project = projects.find((p) => p.id === projectId);
-      setLinkedProjectName(project?.name ?? null);
     }
 
     setIsLinking(true);
@@ -206,11 +200,25 @@ export function GitLabRepositoryLinkingDialog({
         `Successfully linked "${selectedGitlabProject.name}" to your project`
       );
 
-      // Store the linked project info and show sync prompt
-      setLinkedProjectId(projectId);
-      setShowSyncPrompt(true);
+      // Get project name for the sync dialog
+      const project = projects.find((p) => p.id === projectId);
+      const projectName = isCreatingNewProject
+        ? newProjectName
+        : project?.name;
 
-      // Close the main dialog but keep the sync prompt open
+      // Log if project not found in projects array (stale data condition)
+      if (!isCreatingNewProject && !project) {
+        console.warn(
+          `[GitLabRepositoryLinkingDialog] Linked project not found in projects array. projectId: ${projectId}. This may indicate stale data.`
+        );
+      }
+
+      // Store the linked project info and open sync dialog directly
+      setLinkedProjectId(projectId);
+      setLinkedProjectName(projectName ?? "Unknown project");
+      setShowSyncDialog(true);
+
+      // Close the main dialog but keep the sync dialog open
       onLinkSuccess?.();
       await refreshIntegration();
     } catch (err) {
@@ -252,7 +260,7 @@ export function GitLabRepositoryLinkingDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-lg w-full max-h-[90vh] p-0 gap-0 flex flex-col">
+        <DialogContent className="max-w-md w-full max-h-[90vh] p-0 gap-0 flex flex-col">
           {/* Header */}
           <div className="p-6 border-b border-border/30 flex items-start justify-between">
             <div>
@@ -461,50 +469,6 @@ export function GitLabRepositoryLinkingDialog({
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Sync Prompt Dialog */}
-      {showSyncPrompt && linkedProjectId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg shadow-lg max-w-md w-full">
-            {/* Header */}
-            <div className="p-6 border-b border-border/30">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-md">
-                  <Download className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-medium">Sync from GitLab?</h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Your repository is now linked. Would you like to import
-                    scenes from GitLab?
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="p-6 border-t border-border/30 flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowSyncPrompt(false);
-                  closeDialog();
-                }}
-              >
-                Skip for now
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowSyncPrompt(false);
-                  setShowSyncDialog(true);
-                }}
-              >
-                Continue
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Sync Dialog */}
       {linkedProjectId && showSyncDialog && (
