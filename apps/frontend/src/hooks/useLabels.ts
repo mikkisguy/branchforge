@@ -5,10 +5,10 @@
  * Simplified with stable query keys and proper refetch behavior.
  */
 
-import { useState, useCallback, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { labelKeys, projectFilesKeys } from "@/lib/query-keys";
-import { labelsApi } from "@/lib/api/labels";
+import { labelsApi, type UpdateDialogueResponse } from "@/lib/api/labels";
 import { useProject } from "@/hooks/useProject";
 import type { PublicLabel, LabelDetail } from "@branchforge/shared";
 
@@ -19,6 +19,8 @@ function clearHistoryCursor(labelId: string): void {
     // Ignore storage failures.
   }
 }
+
+const EMPTY_PROJECT_KEY = "__no_project__";
 
 // ============================================================================
 // Constants
@@ -42,8 +44,12 @@ export interface UseLabelsReturn {
   invalidateLabels: () => Promise<void>;
   updateDialogue: (
     labelId: string,
-    dialogue: Array<{ speakerId: string | null; text: string }>
-  ) => Promise<{ success: boolean }>;
+    dialogue: Array<{ speakerId: string | null; text: string }>,
+    options?: {
+      expectedVersion?: number;
+      expectedContentHash?: string;
+    }
+  ) => Promise<UpdateDialogueResponse>;
   isUpdatingDialogue: boolean;
   isUpdateError: boolean;
 }
@@ -55,6 +61,7 @@ export interface UseLabelsReturn {
 export function useLabels(): UseLabelsReturn {
   const queryClient = useQueryClient();
   const { currentProject } = useProject();
+  const projectKey = currentProject?.id ?? EMPTY_PROJECT_KEY;
 
   // Query for all labels in the current project
   // Refetch on mount to ensure fresh data when entering Write Mode
@@ -68,24 +75,23 @@ export function useLabels(): UseLabelsReturn {
 
   // Local state for active label ID
   // Initialize from query cache on mount to persist across navigation
-  const [localActiveLabelId, setLocalActiveLabelId] = useState<string | null>(
-    () => {
-      if (!currentProject?.id) return null;
-      const cached = queryClient.getQueryData<string | null>(
-        labelKeys.activeLabelId(currentProject.id)
-      );
-      return cached ?? null;
-    }
-  );
+  const { data: activeLabelId = null } = useQuery<string | null>({
+    queryKey: labelKeys.activeLabelId(projectKey),
+    queryFn: () => null,
+    initialData: null,
+    staleTime: Infinity,
+    gcTime: Infinity,
+    enabled: true,
+  });
 
   // Query for active label detail
   const { data: activeLabel, isLoading: isLoadingLabel } = useQuery({
     queryKey: labelKeys.detail(
       currentProject?.id ?? "",
-      localActiveLabelId ?? ""
+      activeLabelId ?? ""
     ),
-    queryFn: () => labelsApi.getLabel(localActiveLabelId!),
-    enabled: !!localActiveLabelId && !!currentProject?.id,
+    queryFn: () => labelsApi.getLabel(activeLabelId!),
+    enabled: !!activeLabelId && !!currentProject?.id,
     staleTime: 5 * 60 * 1000,
     refetchOnMount: true,
   });
@@ -95,10 +101,18 @@ export function useLabels(): UseLabelsReturn {
     mutationFn: async ({
       labelId,
       dialogue,
+      expectedVersion,
+      expectedContentHash,
     }: {
       labelId: string;
       dialogue: Array<{ speakerId: string | null; text: string }>;
-    }) => labelsApi.updateDialogue(labelId, dialogue),
+      expectedVersion?: number;
+      expectedContentHash?: string;
+    }) =>
+      labelsApi.updateDialogue(labelId, dialogue, {
+        expectedVersion,
+        expectedContentHash,
+      }),
     onSuccess: async (_data, variables) => {
       clearHistoryCursor(variables.labelId);
 
@@ -106,13 +120,13 @@ export function useLabels(): UseLabelsReturn {
       // Invalidate writingGoals (word count may have changed)
       // Invalidate project files (file content is reconstructed after dialogue update)
       // Don't invalidate labels list - metadata hasn't changed
-      if (currentProject && localActiveLabelId) {
+      if (currentProject && variables.labelId) {
         await queryClient.invalidateQueries({
-          queryKey: labelKeys.detail(currentProject.id, localActiveLabelId),
+          queryKey: labelKeys.detail(currentProject.id, variables.labelId),
         });
 
         await queryClient.invalidateQueries({
-          queryKey: ["labels", variables.labelId, "versions"],
+          queryKey: labelKeys.versions(variables.labelId),
         });
 
         // Invalidate project files for this project and force refetch
@@ -133,22 +147,16 @@ export function useLabels(): UseLabelsReturn {
   // Set active label method (updates both local state and cache)
   const setActiveLabelId = useCallback(
     (labelId: string | null) => {
-      setLocalActiveLabelId(labelId);
-      if (currentProject) {
-        queryClient.setQueryData(
-          labelKeys.activeLabelId(currentProject.id),
-          labelId
-        );
-      }
+      queryClient.setQueryData(labelKeys.activeLabelId(projectKey), labelId);
     },
-    [currentProject, queryClient]
+    [projectKey, queryClient]
   );
 
   // Invalidate labels method
   const invalidateLabels = useCallback(async () => {
     if (currentProject) {
-      // Invalidate list queries
-      await queryClient.invalidateQueries({
+      // Refetch list queries to ensure immediate data refresh after import
+      await queryClient.refetchQueries({
         queryKey: labelKeys.lists(currentProject.id),
       });
       // Also invalidate all detail queries for this project
@@ -171,9 +179,18 @@ export function useLabels(): UseLabelsReturn {
   const updateDialogue = useCallback(
     (
       labelId: string,
-      dialogue: Array<{ speakerId: string | null; text: string }>
+      dialogue: Array<{ speakerId: string | null; text: string }>,
+      options?: {
+        expectedVersion?: number;
+        expectedContentHash?: string;
+      }
     ) => {
-      return updateDialogueMutation.mutateAsync({ labelId, dialogue });
+      return updateDialogueMutation.mutateAsync({
+        labelId,
+        dialogue,
+        expectedVersion: options?.expectedVersion,
+        expectedContentHash: options?.expectedContentHash,
+      });
     },
     [updateDialogueMutation]
   );
@@ -182,7 +199,7 @@ export function useLabels(): UseLabelsReturn {
     labels,
     labelsMap,
     activeLabel,
-    activeLabelId: localActiveLabelId,
+    activeLabelId,
     isLoadingLabels,
     isLoadingLabel,
     setActiveLabelId,

@@ -12,6 +12,18 @@ export interface ApiError {
   error: string;
 }
 
+export class ApiRequestError extends Error {
+  status: number;
+  data: unknown;
+
+  constructor(message: string, status: number, data: unknown) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.status = status;
+    this.data = data;
+  }
+}
+
 // ============================================================================
 // API Request Handler
 // ============================================================================
@@ -21,7 +33,8 @@ export interface ApiError {
  */
 async function fetchInternal(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  allowConflict = false
 ): Promise<Response> {
   const url = `${API_BASE}${endpoint}`;
 
@@ -40,11 +53,18 @@ async function fetchInternal(
   });
 
   if (!response.ok) {
-    const error: ApiError = await response
+    // Don't throw error for 409 Conflict if allowConflict is true
+    if (allowConflict && response.status === 409) {
+      return response;
+    }
+
+    const errorData: ApiError = await response
       .json()
       .catch(() => ({ error: "Unknown error" }));
-    throw new Error(
-      error.error || `Request failed with status ${response.status}`
+    throw new ApiRequestError(
+      errorData.error || `Request failed with status ${response.status}`,
+      response.status,
+      errorData
     );
   }
 
@@ -54,21 +74,24 @@ async function fetchInternal(
 // Overload for endpoints that return void (204 No Content)
 export async function request(
   endpoint: string,
-  options?: RequestInit
+  options?: RequestInit,
+  allowConflict?: boolean
 ): Promise<void>;
 
 // Overload for endpoints that return data
 export async function request<T>(
   endpoint: string,
-  options?: RequestInit
+  options?: RequestInit,
+  allowConflict?: boolean
 ): Promise<T>;
 
 // Implementation
 export async function request<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  allowConflict = false
 ): Promise<T | void> {
-  const response = await fetchInternal(endpoint, options);
+  const response = await fetchInternal(endpoint, options, allowConflict);
 
   // For 204 No Content responses, return void
   if (response.status === 204) {

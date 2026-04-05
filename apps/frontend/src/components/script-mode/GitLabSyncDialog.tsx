@@ -16,7 +16,7 @@ import { type ConflictResolution } from "@/lib/api/gitlab";
 import { useGitLabSync } from "@/hooks/useGitLabSync";
 import { useToast } from "@/contexts/ToastContext";
 import { useLabels } from "@/hooks/useLabels";
-import { characterKeys } from "@/lib/query-keys";
+import { characterKeys, projectFilesKeys } from "@/lib/query-keys";
 import { CharacterImportWizard } from "@/components/CharacterImportWizard";
 import {
   charactersApi,
@@ -139,6 +139,14 @@ export function GitLabSyncDialog({
       // Refresh scene list after successful sync
       await invalidateLabels();
 
+      // For import operations, also refresh project files list
+      // This ensures Script Mode shows imported files immediately
+      if (operationType === "import") {
+        void queryClient.refetchQueries({
+          queryKey: projectFilesKeys.lists(projectId),
+        });
+      }
+
       // For import operations, always show the character wizard
       // (even if no characters were detected - users can manually add them)
       if (operationType === "import") {
@@ -194,6 +202,7 @@ export function GitLabSyncDialog({
     error,
     invalidateLabels,
     isFirstSync,
+    queryClient,
   ]);
 
   /**

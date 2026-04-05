@@ -109,6 +109,8 @@ type LabelForPublic = Pick<
   | "route"
   | "status"
   | "visibility"
+  | "version"
+  | "contentHash"
   | "createdAt"
   | "updatedAt"
 >;
@@ -343,6 +345,8 @@ function mapToPublicLabel(label: LabelForPublic): PublicLabel {
     routeKey: label.route ?? null,
     status: isValidLabelStatus(label.status) ? label.status : null,
     visibility: label.visibility,
+    version: label.version,
+    contentHash: label.contentHash,
     createdAt: label.createdAt.toISOString(),
     updatedAt: label.updatedAt.toISOString(),
   };

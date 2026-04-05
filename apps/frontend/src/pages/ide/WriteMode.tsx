@@ -20,6 +20,8 @@ import type { DialogueEntry } from "@/lib/prose-types";
 import { dialogueToPayload, hashDialogueEntries } from "@/lib/prose-converter";
 import { Loader2, Sparkles, FileQuestion } from "lucide-react";
 import type { LabelDetail } from "@branchforge/shared";
+import { useToast } from "@/contexts/ToastContext";
+import { registerModeFlushHandler } from "@/lib/editor-sync-coordinator";
 
 interface WriteModeProps {
   projectName?: string;
@@ -52,6 +54,7 @@ function getPersistedDialogueFromLabel(
 
 export function WriteMode({ projectName }: WriteModeProps) {
   const { currentProject } = useProject();
+  const { error: showErrorToast } = useToast();
   const {
     labels,
     activeLabel,
@@ -65,6 +68,12 @@ export function WriteMode({ projectName }: WriteModeProps) {
 
   const { characters } = useCharacters(currentProject?.id ?? "");
   const [isFocusMode, setIsFocusMode] = useState(false);
+  const [lastKnownVersionByLabel, setLastKnownVersionByLabel] = useState<
+    Map<string, number>
+  >(new Map());
+  const [conflictByLabel, setConflictByLabel] = useState<Map<string, boolean>>(
+    new Map()
+  );
 
   // Track current editor draft with its source label for safe autosave
   const [currentDraft, setCurrentDraft] = useState<LabelDialogueDraft>(() => ({
@@ -80,6 +89,8 @@ export function WriteMode({ projectName }: WriteModeProps) {
 
   // Track the saved hash per label for accurate change detection
   const savedHashesRef = useRef<Map<string, string>>(new Map());
+  // Track server content hashes per label for optimistic concurrency checks
+  const serverContentHashesRef = useRef<Map<string, string>>(new Map());
 
   // Track previous isUpdatingDialogue state to detect when save completes
   const wasUpdatingDialogueRef = useRef(false);
@@ -88,6 +99,8 @@ export function WriteMode({ projectName }: WriteModeProps) {
   const isSwitchingLabelsRef = useRef(false);
   // Track pending data to reset hash for after label switch
   const pendingResetHashRef = useRef<LabelDialogueDraft | null>(null);
+  // Track which labelId is currently being saved for error handling
+  const savingLabelIdRef = useRef<string | undefined>(undefined);
 
   const handleFocusModeToggle = useCallback(() => {
     setIsFocusMode((prev) => !prev);
@@ -99,8 +112,40 @@ export function WriteMode({ projectName }: WriteModeProps) {
       const persistedDialogue = getPersistedDialogueFromLabel(activeLabel);
       const hash = hashDialogueEntries(persistedDialogue);
       savedHashesRef.current.set(activeLabel.id, hash);
+      if (typeof activeLabel.contentHash === "string") {
+        serverContentHashesRef.current.set(activeLabel.id, activeLabel.contentHash);
+      }
+      const labelVersion = activeLabel.version;
+      if (typeof labelVersion === "number") {
+        setLastKnownVersionByLabel((prev) => {
+          const next = new Map(prev);
+          next.set(activeLabel.id, labelVersion);
+          return next;
+        });
+      }
+
+      setConflictByLabel((prev) => {
+        if (!prev.has(activeLabel.id)) {
+          return prev;
+        }
+        const next = new Map(prev);
+        next.delete(activeLabel.id);
+        return next;
+      });
     }
   }, [activeLabel, isUpdatingDialogue]);
+
+  const prevProjectIdRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (prevProjectIdRef.current !== undefined && prevProjectIdRef.current !== currentProject?.id) {
+      setLastKnownVersionByLabel(new Map());
+      setConflictByLabel(new Map());
+      savedHashesRef.current.clear();
+      serverContentHashesRef.current.clear();
+    }
+    prevProjectIdRef.current = currentProject?.id;
+  }, [currentProject?.id]);
 
   // Update lastSaved timestamp when save completes successfully
   useEffect(() => {
@@ -125,16 +170,62 @@ export function WriteMode({ projectName }: WriteModeProps) {
       onSave: useCallback(
         async (draft: LabelDialogueDraft) => {
           if (draft.labelId) {
-            const payload = dialogueToPayload(draft.entries);
-            await updateDialogue(draft.labelId, payload);
-            // Update saved hash after successful save
-            savedHashesRef.current.set(
-              draft.labelId,
-              hashDialogueEntries(draft.entries)
-            );
+            savingLabelIdRef.current = draft.labelId;
+            try {
+              const payload = dialogueToPayload(draft.entries);
+              const expectedVersion = lastKnownVersionByLabel.get(draft.labelId);
+              const expectedContentHash = serverContentHashesRef.current.get(
+                draft.labelId
+              );
+
+              const result = await updateDialogue(draft.labelId, payload, {
+                expectedVersion,
+                expectedContentHash,
+              });
+
+              if (result.success) {
+                // Update saved hash after successful save
+                savedHashesRef.current.set(
+                  draft.labelId,
+                  hashDialogueEntries(draft.entries)
+                );
+                setLastKnownVersionByLabel((prev) => {
+                  const next = new Map(prev);
+                  next.set(draft.labelId!, result.version);
+                  return next;
+                });
+                serverContentHashesRef.current.set(draft.labelId, result.contentHash);
+                setConflictByLabel((prev) => {
+                  if (!prev.has(draft.labelId!)) {
+                    return prev;
+                  }
+                  const next = new Map(prev);
+                  next.delete(draft.labelId!);
+                  return next;
+                });
+              } else {
+                // Conflict detected - update version tracker with current server version
+                setLastKnownVersionByLabel((prev) => {
+                  const next = new Map(prev);
+                  next.set(draft.labelId!, result.conflict.currentVersion);
+                  return next;
+                });
+                setConflictByLabel((prev) => {
+                  const next = new Map(prev);
+                  next.set(draft.labelId!, true);
+                  return next;
+                });
+                showErrorToast(
+                  "This scene changed elsewhere. Reloaded data is needed before saving again.",
+                  "Write conflict detected"
+                );
+              }
+            } finally {
+              savingLabelIdRef.current = undefined;
+            }
           }
         },
-        [updateDialogue]
+        [updateDialogue, lastKnownVersionByLabel, showErrorToast]
       ),
       onError: useCallback((error: Error) => {
         console.error("Failed to save dialogue:", error);
@@ -153,18 +244,40 @@ export function WriteMode({ projectName }: WriteModeProps) {
     triggerSaveRef.current = triggerSave;
   }, [triggerSave]);
 
+  useEffect(() => {
+    const unregister = registerModeFlushHandler("write", async () => {
+      return await triggerSaveRef.current();
+    });
+
+    return unregister;
+  }, []);
+
   // Handle content changes from ProseEditor
   const handleContentChange = useCallback((entries: DialogueEntry[]) => {
     setCurrentDraft((prev) => ({ ...prev, entries }));
   }, []);
 
+  const handleSelectLabel = useCallback(
+    async (labelId: string) => {
+      const prevLabelId = prevLabelIdRef.current;
+      if (prevLabelId && prevLabelId !== labelId && isDirtyRef.current) {
+        const flushed = await triggerSave();
+        if (!flushed) {
+          showErrorToast(
+            "Could not save pending edits. Resolve the save error before switching scenes.",
+            "Scene switch blocked"
+          );
+          return;
+        }
+      }
+      setActiveLabelId(labelId);
+    },
+    [triggerSave, setActiveLabelId, showErrorToast]
+  );
+
   // Handle label switching - flush pending save for previous label
   useEffect(() => {
     const prevLabelId = prevLabelIdRef.current;
-    if (prevLabelId && prevLabelId !== activeLabelId && isDirty) {
-      // Flush pending save before switching labels
-      triggerSave();
-    }
 
     // Update current entries when the resolved active label changes
     if (activeLabel && activeLabel.id !== prevLabelId) {
@@ -187,7 +300,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
     if (!activeLabelId) {
       prevLabelIdRef.current = null;
     }
-  }, [activeLabelId, activeLabel, isDirty, triggerSave]);
+  }, [activeLabelId, activeLabel]);
 
   // Reset saved hash and clear switching flag after currentEntries updates
   useEffect(() => {
@@ -217,6 +330,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
     for (const labelId of prevLabelIds) {
       if (!currentLabelIds.includes(labelId)) {
         savedHashesRef.current.delete(labelId);
+        serverContentHashesRef.current.delete(labelId);
       }
     }
 
@@ -226,8 +340,10 @@ export function WriteMode({ projectName }: WriteModeProps) {
   // Clean up savedHashesRef on unmount
   useEffect(() => {
     const map = savedHashesRef.current;
+    const serverMap = serverContentHashesRef.current;
     return () => {
       map.clear();
+      serverMap.clear();
     };
   }, []);
 
@@ -260,6 +376,20 @@ export function WriteMode({ projectName }: WriteModeProps) {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleFocusModeToggle, triggerSave]);
+
+  // Warn user before tab close while dirty
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!isDirtyRef.current) {
+        return;
+      }
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
 
   if (isLoadingLabels) {
     return (
@@ -300,6 +430,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
   }
 
   const editorProps = saveStatusToEditorProps();
+  const hasConflict = activeLabelId ? conflictByLabel.get(activeLabelId) : false;
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
@@ -339,7 +470,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
           <SceneNavigator
             labels={labels}
             activeLabelId={activeLabelId}
-            onSelect={setActiveLabelId}
+            onSelect={handleSelectLabel}
           />
         </div>
 
@@ -354,6 +485,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
               isSaving={editorProps.isSaving}
               lastSaved={editorProps.lastSaved}
               saveError={editorProps.saveError}
+              saveConflict={Boolean(hasConflict)}
             />
           </div>
         </div>

@@ -47,7 +47,7 @@ import {
   userSettings,
   characters,
 } from "../db/schema/index.js";
-import { eq, asc, inArray, isNull, and, sql } from "drizzle-orm";
+import { eq, asc, inArray, isNull, and, sql, desc } from "drizzle-orm";
 import { reconstructRPYFile } from "../services/rpy-parser.service.js";
 import { calculateDialogueHash } from "../lib/hash.js";
 import { updateAuditFields } from "../lib/audit.js";
@@ -85,7 +85,26 @@ interface ErrorResponse {
 
 interface UpdateLabelDialogueResponse {
   success: boolean;
+  version: number;
+  contentHash: string;
+  fileContentHash: string;
+  fileUpdatedAt: string;
+  conflict?: {
+    reason: "STALE_LABEL_VERSION" | "STALE_CONTENT_HASH";
+    currentVersion: number;
+    currentContentHash: string | null;
+  };
 }
+
+/**
+ * Generic type for database query operations shared by both db connections
+ * and transactions. This allows the same function to work with either context.
+ *
+ * Only includes the query methods actually used by reconstructFileForLabel.
+ */
+type QueryContext = {
+  select: ReturnType<typeof getDb>["select"];
+};
 
 /**
  * Reconstruct file content for a project file by fetching all labels
@@ -94,8 +113,10 @@ interface UpdateLabelDialogueResponse {
  * References: db (getDb), labels, labelLines, characters, projectFiles tables,
  * and reconstructRPYFile service.
  */
-async function reconstructFileForLabel(projectFileId: string): Promise<string> {
-  const db = getDb();
+async function reconstructFileForLabel(
+  projectFileId: string,
+  db: QueryContext = getDb()
+): Promise<string> {
 
   // Get the project file
   const [projectFile] = await db
@@ -107,6 +128,10 @@ async function reconstructFileForLabel(projectFileId: string): Promise<string> {
   if (!projectFile) {
     throw new NotFoundError("ProjectFile");
   }
+
+  // `content` is the single source of truth for the current file state.
+  // `originalContent` is import-time baseline only and must not be used here.
+  const reconstructionBaseContent = projectFile.content;
 
   // Fetch all labels for the project file
   const allLabels = await db
@@ -121,10 +146,10 @@ async function reconstructFileForLabel(projectFileId: string): Promise<string> {
     )
     .orderBy(asc(labels.labelPosition));
 
-  // If there are no labels, return the original content as-is
+  // If there are no labels, return current file content as-is
   if (allLabels.length === 0) {
     return reconstructRPYFile({
-      originalContent: projectFile.originalContent || projectFile.content,
+      originalContent: reconstructionBaseContent,
       updatedDialogue: new Map(),
     });
   }
@@ -186,9 +211,9 @@ async function reconstructFileForLabel(projectFileId: string): Promise<string> {
     updatedDialogue.set(labelName, labelDialogue);
   }
 
-  // Reconstruct and return file content using original content as base
+  // Reconstruct and return file content using current file content as base
   return reconstructRPYFile({
-    originalContent: projectFile.originalContent || projectFile.content,
+    originalContent: reconstructionBaseContent,
     updatedDialogue,
   });
 }
@@ -296,7 +321,7 @@ async function updateLabelDialogueHandler(
   reply: FastifyReply
 ): Promise<void> {
   const { labelId } = request.params;
-  const { dialogue } = request.body;
+  const { dialogue, expectedVersion, expectedContentHash } = request.body;
   const user = request.user!;
 
   try {
@@ -309,6 +334,7 @@ async function updateLabelDialogueHandler(
         projectId: labels.projectId,
         projectFileId: labels.projectFileId,
         version: labels.version,
+        contentHash: labels.contentHash,
         labelPosition: labels.labelPosition,
       })
       .from(labels)
@@ -373,45 +399,154 @@ async function updateLabelDialogueHandler(
     // Calculate content hash for new dialogue
     const contentHash = calculateDialogueHash(dialogue);
 
-    // Update label_lines with new dialogue
-    await db.transaction(async (tx) => {
+    const updateResult = await db.transaction(async (tx) => {
       // Serialize concurrent updates for the same label to avoid duplicate rows
       // from overlapping delete + insert operations.
       await tx.execute(
         sql`SELECT id FROM labels WHERE id = ${labelId} FOR UPDATE`
       );
 
-      // 1. Delete existing lines (hard delete, not soft)
-      await tx
-        .delete(labelLines)
-        .where(
-          and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt))
-        );
+      const [lockedLabel] = await tx
+        .select({
+          version: labels.version,
+          contentHash: labels.contentHash,
+          projectFileId: labels.projectFileId,
+          labelPosition: labels.labelPosition,
+        })
+        .from(labels)
+        .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
+        .limit(1);
 
-      const allValues = dialogue.map((entry, index) => ({
-        labelId,
-        sequence: index + 1,
-        // DIALOGUE if there's a speakerId, NARRATION otherwise
-        contentType: (entry.speakerId ? "DIALOGUE" : "NARRATION") as
-          | "DIALOGUE"
-          | "NARRATION",
-        content: entry.text,
-        speakerId: entry.speakerId, // Use speakerId directly from payload
-        demoNotes: null, // demo_notes should not be used for speaker names
-        isDirty: true, // Mark as modified since last sync
-        projectFileId: label.projectFileId,
-        linePosition: (label.labelPosition ?? 0) + index,
-        contentHash: calculateContentHash(entry.text),
-        lastSyncedHash: null, // No synced hash for newly created/modified lines
-      }));
+      if (!lockedLabel || !lockedLabel.projectFileId) {
+        throw new NotFoundError("Label or file not found");
+      }
 
-      if (allValues.length > 0) {
-        await tx.insert(labelLines).values(allValues);
+      await tx.execute(
+        sql`SELECT id FROM project_files WHERE id = ${lockedLabel.projectFileId} FOR UPDATE`
+      );
+
+      const [lockedProjectFile] = await tx
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.id, lockedLabel.projectFileId))
+        .limit(1);
+
+      if (!lockedProjectFile) {
+        throw new NotFoundError("File");
+      }
+
+      const lockedCurrentVersion = lockedLabel.version ?? 1;
+      if (
+        expectedVersion !== undefined &&
+        expectedVersion !== lockedCurrentVersion
+      ) {
+        return {
+          conflictPayload: {
+            success: false,
+            version: lockedCurrentVersion,
+            contentHash: lockedLabel.contentHash ?? "",
+            fileContentHash: lockedProjectFile.contentHash,
+            fileUpdatedAt: lockedProjectFile.updatedAt.toISOString(),
+            conflict: {
+              reason: "STALE_LABEL_VERSION",
+              currentVersion: lockedCurrentVersion,
+              currentContentHash: lockedLabel.contentHash,
+            },
+          } satisfies UpdateLabelDialogueResponse,
+          nextVersion: lockedCurrentVersion,
+          nextContentHash: lockedLabel.contentHash ?? "",
+          nextFileContentHash: lockedProjectFile.contentHash,
+          fileUpdatedAt: lockedProjectFile.updatedAt,
+        };
+      }
+
+      if (
+        expectedContentHash !== undefined &&
+        (lockedLabel.contentHash ?? null) !== expectedContentHash
+      ) {
+        return {
+          conflictPayload: {
+            success: false,
+            version: lockedCurrentVersion,
+            contentHash: lockedLabel.contentHash ?? "",
+            fileContentHash: lockedProjectFile.contentHash,
+            fileUpdatedAt: lockedProjectFile.updatedAt.toISOString(),
+            conflict: {
+              reason: "STALE_CONTENT_HASH",
+              currentVersion: lockedCurrentVersion,
+              currentContentHash: lockedLabel.contentHash,
+            },
+          } satisfies UpdateLabelDialogueResponse,
+          nextVersion: lockedCurrentVersion,
+          nextContentHash: lockedLabel.contentHash ?? "",
+          nextFileContentHash: lockedProjectFile.contentHash,
+          fileUpdatedAt: lockedProjectFile.updatedAt,
+        };
+      }
+
+      // 1. Fetch existing lines with FOR UPDATE to preserve IDs and handle updates/inserts/deletes
+      const existingLines = await tx
+        .select()
+        .from(labelLines)
+        .where(and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt)))
+        .orderBy(asc(labelLines.sequence));
+
+      const existingLinesBySequence = new Map(
+        existingLines.map((line) => [line.sequence, line])
+      );
+
+      const newSequences = new Set<number>();
+
+      // 2. Update existing rows and insert new rows for each entry
+      for (const [index, entry] of dialogue.entries()) {
+        const sequence = index + 1;
+        newSequences.add(sequence);
+
+        const existingLine = existingLinesBySequence.get(sequence);
+
+        const values = {
+          contentType: (entry.speakerId ? "DIALOGUE" : "NARRATION") as
+            | "DIALOGUE"
+            | "NARRATION",
+          content: entry.text,
+          speakerId: entry.speakerId,
+          demoNotes: null,
+          isDirty: true,
+          projectFileId: lockedProjectFile.id,
+          linePosition: (lockedLabel.labelPosition ?? 0) + index,
+          contentHash: calculateContentHash(entry.text),
+          lastSyncedHash: null,
+        };
+
+        if (existingLine) {
+          // Update existing row, preserving its ID
+          await tx
+            .update(labelLines)
+            .set(values)
+            .where(eq(labelLines.id, existingLine.id));
+        } else {
+          // Insert new row for sequences that don't exist yet
+          await tx.insert(labelLines).values({
+            labelId,
+            sequence,
+            ...values,
+          });
+        }
+      }
+
+      // 3. Delete rows whose sequences are no longer present
+      const sequencesToDelete = existingLines
+        .filter((line) => !newSequences.has(line.sequence))
+        .map((line) => line.id);
+
+      if (sequencesToDelete.length > 0) {
+        await tx
+          .delete(labelLines)
+          .where(inArray(labelLines.id, sequencesToDelete));
       }
 
       // 2. Update label with audit fields and sync status
-      const currentVersion = label.version ?? 1;
-      const auditFields = updateAuditFields(currentVersion, user.id);
+      const auditFields = updateAuditFields(lockedCurrentVersion, user.id);
       await tx
         .update(labels)
         .set({
@@ -420,21 +555,33 @@ async function updateLabelDialogueHandler(
           syncStatus: "MODIFIED_LOCAL",
         })
         .where(eq(labels.id, labelId));
+
+      const newContent = await reconstructFileForLabel(lockedProjectFile.id, tx);
+      const newContentHash = calculateContentHash(newContent);
+      const fileUpdatedAt = new Date();
+
+      await tx
+        .update(projectFiles)
+        .set({
+          content: newContent,
+          contentHash: newContentHash,
+          updatedAt: fileUpdatedAt,
+        })
+        .where(eq(projectFiles.id, lockedProjectFile.id));
+
+      return {
+        conflictPayload: null,
+        nextVersion: (auditFields.version ?? lockedCurrentVersion) as number,
+        nextContentHash: contentHash,
+        nextFileContentHash: newContentHash,
+        fileUpdatedAt,
+      };
     });
 
-    // Reconstruct file content with updated dialogue
-    const newContent = await reconstructFileForLabel(projectFile.id);
-    const newContentHash = calculateContentHash(newContent);
-
-    // Update file content
-    await db
-      .update(projectFiles)
-      .set({
-        content: newContent,
-        contentHash: newContentHash,
-        updatedAt: new Date(),
-      })
-      .where(eq(projectFiles.id, projectFile.id));
+    if (updateResult.conflictPayload) {
+      reply.status(409).send(updateResult.conflictPayload);
+      return;
+    }
 
     // Track word counts for daily writing goals
     // This is non-critical: if tracking fails, the dialogue save is still successful
@@ -467,36 +614,22 @@ async function updateLabelDialogueHandler(
           wordCount
         );
 
-        // Only update if there are actually new words to count
-        if (wordsToAdd > 0) {
-          const dailyWordCounts = parseDailyWordCounts(
-            settings.dailyWordCounts
-          );
-          const updatedWordCounts = updateTodayWordCount(
-            dailyWordCounts,
-            todayDateKey,
-            wordsToAdd
-          );
+        const dailyWordCounts = parseDailyWordCounts(settings.dailyWordCounts);
+        const updatedWordCounts = updateTodayWordCount(
+          dailyWordCounts,
+          todayDateKey,
+          wordsToAdd
+        );
 
-          // Save both daily word counts and per-label tracking
-          await db
-            .update(userSettings)
-            .set({
-              dailyWordCounts: updatedWordCounts,
-              labelWordCounts: updatedTracking,
-              updatedAt: new Date(),
-            })
-            .where(eq(userSettings.userId, user.id));
-        } else {
-          // Still update the per-label tracking even if no new words (to record current state)
-          await db
-            .update(userSettings)
-            .set({
-              labelWordCounts: updatedTracking,
-              updatedAt: new Date(),
-            })
-            .where(eq(userSettings.userId, user.id));
-        }
+        // Save both daily word counts and per-label tracking
+        await db
+          .update(userSettings)
+          .set({
+            dailyWordCounts: updatedWordCounts,
+            labelWordCounts: updatedTracking,
+            updatedAt: new Date(),
+          })
+          .where(eq(userSettings.userId, user.id));
       }
     } catch (error) {
       // Log the error but don't fail the request - the dialogue was already saved successfully
@@ -510,7 +643,13 @@ async function updateLabelDialogueHandler(
       );
     }
 
-    reply.send({ success: true } as UpdateLabelDialogueResponse);
+    reply.send({
+      success: true,
+      version: updateResult.nextVersion,
+      contentHash: updateResult.nextContentHash,
+      fileContentHash: updateResult.nextFileContentHash,
+      fileUpdatedAt: updateResult.fileUpdatedAt.toISOString(),
+    } as UpdateLabelDialogueResponse);
   } catch (error) {
     request.log.error(error);
 
@@ -523,7 +662,6 @@ async function updateLabelDialogueHandler(
       reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
       return;
     }
-
     reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
   }
 }

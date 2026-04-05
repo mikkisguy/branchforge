@@ -33,7 +33,7 @@ import {
   type NewUser,
   type NewProject,
 } from "../../db/schema/index.js";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, and, asc } from "drizzle-orm";
 import { calculateContentHash } from "../../lib/hash.js";
 
 describe("ProjectsRoutes (Integration)", () => {
@@ -596,6 +596,45 @@ describe("ProjectsRoutes (Integration)", () => {
       });
     });
 
+    it("returns 409 when expected content hash is stale", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+      const fileId = testUuid("13000000", 8);
+
+      const initialContent = ["label intro:", '    "Hello"'].join("\n");
+
+      await db.insert(projectFiles).values({
+        id: fileId,
+        projectId: ownedProject.id!,
+        source: "ZIP",
+        filePath: "story/stale_hash.rpy",
+        fileType: "STORY",
+        content: initialContent,
+        originalContent: initialContent,
+        contentHash: calculateContentHash(initialContent),
+      });
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/files/${fileId}`,
+        payload: {
+          content: ["label intro:", '    "Updated"'].join("\n"),
+          expectedContentHash: "stale-hash-value",
+        },
+        cookies: {
+          [SESSION_COOKIE_NAME]: auth.sessionId,
+        },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({
+        success: false,
+        conflict: {
+          reason: "STALE_CONTENT_HASH",
+          currentContentHash: calculateContentHash(initialContent),
+        },
+      });
+    });
+
     it("links speakers by display name for compatibility", async () => {
       const auth = await createAuthenticatedRequest(testUserId);
       const fileId = testUuid("13000000", 2);
@@ -659,6 +698,139 @@ describe("ProjectsRoutes (Integration)", () => {
         contentType: "DIALOGUE",
         speakerId: characterId,
       });
+    });
+
+    it("reclassifies SETTINGS files to STORY when labels are added", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+      const fileId = testUuid("13000000", 3);
+
+      const initialContent = [
+        "define e = Character(\"Eileen\")",
+        "",
+        "# no labels yet",
+      ].join("\n");
+
+      await db.insert(projectFiles).values({
+        id: fileId,
+        projectId: ownedProject.id!,
+        source: "ZIP",
+        filePath: "story/new_scene.rpy",
+        fileType: "SETTINGS",
+        content: initialContent,
+        originalContent: initialContent,
+        contentHash: calculateContentHash(initialContent),
+      });
+
+      const updatedContent = [
+        'label hero:',
+        '',
+        '    "I am the hero!"',
+        '',
+        '    e "hehe, hello! yes"',
+      ].join("\n");
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/files/${fileId}`,
+        payload: { content: updatedContent },
+        cookies: {
+          [SESSION_COOKIE_NAME]: auth.sessionId,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ success: true });
+
+      const [updatedFile] = await db
+        .select({ fileType: projectFiles.fileType })
+        .from(projectFiles)
+        .where(eq(projectFiles.id, fileId))
+        .limit(1);
+
+      expect(updatedFile.fileType).toBe("STORY");
+
+      const syncedLabels = await db
+        .select({ id: labels.id, labelName: labels.labelName })
+        .from(labels)
+        .where(eq(labels.projectFileId, fileId));
+
+      expect(syncedLabels).toHaveLength(1);
+      expect(syncedLabels[0].labelName).toBe("hero");
+
+      const syncedLines = await db
+        .select({ contentType: labelLines.contentType, content: labelLines.content })
+        .from(labelLines)
+        .where(eq(labelLines.labelId, syncedLabels[0].id))
+        .orderBy(asc(labelLines.sequence));
+
+      expect(syncedLines).toHaveLength(2);
+      expect(syncedLines[0]).toMatchObject({
+        contentType: "NARRATION",
+        content: "I am the hero!",
+      });
+      expect(syncedLines[1]).toMatchObject({
+        contentType: "DIALOGUE",
+        content: "hehe, hello! yes",
+      });
+    });
+
+    it("does not duplicate labels when a soft-deleted label is reintroduced", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+      const fileId = testUuid("13000000", 4);
+      const resurrectedLabelId = testUuid("15000000", 1);
+
+      const initialContent = ['label intro:', '    "Hello"'].join("\n");
+
+      await db.insert(projectFiles).values({
+        id: fileId,
+        projectId: ownedProject.id!,
+        source: "ZIP",
+        filePath: "story/reintroduced_label.rpy",
+        fileType: "STORY",
+        content: initialContent,
+        originalContent: initialContent,
+        contentHash: calculateContentHash(initialContent),
+      });
+
+      await db.insert(labels).values({
+        id: resurrectedLabelId,
+        projectId: ownedProject.id!,
+        projectFileId: fileId,
+        labelName: "hero",
+        title: "hero",
+        labelPosition: 0,
+        labelNumber: 1,
+        sequenceOrder: 0,
+        status: "DRAFT",
+        visibility: "EXCLUSIVE",
+        prerequisites: {},
+        effects: {},
+        deletedAt: new Date(),
+      });
+
+      const updatedContent = ['label hero:', '    "I am the hero!"'].join("\n");
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/files/${fileId}`,
+        payload: { content: updatedContent },
+        cookies: {
+          [SESSION_COOKIE_NAME]: auth.sessionId,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ success: true });
+
+      const heroLabels = await db
+        .select({ id: labels.id, deletedAt: labels.deletedAt })
+        .from(labels)
+        .where(and(eq(labels.projectFileId, fileId), eq(labels.labelName, "hero")));
+
+      // One historical soft-deleted row + one active row, never duplicate active rows
+      expect(heroLabels).toHaveLength(2);
+      const activeHeroLabels = heroLabels.filter((row) => row.deletedAt === null);
+      expect(activeHeroLabels).toHaveLength(1);
     });
   });
 });

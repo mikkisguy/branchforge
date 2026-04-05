@@ -30,9 +30,19 @@ export interface ImportZipResponse {
   error?: string;
 }
 
-export interface UpdateFileResponse {
-  success: boolean;
-}
+export type UpdateFileResponse =
+  | {
+      success: true;
+      contentHash: string;
+      updatedAt: string;
+    }
+  | {
+      success: false;
+      conflict: {
+        reason: "STALE_CONTENT_HASH";
+        currentContentHash: string;
+      };
+    };
 
 // ============================================================================
 // Validation Utilities
@@ -124,14 +134,22 @@ export const projectFilesApi = {
    */
   async updateFile(
     fileId: string,
-    content: string
+    content: string,
+    options?: { expectedContentHash?: string }
   ): Promise<UpdateFileResponse> {
     validateRequired(fileId, "File ID");
 
-    return request<UpdateFileResponse>(`/projects/files/${fileId}`, {
-      method: "PUT",
-      body: JSON.stringify({ content }),
-    });
+    return request<UpdateFileResponse>(
+      `/projects/files/${fileId}`,
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          content,
+          expectedContentHash: options?.expectedContentHash,
+        }),
+      },
+      true, // allow 409 Conflict responses (STALE_CONTENT_HASH) to be returned instead of thrown
+    );
   },
 
   /**

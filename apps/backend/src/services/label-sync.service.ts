@@ -132,7 +132,7 @@ async function syncLabelsInTransaction(
   const existingLabels = await tx
     .select()
     .from(labels)
-    .where(eq(labels.projectFileId, sourceId));
+    .where(and(eq(labels.projectFileId, sourceId), isNull(labels.deletedAt)));
 
   // Build character lookup maps once for robust speaker linking during sync
   const projectCharacters = await tx

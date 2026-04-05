@@ -203,7 +203,7 @@ export function ZipImportDialog({
         // Invalidate queries to refresh data
         await Promise.all([
           invalidateLabels(),
-          queryClient.invalidateQueries({
+          queryClient.refetchQueries({
             queryKey: projectFilesKeys.lists(projectId),
           }),
         ]);

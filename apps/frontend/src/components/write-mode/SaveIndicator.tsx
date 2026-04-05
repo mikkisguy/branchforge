@@ -21,6 +21,7 @@ interface SaveIndicatorProps {
   saveStatus: SaveStatus;
   displayMode?: SaveIndicatorDisplayMode;
   lastSaved?: Date | null;
+  saveConflict?: boolean;
   onRetry?: () => void;
 }
 
@@ -46,8 +47,27 @@ export const SaveIndicator = memo(function SaveIndicator({
   saveStatus,
   displayMode = "compact",
   lastSaved = null,
+  saveConflict = false,
   onRetry,
 }: SaveIndicatorProps) {
+  if (saveConflict) {
+    return (
+      <div
+        className="flex items-center gap-1.5 text-xs text-destructive"
+        role="status"
+        aria-live="polite"
+        title="Edit conflict detected"
+      >
+        <span
+          className={`flex items-center justify-center w-3 h-3 rounded-full text-white ${ERROR_DOT_COLOR}`}
+        >
+          <AlertCircle className="w-3 h-3" />
+        </span>
+        {displayMode === "verbose" && <span>Conflict detected</span>}
+      </div>
+    );
+  }
+
   const text = STATUS_TEXT[saveStatus][displayMode];
 
   // Compute icon JSX based on status
