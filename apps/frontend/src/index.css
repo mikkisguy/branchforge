@@ -129,6 +129,38 @@
     scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
     scrollbar-width: thin;
   }
+
+  /* Scrollbar hide utility */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Scrollbar shown on hover/focus utility */
+  .scrollbar-hover {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hover::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+
+  .scrollbar-hover:hover,
+  .scrollbar-hover:focus-within {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.5) transparent;
+  }
+
+  .scrollbar-hover:hover::-webkit-scrollbar,
+  .scrollbar-hover:focus-within::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
 }
 
 /* CodeMirror find/replace panel */

@@ -113,7 +113,9 @@ export function useProjectFiles(
   });
 
   // Update file content method
-  const updateFileContent = useCallback<UseProjectFilesReturn["updateFileContent"]>(
+  const updateFileContent = useCallback<
+    UseProjectFilesReturn["updateFileContent"]
+  >(
     async (fileId, content, updateOptions) => {
       const result = await updateFileMutation.mutateAsync({
         fileId,

@@ -76,7 +76,10 @@ function countWordsFromEntries(entries: DialogueEntry[]): number {
 }
 
 function formatDateKey(year: number, month: number, day: number): string {
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(
+    2,
+    "0"
+  )}`;
 }
 
 function getDatePartsInTimezone(
@@ -581,7 +584,7 @@ export function ProseEditor({
   }
 
   return (
-    <div className="flex flex-col h-full tracking-normal pb-4">
+    <div className="flex flex-col h-full tracking-normal pb-3">
       {/* Top Bar */}
       <div
         className="px-4 py-3 border-b border-border bg-card rounded-t-lg flex items-center justify-between gap-4 transition-opacity duration-300 ease-out"
@@ -598,19 +601,11 @@ export function ProseEditor({
               activeLabel.status === "FINAL"
                 ? "bg-[var(--theme-color)]/20 text-[var(--theme-color)] border-[var(--theme-border)]"
                 : activeLabel.status === "REVIEW"
-                  ? "bg-[var(--theme-review-color)]/20 text-[var(--theme-review-color)] border-[var(--theme-review-color)]/30"
-                  : "bg-[var(--theme-draft-color)]/20 text-[var(--theme-draft-color)] border-[var(--theme-draft-color)]/30"
+                ? "bg-[var(--theme-review-color)]/20 text-[var(--theme-review-color)] border-[var(--theme-review-color)]/30"
+                : "bg-[var(--theme-draft-color)]/20 text-[var(--theme-draft-color)] border-[var(--theme-draft-color)]/30"
             }`}
           >
             {activeLabel.status?.toLowerCase() || "draft"}
-          </span>
-
-          {/* Scene title */}
-          <span className="text-sm truncate">{activeLabel.title}</span>
-
-          {/* Scene number */}
-          <span className="text-xs text-muted-foreground font-mono shrink-0">
-            {String(activeLabel.labelNumber).padStart(2, "0")}
           </span>
         </div>
 

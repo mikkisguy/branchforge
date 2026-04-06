@@ -8,6 +8,8 @@ export { StateVariablesModal } from "./StateVariablesModal";
 export { CharactersModal } from "./CharactersModal";
 export { GitLabSettingsContent } from "./GitLabSettingsContent";
 export { GitLabRepositoryLinkingDialog } from "./GitLabRepositoryLinkingDialog";
+export { EditorTabBar } from "./EditorTabBar";
+export type { EditorTabBarItem } from "./EditorTabBar";
 
 // Re-export write-mode components for convenience
 export {

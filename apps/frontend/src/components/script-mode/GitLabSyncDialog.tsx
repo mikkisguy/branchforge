@@ -95,14 +95,19 @@ export function GitLabSyncDialog({
   // Ref to track the timeout so we can clear it on unmount
   const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
+  const clearAutoCloseTimeout = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = undefined;
+    }
+  }, []);
+
   // Clear timeout on unmount to prevent running callbacks after unmount
   useEffect(() => {
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
+      clearAutoCloseTimeout();
     };
-  }, []);
+  }, [clearAutoCloseTimeout]);
 
   /**
    * Handle sync operation
@@ -147,46 +152,38 @@ export function GitLabSyncDialog({
         });
       }
 
-      // For import operations, always show the character wizard
-      // (even if no characters were detected - users can manually add them)
+      // For import operations, show the character wizard only if characters detected
       if (operationType === "import") {
         try {
-          // Get full detection info including conflicts
           const detectionResult = await charactersApi.detectCharacters(
             projectId
           );
-          setDetectedCharacters({
-            characters: detectionResult.characters,
-            conflicts: detectionResult.conflicts,
-            excludedTags: detectionResult.excludedTags,
-          });
-          setShowCharacterWizard(true);
-          // Don't close the dialog - show the character wizard
-          return;
+          if (detectionResult.characters.length > 0) {
+            setDetectedCharacters({
+              characters: detectionResult.characters,
+              conflicts: detectionResult.conflicts,
+              excludedTags: detectionResult.excludedTags,
+            });
+            setShowCharacterWizard(true);
+            return;
+          }
         } catch (err) {
           console.error("Failed to detect characters:", err);
-          // Still show wizard even if detection fails - users can add manually
-          setDetectedCharacters({
-            characters: [],
-            conflicts: [],
-            excludedTags: [],
-          });
-          setShowCharacterWizard(true);
-          return;
         }
       }
 
       // Close dialog after successful sync (if not showing character wizard)
       // Clear any existing timeout before scheduling a new one
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
+      clearAutoCloseTimeout();
       timeoutRef.current = setTimeout(() => {
         reset();
         onOpenChange(false);
       }, 1000);
     } else if (result?.status === "FAILED") {
       error(result.errorMessage || "Operation failed");
+    } else {
+      console.warn("Unexpected sync result:", result);
+      error("Failed to complete sync operation");
     }
   }, [
     branch,
@@ -203,15 +200,35 @@ export function GitLabSyncDialog({
     invalidateLabels,
     isFirstSync,
     queryClient,
+    clearAutoCloseTimeout,
   ]);
 
   /**
    * Reset and close
    */
   const handleClose = useCallback(() => {
+    clearAutoCloseTimeout();
+    setShowCharacterWizard(false);
+    setDetectedCharacters(null);
     reset();
     onOpenChange(false);
-  }, [reset, onOpenChange]);
+  }, [clearAutoCloseTimeout, reset, onOpenChange]);
+
+  const handleDialogOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (nextOpen) {
+        onOpenChange(true);
+        return;
+      }
+
+      if (state.isProcessing) {
+        return;
+      }
+
+      handleClose();
+    },
+    [handleClose, onOpenChange, state.isProcessing]
+  );
 
   /**
    * Get sync icon
@@ -223,7 +240,7 @@ export function GitLabSyncDialog({
   // ============================================================================
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="max-w-md w-full p-0 gap-0">
         {/* Header */}
         <div className="p-6 border-b border-border/30 flex items-start justify-between">
@@ -248,6 +265,8 @@ export function GitLabSyncDialog({
             onClick={handleClose}
             className="text-muted-foreground hover:text-foreground transition-colors"
             disabled={state.isProcessing}
+            type="button"
+            aria-label="Close sync dialog"
           >
             <X className="w-5 h-5" />
           </button>
@@ -258,31 +277,14 @@ export function GitLabSyncDialog({
           {/* Progress / Status */}
           {state.isProcessing || state.operation ? (
             <div className="space-y-3">
-              {/* Progress Bar */}
-              {state.isProcessing && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      {operationType === "export" ? "Exporting" : "Importing"}
-                      ...
-                    </span>
-                    <span className="font-medium">{state.progress}%</span>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary transition-all duration-300"
-                      style={{ width: `${state.progress}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
               {/* Status Message */}
               {state.operation && (
                 <div
                   className={
                     state.operation.status === "COMPLETED"
                       ? "text-green-600"
+                      : state.operation.status === "FAILED"
+                      ? "text-red-600"
                       : "text-amber-600"
                   }
                 >
@@ -312,6 +314,30 @@ export function GitLabSyncDialog({
                     review may be required.
                   </div>
                 )}
+
+              {/* Progress Bar - only show during processing */}
+              {state.isProcessing && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {operationType === "export" ? "Exporting" : "Importing"}
+                      ...
+                    </span>
+                    <span className="font-medium">{state.progress}%</span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-all duration-300"
+                      style={{ width: `${state.progress}%` }}
+                      role="progressbar"
+                      aria-label="GitLab sync progress"
+                      aria-valuenow={state.progress}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             // Form
@@ -411,7 +437,11 @@ export function GitLabSyncDialog({
           )}
           {(state.isProcessing || state.operation) &&
             state.operation?.status !== "COMPLETED" && (
-              <Button onClick={handleClose} variant="outline">
+              <Button
+                onClick={handleClose}
+                variant="outline"
+                disabled={state.isProcessing}
+              >
                 Close
               </Button>
             )}
@@ -429,8 +459,7 @@ export function GitLabSyncDialog({
             setShowCharacterWizard(open);
             if (!open) {
               // Close the sync dialog after character wizard is closed
-              reset();
-              onOpenChange(false);
+              handleClose();
             }
           }}
           projectId={projectId}

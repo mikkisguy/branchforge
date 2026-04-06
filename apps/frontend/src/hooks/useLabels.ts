@@ -77,7 +77,16 @@ export function useLabels(): UseLabelsReturn {
   // Initialize from query cache on mount to persist across navigation
   const { data: activeLabelId = null } = useQuery<string | null>({
     queryKey: labelKeys.activeLabelId(projectKey),
-    queryFn: () => null,
+    queryFn: () => {
+      try {
+        const saved = localStorage.getItem(
+          `branchforge:activeLabel:${projectKey}`
+        );
+        return saved;
+      } catch {
+        return null;
+      }
+    },
     initialData: null,
     staleTime: Infinity,
     gcTime: Infinity,
@@ -86,10 +95,7 @@ export function useLabels(): UseLabelsReturn {
 
   // Query for active label detail
   const { data: activeLabel, isLoading: isLoadingLabel } = useQuery({
-    queryKey: labelKeys.detail(
-      currentProject?.id ?? "",
-      activeLabelId ?? ""
-    ),
+    queryKey: labelKeys.detail(currentProject?.id ?? "", activeLabelId ?? ""),
     queryFn: () => labelsApi.getLabel(activeLabelId!),
     enabled: !!activeLabelId && !!currentProject?.id,
     staleTime: 5 * 60 * 1000,

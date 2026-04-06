@@ -5,20 +5,21 @@
  * Matches app design system with theme colors and simple styling.
  */
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import {
   ProseEditor,
   SceneNavigator,
   CharacterReferencePanel,
   FocusModeToggle,
 } from "@/components/write-mode";
+import { EditorTabBar, type EditorTabBarItem } from "@/components/ide-shared";
 import { useLabels } from "@/hooks/useLabels";
 import { useCharacters } from "@/hooks/useCharacters";
 import { useProject } from "@/hooks/useProject";
 import { useAutosave } from "@/hooks/useAutosave";
 import type { DialogueEntry } from "@/lib/prose-types";
 import { dialogueToPayload, hashDialogueEntries } from "@/lib/prose-converter";
-import { Loader2, Sparkles, FileQuestion } from "lucide-react";
+import { Loader2, FileQuestion } from "lucide-react";
 import type { LabelDetail } from "@branchforge/shared";
 import { useToast } from "@/contexts/ToastContext";
 import { registerModeFlushHandler } from "@/lib/editor-sync-coordinator";
@@ -102,6 +103,37 @@ export function WriteMode({ projectName }: WriteModeProps) {
   // Track which labelId is currently being saved for error handling
   const savingLabelIdRef = useRef<string | undefined>(undefined);
 
+  // Track open tabs with project-scoped persistence
+  const [openTabs, setOpenTabs] = useState<string[]>(() => {
+    if (activeLabelId) return [activeLabelId];
+    return [];
+  });
+  const tabsLoadedRef = useRef<string | undefined>(undefined);
+
+  // Persist open tabs after project state has been hydrated from storage
+  useEffect(() => {
+    if (currentProject?.id && tabsLoadedRef.current === currentProject.id) {
+      localStorage.setItem(
+        `branchforge:tabs:${currentProject.id}`,
+        JSON.stringify(openTabs)
+      );
+    }
+  }, [openTabs, currentProject?.id]);
+
+  // Persist active label to localStorage
+  useEffect(() => {
+    if (currentProject?.id) {
+      if (activeLabelId) {
+        localStorage.setItem(
+          `branchforge:activeLabel:${currentProject.id}`,
+          activeLabelId
+        );
+      } else {
+        localStorage.removeItem(`branchforge:activeLabel:${currentProject.id}`);
+      }
+    }
+  }, [activeLabelId, currentProject?.id]);
+
   const handleFocusModeToggle = useCallback(() => {
     setIsFocusMode((prev) => !prev);
   }, []);
@@ -113,7 +145,10 @@ export function WriteMode({ projectName }: WriteModeProps) {
       const hash = hashDialogueEntries(persistedDialogue);
       savedHashesRef.current.set(activeLabel.id, hash);
       if (typeof activeLabel.contentHash === "string") {
-        serverContentHashesRef.current.set(activeLabel.id, activeLabel.contentHash);
+        serverContentHashesRef.current.set(
+          activeLabel.id,
+          activeLabel.contentHash
+        );
       }
       const labelVersion = activeLabel.version;
       if (typeof labelVersion === "number") {
@@ -138,14 +173,95 @@ export function WriteMode({ projectName }: WriteModeProps) {
   const prevProjectIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    if (prevProjectIdRef.current !== undefined && prevProjectIdRef.current !== currentProject?.id) {
+    if (
+      prevProjectIdRef.current !== undefined &&
+      prevProjectIdRef.current !== currentProject?.id
+    ) {
       setLastKnownVersionByLabel(new Map());
       setConflictByLabel(new Map());
       savedHashesRef.current.clear();
       serverContentHashesRef.current.clear();
+      setOpenTabs([]);
+      tabsLoadedRef.current = undefined;
     }
     prevProjectIdRef.current = currentProject?.id;
   }, [currentProject?.id]);
+
+  // Load persisted tabs and active label once per project after labels load
+  useEffect(() => {
+    if (
+      isLoadingLabels ||
+      !currentProject?.id ||
+      labels.length === 0 ||
+      tabsLoadedRef.current === currentProject.id
+    ) {
+      return;
+    }
+
+    const labelIds = new Set(labels.map((l) => l.id));
+    const savedTabsRaw = localStorage.getItem(
+      `branchforge:tabs:${currentProject.id}`
+    );
+
+    let nextOpenTabs: string[] = [];
+    if (savedTabsRaw) {
+      try {
+        const parsedTabs = JSON.parse(savedTabsRaw) as unknown;
+        if (Array.isArray(parsedTabs)) {
+          nextOpenTabs = parsedTabs.filter(
+            (id): id is string => typeof id === "string" && labelIds.has(id)
+          );
+        }
+      } catch {
+        // Invalid JSON, ignore
+      }
+    }
+
+    const savedActiveLabel = localStorage.getItem(
+      `branchforge:activeLabel:${currentProject.id}`
+    );
+    const resolvedActiveLabelId =
+      savedActiveLabel && labelIds.has(savedActiveLabel)
+        ? savedActiveLabel
+        : activeLabelId && labelIds.has(activeLabelId)
+        ? activeLabelId
+        : null;
+
+    if (
+      resolvedActiveLabelId &&
+      !nextOpenTabs.includes(resolvedActiveLabelId)
+    ) {
+      nextOpenTabs = [...nextOpenTabs, resolvedActiveLabelId];
+    }
+
+    setOpenTabs(nextOpenTabs);
+
+    if (resolvedActiveLabelId && resolvedActiveLabelId !== activeLabelId) {
+      setActiveLabelId(resolvedActiveLabelId);
+    }
+
+    tabsLoadedRef.current = currentProject.id;
+  }, [
+    isLoadingLabels,
+    currentProject?.id,
+    labels,
+    activeLabelId,
+    setActiveLabelId,
+  ]);
+
+  // Keep tab bar aligned with externally changed active label
+  useEffect(() => {
+    if (!activeLabelId || !labels.some((label) => label.id === activeLabelId)) {
+      return;
+    }
+
+    setOpenTabs((prev) => {
+      if (prev.includes(activeLabelId)) {
+        return prev;
+      }
+      return [...prev, activeLabelId];
+    });
+  }, [activeLabelId, labels]);
 
   // Update lastSaved timestamp when save completes successfully
   useEffect(() => {
@@ -173,7 +289,9 @@ export function WriteMode({ projectName }: WriteModeProps) {
             savingLabelIdRef.current = draft.labelId;
             try {
               const payload = dialogueToPayload(draft.entries);
-              const expectedVersion = lastKnownVersionByLabel.get(draft.labelId);
+              const expectedVersion = lastKnownVersionByLabel.get(
+                draft.labelId
+              );
               const expectedContentHash = serverContentHashesRef.current.get(
                 draft.labelId
               );
@@ -194,7 +312,10 @@ export function WriteMode({ projectName }: WriteModeProps) {
                   next.set(draft.labelId!, result.version);
                   return next;
                 });
-                serverContentHashesRef.current.set(draft.labelId, result.contentHash);
+                serverContentHashesRef.current.set(
+                  draft.labelId,
+                  result.contentHash
+                );
                 setConflictByLabel((prev) => {
                   if (!prev.has(draft.labelId!)) {
                     return prev;
@@ -270,9 +391,38 @@ export function WriteMode({ projectName }: WriteModeProps) {
           return;
         }
       }
+
+      // Add to open tabs if not already there
+      setOpenTabs((prev) => {
+        if (prev.includes(labelId)) {
+          return prev;
+        }
+        return [...prev, labelId];
+      });
+
       setActiveLabelId(labelId);
     },
     [triggerSave, setActiveLabelId, showErrorToast]
+  );
+
+  const handleCloseTab = useCallback(
+    (e: React.MouseEvent | React.KeyboardEvent, labelId: string) => {
+      e.stopPropagation();
+      setOpenTabs((prev) => {
+        const index = prev.indexOf(labelId);
+        const newTabs = prev.filter((id) => id !== labelId);
+
+        if (newTabs.length === 0) {
+          setActiveLabelId(null);
+        } else if (labelId === activeLabelId) {
+          const nextActive = prev[index - 1] ?? newTabs[0];
+          setActiveLabelId(nextActive);
+        }
+
+        return newTabs;
+      });
+    },
+    [activeLabelId, setActiveLabelId]
   );
 
   // Handle label switching - flush pending save for previous label
@@ -391,6 +541,27 @@ export function WriteMode({ projectName }: WriteModeProps) {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, []);
 
+  const tabItems = useMemo<EditorTabBarItem[]>(
+    () =>
+      openTabs.flatMap((tabId) => {
+        const label = labels.find((candidate) => candidate.id === tabId);
+        if (!label) {
+          console.warn(`Label with ID ${tabId} not found for open tab`);
+          return [];
+        }
+
+        return [
+          {
+            id: label.id,
+            title: label.title,
+            meta: String(label.labelNumber ?? 0).padStart(2, "0"),
+            closeLabel: `Close ${label.title}`,
+          },
+        ];
+      }),
+    [openTabs, labels]
+  );
+
   if (isLoadingLabels) {
     return (
       <div className="h-screen flex flex-col items-center justify-center">
@@ -430,26 +601,14 @@ export function WriteMode({ projectName }: WriteModeProps) {
   }
 
   const editorProps = saveStatusToEditorProps();
-  const hasConflict = activeLabelId ? conflictByLabel.get(activeLabelId) : false;
+  const hasConflict = activeLabelId
+    ? conflictByLabel.get(activeLabelId)
+    : false;
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded bg-[var(--theme-color)] flex items-center justify-center shadow-sm">
-            <Sparkles className="w-4 h-4 text-white" />
-          </div>
-          <div>
-            <span className="text-sm font-medium">
-              {projectName || currentProject?.name || "Write Mode"}
-            </span>
-            <p className="text-xs text-muted-foreground">
-              {labels.length} scene{labels.length !== 1 ? "s" : ""}
-            </p>
-          </div>
-        </div>
-
+      {/* Floating Focus Mode Toggle */}
+      <div className="fixed top-1 right-1 z-50">
         <FocusModeToggle
           isFocusMode={isFocusMode}
           onToggle={handleFocusModeToggle}
@@ -461,7 +620,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
         {/* Left Sidebar */}
         <div
           aria-hidden={isFocusMode}
-          className={`min-h-0 shrink-0 rounded-lg border border-border bg-card/80 backdrop-blur overflow-hidden transition-all duration-300 ease-out ${
+          className={`min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden transition-all duration-300 ease-out mt-3 ${
             isFocusMode
               ? "w-0 opacity-0 -translate-x-full pointer-events-none"
               : "w-48 opacity-100 translate-x-0"
@@ -471,29 +630,44 @@ export function WriteMode({ projectName }: WriteModeProps) {
             labels={labels}
             activeLabelId={activeLabelId}
             onSelect={handleSelectLabel}
+            projectName={projectName || currentProject?.name}
+            projectLabelCount={labels.length}
           />
         </div>
 
-        {/* Main Editor */}
-        <div className="flex-1 flex justify-center min-h-0 min-w-0">
-          <div className="w-full max-w-3xl min-h-0">
-            <ProseEditor
-              activeLabel={activeLabel}
-              characters={characters}
-              onChange={handleContentChange}
-              isFocusMode={isFocusMode}
-              isSaving={editorProps.isSaving}
-              lastSaved={editorProps.lastSaved}
-              saveError={editorProps.saveError}
-              saveConflict={Boolean(hasConflict)}
-            />
+        {/* Center Column: Tab Bar + Editor */}
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 mt-3">
+          <EditorTabBar
+            hidden={isFocusMode}
+            items={tabItems}
+            activeItemId={activeLabelId}
+            onSelect={handleSelectLabel}
+            onClose={handleCloseTab}
+            idPrefix="tab-"
+            titleMaxWidthClassName="max-w-[180px]"
+          />
+
+          {/* Main Editor */}
+          <div className="flex-1 flex justify-center min-h-0 min-w-0">
+            <div className="w-full max-w-3xl min-h-0">
+              <ProseEditor
+                activeLabel={activeLabel}
+                characters={characters}
+                onChange={handleContentChange}
+                isFocusMode={isFocusMode}
+                isSaving={editorProps.isSaving}
+                lastSaved={editorProps.lastSaved}
+                saveError={editorProps.saveError}
+                saveConflict={Boolean(hasConflict)}
+              />
+            </div>
           </div>
         </div>
 
         {/* Right Sidebar */}
         <div
           aria-hidden={isFocusMode}
-          className={`min-h-0 shrink-0 rounded-lg border border-border bg-card/80 backdrop-blur overflow-hidden transition-all duration-300 ease-out ${
+          className={`min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden transition-all duration-300 ease-out mt-3 ${
             isFocusMode
               ? "w-0 opacity-0 translate-x-full pointer-events-none"
               : "w-56 opacity-100 translate-x-0"

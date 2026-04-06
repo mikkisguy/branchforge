@@ -31,6 +31,15 @@ export default {
       letterSpacing: {
         tighter: "-0.05em",
       },
+      utilities: {
+        "scrollbar-hide": {
+          "&::-webkit-scrollbar": {
+            display: "none",
+          },
+          "-ms-overflow-style": "none",
+          "scrollbar-width": "none",
+        },
+      },
       colors: {
         border: "var(--theme-border)",
         input: "hsl(var(--input))",

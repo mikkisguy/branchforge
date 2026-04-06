@@ -60,8 +60,6 @@ export function HomePageIDE() {
     setActiveLabelId(null);
   }, [currentProject?.id, setActiveLabelId]);
 
-  const themeInfo = themePalettes.find((p) => p.key === theme);
-
   const handleLogout = async () => {
     await logout();
     navigate(`${BASE_URL}login`);
@@ -211,7 +209,6 @@ export function HomePageIDE() {
               }
             >
               <ScriptMode
-                themeName={themeInfo?.name || ""}
                 projectId={currentProject?.id}
                 projectName={currentProject?.name}
                 gitlabBranch={gitlabBranch}

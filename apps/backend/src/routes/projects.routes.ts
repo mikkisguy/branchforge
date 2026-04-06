@@ -238,11 +238,16 @@ async function getProjectFilesHandler(
       labelsByFileId.get(label.projectFileId)!.push(publicLabel);
     }
 
-    // Attach labels to each file
-    const filesWithLabels = files.map((file) => ({
-      ...file,
-      labels: labelsByFileId.get(file.id) ?? [],
-    }));
+    // Attach labels to each file and map database field names to API field names
+    const filesWithLabels = files.map((file) => {
+      const { source: fileSource, ...fileWithoutSource } = file;
+      return {
+        ...fileWithoutSource,
+        // Map database 'source' column to API 'sourceType' field
+        sourceType: fileSource,
+        labels: labelsByFileId.get(file.id) ?? [],
+      };
+    });
 
     reply.send({ files: filesWithLabels });
   } catch (err) {
