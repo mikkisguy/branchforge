@@ -174,15 +174,11 @@ export const projectFilesApi = {
       throw new Error("File must be a .zip file");
     }
 
+    const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
+
     // Create FormData for multipart upload
     const formData = new FormData();
     formData.append("file", file);
-
-    // TODO: Should be refactored or extracted somewhere (see BASE_PATH)
-    const API_BASE =
-      import.meta.env.VITE_API_ENV === "development"
-        ? "/api/api"
-        : "/api";
 
     // Use XMLHttpRequest for upload progress if callback provided
     if (options?.onProgress) {

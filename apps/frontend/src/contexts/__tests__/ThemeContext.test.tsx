@@ -258,7 +258,10 @@ describe("ThemeContext", () => {
     // Regression test: verify all themes have the correct expected colors.
     // This catches accidental changes to themeConfigs that the parameterized test above
     // would miss (since it uses themeConfigs as both source and expected value).
-    const expectedColors: Record<ThemePalette, { primary: string; hover: string }> = {
+    const expectedColors: Record<
+      ThemePalette,
+      { primary: string; hover: string }
+    > = {
       forest: { primary: "#40bb82", hover: "#52c992" },
       periwinkle: { primary: "#3d4ac2", hover: "#515fcc" },
       "dark-amethyst": { primary: "#9549b6", hover: "#a960c7" },
@@ -276,7 +279,9 @@ describe("ThemeContext", () => {
 
       // These values should match the documented theme colors
       expect(
-        container.querySelector(`[data-primary="${expectedColors[theme].primary}"]`)
+        container.querySelector(
+          `[data-primary="${expectedColors[theme].primary}"]`
+        )
       ).toBeInTheDocument();
       expect(
         container.querySelector(`[data-hover="${expectedColors[theme].hover}"]`)

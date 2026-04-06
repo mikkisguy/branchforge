@@ -539,10 +539,7 @@ export function ScriptMode({
         .map((tabId) =>
           projectFiles.find((projectFile) => projectFile.id === tabId)
         )
-        .filter(
-          (file): file is NonNullable<typeof file> =>
-            file !== undefined
-        )
+        .filter((file): file is NonNullable<typeof file> => file !== undefined)
         .map((file) => {
           const fileName = file.filePath.split("/").pop() || file.filePath;
           const fileKind = file.fileType === "SETTINGS" ? "Settings" : "Story";

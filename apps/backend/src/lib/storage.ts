@@ -89,7 +89,7 @@ export function generateAvatarFilename(): string {
 /**
  * Get the avatar URL path for client access
  * @param filename - The avatar filename
- * @param basePath - The API base path (e.g., "/api/api/" or "/api/")
+ * @param basePath - The API base path
  * @returns The full URL path for accessing the avatar
  */
 export function getAvatarPath(filename: string, basePath = "/"): string {

@@ -1,7 +1,6 @@
 import type { ThemePalette } from "@/contexts/ThemeContext";
 
-export const BASE_URL =
-  import.meta.env.VITE_API_ENV === "development" ? "/" : "/";
+export const BASE_URL = import.meta.env.VITE_FRONTEND_BASE_URL ?? "/";
 
 export const themePalettes: {
   name: string;

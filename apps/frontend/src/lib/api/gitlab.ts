@@ -5,8 +5,7 @@
  * Handles token validation, repository linking, and sync operations.
  */
 
-const API_BASE =
-  import.meta.env.VITE_API_ENV === "development" ? "/api/api" : "/api";
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 // ============================================================================
 // Types

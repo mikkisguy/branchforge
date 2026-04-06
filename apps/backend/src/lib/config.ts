@@ -17,7 +17,7 @@ export function getBasePath(): string {
   if (!basePath) {
     throw new Error(
       "BASE_PATH environment variable is required but not set. " +
-        'Please set BASE_PATH in your environment (e.g., "/api/api/" for development or "/api/" for production).'
+        "Please set BASE_PATH in your environment."
     );
   }
 
