@@ -4,7 +4,7 @@
  * Complete Drizzle ORM schema for the Visual Novel IDE.
  * This module re-exports all tables, enums, and types from their respective modules.
  *
- * Based on Database_Schemas.md specification.
+ * Based on DATABASE_SCHEMAS.md specification.
  */
 
 // ============================================================================

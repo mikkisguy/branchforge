@@ -42,6 +42,7 @@ cache/
 uploads/
 _other/
 plans/
+.kilo/
 
 tsconfig.tsbuildinfo
 tsconfig.schema.tsbuildinfo
