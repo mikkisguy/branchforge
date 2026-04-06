@@ -9,6 +9,7 @@ import {
 import { Download, Heart, Package, Sparkles, X } from "lucide-react";
 import { StatusBar, ScriptEditor } from "@/components/script-mode";
 import { ProjectFileTree } from "@/components/script-mode/ProjectFileTree";
+import { EditorTabBar, type EditorTabBarItem } from "@/components/ide-shared";
 import { useLabels } from "@/hooks/useLabels";
 import { useGitLab } from "@/hooks/useGitLab";
 import { useCharacters } from "@/hooks/useCharacters";
@@ -55,11 +56,6 @@ export function ScriptMode({
   // Track open tabs with project-scoped persistence
   const [openTabs, setOpenTabs] = useState<string[]>([]);
   const tabsLoadedRef = useRef<string | undefined>(undefined);
-  const tabsScrollContainerRef = useRef<HTMLDivElement>(null);
-  const scrollIndicatorRafIdRef = useRef<number | null>(null);
-  const [showLeftScrollIndicator, setShowLeftScrollIndicator] = useState(false);
-  const [showRightScrollIndicator, setShowRightScrollIndicator] =
-    useState(false);
 
   const tabsStorageKey = projectId
     ? `branchforge:scriptTabs:${projectId}`
@@ -67,20 +63,6 @@ export function ScriptMode({
   const activeFileStorageKey = projectId
     ? `branchforge:activeScriptFile:${projectId}`
     : null;
-
-  // Update scroll indicators based on scroll position and overflow
-  const updateScrollIndicators = useCallback(() => {
-    const container = tabsScrollContainerRef.current;
-    if (!container) return;
-
-    const hasOverflow = container.scrollWidth > container.clientWidth;
-    const canScrollLeft = container.scrollLeft > 0;
-    const canScrollRight =
-      container.scrollLeft < container.scrollWidth - container.clientWidth - 1;
-
-    setShowLeftScrollIndicator(hasOverflow && canScrollLeft);
-    setShowRightScrollIndicator(hasOverflow && canScrollRight);
-  }, []);
 
   // Track edited file content for autosave
   const [editedFileContent, setEditedFileContent] = useState<string>("");
@@ -367,34 +349,6 @@ export function ScriptMode({
     }
   }, [activeFileId, activeFileStorageKey]);
 
-  // Update scroll indicators when tabs change or on window resize
-  useEffect(() => {
-    if (scrollIndicatorRafIdRef.current !== null) {
-      cancelAnimationFrame(scrollIndicatorRafIdRef.current);
-    }
-    scrollIndicatorRafIdRef.current = requestAnimationFrame(() => {
-      updateScrollIndicators();
-    });
-
-    const handleResize = () => {
-      if (scrollIndicatorRafIdRef.current !== null) {
-        cancelAnimationFrame(scrollIndicatorRafIdRef.current);
-      }
-      scrollIndicatorRafIdRef.current = requestAnimationFrame(() => {
-        updateScrollIndicators();
-      });
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      if (scrollIndicatorRafIdRef.current !== null) {
-        cancelAnimationFrame(scrollIndicatorRafIdRef.current);
-        scrollIndicatorRafIdRef.current = null;
-      }
-    };
-  }, [openTabs, updateScrollIndicators]);
-
   // Refs for project reset effect to avoid unwanted reruns
   const currentEditFileIdRef = useRef(currentEditFileId);
   const isFileDirtyRef = useRef(isFileDirty);
@@ -551,10 +505,10 @@ export function ScriptMode({
 
   // Update edited content when active file changes (manual selection)
   useEffect(() => {
-    if (activeProjectFile) {
+    if (activeProjectFile && activeProjectFile.id !== currentEditFileId) {
       void switchToFile(activeProjectFile);
     }
-  }, [activeProjectFile, switchToFile]);
+  }, [activeProjectFile, switchToFile, currentEditFileId]);
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -585,6 +539,30 @@ export function ScriptMode({
     }
     return Array.from(folders);
   }, [projectFiles]);
+
+  const tabItems = useMemo<EditorTabBarItem[]>(
+    () =>
+      openTabs
+        .map((tabId) =>
+          projectFiles.find((projectFile) => projectFile.id === tabId)
+        )
+        .filter(
+          (file): file is NonNullable<typeof file> =>
+            file !== null && file !== undefined
+        )
+        .map((file) => {
+          const fileName = file.filePath.split("/").pop() || file.filePath;
+          const fileKind = file.fileType === "SETTINGS" ? "Settings" : "Story";
+
+          return {
+            id: file.id,
+            title: fileName,
+            meta: fileKind,
+            closeLabel: `Close ${fileName}`,
+          };
+        }),
+    [openTabs, projectFiles]
+  );
 
   // Load persisted tabs and active file once per project after files load
   useEffect(() => {
@@ -767,111 +745,6 @@ export function ScriptMode({
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      {/* Tab Bar */}
-      <div className="border-b border-border bg-card/50 h-11">
-        <div className="h-full flex justify-center">
-          <div className="h-full relative min-w-[200px] max-w-[calc(100vw-2rem)]">
-            {showLeftScrollIndicator && (
-              <div
-                className="absolute left-0 top-0 bottom-0 w-8 pointer-events-none z-10 flex items-center justify-start pl-2 bg-gradient-to-r from-card/95 to-transparent"
-                aria-hidden="true"
-              >
-                <div className="w-1 h-6 rounded-full bg-muted-foreground/30" />
-              </div>
-            )}
-
-            <div
-              ref={tabsScrollContainerRef}
-              onScroll={updateScrollIndicators}
-              className="h-full flex items-center gap-1 overflow-x-auto px-4"
-            >
-              {openTabs.map((tabId) => {
-                const file = projectFiles.find(
-                  (projectFile) => projectFile.id === tabId
-                );
-                if (!file) return null;
-
-                const isActive = file.id === activeFileId;
-                const fileName =
-                  file.filePath.split("/").pop() || file.filePath;
-                const fileKind =
-                  file.fileType === "SETTINGS" ? "Settings" : "Story";
-
-                return (
-                  <div
-                    key={file.id}
-                    id={`script-tab-${file.id}`}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => {
-                      void handleSelectFileTab(file.id);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        void handleSelectFileTab(file.id);
-                      } else if (
-                        (e.key === "ArrowLeft" || e.key === "ArrowRight") &&
-                        openTabs.length > 0
-                      ) {
-                        e.preventDefault();
-                        const currentIndex = openTabs.findIndex(
-                          (id) => id === file.id
-                        );
-                        const direction = e.key === "ArrowLeft" ? -1 : 1;
-                        const nextIndex =
-                          (currentIndex + direction + openTabs.length) %
-                          openTabs.length;
-                        const nextFileId = openTabs[nextIndex];
-                        void handleSelectFileTab(nextFileId);
-                        const nextTab = document.getElementById(
-                          `script-tab-${nextFileId}`
-                        );
-                        nextTab?.focus();
-                      }
-                    }}
-                    className={`group relative flex items-center gap-2 px-3 py-1.5 rounded-t-lg border-b-2 text-sm transition-all whitespace-nowrap cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                      isActive
-                        ? "bg-background border-[var(--theme-color)] text-foreground"
-                        : "bg-transparent border-transparent hover:bg-muted text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <span className="truncate max-w-[240px]">{fileName}</span>
-                    <span
-                      className={`text-xs font-mono ${
-                        isActive
-                          ? "text-[var(--theme-color)]"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      {fileKind}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(e) => handleCloseFileTab(e, file.id)}
-                      className="ml-1 p-0.5 rounded hover:bg-muted-foreground/20 opacity-30 group-hover:opacity-100 group-focus:opacity-100 transition-opacity"
-                      aria-label={`Close ${fileName}`}
-                      title="Close tab"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-
-            {showRightScrollIndicator && (
-              <div
-                className="absolute right-0 top-0 bottom-0 w-8 pointer-events-none z-10 flex items-center justify-end pr-2 bg-gradient-to-l from-card/95 to-transparent"
-                aria-hidden="true"
-              >
-                <div className="w-1 h-6 rounded-full bg-muted-foreground/30" />
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Main Editor Layout */}
       <div className="flex-1 flex gap-4 px-4 pb-4 overflow-hidden min-h-0 min-w-0">
         {/* Left Sidebar */}
@@ -914,36 +787,49 @@ export function ScriptMode({
           </div>
         </div>
 
-        {/* Main Editor */}
-        <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden mt-3">
-          <div className="bg-card/50 border border-border rounded-lg h-full overflow-hidden min-h-0 min-w-0">
-            {activeProjectFile ? (
-              <ScriptEditor
-                content={activeFileContent}
-                scrollToLine={scrollToLine}
-                onChange={(value) => {
-                  setEditedFileContent(value);
-                }}
-              />
-            ) : activeLabel ? (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
-                <div className="flex items-center gap-2 text-destructive">
-                  <X size={16} />
-                  <span className="font-medium">Scene not found</span>
+        {/* Center Column: Tab Bar + Editor */}
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 mt-3">
+          <EditorTabBar
+            items={tabItems}
+            activeItemId={activeFileId}
+            onSelect={handleSelectFileTab}
+            onClose={handleCloseFileTab}
+            idPrefix="script-tab-"
+            titleMaxWidthClassName="max-w-[240px]"
+          />
+
+          {/* Main Editor */}
+          <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
+            <div className="bg-card/50 border border-border rounded-lg h-full overflow-hidden min-h-0 min-w-0">
+              {activeProjectFile ? (
+                <ScriptEditor
+                  content={activeFileContent}
+                  scrollToLine={scrollToLine}
+                  onChange={(value) => {
+                    setEditedFileContent(value);
+                  }}
+                />
+              ) : activeLabel ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
+                  <div className="flex items-center gap-2 text-destructive">
+                    <X size={16} />
+                    <span className="font-medium">Scene not found</span>
+                  </div>
+                  <p className="text-sm max-w-md text-center">
+                    The file containing this scene could not be found. It may
+                    have been deleted or there was an error loading the project
+                    files.
+                  </p>
+                  <Button variant="outline" size="sm" onClick={refreshFiles}>
+                    Refresh files
+                  </Button>
                 </div>
-                <p className="text-sm max-w-md text-center">
-                  The file containing this scene could not be found. It may have
-                  been deleted or there was an error loading the project files.
-                </p>
-                <Button variant="outline" size="sm" onClick={refreshFiles}>
-                  Refresh files
-                </Button>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                Select a file or scene to view its content
-              </div>
-            )}
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  Select a file or scene to view its content
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

@@ -5,20 +5,21 @@
  * Matches app design system with theme colors and simple styling.
  */
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import {
   ProseEditor,
   SceneNavigator,
   CharacterReferencePanel,
   FocusModeToggle,
 } from "@/components/write-mode";
+import { EditorTabBar, type EditorTabBarItem } from "@/components/ide-shared";
 import { useLabels } from "@/hooks/useLabels";
 import { useCharacters } from "@/hooks/useCharacters";
 import { useProject } from "@/hooks/useProject";
 import { useAutosave } from "@/hooks/useAutosave";
 import type { DialogueEntry } from "@/lib/prose-types";
 import { dialogueToPayload, hashDialogueEntries } from "@/lib/prose-converter";
-import { Loader2, FileQuestion, X } from "lucide-react";
+import { Loader2, FileQuestion } from "lucide-react";
 import type { LabelDetail } from "@branchforge/shared";
 import { useToast } from "@/contexts/ToastContext";
 import { registerModeFlushHandler } from "@/lib/editor-sync-coordinator";
@@ -108,23 +109,6 @@ export function WriteMode({ projectName }: WriteModeProps) {
     return [];
   });
   const tabsLoadedRef = useRef<string | undefined>(undefined);
-  const tabsScrollContainerRef = useRef<HTMLDivElement>(null);
-  const scrollIndicatorRafIdRef = useRef<number | null>(null);
-  const [showLeftScrollIndicator, setShowLeftScrollIndicator] = useState(false);
-  const [showRightScrollIndicator, setShowRightScrollIndicator] = useState(false);
-
-  // Update scroll indicators based on scroll position and overflow
-  const updateScrollIndicators = useCallback(() => {
-    const container = tabsScrollContainerRef.current;
-    if (!container) return;
-
-    const hasOverflow = container.scrollWidth > container.clientWidth;
-    const canScrollLeft = container.scrollLeft > 0;
-    const canScrollRight = container.scrollLeft < container.scrollWidth - container.clientWidth - 1;
-
-    setShowLeftScrollIndicator(hasOverflow && canScrollLeft);
-    setShowRightScrollIndicator(hasOverflow && canScrollRight);
-  }, []);
 
   // Persist open tabs after project state has been hydrated from storage
   useEffect(() => {
@@ -149,28 +133,6 @@ export function WriteMode({ projectName }: WriteModeProps) {
       }
     }
   }, [activeLabelId, currentProject?.id]);
-
-  // Update scroll indicators when tabs change or on window resize
-  useEffect(() => {
-    scrollIndicatorRafIdRef.current = requestAnimationFrame(() => {
-      updateScrollIndicators();
-    });
-
-    const handleResize = () => {
-      scrollIndicatorRafIdRef.current = requestAnimationFrame(() => {
-        updateScrollIndicators();
-      });
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      if (scrollIndicatorRafIdRef.current !== null) {
-        cancelAnimationFrame(scrollIndicatorRafIdRef.current);
-        scrollIndicatorRafIdRef.current = null;
-      }
-    };
-  }, [openTabs, updateScrollIndicators]);
 
   const handleFocusModeToggle = useCallback(() => {
     setIsFocusMode((prev) => !prev);
@@ -579,6 +541,27 @@ export function WriteMode({ projectName }: WriteModeProps) {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, []);
 
+  const tabItems = useMemo<EditorTabBarItem[]>(
+    () =>
+      openTabs.flatMap((tabId) => {
+        const label = labels.find((candidate) => candidate.id === tabId);
+        if (!label) {
+          console.warn(`Label with ID ${tabId} not found for open tab`);
+          return [];
+        }
+
+        return [
+          {
+            id: label.id,
+            title: label.title,
+            meta: String(label.labelNumber ?? 0).padStart(2, "0"),
+            closeLabel: `Close ${label.title}`,
+          },
+        ];
+      }),
+    [openTabs, labels]
+  );
+
   if (isLoadingLabels) {
     return (
       <div className="h-screen flex flex-col items-center justify-center">
@@ -632,101 +615,6 @@ export function WriteMode({ projectName }: WriteModeProps) {
         />
       </div>
 
-      {/* Tab Bar */}
-      <div
-        className={`border-b border-border bg-card/50 transition-all duration-300 ease-out ${
-          isFocusMode ? "h-0 opacity-0 overflow-hidden" : "h-11 opacity-100"
-        }`}
-      >
-        <div className="h-full flex justify-center">
-          <div className="h-full relative min-w-[200px] max-w-[calc(100vw-2rem)]">
-            {/* Left scroll indicator */}
-            {showLeftScrollIndicator && (
-              <div
-                className="absolute left-0 top-0 bottom-0 w-8 pointer-events-none z-10 flex items-center justify-start pl-2 bg-gradient-to-r from-card/95 to-transparent"
-                aria-hidden="true"
-              >
-                <div className="w-1 h-6 rounded-full bg-muted-foreground/30" />
-              </div>
-            )}
-
-            {/* Scrollable tabs container */}
-            <div
-              ref={tabsScrollContainerRef}
-              onScroll={updateScrollIndicators}
-              className="h-full flex items-center gap-1 overflow-x-auto px-4"
-            >
-              {/* Open Tabs */}
-              {openTabs.map((tabId) => {
-                const label = labels.find((l) => l.id === tabId);
-                if (!label) return null;
-
-                const isActive = label.id === activeLabelId;
-
-                return (
-                  <div
-                    key={label.id}
-                    id={`tab-${label.id}`}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handleSelectLabel(label.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleSelectLabel(label.id);
-                      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-                        e.preventDefault();
-                        const currentIndex = openTabs.findIndex((id) => id === label.id);
-                        const direction = e.key === 'ArrowLeft' ? -1 : 1;
-                        const newIndex = (currentIndex + direction + openTabs.length) % openTabs.length;
-                        const nextLabelId = openTabs[newIndex];
-                        handleSelectLabel(nextLabelId);
-                        const nextTab = document.getElementById(`tab-${nextLabelId}`);
-                        nextTab?.focus();
-                      }
-                    }}
-                    className={`group relative flex items-center gap-2 px-3 py-1.5 rounded-t-lg border-b-2 text-sm transition-all whitespace-nowrap cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                      isActive
-                        ? "bg-background border-[var(--theme-color)] text-foreground"
-                        : "bg-transparent border-transparent hover:bg-muted text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <span className="truncate max-w-[180px]">{label.title}</span>
-                    <span
-                      className={`text-xs font-mono ${
-                        isActive
-                          ? "text-[var(--theme-color)]"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      {String(label.labelNumber).padStart(2, "0")}
-                    </span>
-                    <button
-                      onClick={(e) => handleCloseTab(e, label.id)}
-                      className="ml-1 p-0.5 rounded hover:bg-muted-foreground/20 opacity-30 group-hover:opacity-100 group-focus:opacity-100 transition-opacity"
-                      aria-label={`Close ${label.title}`}
-                      title="Close tab"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Right scroll indicator */}
-            {showRightScrollIndicator && (
-              <div
-                className="absolute right-0 top-0 bottom-0 w-8 pointer-events-none z-10 flex items-center justify-end pr-2 bg-gradient-to-l from-card/95 to-transparent"
-                aria-hidden="true"
-              >
-                <div className="w-1 h-6 rounded-full bg-muted-foreground/30" />
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Main Editor Layout */}
       <div className="flex-1 flex gap-4 px-4 pb-4 overflow-hidden min-h-0 min-w-0">
         {/* Left Sidebar */}
@@ -747,19 +635,32 @@ export function WriteMode({ projectName }: WriteModeProps) {
           />
         </div>
 
-        {/* Main Editor */}
-        <div className="flex-1 flex justify-center min-h-0 min-w-0 mt-3">
-          <div className="w-full max-w-3xl min-h-0">
-            <ProseEditor
-              activeLabel={activeLabel}
-              characters={characters}
-              onChange={handleContentChange}
-              isFocusMode={isFocusMode}
-              isSaving={editorProps.isSaving}
-              lastSaved={editorProps.lastSaved}
-              saveError={editorProps.saveError}
-              saveConflict={Boolean(hasConflict)}
-            />
+        {/* Center Column: Tab Bar + Editor */}
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 mt-3">
+          <EditorTabBar
+            hidden={isFocusMode}
+            items={tabItems}
+            activeItemId={activeLabelId}
+            onSelect={handleSelectLabel}
+            onClose={handleCloseTab}
+            idPrefix="tab-"
+            titleMaxWidthClassName="max-w-[180px]"
+          />
+
+          {/* Main Editor */}
+          <div className="flex-1 flex justify-center min-h-0 min-w-0">
+            <div className="w-full max-w-3xl min-h-0">
+              <ProseEditor
+                activeLabel={activeLabel}
+                characters={characters}
+                onChange={handleContentChange}
+                isFocusMode={isFocusMode}
+                isSaving={editorProps.isSaving}
+                lastSaved={editorProps.lastSaved}
+                saveError={editorProps.saveError}
+                saveConflict={Boolean(hasConflict)}
+              />
+            </div>
           </div>
         </div>
 

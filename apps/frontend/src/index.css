@@ -129,6 +129,38 @@
     scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
     scrollbar-width: thin;
   }
+
+  /* Scrollbar hide utility */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Scrollbar shown on hover/focus utility */
+  .scrollbar-hover {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hover::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+
+  .scrollbar-hover:hover,
+  .scrollbar-hover:focus-within {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.5) transparent;
+  }
+
+  .scrollbar-hover:hover::-webkit-scrollbar,
+  .scrollbar-hover:focus-within::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
 }
 
 /* CodeMirror find/replace panel */
@@ -194,7 +226,9 @@
   color: hsl(var(--muted-foreground));
   cursor: pointer;
   user-select: none;
-  transition: color 0.15s ease, background-color 0.15s ease;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
 }
 
 .cm-editor .cm-panel.cm-search label:hover {
@@ -217,7 +251,9 @@
   border-radius: 0.22rem;
   background: hsl(var(--input));
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease,
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
     box-shadow 0.15s ease;
 }
 
@@ -278,7 +314,9 @@
   font-family: "Fira Code", monospace;
   font-size: 0.8125rem;
   line-height: 1.2rem;
-  transition: background-color 0.15s ease, border-color 0.15s ease,
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
     color 0.15s ease;
 }
 
@@ -317,7 +355,9 @@
   line-height: 1;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease,
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
     color 0.15s ease;
 }
 
