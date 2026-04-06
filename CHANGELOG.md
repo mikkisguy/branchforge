@@ -97,4 +97,3 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Robust session management (backend)
 - GPLv3 license
 - Updated versioning process to read version from root package.json
-- Updated  configuration and Gitleaks settings
