@@ -62,7 +62,6 @@ uploads/
 # Config and tooling files
 .prettierrc
 
-
 # Claude settings
 .claude/
 
