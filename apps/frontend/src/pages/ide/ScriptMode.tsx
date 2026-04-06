@@ -1,11 +1,4 @@
-import {
-  useState,
-  useMemo,
-  useEffect,
-  useCallback,
-  useRef,
-  type MouseEvent,
-} from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Download, Heart, Package, Sparkles, X } from "lucide-react";
 import { StatusBar, ScriptEditor } from "@/components/script-mode";
 import { ProjectFileTree } from "@/components/script-mode/ProjectFileTree";
@@ -206,8 +199,8 @@ export function ScriptMode({
     activeLabel?.status === "FINAL"
       ? "var(--theme-color)"
       : activeLabel?.status === "REVIEW"
-        ? "var(--theme-review-color)"
-        : "var(--theme-draft-color)";
+      ? "var(--theme-review-color)"
+      : "var(--theme-draft-color)";
 
   // Track the line number to scroll to when switching modes
   const [scrollToLine, setScrollToLine] = useState<number | null>(null);
@@ -459,7 +452,7 @@ export function ScriptMode({
   );
 
   const handleCloseFileTab = useCallback(
-    (e: MouseEvent, fileId: string) => {
+    (e: React.MouseEvent | React.KeyboardEvent, fileId: string) => {
       e.stopPropagation();
 
       const isActive = fileId === activeFileId;
@@ -548,7 +541,7 @@ export function ScriptMode({
         )
         .filter(
           (file): file is NonNullable<typeof file> =>
-            file !== null && file !== undefined
+            file !== undefined
         )
         .map((file) => {
           const fileName = file.filePath.split("/").pop() || file.filePath;
@@ -598,8 +591,8 @@ export function ScriptMode({
       savedActiveFileId && fileIds.has(savedActiveFileId)
         ? savedActiveFileId
         : activeFileId && fileIds.has(activeFileId)
-          ? activeFileId
-          : null;
+        ? activeFileId
+        : null;
 
     if (resolvedActiveFileId && !nextOpenTabs.includes(resolvedActiveFileId)) {
       nextOpenTabs = [...nextOpenTabs, resolvedActiveFileId];

@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { ThemeContext, type ThemePalette, type ThemeColors } from "./useTheme";
 
-const themeConfigs: Record<ThemePalette, ThemeColors> = {
+export const themeConfigs: Record<ThemePalette, ThemeColors> = {
   forest: { primary: "#40bb82", hover: "#52c992" },
   periwinkle: { primary: "#3d4ac2", hover: "#515fcc" },
   "dark-amethyst": { primary: "#9549b6", hover: "#a960c7" },

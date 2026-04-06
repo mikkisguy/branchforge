@@ -79,7 +79,9 @@ export function useLabels(): UseLabelsReturn {
     queryKey: labelKeys.activeLabelId(projectKey),
     queryFn: () => {
       try {
-        const saved = localStorage.getItem(`branchforge:activeLabel:${projectKey}`);
+        const saved = localStorage.getItem(
+          `branchforge:activeLabel:${projectKey}`
+        );
         return saved;
       } catch {
         return null;
@@ -93,10 +95,7 @@ export function useLabels(): UseLabelsReturn {
 
   // Query for active label detail
   const { data: activeLabel, isLoading: isLoadingLabel } = useQuery({
-    queryKey: labelKeys.detail(
-      currentProject?.id ?? "",
-      activeLabelId ?? ""
-    ),
+    queryKey: labelKeys.detail(currentProject?.id ?? "", activeLabelId ?? ""),
     queryFn: () => labelsApi.getLabel(activeLabelId!),
     enabled: !!activeLabelId && !!currentProject?.id,
     staleTime: 5 * 60 * 1000,

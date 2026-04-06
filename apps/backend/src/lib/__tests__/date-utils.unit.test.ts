@@ -12,12 +12,7 @@ describe("calculateNetNewWords", () => {
       "label-1": { date: "2026-04-04", count: 10 },
     };
 
-    const result = calculateNetNewWords(
-      tracking,
-      "label-1",
-      "2026-04-04",
-      15
-    );
+    const result = calculateNetNewWords(tracking, "label-1", "2026-04-04", 15);
 
     expect(result.wordsToAdd).toBe(5);
     expect(result.updatedTracking["label-1"]?.count).toBe(15);
@@ -28,12 +23,7 @@ describe("calculateNetNewWords", () => {
       "label-1": { date: "2026-04-04", count: 15 },
     };
 
-    const result = calculateNetNewWords(
-      tracking,
-      "label-1",
-      "2026-04-04",
-      10
-    );
+    const result = calculateNetNewWords(tracking, "label-1", "2026-04-04", 10);
 
     expect(result.wordsToAdd).toBe(-5);
     expect(result.updatedTracking["label-1"]?.count).toBe(10);
@@ -51,12 +41,7 @@ describe("calculateNetNewWords", () => {
       "label-1": { date: "2026-04-03", count: 10 },
     };
 
-    const result = calculateNetNewWords(
-      tracking,
-      "label-1",
-      "2026-04-04",
-      20
-    );
+    const result = calculateNetNewWords(tracking, "label-1", "2026-04-04", 20);
 
     expect(result.wordsToAdd).toBe(0);
     expect(result.updatedTracking["label-1"]?.count).toBe(20);

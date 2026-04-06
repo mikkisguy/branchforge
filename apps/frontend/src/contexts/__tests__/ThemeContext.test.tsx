@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { ThemeProvider } from "../ThemeContext";
+import { ThemeProvider, themeConfigs } from "../ThemeContext";
 import { useTheme, type ThemePalette } from "../useTheme";
 
 // Mock localStorage
@@ -234,15 +234,6 @@ describe("ThemeContext", () => {
       "dark-amethyst",
       "graphite",
     ];
-    const expectedColors: Record<
-      ThemePalette,
-      { primary: string; hover: string }
-    > = {
-      forest: { primary: "#40bb82", hover: "#52c992" },
-      periwinkle: { primary: "#3d4ac2", hover: "#515fcc" },
-      "dark-amethyst": { primary: "#9549b6", hover: "#a960c7" },
-      graphite: { primary: "#9ca3af", hover: "#b0b7c4" },
-    };
 
     it.each(themes)("should provide correct colors for %s", (theme) => {
       localStorage.setItem("branchforge-theme", theme);
@@ -254,14 +245,42 @@ describe("ThemeContext", () => {
       );
 
       const primaryEl = container.querySelector(
-        `[data-primary="${expectedColors[theme].primary}"]`
+        `[data-primary="${themeConfigs[theme].primary}"]`
       );
       expect(primaryEl).toBeInTheDocument();
 
       const hoverEl = container.querySelector(
-        `[data-hover="${expectedColors[theme].hover}"]`
+        `[data-hover="${themeConfigs[theme].hover}"]`
       );
       expect(hoverEl).toBeInTheDocument();
+    });
+
+    // Regression test: verify all themes have the correct expected colors.
+    // This catches accidental changes to themeConfigs that the parameterized test above
+    // would miss (since it uses themeConfigs as both source and expected value).
+    const expectedColors: Record<ThemePalette, { primary: string; hover: string }> = {
+      forest: { primary: "#40bb82", hover: "#52c992" },
+      periwinkle: { primary: "#3d4ac2", hover: "#515fcc" },
+      "dark-amethyst": { primary: "#9549b6", hover: "#a960c7" },
+      graphite: { primary: "#72757d", hover: "#b0b7c4" },
+    };
+
+    it.each(themes)("should have correct hardcoded colors for %s", (theme) => {
+      localStorage.setItem("branchforge-theme", theme);
+
+      const { container } = render(
+        <ThemeProvider>
+          <TestComponent />
+        </ThemeProvider>
+      );
+
+      // These values should match the documented theme colors
+      expect(
+        container.querySelector(`[data-primary="${expectedColors[theme].primary}"]`)
+      ).toBeInTheDocument();
+      expect(
+        container.querySelector(`[data-hover="${expectedColors[theme].hover}"]`)
+      ).toBeInTheDocument();
     });
   });
 

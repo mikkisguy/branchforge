@@ -47,7 +47,7 @@ import {
   userSettings,
   characters,
 } from "../db/schema/index.js";
-import { eq, asc, inArray, isNull, and, sql, desc } from "drizzle-orm";
+import { eq, asc, inArray, isNull, and, sql } from "drizzle-orm";
 import { reconstructRPYFile } from "../services/rpy-parser.service.js";
 import { calculateDialogueHash } from "../lib/hash.js";
 import { updateAuditFields } from "../lib/audit.js";
@@ -117,7 +117,6 @@ async function reconstructFileForLabel(
   projectFileId: string,
   db: QueryContext = getDb()
 ): Promise<string> {
-
   // Get the project file
   const [projectFile] = await db
     .select()
@@ -488,7 +487,9 @@ async function updateLabelDialogueHandler(
       const existingLines = await tx
         .select()
         .from(labelLines)
-        .where(and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt)))
+        .where(
+          and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt))
+        )
         .orderBy(asc(labelLines.sequence));
 
       const existingLinesBySequence = new Map(
@@ -556,7 +557,10 @@ async function updateLabelDialogueHandler(
         })
         .where(eq(labels.id, labelId));
 
-      const newContent = await reconstructFileForLabel(lockedProjectFile.id, tx);
+      const newContent = await reconstructFileForLabel(
+        lockedProjectFile.id,
+        tx
+      );
       const newContentHash = calculateContentHash(newContent);
       const fileUpdatedAt = new Date();
 

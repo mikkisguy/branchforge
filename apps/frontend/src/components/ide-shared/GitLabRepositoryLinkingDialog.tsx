@@ -202,9 +202,7 @@ export function GitLabRepositoryLinkingDialog({
 
       // Get project name for the sync dialog
       const project = projects.find((p) => p.id === projectId);
-      const projectName = isCreatingNewProject
-        ? newProjectName
-        : project?.name;
+      const projectName = isCreatingNewProject ? newProjectName : project?.name;
 
       // Log if project not found in projects array (stale data condition)
       if (!isCreatingNewProject && !project) {

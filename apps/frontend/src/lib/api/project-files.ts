@@ -148,7 +148,7 @@ export const projectFilesApi = {
           expectedContentHash: options?.expectedContentHash,
         }),
       },
-      true, // allow 409 Conflict responses (STALE_CONTENT_HASH) to be returned instead of thrown
+      true // allow 409 Conflict responses (STALE_CONTENT_HASH) to be returned instead of thrown
     );
   },
 

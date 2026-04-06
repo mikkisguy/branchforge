@@ -21,7 +21,7 @@ interface EditorTabBarProps {
   items: EditorTabBarItem[];
   activeItemId: string | null;
   onSelect: (itemId: string) => void | Promise<void>;
-  onClose: (event: MouseEvent, itemId: string) => void;
+  onClose: (event: MouseEvent | KeyboardEvent, itemId: string) => void;
   idPrefix: string;
   hidden?: boolean;
   titleMaxWidthClassName?: string;
@@ -51,7 +51,7 @@ export function EditorTabBar({
     const hasOverflow = container.scrollWidth > container.clientWidth;
     const canScrollLeft = container.scrollLeft > 0;
     const canScrollRight =
-      container.scrollLeft < container.scrollWidth - container.clientWidth - 1;
+      container.scrollLeft < container.scrollWidth - container.clientWidth;
 
     setShowLeftScrollIndicator(hasOverflow && canScrollLeft);
     setShowRightScrollIndicator(hasOverflow && canScrollRight);
@@ -143,7 +143,7 @@ export function EditorTabBar({
         return;
       }
 
-      const hasOverflow = container.scrollWidth > container.clientWidth + 1;
+      const hasOverflow = container.scrollWidth > container.clientWidth;
       if (!hasOverflow) {
         return;
       }
@@ -223,10 +223,14 @@ export function EditorTabBar({
 
                 <button
                   type="button"
-                  onClick={(event) => onClose(event, item.id)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onClose(event, item.id);
+                  }}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
+                      event.stopPropagation();
                       onClose(event, item.id);
                     }
                   }}

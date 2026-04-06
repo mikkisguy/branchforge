@@ -224,8 +224,8 @@ export function WriteMode({ projectName }: WriteModeProps) {
       savedActiveLabel && labelIds.has(savedActiveLabel)
         ? savedActiveLabel
         : activeLabelId && labelIds.has(activeLabelId)
-          ? activeLabelId
-          : null;
+        ? activeLabelId
+        : null;
 
     if (
       resolvedActiveLabelId &&
@@ -406,7 +406,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
   );
 
   const handleCloseTab = useCallback(
-    (e: React.MouseEvent, labelId: string) => {
+    (e: React.MouseEvent | React.KeyboardEvent, labelId: string) => {
       e.stopPropagation();
       setOpenTabs((prev) => {
         const index = prev.indexOf(labelId);

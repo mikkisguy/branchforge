@@ -705,7 +705,7 @@ describe("ProjectsRoutes (Integration)", () => {
       const fileId = testUuid("13000000", 3);
 
       const initialContent = [
-        "define e = Character(\"Eileen\")",
+        'define e = Character("Eileen")',
         "",
         "# no labels yet",
       ].join("\n");
@@ -722,10 +722,10 @@ describe("ProjectsRoutes (Integration)", () => {
       });
 
       const updatedContent = [
-        'label hero:',
-        '',
+        "label hero:",
+        "",
         '    "I am the hero!"',
-        '',
+        "",
         '    e "hehe, hello! yes"',
       ].join("\n");
 
@@ -758,7 +758,10 @@ describe("ProjectsRoutes (Integration)", () => {
       expect(syncedLabels[0].labelName).toBe("hero");
 
       const syncedLines = await db
-        .select({ contentType: labelLines.contentType, content: labelLines.content })
+        .select({
+          contentType: labelLines.contentType,
+          content: labelLines.content,
+        })
         .from(labelLines)
         .where(eq(labelLines.labelId, syncedLabels[0].id))
         .orderBy(asc(labelLines.sequence));
@@ -779,7 +782,7 @@ describe("ProjectsRoutes (Integration)", () => {
       const fileId = testUuid("13000000", 4);
       const resurrectedLabelId = testUuid("15000000", 1);
 
-      const initialContent = ['label intro:', '    "Hello"'].join("\n");
+      const initialContent = ["label intro:", '    "Hello"'].join("\n");
 
       await db.insert(projectFiles).values({
         id: fileId,
@@ -808,7 +811,7 @@ describe("ProjectsRoutes (Integration)", () => {
         deletedAt: new Date(),
       });
 
-      const updatedContent = ['label hero:', '    "I am the hero!"'].join("\n");
+      const updatedContent = ["label hero:", '    "I am the hero!"'].join("\n");
 
       const response = await fastify.inject({
         method: "PUT",
@@ -825,11 +828,15 @@ describe("ProjectsRoutes (Integration)", () => {
       const heroLabels = await db
         .select({ id: labels.id, deletedAt: labels.deletedAt })
         .from(labels)
-        .where(and(eq(labels.projectFileId, fileId), eq(labels.labelName, "hero")));
+        .where(
+          and(eq(labels.projectFileId, fileId), eq(labels.labelName, "hero"))
+        );
 
       // One historical soft-deleted row + one active row, never duplicate active rows
       expect(heroLabels).toHaveLength(2);
-      const activeHeroLabels = heroLabels.filter((row) => row.deletedAt === null);
+      const activeHeroLabels = heroLabels.filter(
+        (row) => row.deletedAt === null
+      );
       expect(activeHeroLabels).toHaveLength(1);
     });
   });

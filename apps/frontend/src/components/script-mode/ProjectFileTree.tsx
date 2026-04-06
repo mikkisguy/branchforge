@@ -84,7 +84,6 @@ export function ProjectFileTree({
 
   return (
     <div className="space-y-1.5" role="tree">
-
       {Array.from(groupedFiles.entries()).map(([folder, folderFiles]) => (
         <div key={folder} className="mb-1.5">
           {folder && (

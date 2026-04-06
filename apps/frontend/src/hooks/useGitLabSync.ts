@@ -83,9 +83,7 @@ function syncStateFromOperation(
     progress: calculateProgress(status, pollStartTime),
     isProcessing: status === "PENDING" || status === "IN_PROGRESS",
     error:
-      status === "FAILED"
-        ? (operation.errorMessage ?? "Operation failed")
-        : null,
+      status === "FAILED" ? operation.errorMessage ?? "Operation failed" : null,
   };
 }
 
@@ -160,7 +158,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
     setActiveOperationId(id);
   }, []);
 
-    const invalidateProjectCaches = useCallback(
+  const invalidateProjectCaches = useCallback(
     (projectId: string) => {
       // Invalidate and refetch list queries to ensure immediate data refresh
       void queryClient.refetchQueries({

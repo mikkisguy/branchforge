@@ -12,7 +12,10 @@ import {
 import { stripBOM } from "../../lib/codemirror/utils";
 import { useEditorCursor } from "../../lib/codemirror/useEditorCursor";
 import { PaletteSwitcher } from "./PaletteSwitcher";
-import { FontSizeSwitcher, EDITOR_FONT_SIZE_CHANGED } from "../FontSizeSwitcher";
+import {
+  FontSizeSwitcher,
+  EDITOR_FONT_SIZE_CHANGED,
+} from "../FontSizeSwitcher";
 import { LineWrapSwitcher } from "./LineWrapSwitcher";
 
 interface ScriptEditorProps {
@@ -196,7 +199,12 @@ export function ScriptEditor({
       // Apply initial font size
       applyEditorFontSize(view);
     },
-    [scrollToLine, scrollToLineIfValid, scheduleLineHighlight, applyEditorFontSize]
+    [
+      scrollToLine,
+      scrollToLineIfValid,
+      scheduleLineHighlight,
+      applyEditorFontSize,
+    ]
   );
 
   // Track previous scrollToLine to detect changes
@@ -235,8 +243,13 @@ export function ScriptEditor({
   // Listen for font size changes and update CodeMirror DOM
   useEffect(() => {
     const handleFontSizeChange = (event: Event) => {
-      const fontSize = (event as CustomEvent<{ fontSize: number }>).detail.fontSize;
-      if (editorViewRef.current && typeof fontSize === 'number' && Number.isFinite(fontSize)) {
+      const fontSize = (event as CustomEvent<{ fontSize: number }>).detail
+        .fontSize;
+      if (
+        editorViewRef.current &&
+        typeof fontSize === "number" &&
+        Number.isFinite(fontSize)
+      ) {
         editorViewRef.current.dom.style.fontSize = `${fontSize}px`;
         editorViewRef.current.requestMeasure();
       }
@@ -245,7 +258,10 @@ export function ScriptEditor({
     window.addEventListener(EDITOR_FONT_SIZE_CHANGED, handleFontSizeChange);
 
     return () => {
-      window.removeEventListener(EDITOR_FONT_SIZE_CHANGED, handleFontSizeChange);
+      window.removeEventListener(
+        EDITOR_FONT_SIZE_CHANGED,
+        handleFontSizeChange
+      );
     };
   }, []);
 
