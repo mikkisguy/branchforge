@@ -1,13 +1,19 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { Download, Package } from "lucide-react";
-import { StoryPanel } from "@/components/ide-shared";
-import { BookmarkTab, StatusBar, ScriptEditor } from "@/components/script-mode";
+import {
+  useState,
+  useMemo,
+  useEffect,
+  useCallback,
+  useRef,
+  type MouseEvent,
+} from "react";
+import { Download, Heart, Package, Sparkles, X } from "lucide-react";
+import { StatusBar, ScriptEditor } from "@/components/script-mode";
 import { ProjectFileTree } from "@/components/script-mode/ProjectFileTree";
 import { useLabels } from "@/hooks/useLabels";
 import { useGitLab } from "@/hooks/useGitLab";
+import { useCharacters } from "@/hooks/useCharacters";
 import { useProjectFiles } from "@/hooks/useProjectFiles";
 import { useAutosave } from "@/hooks/useAutosave";
-import { generateRpyPlainText } from "@/lib/rpy-generator";
 import { sanitizeLabelName } from "@/lib/label-utils";
 import { GitLabSyncDialog } from "@/components/script-mode/GitLabSyncDialog";
 import { ZipImportDialog } from "@/components/zip-import";
@@ -17,16 +23,15 @@ import { labelKeys, projectFilesKeys } from "@/lib/query-keys";
 import { useToast } from "@/contexts/ToastContext";
 import { ApiRequestError } from "@/lib/api/client";
 import { registerModeFlushHandler } from "@/lib/editor-sync-coordinator";
+import type { FileSourceType } from "@branchforge/shared";
 
 interface ScriptModeProps {
-  themeName: string;
   projectId?: string;
   projectName?: string;
   gitlabBranch?: string;
 }
 
 export function ScriptMode({
-  themeName,
   projectId,
   projectName,
   gitlabBranch,
@@ -46,6 +51,36 @@ export function ScriptMode({
   // Sync dialog state
   const [showSyncDialog, setShowSyncDialog] = useState(false);
   const [showZipImportDialog, setShowZipImportDialog] = useState(false);
+
+  // Track open tabs with project-scoped persistence
+  const [openTabs, setOpenTabs] = useState<string[]>([]);
+  const tabsLoadedRef = useRef<string | undefined>(undefined);
+  const tabsScrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollIndicatorRafIdRef = useRef<number | null>(null);
+  const [showLeftScrollIndicator, setShowLeftScrollIndicator] = useState(false);
+  const [showRightScrollIndicator, setShowRightScrollIndicator] =
+    useState(false);
+
+  const tabsStorageKey = projectId
+    ? `branchforge:scriptTabs:${projectId}`
+    : null;
+  const activeFileStorageKey = projectId
+    ? `branchforge:activeScriptFile:${projectId}`
+    : null;
+
+  // Update scroll indicators based on scroll position and overflow
+  const updateScrollIndicators = useCallback(() => {
+    const container = tabsScrollContainerRef.current;
+    if (!container) return;
+
+    const hasOverflow = container.scrollWidth > container.clientWidth;
+    const canScrollLeft = container.scrollLeft > 0;
+    const canScrollRight =
+      container.scrollLeft < container.scrollWidth - container.clientWidth - 1;
+
+    setShowLeftScrollIndicator(hasOverflow && canScrollLeft);
+    setShowRightScrollIndicator(hasOverflow && canScrollRight);
+  }, []);
 
   // Track edited file content for autosave
   const [editedFileContent, setEditedFileContent] = useState<string>("");
@@ -163,6 +198,35 @@ export function ScriptMode({
     [projectFiles, activeFileId]
   );
 
+  const { characters: projectCharacters } = useCharacters(projectId ?? "");
+
+  const sceneCharacters = useMemo(() => {
+    return activeLabel?.characters ?? [];
+  }, [activeLabel]);
+
+  const characterById = useMemo(() => {
+    return new Map(
+      projectCharacters.map((character) => [character.id, character])
+    );
+  }, [projectCharacters]);
+
+  const sceneCharacterIds = useMemo(() => {
+    return new Set(sceneCharacters.map((character) => character.id));
+  }, [sceneCharacters]);
+
+  const otherCharacters = useMemo(() => {
+    return projectCharacters.filter(
+      (character) => !sceneCharacterIds.has(character.id)
+    );
+  }, [projectCharacters, sceneCharacterIds]);
+
+  const statusColor =
+    activeLabel?.status === "FINAL"
+      ? "var(--theme-color)"
+      : activeLabel?.status === "REVIEW"
+        ? "var(--theme-review-color)"
+        : "var(--theme-draft-color)";
+
   // Track the line number to scroll to when switching modes
   const [scrollToLine, setScrollToLine] = useState<number | null>(null);
 
@@ -211,6 +275,12 @@ export function ScriptMode({
 
       // Switch to the new file
       setActiveFileId(file.id);
+      setOpenTabs((prev) => {
+        if (prev.includes(file.id)) {
+          return prev;
+        }
+        return [...prev, file.id];
+      });
       setEditedFileContent(file.content);
       setCurrentEditFileId(file.id);
       const nextFile = projectFiles.find((f) => f.id === file.id);
@@ -277,6 +347,54 @@ export function ScriptMode({
     }
   }, [projectId, isLoadingFiles, refreshFiles]);
 
+  // Persist open tabs after project state has been hydrated from storage
+  useEffect(() => {
+    if (tabsStorageKey && tabsLoadedRef.current === projectId) {
+      localStorage.setItem(tabsStorageKey, JSON.stringify(openTabs));
+    }
+  }, [openTabs, projectId, tabsStorageKey]);
+
+  // Persist active file to localStorage
+  useEffect(() => {
+    if (!activeFileStorageKey) {
+      return;
+    }
+
+    if (activeFileId) {
+      localStorage.setItem(activeFileStorageKey, activeFileId);
+    } else {
+      localStorage.removeItem(activeFileStorageKey);
+    }
+  }, [activeFileId, activeFileStorageKey]);
+
+  // Update scroll indicators when tabs change or on window resize
+  useEffect(() => {
+    if (scrollIndicatorRafIdRef.current !== null) {
+      cancelAnimationFrame(scrollIndicatorRafIdRef.current);
+    }
+    scrollIndicatorRafIdRef.current = requestAnimationFrame(() => {
+      updateScrollIndicators();
+    });
+
+    const handleResize = () => {
+      if (scrollIndicatorRafIdRef.current !== null) {
+        cancelAnimationFrame(scrollIndicatorRafIdRef.current);
+      }
+      scrollIndicatorRafIdRef.current = requestAnimationFrame(() => {
+        updateScrollIndicators();
+      });
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      if (scrollIndicatorRafIdRef.current !== null) {
+        cancelAnimationFrame(scrollIndicatorRafIdRef.current);
+        scrollIndicatorRafIdRef.current = null;
+      }
+    };
+  }, [openTabs, updateScrollIndicators]);
+
   // Refs for project reset effect to avoid unwanted reruns
   const currentEditFileIdRef = useRef(currentEditFileId);
   const isFileDirtyRef = useRef(isFileDirty);
@@ -315,6 +433,8 @@ export function ScriptMode({
       }
 
       hasRefreshed.current = false;
+      tabsLoadedRef.current = undefined;
+      setOpenTabs([]);
       setActiveFileId(null);
       setCurrentEditFileId(null);
       setCurrentEditFileHash(null);
@@ -339,28 +459,12 @@ export function ScriptMode({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [triggerFileSave]);
 
-  // Generate RPY content for active scene (plain text for CodeMirror)
-  const activeLabelPlainText = useMemo(() => {
-    if (!activeLabel) return "";
-    return generateRpyPlainText(activeLabel);
-  }, [activeLabel]);
-
   // Get active file content directly for Script Mode editing
   // Use edited content if available, otherwise use original content
   const activeFileContent =
     activeProjectFile && currentEditFileId === activeProjectFile.id
       ? editedFileContent
       : activeProjectFile?.content || "";
-  // Memoize file lines to avoid repeated split operations
-  const activeFileLines = useMemo(
-    () => activeFileContent.split("\n"),
-    [activeFileContent]
-  );
-  // Memoize label lines to avoid repeated split operations
-  const activeLabelLines = useMemo(
-    () => activeLabelPlainText.split("\n"),
-    [activeLabelPlainText]
-  );
 
   // Handle GitLab file selection
   const handleGitLabFileSelect = (fileId: string) => {
@@ -379,6 +483,71 @@ export function ScriptMode({
       setActiveLabelId(null);
     })();
   };
+
+  const handleSelectFileTab = useCallback(
+    async (fileId: string) => {
+      const file = projectFiles.find(
+        (projectFile) => projectFile.id === fileId
+      );
+      if (!file) {
+        return;
+      }
+
+      const switched = await switchToFile(file);
+      if (!switched) {
+        return;
+      }
+
+      setScrollToLine(null);
+      setActiveLabelId(null);
+    },
+    [projectFiles, switchToFile, setActiveLabelId]
+  );
+
+  const handleCloseFileTab = useCallback(
+    (e: MouseEvent, fileId: string) => {
+      e.stopPropagation();
+
+      const isActive = fileId === activeFileId;
+      setOpenTabs((prev) => {
+        const index = prev.indexOf(fileId);
+        if (index === -1) {
+          return prev;
+        }
+
+        return prev.filter((id) => id !== fileId);
+      });
+
+      if (isActive) {
+        const nextTabs = openTabs.filter((id) => id !== fileId);
+
+        if (nextTabs.length === 0) {
+          setActiveFileId(null);
+          setCurrentEditFileId(null);
+          setCurrentEditFileHash(null);
+          setEditedFileContent("");
+          setActiveLabelId(null);
+          setScrollToLine(null);
+        } else {
+          const index = openTabs.indexOf(fileId);
+          const fallbackFileId = openTabs[index - 1] ?? nextTabs[0];
+
+          void handleSelectFileTab(fallbackFileId);
+        }
+      }
+    },
+    [
+      activeFileId,
+      openTabs,
+      handleSelectFileTab,
+      setActiveLabelId,
+      setActiveFileId,
+      setCurrentEditFileId,
+      setCurrentEditFileHash,
+      setEditedFileContent,
+      setScrollToLine,
+    ]
+  );
 
   // Update edited content when active file changes (manual selection)
   useEffect(() => {
@@ -417,10 +586,117 @@ export function ScriptMode({
     return Array.from(folders);
   }, [projectFiles]);
 
-  // Character panel data
-  const characters = useMemo(() => {
-    return activeLabel?.characters ?? [];
-  }, [activeLabel]);
+  // Load persisted tabs and active file once per project after files load
+  useEffect(() => {
+    if (!projectId || isLoadingFiles || tabsLoadedRef.current === projectId) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const fileIds = new Set(projectFiles.map((file) => file.id));
+    const savedTabsRaw = tabsStorageKey
+      ? localStorage.getItem(tabsStorageKey)
+      : null;
+
+    let nextOpenTabs: string[] = [];
+    if (savedTabsRaw) {
+      try {
+        const parsedTabs = JSON.parse(savedTabsRaw) as unknown;
+        if (Array.isArray(parsedTabs)) {
+          nextOpenTabs = parsedTabs.filter(
+            (id): id is string => typeof id === "string" && fileIds.has(id)
+          );
+        }
+      } catch {
+        // Invalid JSON, ignore
+      }
+    }
+
+    const savedActiveFileId = activeFileStorageKey
+      ? localStorage.getItem(activeFileStorageKey)
+      : null;
+    const resolvedActiveFileId =
+      savedActiveFileId && fileIds.has(savedActiveFileId)
+        ? savedActiveFileId
+        : activeFileId && fileIds.has(activeFileId)
+          ? activeFileId
+          : null;
+
+    if (resolvedActiveFileId && !nextOpenTabs.includes(resolvedActiveFileId)) {
+      nextOpenTabs = [...nextOpenTabs, resolvedActiveFileId];
+    }
+
+    setOpenTabs(nextOpenTabs);
+
+    const loadActiveFile = async () => {
+      if (resolvedActiveFileId && resolvedActiveFileId !== activeFileId) {
+        await handleSelectFileTab(resolvedActiveFileId);
+      }
+
+      if (isMounted) {
+        tabsLoadedRef.current = projectId;
+      }
+    };
+
+    void loadActiveFile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    projectId,
+    isLoadingFiles,
+    projectFiles,
+    tabsStorageKey,
+    activeFileStorageKey,
+    activeFileId,
+    handleSelectFileTab,
+  ]);
+
+  // Keep tab bar aligned with externally changed active file
+  useEffect(() => {
+    if (
+      !activeFileId ||
+      !projectFiles.some((file) => file.id === activeFileId)
+    ) {
+      return;
+    }
+
+    setOpenTabs((prev) => {
+      if (prev.includes(activeFileId)) {
+        return prev;
+      }
+      return [...prev, activeFileId];
+    });
+  }, [activeFileId, projectFiles]);
+
+  // Prune tabs if files disappear from the project
+  useEffect(() => {
+    const fileIds = new Set(projectFiles.map((file) => file.id));
+    setOpenTabs((prev) => {
+      const nextTabs = prev.filter((tabId) => fileIds.has(tabId));
+      return nextTabs.length === prev.length ? prev : nextTabs;
+    });
+  }, [projectFiles]);
+
+  const isLinked = projectId ? isProjectLinked(projectId) : false;
+  const linkedRepo = projectId ? getLinkedRepository(projectId) : null;
+
+  // Determine the primary file source type from project files
+  // If no files exist but project is GitLab-linked, assume GITLAB type
+  const primaryFileSourceType: FileSourceType | undefined = useMemo(() => {
+    if (projectFiles.length === 0) {
+      // No files yet - check if project is GitLab-linked
+      if (isLinked) {
+        return "GITLAB";
+      }
+      return undefined;
+    }
+    // Use the first file's source type as the primary type
+    // (projects typically use a single source type)
+    return projectFiles[0].sourceType;
+  }, [projectFiles, isLinked]);
 
   // Loading state
   if (isLoadingLabels || isLoadingFiles) {
@@ -435,9 +711,6 @@ export function ScriptMode({
 
   // No files state
   if (!projectFiles.length) {
-    const isLinked = projectId ? isProjectLinked(projectId) : false;
-    const linkedRepo = projectId ? getLinkedRepository(projectId) : null;
-
     return (
       <div className="flex-1 flex flex-col pt-16">
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
@@ -494,170 +767,344 @@ export function ScriptMode({
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      {/* Main Editor Layout */}
-      <div className="flex-1 flex gap-4 px-4 py-4 overflow-hidden min-h-0 min-w-0">
-        {/* Sidebar - File Tree */}
-        <div className="w-56 min-h-0 shrink-0">
-          <StoryPanel className="h-full">
-            <button
-              className="w-full py-2 px-3 rounded text-sm font-medium mb-2 transition-colors"
-              style={{ background: "var(--theme-color)", color: "white" }}
+      {/* Tab Bar */}
+      <div className="border-b border-border bg-card/50 h-11">
+        <div className="h-full flex justify-center">
+          <div className="h-full relative min-w-[200px] max-w-[calc(100vw-2rem)]">
+            {showLeftScrollIndicator && (
+              <div
+                className="absolute left-0 top-0 bottom-0 w-8 pointer-events-none z-10 flex items-center justify-start pl-2 bg-gradient-to-r from-card/95 to-transparent"
+                aria-hidden="true"
+              >
+                <div className="w-1 h-6 rounded-full bg-muted-foreground/30" />
+              </div>
+            )}
+
+            <div
+              ref={tabsScrollContainerRef}
+              onScroll={updateScrollIndicators}
+              className="h-full flex items-center gap-1 overflow-x-auto px-4"
             >
-              + New Chapter
-            </button>
+              {openTabs.map((tabId) => {
+                const file = projectFiles.find(
+                  (projectFile) => projectFile.id === tabId
+                );
+                if (!file) return null;
 
-            <button
-              onClick={() => setShowZipImportDialog(true)}
-              className="w-full py-2 px-3 rounded text-sm font-medium mb-4 transition-colors border border-dashed hover:bg-muted/50 text-muted-foreground"
-              type="button"
-            >
-              <Package className="w-4 h-4 mr-2 inline" />
-              Import Zip
-            </button>
+                const isActive = file.id === activeFileId;
+                const fileName =
+                  file.filePath.split("/").pop() || file.filePath;
+                const fileKind =
+                  file.fileType === "SETTINGS" ? "Settings" : "Story";
 
-            <ProjectFileTree
-              files={projectFiles}
-              activeFileId={activeFileId ?? undefined}
-              activeSceneId={activeLabelId ?? undefined}
-              onFileSelect={handleGitLabFileSelect}
-              onSceneSelect={handleGitLabSceneSelect}
-              initialExpandedFolders={initialExpandedFolders}
-            />
-          </StoryPanel>
-        </div>
+                return (
+                  <div
+                    key={file.id}
+                    id={`script-tab-${file.id}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      void handleSelectFileTab(file.id);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        void handleSelectFileTab(file.id);
+                      } else if (
+                        (e.key === "ArrowLeft" || e.key === "ArrowRight") &&
+                        openTabs.length > 0
+                      ) {
+                        e.preventDefault();
+                        const currentIndex = openTabs.findIndex(
+                          (id) => id === file.id
+                        );
+                        const direction = e.key === "ArrowLeft" ? -1 : 1;
+                        const nextIndex =
+                          (currentIndex + direction + openTabs.length) %
+                          openTabs.length;
+                        const nextFileId = openTabs[nextIndex];
+                        void handleSelectFileTab(nextFileId);
+                        const nextTab = document.getElementById(
+                          `script-tab-${nextFileId}`
+                        );
+                        nextTab?.focus();
+                      }
+                    }}
+                    className={`group relative flex items-center gap-2 px-3 py-1.5 rounded-t-lg border-b-2 text-sm transition-all whitespace-nowrap cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                      isActive
+                        ? "bg-background border-[var(--theme-color)] text-foreground"
+                        : "bg-transparent border-transparent hover:bg-muted text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <span className="truncate max-w-[240px]">{fileName}</span>
+                    <span
+                      className={`text-xs font-mono ${
+                        isActive
+                          ? "text-[var(--theme-color)]"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {fileKind}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => handleCloseFileTab(e, file.id)}
+                      className="ml-1 p-0.5 rounded hover:bg-muted-foreground/20 opacity-30 group-hover:opacity-100 group-focus:opacity-100 transition-opacity"
+                      aria-label={`Close ${fileName}`}
+                      title="Close tab"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
 
-        {/* Main Editor Area */}
-        <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
-          {/* Tabs */}
-          <div className="flex items-end mb-0">
-            {activeProjectFile && (
-              <BookmarkTab
-                name={
-                  activeProjectFile.filePath.split("/").pop() ||
-                  activeProjectFile.filePath
-                }
-                isActive={true}
-                onClick={() => {}}
-              />
+            {showRightScrollIndicator && (
+              <div
+                className="absolute right-0 top-0 bottom-0 w-8 pointer-events-none z-10 flex items-center justify-end pr-2 bg-gradient-to-l from-card/95 to-transparent"
+                aria-hidden="true"
+              >
+                <div className="w-1 h-6 rounded-full bg-muted-foreground/30" />
+              </div>
             )}
           </div>
+        </div>
+      </div>
 
-          {/* Editor */}
-          <div className="flex-1 !mt-0 min-h-0 min-w-0 overflow-hidden">
-            <div className="bg-card/80 backdrop-blur border border-border/30 rounded-lg h-full overflow-hidden min-h-0 min-w-0">
-              {activeProjectFile ? (
-                <ScriptEditor
-                  content={activeFileContent}
-                  scrollToLine={scrollToLine}
-                  onChange={(value) => {
-                    setEditedFileContent(value);
-                  }}
-                />
-              ) : activeLabel ? (
-                <ScriptEditor
-                  content={activeLabelPlainText}
-                  onChange={(value) =>
-                    // TODO: Implement content persistence for GitLab files
-                    console.log("Label content changed:", value)
-                  }
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  Select a file or scene to view its content
+      {/* Main Editor Layout */}
+      <div className="flex-1 flex gap-4 px-4 pb-4 overflow-hidden min-h-0 min-w-0">
+        {/* Left Sidebar */}
+        <div className="w-56 min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3">
+          <div className="h-full overflow-y-auto">
+            <div className="sticky top-0 z-20 bg-card border-b border-border px-4 py-3">
+              <div className="flex items-center gap-3">
+                <div className="w-7 h-7 rounded bg-[var(--theme-color)] flex items-center justify-center shadow-sm shrink-0">
+                  <Sparkles className="w-4 h-4 text-white" />
                 </div>
-              )}
+                <div className="min-w-0">
+                  <span className="text-sm font-medium block truncate">
+                    {projectName || "Script Mode"}
+                  </span>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {projectFiles.length} file
+                    {projectFiles.length !== 1 ? "s" : ""}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 space-y-3">
+              <button
+                type="button"
+                className="w-full py-2 px-3 rounded-lg text-sm font-medium transition-colors bg-[var(--theme-color)] text-white hover:opacity-90"
+              >
+                + New Chapter
+              </button>
+
+              <ProjectFileTree
+                files={projectFiles}
+                activeFileId={activeFileId ?? undefined}
+                activeSceneId={activeLabelId ?? undefined}
+                onFileSelect={handleGitLabFileSelect}
+                onSceneSelect={handleGitLabSceneSelect}
+                initialExpandedFolders={initialExpandedFolders}
+              />
             </div>
           </div>
         </div>
 
-        {/* Right Panel - Character Reference */}
-        <div className="w-64 min-h-0 shrink-0">
-          <StoryPanel className="h-full">
-            {characters.length > 0 ? (
-              <div className="space-y-4">
-                {characters.map((character) => (
-                  <div
-                    key={character.id}
-                    className="text-center p-4 rounded-lg border border-dashed"
-                    style={{ borderColor: "var(--theme-border-subtle)" }}
-                  >
-                    <div className="text-4xl mb-2">
-                      {character.displayName[0] || "???"}
-                    </div>
-                    <p className="text-sm font-medium">
-                      {character.displayName}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {character.role.toLowerCase()}
-                    </p>
-                    {character.emotion && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Emotion: {character.emotion}
-                      </p>
-                    )}
-                  </div>
-                ))}
+        {/* Main Editor */}
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden mt-3">
+          <div className="bg-card/50 border border-border rounded-lg h-full overflow-hidden min-h-0 min-w-0">
+            {activeProjectFile ? (
+              <ScriptEditor
+                content={activeFileContent}
+                scrollToLine={scrollToLine}
+                onChange={(value) => {
+                  setEditedFileContent(value);
+                }}
+              />
+            ) : activeLabel ? (
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
+                <div className="flex items-center gap-2 text-destructive">
+                  <X size={16} />
+                  <span className="font-medium">Scene not found</span>
+                </div>
+                <p className="text-sm max-w-md text-center">
+                  The file containing this scene could not be found. It may have
+                  been deleted or there was an error loading the project files.
+                </p>
+                <Button variant="outline" size="sm" onClick={refreshFiles}>
+                  Refresh files
+                </Button>
               </div>
             ) : (
-              <div className="text-center p-4 text-muted-foreground">
-                No characters in this scene
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                Select a file or scene to view its content
               </div>
             )}
+          </div>
+        </div>
 
-            {/* Branching visualization */}
-            <div
-              className="mt-6 pt-4 border-t border-dashed"
-              style={{ borderColor: "var(--theme-border-subtle)" }}
-            >
-              <p className="text-s font-display tracking-wider text-muted-foreground mb-3">
-                Scene Info
+        {/* Right Sidebar */}
+        <div className="w-64 min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3">
+          <div className="h-full overflow-y-auto">
+            <div className="sticky top-0 z-20 bg-card border-b border-border px-4 py-3">
+              <h2 className="text-sm font-semibold tracking-wide">
+                Characters
+              </h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                {sceneCharacters.length} in scene · {projectCharacters.length}{" "}
+                total
               </p>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <span
-                    className="w-2 h-2 rounded-full"
-                    style={{ background: "var(--theme-color)" }}
-                  />
-                  <span>Status: {activeLabel?.status ?? "Unknown"}</span>
-                </div>
-                {activeLabel?.routeKey && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
-                    <span>Route: {activeLabel.routeKey}</span>
+            </div>
+
+            <div className="p-3 space-y-4">
+              <div>
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
+                  In This Scene
+                </h3>
+
+                {sceneCharacters.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-2">
+                      <span className="text-2xl opacity-40">👥</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      No characters in this scene
+                    </p>
                   </div>
-                )}
-                {activeLabel?.groupType && activeLabel?.groupValue && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
-                    <span>
-                      {activeLabel.groupType}: {activeLabel.groupValue}
-                    </span>
+                ) : (
+                  <div className="space-y-2">
+                    {sceneCharacters.map((sceneCharacter) => {
+                      const resolvedCharacter = characterById.get(
+                        sceneCharacter.id
+                      );
+                      const displayName =
+                        resolvedCharacter?.displayName ??
+                        sceneCharacter.displayName;
+                      const avatarColor =
+                        resolvedCharacter?.color ?? "var(--theme-color)";
+
+                      return (
+                        <div
+                          key={sceneCharacter.id}
+                          className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-muted transition-colors group"
+                        >
+                          <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0 shadow-sm"
+                            style={{ backgroundColor: avatarColor }}
+                          >
+                            {displayName[0] || "?"}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium truncate">
+                              {displayName}
+                            </p>
+                            {resolvedCharacter?.dialogueStyle && (
+                              <p className="text-xs text-muted-foreground truncate italic">
+                                "{resolvedCharacter.dialogueStyle}"
+                              </p>
+                            )}
+                          </div>
+                          {resolvedCharacter?.isLoveInterest && (
+                            <Heart className="w-4 h-4 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
+
+              {otherCharacters.length > 0 && (
+                <div className="pt-4 border-t border-border">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
+                    Other Characters
+                  </h3>
+
+                  <div className="space-y-1">
+                    {otherCharacters.map((character) => (
+                      <div
+                        key={character.id}
+                        className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted transition-colors group"
+                      >
+                        <div
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs shrink-0 shadow-sm"
+                          style={{ backgroundColor: character.color }}
+                        >
+                          {character.displayName[0] || "?"}
+                        </div>
+                        <span className="text-sm text-muted-foreground truncate flex-1">
+                          {character.displayName}
+                        </span>
+                        {character.isLoveInterest && (
+                          <Heart className="w-3.5 h-3.5 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-4 border-t border-border">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
+                  Scene Info
+                </h3>
+
+                <div className="space-y-2 text-sm px-2">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <span
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: statusColor }}
+                    />
+                    <span>Status: {activeLabel?.status ?? "Unknown"}</span>
+                  </div>
+                  {activeLabel?.routeKey && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
+                      <span>Route: {activeLabel.routeKey}</span>
+                    </div>
+                  )}
+                  {activeLabel?.groupType && activeLabel?.groupValue && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
+                      <span>
+                        {activeLabel.groupType}: {activeLabel.groupValue}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-          </StoryPanel>
+          </div>
         </div>
       </div>
 
       {/* Status Bar */}
       <StatusBar
-        lineCount={
-          activeProjectFile
-            ? activeFileLines.length
-            : activeLabel
-              ? activeLabelLines.length
-              : 0
-        }
         language="Ren'Py"
-        themeName={themeName}
         projectId={projectId}
         projectName={projectName}
         gitlabBranch={gitlabBranch}
+        fileSourceType={primaryFileSourceType}
         saveStatus={activeProjectFile ? fileSaveStatus : undefined}
         saveConflict={activeProjectFile ? hasSaveConflict : undefined}
         onSaveRequest={activeProjectFile ? retryFileSave : undefined}
       />
+
+      {/* Sync Dialog */}
+      {projectId && isLinked && linkedRepo && (
+        <GitLabSyncDialog
+          open={showSyncDialog}
+          onOpenChange={setShowSyncDialog}
+          operationType="import"
+          projectId={projectId}
+          projectName={projectName}
+          defaultBranch={linkedRepo.defaultBranch}
+        />
+      )}
 
       {/* Zip Import Dialog (always available for non-empty projects too) */}
       {projectId && (

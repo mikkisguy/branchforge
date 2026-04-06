@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 
+export const EDITOR_FONT_SIZE_CHANGED = "editor-font-size-changed";
+
 type FontSizeOption = { label: string; value: number };
 
 type FontSizeSwitcherMode = "script" | "write";
@@ -139,7 +141,14 @@ export function FontSizeSwitcher({
   useEffect(() => {
     // Set CSS custom property on document root for persistence across remounts
     document.documentElement.style.setProperty(cssVariable, `${fontSize}px`);
-  }, [cssVariable, fontSize]);
+
+    // Dispatch custom event to notify CodeMirror editors of font size change
+    if (mode === "script") {
+      window.dispatchEvent(
+        new CustomEvent(EDITOR_FONT_SIZE_CHANGED, { detail: { fontSize } })
+      );
+    }
+  }, [cssVariable, fontSize, mode]);
 
   // Set focused index to current option when dropdown opens
   useEffect(() => {

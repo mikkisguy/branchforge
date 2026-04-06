@@ -1,23 +1,24 @@
 import { useState, useCallback } from "react";
-import { Download, Upload, GitBranch } from "lucide-react";
+import { Download, Upload, GitBranch, Package } from "lucide-react";
 import {
   GitLabSyncDialog,
   SyncOperationType,
 } from "@/components/script-mode/GitLabSyncDialog";
 import { ConflictReviewDialog } from "@/components/script-mode/ConflictReviewDialog";
+import { ZipImportDialog } from "@/components/zip-import";
 import { SaveIndicator } from "@/components/write-mode";
-import { useGitLab } from "@/hooks/useGitLab";
 import { cn } from "@/lib/utils";
 import type { SaveStatus } from "@/hooks/useAutosave";
+import type { FileSourceType } from "@branchforge/shared";
 
 // Status bar styled like a storybook footer
 interface StatusBarProps {
-  lineCount: number;
   language: string;
-  themeName: string;
   projectId?: string;
   projectName?: string;
   gitlabBranch?: string;
+  // File source type - determines which import/export controls to show
+  fileSourceType?: FileSourceType;
   // Save status
   saveStatus?: SaveStatus;
   saveConflict?: boolean;
@@ -25,23 +26,21 @@ interface StatusBarProps {
 }
 
 export function StatusBar({
-  lineCount,
   language,
-  themeName,
   projectId,
   projectName,
   gitlabBranch,
+  fileSourceType,
   saveStatus = "saved",
   saveConflict = false,
   onSaveRequest,
 }: StatusBarProps) {
-  const { hasIntegration, isProjectLinked } = useGitLab();
-
   // Dialog state
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
   const [syncOperationType, setSyncOperationType] =
     useState<SyncOperationType>("export");
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
+  const [zipImportDialogOpen, setZipImportDialogOpen] = useState(false);
 
   /**
    * Handle export click
@@ -52,11 +51,18 @@ export function StatusBar({
   }, []);
 
   /**
-   * Handle import click
+   * Handle import click (GitLab)
    */
   const handleImportClick = useCallback(() => {
     setSyncOperationType("import");
     setSyncDialogOpen(true);
+  }, []);
+
+  /**
+   * Handle ZIP import click
+   */
+  const handleZipImportClick = useCallback(() => {
+    setZipImportDialogOpen(true);
   }, []);
 
   /**
@@ -70,68 +76,97 @@ export function StatusBar({
 
   /**
    * Check if GitLab is available for this project
+   * GitLab is available if the project type is GITLAB (regardless of linking status)
    */
-  const isGitLabAvailable =
-    hasIntegration && projectId !== undefined && isProjectLinked(projectId);
+  const isGitLabAvailable = fileSourceType === "GITLAB";
+
+  /**
+   * Check if ZIP import is available for this project
+   * ZIP is available if the project type is ZIP
+   */
+  const isZipAvailable = fileSourceType === "ZIP";
 
   return (
     <>
       <div
-        className="flex items-center justify-between px-4 py-2 text-xs bg-card/90 backdrop-blur border-t border-dashed"
+        className="flex items-center justify-between px-4 py-2 text-xs bg-card/50 border-t border-dashed"
         style={{ borderColor: "var(--theme-border-subtle)" }}
       >
         <div className="flex items-center gap-4">
-          <span className="text-muted-foreground"> {language}</span>
-          <span className="text-muted-foreground"> {themeName}</span>
+          <div className="text-muted-foreground border-r border-border/30 pr-4">
+            {language}
+          </div>
           {isGitLabAvailable && (
-            <span className="flex items-center gap-1.5 text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-muted-foreground border-r border-border/30 pr-4">
               <GitBranch className="w-3 h-3" />
               <span>{gitlabBranch ?? "Unknown"}</span>
-            </span>
+            </div>
           )}
         </div>
         <div className="flex items-center gap-4">
-          {/* GitLab Controls */}
+          {/* GitLab Controls - only show for GITLAB source type */}
           {isGitLabAvailable && (
+            <>
+              <div className="flex items-center gap-2 border-l border-border/30 pl-4">
+                <button
+                  onClick={handleImportClick}
+                  className={cn(
+                    "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
+                    "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+                  )}
+                  title="Import from GitLab"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Import</span>
+                </button>
+              </div>
+              <div className="border-l border-border/30 pl-4">
+                <button
+                  onClick={handleExportClick}
+                  className={cn(
+                    "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
+                    "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+                  )}
+                  title="Export to GitLab"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Export</span>
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ZIP Controls - only show for ZIP source type */}
+          {isZipAvailable && (
             <div className="flex items-center gap-2 border-l border-border/30 pl-4">
               <button
-                onClick={handleImportClick}
+                onClick={handleZipImportClick}
                 className={cn(
                   "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
                   "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
                 )}
-                title="Import from GitLab"
+                title="Import from Zip"
               >
-                <Download className="w-3.5 h-3.5" />
-                <span>Import</span>
-              </button>
-              <button
-                onClick={handleExportClick}
-                className={cn(
-                  "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
-                  "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
-                )}
-                title="Export to GitLab"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                <span>Export</span>
+                <Package className="w-3.5 h-3.5" />
+                <span>Import Zip</span>
               </button>
             </div>
           )}
-          <span className="text-muted-foreground">Line {lineCount}</span>
 
           {/* Save status indicator - using unified SaveIndicator component */}
-          <SaveIndicator
-            saveStatus={saveStatus}
-            displayMode="verbose"
-            saveConflict={saveConflict}
-            onRetry={onSaveRequest}
-          />
+          <div className="border-l border-border/30 pl-4">
+            <SaveIndicator
+              saveStatus={saveStatus}
+              displayMode="verbose"
+              saveConflict={saveConflict}
+              onRetry={onSaveRequest}
+            />
+          </div>
         </div>
       </div>
 
       {/* Sync Dialog */}
-      {projectId !== undefined && (
+      {projectId !== undefined && isGitLabAvailable && (
         <GitLabSyncDialog
           open={syncDialogOpen}
           onOpenChange={setSyncDialogOpen}
@@ -143,13 +178,25 @@ export function StatusBar({
       )}
 
       {/* Conflict Review Dialog */}
-      {projectId !== undefined && gitlabBranch !== undefined && (
-        <ConflictReviewDialog
-          open={conflictDialogOpen}
-          onOpenChange={setConflictDialogOpen}
+      {projectId !== undefined &&
+        gitlabBranch !== undefined &&
+        isGitLabAvailable && (
+          <ConflictReviewDialog
+            open={conflictDialogOpen}
+            onOpenChange={setConflictDialogOpen}
+            projectId={projectId}
+            branch={gitlabBranch}
+            onApplyResolutions={handleApplyResolutions}
+          />
+        )}
+
+      {/* ZIP Import Dialog */}
+      {projectId !== undefined && isZipAvailable && (
+        <ZipImportDialog
+          open={zipImportDialogOpen}
+          onOpenChange={setZipImportDialogOpen}
           projectId={projectId}
-          branch={gitlabBranch}
-          onApplyResolutions={handleApplyResolutions}
+          projectName={projectName}
         />
       )}
     </>

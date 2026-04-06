@@ -12,13 +12,14 @@ import {
 import { stripBOM } from "../../lib/codemirror/utils";
 import { useEditorCursor } from "../../lib/codemirror/useEditorCursor";
 import { PaletteSwitcher } from "./PaletteSwitcher";
-import { FontSizeSwitcher } from "../FontSizeSwitcher";
+import { FontSizeSwitcher, EDITOR_FONT_SIZE_CHANGED } from "../FontSizeSwitcher";
 import { LineWrapSwitcher } from "./LineWrapSwitcher";
 
 interface ScriptEditorProps {
   content: string;
   onChange?: (value: string) => void;
   scrollToLine?: number | null;
+  readOnly?: boolean;
 }
 
 const TARGET_LINE_HIGHLIGHT_MS = 920;
@@ -64,6 +65,7 @@ export function ScriptEditor({
   content,
   onChange,
   scrollToLine,
+  readOnly = false,
 }: ScriptEditorProps) {
   const [lineWrapExtension, setLineWrapExtension] = useState<
     Extension | readonly Extension[]
@@ -168,6 +170,18 @@ export function ScriptEditor({
     []
   );
 
+  const applyEditorFontSize = useCallback((view: EditorView) => {
+    const fontSize = getComputedStyle(document.documentElement)
+      .getPropertyValue("--editor-font-size")
+      .trim();
+    if (!fontSize) {
+      return;
+    }
+
+    view.dom.style.fontSize = fontSize;
+    view.requestMeasure();
+  }, []);
+
   // Add a handler for editor creation to store the view and handle initial scroll
   const handleCreateEditor = useCallback(
     (view: EditorView) => {
@@ -179,8 +193,10 @@ export function ScriptEditor({
           scheduleLineHighlight(view, scrollToLine);
         }
       }
+      // Apply initial font size
+      applyEditorFontSize(view);
     },
-    [scrollToLine, scrollToLineIfValid, scheduleLineHighlight]
+    [scrollToLine, scrollToLineIfValid, scheduleLineHighlight, applyEditorFontSize]
   );
 
   // Track previous scrollToLine to detect changes
@@ -213,6 +229,23 @@ export function ScriptEditor({
       if (highlightRafNestedRef.current !== null) {
         cancelAnimationFrame(highlightRafNestedRef.current);
       }
+    };
+  }, []);
+
+  // Listen for font size changes and update CodeMirror DOM
+  useEffect(() => {
+    const handleFontSizeChange = (event: Event) => {
+      const fontSize = (event as CustomEvent<{ fontSize: number }>).detail.fontSize;
+      if (editorViewRef.current && typeof fontSize === 'number' && Number.isFinite(fontSize)) {
+        editorViewRef.current.dom.style.fontSize = `${fontSize}px`;
+        editorViewRef.current.requestMeasure();
+      }
+    };
+
+    window.addEventListener(EDITOR_FONT_SIZE_CHANGED, handleFontSizeChange);
+
+    return () => {
+      window.removeEventListener(EDITOR_FONT_SIZE_CHANGED, handleFontSizeChange);
     };
   }, []);
 
@@ -250,7 +283,7 @@ export function ScriptEditor({
           value={cleanContent}
           height="100%"
           className="h-full w-full min-w-0"
-          editable={true}
+          editable={!readOnly}
           extensions={extensions}
           onChange={onChange}
           onCreateEditor={handleCreateEditor}
