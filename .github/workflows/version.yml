@@ -54,8 +54,10 @@ jobs:
           if [ "$CHANGESET_COUNT" -gt 0 ]; then
             echo "Found $CHANGESET_COUNT changeset files, consuming and bumping versions..."
             pnpm run bump:version
+            pnpm typecheck
+            pnpm test
             VERSION=$(node -p "require('./package.json').version")
-            git add .
+            git add -u
             git commit -m "chore: version packages to v$VERSION"
             git tag "v$VERSION"
             git push https://x-access-token:$REPO_TOKEN@github.com/${{ github.repository }}.git main

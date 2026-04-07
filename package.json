@@ -39,7 +39,7 @@
     "typescript": "^5.9.3"
   },
   "lint-staged": {
-    "*.{js,ts,tsx,json,css,md,yml,yaml}": [
+    "*.{js,jsx,ts,tsx,json,css,scss,md,yml,yaml}": [
       "pnpm exec prettier --write"
     ],
     "apps/frontend/**/*.{js,ts,tsx}": [

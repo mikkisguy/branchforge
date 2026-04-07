@@ -21,11 +21,11 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
           VERSION=${VERSION#v}
-          awk -v version="$VERSION" '/^## v/ {if (p) exit; if ($0 ~ version) p=1} p && !/^## v/ {print}' CHANGELOG.md > release_notes.md || echo "No changelog entry found for v$VERSION"
+          awk -v version="$VERSION" '/^## v/ {if (p) exit; if ($0 == "## v" version) p=1} p && !/^## v/ {print}' CHANGELOG.md > release_notes.md || echo "No changelog entry found for v$VERSION"
           echo "exists=$(test -s release_notes.md && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           name: Release ${{ github.ref_name }}
           body_path: release_notes.md
@@ -37,7 +37,7 @@ jobs:
         if: steps.changelog.outputs.exists == 'true'
 
       - name: Create Release (fallback)
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           name: Release ${{ github.ref_name }}
           body: |

@@ -96,9 +96,6 @@ jobs:
       - name: Build shared package
         run: pnpm --filter @branchforge/shared build
 
-      - name: Install drizzle-kit
-        run: cd apps/backend && npx -y drizzle-kit
-
       - name: Run test migrations
         run: cd apps/backend && pnpm db:migrate:test
 
