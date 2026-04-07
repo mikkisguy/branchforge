@@ -4,5 +4,6 @@ export { BookmarkTab } from "./BookmarkTab";
 export { StatusBar } from "./StatusBar";
 export { GitLabSyncDialog } from "./GitLabSyncDialog";
 export { ConflictReviewDialog } from "./ConflictReviewDialog";
+export { CharacterReferencePanel } from "./CharacterReferencePanel";
 export type { ScriptFile as File } from "./FileTree";
 export type { SyncOperationType } from "./GitLabSyncDialog";
