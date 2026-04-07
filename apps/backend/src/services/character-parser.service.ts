@@ -223,7 +223,7 @@ class CharacterParserService {
         : bracketedNameMatch
           ? bracketedNameMatch[1]
           : variableNameMatch
-            ? variableNameMatch[0]
+            ? variableNameMatch[1]
             : null;
 
       // Try to extract color from rest of line (who_color first, then color)
