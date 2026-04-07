@@ -1,0 +1,127 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify-main:
+    name: Verify Main
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        run: npm install -g pnpm@9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm build
+
+  build-verification:
+    name: Build Verification
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    container: node:20-alpine
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        run: npm install -g pnpm@9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm build
+
+  test-backend-unit:
+    name: Backend Unit Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    container: node:20-alpine
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        run: npm install -g pnpm@9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @branchforge/shared build
+
+      - name: Run unit tests
+        run: pnpm test:unit
+
+  test-backend-integration:
+    name: Backend Integration Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    container: node:20-alpine
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: branchforge_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL_TEST: "postgresql://test_user:test_password@postgres:5432/branchforge_test"
+      NODE_ENV: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        run: npm install -g pnpm@9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @branchforge/shared build
+
+      - name: Install drizzle-kit
+        run: cd apps/backend && npx -y drizzle-kit
+
+      - name: Run test migrations
+        run: cd apps/backend && pnpm db:migrate:test
+
+      - name: Run integration tests
+        run: cd apps/backend && pnpm test:integration
+
+  test-frontend-unit:
+    name: Frontend Unit Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    container: node:20-alpine
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        run: npm install -g pnpm@9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @branchforge/shared build
+
+      - name: Run frontend tests
+        run: cd apps/frontend && pnpm test
