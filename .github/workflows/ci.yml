@@ -1,4 +1,4 @@
-name: CI for BranchForge
+name: CI
 
 on:
   push:
