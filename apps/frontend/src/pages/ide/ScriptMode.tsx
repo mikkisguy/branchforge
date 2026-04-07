@@ -1,6 +1,10 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Download, Package, Sparkles, X } from "lucide-react";
-import { StatusBar, ScriptEditor, CharacterReferencePanel } from "@/components/script-mode";
+import {
+  StatusBar,
+  ScriptEditor,
+  CharacterReferencePanel,
+} from "@/components/script-mode";
 import { ProjectFileTree } from "@/components/script-mode/ProjectFileTree";
 import { EditorTabBar, type EditorTabBarItem } from "@/components/ide-shared";
 import { useLabels } from "@/hooks/useLabels";
@@ -809,7 +813,6 @@ export function ScriptMode({
 
         {/* Right Sidebar */}
         <CharacterReferencePanel
-          projectId={projectId}
           sceneCharacters={sceneCharacters}
           projectCharacters={projectCharacters}
           activeLabel={activeLabel}

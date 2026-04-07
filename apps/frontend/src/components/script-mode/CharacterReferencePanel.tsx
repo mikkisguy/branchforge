@@ -1,5 +1,5 @@
+import { useMemo } from "react";
 import { Heart } from "lucide-react";
-import * as React from "react";
 import type {
   Character,
   LabelCharacter,
@@ -19,18 +19,18 @@ export function CharacterReferencePanel({
   activeLabel,
   statusColor,
 }: CharacterReferencePanelProps) {
-  const characterById = React.useMemo(
+  const characterById = useMemo(
     () =>
       new Map(projectCharacters.map((character) => [character.id, character])),
     [projectCharacters]
   );
 
-  const sceneCharacterIds = React.useMemo(
+  const sceneCharacterIds = useMemo(
     () => new Set(sceneCharacters.map((character) => character.id)),
     [sceneCharacters]
   );
 
-  const otherCharacters = React.useMemo(
+  const otherCharacters = useMemo(
     () =>
       projectCharacters.filter(
         (character) => !sceneCharacterIds.has(character.id)
