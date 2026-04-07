@@ -7,6 +7,7 @@ on:
       - "v*"
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   test-backend-unit:
@@ -122,7 +123,7 @@ jobs:
     name: Bump Version
     runs-on: ubuntu-latest
     container: node:20-alpine
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch'
     env:
       REPO_TOKEN: ${{ secrets.REPO_TOKEN }}
     steps:

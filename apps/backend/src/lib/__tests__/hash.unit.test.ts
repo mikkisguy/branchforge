@@ -29,7 +29,7 @@ describe("calculateContentHash", () => {
   it("should handle empty string", () => {
     const hash = calculateContentHash("");
     expect(hash).toBe(
-      "e3b0c44298fc1c149af4c8996fb92427ae41e4649b934ca495991b7852b855"
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     );
   });
 
@@ -59,7 +59,7 @@ describe("calculateDialogueHash", () => {
   it("should handle empty dialogue array", () => {
     const hash = calculateDialogueHash([]);
     expect(hash).toBe(
-      "e3b0c44298fc1c149af4c8996fb92427ae41e4649b934ca495991b7852b855"
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     );
   });
 
@@ -124,7 +124,7 @@ describe("calculateLinesHash - Cross-format compatibility", () => {
       const hash = calculateLinesHash(lines);
       // Empty entry contributes empty string to hash
       expect(hash).toBe(
-        "e3b0c44298fc1c149af4c8996fb92427ae41e4649b934ca495991b7852b855"
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       );
     });
   });
@@ -176,7 +176,7 @@ describe("calculateLinesHash - Cross-format compatibility", () => {
       const lines = [{ type: "JUMP", target: undefined }];
       const hash = calculateLinesHash(lines);
       expect(hash).toBe(
-        "e3b0c44298fc1c149af4c8996fb92427ae41e4649b934ca495991b7852b855"
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       );
     });
   });
@@ -305,7 +305,7 @@ describe("Cross-format hash consistency", () => {
       const hash2 = calculateLinesHash([]);
       expect(hash1).toBe(hash2);
       expect(hash1).toBe(
-        "e3b0c44298fc1c149af4c8996fb92427ae41e4649b934ca495991b7852b855"
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       );
     });
   });
