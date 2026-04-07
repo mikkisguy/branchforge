@@ -93,7 +93,9 @@ export function GitLabSyncDialog({
     useState<DetectCharactersResponse | null>(null);
 
   // Ref to track the timeout so we can clear it on unmount
-  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined
+  );
 
   const clearAutoCloseTimeout = useCallback(() => {
     if (timeoutRef.current) {
@@ -155,9 +157,8 @@ export function GitLabSyncDialog({
       // For import operations, show the character wizard only if characters detected
       if (operationType === "import") {
         try {
-          const detectionResult = await charactersApi.detectCharacters(
-            projectId
-          );
+          const detectionResult =
+            await charactersApi.detectCharacters(projectId);
           if (detectionResult.characters.length > 0) {
             setDetectedCharacters({
               characters: detectionResult.characters,
@@ -284,8 +285,8 @@ export function GitLabSyncDialog({
                     state.operation.status === "COMPLETED"
                       ? "text-green-600"
                       : state.operation.status === "FAILED"
-                      ? "text-red-600"
-                      : "text-amber-600"
+                        ? "text-red-600"
+                        : "text-amber-600"
                   }
                 >
                   {state.operation.status === "COMPLETED" && (

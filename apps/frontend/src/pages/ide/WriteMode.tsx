@@ -224,8 +224,8 @@ export function WriteMode({ projectName }: WriteModeProps) {
       savedActiveLabel && labelIds.has(savedActiveLabel)
         ? savedActiveLabel
         : activeLabelId && labelIds.has(activeLabelId)
-        ? activeLabelId
-        : null;
+          ? activeLabelId
+          : null;
 
     if (
       resolvedActiveLabelId &&

@@ -199,8 +199,8 @@ export function ScriptMode({
     activeLabel?.status === "FINAL"
       ? "var(--theme-color)"
       : activeLabel?.status === "REVIEW"
-      ? "var(--theme-review-color)"
-      : "var(--theme-draft-color)";
+        ? "var(--theme-review-color)"
+        : "var(--theme-draft-color)";
 
   // Track the line number to scroll to when switching modes
   const [scrollToLine, setScrollToLine] = useState<number | null>(null);
@@ -588,8 +588,8 @@ export function ScriptMode({
       savedActiveFileId && fileIds.has(savedActiveFileId)
         ? savedActiveFileId
         : activeFileId && fileIds.has(activeFileId)
-        ? activeFileId
-        : null;
+          ? activeFileId
+          : null;
 
     if (resolvedActiveFileId && !nextOpenTabs.includes(resolvedActiveFileId)) {
       nextOpenTabs = [...nextOpenTabs, resolvedActiveFileId];

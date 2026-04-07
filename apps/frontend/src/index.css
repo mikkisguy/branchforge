@@ -226,7 +226,9 @@
   color: hsl(var(--muted-foreground));
   cursor: pointer;
   user-select: none;
-  transition: color 0.15s ease, background-color 0.15s ease;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
 }
 
 .cm-editor .cm-panel.cm-search label:hover {
@@ -249,7 +251,9 @@
   border-radius: 0.22rem;
   background: hsl(var(--input));
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease,
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
     box-shadow 0.15s ease;
 }
 
@@ -310,7 +314,9 @@
   font-family: "Fira Code", monospace;
   font-size: 0.8125rem;
   line-height: 1.2rem;
-  transition: background-color 0.15s ease, border-color 0.15s ease,
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
     color 0.15s ease;
 }
 
@@ -349,7 +355,9 @@
   line-height: 1;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease,
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
     color 0.15s ease;
 }
 
@@ -422,10 +430,7 @@
   }
 
   .cm-editor .cm-panel.cm-search .-search-row-primary input[name="search"],
-  .cm-editor
-    .cm-panel.cm-search
-    .-search-row-secondary
-    input[name="replace"] {
+  .cm-editor .cm-panel.cm-search .-search-row-secondary input[name="replace"] {
     flex: 1 1 100%;
     max-width: none;
   }

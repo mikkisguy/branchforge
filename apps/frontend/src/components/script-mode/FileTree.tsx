@@ -29,8 +29,8 @@ export function FileTree({ files, activeFile, onSelectFile }: FileTreeProps) {
             file.type === "folder"
               ? "text-foreground/70 cursor-default italic"
               : activeFile === file.name
-              ? "bg-muted/50 text-foreground"
-              : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
+                ? "bg-muted/50 text-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
           }`}
         >
           <span>{file.icon || (file.type === "folder" ? "" : "↳")}</span>

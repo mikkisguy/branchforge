@@ -21,7 +21,8 @@ const toastVariants = cva(
 );
 
 interface ToastProps
-  extends React.HTMLAttributes<HTMLDivElement>,
+  extends
+    React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof toastVariants> {
   title?: string;
   onClose?: () => void;

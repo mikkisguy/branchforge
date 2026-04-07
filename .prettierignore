@@ -10,6 +10,7 @@ build/
 
 # Database migrations
 apps/backend/src/db/migrations/
+apps/backend/src/db/migrations/meta/
 
 # Database files
 *.db

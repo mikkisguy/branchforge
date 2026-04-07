@@ -136,7 +136,7 @@ export function validateParams<T extends z.ZodTypeAny>(
 export function validateRequest<
   BodySchema extends z.ZodTypeAny = z.ZodNever,
   QuerySchema extends z.ZodTypeAny = z.ZodNever,
-  ParamsSchema extends z.ZodTypeAny = z.ZodNever
+  ParamsSchema extends z.ZodTypeAny = z.ZodNever,
 >(options: {
   body?: BodySchema;
   query?: QuerySchema;

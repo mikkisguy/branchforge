@@ -558,5 +558,4 @@ export const DialogueLine = memo(function DialogueLine({
       )}
     </div>
   );
-},
-areDialogueLinePropsEqual);
+}, areDialogueLinePropsEqual);

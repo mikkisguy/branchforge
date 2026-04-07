@@ -83,7 +83,9 @@ function syncStateFromOperation(
     progress: calculateProgress(status, pollStartTime),
     isProcessing: status === "PENDING" || status === "IN_PROGRESS",
     error:
-      status === "FAILED" ? operation.errorMessage ?? "Operation failed" : null,
+      status === "FAILED"
+        ? (operation.errorMessage ?? "Operation failed")
+        : null,
   };
 }
 
