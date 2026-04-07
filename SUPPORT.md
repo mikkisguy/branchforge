@@ -44,47 +44,47 @@ General questions are best handled via GitHub issues.
 
 ### Common Questions
 
-> Is BranchForge stable enough for my project?
+#### Is BranchForge stable enough for my project?
 
 **No.** BranchForge is currently in **alpha**. It's a work-in-progress with incomplete features and potential bugs. Back up your work frequently. Use it for experimentation and feedback only.
 
-> How do I export my project?
+#### How do I export my project?
 
 Use GitLab export (`/api/projects/:id/gitlab/export`) or wait for zip export (planned).
 
-> Can I collaborate with other writers?
+#### Can I collaborate with other writers?
 
 Project sharing is planned. Currently, GitLab provides version control.
 
-> How do I backup my data?
+#### How do I backup my data?
 
 Use PostgreSQL backups or rely on GitLab as version control.
 
-> Is BranchForge free?
+#### Is BranchForge free?
 
 Yes! It's open source (GPL v3).
 
 ### Troubleshooting
 
-**Issue: "Database connection failed"**
+#### Issue: "Database connection failed"
 
 - Check PostgreSQL is running
 - Verify `DATABASE_URL` in `.env`
 - Ensure user has permissions
 
-**Issue: "GitLab sync fails"**
+#### Issue: "GitLab sync fails"
 
 - Verify PAT has correct permissions (read_api, read_repository)
 - Check repository URL is correct
 - Test connection in GitLab settings
 
-**Issue: "Session expired"**
+#### Issue: "Session expired"
 
 - Check `SESSION_SECRET` is set
 - Verify `SESSION_MAX_AGE` (default: 24 hours)
 - Clear browser cookies
 
-**Issue: "Avatar upload failed"**
+#### Issue: "Avatar upload failed"
 
 - Check file size (max 500KB)
 - Verify file type (PNG, JPEG, WebP, GIF)

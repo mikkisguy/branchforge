@@ -43,6 +43,8 @@ uploads/
 _other/
 plans/
 .kilo/
+tmp/
+create-issues.sh
 
 tsconfig.tsbuildinfo
 tsconfig.schema.tsbuildinfo

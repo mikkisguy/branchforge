@@ -268,7 +268,7 @@ POST   /api/projects/:projectId/characters/import // Import characters
 
 **Schema**: `pair_groups` table
 
-- Sequel duo tracking (character_a_id, character_b_id)
+- For tracking duos (character_a_id, character_b_id)
 - `duo_ending_label`, `threshold`
 
 **Implementation Status**:
