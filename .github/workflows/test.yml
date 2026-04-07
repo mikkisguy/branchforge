@@ -61,7 +61,7 @@ jobs:
         run: pnpm --filter @branchforge/shared build
 
       - name: Run unit tests
-        run: pnpm test:unit
+        run: cd apps/backend && pnpm test:unit
 
   test-backend-integration:
     name: Backend Integration Tests

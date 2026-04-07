@@ -21,7 +21,7 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
           VERSION=${VERSION#v}
-          awk -v version="$VERSION" '/^## v/ {if (p) exit; if ($0 == "## v" version) p=1} p && !/^## v/ {print}' CHANGELOG.md > release_notes.md || echo "No changelog entry found for v$VERSION"
+          awk -v version="$VERSION" '/^## v/ {if (p) exit; if ($0 ~ "^## v" version) p=1} p && !/^## v/ {print}' CHANGELOG.md > release_notes.md || echo "No changelog entry found for v$VERSION"
           echo "exists=$(test -s release_notes.md && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
 
       - name: Create Release

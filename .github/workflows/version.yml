@@ -6,9 +6,6 @@ on:
 permissions:
   contents: write
 
-env:
-  REPO_TOKEN: ${{ secrets.REPO_TOKEN }}
-
 jobs:
   bump-version:
     name: Bump Version
@@ -42,6 +39,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Validate REPO_TOKEN
+        env:
+          REPO_TOKEN: ${{ secrets.REPO_TOKEN }}
         run: |
           if [ -z "$REPO_TOKEN" ]; then
             echo "::error:: REPO_TOKEN secret is not set or is empty. Please add the REPO_TOKEN secret to your repository settings."
@@ -49,6 +48,8 @@ jobs:
           fi
 
       - name: Check for changesets and bump version
+        env:
+          REPO_TOKEN: ${{ secrets.REPO_TOKEN }}
         run: |
           CHANGESET_COUNT=$(ls -1 .changeset/*.md 2>/dev/null | grep -v README.md | wc -l)
           if [ "$CHANGESET_COUNT" -gt 0 ]; then
