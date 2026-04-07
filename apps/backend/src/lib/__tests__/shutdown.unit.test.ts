@@ -26,13 +26,15 @@ vi.mock("../../services/rate-limiter.service.js", () => ({
   cleanupRateLimiter: vi.fn(),
 }));
 
-// Mock type definitions - use Partial to match expected interfaces
-type MockServer = Partial<FastifyInstance> & {
-  close: Mock<(callback?: (err?: Error) => void) => MockServer>;
+// Mock type definitions for shutdownForTest dependencies
+type CloseCallback = (err?: Error) => void;
+
+type MockServer = {
+  close: Mock<(callback?: CloseCallback) => void>;
 };
 
-type MockSessionStore = Partial<DrizzleSessionStore> & {
-  cleanup: Mock;
+type MockSessionStore = {
+  cleanup: Mock<() => void>;
 };
 
 // We need to dynamically import after mocking
@@ -40,7 +42,7 @@ describe("Graceful Shutdown Helpers", () => {
   let mockServer: MockServer;
   let mockSessionStore: MockSessionStore;
   let closeDb: Mock<() => Promise<void>>;
-  let cleanupRateLimiter: Mock;
+  let cleanupRateLimiter: Mock<() => void>;
 
   beforeEach(async () => {
     // Reset shutdown state before each test
@@ -48,12 +50,13 @@ describe("Graceful Shutdown Helpers", () => {
 
     // Import mocks after they're set up
     const dbModule = await import("../../db/index.js");
-    closeDb = dbModule.closeDb;
+    closeDb = dbModule.closeDb as Mock<() => Promise<void>>;
 
-    const rateLimiterModule = await import(
-      "../../services/rate-limiter.service.js"
-    );
-    cleanupRateLimiter = rateLimiterModule.cleanupRateLimiter;
+    const rateLimiterModule =
+      await import("../../services/rate-limiter.service.js");
+    cleanupRateLimiter = rateLimiterModule.cleanupRateLimiter as Mock<
+      () => void
+    >;
 
     // Create mock server with close method
     mockServer = {
@@ -62,14 +65,13 @@ describe("Graceful Shutdown Helpers", () => {
         setImmediate(() => {
           if (callback) callback();
         });
-        return mockServer;
       }),
-    };
+    } as MockServer;
 
     // Create mock session store with cleanup method
     mockSessionStore = {
       cleanup: vi.fn(),
-    };
+    } as MockSessionStore;
   });
 
   afterEach(() => {
@@ -101,25 +103,37 @@ describe("Graceful Shutdown Helpers", () => {
 
   describe("shutdownForTest", () => {
     it("should close the server", async () => {
-      await shutdownForTest(mockServer, mockSessionStore);
+      await shutdownForTest(
+        mockServer as unknown as FastifyInstance,
+        mockSessionStore as unknown as DrizzleSessionStore
+      );
 
       expect(mockServer.close).toHaveBeenCalled();
     });
 
     it("should cleanup rate limiter", async () => {
-      await shutdownForTest(mockServer, mockSessionStore);
+      await shutdownForTest(
+        mockServer as unknown as FastifyInstance,
+        mockSessionStore as unknown as DrizzleSessionStore
+      );
 
       expect(cleanupRateLimiter).toHaveBeenCalled();
     });
 
     it("should cleanup session store", async () => {
-      await shutdownForTest(mockServer, mockSessionStore);
+      await shutdownForTest(
+        mockServer as unknown as FastifyInstance,
+        mockSessionStore as unknown as DrizzleSessionStore
+      );
 
       expect(mockSessionStore.cleanup).toHaveBeenCalled();
     });
 
     it("should close database connections", async () => {
-      await shutdownForTest(mockServer, mockSessionStore);
+      await shutdownForTest(
+        mockServer as unknown as FastifyInstance,
+        mockSessionStore as unknown as DrizzleSessionStore
+      );
 
       expect(closeDb).toHaveBeenCalled();
     });
@@ -128,7 +142,10 @@ describe("Graceful Shutdown Helpers", () => {
       // State should be false initially (reset in beforeEach)
       expect(isShutting()).toBe(false);
 
-      await shutdownForTest(mockServer, mockSessionStore);
+      await shutdownForTest(
+        mockServer as unknown as FastifyInstance,
+        mockSessionStore as unknown as DrizzleSessionStore
+      );
 
       // State should be reset for test re-use after shutdown completes
       expect(isShutting()).toBe(false);
@@ -143,7 +160,6 @@ describe("Graceful Shutdown Helpers", () => {
           executionOrder.push("server-close-end");
           if (callback) callback();
         }, 10);
-        return mockServer;
       });
 
       cleanupRateLimiter.mockImplementation(() => {
@@ -161,7 +177,10 @@ describe("Graceful Shutdown Helpers", () => {
         });
       });
 
-      await shutdownForTest(mockServer, mockSessionStore);
+      await shutdownForTest(
+        mockServer as unknown as FastifyInstance,
+        mockSessionStore as unknown as DrizzleSessionStore
+      );
 
       // Verify order: server close → rate limiter → session store → db close
       expect(executionOrder[0]).toBe("server-close-start");
@@ -182,12 +201,14 @@ describe("Graceful Shutdown Helpers", () => {
         setTimeout(() => {
           if (callback) callback(closeError);
         }, 10);
-        return mockServer;
       });
 
       // Should not throw even on error
       await expect(
-        shutdownForTest(mockServer, mockSessionStore)
+        shutdownForTest(
+          mockServer as unknown as FastifyInstance,
+          mockSessionStore as unknown as DrizzleSessionStore
+        )
       ).resolves.toBeUndefined();
 
       // Should still execute other cleanup
@@ -199,7 +220,10 @@ describe("Graceful Shutdown Helpers", () => {
     it("should return early if already shutting down", async () => {
       setShuttingState(true);
 
-      await shutdownForTest(mockServer, mockSessionStore);
+      await shutdownForTest(
+        mockServer as unknown as FastifyInstance,
+        mockSessionStore as unknown as DrizzleSessionStore
+      );
 
       // Should not execute cleanup if already shutting down
       expect(mockServer.close).not.toHaveBeenCalled();
@@ -208,11 +232,17 @@ describe("Graceful Shutdown Helpers", () => {
 
     it("should be callable multiple times and reset state", async () => {
       // First call
-      await shutdownForTest(mockServer, mockSessionStore);
+      await shutdownForTest(
+        mockServer as unknown as FastifyInstance,
+        mockSessionStore as unknown as DrizzleSessionStore
+      );
       expect(mockServer.close).toHaveBeenCalledTimes(1);
 
       // Second call - state should already be reset by shutdownForTest
-      await shutdownForTest(mockServer, mockSessionStore);
+      await shutdownForTest(
+        mockServer as unknown as FastifyInstance,
+        mockSessionStore as unknown as DrizzleSessionStore
+      );
       expect(mockServer.close).toHaveBeenCalledTimes(2);
     });
   });
@@ -226,12 +256,17 @@ describe("Graceful Shutdown Helpers", () => {
         setTimeout(() => {
           if (callback) callback();
         }, 10);
-        return mockServer;
       });
 
       // Simulate concurrent shutdown attempts
-      const promise1 = shutdownForTest(mockServer, mockSessionStore);
-      const promise2 = shutdownForTest(mockServer, mockSessionStore);
+      const promise1 = shutdownForTest(
+        mockServer as unknown as FastifyInstance,
+        mockSessionStore as unknown as DrizzleSessionStore
+      );
+      const promise2 = shutdownForTest(
+        mockServer as unknown as FastifyInstance,
+        mockSessionStore as unknown as DrizzleSessionStore
+      );
 
       await Promise.all([promise1, promise2]);
 

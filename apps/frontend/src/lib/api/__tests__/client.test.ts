@@ -9,7 +9,7 @@ import { request, requestVoid, type ApiError } from "../client";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
+globalThis.fetch = mockFetch;
 
 describe("API Client", () => {
   beforeEach(() => {
@@ -173,7 +173,9 @@ describe("API Client", () => {
         await requestWithStubbedEnv("/endpoint");
 
         const [url] = mockFetch.mock.calls[0];
-        expect(url).toBe(`${import.meta.env.VITE_API_BASE_URL ?? "/api"}/endpoint`);
+        expect(url).toBe(
+          `${import.meta.env.VITE_API_BASE_URL ?? "/api"}/endpoint`
+        );
       } finally {
         vi.unstubAllEnvs();
         vi.resetModules();
