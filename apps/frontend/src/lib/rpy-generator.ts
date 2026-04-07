@@ -193,18 +193,21 @@ export function generateFileTree(labels: PublicLabel[]): FileItem[] {
   if (!labels.length) return [];
 
   // Group by groupType/groupValue for hierarchical display
-  const grouped = labels.reduce((acc, label) => {
-    // Use group value if available, otherwise "Main"
-    const key =
-      label.groupType && label.groupValue
-        ? `${label.groupType} ${label.groupValue}`
-        : "Main";
-    if (!acc[key]) {
-      acc[key] = [];
-    }
-    acc[key].push(label);
-    return acc;
-  }, {} as Record<string, PublicLabel[]>);
+  const grouped = labels.reduce(
+    (acc, label) => {
+      // Use group value if available, otherwise "Main"
+      const key =
+        label.groupType && label.groupValue
+          ? `${label.groupType} ${label.groupValue}`
+          : "Main";
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(label);
+      return acc;
+    },
+    {} as Record<string, PublicLabel[]>
+  );
 
   // Convert to file tree structure
   return Object.entries(grouped)

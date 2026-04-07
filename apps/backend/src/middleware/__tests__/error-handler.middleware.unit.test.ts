@@ -27,7 +27,7 @@ const createMockRequest = (overrides = {}) =>
     routerPath: "/test",
     url: "/test",
     ...overrides,
-  } as Partial<FastifyRequest> as FastifyRequest);
+  }) as Partial<FastifyRequest> as FastifyRequest;
 
 const createMockReply = () => {
   const reply = {

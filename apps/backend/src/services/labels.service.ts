@@ -60,8 +60,10 @@ export function isValidLabelStatus(
 /**
  * Label line with speaker information
  */
-export interface LabelLineWithSpeaker
-  extends Omit<LabelLine, "speakerId" | "createdAt" | "updatedAt"> {
+export interface LabelLineWithSpeaker extends Omit<
+  LabelLine,
+  "speakerId" | "createdAt" | "updatedAt"
+> {
   speakerId: string | null;
   speakerName: string | null; // From characters.displayName
   speakerTag: string | null; // From characters.renpyTag

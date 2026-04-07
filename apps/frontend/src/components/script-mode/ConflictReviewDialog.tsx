@@ -357,8 +357,8 @@ export function ConflictReviewDialog({
                     {currentResolution === "local"
                       ? "BranchForge"
                       : currentResolution === "remote"
-                      ? "GitLab"
-                      : "Skipped"}{" "}
+                        ? "GitLab"
+                        : "Skipped"}{" "}
                     version
                   </span>
                 </div>

@@ -324,8 +324,8 @@ export function CharacterImportWizard({
                 {detectedCharacters.length > 0
                   ? `Review and approve ${detectedCharacters.length} detected character(s)`
                   : newCount > 0
-                  ? `${newCount} character(s) added manually`
-                  : "No characters detected - add them manually"}
+                    ? `${newCount} character(s) added manually`
+                    : "No characters detected - add them manually"}
               </p>
             </div>
           </div>

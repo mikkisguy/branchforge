@@ -116,8 +116,8 @@ export function SceneNavigator({
                                 label.status === "FINAL"
                                   ? "var(--theme-color)"
                                   : label.status === "REVIEW"
-                                  ? "var(--theme-review-color)"
-                                  : "var(--theme-draft-color)",
+                                    ? "var(--theme-review-color)"
+                                    : "var(--theme-draft-color)",
                               opacity: isActive ? 1 : 0.5,
                             }}
                           />

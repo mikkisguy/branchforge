@@ -41,7 +41,10 @@ export class HttpError extends Error {
  * Use when input validation fails (e.g., from Zod schemas)
  */
 export class ValidationError extends HttpError {
-  constructor(message: string = "Validation failed", public details?: unknown) {
+  constructor(
+    message: string = "Validation failed",
+    public details?: unknown
+  ) {
     super(400, message, "Invalid request data");
     this.name = "ValidationError";
   }
