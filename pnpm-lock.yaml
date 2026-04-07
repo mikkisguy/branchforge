@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      eslint:
+        specifier: ^10.2.0
+        version: 10.2.0(jiti@2.6.1)
     devDependencies:
       '@changesets/cli':
         specifier: ^2.30.0

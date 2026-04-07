@@ -1,5 +1,12 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { Download, Package, Sparkles, X } from "lucide-react";
+import {
+  Download,
+  Package,
+  Sparkles,
+  X,
+  ChevronRight,
+  ChevronLeft,
+} from "lucide-react";
 import {
   StatusBar,
   ScriptEditor,
@@ -49,6 +56,20 @@ export function ScriptMode({
   // Sync dialog state
   const [showSyncDialog, setShowSyncDialog] = useState(false);
   const [showZipImportDialog, setShowZipImportDialog] = useState(false);
+
+  // Sidebar collapse states
+  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(() => {
+    const leftCollapsed = localStorage.getItem(
+      "scriptmode-left-sidebar-collapsed"
+    );
+    return leftCollapsed === "true";
+  });
+  const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(() => {
+    const rightCollapsed = localStorage.getItem(
+      "scriptmode-right-sidebar-collapsed"
+    );
+    return rightCollapsed === "true";
+  });
 
   // Track open tabs with project-scoped persistence
   const [openTabs, setOpenTabs] = useState<string[]>([]);
@@ -329,6 +350,21 @@ export function ScriptMode({
       localStorage.removeItem(activeFileStorageKey);
     }
   }, [activeFileId, activeFileStorageKey]);
+
+  // Persist sidebar collapse states to localStorage
+  useEffect(() => {
+    localStorage.setItem(
+      "scriptmode-left-sidebar-collapsed",
+      String(isLeftSidebarCollapsed)
+    );
+  }, [isLeftSidebarCollapsed]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      "scriptmode-right-sidebar-collapsed",
+      String(isRightSidebarCollapsed)
+    );
+  }, [isRightSidebarCollapsed]);
 
   // Refs for project reset effect to avoid unwanted reruns
   const currentEditFileIdRef = useRef(currentEditFileId);
@@ -726,9 +762,23 @@ export function ScriptMode({
       {/* Main Editor Layout */}
       <div className="flex-1 flex gap-4 px-4 pb-4 overflow-hidden min-h-0 min-w-0">
         {/* Left Sidebar */}
-        <div className="w-56 min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3">
-          <div className="h-full overflow-y-auto">
-            <div className="sticky top-0 z-20 bg-card border-b border-border px-4 py-3">
+        <div
+          className={`min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3 transition-all duration-300 ease-out ${
+            isLeftSidebarCollapsed
+              ? "w-0 opacity-0 -translate-x-full pointer-events-none"
+              : "w-56 opacity-100 translate-x-0"
+          }`}
+        >
+          <div className="h-full overflow-y-auto relative">
+            <div className="sticky top-0 z-20 bg-card border-b border-border pl-10 pr-4 py-3">
+              <button
+                onClick={() => setIsLeftSidebarCollapsed(true)}
+                className="absolute top-2 left-2 z-30 p-1 rounded-md hover:bg-muted/80 transition-colors"
+                aria-label="Collapse sidebar"
+                title="Collapse sidebar"
+              >
+                <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+              </button>
               <div className="flex items-center gap-3">
                 <div className="w-7 h-7 rounded bg-[var(--theme-color)] flex items-center justify-center shadow-sm shrink-0">
                   <Sparkles className="w-4 h-4 text-white" />
@@ -764,6 +814,20 @@ export function ScriptMode({
             </div>
           </div>
         </div>
+
+        {/* Left Sidebar Expand Button (shown when collapsed) */}
+        {isLeftSidebarCollapsed && (
+          <div className="min-h-0 shrink-0 mt-3 flex items-center -ml-4">
+            <button
+              onClick={() => setIsLeftSidebarCollapsed(false)}
+              className="p-2 rounded-lg border border-border bg-card/50 hover:bg-muted/80 transition-colors"
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+            >
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
+        )}
 
         {/* Center Column: Tab Bar + Editor */}
         <div className="flex-1 flex flex-col min-h-0 min-w-0 mt-3">
@@ -817,6 +881,10 @@ export function ScriptMode({
           projectCharacters={projectCharacters}
           activeLabel={activeLabel}
           statusColor={statusColor}
+          isCollapsed={isRightSidebarCollapsed}
+          onCollapseToggle={() =>
+            setIsRightSidebarCollapsed(!isRightSidebarCollapsed)
+          }
         />
       </div>
 

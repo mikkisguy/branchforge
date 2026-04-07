@@ -51,5 +51,8 @@
     "packages/**/*.{js,ts}": [
       "pnpm exec eslint --fix"
     ]
+  },
+  "dependencies": {
+    "eslint": "^10.2.0"
   }
 }
