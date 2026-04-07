@@ -1,0 +1,87 @@
+name: Docker
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  docker-frontend:
+    name: Docker Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep '"version"' apps/frontend/package.json | head -1 | cut -d'"' -f4)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/frontend/Dockerfile
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/branchforge-frontend:${{ steps.version.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/branchforge-frontend:latest
+            ghcr.io/${{ github.repository_owner }}/branchforge-frontend:${{ github.sha }}
+
+  docker-backend:
+    name: Docker Backend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep '"version"' apps/backend/package.json | head -1 | cut -d'"' -f4)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/backend/Dockerfile
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/branchforge-backend:${{ steps.version.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/branchforge-backend:latest
+            ghcr.io/${{ github.repository_owner }}/branchforge-backend:${{ github.sha }}

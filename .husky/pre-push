@@ -1,0 +1,13 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Run full typecheck and tests before pushing
+echo "Running pre-push checks..."
+
+echo "▸ Type checking..."
+pnpm typecheck || exit 1
+
+echo "▸ Running tests..."
+pnpm test || exit 1
+
+echo "✓ Pre-push checks passed!"

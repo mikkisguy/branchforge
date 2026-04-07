@@ -1,0 +1,68 @@
+name: Version Bump
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bump-version:
+    name: Bump Version
+    runs-on: ubuntu-latest
+    container: node:20-alpine
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        run: apk add --no-cache git jq
+
+      - name: Configure git
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
+      - name: Fetch all history
+        run: |
+          git fetch --unshallow || git fetch origin +refs/heads/*:refs/*
+          git checkout main
+          git branch --set-upstream-to=origin/main main
+
+      - name: Install pnpm
+        run: npm install -g pnpm@9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate REPO_TOKEN
+        env:
+          REPO_TOKEN: ${{ secrets.REPO_TOKEN }}
+        run: |
+          if [ -z "$REPO_TOKEN" ]; then
+            echo "::error:: REPO_TOKEN secret is not set or is empty. Please add the REPO_TOKEN secret to your repository settings."
+            exit 1
+          fi
+
+      - name: Check for changesets and bump version
+        env:
+          REPO_TOKEN: ${{ secrets.REPO_TOKEN }}
+        run: |
+          CHANGESET_COUNT=$(ls -1 .changeset/*.md 2>/dev/null | grep -v README.md | wc -l)
+          if [ "$CHANGESET_COUNT" -gt 0 ]; then
+            echo "Found $CHANGESET_COUNT changeset files, consuming and bumping versions..."
+            pnpm run bump:version
+            pnpm typecheck
+            pnpm test
+            VERSION=$(node -p "require('./package.json').version")
+            git add -u
+            git commit -m "chore: version packages to v$VERSION"
+            git tag "v$VERSION"
+            git push https://x-access-token:$REPO_TOKEN@github.com/${{ github.repository }}.git main
+            git push https://x-access-token:$REPO_TOKEN@github.com/${{ github.repository }}.git "v$VERSION"
+          else
+            echo "No changesets to consume"
+          fi
