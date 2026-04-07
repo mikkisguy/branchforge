@@ -12,7 +12,7 @@
 
 ---
 
-BranchForge is currently in **alpha**. The app may contain bugs, incomplete features, and breaking changes. **Do not use it for production projects.** We welcome feedback, bug reports, and contributions!
+⚠️ BranchForge is currently in **alpha**. The app may contain bugs, incomplete features, and breaking changes. **Do not use it for production projects.** We welcome feedback, bug reports, and contributions!
 
 ## ✨ Why BranchForge?
 
