@@ -1,9 +1,12 @@
 import { Heart } from "lucide-react";
 import * as React from "react";
-import type { Character, LabelCharacter, LabelDetail } from "@branchforge/shared";
+import type {
+  Character,
+  LabelCharacter,
+  LabelDetail,
+} from "@branchforge/shared";
 
 interface CharacterReferencePanelProps {
-  projectId?: string;
   sceneCharacters: LabelCharacter[];
   projectCharacters: Character[];
   activeLabel?: LabelDetail | null;
@@ -18,9 +21,7 @@ export function CharacterReferencePanel({
 }: CharacterReferencePanelProps) {
   const characterById = React.useMemo(
     () =>
-      new Map(
-        projectCharacters.map((character) => [character.id, character])
-      ),
+      new Map(projectCharacters.map((character) => [character.id, character])),
     [projectCharacters]
   );
 
@@ -41,12 +42,9 @@ export function CharacterReferencePanel({
     <div className="w-64 min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3">
       <div className="h-full overflow-y-auto">
         <div className="sticky top-0 z-20 bg-card border-b border-border px-4 py-3">
-          <h2 className="text-sm font-semibold tracking-wide">
-            Characters
-          </h2>
+          <h2 className="text-sm font-semibold tracking-wide">Characters</h2>
           <p className="text-xs text-muted-foreground mt-1">
-            {sceneCharacters.length} in scene · {projectCharacters.length}{" "}
-            total
+            {sceneCharacters.length} in scene · {projectCharacters.length} total
           </p>
         </div>
 
