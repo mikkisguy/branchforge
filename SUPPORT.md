@@ -44,23 +44,25 @@ General questions are best handled via GitHub issues.
 
 ### Common Questions
 
-**Q: How do I export my project?**
-A: Use GitLab export (`/api/projects/:id/gitlab/export`) or wait for zip export (planned).
+> Is BranchForge stable enough for my project?
 
-**Q: Can I import from Google Docs?**
-A: Not currently. Only GitLab and zip imports are supported.
+**No.** BranchForge is currently in **alpha**. It's a work-in-progress with incomplete features and potential bugs. Back up your work frequently. Use it for experimentation and feedback only.
 
-**Q: Does BranchForge support light mode?**
-A: Not yet. Light mode is on the roadmap.
+> How do I export my project?
 
-**Q: Can I collaborate with other writers?**
-A: Project sharing is planned. Currently, GitLab provides version control.
+Use GitLab export (`/api/projects/:id/gitlab/export`) or wait for zip export (planned).
 
-**Q: How do I backup my data?**
-A: Use PostgreSQL backups or rely on GitLab as version control.
+> Can I collaborate with other writers?
 
-**Q: Is BranchForge free?**
-A: Yes! It's open source (GPL v3).
+Project sharing is planned. Currently, GitLab provides version control.
+
+> How do I backup my data?
+
+Use PostgreSQL backups or rely on GitLab as version control.
+
+> Is BranchForge free?
+
+Yes! It's open source (GPL v3).
 
 ### Troubleshooting
 

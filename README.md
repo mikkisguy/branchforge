@@ -5,12 +5,15 @@
 **A creative workspace for visual novel writers**
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.7.0-green)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.7.0-yellow)](CHANGELOG.md)
+![Alpha](https://img.shields.io/badge/status-alpha-orange)
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/mikkisguy/branchforge?utm_source=oss&utm_medium=github&utm_campaign=mikkisguy%2Fbranchforge&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
 </div>
 
 ---
+
+> BranchForge is currently in **alpha**. The app may contain bugs, incomplete features, and breaking changes. **Do not use it for production projects.** Back up your work regularly. We welcome feedback, bug reports, and contributions!
 
 ## ✨ Why BranchForge?
 
