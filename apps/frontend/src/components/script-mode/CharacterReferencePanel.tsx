@@ -1,4 +1,5 @@
 import { Heart } from "lucide-react";
+import * as React from "react";
 import type { Character, LabelCharacter, LabelDetail } from "@branchforge/shared";
 
 interface CharacterReferencePanelProps {
@@ -15,16 +16,25 @@ export function CharacterReferencePanel({
   activeLabel,
   statusColor,
 }: CharacterReferencePanelProps) {
-  const characterById = new Map(
-    projectCharacters.map((character) => [character.id, character])
+  const characterById = React.useMemo(
+    () =>
+      new Map(
+        projectCharacters.map((character) => [character.id, character])
+      ),
+    [projectCharacters]
   );
 
-  const sceneCharacterIds = new Set(
-    sceneCharacters.map((character) => character.id)
+  const sceneCharacterIds = React.useMemo(
+    () => new Set(sceneCharacters.map((character) => character.id)),
+    [sceneCharacters]
   );
 
-  const otherCharacters = projectCharacters.filter(
-    (character) => !sceneCharacterIds.has(character.id)
+  const otherCharacters = React.useMemo(
+    () =>
+      projectCharacters.filter(
+        (character) => !sceneCharacterIds.has(character.id)
+      ),
+    [projectCharacters, sceneCharacterIds]
   );
 
   return (
