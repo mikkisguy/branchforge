@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Heart, ChevronRight, ChevronLeft } from "lucide-react";
+import { cva } from "class-variance-authority";
 import type {
   Character,
   LabelCharacter,
@@ -14,6 +15,18 @@ interface CharacterReferencePanelProps {
   isCollapsed?: boolean;
   onCollapseToggle?: () => void;
 }
+
+const panelVariants = cva(
+  "min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3 transition-all duration-300 ease-out",
+  {
+    variants: {
+      collapsed: {
+        true: "w-0 opacity-0 translate-x-full pointer-events-none",
+        false: "w-64 opacity-100 translate-x-0",
+      },
+    },
+  }
+);
 
 export function CharacterReferencePanel({
   sceneCharacters,
@@ -44,13 +57,7 @@ export function CharacterReferencePanel({
 
   return (
     <>
-      <div
-        className={`min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3 transition-all duration-300 ease-out ${
-          isCollapsed
-            ? "w-0 opacity-0 translate-x-full pointer-events-none"
-            : "w-64 opacity-100 translate-x-0"
-        }`}
-      >
+      <div className={panelVariants({ collapsed: isCollapsed })}>
         <div className="h-full overflow-y-auto relative">
           <div className="sticky top-0 z-20 bg-card border-b border-border px-4 py-3">
             {onCollapseToggle && (

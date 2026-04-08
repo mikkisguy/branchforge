@@ -29,6 +29,22 @@ import { useToast } from "@/contexts/ToastContext";
 import { ApiRequestError } from "@/lib/api/client";
 import { registerModeFlushHandler } from "@/lib/editor-sync-coordinator";
 import type { FileSourceType } from "@branchforge/shared";
+import { cva } from "class-variance-authority";
+
+const sidebarVariants = cva(
+  "min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3 transition-all duration-300 ease-out",
+  {
+    variants: {
+      variant: {
+        collapsed: "w-0 opacity-0 -translate-x-full pointer-events-none",
+        expanded: "w-56 opacity-100 translate-x-0",
+      },
+    },
+    defaultVariants: {
+      variant: "expanded",
+    },
+  }
+);
 
 interface ScriptModeProps {
   projectId?: string;
@@ -763,11 +779,9 @@ export function ScriptMode({
       <div className="flex-1 flex gap-4 px-4 pb-4 overflow-hidden min-h-0 min-w-0">
         {/* Left Sidebar */}
         <div
-          className={`min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3 transition-all duration-300 ease-out ${
-            isLeftSidebarCollapsed
-              ? "w-0 opacity-0 -translate-x-full pointer-events-none"
-              : "w-56 opacity-100 translate-x-0"
-          }`}
+          className={sidebarVariants({
+            variant: isLeftSidebarCollapsed ? "collapsed" : "expanded",
+          })}
         >
           <div className="h-full overflow-y-auto relative">
             <div className="sticky top-0 z-20 bg-card border-b border-border pl-10 pr-4 py-3">
@@ -882,9 +896,7 @@ export function ScriptMode({
           activeLabel={activeLabel}
           statusColor={statusColor}
           isCollapsed={isRightSidebarCollapsed}
-          onCollapseToggle={() =>
-            setIsRightSidebarCollapsed(!isRightSidebarCollapsed)
-          }
+          onCollapseToggle={() => setIsRightSidebarCollapsed((prev) => !prev)}
         />
       </div>
 
