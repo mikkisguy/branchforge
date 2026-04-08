@@ -788,8 +788,8 @@ export function ScriptMode({
               <button
                 onClick={() => setIsLeftSidebarCollapsed(true)}
                 className="absolute top-2 left-2 z-30 p-1 rounded-md hover:bg-muted/80 transition-colors"
-                aria-label="Collapse sidebar"
-                title="Collapse sidebar"
+                aria-label="Collapse project files sidebar"
+                title="Collapse project files sidebar"
               >
                 <ChevronLeft className="w-4 h-4 text-muted-foreground" />
               </button>
@@ -835,8 +835,8 @@ export function ScriptMode({
             <button
               onClick={() => setIsLeftSidebarCollapsed(false)}
               className="p-2 rounded-lg border border-border bg-card/50 hover:bg-muted/80 transition-colors"
-              aria-label="Expand sidebar"
-              title="Expand sidebar"
+              aria-label="Expand project files sidebar"
+              title="Expand project files sidebar"
             >
               <ChevronRight className="w-4 h-4 text-muted-foreground" />
             </button>
