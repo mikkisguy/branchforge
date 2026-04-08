@@ -1,6 +1,7 @@
 # AGENTS.md
 
-This file provides guidance to agentic coding assistants working in this repository.
+This file is the authoritative technical reference for agentic coding assistants.
+It contains detailed implementation guidelines that should be followed exactly.
 
 ## Development Commands
 
@@ -87,8 +88,8 @@ pnpm db:studio
 - Files: kebab-case for utilities/services, PascalCase for components
 - Functions: camelCase
 - Classes/Interfaces: PascalCase
-- Constants: UPPER_SNAKE_CASE
-- Test files: `*.unit.test.ts`, `*.integration.test.ts`, `*.test.tsx`
+- Constants: Use UPPER_SNAKE_CASE for global values (API_BASE_URL, MAX_RETRIES, error codes). Use camelCase for config objects, theme values, and module-level defaults.
+- Test files: `*.unit.test.ts`, `*.integration.test.ts`
 
 ### Formatting (Prettier)
 

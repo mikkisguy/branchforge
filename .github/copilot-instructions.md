@@ -1,6 +1,7 @@
 # AGENTS.md
 
-This file provides guidance to agentic coding assistants working in this repository.
+This file is the authoritative technical reference for agentic coding assistants.
+It contains detailed implementation guidelines that should be followed exactly.
 
 ## Development Commands
 
@@ -71,7 +72,7 @@ pnpm db:studio
 - All imports must use `.js` extensions (ES modules)
 - Backend: Import from local files with relative paths: `import { thing } from "../service.js"`
 - Frontend: Use `@/` alias for src: `import { thing } from "@/lib/thing"`
-- Type-only imports: `import type { Thing } from "./file"`
+- Type-only imports: `import type { Thing } from "./file.js"`
 - Order: external libs → workspace packages → local modules
 
 ### TypeScript
@@ -87,8 +88,8 @@ pnpm db:studio
 - Files: kebab-case for utilities/services, PascalCase for components
 - Functions: camelCase
 - Classes/Interfaces: PascalCase
-- Constants: UPPER_SNAKE_CASE
-- Test files: `*.unit.test.ts`, `*.integration.test.ts`, `*.test.tsx`
+- Constants: Use UPPER_SNAKE_CASE for global values (API_BASE_URL, MAX_RETRIES, error codes). Use camelCase for config objects, theme values, and module-level defaults.
+- Test files: `*.unit.test.ts`, `*.integration.test.ts`
 
 ### Formatting (Prettier)
 
