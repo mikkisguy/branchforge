@@ -133,7 +133,6 @@ Backend runs at `http://localhost:3000`, frontend at `http://localhost:5173`.
 - [CONTRIBUTING.md](CONTRIBUTING.md) - How to contribute
 - [SUPPORT.md](SUPPORT.md) - Get help and FAQ
 - [SECURITY.md](SECURITY.md) - Report vulnerabilities
-- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) - Community guidelines
 - [DEPLOYMENT.md](docs/DEPLOYMENT.md) - Deployment guide
 - [FEATURE_ROADMAP.md](docs/FEATURE_ROADMAP.md) - What's being built
 - [ACCESSIBILITY_ROADMAP.md](docs/ACCESSIBILITY_ROADMAP.md) - Accessibility improvements plan

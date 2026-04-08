@@ -33,6 +33,7 @@
   "devDependencies": {
     "@changesets/cli": "^2.30.0",
     "@types/node": "^22.19.17",
+    "eslint": "^10.2.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "prettier": "^3.8.1",

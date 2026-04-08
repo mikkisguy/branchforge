@@ -115,19 +115,19 @@ Keep branches focused on a single issue or small feature.
 
 ### Coding Standards
 
-For detailed code style guidelines, import conventions, testing patterns, and specific backend/frontend rules, see [AGENTS.md](./AGENTS.md).
+For detailed code style guidelines, import conventions, testing patterns, and specific backend/frontend implementation details, see [AGENTS.md](./AGENTS.md).
+
+Quick checklist before committing:
+
+```bash
+pnpm lint
+pnpm format
+pnpm typecheck
+pnpm test
+```
 
 - Use TypeScript for type safety
 - Follow existing code patterns and conventions
-- Run linting and formatting before committing:
-  ```bash
-  pnpm lint
-  pnpm format
-  ```
-- Run type checking:
-  ```bash
-  pnpm typecheck
-  ```
 - Keep functions and components small and focused
 
 ### Testing
@@ -139,6 +139,8 @@ For detailed code style guidelines, import conventions, testing patterns, and sp
   ```
 - Ensure all existing tests still pass
 - Focus on critical paths and edge cases
+
+For detailed testing patterns and framework-specific guidance, see [AGENTS.md](./AGENTS.md).
 
 ### Commit Messages
 
@@ -217,18 +219,17 @@ branchforge/
 
 ### Database Changes
 
-**Important**: Database schema changes are significant and require maintainer approval.
+Database schema changes are significant and require maintainer approval.
 
-1. Modify schema in `apps/backend/src/db/schema.ts`
-2. Generate migration:
-   ```bash
-   pnpm --filter @branchforge/backend db:generate
-   ```
-3. Review and test migration
-4. Get approval before running:
-   ```bash
-   pnpm --filter @branchforge/backend db:migrate
-   ```
+For the complete database workflow including schema structure and migration
+commands, see the **Database Migrations** section in [AGENTS.md](./AGENTS.md).
+
+**Quick reference:**
+
+1. Modify schema files in `apps/backend/src/db/schema/`
+2. Generate migration: `pnpm --filter @branchforge/backend db:generate`
+3. Get approval before applying
+4. Apply migration: `pnpm --filter @branchforge/backend db:migrate`
 
 ## Design Philosophy
 
