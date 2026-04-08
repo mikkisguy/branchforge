@@ -227,9 +227,9 @@ commands, see the **Database Migrations** section in [AGENTS.md](./AGENTS.md).
 **Quick reference:**
 
 1. Modify schema files in `apps/backend/src/db/schema/`
-2. Generate migration: `pnpm --filter backend db:generate`
+2. Generate migration: `pnpm --filter @branchforge/backend db:generate`
 3. Get approval before applying
-4. Apply migration: `pnpm --filter backend db:migrate`
+4. Apply migration: `pnpm --filter @branchforge/backend db:migrate`
 
 ## Design Philosophy
 

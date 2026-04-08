@@ -1,4 +1,4 @@
-# AGENTS.md
+# Copilot Instructions for BranchForge
 
 This file is the authoritative technical reference for agentic coding assistants.
 It contains detailed implementation guidelines that should be followed exactly.
@@ -89,7 +89,7 @@ pnpm db:studio
 - Functions: camelCase
 - Classes/Interfaces: PascalCase
 - Constants: Use UPPER_SNAKE_CASE for global values (API_BASE_URL, MAX_RETRIES, error codes). Use camelCase for config objects, theme values, and module-level defaults.
-- Test files: `*.unit.test.ts`, `*.integration.test.ts`
+- Test files: `*.unit.test.ts`, `*.integration.test.ts`, `*.test.tsx`
 
 ### Formatting (Prettier)
 
@@ -143,8 +143,8 @@ All types shared between frontend and backend MUST be defined in `packages/share
 NEVER create hand-written migration files. The only correct workflow:
 
 1. Modify schema files in `apps/backend/src/db/schema/`
-2. Run `pnpm --filter backend db:generate`
+2. Run `pnpm --filter @branchforge/backend db:generate`
 3. Review generated migration in `apps/backend/src/db/migrations/`
-4. Apply with `pnpm --filter backend db:migrate`
+4. Apply with `pnpm --filter @branchforge/backend db:migrate`
 
 Bypassing this breaks migration tracking and causes deployment failures.
