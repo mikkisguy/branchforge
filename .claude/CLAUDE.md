@@ -73,7 +73,6 @@ pnpm db:studio
 - Backend: Import from local files with relative paths: `import { thing } from "../service.js"`
 - Frontend: Use `@/` alias for src: `import { thing } from "@/lib/thing"`
 - Type-only imports: `import type { Thing } from "./file.js"`
-- Order: external libs → workspace packages → local modules
 
 ### TypeScript
 
