@@ -62,6 +62,7 @@ export function CharacterReferencePanel({
           <div className="sticky top-0 z-20 bg-card border-b border-border px-4 py-3">
             {onCollapseToggle && (
               <button
+                type="button"
                 onClick={onCollapseToggle}
                 className="absolute top-2 right-2 z-30 p-1 rounded-md hover:bg-muted/80 transition-colors"
                 aria-label="Collapse sidebar"
@@ -200,6 +201,7 @@ export function CharacterReferencePanel({
       {isCollapsed && onCollapseToggle && (
         <div className="min-h-0 shrink-0 mt-3 flex items-center -ml-4">
           <button
+            type="button"
             onClick={onCollapseToggle}
             className="p-2 rounded-lg border border-border bg-card/50 hover:bg-muted/80 transition-colors"
             aria-label="Expand sidebar"
