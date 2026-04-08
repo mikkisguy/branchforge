@@ -7,7 +7,7 @@
 
 import { useMemo } from "react";
 import type { PublicLabel } from "@branchforge/shared";
-import { Sparkles } from "lucide-react";
+import { Sparkles, ChevronLeft } from "lucide-react";
 
 interface SceneNavigatorProps {
   labels: PublicLabel[];
@@ -15,6 +15,7 @@ interface SceneNavigatorProps {
   onSelect: (labelId: string) => void;
   projectName?: string;
   projectLabelCount?: number;
+  onToggleCollapse?: () => void;
 }
 
 export function SceneNavigator({
@@ -23,6 +24,7 @@ export function SceneNavigator({
   onSelect,
   projectName,
   projectLabelCount,
+  onToggleCollapse,
 }: SceneNavigatorProps) {
   const groupedLabels = useMemo(() => {
     const groups = new Map<string, PublicLabel[]>();
@@ -61,7 +63,20 @@ export function SceneNavigator({
   return (
     <div className="h-full overflow-y-auto">
       {/* Project Info Header */}
-      <div className="sticky top-0 z-20 bg-card border-b border-border px-4 py-3">
+      <div
+        className={`sticky top-0 z-20 bg-card border-b border-border pr-4 py-3 ${onToggleCollapse ? "pl-10" : "px-4"}`}
+      >
+        {onToggleCollapse && (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="absolute top-2 left-2 z-30 p-1 rounded-md hover:bg-muted/80 transition-colors"
+            aria-label="Collapse scene navigator sidebar"
+            title="Collapse scene navigator sidebar"
+          >
+            <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+          </button>
+        )}
         <div className="flex items-center gap-3">
           <div className="w-7 h-7 rounded bg-[var(--theme-color)] flex items-center justify-center shadow-sm shrink-0">
             <Sparkles className="w-4 h-4 text-white" />

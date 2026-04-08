@@ -12,6 +12,7 @@ import {
   CharacterReferencePanel,
   FocusModeToggle,
 } from "@/components/write-mode";
+import { ChevronRight } from "lucide-react";
 import { EditorTabBar, type EditorTabBarItem } from "@/components/ide-shared";
 import { useLabels } from "@/hooks/useLabels";
 import { useCharacters } from "@/hooks/useCharacters";
@@ -23,6 +24,22 @@ import { Loader2, FileQuestion } from "lucide-react";
 import type { LabelDetail } from "@branchforge/shared";
 import { useToast } from "@/contexts/ToastContext";
 import { registerModeFlushHandler } from "@/lib/editor-sync-coordinator";
+import { cva } from "class-variance-authority";
+
+const sidebarVariants = cva(
+  "min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3 transition-all duration-300 ease-out",
+  {
+    variants: {
+      variant: {
+        collapsed: "w-0 opacity-0 -translate-x-full pointer-events-none",
+        expanded: "w-48 opacity-100 translate-x-0",
+      },
+    },
+    defaultVariants: {
+      variant: "expanded",
+    },
+  }
+);
 
 interface WriteModeProps {
   projectName?: string;
@@ -69,6 +86,24 @@ export function WriteMode({ projectName }: WriteModeProps) {
 
   const { characters } = useCharacters(currentProject?.id ?? "");
   const [isFocusMode, setIsFocusMode] = useState(false);
+
+  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(() => {
+    const leftCollapsed = localStorage.getItem(
+      "writemode-left-sidebar-collapsed"
+    );
+    return leftCollapsed === "true";
+  });
+  const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(() => {
+    const rightCollapsed = localStorage.getItem(
+      "writemode-right-sidebar-collapsed"
+    );
+    return rightCollapsed === "true";
+  });
+
+  const [preFocusSidebarStates, setPreFocusSidebarStates] = useState<{
+    leftCollapsed: boolean;
+    rightCollapsed: boolean;
+  } | null>(null);
   const [lastKnownVersionByLabel, setLastKnownVersionByLabel] = useState<
     Map<string, number>
   >(new Map());
@@ -134,9 +169,40 @@ export function WriteMode({ projectName }: WriteModeProps) {
     }
   }, [activeLabelId, currentProject?.id]);
 
+  useEffect(() => {
+    localStorage.setItem(
+      "writemode-left-sidebar-collapsed",
+      String(isLeftSidebarCollapsed)
+    );
+  }, [isLeftSidebarCollapsed]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      "writemode-right-sidebar-collapsed",
+      String(isRightSidebarCollapsed)
+    );
+  }, [isRightSidebarCollapsed]);
+
   const handleFocusModeToggle = useCallback(() => {
-    setIsFocusMode((prev) => !prev);
-  }, []);
+    if (!isFocusMode) {
+      setPreFocusSidebarStates({
+        leftCollapsed: isLeftSidebarCollapsed,
+        rightCollapsed: isRightSidebarCollapsed,
+      });
+      setIsFocusMode(true);
+    } else {
+      setIsFocusMode(false);
+      if (preFocusSidebarStates) {
+        setIsLeftSidebarCollapsed(preFocusSidebarStates.leftCollapsed);
+        setIsRightSidebarCollapsed(preFocusSidebarStates.rightCollapsed);
+      }
+    }
+  }, [
+    isFocusMode,
+    isLeftSidebarCollapsed,
+    isRightSidebarCollapsed,
+    preFocusSidebarStates,
+  ]);
 
   // Update saved hash when active label changes or save completes
   useEffect(() => {
@@ -620,20 +686,37 @@ export function WriteMode({ projectName }: WriteModeProps) {
         {/* Left Sidebar */}
         <div
           aria-hidden={isFocusMode}
-          className={`min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden transition-all duration-300 ease-out mt-3 ${
-            isFocusMode
-              ? "w-0 opacity-0 -translate-x-full pointer-events-none"
-              : "w-48 opacity-100 translate-x-0"
-          }`}
+          className={sidebarVariants({
+            variant:
+              isFocusMode || isLeftSidebarCollapsed ? "collapsed" : "expanded",
+          })}
         >
-          <SceneNavigator
-            labels={labels}
-            activeLabelId={activeLabelId}
-            onSelect={handleSelectLabel}
-            projectName={projectName || currentProject?.name}
-            projectLabelCount={labels.length}
-          />
+          <div className="h-full overflow-y-auto relative">
+            <SceneNavigator
+              labels={labels}
+              activeLabelId={activeLabelId}
+              onSelect={handleSelectLabel}
+              projectName={projectName || currentProject?.name}
+              projectLabelCount={labels.length}
+              onToggleCollapse={() => setIsLeftSidebarCollapsed(true)}
+            />
+          </div>
         </div>
+
+        {/* Left Sidebar Expand Button (shown when collapsed and not in focus mode) */}
+        {isLeftSidebarCollapsed && !isFocusMode && (
+          <div className="min-h-0 shrink-0 mt-3 flex items-center -ml-4">
+            <button
+              type="button"
+              onClick={() => setIsLeftSidebarCollapsed(false)}
+              className="p-2 rounded-lg border border-border bg-card/50 hover:bg-muted/80 transition-colors"
+              aria-label="Expand scene navigator sidebar"
+              title="Expand scene navigator sidebar"
+            >
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
+        )}
 
         {/* Center Column: Tab Bar + Editor */}
         <div className="flex-1 flex flex-col min-h-0 min-w-0 mt-3">
@@ -665,19 +748,16 @@ export function WriteMode({ projectName }: WriteModeProps) {
         </div>
 
         {/* Right Sidebar */}
-        <div
-          aria-hidden={isFocusMode}
-          className={`min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden transition-all duration-300 ease-out mt-3 ${
-            isFocusMode
-              ? "w-0 opacity-0 translate-x-full pointer-events-none"
-              : "w-56 opacity-100 translate-x-0"
-          }`}
-        >
-          <CharacterReferencePanel
-            characters={characters}
-            activeLabel={activeLabel}
-          />
-        </div>
+        <CharacterReferencePanel
+          characters={characters}
+          activeLabel={activeLabel}
+          isCollapsed={isRightSidebarCollapsed || isFocusMode}
+          onCollapseToggle={
+            !isFocusMode
+              ? () => setIsRightSidebarCollapsed((prev) => !prev)
+              : undefined
+          }
+        />
       </div>
     </div>
   );

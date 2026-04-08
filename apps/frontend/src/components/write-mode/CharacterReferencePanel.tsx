@@ -6,17 +6,34 @@
  */
 
 import { useMemo } from "react";
-import { Heart } from "lucide-react";
+import { Heart, ChevronRight, ChevronLeft } from "lucide-react";
 import type { Character, LabelDetail } from "@branchforge/shared";
+import { cva } from "class-variance-authority";
+
+const panelVariants = cva(
+  "min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3 transition-all duration-300 ease-out",
+  {
+    variants: {
+      collapsed: {
+        true: "w-0",
+        false: "w-56",
+      },
+    },
+  }
+);
 
 interface CharacterReferencePanelProps {
   characters: Character[];
   activeLabel: LabelDetail | undefined;
+  isCollapsed?: boolean;
+  onCollapseToggle?: () => void;
 }
 
 export function CharacterReferencePanel({
   characters,
   activeLabel,
+  isCollapsed = false,
+  onCollapseToggle,
 }: CharacterReferencePanelProps) {
   const sceneCharacters = useMemo(() => {
     return activeLabel?.characters ?? [];
@@ -41,104 +58,139 @@ export function CharacterReferencePanel({
   }, [sceneCharacters, characterById]);
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="sticky top-0 z-10 bg-card border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold tracking-wide">Characters</h2>
-        <p className="text-xs text-muted-foreground mt-1">
-          {resolvedSceneChars.length} in scene · {characters.length} total
-        </p>
-      </div>
-
-      <div className="p-3 space-y-4">
-        {/* Scene Characters */}
-        <div>
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
-            In This Scene
-          </h3>
-
-          {resolvedSceneChars.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-2">
-                <span className="text-2xl opacity-40">👥</span>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                No characters in this scene
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {resolvedSceneChars.map((character) => (
-                <div
-                  key={character.id}
-                  className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-muted transition-colors focus-within:bg-muted group"
-                >
-                  <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0 shadow-sm"
-                    style={{ backgroundColor: character.color }}
-                  >
-                    {character.displayName[0] || "?"}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">
-                      {character.displayName}
-                    </p>
-                    {character.dialogueStyle && (
-                      <p className="text-xs text-muted-foreground truncate italic">
-                        "{character.dialogueStyle}"
-                      </p>
-                    )}
-                  </div>
-                  {character.isLoveInterest && (
-                    <Heart className="w-4 h-4 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Other Characters */}
-        {otherCharacters.length > 0 && (
-          <div className="pt-4 border-t border-border">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
-              Other Characters
-            </h3>
-
-            <div className="space-y-1">
-              {otherCharacters.map((character) => (
-                <div
-                  key={character.id}
-                  className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted transition-colors focus-within:bg-muted group"
-                >
-                  <div
-                    className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs shrink-0 shadow-sm"
-                    style={{ backgroundColor: character.color }}
-                  >
-                    {character.displayName[0] || "?"}
-                  </div>
-                  <span className="text-sm text-muted-foreground truncate flex-1">
-                    {character.displayName}
-                  </span>
-                  {character.isLoveInterest && (
-                    <Heart className="w-3.5 h-3.5 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {characters.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-2">
-              <span className="text-2xl opacity-40">👤</span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              No characters in project
+    <>
+      <div className={panelVariants({ collapsed: isCollapsed })}>
+        <div
+          className={`h-full overflow-y-auto relative transition-all duration-300 ease-out ${
+            isCollapsed
+              ? "opacity-0 translate-x-full pointer-events-none"
+              : "opacity-100 translate-x-0"
+          }`}
+        >
+          <div className="sticky top-0 z-20 bg-card border-b border-border px-4 py-3">
+            {onCollapseToggle && (
+              <button
+                type="button"
+                onClick={onCollapseToggle}
+                className="absolute top-2 right-2 z-30 p-1 rounded-md hover:bg-muted/80 transition-colors"
+                aria-label="Collapse character reference sidebar"
+                title="Collapse character reference sidebar"
+              >
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </button>
+            )}
+            <h2 className="text-sm font-semibold tracking-wide">Characters</h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              {resolvedSceneChars.length} in scene · {characters.length} total
             </p>
           </div>
-        )}
+
+          <div className="p-3 space-y-4">
+            {/* Scene Characters */}
+            <div>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
+                In This Scene
+              </h3>
+
+              {resolvedSceneChars.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-2">
+                    <span className="text-2xl opacity-40">👥</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    No characters in this scene
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {resolvedSceneChars.map((character) => (
+                    <div
+                      key={character.id}
+                      className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-muted transition-colors focus-within:bg-muted group"
+                    >
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0 shadow-sm"
+                        style={{ backgroundColor: character.color }}
+                      >
+                        {character.displayName[0] || "?"}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">
+                          {character.displayName}
+                        </p>
+                        {character.dialogueStyle && (
+                          <p className="text-xs text-muted-foreground truncate italic">
+                            "{character.dialogueStyle}"
+                          </p>
+                        )}
+                      </div>
+                      {character.isLoveInterest && (
+                        <Heart className="w-4 h-4 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Other Characters */}
+            {otherCharacters.length > 0 && (
+              <div className="pt-4 border-t border-border">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
+                  Other Characters
+                </h3>
+
+                <div className="space-y-1">
+                  {otherCharacters.map((character) => (
+                    <div
+                      key={character.id}
+                      className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted transition-colors focus-within:bg-muted group"
+                    >
+                      <div
+                        className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs shrink-0 shadow-sm"
+                        style={{ backgroundColor: character.color }}
+                      >
+                        {character.displayName[0] || "?"}
+                      </div>
+                      <span className="text-sm text-muted-foreground truncate flex-1">
+                        {character.displayName}
+                      </span>
+                      {character.isLoveInterest && (
+                        <Heart className="w-3.5 h-3.5 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {characters.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-2">
+                  <span className="text-2xl opacity-40">👤</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  No characters in project
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
-    </div>
+
+      {isCollapsed && onCollapseToggle && (
+        <div className="min-h-0 shrink-0 mt-3 flex items-center -ml-4">
+          <button
+            type="button"
+            onClick={onCollapseToggle}
+            className="p-2 rounded-lg border border-border bg-card/50 hover:bg-muted/80 transition-colors"
+            aria-label="Expand character reference sidebar"
+            title="Expand character reference sidebar"
+          >
+            <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </div>
+      )}
+    </>
   );
 }
