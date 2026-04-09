@@ -111,6 +111,11 @@ export function WriteMode({ projectName }: WriteModeProps) {
     leftCollapsed: boolean;
     rightCollapsed: boolean;
   } | null>(null);
+  const [preFocusElement, setPreFocusElement] = useState<HTMLElement | null>(
+    null
+  );
+  const focusToggleRef = useRef<HTMLButtonElement>(null);
+  const editorRef = useRef<{ focus: () => void } | null>(null);
   const [lastKnownVersionByLabel, setLastKnownVersionByLabel] = useState<
     Map<string, number>
   >(new Map());
@@ -196,19 +201,31 @@ export function WriteMode({ projectName }: WriteModeProps) {
         leftCollapsed: isLeftSidebarCollapsed,
         rightCollapsed: isRightSidebarCollapsed,
       });
+      setPreFocusElement(document.activeElement as HTMLElement | null);
       setIsFocusMode(true);
+      requestAnimationFrame(() => {
+        editorRef.current?.focus();
+      });
     } else {
       setIsFocusMode(false);
       if (preFocusSidebarStates) {
         setIsLeftSidebarCollapsed(preFocusSidebarStates.leftCollapsed);
         setIsRightSidebarCollapsed(preFocusSidebarStates.rightCollapsed);
       }
+      requestAnimationFrame(() => {
+        const restoreTarget = preFocusElement || focusToggleRef.current;
+        if (restoreTarget) {
+          restoreTarget.focus();
+        }
+        setPreFocusElement(null);
+      });
     }
   }, [
     isFocusMode,
     isLeftSidebarCollapsed,
     isRightSidebarCollapsed,
     preFocusSidebarStates,
+    preFocusElement,
   ]);
 
   // Update saved hash when active label changes or save completes
@@ -684,6 +701,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
       {isFocusMode && (
         <div className="fixed top-2 right-2 z-[100] pointer-events-auto">
           <FocusModeToggle
+            ref={focusToggleRef}
             isFocusMode={isFocusMode}
             onToggle={handleFocusModeToggle}
           />
@@ -744,6 +762,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
               <div className="h-12 overflow-hidden rounded-lg border border-border/80 bg-card/55 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                 <div className="h-full flex items-center justify-end px-3">
                   <FocusModeToggle
+                    ref={focusToggleRef}
                     isFocusMode={isFocusMode}
                     onToggle={handleFocusModeToggle}
                   />
@@ -756,6 +775,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
           <div className="flex-1 flex justify-center min-h-0 min-w-0">
             <div className="w-full max-w-3xl min-h-0">
               <ProseEditor
+                ref={editorRef}
                 activeLabel={activeLabel}
                 characters={characters}
                 onChange={handleContentChange}
