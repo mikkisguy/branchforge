@@ -5,87 +5,51 @@
  * Matches app design system with theme colors.
  */
 
-import { useEffect, useCallback, useRef, memo } from "react";
+import { memo, forwardRef } from "react";
 import { Maximize2, Minimize2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface FocusModeToggleProps {
   isFocusMode: boolean;
   onToggle: () => void;
 }
 
-const FOCUS_MODE_STORAGE_KEY = "writemode-focus-mode";
+export const FocusModeToggle = memo(
+  forwardRef<HTMLButtonElement, FocusModeToggleProps>(function FocusModeToggle(
+    { isFocusMode, onToggle },
+    ref
+  ) {
+    const title = isFocusMode
+      ? "Exit focus mode (Ctrl+Shift+F)"
+      : "Enter focus mode (Ctrl+Shift+F)";
 
-export const FocusModeToggle = memo(function FocusModeToggle({
-  isFocusMode,
-  onToggle,
-}: FocusModeToggleProps) {
-  const initializedRef = useRef(false);
-
-  useEffect(() => {
-    if (initializedRef.current) return;
-    initializedRef.current = true;
-
-    try {
-      const saved = localStorage.getItem(FOCUS_MODE_STORAGE_KEY);
-      if (saved === "true" && !isFocusMode) {
-        onToggle();
-      }
-    } catch {
-      console.warn("Could not load focus mode preference from localStorage");
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        FOCUS_MODE_STORAGE_KEY,
-        isFocusMode ? "true" : "false"
-      );
-    } catch {
-      console.warn("Could not save focus mode preference to localStorage");
-    }
-  }, [isFocusMode]);
-
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key === "F") {
-        e.preventDefault();
-        onToggle();
-      }
-    },
-    [onToggle]
-  );
-
-  useEffect(() => {
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleKeyDown]);
-
-  return (
-    <button
-      onClick={onToggle}
-      className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-all ${
-        isFocusMode
-          ? "bg-[var(--theme-color)]/20 text-[var(--theme-color)]"
-          : "hover:bg-muted text-muted-foreground"
-      }`}
-      title={
-        isFocusMode
-          ? "Exit focus mode (Ctrl+Shift+F)"
-          : "Enter focus mode (Ctrl+Shift+F)"
-      }
-    >
-      {isFocusMode ? (
-        <>
-          <Minimize2 className="w-4 h-4" />
-          <span className="font-medium">Exit Focus</span>
-        </>
-      ) : (
-        <>
-          <Maximize2 className="w-4 h-4" />
-          <span>Focus Mode</span>
-        </>
-      )}
-    </button>
-  );
-});
+    return (
+      <button
+        type="button"
+        ref={ref}
+        onClick={onToggle}
+        aria-label={title}
+        title={title}
+        className={cn(
+          "group inline-flex items-center transition-all duration-200",
+          "focus-visible:outline-none focus-visible:ring-2",
+          "focus-visible:ring-[var(--theme-color)]/35",
+          isFocusMode
+            ? "gap-2 rounded-full border border-border/70 bg-card/90 px-3.5 py-2 whitespace-nowrap text-sm font-medium text-foreground shadow-lg backdrop-blur-sm hover:border-[var(--theme-color)]/35 hover:bg-card"
+            : "gap-2 rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+        )}
+      >
+        {isFocusMode ? (
+          <>
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--theme-color)]/15 text-[var(--theme-color)]">
+              <Minimize2 className="h-3.5 w-3.5" />
+            </span>
+            <span className="font-semibold">Exit Focus</span>
+          </>
+        ) : (
+          <Maximize2 className="h-4 w-4" />
+        )}
+      </button>
+    );
+  })
+);

@@ -10,8 +10,10 @@ import {
   ProseEditor,
   SceneNavigator,
   CharacterReferencePanel,
-  FocusModeToggle,
 } from "@/components/write-mode";
+import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
+import { useFocusModeKeyboardHandler } from "@/hooks/useFocusModeKeyboardHandler";
+import { useFocusModeState } from "@/hooks/useFocusModeState";
 import { ChevronRight } from "lucide-react";
 import { EditorTabBar, type EditorTabBarItem } from "@/components/ide-shared";
 import { useLabels } from "@/hooks/useLabels";
@@ -85,7 +87,15 @@ export function WriteMode({ projectName }: WriteModeProps) {
   } = useLabels();
 
   const { characters } = useCharacters(currentProject?.id ?? "");
-  const [isFocusMode, setIsFocusMode] = useState(false);
+
+  const {
+    isFocusMode,
+    setIsFocusMode,
+    preFocusSidebarStates,
+    setPreFocusSidebarStates,
+    preFocusElementRef,
+    focusToggleRef,
+  } = useFocusModeState("writemode-focus-mode");
 
   const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(() => {
     const leftCollapsed = localStorage.getItem(
@@ -100,10 +110,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
     return rightCollapsed === "true";
   });
 
-  const [preFocusSidebarStates, setPreFocusSidebarStates] = useState<{
-    leftCollapsed: boolean;
-    rightCollapsed: boolean;
-  } | null>(null);
+  const editorRef = useRef<{ focus: () => void } | null>(null);
   const [lastKnownVersionByLabel, setLastKnownVersionByLabel] = useState<
     Map<string, number>
   >(new Map());
@@ -189,19 +196,44 @@ export function WriteMode({ projectName }: WriteModeProps) {
         leftCollapsed: isLeftSidebarCollapsed,
         rightCollapsed: isRightSidebarCollapsed,
       });
+      preFocusElementRef.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
       setIsFocusMode(true);
+      requestAnimationFrame(() => {
+        editorRef.current?.focus();
+      });
     } else {
       setIsFocusMode(false);
       if (preFocusSidebarStates) {
         setIsLeftSidebarCollapsed(preFocusSidebarStates.leftCollapsed);
         setIsRightSidebarCollapsed(preFocusSidebarStates.rightCollapsed);
       }
+      requestAnimationFrame(() => {
+        const restoreTarget = preFocusElementRef.current?.isConnected
+          ? preFocusElementRef.current
+          : focusToggleRef.current;
+
+        if (restoreTarget && restoreTarget.isConnected) {
+          restoreTarget.focus();
+        }
+
+        preFocusElementRef.current = null;
+      });
     }
   }, [
     isFocusMode,
+    setIsFocusMode,
     isLeftSidebarCollapsed,
+    setIsLeftSidebarCollapsed,
     isRightSidebarCollapsed,
+    setIsRightSidebarCollapsed,
     preFocusSidebarStates,
+    setPreFocusSidebarStates,
+    preFocusElementRef,
+    focusToggleRef,
+    editorRef,
   ]);
 
   // Update saved hash when active label changes or save completes
@@ -576,13 +608,11 @@ export function WriteMode({ projectName }: WriteModeProps) {
     };
   }, [saveStatus, lastSaved]);
 
+  useFocusModeKeyboardHandler(handleFocusModeToggle);
+
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyF") {
-        e.preventDefault();
-        handleFocusModeToggle();
-      }
       if ((e.ctrlKey || e.metaKey) && e.code === "KeyS") {
         e.preventDefault();
         triggerSave();
@@ -591,7 +621,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleFocusModeToggle, triggerSave]);
+  }, [triggerSave]);
 
   // Warn user before tab close while dirty
   useEffect(() => {
@@ -673,13 +703,16 @@ export function WriteMode({ projectName }: WriteModeProps) {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      {/* Floating Focus Mode Toggle */}
-      <div className="fixed top-1 right-1 z-50">
-        <FocusModeToggle
-          isFocusMode={isFocusMode}
-          onToggle={handleFocusModeToggle}
-        />
-      </div>
+      {/* Floating Focus Mode Toggle (shown when focus mode is ON) */}
+      {isFocusMode && (
+        <div className="fixed top-2 right-2 z-[100] pointer-events-auto">
+          <FocusModeToggle
+            ref={focusToggleRef}
+            isFocusMode={isFocusMode}
+            onToggle={handleFocusModeToggle}
+          />
+        </div>
+      )}
 
       {/* Main Editor Layout */}
       <div className="flex-1 flex gap-4 px-4 pb-4 overflow-hidden min-h-0 min-w-0">
@@ -720,20 +753,35 @@ export function WriteMode({ projectName }: WriteModeProps) {
 
         {/* Center Column: Tab Bar + Editor */}
         <div className="flex-1 flex flex-col min-h-0 min-w-0 mt-3">
-          <EditorTabBar
-            hidden={isFocusMode}
-            items={tabItems}
-            activeItemId={activeLabelId}
-            onSelect={handleSelectLabel}
-            onClose={handleCloseTab}
-            idPrefix="tab-"
-            titleMaxWidthClassName="max-w-[180px]"
-          />
+          {!isFocusMode && (
+            <div className="mb-2 flex gap-2">
+              <div className="flex-1 min-w-0">
+                <EditorTabBar
+                  items={tabItems}
+                  activeItemId={activeLabelId}
+                  onSelect={handleSelectLabel}
+                  onClose={handleCloseTab}
+                  idPrefix="tab-"
+                  titleMaxWidthClassName="max-w-[180px]"
+                />
+              </div>
+              <div className="h-12 overflow-hidden rounded-lg border border-border/80 bg-card/55 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                <div className="h-full flex items-center justify-end px-3">
+                  <FocusModeToggle
+                    ref={focusToggleRef}
+                    isFocusMode={isFocusMode}
+                    onToggle={handleFocusModeToggle}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Main Editor */}
           <div className="flex-1 flex justify-center min-h-0 min-w-0">
             <div className="w-full max-w-3xl min-h-0">
               <ProseEditor
+                ref={editorRef}
                 activeLabel={activeLabel}
                 characters={characters}
                 onChange={handleContentChange}
