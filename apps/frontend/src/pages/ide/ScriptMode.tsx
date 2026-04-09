@@ -16,6 +16,8 @@ import { ProjectFileTree } from "@/components/script-mode/ProjectFileTree";
 import { EditorTabBar, type EditorTabBarItem } from "@/components/ide-shared";
 import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
 import { useLabels } from "@/hooks/useLabels";
+import { useFocusModeKeyboardHandler } from "@/hooks/useFocusModeKeyboardHandler";
+import { useFocusModeState } from "@/hooks/useFocusModeState";
 import { useGitLab } from "@/hooks/useGitLab";
 import { useCharacters } from "@/hooks/useCharacters";
 import { useProjectFiles } from "@/hooks/useProjectFiles";
@@ -89,23 +91,20 @@ export function ScriptMode({
     return rightCollapsed === "true";
   });
 
-  const [isFocusMode, setIsFocusMode] = useState(() => {
-    const saved = localStorage.getItem("scriptmode-focus-mode");
-    return saved === "true";
-  });
+  const {
+    isFocusMode,
+    setIsFocusMode,
+    preFocusSidebarStates,
+    setPreFocusSidebarStates,
+    preFocusElementRef,
+    focusToggleRef,
+  } = useFocusModeState("scriptmode-focus-mode");
 
-  const [preFocusSidebarStates, setPreFocusSidebarStates] = useState<{
-    leftCollapsed: boolean;
-    rightCollapsed: boolean;
-  } | null>(null);
-
-  const preFocusActiveElementRef = useRef<HTMLElement | null>(null);
-  const focusToggleRef = useRef<HTMLButtonElement | null>(null);
   const editorRef = useRef<ScriptEditorRef>(null);
 
   const handleFocusModeToggle = useCallback(() => {
     if (!isFocusMode) {
-      preFocusActiveElementRef.current =
+      preFocusElementRef.current =
         document.activeElement instanceof HTMLElement
           ? document.activeElement
           : null;
@@ -121,22 +120,25 @@ export function ScriptMode({
         setIsLeftSidebarCollapsed(preFocusSidebarStates.leftCollapsed);
         setIsRightSidebarCollapsed(preFocusSidebarStates.rightCollapsed);
       }
-      if (preFocusActiveElementRef.current) {
-        preFocusActiveElementRef.current.focus();
+      if (preFocusElementRef.current) {
+        preFocusElementRef.current.focus();
       } else if (focusToggleRef.current) {
         focusToggleRef.current.focus();
       }
     }
   }, [
     isFocusMode,
+    setIsFocusMode,
     isLeftSidebarCollapsed,
+    setIsLeftSidebarCollapsed,
     isRightSidebarCollapsed,
+    setIsRightSidebarCollapsed,
     preFocusSidebarStates,
+    setPreFocusSidebarStates,
+    preFocusElementRef,
+    focusToggleRef,
+    editorRef,
   ]);
-
-  useEffect(() => {
-    localStorage.setItem("scriptmode-focus-mode", String(isFocusMode));
-  }, [isFocusMode]);
 
   // Track open tabs with project-scoped persistence
   const [openTabs, setOpenTabs] = useState<string[]>([]);
@@ -497,18 +499,7 @@ export function ScriptMode({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [triggerFileSave]);
 
-  // Handle Ctrl+Shift+F for focus mode
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyF") {
-        e.preventDefault();
-        handleFocusModeToggle();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleFocusModeToggle]);
+  useFocusModeKeyboardHandler(handleFocusModeToggle);
 
   // Get active file content directly for Script Mode editing
   // Use edited content if available, otherwise use original content

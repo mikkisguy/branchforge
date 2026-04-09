@@ -10,8 +10,10 @@ import {
   ProseEditor,
   SceneNavigator,
   CharacterReferencePanel,
-  FocusModeToggle,
 } from "@/components/write-mode";
+import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
+import { useFocusModeKeyboardHandler } from "@/hooks/useFocusModeKeyboardHandler";
+import { useFocusModeState } from "@/hooks/useFocusModeState";
 import { ChevronRight } from "lucide-react";
 import { EditorTabBar, type EditorTabBarItem } from "@/components/ide-shared";
 import { useLabels } from "@/hooks/useLabels";
@@ -85,14 +87,15 @@ export function WriteMode({ projectName }: WriteModeProps) {
   } = useLabels();
 
   const { characters } = useCharacters(currentProject?.id ?? "");
-  const [isFocusMode, setIsFocusMode] = useState(() => {
-    const saved = localStorage.getItem("writemode-focus-mode");
-    return saved === "true";
-  });
 
-  useEffect(() => {
-    localStorage.setItem("writemode-focus-mode", String(isFocusMode));
-  }, [isFocusMode]);
+  const {
+    isFocusMode,
+    setIsFocusMode,
+    preFocusSidebarStates,
+    setPreFocusSidebarStates,
+    preFocusElementRef,
+    focusToggleRef,
+  } = useFocusModeState("writemode-focus-mode");
 
   const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(() => {
     const leftCollapsed = localStorage.getItem(
@@ -107,14 +110,6 @@ export function WriteMode({ projectName }: WriteModeProps) {
     return rightCollapsed === "true";
   });
 
-  const [preFocusSidebarStates, setPreFocusSidebarStates] = useState<{
-    leftCollapsed: boolean;
-    rightCollapsed: boolean;
-  } | null>(null);
-  const [preFocusElement, setPreFocusElement] = useState<HTMLElement | null>(
-    null
-  );
-  const focusToggleRef = useRef<HTMLButtonElement>(null);
   const editorRef = useRef<{ focus: () => void } | null>(null);
   const [lastKnownVersionByLabel, setLastKnownVersionByLabel] = useState<
     Map<string, number>
@@ -201,7 +196,10 @@ export function WriteMode({ projectName }: WriteModeProps) {
         leftCollapsed: isLeftSidebarCollapsed,
         rightCollapsed: isRightSidebarCollapsed,
       });
-      setPreFocusElement(document.activeElement as HTMLElement | null);
+      preFocusElementRef.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
       setIsFocusMode(true);
       requestAnimationFrame(() => {
         editorRef.current?.focus();
@@ -213,19 +211,29 @@ export function WriteMode({ projectName }: WriteModeProps) {
         setIsRightSidebarCollapsed(preFocusSidebarStates.rightCollapsed);
       }
       requestAnimationFrame(() => {
-        const restoreTarget = preFocusElement || focusToggleRef.current;
-        if (restoreTarget) {
+        const restoreTarget = preFocusElementRef.current?.isConnected
+          ? preFocusElementRef.current
+          : focusToggleRef.current;
+
+        if (restoreTarget && restoreTarget.isConnected) {
           restoreTarget.focus();
         }
-        setPreFocusElement(null);
+
+        preFocusElementRef.current = null;
       });
     }
   }, [
     isFocusMode,
+    setIsFocusMode,
     isLeftSidebarCollapsed,
+    setIsLeftSidebarCollapsed,
     isRightSidebarCollapsed,
+    setIsRightSidebarCollapsed,
     preFocusSidebarStates,
-    preFocusElement,
+    setPreFocusSidebarStates,
+    preFocusElementRef,
+    focusToggleRef,
+    editorRef,
   ]);
 
   // Update saved hash when active label changes or save completes
@@ -600,13 +608,11 @@ export function WriteMode({ projectName }: WriteModeProps) {
     };
   }, [saveStatus, lastSaved]);
 
+  useFocusModeKeyboardHandler(handleFocusModeToggle);
+
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyF") {
-        e.preventDefault();
-        handleFocusModeToggle();
-      }
       if ((e.ctrlKey || e.metaKey) && e.code === "KeyS") {
         e.preventDefault();
         triggerSave();
@@ -615,7 +621,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleFocusModeToggle, triggerSave]);
+  }, [triggerSave]);
 
   // Warn user before tab close while dirty
   useEffect(() => {

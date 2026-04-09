@@ -235,6 +235,17 @@ export const ProseEditor = forwardRef<ProseEditorRef, ProseEditorProps>(
       ref,
       () => ({
         focus: () => {
+          const activeElement = document.activeElement;
+
+          if (activeElement instanceof HTMLTextAreaElement) {
+            for (const textarea of textareaRefs.current.values()) {
+              if (textarea === activeElement) {
+                textarea.focus();
+                return;
+              }
+            }
+          }
+
           const textarea = textareaRefs.current.get(0);
           if (textarea) {
             textarea.focus();

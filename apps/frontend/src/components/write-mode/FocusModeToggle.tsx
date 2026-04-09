@@ -14,45 +14,42 @@ interface FocusModeToggleProps {
   onToggle: () => void;
 }
 
-const FocusModeToggleInner = forwardRef<
-  HTMLButtonElement,
-  FocusModeToggleProps
->(function FocusModeToggle(
-  { isFocusMode, onToggle }: FocusModeToggleProps,
-  ref
-) {
-  const title = isFocusMode
-    ? "Exit focus mode (Ctrl+Shift+F)"
-    : "Enter focus mode (Ctrl+Shift+F)";
+export const FocusModeToggle = memo(
+  forwardRef<HTMLButtonElement, FocusModeToggleProps>(function FocusModeToggle(
+    { isFocusMode, onToggle },
+    ref
+  ) {
+    const title = isFocusMode
+      ? "Exit focus mode (Ctrl+Shift+F)"
+      : "Enter focus mode (Ctrl+Shift+F)";
 
-  return (
-    <button
-      type="button"
-      ref={ref}
-      onClick={onToggle}
-      aria-label={title}
-      title={title}
-      className={cn(
-        "group inline-flex items-center transition-all duration-200",
-        "focus-visible:outline-none focus-visible:ring-2",
-        "focus-visible:ring-[var(--theme-color)]/35",
-        isFocusMode
-          ? "gap-2 rounded-full border border-border/70 bg-card/90 px-3.5 py-2 whitespace-nowrap text-sm font-medium text-foreground shadow-lg backdrop-blur-sm hover:border-[var(--theme-color)]/35 hover:bg-card"
-          : "gap-2 rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-      )}
-    >
-      {isFocusMode ? (
-        <>
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--theme-color)]/15 text-[var(--theme-color)]">
-            <Minimize2 className="h-3.5 w-3.5" />
-          </span>
-          <span className="font-semibold">Exit Focus</span>
-        </>
-      ) : (
-        <Maximize2 className="h-4 w-4" />
-      )}
-    </button>
-  );
-});
-
-export const FocusModeToggle = memo(FocusModeToggleInner);
+    return (
+      <button
+        type="button"
+        ref={ref}
+        onClick={onToggle}
+        aria-label={title}
+        title={title}
+        className={cn(
+          "group inline-flex items-center transition-all duration-200",
+          "focus-visible:outline-none focus-visible:ring-2",
+          "focus-visible:ring-[var(--theme-color)]/35",
+          isFocusMode
+            ? "gap-2 rounded-full border border-border/70 bg-card/90 px-3.5 py-2 whitespace-nowrap text-sm font-medium text-foreground shadow-lg backdrop-blur-sm hover:border-[var(--theme-color)]/35 hover:bg-card"
+            : "gap-2 rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+        )}
+      >
+        {isFocusMode ? (
+          <>
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--theme-color)]/15 text-[var(--theme-color)]">
+              <Minimize2 className="h-3.5 w-3.5" />
+            </span>
+            <span className="font-semibold">Exit Focus</span>
+          </>
+        ) : (
+          <Maximize2 className="h-4 w-4" />
+        )}
+      </button>
+    );
+  })
+);
