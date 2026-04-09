@@ -673,13 +673,15 @@ export function WriteMode({ projectName }: WriteModeProps) {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      {/* Floating Focus Mode Toggle */}
-      <div className="fixed top-1 right-1 z-50">
-        <FocusModeToggle
-          isFocusMode={isFocusMode}
-          onToggle={handleFocusModeToggle}
-        />
-      </div>
+      {/* Floating Focus Mode Toggle (shown when focus mode is ON) */}
+      {isFocusMode && (
+        <div className="fixed top-2 right-2 z-[100] pointer-events-auto">
+          <FocusModeToggle
+            isFocusMode={isFocusMode}
+            onToggle={handleFocusModeToggle}
+          />
+        </div>
+      )}
 
       {/* Main Editor Layout */}
       <div className="flex-1 flex gap-4 px-4 pb-4 overflow-hidden min-h-0 min-w-0">
@@ -720,15 +722,28 @@ export function WriteMode({ projectName }: WriteModeProps) {
 
         {/* Center Column: Tab Bar + Editor */}
         <div className="flex-1 flex flex-col min-h-0 min-w-0 mt-3">
-          <EditorTabBar
-            hidden={isFocusMode}
-            items={tabItems}
-            activeItemId={activeLabelId}
-            onSelect={handleSelectLabel}
-            onClose={handleCloseTab}
-            idPrefix="tab-"
-            titleMaxWidthClassName="max-w-[180px]"
-          />
+          {!isFocusMode && (
+            <div className="mb-2 flex gap-2">
+              <div className="flex-1 min-w-0">
+                <EditorTabBar
+                  items={tabItems}
+                  activeItemId={activeLabelId}
+                  onSelect={handleSelectLabel}
+                  onClose={handleCloseTab}
+                  idPrefix="tab-"
+                  titleMaxWidthClassName="max-w-[180px]"
+                />
+              </div>
+              <div className="h-12 overflow-hidden rounded-lg border border-border/80 bg-card/55 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                <div className="h-full flex items-center justify-end px-3">
+                  <FocusModeToggle
+                    isFocusMode={isFocusMode}
+                    onToggle={handleFocusModeToggle}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Main Editor */}
           <div className="flex-1 flex justify-center min-h-0 min-w-0">

@@ -14,6 +14,7 @@ import {
 } from "@/components/script-mode";
 import { ProjectFileTree } from "@/components/script-mode/ProjectFileTree";
 import { EditorTabBar, type EditorTabBarItem } from "@/components/ide-shared";
+import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
 import { useLabels } from "@/hooks/useLabels";
 import { useGitLab } from "@/hooks/useGitLab";
 import { useCharacters } from "@/hooks/useCharacters";
@@ -29,6 +30,7 @@ import { useToast } from "@/contexts/ToastContext";
 import { ApiRequestError } from "@/lib/api/client";
 import { registerModeFlushHandler } from "@/lib/editor-sync-coordinator";
 import type { FileSourceType } from "@branchforge/shared";
+import type { ScriptEditorRef } from "@/components/script-mode/ScriptEditor";
 import { cva } from "class-variance-authority";
 
 const sidebarVariants = cva(
@@ -86,6 +88,59 @@ export function ScriptMode({
     );
     return rightCollapsed === "true";
   });
+
+  const [isFocusMode, setIsFocusMode] = useState(() => {
+    const saved = localStorage.getItem("scriptmode-focus-mode");
+    return saved === "true";
+  });
+
+  const [preFocusSidebarStates, setPreFocusSidebarStates] = useState<{
+    leftCollapsed: boolean;
+    rightCollapsed: boolean;
+  } | null>(null);
+
+  const preFocusActiveElementRef = useRef<HTMLElement | null>(null);
+  const editorRef = useRef<ScriptEditorRef>(null);
+
+  const handleFocusModeToggle = useCallback(() => {
+    if (!isFocusMode) {
+      preFocusActiveElementRef.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+      setPreFocusSidebarStates({
+        leftCollapsed: isLeftSidebarCollapsed,
+        rightCollapsed: isRightSidebarCollapsed,
+      });
+      setIsFocusMode(true);
+      editorRef.current?.focus();
+    } else {
+      setIsFocusMode(false);
+      if (preFocusSidebarStates) {
+        setIsLeftSidebarCollapsed(preFocusSidebarStates.leftCollapsed);
+        setIsRightSidebarCollapsed(preFocusSidebarStates.rightCollapsed);
+      }
+      if (preFocusActiveElementRef.current) {
+        preFocusActiveElementRef.current.focus();
+      } else {
+        const focusToggleButton = document.querySelector(
+          'button[title*="Exit focus mode"], button[aria-label*="Exit focus mode"]'
+        );
+        if (focusToggleButton instanceof HTMLElement) {
+          focusToggleButton.focus();
+        }
+      }
+    }
+  }, [
+    isFocusMode,
+    isLeftSidebarCollapsed,
+    isRightSidebarCollapsed,
+    preFocusSidebarStates,
+  ]);
+
+  useEffect(() => {
+    localStorage.setItem("scriptmode-focus-mode", String(isFocusMode));
+  }, [isFocusMode]);
 
   // Track open tabs with project-scoped persistence
   const [openTabs, setOpenTabs] = useState<string[]>([]);
@@ -446,6 +501,19 @@ export function ScriptMode({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [triggerFileSave]);
 
+  // Handle Ctrl+Shift+F for focus mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyF") {
+        e.preventDefault();
+        handleFocusModeToggle();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleFocusModeToggle]);
+
   // Get active file content directly for Script Mode editing
   // Use edited content if available, otherwise use original content
   const activeFileContent =
@@ -775,12 +843,25 @@ export function ScriptMode({
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
+      {/* Floating Focus Mode Toggle (shown when focus mode is ON) */}
+      {isFocusMode && (
+        <div className="fixed top-2 right-2 z-[100] pointer-events-auto">
+          <FocusModeToggle
+            isFocusMode={isFocusMode}
+            onToggle={handleFocusModeToggle}
+          />
+        </div>
+      )}
+
       {/* Main Editor Layout */}
       <div className="flex-1 flex gap-4 px-4 pb-4 overflow-hidden min-h-0 min-w-0">
         {/* Left Sidebar */}
         <div
+          aria-hidden={isFocusMode}
+          inert={isFocusMode}
           className={sidebarVariants({
-            variant: isLeftSidebarCollapsed ? "collapsed" : "expanded",
+            variant:
+              isFocusMode || isLeftSidebarCollapsed ? "collapsed" : "expanded",
           })}
         >
           <div className="h-full overflow-y-auto relative">
@@ -829,8 +910,8 @@ export function ScriptMode({
           </div>
         </div>
 
-        {/* Left Sidebar Expand Button (shown when collapsed) */}
-        {isLeftSidebarCollapsed && (
+        {/* Left Sidebar Expand Button (shown when collapsed and not in focus mode) */}
+        {isLeftSidebarCollapsed && !isFocusMode && (
           <div className="min-h-0 shrink-0 mt-3 flex items-center -ml-4">
             <button
               onClick={() => setIsLeftSidebarCollapsed(false)}
@@ -845,20 +926,35 @@ export function ScriptMode({
 
         {/* Center Column: Tab Bar + Editor */}
         <div className="flex-1 flex flex-col min-h-0 min-w-0 mt-3">
-          <EditorTabBar
-            items={tabItems}
-            activeItemId={activeFileId}
-            onSelect={handleSelectFileTab}
-            onClose={handleCloseFileTab}
-            idPrefix="script-tab-"
-            titleMaxWidthClassName="max-w-[240px]"
-          />
+          {!isFocusMode && (
+            <div className="mb-2 flex gap-2">
+              <div className="flex-1 min-w-0">
+                <EditorTabBar
+                  items={tabItems}
+                  activeItemId={activeFileId}
+                  onSelect={handleSelectFileTab}
+                  onClose={handleCloseFileTab}
+                  idPrefix="script-tab-"
+                  titleMaxWidthClassName="max-w-[240px]"
+                />
+              </div>
+              <div className="h-12 overflow-hidden rounded-lg border border-border/80 bg-card/55 opacity-100 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                <div className="h-full flex items-center justify-end px-3">
+                  <FocusModeToggle
+                    isFocusMode={isFocusMode}
+                    onToggle={handleFocusModeToggle}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Main Editor */}
           <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
             <div className="bg-card/50 border border-border rounded-lg h-full overflow-hidden min-h-0 min-w-0">
               {activeProjectFile ? (
                 <ScriptEditor
+                  ref={editorRef}
                   content={activeFileContent}
                   scrollToLine={scrollToLine}
                   onChange={(value) => {
@@ -895,8 +991,12 @@ export function ScriptMode({
           projectCharacters={projectCharacters}
           activeLabel={activeLabel}
           statusColor={statusColor}
-          isCollapsed={isRightSidebarCollapsed}
-          onCollapseToggle={() => setIsRightSidebarCollapsed((prev) => !prev)}
+          isCollapsed={isRightSidebarCollapsed || isFocusMode}
+          onCollapseToggle={
+            !isFocusMode
+              ? () => setIsRightSidebarCollapsed((prev) => !prev)
+              : undefined
+          }
         />
       </div>
 
