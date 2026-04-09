@@ -100,6 +100,7 @@ export function ScriptMode({
   } | null>(null);
 
   const preFocusActiveElementRef = useRef<HTMLElement | null>(null);
+  const focusToggleRef = useRef<HTMLButtonElement | null>(null);
   const editorRef = useRef<ScriptEditorRef>(null);
 
   const handleFocusModeToggle = useCallback(() => {
@@ -122,13 +123,8 @@ export function ScriptMode({
       }
       if (preFocusActiveElementRef.current) {
         preFocusActiveElementRef.current.focus();
-      } else {
-        const focusToggleButton = document.querySelector(
-          'button[title*="Exit focus mode"], button[aria-label*="Exit focus mode"]'
-        );
-        if (focusToggleButton instanceof HTMLElement) {
-          focusToggleButton.focus();
-        }
+      } else if (focusToggleRef.current) {
+        focusToggleRef.current.focus();
       }
     }
   }, [
@@ -847,6 +843,7 @@ export function ScriptMode({
       {isFocusMode && (
         <div className="fixed top-2 right-2 z-[100] pointer-events-auto">
           <FocusModeToggle
+            ref={focusToggleRef}
             isFocusMode={isFocusMode}
             onToggle={handleFocusModeToggle}
           />
@@ -941,6 +938,7 @@ export function ScriptMode({
               <div className="h-12 overflow-hidden rounded-lg border border-border/80 bg-card/55 opacity-100 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                 <div className="h-full flex items-center justify-end px-3">
                   <FocusModeToggle
+                    ref={focusToggleRef}
                     isFocusMode={isFocusMode}
                     onToggle={handleFocusModeToggle}
                   />

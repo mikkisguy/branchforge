@@ -85,7 +85,14 @@ export function WriteMode({ projectName }: WriteModeProps) {
   } = useLabels();
 
   const { characters } = useCharacters(currentProject?.id ?? "");
-  const [isFocusMode, setIsFocusMode] = useState(false);
+  const [isFocusMode, setIsFocusMode] = useState(() => {
+    const saved = localStorage.getItem("writemode-focus-mode");
+    return saved === "true";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("writemode-focus-mode", String(isFocusMode));
+  }, [isFocusMode]);
 
   const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(() => {
     const leftCollapsed = localStorage.getItem(

@@ -5,7 +5,7 @@
  * Matches app design system with theme colors.
  */
 
-import { memo } from "react";
+import { memo, forwardRef } from "react";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -14,10 +14,13 @@ interface FocusModeToggleProps {
   onToggle: () => void;
 }
 
-export const FocusModeToggle = memo(function FocusModeToggle({
-  isFocusMode,
-  onToggle,
-}: FocusModeToggleProps) {
+const FocusModeToggleInner = forwardRef<
+  HTMLButtonElement,
+  FocusModeToggleProps
+>(function FocusModeToggle(
+  { isFocusMode, onToggle }: FocusModeToggleProps,
+  ref
+) {
   const title = isFocusMode
     ? "Exit focus mode (Ctrl+Shift+F)"
     : "Enter focus mode (Ctrl+Shift+F)";
@@ -25,6 +28,7 @@ export const FocusModeToggle = memo(function FocusModeToggle({
   return (
     <button
       type="button"
+      ref={ref}
       onClick={onToggle}
       aria-label={title}
       title={title}
@@ -50,3 +54,5 @@ export const FocusModeToggle = memo(function FocusModeToggle({
     </button>
   );
 });
+
+export const FocusModeToggle = memo(FocusModeToggleInner);

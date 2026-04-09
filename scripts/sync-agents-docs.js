@@ -3,7 +3,12 @@ const path = require("path");
 
 const sourcePath = path.join(__dirname, "..", "AGENTS.md");
 const claudePath = path.join(__dirname, "..", ".claude", "CLAUDE.md");
-const copilotPath = path.join(__dirname, "..", ".github", "copilot-instructions.md");
+const copilotPath = path.join(
+  __dirname,
+  "..",
+  ".github",
+  "copilot-instructions.md"
+);
 
 try {
   const content = fs.readFileSync(sourcePath, "utf-8");

@@ -2,38 +2,38 @@
 
 ### Enums
 
-| Enum                      | Values                                                    | Notes                                          |
-| ------------------------- | --------------------------------------------------------- | ---------------------------------------------- |
-| `user_role`               | `OWNER`, `READER`, `TESTER`                               | Used in TWO contexts: (1) `users.role` for system-level admin access (OWNER only), (2) `project_users.role` for project-level access control (READER/TESTER only). Project ownership is tracked by `projects.user_id`, not by `project_users.role = OWNER`. The `getProjectRole()` function returns "OWNER" as a computed value when user matches `projects.user_id`. |
-| `project_visibility`      | `PUBLIC`, `PRIVATE`, `TEAM`                               | Project visibility (not to be confused with roles) |
-| `label_status`            | `DRAFT`, `REVIEW`, `FINAL`                                | Label workflow status                          |
-| `content_type`            | `NARRATION`, `DIALOGUE`, `CHOICE`, `MENU`, `JUMP`         | For line-level export logic                    |
-| `visual_type`             | `GENERATED`, `BLACK`, `CUSTOM`                            | Image handling per line                        |
-| `element_type`            | `LOCATION`, `ITEM`, `CONCEPT`, `EVENT`                    | World bible                                    |
-| `suggestion_type`         | `CONSISTENCY`, `FLAG_SUGGEST`, `METER_SUGGEST`, `DIALOGUE_VARIANT` | AI suggestion types                            |
-| `suggestion_status`       | `PENDING`, `ACCEPTED`, `REJECTED`                         | AI suggestion workflow status                  |
-| `character_role`          | `PRIMARY`, `SECONDARY`, `BACKGROUND`, `MENTIONED`         | Character role in label                        |
-| `renpy_definition_category` | `CHARACTER`, `TRANSFORM`, `IMAGE`, `INIT`             | Ren'Py definition types                        |
-| `label_visibility`        | `EXCLUSIVE`, `SHARED`, `DUO_PAIR`                         | Label visibility across routes                |
-| `sync_operation`          | `EXPORT`, `IMPORT`                                        | GitLab sync operation type                    |
-| `sync_operation_status`   | `PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`          | GitLab sync operation status                   |
-| `sync_status`             | `SYNCED`, `MODIFIED_LOCAL`, `CONFLICT`                   | File sync state (labels and file sync state)   |
-| `project_file_type`       | `STORY`, `SETTINGS`                                       | Project file type (unified for all sources)    |
-| `file_source`             | `GITLAB`, `ZIP`                                            | File source type (where files come from)       |
+| Enum                        | Values                                                             | Notes                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `user_role`                 | `OWNER`, `READER`, `TESTER`                                        | Used in TWO contexts: (1) `users.role` for system-level admin access (OWNER only), (2) `project_users.role` for project-level access control (READER/TESTER only). Project ownership is tracked by `projects.user_id`, not by `project_users.role = OWNER`. The `getProjectRole()` function returns "OWNER" as a computed value when user matches `projects.user_id`. |
+| `project_visibility`        | `PUBLIC`, `PRIVATE`, `TEAM`                                        | Project visibility (not to be confused with roles)                                                                                                                                                                                                                                                                                                                    |
+| `label_status`              | `DRAFT`, `REVIEW`, `FINAL`                                         | Label workflow status                                                                                                                                                                                                                                                                                                                                                 |
+| `content_type`              | `NARRATION`, `DIALOGUE`, `CHOICE`, `MENU`, `JUMP`                  | For line-level export logic                                                                                                                                                                                                                                                                                                                                           |
+| `visual_type`               | `GENERATED`, `BLACK`, `CUSTOM`                                     | Image handling per line                                                                                                                                                                                                                                                                                                                                               |
+| `element_type`              | `LOCATION`, `ITEM`, `CONCEPT`, `EVENT`                             | World bible                                                                                                                                                                                                                                                                                                                                                           |
+| `suggestion_type`           | `CONSISTENCY`, `FLAG_SUGGEST`, `METER_SUGGEST`, `DIALOGUE_VARIANT` | AI suggestion types                                                                                                                                                                                                                                                                                                                                                   |
+| `suggestion_status`         | `PENDING`, `ACCEPTED`, `REJECTED`                                  | AI suggestion workflow status                                                                                                                                                                                                                                                                                                                                         |
+| `character_role`            | `PRIMARY`, `SECONDARY`, `BACKGROUND`, `MENTIONED`                  | Character role in label                                                                                                                                                                                                                                                                                                                                               |
+| `renpy_definition_category` | `CHARACTER`, `TRANSFORM`, `IMAGE`, `INIT`                          | Ren'Py definition types                                                                                                                                                                                                                                                                                                                                               |
+| `label_visibility`          | `EXCLUSIVE`, `SHARED`, `DUO_PAIR`                                  | Label visibility across routes                                                                                                                                                                                                                                                                                                                                        |
+| `sync_operation`            | `EXPORT`, `IMPORT`                                                 | GitLab sync operation type                                                                                                                                                                                                                                                                                                                                            |
+| `sync_operation_status`     | `PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`                    | GitLab sync operation status                                                                                                                                                                                                                                                                                                                                          |
+| `sync_status`               | `SYNCED`, `MODIFIED_LOCAL`, `CONFLICT`                             | File sync state (labels and file sync state)                                                                                                                                                                                                                                                                                                                          |
+| `project_file_type`         | `STORY`, `SETTINGS`                                                | Project file type (unified for all sources)                                                                                                                                                                                                                                                                                                                           |
+| `file_source`               | `GITLAB`, `ZIP`                                                    | File source type (where files come from)                                                                                                                                                                                                                                                                                                                              |
 
 ---
 
 ### 1. Users
 
-| Column          | Type                         | Notes            |
-| --------------- | ---------------------------- | ---------------- |
-| `id`            | uuid PK                      |                  |
-| `email`         | text, unique, not null       |                  |
-| `password_hash` | text, not null               |                  |
+| Column          | Type                         | Notes                                                                                                     |
+| --------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `id`            | uuid PK                      |                                                                                                           |
+| `email`         | text, unique, not null       |                                                                                                           |
+| `password_hash` | text, not null               |                                                                                                           |
 | `role`          | `user_role`, default `OWNER` | System-level admin role (OWNER only for admin access, distinct from project-level roles in project_users) |
-| `deleted_at`    | timestamp, nullable          | Soft delete      |
-| `created_at`    | timestamp, default now       |                  |
-| `updated_at`    | timestamp, default now       |                  |
+| `deleted_at`    | timestamp, nullable          | Soft delete                                                                                               |
+| `created_at`    | timestamp, default now       |                                                                                                           |
+| `updated_at`    | timestamp, default now       |                                                                                                           |
 
 ---
 
@@ -86,16 +86,16 @@ Global application settings as key-value pairs.
 
 ### 5. Projects
 
-| Column            | Type                              | Notes                 |
-| ----------------- | --------------------------------- | --------------------- |
-| `id`              | uuid PK                           |                       |
-| `user_id`         | uuid FK → users                  | Owner                 |
-| `name`            | text, not null                    |                       |
-| `description`     | text                              |                       |
-| `max_meter_delta` | integer, default 10               | For budget calculator |
+| Column            | Type                                    | Notes                 |
+| ----------------- | --------------------------------------- | --------------------- |
+| `id`              | uuid PK                                 |                       |
+| `user_id`         | uuid FK → users                         | Owner                 |
+| `name`            | text, not null                          |                       |
+| `description`     | text                                    |                       |
+| `max_meter_delta` | integer, default 10                     | For budget calculator |
 | `visibility`      | `project_visibility`, default `PRIVATE` | Who can access        |
-| `created_at`      | timestamp                         |                       |
-| `updated_at`      | timestamp                         |                       |
+| `created_at`      | timestamp                               |                       |
+| `updated_at`      | timestamp                               |                       |
 
 ---
 
@@ -103,12 +103,12 @@ Global application settings as key-value pairs.
 
 Beta reader access control.
 
-| Column       | Type                  | Notes                |
-| ------------ | --------------------- | -------------------- |
-| `project_id` | uuid FK → projects    |                      |
-| `user_id`    | uuid FK → users       |                      |
+| Column       | Type                  | Notes                                                                                 |
+| ------------ | --------------------- | ------------------------------------------------------------------------------------- |
+| `project_id` | uuid FK → projects    |                                                                                       |
+| `user_id`    | uuid FK → users       |                                                                                       |
 | `role`       | `user_role`, not null | `READER` or `TESTER` (not OWNER - project ownership is tracked by `projects.user_id`) |
-| `added_at`   | timestamp             |                      |
+| `added_at`   | timestamp             |                                                                                       |
 
 PK: `(project_id, user_id)`
 
@@ -118,12 +118,12 @@ PK: `(project_id, user_id)`
 
 Per-project configuration for character import and other project-specific settings.
 
-| Column                  | Type                      | Notes                                  |
-| ----------------------- | ------------------------- | -------------------------------------- |
-| `project_id`            | uuid PK, FK → projects    | One-to-one with projects              |
-| `excluded_character_tags` | jsonb                    | Tags to exclude from character import  |
-| `auto_link_speakers`    | boolean, default true     | Auto-link speakers to characters      |
-| `updated_at`            | timestamp, default now    |                                        |
+| Column                    | Type                   | Notes                                 |
+| ------------------------- | ---------------------- | ------------------------------------- |
+| `project_id`              | uuid PK, FK → projects | One-to-one with projects              |
+| `excluded_character_tags` | jsonb                  | Tags to exclude from character import |
+| `auto_link_speakers`      | boolean, default true  | Auto-link speakers to characters      |
+| `updated_at`              | timestamp, default now |                                       |
 
 ---
 
@@ -264,39 +264,39 @@ Sequel duo tracking.
 
 Container for logical labels; content in `label_lines`. Represents Ren'Py label statements (not to be confused with Ren'Py 'scene' commands).
 
-| Column                | Type                             | Notes                                                                                                                                                                                                                                                          |
-| --------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `id`                  | uuid PK                          |                                                                                                                                                                                                                                                                |
-| `project_id`          | uuid FK → projects               |                                                                                                                                                                                                                                                                |
-| `title`               | text, not null                   |                                                                                                                                                                                                                                                                |
-| `group_type`          | text, nullable                   | `"act"`, `"chapter"`, `"episode"`, etc. or null                                                                                                                                                                                                                 |
-| `group_value`         | text, nullable                   | `"I"`, `"1"`, `"1a"`, etc. or null                                                                                                                                                                                                                            |
-| `label_number`        | integer, not null                |                                                                                                                                                                                                                                                                |
-| `sequence_order`      | integer, default 0               | Sorting                                                                                                                                                                                                                                                        |
-| `route`               | text, nullable                   | **Soft reference** to `route_configs.route_key` within same project. Null = shared/common. Application-layer validation ensures the route exists for the project; no database FK constraint due to composite key requirement `(project_id, route)` → `route_configs(project_id, route_key)`. |
-| `visibility`          | enum                             | `EXCLUSIVE`, `SHARED`, `DUO_PAIR`                                                                                                                                                                                                                              |
-| `duo_pair_id`         | uuid FK → pair_groups, nullable  |                                                                                                                                                                                                                                                                |
-| `status`              | `label_status`, default `DRAFT`  |                                                                                                                                                                                                                                                                |
-| `prerequisites`       | jsonb                            | `{stateVariables?: [], meters?: {}}`                                                                                                                                                                                                                          |
-| `effects`             | jsonb                            | `{stateVariablesSet?: [], stateVariablesUnset?: [], meters?: {}}`                                                                                                                                                                                             |
-| `cross_route_context` | text, nullable                   | Prequel: `"Lucas_Friend_Mode"`                                                                                                                                                                                                                               |
-| `reader_notes`        | text, nullable                   | Beta feedback                                                                                                                                                                                                                                                  |
-| `project_file_id`     | uuid FK → project_files, nullable | Project file reference                                                                                                                                                                                                                                       |
-| `label_name`          | text, nullable                   | The actual label name in the RPY file                                                                                                                                                                                                                         |
-| `label_position`      | integer, nullable                | Position of this label within the file                                                                                                                                                                                                                        |
-| `content_hash`       | text, nullable                   | Hash of all lines' content                                                                                                                                                                                                                                    |
-| `last_synced_hash`    | text, nullable                   |                                                                                                                                                                                                                                                                |
-| `sync_status`        | enum, nullable                   | `SYNCED`, `MODIFIED_LOCAL`, `CONFLICT`                                                                                                                                                                                                                         |
-| `last_exported_at`    | timestamp, nullable              |                                                                                                                                                                                                                                                                |
-| `last_imported_at`    | timestamp, nullable              |                                                                                                                                                                                                                                                                |
-| `export_commit_sha`   | text, nullable                   |                                                                                                                                                                                                                                                                |
-| `import_commit_sha`   | text, nullable                   |                                                                                                                                                                                                                                                                |
-| `created_by`          | uuid FK → users, nullable       | Audit trail                                                                                                                                                                                                                                                   |
-| `updated_by`          | uuid FK → users, nullable       | Audit trail                                                                                                                                                                                                                                                   |
-| `version`             | integer, default 1               |                                                                                                                                                                                                                                                                |
-| `deleted_at`          | timestamp, nullable             | Soft delete                                                                                                                                                                                                                                                    |
-| `created_at`          | timestamp                        |                                                                                                                                                                                                                                                                |
-| `updated_at`          | timestamp                        |                                                                                                                                                                                                                                                                |
+| Column                | Type                              | Notes                                                                                                                                                                                                                                                                                        |
+| --------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                  | uuid PK                           |                                                                                                                                                                                                                                                                                              |
+| `project_id`          | uuid FK → projects                |                                                                                                                                                                                                                                                                                              |
+| `title`               | text, not null                    |                                                                                                                                                                                                                                                                                              |
+| `group_type`          | text, nullable                    | `"act"`, `"chapter"`, `"episode"`, etc. or null                                                                                                                                                                                                                                              |
+| `group_value`         | text, nullable                    | `"I"`, `"1"`, `"1a"`, etc. or null                                                                                                                                                                                                                                                           |
+| `label_number`        | integer, not null                 |                                                                                                                                                                                                                                                                                              |
+| `sequence_order`      | integer, default 0                | Sorting                                                                                                                                                                                                                                                                                      |
+| `route`               | text, nullable                    | **Soft reference** to `route_configs.route_key` within same project. Null = shared/common. Application-layer validation ensures the route exists for the project; no database FK constraint due to composite key requirement `(project_id, route)` → `route_configs(project_id, route_key)`. |
+| `visibility`          | enum                              | `EXCLUSIVE`, `SHARED`, `DUO_PAIR`                                                                                                                                                                                                                                                            |
+| `duo_pair_id`         | uuid FK → pair_groups, nullable   |                                                                                                                                                                                                                                                                                              |
+| `status`              | `label_status`, default `DRAFT`   |                                                                                                                                                                                                                                                                                              |
+| `prerequisites`       | jsonb                             | `{stateVariables?: [], meters?: {}}`                                                                                                                                                                                                                                                         |
+| `effects`             | jsonb                             | `{stateVariablesSet?: [], stateVariablesUnset?: [], meters?: {}}`                                                                                                                                                                                                                            |
+| `cross_route_context` | text, nullable                    | Prequel: `"Lucas_Friend_Mode"`                                                                                                                                                                                                                                                               |
+| `reader_notes`        | text, nullable                    | Beta feedback                                                                                                                                                                                                                                                                                |
+| `project_file_id`     | uuid FK → project_files, nullable | Project file reference                                                                                                                                                                                                                                                                       |
+| `label_name`          | text, nullable                    | The actual label name in the RPY file                                                                                                                                                                                                                                                        |
+| `label_position`      | integer, nullable                 | Position of this label within the file                                                                                                                                                                                                                                                       |
+| `content_hash`        | text, nullable                    | Hash of all lines' content                                                                                                                                                                                                                                                                   |
+| `last_synced_hash`    | text, nullable                    |                                                                                                                                                                                                                                                                                              |
+| `sync_status`         | enum, nullable                    | `SYNCED`, `MODIFIED_LOCAL`, `CONFLICT`                                                                                                                                                                                                                                                       |
+| `last_exported_at`    | timestamp, nullable               |                                                                                                                                                                                                                                                                                              |
+| `last_imported_at`    | timestamp, nullable               |                                                                                                                                                                                                                                                                                              |
+| `export_commit_sha`   | text, nullable                    |                                                                                                                                                                                                                                                                                              |
+| `import_commit_sha`   | text, nullable                    |                                                                                                                                                                                                                                                                                              |
+| `created_by`          | uuid FK → users, nullable         | Audit trail                                                                                                                                                                                                                                                                                  |
+| `updated_by`          | uuid FK → users, nullable         | Audit trail                                                                                                                                                                                                                                                                                  |
+| `version`             | integer, default 1                |                                                                                                                                                                                                                                                                                              |
+| `deleted_at`          | timestamp, nullable               | Soft delete                                                                                                                                                                                                                                                                                  |
+| `created_at`          | timestamp                         |                                                                                                                                                                                                                                                                                              |
+| `updated_at`          | timestamp                         |                                                                                                                                                                                                                                                                                              |
 
 > **Design Note - Soft Route Reference**: The `route` column uses a soft reference (text field without FK constraint) instead of a hard foreign key. This design choice was made because:
 >
@@ -310,32 +310,32 @@ Container for logical labels; content in `label_lines`. Represents Ren'Py label 
 
 Atomic lines with images.
 
-| Column                   | Type                               | Notes                                                      |
-| ------------------------ | ---------------------------------- | ---------------------------------------------------------- |
-| `id`                     | uuid PK                            |                                                            |
-| `label_id`               | uuid FK → labels                   |                                                            |
-| `sequence`               | integer, not null                  | Line order within label                                   |
-| `content`                | text, not null                     | The text                                                   |
-| `content_type`           | `content_type`, not null           |                                                            |
-| `speaker_id`             | uuid FK → characters, nullable     | Null = narration                                           |
-| `visual_type`            | `visual_type`, default `GENERATED` |                                                            |
-| `visual_slug_override`   | text, nullable                     | Manual slug instead of auto                                |
-| `custom_visual_name`     | text, nullable                     | For `CUSTOM` type                                          |
-| `menu_options`           | jsonb, nullable                    | `[{label, targetLabelId, conditionFlags?}]`                |
-| `word_count`             | integer, nullable                  | Computed on insert/update via trigger                      |
-| `demo_placeholder_color` | text, nullable                     | Black screen fallback hex                                  |
-| `demo_notes`             | text, nullable                     | "Character enters from left" for placeholder rendering     |
-| `project_file_id`        | uuid FK → project_files, nullable | Project file reference                                     |
-| `line_position`          | integer, nullable                 | Position within the RPY file                               |
-| `content_hash`           | text, nullable                     | SHA-256 of content field                                   |
-| `last_synced_hash`       | text, nullable                     | Hash at last sync                                          |
-| `is_dirty`               | boolean, default false             | Modified since last sync                                   |
-| `last_synced_at`         | timestamp, nullable                |                                                            |
-| `rpy_line_number`        | integer, nullable                  | Actual line number in source                               |
-| `rpy_indent_level`      | integer, nullable                  | Indent for proper formatting                               |
-| `deleted_at`             | timestamp, nullable                | Soft delete                                                |
-| `created_at`             | timestamp                          |                                                            |
-| `updated_at`             | timestamp                          |                                                            |
+| Column                   | Type                               | Notes                                                  |
+| ------------------------ | ---------------------------------- | ------------------------------------------------------ |
+| `id`                     | uuid PK                            |                                                        |
+| `label_id`               | uuid FK → labels                   |                                                        |
+| `sequence`               | integer, not null                  | Line order within label                                |
+| `content`                | text, not null                     | The text                                               |
+| `content_type`           | `content_type`, not null           |                                                        |
+| `speaker_id`             | uuid FK → characters, nullable     | Null = narration                                       |
+| `visual_type`            | `visual_type`, default `GENERATED` |                                                        |
+| `visual_slug_override`   | text, nullable                     | Manual slug instead of auto                            |
+| `custom_visual_name`     | text, nullable                     | For `CUSTOM` type                                      |
+| `menu_options`           | jsonb, nullable                    | `[{label, targetLabelId, conditionFlags?}]`            |
+| `word_count`             | integer, nullable                  | Computed on insert/update via trigger                  |
+| `demo_placeholder_color` | text, nullable                     | Black screen fallback hex                              |
+| `demo_notes`             | text, nullable                     | "Character enters from left" for placeholder rendering |
+| `project_file_id`        | uuid FK → project_files, nullable  | Project file reference                                 |
+| `line_position`          | integer, nullable                  | Position within the RPY file                           |
+| `content_hash`           | text, nullable                     | SHA-256 of content field                               |
+| `last_synced_hash`       | text, nullable                     | Hash at last sync                                      |
+| `is_dirty`               | boolean, default false             | Modified since last sync                               |
+| `last_synced_at`         | timestamp, nullable                |                                                        |
+| `rpy_line_number`        | integer, nullable                  | Actual line number in source                           |
+| `rpy_indent_level`       | integer, nullable                  | Indent for proper formatting                           |
+| `deleted_at`             | timestamp, nullable                | Soft delete                                            |
+| `created_at`             | timestamp                          |                                                        |
+| `updated_at`             | timestamp                          |                                                        |
 
 ---
 
@@ -454,20 +454,20 @@ User-level GitLab integration storing encrypted PAT.
 
 Unified file storage for all project sources (GitLab, zip, etc.). Stores full RPY file content for Script Mode editing and links to labels.
 
-| Column            | Type                          | Notes                                                      |
-| ----------------- | ----------------------------- | ---------------------------------------------------------- |
-| `id`              | uuid PK                       |                                                            |
-| `project_id`      | uuid FK → projects            |                                                            |
-| `source`          | `file_source`, not null       | `GITLAB` or `ZIP` (where the file came from)               |
-| `file_path`       | text, not null                | e.g., `"labels/act_i.rpy"` or `"gui/screens.rpy"`          |
-| `file_type`       | `project_file_type`, not null | `STORY` (story labels) or `SETTINGS` (gui, etc.)           |
-| `content`         | text, not null                | Full RPY file content for Script Mode                      |
-| `original_content` | text, nullable               | Original imported content (used as base for reconstruction) |
-| `content_hash`    | text, not null                | SHA-256 hash for idempotency                               |
-| `last_synced_at`  | timestamp, nullable           | Last sync timestamp (GitLab-specific, null for non-GitLab) |
-| `last_commit_sha` | text, nullable                | Last commit SHA (GitLab-specific, null for non-GitLab)     |
-| `created_at`      | timestamp                     |                                                            |
-| `updated_at`      | timestamp                     |                                                            |
+| Column             | Type                          | Notes                                                       |
+| ------------------ | ----------------------------- | ----------------------------------------------------------- |
+| `id`               | uuid PK                       |                                                             |
+| `project_id`       | uuid FK → projects            |                                                             |
+| `source`           | `file_source`, not null       | `GITLAB` or `ZIP` (where the file came from)                |
+| `file_path`        | text, not null                | e.g., `"labels/act_i.rpy"` or `"gui/screens.rpy"`           |
+| `file_type`        | `project_file_type`, not null | `STORY` (story labels) or `SETTINGS` (gui, etc.)            |
+| `content`          | text, not null                | Full RPY file content for Script Mode                       |
+| `original_content` | text, nullable                | Original imported content (used as base for reconstruction) |
+| `content_hash`     | text, not null                | SHA-256 hash for idempotency                                |
+| `last_synced_at`   | timestamp, nullable           | Last sync timestamp (GitLab-specific, null for non-GitLab)  |
+| `last_commit_sha`  | text, nullable                | Last commit SHA (GitLab-specific, null for non-GitLab)      |
+| `created_at`       | timestamp                     |                                                             |
+| `updated_at`       | timestamp                     |                                                             |
 
 Unique constraint: `(project_id, source, file_path)`
 
@@ -512,17 +512,17 @@ Project to GitLab repository mapping.
 
 Sync operations tracking for export/import.
 
-| Column           | Type                            | Notes                                                        |
-| ---------------- | ------------------------------- | ------------------------------------------------------------ |
-| `id`             | uuid PK                         |                                                              |
-| `project_id`     | uuid FK → projects              |                                                              |
-| `operation`      | `sync_operation`, not null      | `export` or `import`                                         |
-| `status`         | `sync_operation_status`, not null | `pending`, `in_progress`, `completed`, `failed`                |
-| `branch`         | text, nullable                  | Branch name                                                  |
-| `conflict_count` | integer, default 0              | Number of conflicts                                          |
-| `error_message`  | text, nullable                  | Error details                                                |
-| `started_at`     | timestamp                       |                                                              |
-| `completed_at`   | timestamp, nullable            |                                                              |
+| Column           | Type                              | Notes                                           |
+| ---------------- | --------------------------------- | ----------------------------------------------- |
+| `id`             | uuid PK                           |                                                 |
+| `project_id`     | uuid FK → projects                |                                                 |
+| `operation`      | `sync_operation`, not null        | `export` or `import`                            |
+| `status`         | `sync_operation_status`, not null | `pending`, `in_progress`, `completed`, `failed` |
+| `branch`         | text, nullable                    | Branch name                                     |
+| `conflict_count` | integer, default 0                | Number of conflicts                             |
+| `error_message`  | text, nullable                    | Error details                                   |
+| `started_at`     | timestamp                         |                                                 |
+| `completed_at`   | timestamp, nullable               |                                                 |
 
 ---
 
@@ -601,36 +601,42 @@ gitlab_sync_operations
 The following features are planned but have not been implemented in the current schema:
 
 ### User Management Enhancements
+
 - Email verification workflow
 - Password reset functionality
 - User profile customization
 - User activity tracking
 
 ### Collaboration Features
+
 - Real-time collaborative editing
 - Comment threads on labels/lines
 - Change history and rollback
 - User permissions beyond OWNER/READER/TESTER
 
 ### AI Integration Enhancements
+
 - Voice generation integration
 - Image generation integration
 - Advanced narrative suggestions
 - Character personality consistency checking
 
 ### Export/Import Features
+
 - Additional export formats (Twine, Ink, etc.)
 - Import from more sources (Google Sheets, CSV)
 - Merge conflict resolution UI
 - Version control integration beyond GitLab
 
 ### Analytics
+
 - Project analytics dashboard
 - User activity reports
 - Label completion tracking
 - Story branching visualization
 
 ### Advanced Script Mode
+
 - Ren'Py syntax highlighting
 - Code completion
 - Inline error checking

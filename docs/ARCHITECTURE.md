@@ -19,16 +19,16 @@ BranchForge is a full-stack monorepo application designed for visual novel autho
 
 ## Tech Stack
 
-| Component | Technology | Purpose |
-|-----------|-------------|----------|
-| Frontend | React 19, TypeScript, Vite | User interface |
-| State Management | TanStack Query v5 | Server state, caching |
-| Backend | Fastify, TypeScript | REST API server |
-| Database | PostgreSQL 14+ | Persistent storage |
-| ORM | Drizzle ORM | Type-safe queries |
-| Styling | Tailwind CSS | Utility-first CSS |
-| Editor | CodeMirror 6 | Ren'Py syntax highlighting |
-| Build | pnpm workspaces | Monorepo management |
+| Component        | Technology                 | Purpose                    |
+| ---------------- | -------------------------- | -------------------------- |
+| Frontend         | React 19, TypeScript, Vite | User interface             |
+| State Management | TanStack Query v5          | Server state, caching      |
+| Backend          | Fastify, TypeScript        | REST API server            |
+| Database         | PostgreSQL 14+             | Persistent storage         |
+| ORM              | Drizzle ORM                | Type-safe queries          |
+| Styling          | Tailwind CSS               | Utility-first CSS          |
+| Editor           | CodeMirror 6               | Ren'Py syntax highlighting |
+| Build            | pnpm workspaces            | Monorepo management        |
 
 ## Project Structure
 
@@ -58,28 +58,34 @@ branchforge/
 ## Key Architectural Decisions
 
 ### 1. Monorepo with pnpm Workspaces
+
 - **Why**: Shared types between frontend/backend, consistent dependency versions
 - **Trade-off**: More complex builds, but better type safety across stack
 
 ### 2. Fastify over Express
+
 - **Why**: Better performance, plugin ecosystem, built-in TypeScript support
 - **Trade-off**: Smaller community than Express
 
 ### 3. TanStack Query (React Query v5)
+
 - **Why**: Automatic caching, background updates, optimistic updates
 - **Trade-off**: Additional learning curve for simple state
 
 ### 4. Drizzle ORM
+
 - **Why**: Type-safe queries, minimal runtime, good TypeScript integration
 - **Trade-off**: Fewer features than Prisma, but more control
 
 ### 5. Custom Ren'Py Syntax Highlighting
+
 - **Why**: Better DX for visual novel writers (CodeMirror 6 + custom language mode)
 - **Trade-off**: Requires maintenance for Ren'Py syntax updates
 
 ## Data Flow
 
 ### Authentication Flow
+
 ```
 User → Frontend → POST /api/auth/login
                    → Validate credentials
@@ -88,6 +94,7 @@ User → Frontend → POST /api/auth/login
 ```
 
 ### GitLab Sync Flow
+
 ```
 User → Frontend → POST /api/gitlab/sync
                    → Fetch from GitLab API
@@ -98,6 +105,7 @@ User → Frontend → POST /api/gitlab/sync
 ```
 
 ### Writing Flow
+
 ```
 User → Frontend (Write Mode)
      → Auto-save (debounced, 500ms)
@@ -109,6 +117,7 @@ User → Frontend (Write Mode)
 ## Database Schema Highlights
 
 Core tables:
+
 - `users`, `user_settings` - Authentication & preferences
 - `projects`, `project_users` - Project management & sharing
 - `labels`, `label_lines` - Dialogue management
@@ -122,6 +131,7 @@ See [DATABASE_SCHEMAS.md](DATABASE_SCHEMAS.md) for complete schema.
 ## API Design Patterns
 
 ### RESTful Conventions
+
 - `GET /api/resources` - List resources
 - `POST /api/resources` - Create resource
 - `GET /api/resources/:id` - Get single resource
@@ -129,6 +139,7 @@ See [DATABASE_SCHEMAS.md](DATABASE_SCHEMAS.md) for complete schema.
 - `DELETE /api/resources/:id` - Delete resource
 
 ### Error Handling
+
 - **400**: Validation error (Zod schema failure)
 - **401**: Unauthorized (missing/invalid session)
 - **403**: Forbidden (insufficient permissions)
@@ -138,6 +149,7 @@ See [DATABASE_SCHEMAS.md](DATABASE_SCHEMAS.md) for complete schema.
 - **500**: Server error
 
 ### Rate Limiting
+
 - Auth endpoints: Required (prevent brute force)
 - Public endpoints: Recommended
 - Implementation: In-memory, configurable per endpoint
@@ -145,30 +157,34 @@ See [DATABASE_SCHEMAS.md](DATABASE_SCHEMAS.md) for complete schema.
 ## Frontend Patterns
 
 ### Query Keys (TanStack Query)
+
 Defined in `src/lib/query-keys.ts` with hierarchical structure:
+
 ```typescript
 ['projects'] → ['projects', projectId] → ['labels', labelId]
 ```
 
 ### Custom Hooks
+
 - `useProjects()` - Project CRUD operations
 - `useLabels(projectId)` - Label management
 - `useCharacters(projectId)` - Character management
 - `useGitLab(projectId)` - GitLab sync operations
 
 ### Component Organization
+
 - **Atomic components**: `Button`, `Input`, `Modal`
 - **Feature components**: `LabelCard`, `CharacterDialog`, `GitLabSettings`
 - **Layout components**: `Sidebar`, `Header`, `Layout`
 
 ## State Management Strategy
 
-| State Type | Solution |
-|-------------|-----------|
+| State Type   | Solution                               |
+| ------------ | -------------------------------------- |
 | Server state | TanStack Query (caching, invalidation) |
-| UI state | React useState, useReducer |
-| Global state | React Context (Theme, Toast) |
-| Form state | Controlled components + Zod validation |
+| UI state     | React useState, useReducer             |
+| Global state | React Context (Theme, Toast)           |
+| Form state   | Controlled components + Zod validation |
 
 ## Security Considerations
 
@@ -182,6 +198,7 @@ Defined in `src/lib/query-keys.ts` with hierarchical structure:
 ## Deployment Architecture
 
 ### Development
+
 ```
 Frontend (Vite dev server) → http://localhost:5173
 Backend (Fastify) → http://localhost:3000
@@ -189,6 +206,7 @@ PostgreSQL → localhost:5432
 ```
 
 ### Production (Docker)
+
 ```
 ┌─────────────────┐
 │   Nginx/Proxy  │
@@ -219,14 +237,17 @@ PostgreSQL → localhost:5432
 ## Testing Strategy
 
 ### Unit Tests
+
 - Backend: Vitest, focused on services and business logic
 - Frontend: Vitest + @testing-library/react, component testing
 
 ### Integration Tests
+
 - Backend: Full API tests with test database (PostgreSQL)
 - Database migrations tested on each schema change
 
 ### E2E Tests
+
 - Not currently implemented (Planned: Playwright)
 
 ## Development Workflow
