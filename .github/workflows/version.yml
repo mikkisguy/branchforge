@@ -10,27 +10,31 @@ jobs:
   bump-version:
     name: Bump Version
     runs-on: ubuntu-latest
-    container: node:24-alpine
     steps:
-      - name: Install system dependencies
-        run: apk add --no-cache git jq
-
       - name: Checkout code
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
       - name: Configure git
+        working-directory: ${{ github.workspace }}
         run: |
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
 
       - name: Fetch all history
+        working-directory: ${{ github.workspace }}
         run: |
-          git fetch --unshallow || git fetch origin +refs/heads/*:refs/*
+          git rev-parse --is-inside-work-tree
+          git fetch --prune --tags origin
           git checkout main
-          git branch --set-upstream-to=origin/main main
+          git pull --ff-only origin main
 
       - name: Install pnpm
         run: npm install -g pnpm@9
@@ -50,6 +54,7 @@ jobs:
       - name: Check for changesets and bump version
         env:
           REPO_TOKEN: ${{ secrets.REPO_TOKEN }}
+        working-directory: ${{ github.workspace }}
         run: |
           CHANGESET_COUNT=$(ls -1 .changeset/*.md 2>/dev/null | grep -v README.md | wc -l)
           if [ "$CHANGESET_COUNT" -gt 0 ]; then
