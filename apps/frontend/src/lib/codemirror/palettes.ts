@@ -277,29 +277,3 @@ export function applyPalette(palette: SyntaxPalette): void {
     root.style.setProperty(`--${cssKey}-light`, deriveLightColor(value));
   });
 }
-
-/**
- * Get the current palette from local storage or return the first one
- */
-export function getSavedPalette(): number {
-  try {
-    if (typeof window === "undefined" || !window.localStorage) {
-      return 0;
-    }
-    const saved = window.localStorage.getItem("branchforge-syntax-palette");
-    if (saved === null) {
-      return 0;
-    }
-    const parsed = parseInt(saved, 10);
-    return Number.isFinite(parsed) ? parsed : 0;
-  } catch {
-    return 0;
-  }
-}
-
-/**
- * Save the selected palette index to local storage
- */
-export function savePalette(index: number): void {
-  localStorage.setItem("branchforge-syntax-palette", index.toString());
-}

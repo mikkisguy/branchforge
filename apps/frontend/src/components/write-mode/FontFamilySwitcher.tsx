@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 export type FontFamilyOption = {
   label: string;
@@ -19,43 +20,8 @@ const FONT_FAMILY_OPTIONS: Readonly<FontFamilyOption[]> = [
   { label: "Noto Serif", value: "noto-serif", family: "'Noto Serif', serif" },
 ] as const;
 
-const STORAGE_KEY = "writemode-font-family";
+const STORAGE_KEY = "write:font-family";
 const CSS_VARIABLE = "--prose-editor-font-family";
-
-/**
- * Get the saved font family from local storage or return default
- */
-function getSavedFontFamily(): string {
-  try {
-    if (typeof window === "undefined" || !window.localStorage) {
-      return FONT_FAMILY_OPTIONS[0].value;
-    }
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === null) {
-      return FONT_FAMILY_OPTIONS[0].value;
-    }
-    // Validate it's one of our options
-    if (!FONT_FAMILY_OPTIONS.some((opt) => opt.value === saved)) {
-      return FONT_FAMILY_OPTIONS[0].value;
-    }
-    return saved;
-  } catch {
-    return FONT_FAMILY_OPTIONS[0].value;
-  }
-}
-
-/**
- * Save the font family to local storage
- */
-function saveFontFamily(value: string): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, value);
-  } catch {
-    console.warn(
-      "Failed to save font family preference - Local storage may be unavailable"
-    );
-  }
-}
 
 interface FontFamilySwitcherProps {
   className?: string;
@@ -69,7 +35,14 @@ interface FontFamilySwitcherProps {
 export function FontFamilySwitcher({
   className = "",
 }: FontFamilySwitcherProps = {}) {
-  const [fontFamily, setFontFamily] = useState(getSavedFontFamily);
+  const [fontFamily, setFontFamily] = useLocalStorage<string>(
+    STORAGE_KEY,
+    FONT_FAMILY_OPTIONS[0].value,
+    {
+      validate: (value) =>
+        FONT_FAMILY_OPTIONS.some((option) => option.value === value),
+    }
+  );
 
   // Consolidated dropdown state for better clarity
   const [dropdownState, setDropdownState] = useState({
@@ -141,7 +114,6 @@ export function FontFamilySwitcher({
 
   const handleSelect = (value: string) => {
     setFontFamily(value);
-    saveFontFamily(value);
     updateDropdownState({ isOpen: false });
   };
 

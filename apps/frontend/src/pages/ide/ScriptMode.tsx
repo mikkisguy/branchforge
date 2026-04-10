@@ -34,6 +34,13 @@ import { registerModeFlushHandler } from "@/lib/editor-sync-coordinator";
 import type { FileSourceType } from "@branchforge/shared";
 import type { ScriptEditorRef } from "@/components/script-mode/ScriptEditor";
 import { cva } from "class-variance-authority";
+import {
+  getPrefixedStorageKey,
+  readLocalStorageItem,
+  removeLocalStorageItem,
+  useLocalStorageBoolean,
+  writeLocalStorageItem,
+} from "@/hooks/useLocalStorage";
 
 const sidebarVariants = cva(
   "min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3 transition-all duration-300 ease-out",
@@ -78,18 +85,10 @@ export function ScriptMode({
   const [showZipImportDialog, setShowZipImportDialog] = useState(false);
 
   // Sidebar collapse states
-  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(() => {
-    const leftCollapsed = localStorage.getItem(
-      "scriptmode-left-sidebar-collapsed"
-    );
-    return leftCollapsed === "true";
-  });
-  const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(() => {
-    const rightCollapsed = localStorage.getItem(
-      "scriptmode-right-sidebar-collapsed"
-    );
-    return rightCollapsed === "true";
-  });
+  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] =
+    useLocalStorageBoolean("script:left-sidebar-collapsed", false);
+  const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] =
+    useLocalStorageBoolean("script:right-sidebar-collapsed", false);
 
   const {
     isFocusMode,
@@ -98,7 +97,7 @@ export function ScriptMode({
     setPreFocusSidebarStates,
     preFocusElementRef,
     focusToggleRef,
-  } = useFocusModeState("scriptmode-focus-mode");
+  } = useFocusModeState("script:focus-mode");
 
   const editorRef = useRef<ScriptEditorRef>(null);
 
@@ -142,13 +141,15 @@ export function ScriptMode({
 
   // Track open tabs with project-scoped persistence
   const [openTabs, setOpenTabs] = useState<string[]>([]);
-  const tabsLoadedRef = useRef<string | undefined>(undefined);
+  const [hydratedTabsProjectId, setHydratedTabsProjectId] = useState<
+    string | undefined
+  >(undefined);
 
   const tabsStorageKey = projectId
-    ? `branchforge:scriptTabs:${projectId}`
+    ? getPrefixedStorageKey(`script:open-tabs:${projectId}`)
     : null;
   const activeFileStorageKey = projectId
-    ? `branchforge:activeScriptFile:${projectId}`
+    ? getPrefixedStorageKey(`script:active-file:${projectId}`)
     : null;
 
   // Track edited file content for autosave
@@ -402,38 +403,23 @@ export function ScriptMode({
 
   // Persist open tabs after project state has been hydrated from storage
   useEffect(() => {
-    if (tabsStorageKey && tabsLoadedRef.current === projectId) {
-      localStorage.setItem(tabsStorageKey, JSON.stringify(openTabs));
+    if (tabsStorageKey && hydratedTabsProjectId === projectId) {
+      writeLocalStorageItem(tabsStorageKey, JSON.stringify(openTabs));
     }
-  }, [openTabs, projectId, tabsStorageKey]);
+  }, [openTabs, projectId, tabsStorageKey, hydratedTabsProjectId]);
 
   // Persist active file to localStorage
   useEffect(() => {
-    if (!activeFileStorageKey) {
+    if (!activeFileStorageKey || hydratedTabsProjectId !== projectId) {
       return;
     }
 
     if (activeFileId) {
-      localStorage.setItem(activeFileStorageKey, activeFileId);
+      writeLocalStorageItem(activeFileStorageKey, activeFileId);
     } else {
-      localStorage.removeItem(activeFileStorageKey);
+      removeLocalStorageItem(activeFileStorageKey);
     }
-  }, [activeFileId, activeFileStorageKey]);
-
-  // Persist sidebar collapse states to localStorage
-  useEffect(() => {
-    localStorage.setItem(
-      "scriptmode-left-sidebar-collapsed",
-      String(isLeftSidebarCollapsed)
-    );
-  }, [isLeftSidebarCollapsed]);
-
-  useEffect(() => {
-    localStorage.setItem(
-      "scriptmode-right-sidebar-collapsed",
-      String(isRightSidebarCollapsed)
-    );
-  }, [isRightSidebarCollapsed]);
+  }, [activeFileId, activeFileStorageKey, projectId, hydratedTabsProjectId]);
 
   // Refs for project reset effect to avoid unwanted reruns
   const currentEditFileIdRef = useRef(currentEditFileId);
@@ -473,7 +459,7 @@ export function ScriptMode({
       }
 
       hasRefreshed.current = false;
-      tabsLoadedRef.current = undefined;
+      setHydratedTabsProjectId(undefined);
       setOpenTabs([]);
       setActiveFileId(null);
       setCurrentEditFileId(null);
@@ -651,15 +637,13 @@ export function ScriptMode({
 
   // Load persisted tabs and active file once per project after files load
   useEffect(() => {
-    if (!projectId || isLoadingFiles || tabsLoadedRef.current === projectId) {
+    if (!projectId || isLoadingFiles || hydratedTabsProjectId === projectId) {
       return;
     }
 
-    let isMounted = true;
-
     const fileIds = new Set(projectFiles.map((file) => file.id));
     const savedTabsRaw = tabsStorageKey
-      ? localStorage.getItem(tabsStorageKey)
+      ? readLocalStorageItem(tabsStorageKey)
       : null;
 
     let nextOpenTabs: string[] = [];
@@ -677,7 +661,7 @@ export function ScriptMode({
     }
 
     const savedActiveFileId = activeFileStorageKey
-      ? localStorage.getItem(activeFileStorageKey)
+      ? readLocalStorageItem(activeFileStorageKey)
       : null;
     const resolvedActiveFileId =
       savedActiveFileId && fileIds.has(savedActiveFileId)
@@ -693,20 +677,16 @@ export function ScriptMode({
     setOpenTabs(nextOpenTabs);
 
     const loadActiveFile = async () => {
-      if (resolvedActiveFileId && resolvedActiveFileId !== activeFileId) {
-        await handleSelectFileTab(resolvedActiveFileId);
-      }
-
-      if (isMounted) {
-        tabsLoadedRef.current = projectId;
+      try {
+        if (resolvedActiveFileId && resolvedActiveFileId !== activeFileId) {
+          await handleSelectFileTab(resolvedActiveFileId);
+        }
+      } finally {
+        setHydratedTabsProjectId(projectId);
       }
     };
 
     void loadActiveFile();
-
-    return () => {
-      isMounted = false;
-    };
   }, [
     projectId,
     isLoadingFiles,
@@ -715,6 +695,7 @@ export function ScriptMode({
     activeFileStorageKey,
     activeFileId,
     handleSelectFileTab,
+    hydratedTabsProjectId,
   ]);
 
   // Keep tab bar aligned with externally changed active file

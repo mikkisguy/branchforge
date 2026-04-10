@@ -13,41 +13,48 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { projectsApi, type Project } from "@/lib/api/projects";
 import { projectKeys } from "@/lib/query-keys";
+import {
+  getPrefixedStorageKey,
+  readLocalStorageItem,
+  removeLocalStorageItem,
+  writeLocalStorageItem,
+} from "@/hooks/useLocalStorage";
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-const CURRENT_PROJECT_STORAGE_KEY = "branchforge_current_project_id";
+const CURRENT_PROJECT_STORAGE_KEY = getPrefixedStorageKey("project:current");
 
-function readStoredCurrentProjectId(): string | null {
+function parseStoredProjectId(value: string): string | null {
+  if (value.length === 0) {
+    return null;
+  }
+
   try {
-    const stored = localStorage.getItem(CURRENT_PROJECT_STORAGE_KEY);
-    if (!stored) {
-      return null;
-    }
-
-    const parsed = JSON.parse(stored);
+    const parsed = JSON.parse(value) as unknown;
     return typeof parsed === "string" ? parsed : null;
   } catch {
-    return null;
+    return value;
   }
 }
 
-function persistCurrentProjectId(projectId: string | null): void {
-  try {
-    if (projectId) {
-      localStorage.setItem(
-        CURRENT_PROJECT_STORAGE_KEY,
-        JSON.stringify(projectId)
-      );
-      return;
-    }
-
-    localStorage.removeItem(CURRENT_PROJECT_STORAGE_KEY);
-  } catch {
-    // Ignore storage errors (for example in restrictive browser contexts).
+function readStoredCurrentProjectId(): string | null {
+  const stored = readLocalStorageItem(CURRENT_PROJECT_STORAGE_KEY);
+  if (!stored) {
+    return null;
   }
+
+  return parseStoredProjectId(stored);
+}
+
+function persistCurrentProjectId(projectId: string | null): void {
+  if (projectId) {
+    writeLocalStorageItem(CURRENT_PROJECT_STORAGE_KEY, projectId);
+    return;
+  }
+
+  removeLocalStorageItem(CURRENT_PROJECT_STORAGE_KEY);
 }
 
 // ============================================================================

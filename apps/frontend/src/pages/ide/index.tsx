@@ -11,38 +11,35 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { WriteMode } from "./WriteMode";
 import { flushModeBeforeTransition } from "@/lib/editor-sync-coordinator";
 import { useToast } from "@/contexts/ToastContext";
+import {
+  useLocalStorage,
+  useLocalStorageBoolean,
+} from "@/hooks/useLocalStorage";
 
 const ScriptMode = lazy(() =>
   import("./ScriptMode").then((m) => ({ default: m.ScriptMode }))
 );
 
-const MODE_STORAGE_KEY = "branchforge_ide_mode";
-
-function getStoredMode(): "write" | "script" {
-  try {
-    const stored = localStorage.getItem(MODE_STORAGE_KEY);
-    return stored === "write" || stored === "script" ? stored : "write";
-  } catch {
-    return "write";
-  }
-}
-
-function setStoredMode(mode: "write" | "script") {
-  try {
-    localStorage.setItem(MODE_STORAGE_KEY, mode);
-  } catch {
-    // Ignore storage errors (e.g., private browsing)
-  }
-}
-
 export function HomePageIDE() {
   const { theme, setTheme } = useTheme();
   const { logout } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"write" | "script">(getStoredMode);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [mode, setMode] = useLocalStorage<"write" | "script">(
+    "ide:mode",
+    "write",
+    {
+      serializer: (value) => value,
+      deserializer: (value) => value as "write" | "script",
+      validate: (value) => value === "write" || value === "script",
+    }
+  );
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useLocalStorageBoolean(
+    "ide:sidebar-collapsed",
+    false
+  );
   const [scriptModeKey, setScriptModeKey] = useState(0);
   const isFlushing = useRef(false);
+  const previousProjectIdRef = useRef<string | undefined>(undefined);
 
   // Project context
   const { currentProject, projects, setCurrentProject, isLoadingProjects } =
@@ -57,7 +54,17 @@ export function HomePageIDE() {
 
   // Clear active label when project changes
   useEffect(() => {
-    setActiveLabelId(null);
+    const previousProjectId = previousProjectIdRef.current;
+    const nextProjectId = currentProject?.id;
+
+    if (
+      previousProjectId !== undefined &&
+      previousProjectId !== nextProjectId
+    ) {
+      setActiveLabelId(null);
+    }
+
+    previousProjectIdRef.current = nextProjectId;
   }, [currentProject?.id, setActiveLabelId]);
 
   const handleLogout = async () => {
@@ -65,7 +72,6 @@ export function HomePageIDE() {
     navigate(`${BASE_URL}login`);
   };
 
-  // Wrap setMode to persist to localStorage
   const handleSetMode = (newMode: "write" | "script") => {
     void (async () => {
       if (newMode === mode) {
@@ -89,7 +95,6 @@ export function HomePageIDE() {
         }
 
         setMode(newMode);
-        setStoredMode(newMode);
       } catch (error) {
         showErrorToast(
           "An error occurred while switching modes. Please try again.",

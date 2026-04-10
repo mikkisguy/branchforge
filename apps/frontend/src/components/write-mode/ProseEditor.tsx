@@ -25,6 +25,7 @@ import { useWritingGoals } from "@/hooks/useWritingGoals";
 import { useInMemoryUndo } from "./useInMemoryUndo";
 import { UndoRedoControls } from "./UndoRedoControls";
 import { BookOpen, PenLine } from "lucide-react";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { Character, LabelDetail } from "@branchforge/shared";
 import type { SaveStatus } from "@/hooks/useAutosave";
@@ -45,7 +46,7 @@ export interface ProseEditorRef {
 }
 
 type LineLayoutMode = "inline" | "stacked";
-const LINE_LAYOUT_STORAGE_KEY = "writemode-line-layout";
+const LINE_LAYOUT_STORAGE_KEY = "write:line-layout";
 const NEW_LINE_BOTTOM_SAFE_OFFSET = 96;
 const TEXT_HISTORY_DEBOUNCE_MS = 450;
 
@@ -181,10 +182,15 @@ export const ProseEditor = forwardRef<ProseEditorRef, ProseEditorProps>(
     const [entries, setEntries] = useState<DialogueEntry[]>(() =>
       convertLabelLinesToEntries(activeLabel)
     );
-    const [layoutMode, setLayoutMode] = useState<LineLayoutMode>(() => {
-      const saved = localStorage.getItem(LINE_LAYOUT_STORAGE_KEY);
-      return saved === "stacked" ? "stacked" : "inline";
-    });
+    const [layoutMode, setLayoutMode] = useLocalStorage<LineLayoutMode>(
+      LINE_LAYOUT_STORAGE_KEY,
+      "inline",
+      {
+        serializer: (value) => value,
+        deserializer: (value) => value as LineLayoutMode,
+        validate: (value) => value === "inline" || value === "stacked",
+      }
+    );
 
     // Writing stats dialog state
     const [statsDialogOpen, setStatsDialogOpen] = useState(false);
@@ -429,10 +435,6 @@ export const ProseEditor = forwardRef<ProseEditorRef, ProseEditorProps>(
         }
       };
     }, []);
-
-    useEffect(() => {
-      localStorage.setItem(LINE_LAYOUT_STORAGE_KEY, layoutMode);
-    }, [layoutMode]);
 
     // Notify parent of changes (but not from external updates)
     useEffect(() => {

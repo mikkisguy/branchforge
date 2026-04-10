@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useRef, useState } from "react";
+import { useLocalStorageBoolean } from "@/hooks/useLocalStorage";
 
 export interface FocusModeSidebarStates {
   leftCollapsed: boolean;
@@ -15,28 +16,16 @@ export interface FocusModeState {
 }
 
 export function useFocusModeState(storageKey: string): FocusModeState {
-  const [isFocusMode, setIsFocusMode] = useState(() => {
-    try {
-      const saved = localStorage.getItem(storageKey);
-      return saved === "true";
-    } catch {
-      return false;
-    }
-  });
+  const [isFocusMode, setIsFocusMode] = useLocalStorageBoolean(
+    storageKey,
+    false
+  );
 
   const [preFocusSidebarStates, setPreFocusSidebarStates] =
     useState<FocusModeSidebarStates | null>(null);
 
   const preFocusElementRef = useRef<HTMLElement | null>(null);
   const focusToggleRef = useRef<HTMLButtonElement | null>(null);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(storageKey, String(isFocusMode));
-    } catch {
-      console.warn(`Could not save focus mode preference to localStorage`);
-    }
-  }, [storageKey, isFocusMode]);
 
   return {
     isFocusMode,

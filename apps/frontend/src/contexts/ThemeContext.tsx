@@ -1,5 +1,6 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { ThemeContext, type ThemePalette, type ThemeColors } from "./useTheme";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 export const themeConfigs: Record<ThemePalette, ThemeColors> = {
   forest: { primary: "#40bb82", hover: "#52c992" },
@@ -20,10 +21,15 @@ function isValidTheme(value: string): value is ThemePalette {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<ThemePalette>(() => {
-    const saved = localStorage.getItem("branchforge-theme");
-    return saved && isValidTheme(saved) ? saved : "periwinkle";
-  });
+  const [theme, setThemeState] = useLocalStorage<ThemePalette>(
+    "theme",
+    "periwinkle",
+    {
+      serializer: (value) => value,
+      deserializer: (value) => value as ThemePalette,
+      validate: isValidTheme,
+    }
+  );
 
   const colors = themeConfigs[theme];
 
@@ -59,7 +65,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setTheme = (newTheme: ThemePalette) => {
     setThemeState(newTheme);
-    localStorage.setItem("branchforge-theme", newTheme);
   };
 
   return (

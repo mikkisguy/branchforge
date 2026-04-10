@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useLocalStorageNumber } from "@/hooks/useLocalStorage";
 
 export const EDITOR_FONT_SIZE_CHANGED = "editor-font-size-changed";
 
@@ -18,7 +19,7 @@ interface FontSizeSwitcherProps {
 
 const MODE_CONFIGS = {
   script: {
-    storageKey: "branchforge-font-size",
+    storageKey: "script:font-size",
     cssVariable: "--editor-font-size",
     defaultSize: 14,
     sizeOptions: [
@@ -33,7 +34,7 @@ const MODE_CONFIGS = {
       "px-3 py-1.5 bg-muted/50 hover:bg-muted border border-border",
   },
   write: {
-    storageKey: "writemode-font-size",
+    storageKey: "write:font-size",
     cssVariable: "--prose-editor-font-size",
     defaultSize: 16,
     sizeOptions: [
@@ -48,46 +49,6 @@ const MODE_CONFIGS = {
       "px-2 py-1 border border-[hsl(var(--border)/0.6)] hover:bg-[hsl(var(--muted)/0.4)]",
   },
 } as const;
-
-/**
- * Get the saved font size from local storage or return default
- */
-function getSavedFontSize(
-  storageKey: string,
-  defaultSize: number,
-  sizeOptions: Readonly<FontSizeOption[]>
-): number {
-  try {
-    if (typeof window === "undefined" || !window.localStorage) {
-      return defaultSize;
-    }
-    const saved = window.localStorage.getItem(storageKey);
-    if (saved === null) {
-      return defaultSize;
-    }
-    const parsed = parseInt(saved, 10);
-    // Validate it's one of our options
-    if (!sizeOptions.some((opt) => opt.value === parsed)) {
-      return defaultSize;
-    }
-    return parsed;
-  } catch {
-    return defaultSize;
-  }
-}
-
-/**
- * Save the font size to local storage
- */
-function saveFontSize(storageKey: string, size: number): void {
-  try {
-    localStorage.setItem(storageKey, size.toString());
-  } catch {
-    console.warn(
-      "Failed to save font size preference - Local storage may be unavailable"
-    );
-  }
-}
 
 /**
  * Font size switcher for editors
@@ -127,8 +88,17 @@ export function FontSizeSwitcher({
   const baseClassName = customClassName ?? config.className;
   const buttonClassName = config.buttonClassName;
 
-  const [fontSize, setFontSize] = useState(() =>
-    getSavedFontSize(storageKey, defaultSize, sizeOptions)
+  const validateFontSize = useCallback(
+    (value: number) => sizeOptions.some((option) => option.value === value),
+    [sizeOptions]
+  );
+
+  const [fontSize, setFontSize] = useLocalStorageNumber(
+    storageKey,
+    defaultSize,
+    {
+      validate: validateFontSize,
+    }
   );
   const [isOpen, setIsOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
@@ -177,7 +147,6 @@ export function FontSizeSwitcher({
 
   const handleSelect = (size: number) => {
     setFontSize(size);
-    saveFontSize(storageKey, size);
     setIsOpen(false);
   };
 
