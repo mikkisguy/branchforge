@@ -14,7 +14,6 @@ jobs:
     if: >
       github.event.pull_request.merged == true &&
       startsWith(github.event.pull_request.head.ref, 'release/version-v') &&
-      github.event.pull_request.user.login == 'github-actions[bot]' &&
       startsWith(github.event.pull_request.title, 'chore: version packages to v') &&
       contains(github.event.pull_request.body, 'release-automation:version-workflow')
     runs-on: ubuntu-latest
