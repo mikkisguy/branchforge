@@ -9,10 +9,10 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    container: node:20-alpine
+    container: node:24-alpine
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install pnpm
         run: npm install -g pnpm@9

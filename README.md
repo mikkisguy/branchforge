@@ -101,7 +101,7 @@ changesets      - Semantic versioning
 
 ### Prerequisites
 
-- Node.js >= 20.0.0
+- Node.js >= 24.0.0
 - pnpm >= 9.0.0
 - PostgreSQL 14+
 

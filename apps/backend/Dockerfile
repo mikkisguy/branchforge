@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 ARG VERSION=0.0.1
 ARG BUILD_DATE
@@ -27,7 +27,7 @@ WORKDIR /app/apps/backend
 RUN pnpm build
 
 # Production image
-FROM node:20-alpine
+FROM node:24-alpine
 
 ARG VERSION=0.0.1
 ARG BUILD_DATE

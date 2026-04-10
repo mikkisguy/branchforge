@@ -10,18 +10,18 @@ jobs:
   bump-version:
     name: Bump Version
     runs-on: ubuntu-latest
+    container: node:24-alpine
     defaults:
       run:
-        working-directory: /github/workspace
-    container: node:20-alpine
+        working-directory: ${{ github.workspace }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install dependencies
+      - name: Install system dependencies
         run: apk add --no-cache git jq
 
       - name: Configure git
@@ -38,7 +38,7 @@ jobs:
       - name: Install pnpm
         run: npm install -g pnpm@9
 
-      - name: Install dependencies
+      - name: Install project dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Validate REPO_TOKEN
