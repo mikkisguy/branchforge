@@ -5,22 +5,30 @@
  * Simplified with stable query keys and proper refetch behavior.
  */
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { labelKeys, projectFilesKeys } from "@/lib/query-keys";
 import { labelsApi, type UpdateDialogueResponse } from "@/lib/api/labels";
 import { useProject } from "@/hooks/useProject";
+import {
+  getPrefixedStorageKey,
+  readLocalStorageItem,
+  removeLocalStorageItem,
+  writeLocalStorageItem,
+} from "@/hooks/useLocalStorage";
 import type { PublicLabel, LabelDetail } from "@branchforge/shared";
 
 function clearHistoryCursor(labelId: string): void {
-  try {
-    localStorage.removeItem(`label-history-cursor:${labelId}`);
-  } catch {
-    // Ignore storage failures.
-  }
+  removeLocalStorageItem(
+    getPrefixedStorageKey(`write:label-history-cursor:${labelId}`)
+  );
 }
 
 const EMPTY_PROJECT_KEY = "__no_project__";
+
+function getActiveLabelStorageKey(projectKey: string): string {
+  return getPrefixedStorageKey(`write:active-label:${projectKey}`);
+}
 
 // ============================================================================
 // Constants
@@ -78,16 +86,26 @@ export function useLabels(): UseLabelsReturn {
   const { data: activeLabelId = null } = useQuery<string | null>({
     queryKey: labelKeys.activeLabelId(projectKey),
     queryFn: () => {
-      try {
-        const saved = localStorage.getItem(
-          `branchforge:activeLabel:${projectKey}`
-        );
-        return saved;
-      } catch {
+      if (projectKey === EMPTY_PROJECT_KEY) {
         return null;
       }
+
+      return readLocalStorageItem(getActiveLabelStorageKey(projectKey));
     },
-    initialData: null,
+    initialData: () => {
+      const cachedActiveLabelId = queryClient.getQueryData<string | null>(
+        labelKeys.activeLabelId(projectKey)
+      );
+      if (cachedActiveLabelId !== undefined) {
+        return cachedActiveLabelId;
+      }
+
+      if (projectKey === EMPTY_PROJECT_KEY) {
+        return null;
+      }
+
+      return readLocalStorageItem(getActiveLabelStorageKey(projectKey));
+    },
     staleTime: Infinity,
     gcTime: Infinity,
     enabled: true,
@@ -157,6 +175,20 @@ export function useLabels(): UseLabelsReturn {
     },
     [projectKey, queryClient]
   );
+
+  useEffect(() => {
+    if (projectKey === EMPTY_PROJECT_KEY) {
+      return;
+    }
+
+    const storageKey = getActiveLabelStorageKey(projectKey);
+    if (activeLabelId) {
+      writeLocalStorageItem(storageKey, activeLabelId);
+      return;
+    }
+
+    removeLocalStorageItem(storageKey);
+  }, [activeLabelId, projectKey]);
 
   // Invalidate labels method
   const invalidateLabels = useCallback(async () => {

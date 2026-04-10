@@ -116,7 +116,7 @@ describe("ThemeContext", () => {
 
   describe("Saved Theme", () => {
     it("should load saved theme from localStorage", () => {
-      localStorage.setItem("branchforge-theme", "forest");
+      localStorage.setItem("branchforge:theme", "forest");
 
       render(
         <ThemeProvider>
@@ -129,7 +129,7 @@ describe("ThemeContext", () => {
     });
 
     it("should set correct colors for forest theme", () => {
-      localStorage.setItem("branchforge-theme", "forest");
+      localStorage.setItem("branchforge:theme", "forest");
 
       render(
         <ThemeProvider>
@@ -146,7 +146,7 @@ describe("ThemeContext", () => {
     });
 
     it("should fall back to default for invalid saved theme", () => {
-      localStorage.setItem("branchforge-theme", "invalid-theme");
+      localStorage.setItem("branchforge:theme", "invalid-theme");
 
       render(
         <ThemeProvider>
@@ -187,7 +187,7 @@ describe("ThemeContext", () => {
       fireEvent.click(screen.getByRole("button", { name: "Set Forest" }));
 
       await waitFor(() => {
-        expect(localStorage.getItem("branchforge-theme")).toBe("forest");
+        expect(localStorage.getItem("branchforge:theme")).toBe("forest");
       });
     });
 
@@ -236,7 +236,7 @@ describe("ThemeContext", () => {
     ];
 
     it.each(themes)("should provide correct colors for %s", (theme) => {
-      localStorage.setItem("branchforge-theme", theme);
+      localStorage.setItem("branchforge:theme", theme);
 
       const { container } = render(
         <ThemeProvider>
@@ -269,7 +269,7 @@ describe("ThemeContext", () => {
     };
 
     it.each(themes)("should have correct hardcoded colors for %s", (theme) => {
-      localStorage.setItem("branchforge-theme", theme);
+      localStorage.setItem("branchforge:theme", theme);
 
       const { container } = render(
         <ThemeProvider>

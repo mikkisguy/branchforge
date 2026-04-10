@@ -1,41 +1,11 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { EditorView } from "@codemirror/view";
 import type { Extension } from "@codemirror/state";
 import { AlignJustify, WrapText } from "lucide-react";
+import { useLocalStorageBoolean } from "@/hooks/useLocalStorage";
 
-const LINE_WRAP_KEY = "branchforge-line-wrap";
+const LINE_WRAP_KEY = "script:line-wrap";
 const DEFAULT_LINE_WRAP = false;
-
-/**
- * Get the saved line wrap preference from local storage or return default
- */
-function getSavedLineWrap(): boolean {
-  try {
-    if (typeof window === "undefined" || !window.localStorage) {
-      return DEFAULT_LINE_WRAP;
-    }
-    const saved = window.localStorage.getItem(LINE_WRAP_KEY);
-    if (saved === null) {
-      return DEFAULT_LINE_WRAP;
-    }
-    return saved === "true";
-  } catch {
-    return DEFAULT_LINE_WRAP;
-  }
-}
-
-/**
- * Save the line wrap preference to local storage
- */
-function saveLineWrap(enabled: boolean): void {
-  try {
-    localStorage.setItem(LINE_WRAP_KEY, enabled.toString());
-  } catch {
-    console.warn(
-      "Failed to save line wrap preference - Local storage may be unavailable"
-    );
-  }
-}
 
 /**
  * Creates a CodeMirror extension for line wrapping
@@ -71,7 +41,10 @@ interface LineWrapSwitcherProps {
 }
 
 export function LineWrapSwitcher({ onChange }: LineWrapSwitcherProps) {
-  const [lineWrap, setLineWrap] = useState(getSavedLineWrap);
+  const [lineWrap, setLineWrap] = useLocalStorageBoolean(
+    LINE_WRAP_KEY,
+    DEFAULT_LINE_WRAP
+  );
 
   useEffect(() => {
     // Notify parent of extension change
@@ -79,9 +52,7 @@ export function LineWrapSwitcher({ onChange }: LineWrapSwitcherProps) {
   }, [lineWrap, onChange]);
 
   const toggle = () => {
-    const newValue = !lineWrap;
-    setLineWrap(newValue);
-    saveLineWrap(newValue);
+    setLineWrap((previousValue) => !previousValue);
   };
 
   return (

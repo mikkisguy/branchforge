@@ -27,6 +27,13 @@ import type { LabelDetail } from "@branchforge/shared";
 import { useToast } from "@/contexts/ToastContext";
 import { registerModeFlushHandler } from "@/lib/editor-sync-coordinator";
 import { cva } from "class-variance-authority";
+import {
+  getPrefixedStorageKey,
+  readLocalStorageItem,
+  removeLocalStorageItem,
+  useLocalStorageBoolean,
+  writeLocalStorageItem,
+} from "@/hooks/useLocalStorage";
 
 const sidebarVariants = cva(
   "min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3 transition-all duration-300 ease-out",
@@ -95,20 +102,12 @@ export function WriteMode({ projectName }: WriteModeProps) {
     setPreFocusSidebarStates,
     preFocusElementRef,
     focusToggleRef,
-  } = useFocusModeState("writemode-focus-mode");
+  } = useFocusModeState("write:focus-mode");
 
-  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(() => {
-    const leftCollapsed = localStorage.getItem(
-      "writemode-left-sidebar-collapsed"
-    );
-    return leftCollapsed === "true";
-  });
-  const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(() => {
-    const rightCollapsed = localStorage.getItem(
-      "writemode-right-sidebar-collapsed"
-    );
-    return rightCollapsed === "true";
-  });
+  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] =
+    useLocalStorageBoolean("write:left-sidebar-collapsed", false);
+  const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] =
+    useLocalStorageBoolean("write:right-sidebar-collapsed", false);
 
   const editorRef = useRef<{ focus: () => void } | null>(null);
   const [lastKnownVersionByLabel, setLastKnownVersionByLabel] = useState<
@@ -150,45 +149,64 @@ export function WriteMode({ projectName }: WriteModeProps) {
     if (activeLabelId) return [activeLabelId];
     return [];
   });
-  const tabsLoadedRef = useRef<string | undefined>(undefined);
+  const [hydratedTabsProjectId, setHydratedTabsProjectId] = useState<
+    string | undefined
+  >(undefined);
+  const tabsStorageKey = useMemo(
+    () =>
+      currentProject?.id
+        ? getPrefixedStorageKey(`write:open-tabs:${currentProject.id}`)
+        : null,
+    [currentProject?.id]
+  );
+  const activeTabStorageKey = useMemo(
+    () =>
+      currentProject?.id
+        ? getPrefixedStorageKey(`write:active-tab:${currentProject.id}`)
+        : null,
+    [currentProject?.id]
+  );
 
   // Persist open tabs after project state has been hydrated from storage
   useEffect(() => {
-    if (currentProject?.id && tabsLoadedRef.current === currentProject.id) {
-      localStorage.setItem(
-        `branchforge:tabs:${currentProject.id}`,
-        JSON.stringify(openTabs)
-      );
-    }
-  }, [openTabs, currentProject?.id]);
-
-  // Persist active label to localStorage
-  useEffect(() => {
-    if (currentProject?.id) {
-      if (activeLabelId) {
-        localStorage.setItem(
-          `branchforge:activeLabel:${currentProject.id}`,
-          activeLabelId
-        );
-      } else {
-        localStorage.removeItem(`branchforge:activeLabel:${currentProject.id}`);
+    if (tabsStorageKey && currentProject?.id) {
+      if (hydratedTabsProjectId !== currentProject.id) {
+        return;
       }
+
+      writeLocalStorageItem(tabsStorageKey, JSON.stringify(openTabs));
     }
-  }, [activeLabelId, currentProject?.id]);
+  }, [tabsStorageKey, openTabs, currentProject?.id, hydratedTabsProjectId]);
 
+  // Persist active tab after project state has been hydrated from storage
   useEffect(() => {
-    localStorage.setItem(
-      "writemode-left-sidebar-collapsed",
-      String(isLeftSidebarCollapsed)
-    );
-  }, [isLeftSidebarCollapsed]);
+    if (!activeTabStorageKey || !currentProject?.id) {
+      return;
+    }
 
-  useEffect(() => {
-    localStorage.setItem(
-      "writemode-right-sidebar-collapsed",
-      String(isRightSidebarCollapsed)
+    if (hydratedTabsProjectId !== currentProject.id) {
+      return;
+    }
+
+    const fallbackActiveTabId = openTabs.find((tabId) =>
+      labels.some((label) => label.id === tabId)
     );
-  }, [isRightSidebarCollapsed]);
+    const nextActiveTabId = activeLabelId ?? fallbackActiveTabId ?? null;
+
+    if (nextActiveTabId) {
+      writeLocalStorageItem(activeTabStorageKey, nextActiveTabId);
+      return;
+    }
+
+    removeLocalStorageItem(activeTabStorageKey);
+  }, [
+    activeTabStorageKey,
+    activeLabelId,
+    currentProject?.id,
+    hydratedTabsProjectId,
+    labels,
+    openTabs,
+  ]);
 
   const handleFocusModeToggle = useCallback(() => {
     if (!isFocusMode) {
@@ -280,7 +298,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
       savedHashesRef.current.clear();
       serverContentHashesRef.current.clear();
       setOpenTabs([]);
-      tabsLoadedRef.current = undefined;
+      setHydratedTabsProjectId(undefined);
     }
     prevProjectIdRef.current = currentProject?.id;
   }, [currentProject?.id]);
@@ -290,16 +308,18 @@ export function WriteMode({ projectName }: WriteModeProps) {
     if (
       isLoadingLabels ||
       !currentProject?.id ||
-      labels.length === 0 ||
-      tabsLoadedRef.current === currentProject.id
+      hydratedTabsProjectId === currentProject.id
     ) {
       return;
     }
 
     const labelIds = new Set(labels.map((l) => l.id));
-    const savedTabsRaw = localStorage.getItem(
-      `branchforge:tabs:${currentProject.id}`
-    );
+    const savedTabsRaw = tabsStorageKey
+      ? readLocalStorageItem(tabsStorageKey)
+      : null;
+    const savedActiveTabId = activeTabStorageKey
+      ? readLocalStorageItem(activeTabStorageKey)
+      : null;
 
     let nextOpenTabs: string[] = [];
     if (savedTabsRaw) {
@@ -315,36 +335,36 @@ export function WriteMode({ projectName }: WriteModeProps) {
       }
     }
 
-    const savedActiveLabel = localStorage.getItem(
-      `branchforge:activeLabel:${currentProject.id}`
-    );
-    const resolvedActiveLabelId =
-      savedActiveLabel && labelIds.has(savedActiveLabel)
-        ? savedActiveLabel
-        : activeLabelId && labelIds.has(activeLabelId)
-          ? activeLabelId
-          : null;
+    let nextActiveLabelId: string | null;
 
-    if (
-      resolvedActiveLabelId &&
-      !nextOpenTabs.includes(resolvedActiveLabelId)
-    ) {
-      nextOpenTabs = [...nextOpenTabs, resolvedActiveLabelId];
+    if (activeLabelId && labelIds.has(activeLabelId)) {
+      nextActiveLabelId = activeLabelId;
+    } else if (savedActiveTabId && labelIds.has(savedActiveTabId)) {
+      nextActiveLabelId = savedActiveTabId;
+    } else {
+      nextActiveLabelId = nextOpenTabs[0] ?? labels[0]?.id ?? null;
+    }
+
+    if (nextActiveLabelId && !nextOpenTabs.includes(nextActiveLabelId)) {
+      nextOpenTabs = [...nextOpenTabs, nextActiveLabelId];
     }
 
     setOpenTabs(nextOpenTabs);
 
-    if (resolvedActiveLabelId && resolvedActiveLabelId !== activeLabelId) {
-      setActiveLabelId(resolvedActiveLabelId);
+    if (nextActiveLabelId && nextActiveLabelId !== activeLabelId) {
+      setActiveLabelId(nextActiveLabelId);
     }
 
-    tabsLoadedRef.current = currentProject.id;
+    setHydratedTabsProjectId(currentProject.id);
   }, [
     isLoadingLabels,
     currentProject?.id,
+    tabsStorageKey,
+    activeTabStorageKey,
     labels,
     activeLabelId,
     setActiveLabelId,
+    hydratedTabsProjectId,
   ]);
 
   // Keep tab bar aligned with externally changed active label

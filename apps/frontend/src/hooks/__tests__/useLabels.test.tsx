@@ -66,6 +66,7 @@ describe("useLabels", () => {
   beforeEach(() => {
     queryClient = createTestQueryClient();
     vi.clearAllMocks();
+    localStorage.clear();
   });
 
   afterEach(() => {
@@ -160,6 +161,25 @@ describe("useLabels", () => {
     it("should load active label ID from cache on mount", async () => {
       // Pre-populate cache
       queryClient.setQueryData(labelKeys.activeLabelId("project-1"), "label-1");
+      vi.mocked(labelsApi.listLabels).mockResolvedValue(mockLabels);
+      vi.mocked(labelsApi.getLabel).mockResolvedValue(mockLabelDetail);
+
+      const { result } = renderHook(() => useLabels(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.activeLabelId).toBe("label-1");
+      });
+
+      await waitFor(() => {
+        expect(result.current.activeLabel).toEqual(mockLabelDetail);
+      });
+    });
+
+    it("hydrates active label ID from localStorage on mount", async () => {
+      localStorage.setItem(
+        "branchforge:write:active-label:project-1",
+        "label-1"
+      );
       vi.mocked(labelsApi.listLabels).mockResolvedValue(mockLabels);
       vi.mocked(labelsApi.getLabel).mockResolvedValue(mockLabelDetail);
 

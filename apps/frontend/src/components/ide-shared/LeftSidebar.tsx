@@ -20,8 +20,6 @@ import { StateVariablesModal } from "./StateVariablesModal";
 import { CharactersModal } from "./CharactersModal";
 import { Logo } from "@/components/ui/logo";
 
-const SIDEBAR_COLLAPSED_KEY = "branchforge-sidebar-collapsed";
-
 export interface ThemePaletteOption {
   name: string;
   key: ThemePalette;
@@ -66,27 +64,9 @@ export function LeftSidebar({
   const themeDropdownRef = useRef<HTMLDivElement>(null);
   const projectPopoverRef = useRef<HTMLDivElement>(null);
 
-  // Load collapsed state from localStorage on mount (default: expanded/false)
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
-      if (stored !== null) {
-        onCollapsedChange(stored === "true");
-      }
-    } catch {
-      // Ignore storage errors
-    }
-  }, [onCollapsedChange]);
-
-  // Persist collapsed state to localStorage
   const handleToggleCollapse = () => {
     const newState = !isCollapsed;
     onCollapsedChange(newState);
-    try {
-      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(newState));
-    } catch {
-      // Ignore storage errors
-    }
   };
 
   // Close theme dropdown when clicking outside

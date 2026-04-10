@@ -2,16 +2,21 @@ import { useEffect, useState, useMemo } from "react";
 import {
   PALETTES,
   applyPalette,
-  getSavedPalette,
-  savePalette,
   type PaletteGroup,
 } from "../../lib/codemirror/palettes";
+import { useLocalStorageNumber } from "@/hooks/useLocalStorage";
 
 /**
  * Palette switcher for syntax highlighting colors
  */
 export function PaletteSwitcher() {
-  const [selectedIndex, setSelectedIndex] = useState(getSavedPalette());
+  const [selectedIndex, setSelectedIndex] = useLocalStorageNumber(
+    "editor:syntax-palette",
+    0,
+    {
+      validate: (value) => value >= 0 && value < PALETTES.length,
+    }
+  );
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
@@ -20,7 +25,6 @@ export function PaletteSwitcher() {
 
   const handleSelect = (index: number) => {
     setSelectedIndex(index);
-    savePalette(index);
     setIsOpen(false);
   };
 

@@ -49,16 +49,13 @@ describe("useProject", () => {
       expect(result.current.currentProject?.id).toBe("project-1");
     });
 
-    expect(localStorage.getItem("branchforge_current_project_id")).toBe(
-      JSON.stringify("project-1")
+    expect(localStorage.getItem("branchforge:project:current")).toBe(
+      "project-1"
     );
   });
 
   it("falls back to the first available project when storage points to a missing project", async () => {
-    localStorage.setItem(
-      "branchforge_current_project_id",
-      JSON.stringify("missing-project")
-    );
+    localStorage.setItem("branchforge:project:current", "missing-project");
 
     const queryClient = createTestQueryClient();
 
@@ -70,8 +67,8 @@ describe("useProject", () => {
       expect(result.current.currentProject?.id).toBe("project-1");
     });
 
-    expect(localStorage.getItem("branchforge_current_project_id")).toBe(
-      JSON.stringify("project-1")
+    expect(localStorage.getItem("branchforge:project:current")).toBe(
+      "project-1"
     );
   });
 });
