@@ -60,6 +60,7 @@ jobs:
           if [ "$CHANGESET_COUNT" -gt 0 ]; then
             echo "Found $CHANGESET_COUNT changeset files, consuming and bumping versions..."
             pnpm run bump:version
+            pnpm --filter @branchforge/shared build
             pnpm typecheck
             pnpm test
             VERSION=$(node -p "require('./package.json').version")
