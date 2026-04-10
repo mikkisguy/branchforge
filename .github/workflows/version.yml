@@ -11,12 +11,9 @@ jobs:
     name: Bump Version
     runs-on: ubuntu-latest
     container: node:24-alpine
-    defaults:
-      run:
-        working-directory: ${{ github.workspace }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}

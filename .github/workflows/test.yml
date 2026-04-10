@@ -14,7 +14,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Install pnpm
         run: npm install -g pnpm@9
@@ -32,7 +32,7 @@ jobs:
     container: node:24-alpine
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Install pnpm
         run: npm install -g pnpm@9
@@ -50,7 +50,7 @@ jobs:
     container: node:24-alpine
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Install pnpm
         run: npm install -g pnpm@9
@@ -86,7 +86,7 @@ jobs:
       NODE_ENV: test
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Install pnpm
         run: npm install -g pnpm@9
@@ -110,7 +110,7 @@ jobs:
     container: node:24-alpine
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Install pnpm
         run: npm install -g pnpm@9
