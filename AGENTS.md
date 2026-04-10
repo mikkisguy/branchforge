@@ -69,10 +69,11 @@ pnpm db:studio
 
 ### Imports
 
-- All imports must use `.js` extensions (ES modules)
+- Backend: All imports must use `.js` extensions (ES modules)
 - Backend: Import from local files with relative paths: `import { thing } from "../service.js"`
 - Frontend: Use `@/` alias for src: `import { thing } from "@/lib/thing"`
-- Type-only imports: `import type { Thing } from "./file.js"`
+- Type-only imports: Backend: `import type { Thing } from "./file.js"`
+- Type-only imports: Frontend: `import type { Thing } from "./file"`
 
 ### TypeScript
 
