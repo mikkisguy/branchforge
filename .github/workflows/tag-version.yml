@@ -1,0 +1,55 @@
+name: Tag Version
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  tag-version:
+    name: Create Version Tag
+    if: >
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'release/version-v') &&
+      github.event.pull_request.user.login == 'github-actions[bot]' &&
+      startsWith(github.event.pull_request.title, 'chore: version packages to v') &&
+      contains(github.event.pull_request.body, 'release-automation:version-workflow')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate REPO_TOKEN
+        env:
+          REPO_TOKEN: ${{ secrets.REPO_TOKEN }}
+        run: |
+          if [ -z "$REPO_TOKEN" ]; then
+            echo "::error::REPO_TOKEN secret is not set or is empty. Please add the REPO_TOKEN secret to your repository settings."
+            exit 1
+          fi
+
+      - name: Create and push tag if missing
+        env:
+          REPO_TOKEN: ${{ secrets.REPO_TOKEN }}
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git fetch --prune --tags origin
+
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v$VERSION"
+
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists"
+            exit 0
+          fi
+
+          git tag "$TAG" "${{ github.event.pull_request.merge_commit_sha }}"
+          git push https://x-access-token:$REPO_TOKEN@github.com/${{ github.repository }}.git "$TAG"
