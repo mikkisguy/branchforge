@@ -9,10 +9,10 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    container: node:20-alpine
+    container: node:24-alpine
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install pnpm
         run: npm install -g pnpm@9
@@ -24,7 +24,7 @@ jobs:
         run: pnpm build
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-artifacts
           path: |
