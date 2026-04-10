@@ -12,14 +12,14 @@ jobs:
     runs-on: ubuntu-latest
     container: node:24-alpine
     steps:
+      - name: Install system dependencies
+        run: apk add --no-cache git jq
+
       - name: Checkout code
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install system dependencies
-        run: apk add --no-cache git jq
 
       - name: Configure git
         run: |
