@@ -215,7 +215,11 @@ export function useLocalStorageBoolean(
 ) {
   return useLocalStorage<boolean>(key, defaultValue, {
     serializer: (value) => String(value),
-    deserializer: (value) => value === "true",
+    deserializer: (value) => {
+      if (value === "true") return true;
+      if (value === "false") return false;
+      return defaultValue;
+    },
     ssrSafe: options?.ssrSafe,
   });
 }

@@ -487,7 +487,11 @@ export function ScriptMode({
       } finally {
         if (resetId === currentResetIdRef.current) {
           isResettingRef.current = false;
-          skipSaveRef.current = false;
+          Promise.resolve().then(() => {
+            if (resetId === currentResetIdRef.current) {
+              skipSaveRef.current = false;
+            }
+          });
         }
       }
     })();
