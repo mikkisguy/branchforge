@@ -4,6 +4,15 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.7.1 - 2026-04-10
+
+- 9b5b4fe: Updated write mode design and features, now tabs
+- 6c0f03f: Improved GitLab sync user flow
+- 7e4a16a: Added focus mode toggle for both write and script mode.
+- 18a6d9d: Added collapsible sidebars to modes
+  - @branchforge/shared@0.7.1
+- @branchforge/shared@0.7.1
+
 ## v0.7.0 - 2026-04-03
 
 - b5285de: Added write mode components and functionality
