@@ -100,6 +100,9 @@ export function ScriptMode({
   } = useFocusModeState("script:focus-mode");
 
   const editorRef = useRef<ScriptEditorRef>(null);
+  const isResettingRef = useRef(false);
+  const skipSaveRef = useRef(false);
+  const currentResetIdRef = useRef(0);
 
   const handleFocusModeToggle = useCallback(() => {
     if (!isFocusMode) {
@@ -183,6 +186,7 @@ export function ScriptMode({
     data: editedFileContent,
     hashFn: hashFileContent,
     debounceMs: 1000, // Reduced from 2000ms for faster feedback
+    skipSaveRef,
     onSave: useCallback(
       async (content: string) => {
         if (currentEditFileId) {
@@ -444,32 +448,49 @@ export function ScriptMode({
   }, [showErrorToast]);
 
   useEffect(() => {
-    const resetProjectState = async () => {
-      if (
-        currentEditFileIdRef.current &&
-        (isFileDirtyRef.current || fileSaveStatusRef.current === "error")
-      ) {
-        const flushed = await triggerFileSaveRef.current();
-        if (!flushed) {
-          showErrorToastRef.current(
-            "Could not save pending edits. The save failed when switching projects.",
-            "Project switch warning"
-          );
+    const resetId = ++currentResetIdRef.current;
+
+    (async () => {
+      isResettingRef.current = true;
+      skipSaveRef.current = true;
+
+      try {
+        if (
+          currentEditFileIdRef.current &&
+          (isFileDirtyRef.current || fileSaveStatusRef.current === "error")
+        ) {
+          if (resetId !== currentResetIdRef.current) {
+            return;
+          }
+          const flushed = await triggerFileSaveRef.current();
+          if (!flushed) {
+            showErrorToastRef.current(
+              "Could not save pending edits. The save failed when switching projects.",
+              "Project switch warning"
+            );
+          }
+        }
+
+        if (resetId !== currentResetIdRef.current) {
+          return;
+        }
+
+        hasRefreshed.current = false;
+        setHydratedTabsProjectId(undefined);
+        setOpenTabs([]);
+        setActiveFileId(null);
+        setCurrentEditFileId(null);
+        setCurrentEditFileHash(null);
+        setEditedFileContent("");
+        setScrollToLine(null);
+        setHasSaveConflict(false);
+      } finally {
+        if (resetId === currentResetIdRef.current) {
+          isResettingRef.current = false;
+          skipSaveRef.current = false;
         }
       }
-
-      hasRefreshed.current = false;
-      setHydratedTabsProjectId(undefined);
-      setOpenTabs([]);
-      setActiveFileId(null);
-      setCurrentEditFileId(null);
-      setCurrentEditFileHash(null);
-      setEditedFileContent("");
-      setScrollToLine(null);
-      setHasSaveConflict(false);
-    };
-
-    void resetProjectState();
+    })();
   }, [projectId]);
 
   // Handle Ctrl+S for immediate save
@@ -637,7 +658,12 @@ export function ScriptMode({
 
   // Load persisted tabs and active file once per project after files load
   useEffect(() => {
-    if (!projectId || isLoadingFiles || hydratedTabsProjectId === projectId) {
+    if (
+      !projectId ||
+      isLoadingFiles ||
+      hydratedTabsProjectId === projectId ||
+      isResettingRef.current
+    ) {
       return;
     }
 

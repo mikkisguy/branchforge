@@ -63,12 +63,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.style.setProperty("--theme-draft-color", STATUS_COLORS.draft);
   }, [theme, colors]);
 
-  const setTheme = (newTheme: ThemePalette) => {
-    setThemeState(newTheme);
-  };
-
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, colors }}>
+    <ThemeContext.Provider value={{ theme, setTheme: setThemeState, colors }}>
       {children}
     </ThemeContext.Provider>
   );

@@ -99,10 +99,6 @@ function readStorageValue<T>(
     return defaultValue;
   }
 
-  if (!isStorageAvailable()) {
-    return defaultValue;
-  }
-
   try {
     const item = window.localStorage.getItem(key);
     if (item === null) {
@@ -175,10 +171,6 @@ export function useLocalStorage<T>(
           return nextValue;
         }
 
-        if (!isStorageAvailable()) {
-          return nextValue;
-        }
-
         try {
           if (nextValue === undefined) {
             window.localStorage.removeItem(prefixedKey);
@@ -204,17 +196,13 @@ export function useLocalStorage<T>(
       return;
     }
 
-    if (!isStorageAvailable()) {
-      setState(defaultValueRef.current);
-      return;
-    }
-
     try {
       window.localStorage.removeItem(prefixedKey);
-      setState(defaultValueRef.current);
     } catch (error) {
       logStorageWarning("remove", prefixedKey, error);
     }
+
+    setState(defaultValueRef.current);
   }, [prefixedKey, ssrSafe]);
 
   return [state, setItem, removeItem] as const;
