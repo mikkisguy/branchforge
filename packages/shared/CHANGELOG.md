@@ -1,3 +1,5 @@
 # @branchforge/shared
 
+## 0.7.1
+
 ## 0.7.0
