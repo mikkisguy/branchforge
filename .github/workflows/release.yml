@@ -24,6 +24,48 @@ jobs:
           awk -v version="$VERSION" '/^## v/ {if (p) exit; if ($0 ~ "^## v" version) p=1} p && !/^## v/ {print}' CHANGELOG.md > release_notes.md || echo "No changelog entry found for v$VERSION"
           echo "exists=$(test -s release_notes.md && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
 
+      - name: Get git commits for release
+        id: commits
+        if: steps.changelog.outputs.exists == 'true'
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          VERSION=${VERSION#v}
+          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${GITHUB_REF#refs/tags/}$" | head -1)
+
+          if [ -z "$PREV_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"%h" --reverse)
+          else
+            COMMITS=$(git log ${PREV_TAG}..${GITHUB_REF#refs/tags/} --pretty=format:"%h" --reverse)
+          fi
+
+          echo "commits=$(echo $COMMITS | tr '\n' ',' | sed 's/,$//')" >> $GITHUB_OUTPUT
+
+      - name: Add git hashes to release notes
+        if: steps.changelog.outputs.exists == 'true'
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          VERSION=${VERSION#v}
+
+          if [ -n "${{ steps.commits.outputs.commits }}" ]; then
+            IFS=',' read -ra COMMITS <<< "${{ steps.commits.outputs.commits }}"
+            COMMIT_INDEX=0
+            
+            while IFS= read -r line; do
+              if [[ $line == \-* ]] && [[ ! $line =~ ^[[:space:]]{2,}- ]]; then
+                if [ $COMMIT_INDEX -lt ${#COMMITS[@]} ]; then
+                  COMMIT="${COMMITS[$COMMIT_INDEX]}"
+                  echo "- ${COMMIT}: ${line#*- }" >> release_notes_with_hashes.md
+                  ((COMMIT_INDEX++))
+                else
+                  echo "$line" >> release_notes_with_hashes.md
+                fi
+              else
+                echo "$line" >> release_notes_with_hashes.md
+              fi
+            done < release_notes.md
+            mv release_notes_with_hashes.md release_notes.md
+          fi
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
