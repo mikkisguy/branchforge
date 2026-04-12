@@ -1,7 +1,7 @@
 const getReleaseLine = async (changeset, _type) => {
   const [firstLine, ...futureLines] = changeset.summary
     .split("\n")
-    .map((l) => l.trimRight());
+    .map((l) => l.trimEnd());
   let returnVal = `- ${firstLine}`;
 
   if (futureLines.length > 0) {
@@ -20,4 +20,4 @@ const defaultChangelogFunctions = {
   getDependencyReleaseLine,
 };
 
-export default defaultChangelogFunctions;
+module.exports = defaultChangelogFunctions;

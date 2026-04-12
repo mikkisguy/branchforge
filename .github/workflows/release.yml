@@ -38,7 +38,7 @@ jobs:
             COMMITS=$(git log ${PREV_TAG}..${GITHUB_REF#refs/tags/} --pretty=format:"%h" --reverse)
           fi
 
-          echo "commits=$(echo $COMMITS | tr '\n' ',' | sed 's/,$//')" >> $GITHUB_OUTPUT
+          echo "commits=$(printf '%s' "$COMMITS" | tr '\n' ',' | sed 's/,$//')" >> $GITHUB_OUTPUT
 
       - name: Add git hashes to release notes
         if: steps.changelog.outputs.exists == 'true'

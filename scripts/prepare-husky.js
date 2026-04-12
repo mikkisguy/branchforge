@@ -19,4 +19,8 @@ if (result.error) {
   process.exit(1);
 }
 
-process.exit(result.status ?? 0);
+if (result.signal) {
+  process.exit(1);
+}
+
+process.exit(typeof result.status === "number" ? result.status : 1);
