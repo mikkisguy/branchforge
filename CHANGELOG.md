@@ -4,6 +4,10 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.7.3 - 2026-04-12
+
+- Fixed release workflow again
+
 ## v0.7.2 - 2026-04-12
 
 - Fixed release workflow
