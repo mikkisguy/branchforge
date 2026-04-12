@@ -12,7 +12,7 @@ if (isProduction || !hasHuskyBinary) {
 
 const result = spawnSync("pnpm", ["exec", "husky"], {
   stdio: "inherit",
-  shell: process.platform === "win32",
+  shell: true,
 });
 
 if (result.error) {

@@ -30,12 +30,12 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
           VERSION=${VERSION#v}
-          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${GITHUB_REF#refs/tags/}$" | head -1)
+          PREV_TAG=$(git describe --tags --abbrev=0 "${GITHUB_REF#refs/tags/}^" 2>/dev/null || echo "")
 
           if [ -z "$PREV_TAG" ]; then
             COMMITS=$(git log --pretty=format:"%h" --reverse)
           else
-            COMMITS=$(git log ${PREV_TAG}..${GITHUB_REF#refs/tags/} --pretty=format:"%h" --reverse)
+            COMMITS=$(git log "${PREV_TAG}..${GITHUB_REF#refs/tags/}" --pretty=format:"%h" --reverse)
           fi
 
           echo "commits=$(printf '%s' "$COMMITS" | tr '\n' ',' | sed 's/,$//')" >> $GITHUB_OUTPUT
