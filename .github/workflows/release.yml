@@ -58,7 +58,7 @@ jobs:
                 if [ $COMMIT_INDEX -lt ${#COMMITS[@]} ]; then
                   COMMIT="${COMMITS[$COMMIT_INDEX]}"
                   echo "- ${COMMIT}: ${line#*- }" >> release_notes_with_hashes.md
-                  ((COMMIT_INDEX++))
+                  COMMIT_INDEX=$((COMMIT_INDEX + 1))
                 else
                   echo "$line" >> release_notes_with_hashes.md
                 fi

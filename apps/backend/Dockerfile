@@ -12,6 +12,7 @@ RUN npm install -g pnpm
 # Copy workspace files
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY tsconfig.base.json ./
+COPY scripts ./scripts
 COPY packages/shared ./packages/shared
 COPY apps/backend ./apps/backend
 
@@ -45,6 +46,7 @@ RUN npm install -g pnpm
 
 # Copy workspace files for production runtime
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
+COPY scripts ./scripts
 COPY packages/shared ./packages/shared
 COPY apps/backend ./apps/backend
 
