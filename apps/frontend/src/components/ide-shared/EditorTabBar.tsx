@@ -100,6 +100,17 @@ export function EditorTabBar({
     [onSelect]
   );
 
+  const handleTabMouseDown = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      if (event.button !== 0) {
+        return;
+      }
+
+      event.preventDefault();
+    },
+    []
+  );
+
   const handleTabKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>, index: number) => {
       if (event.key === "Enter" || event.key === " ") {
@@ -195,6 +206,7 @@ export function EditorTabBar({
                 role="tab"
                 aria-selected={isActive}
                 tabIndex={isActive ? 0 : -1}
+                onMouseDown={handleTabMouseDown}
                 onClick={() => handleSelectItem(item.id)}
                 onKeyDown={(event) => handleTabKeyDown(event, index)}
                 className={cn(
