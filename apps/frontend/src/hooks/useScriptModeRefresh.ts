@@ -24,9 +24,10 @@ export function useScriptModeRefresh({
 
     (async () => {
       try {
-        await refreshFiles();
         hasRefreshedRef.current = true;
+        await refreshFiles();
       } catch (error) {
+        hasRefreshedRef.current = false;
         console.error("Failed to refresh files:", error);
       }
     })();
