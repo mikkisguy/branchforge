@@ -44,6 +44,7 @@ export function useWriteTabs({
   >(undefined);
 
   const prevProjectIdRef = useRef<string | undefined>(undefined);
+  const activeLabelIdRef = useRef<string | null>(null);
 
   const tabsStorageKey = useMemo(() => {
     if (!projectId) {
@@ -75,6 +76,10 @@ export function useWriteTabs({
     prevProjectIdRef.current = projectId;
   }, [projectId]);
 
+  useEffect(() => {
+    activeLabelIdRef.current = activeLabelId;
+  }, [activeLabelId]);
+
   const selectLabelTab = useCallback(
     (labelId: string) => {
       setOpenTabs((prev) => {
@@ -103,7 +108,8 @@ export function useWriteTabs({
           return nextTabs;
         }
 
-        if (labelId === activeLabelId) {
+        const currentActiveId = activeLabelIdRef.current;
+        if (labelId === currentActiveId) {
           const fallbackTab = prev[tabIndex - 1] ?? nextTabs[0] ?? null;
           setActiveLabelId(fallbackTab);
         }
@@ -111,7 +117,7 @@ export function useWriteTabs({
         return nextTabs;
       });
     },
-    [activeLabelId, setActiveLabelId]
+    [setActiveLabelId]
   );
 
   useEffect(() => {

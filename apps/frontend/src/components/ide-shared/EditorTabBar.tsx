@@ -106,6 +106,10 @@ export function EditorTabBar({
         return;
       }
 
+      if ((event.target as Element).closest("button")) {
+        return;
+      }
+
       event.preventDefault();
     },
     []
