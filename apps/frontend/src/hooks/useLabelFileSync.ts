@@ -26,9 +26,10 @@ export function findLabelLineNumber(
   const lines = fileContent.split("\n");
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (line.startsWith("label ") && line.endsWith(":")) {
-      const extractedLabel = line.slice(6, -1).trim();
+    const line = lines[i];
+    const labelMatch = line.match(/^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+    if (labelMatch) {
+      const extractedLabel = labelMatch[1];
       if (extractedLabel === labelName) {
         return i + 1;
       }

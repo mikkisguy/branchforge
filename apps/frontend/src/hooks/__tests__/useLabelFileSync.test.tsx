@@ -99,4 +99,13 @@ describe("useLabelFileSync", () => {
 
     expect(onSetScrollToLine).not.toHaveBeenCalled();
   });
+
+  it("finds label line numbers for parameterized labels", () => {
+    const line = findLabelLineNumber(
+      ["# intro", "label my_label(arg1, arg2):", '    e "hi"'].join("\n"),
+      "my_label"
+    );
+
+    expect(line).toBe(2);
+  });
 });
