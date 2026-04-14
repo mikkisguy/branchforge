@@ -29,7 +29,6 @@ interface UseWriteAutosaveProps {
   labels: PublicLabel[];
   activeLabel: LabelDetail | undefined;
   isUpdatingDialogue: boolean;
-  isUpdateError: boolean;
   skipSaveRef?: RefObject<boolean>;
   onUpdateDialogue: UpdateDialogue;
   showErrorToast: (message: string, title: string) => void;
@@ -42,6 +41,13 @@ interface UseWriteAutosaveReturn {
   resetSavedHash: (draft?: LabelDialogueDraft) => void;
   lastSaved: Date | null;
   conflictByLabel: Map<string, boolean>;
+}
+
+class WriteConflictError extends Error {
+  constructor() {
+    super("Write conflict detected");
+    this.name = "WriteConflictError";
+  }
 }
 
 function setMapValue<V>(
@@ -125,7 +131,6 @@ export function useWriteAutosave({
   labels,
   activeLabel,
   isUpdatingDialogue,
-  isUpdateError,
   skipSaveRef,
   onUpdateDialogue,
   showErrorToast,
@@ -143,7 +148,6 @@ export function useWriteAutosave({
   const serverContentHashesRef = useRef<Map<string, string>>(new Map());
   const triggerSaveRef = useRef<() => Promise<boolean>>(async () => true);
   const isDirtyRef = useRef(false);
-  const wasUpdatingDialogueRef = useRef(false);
   const prevProjectIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
@@ -214,6 +218,7 @@ export function useWriteAutosave({
             setConflictByLabel((prev) =>
               deleteMapKey(prev, draftToSave.labelId!)
             );
+            setLastSaved(new Date());
             return;
           }
 
@@ -246,11 +251,17 @@ export function useWriteAutosave({
             "This scene changed elsewhere. Reloaded data is needed before saving again.",
             "Write conflict detected"
           );
+
+          throw new WriteConflictError();
         },
         [onUpdateDialogue, showErrorToast]
       ),
       onError: useCallback(
         (error: Error) => {
+          if (error instanceof WriteConflictError) {
+            return;
+          }
+
           console.error("Failed to save dialogue:", error);
           showErrorToast(
             "Failed to save your changes. Please try again.",
@@ -309,18 +320,6 @@ export function useWriteAutosave({
 
     setConflictByLabel((prev) => deleteMapKey(prev, activeLabel.id));
   }, [activeLabel, isUpdatingDialogue]);
-
-  useEffect(() => {
-    if (
-      wasUpdatingDialogueRef.current &&
-      !isUpdatingDialogue &&
-      !isUpdateError
-    ) {
-      setLastSaved(new Date());
-    }
-
-    wasUpdatingDialogueRef.current = isUpdatingDialogue;
-  }, [isUpdatingDialogue, isUpdateError]);
 
   useEffect(() => {
     const validLabelIds = new Set(labels.map((label) => label.id));

@@ -81,7 +81,6 @@ describe("useWriteAutosave", () => {
           labels: [label],
           activeLabel: props.activeLabel,
           isUpdatingDialogue: false,
-          isUpdateError: false,
           onUpdateDialogue,
           showErrorToast,
         }),
@@ -181,7 +180,6 @@ describe("useWriteAutosave", () => {
           labels: [label],
           activeLabel: props.activeLabel,
           isUpdatingDialogue: false,
-          isUpdateError: false,
           onUpdateDialogue,
           showErrorToast,
         }),
@@ -206,7 +204,7 @@ describe("useWriteAutosave", () => {
 
     await act(async () => {
       const saved = await result.current.triggerSave();
-      expect(saved).toBe(true);
+      expect(saved).toBe(false);
     });
 
     await waitFor(() => {

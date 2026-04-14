@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import { useFocusModeKeyboardHandler } from "@/hooks/useFocusModeKeyboardHandler";
 import { useFocusModeState } from "@/hooks/useFocusModeState";
@@ -33,8 +33,10 @@ export function useWriteFocusMode({
     focusToggleRef,
   } = useFocusModeState("write:focus-mode");
 
-  const handleFocusModeToggle = useCallback(() => {
-    if (!isFocusMode) {
+  const hasHydratedFocusModeRef = useRef(false);
+
+  const enterFocusMode = useCallback(
+    (shouldFocusEditor: boolean) => {
       setPreFocusSidebarStates({
         leftCollapsed: isLeftSidebarCollapsed,
         rightCollapsed: isRightSidebarCollapsed,
@@ -46,9 +48,30 @@ export function useWriteFocusMode({
       setIsLeftSidebarCollapsed(true);
       setIsRightSidebarCollapsed(true);
       setIsFocusMode(true);
+
+      if (!shouldFocusEditor) {
+        return;
+      }
+
       requestAnimationFrame(() => {
         editorRef.current?.focus();
       });
+    },
+    [
+      editorRef,
+      isLeftSidebarCollapsed,
+      isRightSidebarCollapsed,
+      preFocusElementRef,
+      setIsFocusMode,
+      setIsLeftSidebarCollapsed,
+      setIsRightSidebarCollapsed,
+      setPreFocusSidebarStates,
+    ]
+  );
+
+  const handleFocusModeToggle = useCallback(() => {
+    if (!isFocusMode) {
+      enterFocusMode(true);
       return;
     }
 
@@ -71,18 +94,28 @@ export function useWriteFocusMode({
       preFocusElementRef.current = null;
     });
   }, [
-    editorRef,
+    enterFocusMode,
     focusToggleRef,
     isFocusMode,
-    isLeftSidebarCollapsed,
-    isRightSidebarCollapsed,
     preFocusElementRef,
     preFocusSidebarStates,
     setIsFocusMode,
     setIsLeftSidebarCollapsed,
     setIsRightSidebarCollapsed,
-    setPreFocusSidebarStates,
   ]);
+
+  useEffect(() => {
+    if (!isFocusMode || preFocusSidebarStates !== null) {
+      return;
+    }
+
+    if (hasHydratedFocusModeRef.current) {
+      return;
+    }
+
+    hasHydratedFocusModeRef.current = true;
+    enterFocusMode(false);
+  }, [enterFocusMode, isFocusMode, preFocusSidebarStates]);
 
   useFocusModeKeyboardHandler(handleFocusModeToggle);
 

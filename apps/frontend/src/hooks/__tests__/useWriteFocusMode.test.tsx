@@ -12,6 +12,7 @@ vi.mock("@/hooks/useFocusModeKeyboardHandler", () => ({
 describe("useWriteFocusMode", () => {
   beforeEach(() => {
     keyboardHookSpy.mockClear();
+    window.localStorage.clear();
     vi.spyOn(window, "requestAnimationFrame").mockImplementation(
       (callback: FrameRequestCallback) => {
         callback(0);
@@ -76,6 +77,39 @@ describe("useWriteFocusMode", () => {
 
     expect(result.current.isFocusMode).toBe(false);
     expect(setIsLeftSidebarCollapsed).toHaveBeenNthCalledWith(2, true);
+    expect(setIsRightSidebarCollapsed).toHaveBeenNthCalledWith(2, false);
+  });
+
+  it("rehydrates focus mode with sidebar initialization", () => {
+    window.localStorage.setItem("branchforge:write:focus-mode", "true");
+
+    const editorFocus = vi.fn();
+    const setIsLeftSidebarCollapsed = vi.fn();
+    const setIsRightSidebarCollapsed = vi.fn();
+    const editorRef = createRef<{ focus: () => void } | null>();
+    editorRef.current = { focus: editorFocus };
+
+    const { result } = renderHook(() =>
+      useWriteFocusMode({
+        isLeftSidebarCollapsed: false,
+        setIsLeftSidebarCollapsed,
+        isRightSidebarCollapsed: false,
+        setIsRightSidebarCollapsed,
+        editorRef,
+      })
+    );
+
+    expect(result.current.isFocusMode).toBe(true);
+    expect(setIsLeftSidebarCollapsed).toHaveBeenNthCalledWith(1, true);
+    expect(setIsRightSidebarCollapsed).toHaveBeenNthCalledWith(1, true);
+    expect(editorFocus).not.toHaveBeenCalled();
+
+    act(() => {
+      result.current.handleFocusModeToggle();
+    });
+
+    expect(result.current.isFocusMode).toBe(false);
+    expect(setIsLeftSidebarCollapsed).toHaveBeenNthCalledWith(2, false);
     expect(setIsRightSidebarCollapsed).toHaveBeenNthCalledWith(2, false);
   });
 });

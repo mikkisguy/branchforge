@@ -60,7 +60,6 @@ export function WriteMode({ projectName }: WriteModeProps) {
     isLoadingLabels,
     updateDialogue,
     isUpdatingDialogue,
-    isUpdateError,
   } = useLabels();
 
   const { characters } = useCharacters(currentProject?.id ?? "");
@@ -103,7 +102,6 @@ export function WriteMode({ projectName }: WriteModeProps) {
     labels,
     activeLabel,
     isUpdatingDialogue,
-    isUpdateError,
     skipSaveRef: isSwitchingLabelsRef,
     onUpdateDialogue: updateDialogue,
     showErrorToast,
