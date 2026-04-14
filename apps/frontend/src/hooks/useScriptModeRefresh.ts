@@ -15,26 +15,30 @@ export function useScriptModeRefresh({
   isLoadingFiles,
   refreshFiles,
 }: UseScriptModeRefreshProps): UseScriptModeRefreshReturn {
-  const hasRefreshedRef = useRef(false);
+  const hasRefreshedRef = useRef<Map<string, boolean>>(new Map());
 
   useEffect(() => {
-    if (!projectId || isLoadingFiles || hasRefreshedRef.current) {
+    if (!projectId || isLoadingFiles) {
+      return;
+    }
+
+    if (hasRefreshedRef.current.get(projectId)) {
       return;
     }
 
     (async () => {
       try {
-        hasRefreshedRef.current = true;
+        hasRefreshedRef.current.set(projectId, true);
         await refreshFiles();
       } catch (error) {
-        hasRefreshedRef.current = false;
+        hasRefreshedRef.current.delete(projectId);
         console.error("Failed to refresh files:", error);
       }
     })();
   }, [isLoadingFiles, projectId, refreshFiles]);
 
   const resetRefreshState = useCallback(() => {
-    hasRefreshedRef.current = false;
+    hasRefreshedRef.current.clear();
   }, []);
 
   return { resetRefreshState };

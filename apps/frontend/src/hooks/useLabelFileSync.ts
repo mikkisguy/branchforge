@@ -55,6 +55,7 @@ export function useLabelFileSync({
 
   useEffect(() => {
     if (!activeLabelId) {
+      onSetScrollToLineRef.current(null);
       return;
     }
 
@@ -62,6 +63,7 @@ export function useLabelFileSync({
       file.labels.some((label) => label.id === activeLabelId)
     );
     if (!fileWithLabel) {
+      onSetScrollToLineRef.current(null);
       return;
     }
 
@@ -80,11 +82,15 @@ export function useLabelFileSync({
     let cancelled = false;
 
     void (async () => {
-      const switched = await onFileSelectRef.current(fileWithLabel.id);
-      if (!switched || cancelled) {
-        return;
+      try {
+        const switched = await onFileSelectRef.current(fileWithLabel.id);
+        if (!switched || cancelled) {
+          return;
+        }
+        onSetScrollToLineRef.current(lineNumber);
+      } catch (error) {
+        console.error("Failed to select file:", error);
       }
-      onSetScrollToLineRef.current(lineNumber);
     })();
 
     return () => {
