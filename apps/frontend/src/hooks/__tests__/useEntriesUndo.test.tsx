@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { useInMemoryUndo } from "../useInMemoryUndo";
+import { useEntriesUndo } from "../useEntriesUndo";
 import type { DialogueEntry } from "@/lib/prose-types";
 
 const entriesA: DialogueEntry[] = [
@@ -35,10 +35,10 @@ const entriesB2: DialogueEntry[] = [
   },
 ];
 
-describe("useInMemoryUndo", () => {
+describe("useEntriesUndo", () => {
   it("does not emit changes when undo/redo are unavailable", () => {
     const onChange = vi.fn();
-    const { result } = renderHook(() => useInMemoryUndo(entriesA, onChange));
+    const { result } = renderHook(() => useEntriesUndo(entriesA, onChange));
 
     act(() => {
       result.current.undo();
@@ -50,7 +50,7 @@ describe("useInMemoryUndo", () => {
 
   it("returns true when undo succeeds", () => {
     const onChange = vi.fn();
-    const { result } = renderHook(() => useInMemoryUndo(entriesA, onChange));
+    const { result } = renderHook(() => useEntriesUndo(entriesA, onChange));
 
     // Verify initial state
     expect(result.current.canUndo).toBe(false);
@@ -70,15 +70,12 @@ describe("useInMemoryUndo", () => {
     });
 
     // Verify undo succeeded
-    expect(undoResult).toBeDefined();
-    if (undoResult !== undefined) {
-      expect(undoResult).toBe(true);
-    }
+    expect(undoResult).toBe(true);
   });
 
   it("calls onChange when undo is available", () => {
     const onChange = vi.fn();
-    const { result } = renderHook(() => useInMemoryUndo(entriesA, onChange));
+    const { result } = renderHook(() => useEntriesUndo(entriesA, onChange));
 
     act(() => {
       result.current.recordChange(entriesB);
@@ -93,7 +90,7 @@ describe("useInMemoryUndo", () => {
 
   it("clears history with explicit initial entries", () => {
     const onChange = vi.fn();
-    const { result } = renderHook(() => useInMemoryUndo(entriesA, onChange));
+    const { result } = renderHook(() => useEntriesUndo(entriesA, onChange));
 
     // Record first change
     act(() => {

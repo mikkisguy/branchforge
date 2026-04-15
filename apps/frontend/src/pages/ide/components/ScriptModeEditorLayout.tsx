@@ -5,6 +5,7 @@ import {
   CharacterReferencePanel,
   ScriptEditor,
 } from "@/components/script-mode";
+import { UndoRedoControls } from "@/components/ide-shared";
 import { ProjectFileTree } from "@/components/script-mode/ProjectFileTree";
 import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
 import { EditorTabBar, type EditorTabBarItem } from "@/components/ide-shared";
@@ -65,6 +66,10 @@ interface ScriptModeEditorLayoutProps {
   onContentChange: (value: string) => void;
   onRefreshFiles: () => Promise<unknown>;
   onNewChapter?: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
 }
 
 export function ScriptModeEditorLayout({
@@ -95,6 +100,10 @@ export function ScriptModeEditorLayout({
   onContentChange,
   onRefreshFiles,
   onNewChapter,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
 }: ScriptModeEditorLayoutProps) {
   const { isFocusMode, focusToggleRef } = focusModeState;
 
@@ -198,7 +207,13 @@ export function ScriptModeEditorLayout({
                 />
               </div>
               <div className="h-12 overflow-hidden rounded-lg border border-border/80 bg-card/55 opacity-100 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-                <div className="h-full flex items-center justify-end px-3">
+                <div className="h-full flex items-center justify-end gap-2 px-3">
+                  <UndoRedoControls
+                    canUndo={canUndo}
+                    canRedo={canRedo}
+                    onUndo={onUndo}
+                    onRedo={onRedo}
+                  />
                   <FocusModeToggle
                     ref={focusToggleRef}
                     isFocusMode={isFocusMode}

@@ -19,6 +19,7 @@ import type { ScriptEditorRef } from "@/components/script-mode/ScriptEditor";
 import { useLocalStorageBoolean } from "@/hooks/useLocalStorage";
 import { ScriptModeEditorLayout } from "./components/ScriptModeEditorLayout";
 import { ScriptModeEmptyState } from "./components/ScriptModeEmptyState";
+import { useTextUndo } from "@/hooks/useTextUndo";
 
 interface ScriptModeProps {
   projectId?: string;
@@ -229,7 +230,12 @@ export function ScriptMode({
 
     (async () => {
       const success = await switchToFile(activeProjectFile);
-      if (!success && previousEditFileIdRef.current) {
+      if (success) {
+        pendingUndoClearRef.current = {
+          fileId: activeProjectFile.id,
+          content: activeProjectFile.content || "",
+        };
+      } else if (previousEditFileIdRef.current) {
         void selectFileTab(previousEditFileIdRef.current, { notify: false });
       }
     })();
@@ -252,6 +258,45 @@ export function ScriptMode({
     activeProjectFile && currentEditFileId === activeProjectFile.id
       ? editedFileContent
       : activeProjectFile?.content || "";
+
+  const handleUndoRedoChange = useCallback(
+    (content: string) => {
+      setEditedFileContent(content);
+    },
+    [setEditedFileContent]
+  );
+
+  const { canUndo, canRedo, undo, redo, recordChange, clear } = useTextUndo(
+    activeFileContent,
+    handleUndoRedoChange
+  );
+
+  const handleContentChange = useCallback(
+    (value: string) => {
+      setEditedFileContent(value);
+      recordChange(value);
+    },
+    [recordChange, setEditedFileContent]
+  );
+
+  const previousUndoFileIdRef = useRef<string | null>(activeFileId);
+  const pendingUndoClearRef = useRef<{
+    fileId: string;
+    content: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const pending = pendingUndoClearRef.current;
+    if (pending) {
+      if (previousUndoFileIdRef.current !== pending.fileId) {
+        previousUndoFileIdRef.current = pending.fileId;
+        clear(pending.content);
+      }
+      requestAnimationFrame(() => {
+        pendingUndoClearRef.current = null;
+      });
+    }
+  }, [activeFileContent, activeFileId, clear]);
 
   const handleGitLabFileSelect = useCallback(
     (fileId: string) => {
@@ -370,8 +415,12 @@ export function ScriptMode({
         onSceneSelect={handleGitLabSceneSelect}
         onSelectTab={handleSelectFileTab}
         onCloseTab={handleCloseFileTab}
-        onContentChange={setEditedFileContent}
+        onContentChange={handleContentChange}
         onRefreshFiles={refreshFiles}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={undo}
+        onRedo={redo}
       />
 
       {statusBar}

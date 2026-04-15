@@ -10,6 +10,7 @@ export { GitLabSettingsContent } from "./GitLabSettingsContent";
 export { GitLabRepositoryLinkingDialog } from "./GitLabRepositoryLinkingDialog";
 export { EditorTabBar } from "./EditorTabBar";
 export type { EditorTabBarItem } from "./EditorTabBar";
+export { UndoRedoControls } from "./UndoRedoControls";
 
 // Re-export write-mode components for convenience
 export {

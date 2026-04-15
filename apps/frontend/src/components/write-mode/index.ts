@@ -12,4 +12,3 @@ export { FocusModeToggle } from "./FocusModeToggle";
 export { SaveIndicator } from "./SaveIndicator";
 export type { SaveIndicatorDisplayMode } from "./SaveIndicator";
 export { WritingGoalPill } from "./WritingGoalPill";
-export { UndoRedoControls } from "./UndoRedoControls";

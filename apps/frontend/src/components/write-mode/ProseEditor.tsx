@@ -22,8 +22,8 @@ import { SaveIndicator } from "./SaveIndicator";
 import { FontSizeSwitcher } from "../FontSizeSwitcher";
 import { FontFamilySwitcher } from "./FontFamilySwitcher";
 import { useWritingGoals } from "@/hooks/useWritingGoals";
-import { useInMemoryUndo } from "./useInMemoryUndo";
-import { UndoRedoControls } from "./UndoRedoControls";
+import { useEntriesUndo } from "@/hooks/useEntriesUndo";
+import { UndoRedoControls } from "@/components/ide-shared";
 import { BookOpen, PenLine } from "lucide-react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type { DialogueEntry } from "@/lib/prose-types";
@@ -229,7 +229,7 @@ export const ProseEditor = forwardRef<ProseEditorRef, ProseEditorProps>(
     );
 
     // In-memory undo for immediate response
-    const inMemoryUndo = useInMemoryUndo(
+    const inMemoryUndo = useEntriesUndo(
       entries,
       handleInMemoryHistoryChange,
       50 // Max 50 in-memory undo steps
