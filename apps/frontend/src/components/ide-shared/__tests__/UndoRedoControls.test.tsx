@@ -127,9 +127,9 @@ describe("UndoRedoControls", () => {
       expect(mockHandlers.onUndo).not.toHaveBeenCalled();
     });
 
-    it("should not call onRedo when Ctrl+Shift+Z is pressed", () => {
+    it("should not call onRedo when Ctrl+Shift+Z is pressed but canRedo is false", () => {
       render(
-        <UndoRedoControls canUndo={false} canRedo={true} {...mockHandlers} />
+        <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
       );
 
       fireEvent.keyDown(document, { key: "z", ctrlKey: true, shiftKey: true });
@@ -254,7 +254,7 @@ describe("UndoRedoControls", () => {
         screen.getByTitle(/Undo \(Ctrl\+Z \/ Cmd\+Z\)/)
       ).toBeInTheDocument();
       expect(
-        screen.getByTitle(/Redo \(Ctrl\+Y \/ Cmd\+Y\)/)
+        screen.getByTitle(/Redo \(Ctrl\+Y \/ Cmd\+Shift\+Z\)/)
       ).toBeInTheDocument();
     });
   });
