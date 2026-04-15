@@ -68,7 +68,6 @@ describe("useFileEditor", () => {
         useFileEditor({
           projectId: "project-1",
           projectFiles: [FILE_A, FILE_B],
-          activeLabelId: null,
           updateFileContent,
           showErrorToast,
         }),
@@ -103,6 +102,147 @@ describe("useFileEditor", () => {
     expect(showErrorToast).not.toHaveBeenCalled();
   });
 
+  it("uses the latest content hash across consecutive saves", async () => {
+    const updateFileContent = vi
+      .fn()
+      .mockResolvedValueOnce({
+        success: true,
+        contentHash: "hash-after-first-save",
+        updatedAt: "2024-01-01T00:00:00.000Z",
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        contentHash: "hash-after-second-save",
+        updatedAt: "2024-01-01T00:00:00.000Z",
+      });
+    const showErrorToast = vi.fn();
+
+    const { result } = renderHook(
+      () =>
+        useFileEditor({
+          projectId: "project-1",
+          projectFiles: [FILE_A],
+          updateFileContent,
+          showErrorToast,
+        }),
+      { wrapper }
+    );
+
+    await act(async () => {
+      const switched = await result.current.switchToFile(FILE_A);
+      expect(switched).toBe(true);
+    });
+
+    act(() => {
+      result.current.setEditedFileContent("first edit");
+    });
+
+    await act(async () => {
+      const saved = await result.current.triggerFileSave();
+      expect(saved).toBe(true);
+    });
+
+    act(() => {
+      result.current.setEditedFileContent("second edit");
+    });
+
+    await act(async () => {
+      const saved = await result.current.triggerFileSave();
+      expect(saved).toBe(true);
+    });
+
+    expect(updateFileContent).toHaveBeenNthCalledWith(
+      1,
+      "file-1",
+      "first edit",
+      {
+        expectedContentHash: "hash-file-1",
+      }
+    );
+    expect(updateFileContent).toHaveBeenNthCalledWith(
+      2,
+      "file-1",
+      "second edit",
+      {
+        expectedContentHash: "hash-after-first-save",
+      }
+    );
+    expect(showErrorToast).not.toHaveBeenCalled();
+  });
+
+  it("autosaves consecutive edits after debounce", async () => {
+    vi.useFakeTimers();
+
+    try {
+      const updateFileContent = vi
+        .fn()
+        .mockResolvedValueOnce({
+          success: true,
+          contentHash: "hash-after-first-autosave",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+        })
+        .mockResolvedValueOnce({
+          success: true,
+          contentHash: "hash-after-second-autosave",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+        });
+      const showErrorToast = vi.fn();
+
+      const { result } = renderHook(
+        () =>
+          useFileEditor({
+            projectId: "project-1",
+            projectFiles: [FILE_A],
+            updateFileContent,
+            showErrorToast,
+          }),
+        { wrapper }
+      );
+
+      await act(async () => {
+        const switched = await result.current.switchToFile(FILE_A);
+        expect(switched).toBe(true);
+      });
+
+      act(() => {
+        result.current.setEditedFileContent("autosave edit one");
+      });
+
+      await act(async () => {
+        vi.advanceTimersByTime(1100);
+        await Promise.resolve();
+      });
+
+      act(() => {
+        result.current.setEditedFileContent("autosave edit two");
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1100);
+      });
+
+      expect(updateFileContent).toHaveBeenNthCalledWith(
+        1,
+        "file-1",
+        "autosave edit one",
+        {
+          expectedContentHash: "hash-file-1",
+        }
+      );
+      expect(updateFileContent).toHaveBeenNthCalledWith(
+        2,
+        "file-1",
+        "autosave edit two",
+        {
+          expectedContentHash: "hash-after-first-autosave",
+        }
+      );
+      expect(showErrorToast).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("marks save conflict when backend reports stale hash", async () => {
     const updateFileContent = vi.fn().mockResolvedValue({
       success: false,
@@ -118,7 +258,6 @@ describe("useFileEditor", () => {
         useFileEditor({
           projectId: "project-1",
           projectFiles: [FILE_A],
-          activeLabelId: null,
           updateFileContent,
           showErrorToast,
         }),
@@ -160,7 +299,6 @@ describe("useFileEditor", () => {
         useFileEditor({
           projectId: "project-1",
           projectFiles: [FILE_A, FILE_B],
-          activeLabelId: null,
           updateFileContent,
           showErrorToast,
         }),

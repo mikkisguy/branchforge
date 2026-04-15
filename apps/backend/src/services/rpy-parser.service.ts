@@ -9,6 +9,8 @@
  * - Character definitions
  */
 
+import { sanitizeLabelName, RENPY_LABEL_REGEX } from "@branchforge/shared";
+
 // Parsed RPY data structures
 export interface RPYParsedData {
   labels: string[];
@@ -213,7 +215,7 @@ function trackBlocks(
     }
 
     // Count top-level labels (not inside screens/init blocks)
-    if (countLabels && /^label\s+([a-zA-Z_][a-zA-Z0-9_]*)/.test(trimmed)) {
+    if (countLabels && RENPY_LABEL_REGEX.test(trimmed)) {
       labelCount++;
     }
   }
@@ -236,7 +238,7 @@ export interface ReconstructedFileOptions {
  */
 export function extractLabels(content: string): string[] {
   const labels: string[] = [];
-  const labelRegex = /^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/gm;
+  const labelRegex = new RegExp(RENPY_LABEL_REGEX.source, "gm");
 
   let match;
   while ((match = labelRegex.exec(content)) !== null) {
@@ -404,7 +406,7 @@ export function extractChoices(
     const trimmed = line.trim();
 
     // Track current label
-    const labelMatch = line.match(/^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+    const labelMatch = line.match(RENPY_LABEL_REGEX);
     if (labelMatch) {
       currentLabel = labelMatch[1];
     }
@@ -564,7 +566,7 @@ export function extractJumps(
     const trimmed = line.trim();
 
     // Track current label
-    const labelMatch = line.match(/^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+    const labelMatch = line.match(RENPY_LABEL_REGEX);
     if (labelMatch) {
       currentLabel = labelMatch[1];
     }
@@ -882,7 +884,7 @@ export function parseRPYFileWithLabels(
       const trimmed = line.trim();
 
       // Check for label definition (only top-level labels)
-      const labelMatch = line.match(/^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+      const labelMatch = line.match(RENPY_LABEL_REGEX);
       if (labelMatch) {
         const matchedLabel = labelMatch[1];
 
@@ -981,7 +983,7 @@ export function parseRPYFileWithLabels(
       const trimmed = line.trim();
 
       // Track current label
-      const labelMatch = line.match(/^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+      const labelMatch = line.match(RENPY_LABEL_REGEX);
       if (labelMatch) {
         currentLabelForTracking = labelMatch[1];
       }
@@ -1102,7 +1104,7 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
     const trimmed = line.trim();
 
     // Track current label
-    const labelMatch = line.match(/^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+    const labelMatch = line.match(RENPY_LABEL_REGEX);
     if (labelMatch) {
       // Before switching to new label, insert any remaining dialogue for the previous label
       let insertedDialogue = false;
@@ -1385,7 +1387,7 @@ export function removeLabelFromRPYContent(
     const trimmed = line.trim();
 
     // Check for label definition
-    const labelMatch = line.match(/^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+    const labelMatch = line.match(RENPY_LABEL_REGEX);
     if (labelMatch) {
       const currentLabel = labelMatch[1];
 
@@ -1459,24 +1461,16 @@ export function replaceLabelDialogue(
   let dialogueIndent: string | null = null;
   let newDialogueInserted = false;
 
-  // Sanitize label name for comparison (same as sanitizeLabelName in frontend)
-  const sanitizedLabelName = labelName
-    .toLowerCase()
-    .replace(/[^a-z0-9_]/g, "_")
-    .replace(/^_+|_+$/g, "");
+  const sanitizedLabelName = sanitizeLabelName(labelName);
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
 
-    // Check for label definition
-    const labelMatch = line.match(/^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+    const labelMatch = line.match(RENPY_LABEL_REGEX);
     if (labelMatch) {
       const currentLabel = labelMatch[1];
-      const sanitizedCurrentLabel = currentLabel
-        .toLowerCase()
-        .replace(/[^a-z0-9_]/g, "_")
-        .replace(/^_+|_+$/g, "");
+      const sanitizedCurrentLabel = sanitizeLabelName(currentLabel);
 
       if (sanitizedCurrentLabel === sanitizedLabelName) {
         // Found the target label

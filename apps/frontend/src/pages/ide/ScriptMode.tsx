@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StatusBar } from "@/components/script-mode";
 import { GitLabSyncDialog } from "@/components/script-mode/GitLabSyncDialog";
 import { ZipImportDialog } from "@/components/zip-import";
@@ -64,6 +64,7 @@ export function ScriptMode({
   const editorRef = useRef<ScriptEditorRef>(null);
   const isResettingRef = useRef(false);
   const skipSaveRef = useRef(false);
+  const previousEditFileIdRef = useRef<string | null>(null);
 
   const [scrollToLine, setScrollToLine] = useState<number | null>(null);
 
@@ -119,7 +120,6 @@ export function ScriptMode({
   } = useFileEditor({
     projectId,
     projectFiles,
-    activeLabelId,
     updateFileContent,
     showErrorToast,
     skipSaveRef,
@@ -215,6 +215,25 @@ export function ScriptMode({
     () => projectFiles.find((file) => file.id === activeFileId) || null,
     [activeFileId, projectFiles]
   );
+
+  useEffect(() => {
+    if (!activeProjectFile) {
+      return;
+    }
+
+    if (currentEditFileId === activeProjectFile.id) {
+      return;
+    }
+
+    previousEditFileIdRef.current = currentEditFileId;
+
+    (async () => {
+      const success = await switchToFile(activeProjectFile);
+      if (!success && previousEditFileIdRef.current) {
+        void selectFileTab(previousEditFileIdRef.current, { notify: false });
+      }
+    })();
+  }, [activeProjectFile, currentEditFileId, switchToFile, selectFileTab]);
 
   const { characters: projectCharacters } = useCharacters(projectId ?? "");
 

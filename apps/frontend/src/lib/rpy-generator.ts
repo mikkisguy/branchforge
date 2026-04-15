@@ -6,7 +6,7 @@
  */
 
 import type { LabelDetail, PublicLabel } from "@branchforge/shared";
-import { sanitizeLabelName } from "./label-utils";
+import { sanitizeLabelName } from "@branchforge/shared";
 
 /**
  * Generate RPY content as HTML fragments with syntax highlighting

@@ -10,7 +10,6 @@ import type { ProjectFileNode, UseProjectFilesReturn } from "./useProjectFiles";
 interface UseFileEditorProps {
   projectId: string | undefined;
   projectFiles: ProjectFileNode[];
-  activeLabelId: string | null;
   updateFileContent: UseProjectFilesReturn["updateFileContent"];
   showErrorToast: (message: string, title: string) => void;
   skipSaveRef?: RefObject<boolean>;
@@ -54,7 +53,6 @@ function hashFileContent(content: string): string {
 export function useFileEditor({
   projectId,
   projectFiles,
-  activeLabelId,
   updateFileContent,
   showErrorToast,
   skipSaveRef,
@@ -65,9 +63,8 @@ export function useFileEditor({
   const [currentEditFileId, setCurrentEditFileId] = useState<string | null>(
     null
   );
-  const [currentEditFileHash, setCurrentEditFileHash] = useState<string | null>(
-    null
-  );
+  const currentEditFileHashRef = useRef<string | null>(null);
+  const latestServerHashByFileIdRef = useRef<Record<string, string>>({});
   const [hasSaveConflict, setHasSaveConflict] = useState(false);
 
   const {
@@ -88,43 +85,37 @@ export function useFileEditor({
         }
 
         const result = await updateFileContent(currentEditFileId, content, {
-          expectedContentHash: currentEditFileHash ?? undefined,
+          expectedContentHash: currentEditFileHashRef.current ?? undefined,
         });
 
         if (!result.success) {
           throw new SaveConflictError();
         }
 
-        setCurrentEditFileHash(result.contentHash);
+        if (currentEditFileId && result.contentHash) {
+          latestServerHashByFileIdRef.current[currentEditFileId] =
+            result.contentHash;
+        }
+
+        currentEditFileHashRef.current = result.contentHash;
         setHasSaveConflict(false);
 
         if (!projectId) {
           return;
         }
 
-        queryClient.invalidateQueries({
-          queryKey: projectFilesKeys.lists(projectId),
-        });
-        void queryClient.refetchQueries({
-          queryKey: labelKeys.lists(projectId),
-        });
-
-        if (!activeLabelId) {
-          return;
-        }
-
-        void queryClient.refetchQueries({
-          queryKey: labelKeys.detail(projectId, activeLabelId),
-        });
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: projectFilesKeys.lists(projectId),
+          }),
+          queryClient.invalidateQueries({
+            // Invalidate all label caches scoped to this project so Write Mode
+            // mounts with stale data and refetches immediately.
+            queryKey: labelKeys.scoped(projectId),
+          }),
+        ]);
       },
-      [
-        activeLabelId,
-        currentEditFileHash,
-        currentEditFileId,
-        projectId,
-        queryClient,
-        updateFileContent,
-      ]
+      [currentEditFileId, projectId, queryClient, updateFileContent]
     ),
     onError: useCallback(
       (error: Error) => {
@@ -215,10 +206,15 @@ export function useFileEditor({
       setEditedFileContent(file.content);
       setCurrentEditFileId(file.id);
 
-      const projectFile = projectFiles.find((f) => f.id === file.id);
-      setCurrentEditFileHash(
-        projectFile?.contentHash ?? file.contentHash ?? null
-      );
+      let serverHash: string | null =
+        latestServerHashByFileIdRef.current[file.id] ?? null;
+
+      if (!serverHash) {
+        const projectFile = projectFiles.find((f) => f.id === file.id);
+        serverHash = projectFile?.contentHash ?? file.contentHash ?? null;
+      }
+
+      currentEditFileHashRef.current = serverHash;
       setHasSaveConflict(false);
       resetSavedHash(file.content);
       return true;
@@ -244,7 +240,7 @@ export function useFileEditor({
       }
 
       setCurrentEditFileId(null);
-      setCurrentEditFileHash(null);
+      currentEditFileHashRef.current = null;
       setEditedFileContent("");
       setHasSaveConflict(false);
       resetSavedHash("");

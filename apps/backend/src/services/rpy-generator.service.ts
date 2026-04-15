@@ -5,6 +5,8 @@
  * Patches existing RPY content with conditional logic and variable assignments.
  */
 
+import { RENPY_LABEL_REGEX } from "@branchforge/shared";
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -314,10 +316,11 @@ export function patchRPYWithStateVariables(
     const trimmed = line.trim();
 
     // Detect label declaration: label xyz:
-    const labelMatch = line.match(/^(\s*)label\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
-    if (labelMatch) {
-      currentLabel = labelMatch[2];
-      currentLabelIndent = labelMatch[1].length;
+    const labelIndent = line.match(/^(\s*)/)?.[0]?.length ?? 0;
+    const labelNameMatch = line.match(RENPY_LABEL_REGEX);
+    if (labelNameMatch) {
+      currentLabel = labelNameMatch[1];
+      currentLabelIndent = labelIndent;
       effectsInserted.delete(currentLabel);
 
       result.push(line);
@@ -397,12 +400,11 @@ export function patchRPYWithStateVariables(
         let labelIndent = 0;
 
         for (let i = 0; i < result.length; i++) {
-          const match = result[i].match(
-            /^(\s*)label\s+([a-zA-Z_][a-zA-Z0-9_]*)/
-          );
-          if (match && match[2] === labelTitle) {
+          const indentMatch = result[i].match(/^(\s*)/);
+          const labelMatch = result[i].match(RENPY_LABEL_REGEX);
+          if (labelMatch && labelMatch[1] === labelTitle) {
             labelIndex = i;
-            labelIndent = match[1].length;
+            labelIndent = indentMatch?.[1]?.length ?? 0;
             break;
           }
         }
@@ -424,7 +426,7 @@ export function patchRPYWithStateVariables(
           const lineIndent = line.match(/^(\s*)/)?.[1].length ?? 0;
 
           // Check if this line is a label declaration at same or lesser indent
-          const labelMatch = line.match(/^(\s*)label\s+/);
+          const labelMatch = line.match(RENPY_LABEL_REGEX);
           if (labelMatch && lineIndent <= labelIndent) {
             // Found another label at same or lesser indent level
             // This marks the end of the current label's block

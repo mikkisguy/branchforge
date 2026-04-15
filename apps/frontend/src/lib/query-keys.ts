@@ -89,6 +89,7 @@ export const projectKeys = {
 
 export const labelKeys = {
   all: ["labels"] as const,
+  scoped: (projectId: string) => ["labels", projectId] as const,
   lists: (projectId: string) => ["labels", projectId, "list"] as const,
   listsWithFilters: (
     projectId: string,
