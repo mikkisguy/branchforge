@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StatusBar } from "@/components/script-mode";
 import { GitLabSyncDialog } from "@/components/script-mode/GitLabSyncDialog";
 import { ZipImportDialog } from "@/components/zip-import";
@@ -119,7 +119,6 @@ export function ScriptMode({
   } = useFileEditor({
     projectId,
     projectFiles,
-    activeLabelId,
     updateFileContent,
     showErrorToast,
     skipSaveRef,
@@ -215,6 +214,18 @@ export function ScriptMode({
     () => projectFiles.find((file) => file.id === activeFileId) || null,
     [activeFileId, projectFiles]
   );
+
+  useEffect(() => {
+    if (!activeProjectFile) {
+      return;
+    }
+
+    if (currentEditFileId === activeProjectFile.id) {
+      return;
+    }
+
+    void switchToFile(activeProjectFile);
+  }, [activeProjectFile, currentEditFileId, switchToFile]);
 
   const { characters: projectCharacters } = useCharacters(projectId ?? "");
 

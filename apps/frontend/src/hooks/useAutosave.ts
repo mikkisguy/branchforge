@@ -169,6 +169,7 @@ export function useAutosave<T>({
   const performSave = useCallback(
     async (dataToSave: T): Promise<boolean> => {
       setSaveStatus("saving");
+      let saveSucceeded = false;
 
       try {
         await onSave(dataToSave);
@@ -177,11 +178,10 @@ export function useAutosave<T>({
         if (!isDiscardedRef.current) {
           savedHashRef.current = hashFn(dataToSave);
           lastSavedDataRef.current = dataToSave;
-          pendingHashRef.current = null;
-          pendingDataRef.current = null;
           setIsDirty(false);
           setSaveStatus("saved");
         }
+        saveSucceeded = true;
         return true;
       } catch (error) {
         const err = error instanceof Error ? error : new Error("Save failed");
@@ -192,6 +192,13 @@ export function useAutosave<T>({
       } finally {
         isSavingRef.current = false;
         savePromiseRef.current = null;
+
+        if (saveSucceeded) {
+          // Clear pending markers so a render with newer unsaved data can queue
+          // a fresh autosave cycle after this save completes.
+          pendingHashRef.current = null;
+          pendingDataRef.current = null;
+        }
       }
     },
     [onSave, hashFn, onError]
@@ -313,7 +320,13 @@ export function useAutosave<T>({
         return;
       }
 
-      if (!isSavingRef.current && currentHash !== pendingHashRef.current) {
+      if (isSavingRef.current) {
+        // Keep the latest unsaved payload available for a manual flush while
+        // a debounced save is in-flight.
+        return;
+      }
+
+      if (currentHash !== pendingHashRef.current) {
         pendingHashRef.current = currentHash;
 
         clearSaveTimeout();
