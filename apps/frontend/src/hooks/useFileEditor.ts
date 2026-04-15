@@ -64,6 +64,7 @@ export function useFileEditor({
     null
   );
   const currentEditFileHashRef = useRef<string | null>(null);
+  const latestServerHashByFileIdRef = useRef<Record<string, string>>({});
   const [hasSaveConflict, setHasSaveConflict] = useState(false);
 
   const {
@@ -89,6 +90,11 @@ export function useFileEditor({
 
         if (!result.success) {
           throw new SaveConflictError();
+        }
+
+        if (currentEditFileId && result.contentHash) {
+          latestServerHashByFileIdRef.current[currentEditFileId] =
+            result.contentHash;
         }
 
         currentEditFileHashRef.current = result.contentHash;
@@ -200,9 +206,15 @@ export function useFileEditor({
       setEditedFileContent(file.content);
       setCurrentEditFileId(file.id);
 
-      const projectFile = projectFiles.find((f) => f.id === file.id);
-      currentEditFileHashRef.current =
-        projectFile?.contentHash ?? file.contentHash ?? null;
+      let serverHash: string | null =
+        latestServerHashByFileIdRef.current[file.id] ?? null;
+
+      if (!serverHash) {
+        const projectFile = projectFiles.find((f) => f.id === file.id);
+        serverHash = projectFile?.contentHash ?? file.contentHash ?? null;
+      }
+
+      currentEditFileHashRef.current = serverHash;
       setHasSaveConflict(false);
       resetSavedHash(file.content);
       return true;

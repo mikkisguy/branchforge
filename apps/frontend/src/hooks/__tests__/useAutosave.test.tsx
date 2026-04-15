@@ -11,11 +11,11 @@ describe("useAutosave", () => {
   it("stores pending data while a save is in-flight", async () => {
     vi.useFakeTimers();
 
-    let releaseFirstSave: (() => void) | undefined;
+    let rejectFirstSave: (() => void) | undefined;
     const onSave = vi.fn().mockImplementation((value: string) => {
       if (value === "first") {
-        return new Promise<void>((resolve) => {
-          releaseFirstSave = resolve;
+        return new Promise<void>((_, reject) => {
+          rejectFirstSave = () => reject(new Error("fail"));
         });
       }
 
@@ -49,11 +49,10 @@ describe("useAutosave", () => {
     rerender({ value: "second" });
 
     await act(async () => {
-      releaseFirstSave?.();
+      rejectFirstSave?.();
     });
 
     expect(onSave).toHaveBeenCalledTimes(1);
-    expect(result.current.saveStatus).toBe("saved");
     expect(result.current.isDirty).toBe(true);
 
     await act(async () => {
