@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { sanitizeLabelName } from "@/lib/label-utils";
+import { sanitizeLabelName, RENPY_LABEL_REGEX } from "@branchforge/shared";
 import type { ProjectFileNode } from "./useProjectFiles";
 
 interface UseLabelFileSyncProps {
@@ -27,7 +27,7 @@ export function findLabelLineNumber(
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const labelMatch = line.match(/^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+    const labelMatch = line.match(RENPY_LABEL_REGEX);
     if (labelMatch) {
       const extractedLabel = labelMatch[1];
       if (extractedLabel === labelName) {

@@ -424,6 +424,50 @@ export function isValidJumpPrefix(value: string): boolean {
   return JUMP_PREFIX_REGEX.test(value);
 }
 
+// ============================================================================
+// Ren'Py Label Utilities
+// ============================================================================
+
+/**
+ * Regular expression for matching Ren'Py label definitions.
+ * Matches the label keyword followed by a valid identifier name.
+ * Allows optional leading whitespace.
+ *
+ * @example
+ * RENPY_LABEL_REGEX.exec("label start:") // matches, captures "start"
+ * RENPY_LABEL_REGEX.exec("    label scene_1:") // matches, captures "scene_1"
+ * RENPY_LABEL_REGEX.exec("label 2_invalid:") // does not match (starts with number)
+ */
+export const RENPY_LABEL_REGEX = /^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/;
+
+/**
+ * Sanitize a title to a valid Ren'Py label name.
+ * Only allows [a-z0-9_], replaces invalid chars with underscore.
+ * Ren'Py labels must start with a letter or underscore (not a number).
+ *
+ * @param title - The title to sanitize
+ * @returns A valid Ren'Py label name, or "untitled" if sanitization fails
+ *
+ * @example
+ * sanitizeLabelName("Hello World") // returns "hello_world"
+ * sanitizeLabelName("My Label!") // returns "my_label"
+ * sanitizeLabelName("123") // returns "untitled" (starts with number)
+ * sanitizeLabelName("") // returns "untitled" (empty)
+ */
+export function sanitizeLabelName(title: string): string {
+  let labelName = title
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+  if (!labelName || /^[0-9]/.test(labelName)) {
+    labelName = "untitled";
+  }
+
+  return labelName;
+}
+
 /**
  * GitLab file type enumeration
  */

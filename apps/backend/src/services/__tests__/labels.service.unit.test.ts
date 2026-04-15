@@ -10,6 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { RENPY_LABEL_REGEX } from "@branchforge/shared";
 
 // Mock the label-characters schema table before importing the service
 // This prevents circular dependency issues in the test environment
@@ -34,7 +35,7 @@ const mockRemoveLabelFromRPYContent = vi
     const lines = content.split("\n");
     return lines
       .filter((line) => {
-        const labelMatch = line.match(/^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+        const labelMatch = line.match(RENPY_LABEL_REGEX);
         return !labelMatch || labelMatch[1] !== labelName;
       })
       .join("\n");
