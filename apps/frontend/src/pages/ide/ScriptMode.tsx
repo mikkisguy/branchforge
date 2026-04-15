@@ -64,6 +64,7 @@ export function ScriptMode({
   const editorRef = useRef<ScriptEditorRef>(null);
   const isResettingRef = useRef(false);
   const skipSaveRef = useRef(false);
+  const previousEditFileIdRef = useRef<string | null>(null);
 
   const [scrollToLine, setScrollToLine] = useState<number | null>(null);
 
@@ -224,8 +225,15 @@ export function ScriptMode({
       return;
     }
 
-    void switchToFile(activeProjectFile);
-  }, [activeProjectFile, currentEditFileId, switchToFile]);
+    previousEditFileIdRef.current = currentEditFileId;
+
+    (async () => {
+      const success = await switchToFile(activeProjectFile);
+      if (!success && previousEditFileIdRef.current) {
+        void selectFileTab(previousEditFileIdRef.current, { notify: false });
+      }
+    })();
+  }, [activeProjectFile, currentEditFileId, switchToFile, selectFileTab]);
 
   const { characters: projectCharacters } = useCharacters(projectId ?? "");
 
