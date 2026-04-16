@@ -11,7 +11,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useWritingGoals } from "@/hooks/useWritingGoals";
 import { useToast } from "@/contexts/ToastContext";
 import { RotateCcw } from "lucide-react";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 
 // Writing goal constraints
 const MIN_GOAL = 1;

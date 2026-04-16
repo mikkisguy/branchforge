@@ -140,9 +140,11 @@ async function request<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
-  const headers: Record<string, string> = {
-    ...(options.headers as Record<string, string>),
-  };
+  const h = new Headers(options.headers);
+  const headers: Record<string, string> = {};
+  h.forEach((value, key) => {
+    headers[key] = value;
+  });
   if (options.body) {
     headers["Content-Type"] = "application/json";
   }
@@ -179,9 +181,11 @@ async function requestNoContent(
   options: RequestInit = {}
 ): Promise<void> {
   const url = `${API_BASE}${endpoint}`;
-  const headers: Record<string, string> = {
-    ...(options.headers as Record<string, string>),
-  };
+  const h = new Headers(options.headers);
+  const headers: Record<string, string> = {};
+  h.forEach((value, key) => {
+    headers[key] = value;
+  });
   if (options.body) {
     headers["Content-Type"] = "application/json";
   }
