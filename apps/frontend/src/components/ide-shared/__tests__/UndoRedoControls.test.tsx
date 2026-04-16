@@ -102,7 +102,7 @@ describe("UndoRedoControls", () => {
         <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
       );
 
-      fireEvent.keyDown(document, { key: "z", ctrlKey: true });
+      fireEvent.keyDown(document, { key: "z", code: "KeyZ", ctrlKey: true });
 
       expect(mockHandlers.onUndo).toHaveBeenCalledOnce();
     });
@@ -112,7 +112,7 @@ describe("UndoRedoControls", () => {
         <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
       );
 
-      fireEvent.keyDown(document, { key: "z", metaKey: true });
+      fireEvent.keyDown(document, { key: "z", code: "KeyZ", metaKey: true });
 
       expect(mockHandlers.onUndo).toHaveBeenCalledOnce();
     });
@@ -122,7 +122,7 @@ describe("UndoRedoControls", () => {
         <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
       );
 
-      fireEvent.keyDown(document, { key: "z", ctrlKey: true });
+      fireEvent.keyDown(document, { key: "z", code: "KeyZ", ctrlKey: true });
 
       expect(mockHandlers.onUndo).not.toHaveBeenCalled();
     });
@@ -132,7 +132,12 @@ describe("UndoRedoControls", () => {
         <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
       );
 
-      fireEvent.keyDown(document, { key: "z", ctrlKey: true, shiftKey: true });
+      fireEvent.keyDown(document, {
+        key: "z",
+        code: "KeyZ",
+        ctrlKey: true,
+        shiftKey: true,
+      });
 
       expect(mockHandlers.onRedo).not.toHaveBeenCalled();
     });
@@ -142,7 +147,7 @@ describe("UndoRedoControls", () => {
         <UndoRedoControls canUndo={false} canRedo={true} {...mockHandlers} />
       );
 
-      fireEvent.keyDown(document, { key: "y", ctrlKey: true });
+      fireEvent.keyDown(document, { key: "y", code: "KeyY", ctrlKey: true });
 
       expect(mockHandlers.onRedo).toHaveBeenCalledOnce();
     });
@@ -152,7 +157,7 @@ describe("UndoRedoControls", () => {
         <UndoRedoControls canUndo={false} canRedo={true} {...mockHandlers} />
       );
 
-      fireEvent.keyDown(document, { key: "y", metaKey: true });
+      fireEvent.keyDown(document, { key: "y", code: "KeyY", metaKey: true });
 
       expect(mockHandlers.onRedo).toHaveBeenCalledOnce();
     });
@@ -162,7 +167,7 @@ describe("UndoRedoControls", () => {
         <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
       );
 
-      fireEvent.keyDown(document, { key: "y", ctrlKey: true });
+      fireEvent.keyDown(document, { key: "y", code: "KeyY", ctrlKey: true });
 
       expect(mockHandlers.onRedo).not.toHaveBeenCalled();
     });
@@ -176,7 +181,7 @@ describe("UndoRedoControls", () => {
       document.body.appendChild(input);
 
       try {
-        fireEvent.keyDown(input, { key: "z", ctrlKey: true });
+        fireEvent.keyDown(input, { key: "z", code: "KeyZ", ctrlKey: true });
 
         expect(mockHandlers.onUndo).not.toHaveBeenCalled();
       } finally {
@@ -193,7 +198,7 @@ describe("UndoRedoControls", () => {
       document.body.appendChild(textarea);
 
       try {
-        fireEvent.keyDown(textarea, { key: "z", ctrlKey: true });
+        fireEvent.keyDown(textarea, { key: "z", code: "KeyZ", ctrlKey: true });
 
         expect(mockHandlers.onUndo).not.toHaveBeenCalled();
       } finally {
@@ -214,7 +219,7 @@ describe("UndoRedoControls", () => {
       document.body.appendChild(div);
 
       try {
-        fireEvent.keyDown(div, { key: "z", ctrlKey: true });
+        fireEvent.keyDown(div, { key: "z", code: "KeyZ", ctrlKey: true });
 
         expect(mockHandlers.onUndo).not.toHaveBeenCalled();
       } finally {
