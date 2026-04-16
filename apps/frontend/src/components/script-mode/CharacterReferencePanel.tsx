@@ -57,7 +57,11 @@ export function CharacterReferencePanel({
 
   return (
     <>
-      <div className={panelVariants({ collapsed: isCollapsed })}>
+      <div
+        className={panelVariants({ collapsed: isCollapsed })}
+        aria-hidden={isCollapsed}
+        inert={isCollapsed}
+      >
         {!isCollapsed && (
           <div className="h-full overflow-y-auto relative">
             <div className="sticky top-0 z-20 bg-card border-b border-border px-4 py-3">
