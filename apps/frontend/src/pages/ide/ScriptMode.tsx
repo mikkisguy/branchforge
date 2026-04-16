@@ -19,6 +19,7 @@ import type { ScriptEditorRef } from "@/components/script-mode/ScriptEditor";
 import { useLocalStorageBoolean } from "@/hooks/useLocalStorage";
 import { ScriptModeEditorLayout } from "./components/ScriptModeEditorLayout";
 import { ScriptModeEmptyState } from "./components/ScriptModeEmptyState";
+import { useTextUndo } from "@/hooks/useTextUndo";
 
 interface ScriptModeProps {
   projectId?: string;
@@ -253,6 +254,35 @@ export function ScriptMode({
       ? editedFileContent
       : activeProjectFile?.content || "";
 
+  const handleUndoRedoChange = useCallback(
+    (content: string) => {
+      setEditedFileContent(content);
+    },
+    [setEditedFileContent]
+  );
+
+  const { canUndo, canRedo, undo, redo, recordChange, clear } = useTextUndo(
+    activeFileContent,
+    handleUndoRedoChange
+  );
+
+  const handleContentChange = useCallback(
+    (value: string) => {
+      setEditedFileContent(value);
+      recordChange(value);
+    },
+    [recordChange, setEditedFileContent]
+  );
+
+  const previousUndoFileIdRef = useRef<string | null>(activeFileId);
+
+  useEffect(() => {
+    if (activeFileId && previousUndoFileIdRef.current !== activeFileId) {
+      previousUndoFileIdRef.current = activeFileId;
+      clear(activeFileContent);
+    }
+  }, [activeFileId, activeFileContent, clear]);
+
   const handleGitLabFileSelect = useCallback(
     (fileId: string) => {
       void selectFileTab(fileId);
@@ -306,9 +336,7 @@ export function ScriptMode({
       projectName={projectName}
       gitlabBranch={gitlabBranch}
       fileSourceType={primaryFileSourceType}
-      saveStatus={activeProjectFile ? fileSaveStatus : undefined}
-      saveConflict={activeProjectFile ? hasSaveConflict : undefined}
-      onSaveRequest={activeProjectFile ? retryFileSave : undefined}
+      isFocusMode={isFocusMode}
     />
   );
 
@@ -370,8 +398,15 @@ export function ScriptMode({
         onSceneSelect={handleGitLabSceneSelect}
         onSelectTab={handleSelectFileTab}
         onCloseTab={handleCloseFileTab}
-        onContentChange={setEditedFileContent}
+        onContentChange={handleContentChange}
         onRefreshFiles={refreshFiles}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={undo}
+        onRedo={redo}
+        saveStatus={activeProjectFile ? fileSaveStatus : undefined}
+        saveConflict={activeProjectFile ? hasSaveConflict : undefined}
+        onSaveRequest={activeProjectFile ? retryFileSave : undefined}
       />
 
       {statusBar}

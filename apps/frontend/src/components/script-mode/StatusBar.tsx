@@ -6,9 +6,7 @@ import {
 } from "@/components/script-mode/GitLabSyncDialog";
 import { ConflictReviewDialog } from "@/components/script-mode/ConflictReviewDialog";
 import { ZipImportDialog } from "@/components/zip-import";
-import { SaveIndicator } from "@/components/write-mode";
 import { cn } from "@/lib/utils";
-import type { SaveStatus } from "@/hooks/useAutosave";
 import type { FileSourceType } from "@branchforge/shared";
 
 // Status bar styled like a storybook footer
@@ -19,10 +17,8 @@ interface StatusBarProps {
   gitlabBranch?: string;
   // File source type - determines which import/export controls to show
   fileSourceType?: FileSourceType;
-  // Save status
-  saveStatus?: SaveStatus;
-  saveConflict?: boolean;
-  onSaveRequest?: () => void;
+  // Focus mode
+  isFocusMode?: boolean;
 }
 
 export function StatusBar({
@@ -31,9 +27,7 @@ export function StatusBar({
   projectName,
   gitlabBranch,
   fileSourceType,
-  saveStatus = "saved",
-  saveConflict = false,
-  onSaveRequest,
+  isFocusMode = false,
 }: StatusBarProps) {
   // Dialog state
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
@@ -41,6 +35,7 @@ export function StatusBar({
     useState<SyncOperationType>("export");
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
   const [zipImportDialogOpen, setZipImportDialogOpen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   /**
    * Handle export click
@@ -89,8 +84,15 @@ export function StatusBar({
   return (
     <>
       <div
-        className="flex items-center justify-between px-4 py-2 text-xs bg-card/50 border-t border-dashed"
-        style={{ borderColor: "var(--theme-border-subtle)" }}
+        className="flex items-center justify-between px-4 py-2 text-xs bg-card/50 border-t border-dashed transition-opacity duration-300 ease-out"
+        style={{
+          borderColor: "var(--theme-border-subtle)",
+          opacity: isFocusMode ? (isHovered ? 1 : 0.6) : 1,
+        }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onFocusCapture={() => setIsHovered(true)}
+        onBlurCapture={() => setIsHovered(false)}
       >
         <div className="flex items-center gap-4">
           <div className="text-muted-foreground border-r border-border/30 pr-4">
@@ -152,16 +154,6 @@ export function StatusBar({
               </button>
             </div>
           )}
-
-          {/* Save status indicator - using unified SaveIndicator component */}
-          <div className="border-l border-border/30 pl-4">
-            <SaveIndicator
-              saveStatus={saveStatus}
-              displayMode="verbose"
-              saveConflict={saveConflict}
-              onRetry={onSaveRequest}
-            />
-          </div>
         </div>
       </div>
 

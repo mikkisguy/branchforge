@@ -22,8 +22,8 @@ import { SaveIndicator } from "./SaveIndicator";
 import { FontSizeSwitcher } from "../FontSizeSwitcher";
 import { FontFamilySwitcher } from "./FontFamilySwitcher";
 import { useWritingGoals } from "@/hooks/useWritingGoals";
-import { useInMemoryUndo } from "./useInMemoryUndo";
-import { UndoRedoControls } from "./UndoRedoControls";
+import { useEntriesUndo } from "@/hooks/useEntriesUndo";
+import { UndoRedoControls } from "@/components/ide-shared";
 import { BookOpen, PenLine } from "lucide-react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type { DialogueEntry } from "@/lib/prose-types";
@@ -177,7 +177,6 @@ export const ProseEditor = forwardRef<ProseEditorRef, ProseEditorProps>(
     const { settings: writingGoalSettings } = useWritingGoals();
 
     // Hover state for focus mode dimming
-    const [isTopBarHovered, setIsTopBarHovered] = useState(false);
     const [isBottomBarHovered, setIsBottomBarHovered] = useState(false);
     const [entries, setEntries] = useState<DialogueEntry[]>(() =>
       convertLabelLinesToEntries(activeLabel)
@@ -229,7 +228,7 @@ export const ProseEditor = forwardRef<ProseEditorRef, ProseEditorProps>(
     );
 
     // In-memory undo for immediate response
-    const inMemoryUndo = useInMemoryUndo(
+    const inMemoryUndo = useEntriesUndo(
       entries,
       handleInMemoryHistoryChange,
       50 // Max 50 in-memory undo steps
@@ -633,51 +632,45 @@ export const ProseEditor = forwardRef<ProseEditorRef, ProseEditorProps>(
     return (
       <div className="flex flex-col h-full tracking-normal pb-3">
         {/* Top Bar */}
-        <div
-          className="px-4 py-3 border-b border-border bg-card rounded-t-lg flex items-center justify-between gap-4 transition-opacity duration-300 ease-out"
-          style={{
-            opacity: isFocusMode ? (isTopBarHovered ? 1 : 0.4) : 1,
-          }}
-          onMouseEnter={() => setIsTopBarHovered(true)}
-          onMouseLeave={() => setIsTopBarHovered(false)}
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            {/* Scene status badge */}
-            <span
-              className={`px-2 py-0.4 rounded-full text-xs font-medium border shrink-0 ${
-                activeLabel.status === "FINAL"
-                  ? "bg-[var(--theme-color)]/20 text-[var(--theme-color)] border-[var(--theme-border)]"
-                  : activeLabel.status === "REVIEW"
-                    ? "bg-[var(--theme-review-color)]/20 text-[var(--theme-review-color)] border-[var(--theme-review-color)]/30"
-                    : "bg-[var(--theme-draft-color)]/20 text-[var(--theme-draft-color)] border-[var(--theme-draft-color)]/30"
-              }`}
-            >
-              {activeLabel.status?.toLowerCase() || "draft"}
-            </span>
+        {!isFocusMode && (
+          <div className="px-4 py-3 border-b border-border bg-card rounded-t-lg flex items-center justify-between">
+            <div className="flex items-center gap-3 min-w-0">
+              {/* Scene status badge */}
+              <span
+                className={`px-2 py-0.4 rounded-full text-xs font-medium border shrink-0 ${
+                  activeLabel.status === "FINAL"
+                    ? "bg-[var(--theme-color)]/20 text-[var(--theme-color)] border-[var(--theme-border)]"
+                    : activeLabel.status === "REVIEW"
+                      ? "bg-[var(--theme-review-color)]/20 text-[var(--theme-review-color)] border-[var(--theme-review-color)]/30"
+                      : "bg-[var(--theme-draft-color)]/20 text-[var(--theme-draft-color)] border-[var(--theme-draft-color)]/30"
+                }`}
+              >
+                {activeLabel.status?.toLowerCase() || "draft"}
+              </span>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <UndoRedoControls
+                canUndo={inMemoryUndo.canUndo}
+                canRedo={inMemoryUndo.canRedo}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+              />
+              <SaveIndicator
+                saveStatus={propsToSaveStatus(isSaving, saveError)}
+                displayMode="compact"
+                lastSaved={lastSaved}
+                saveConflict={saveConflict}
+              />
+            </div>
           </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <FontFamilySwitcher />
-            <FontSizeSwitcher mode="write" direction="down" />
-
-            <button
-              onClick={() =>
-                setLayoutMode((prev) =>
-                  prev === "inline" ? "stacked" : "inline"
-                )
-              }
-              className="px-3 py-1.5 rounded-lg border border-border hover:bg-muted text-xs transition-colors"
-              title="Toggle line layout"
-            >
-              {layoutMode === "inline" ? "Inline" : "Stacked"}
-            </button>
-          </div>
-        </div>
+        )}
 
         {/* Editor Content */}
         <div
           data-prose-editor-scroll="true"
-          className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 bg-background scroll-pb-24"
+          className={`flex-1 overflow-y-auto px-4 sm:px-6 py-6 bg-background scroll-pb-24 ${
+            isFocusMode ? "border-t border-border" : ""
+          }`}
         >
           <div className="mx-auto w-full max-w-[75ch] space-y-1 pb-20">
             {entries.map((entry, index) => (
@@ -716,6 +709,8 @@ export const ProseEditor = forwardRef<ProseEditorRef, ProseEditorProps>(
             }}
             onMouseEnter={() => setIsBottomBarHovered(true)}
             onMouseLeave={() => setIsBottomBarHovered(false)}
+            onFocusCapture={() => setIsBottomBarHovered(true)}
+            onBlurCapture={() => setIsBottomBarHovered(false)}
           >
             <WritingGoalPill
               current={todayWordCount}
@@ -733,6 +728,8 @@ export const ProseEditor = forwardRef<ProseEditorRef, ProseEditorProps>(
           }}
           onMouseEnter={() => setIsBottomBarHovered(true)}
           onMouseLeave={() => setIsBottomBarHovered(false)}
+          onFocusCapture={() => setIsBottomBarHovered(true)}
+          onBlurCapture={() => setIsBottomBarHovered(false)}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4 text-sm">
@@ -748,18 +745,19 @@ export const ProseEditor = forwardRef<ProseEditorRef, ProseEditorProps>(
             </div>
 
             <div className="flex items-center gap-4">
-              <UndoRedoControls
-                canUndo={inMemoryUndo.canUndo}
-                canRedo={inMemoryUndo.canRedo}
-                onUndo={handleUndo}
-                onRedo={handleRedo}
-              />
-              <SaveIndicator
-                saveStatus={propsToSaveStatus(isSaving, saveError)}
-                displayMode="compact"
-                lastSaved={lastSaved}
-                saveConflict={saveConflict}
-              />
+              <FontFamilySwitcher direction="up" />
+              <FontSizeSwitcher mode="write" direction="up" />
+              <button
+                onClick={() =>
+                  setLayoutMode((prev) =>
+                    prev === "inline" ? "stacked" : "inline"
+                  )
+                }
+                className="px-2 py-1 rounded border border-[hsl(var(--border)/0.6)] hover:bg-[hsl(var(--muted)/0.4)] text-xs text-muted-foreground hover:text-foreground transition-colors"
+                title="Toggle line layout"
+              >
+                {layoutMode === "inline" ? "Inline" : "Stacked"}
+              </button>
             </div>
           </div>
         </div>

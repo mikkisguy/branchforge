@@ -1,10 +1,3 @@
-/**
- * useInMemoryUndo Hook
- *
- * In-memory undo stack for immediate undo without server roundtrip.
- * Works in tandem with server-side undo for persistence.
- */
-
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { DialogueEntry } from "@/lib/prose-types";
 import { areDialogueEntriesEqual } from "@/lib/prose-converter";
@@ -15,7 +8,7 @@ interface UndoState {
   future: DialogueEntry[][];
 }
 
-export function useInMemoryUndo(
+export function useEntriesUndo(
   entries: DialogueEntry[],
   onChange: (entries: DialogueEntry[]) => void,
   maxHistory: number = 50
@@ -136,7 +129,7 @@ export function useInMemoryUndo(
   // Clear history (call when switching labels)
   const clear = useCallback(
     (initialEntries?: DialogueEntry[]) => {
-      const nextPresent = initialEntries ?? entries;
+      const nextPresent = initialEntries ?? stateRef.current.present ?? [];
 
       commitState({
         past: [],
@@ -145,7 +138,7 @@ export function useInMemoryUndo(
       });
       lastSyncedEntriesRef.current = nextPresent;
     },
-    [commitState, entries]
+    [commitState]
   );
 
   // Sync internal state with entries prop when it changes from external sources

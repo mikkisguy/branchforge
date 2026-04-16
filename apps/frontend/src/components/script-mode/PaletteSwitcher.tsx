@@ -6,10 +6,16 @@ import {
 } from "../../lib/codemirror/palettes";
 import { useLocalStorageNumber } from "@/hooks/useLocalStorage";
 
+interface PaletteSwitcherProps {
+  direction?: "up" | "down";
+}
+
 /**
  * Palette switcher for syntax highlighting colors
  */
-export function PaletteSwitcher() {
+export function PaletteSwitcher({
+  direction = "up",
+}: PaletteSwitcherProps = {}) {
   const [selectedIndex, setSelectedIndex] = useLocalStorageNumber(
     "editor:syntax-palette",
     0,
@@ -47,6 +53,9 @@ export function PaletteSwitcher() {
     return groups;
   }, []);
 
+  const dropdownPositionClasses =
+    direction === "up" ? "bottom-full left-0 mb-1" : "top-full mt-1";
+
   return (
     <div className="relative z-50 flex items-center gap-2">
       <button
@@ -62,7 +71,13 @@ export function PaletteSwitcher() {
         <span>{PALETTES[selectedIndex].name}</span>
         <svg
           className={`w-3 h-3 transition-transform ${
-            isOpen ? "rotate-180" : ""
+            isOpen
+              ? direction === "up"
+                ? ""
+                : "rotate-180"
+              : direction === "up"
+                ? "rotate-180"
+                : ""
           }`}
           fill="none"
           viewBox="0 0 24 24"
@@ -80,7 +95,9 @@ export function PaletteSwitcher() {
       {isOpen && (
         <>
           <div className="fixed inset-0" onClick={() => setIsOpen(false)} />
-          <div className="absolute bottom-full left-0 mb-1 bg-card border border-border rounded-md shadow-lg overflow-hidden min-w-[200px]">
+          <div
+            className={`absolute ${dropdownPositionClasses} bg-card border border-border rounded-md shadow-lg overflow-hidden min-w-[200px]`}
+          >
             {Object.entries(groupedPalettes).map(([groupName, palettes]) => (
               <div key={groupName}>
                 <div className="px-3 py-1 text-xs font-semibold text-muted-foreground bg-muted/30">

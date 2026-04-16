@@ -270,7 +270,13 @@ export function FontSizeSwitcher({
         <span aria-hidden="true">{currentOption.label}</span>
         <svg
           className={`w-3 h-3 transition-transform ${
-            isOpen ? "rotate-180" : ""
+            isOpen
+              ? direction === "up"
+                ? ""
+                : "rotate-180"
+              : direction === "up"
+                ? "rotate-180"
+                : ""
           }`}
           fill="none"
           viewBox="0 0 24 24"

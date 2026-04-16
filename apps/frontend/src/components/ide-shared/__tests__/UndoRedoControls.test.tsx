@@ -102,7 +102,7 @@ describe("UndoRedoControls", () => {
         <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
       );
 
-      fireEvent.keyDown(document, { key: "z", ctrlKey: true });
+      fireEvent.keyDown(document, { key: "z", code: "KeyZ", ctrlKey: true });
 
       expect(mockHandlers.onUndo).toHaveBeenCalledOnce();
     });
@@ -112,7 +112,7 @@ describe("UndoRedoControls", () => {
         <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
       );
 
-      fireEvent.keyDown(document, { key: "z", metaKey: true });
+      fireEvent.keyDown(document, { key: "z", code: "KeyZ", metaKey: true });
 
       expect(mockHandlers.onUndo).toHaveBeenCalledOnce();
     });
@@ -122,19 +122,24 @@ describe("UndoRedoControls", () => {
         <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
       );
 
-      fireEvent.keyDown(document, { key: "z", ctrlKey: true });
+      fireEvent.keyDown(document, { key: "z", code: "KeyZ", ctrlKey: true });
 
       expect(mockHandlers.onUndo).not.toHaveBeenCalled();
     });
 
-    it("should call onRedo when Ctrl+Shift+Z is pressed", () => {
+    it("should not call onRedo when Ctrl+Shift+Z is pressed but canRedo is false", () => {
       render(
-        <UndoRedoControls canUndo={false} canRedo={true} {...mockHandlers} />
+        <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
       );
 
-      fireEvent.keyDown(document, { key: "z", ctrlKey: true, shiftKey: true });
+      fireEvent.keyDown(document, {
+        key: "z",
+        code: "KeyZ",
+        ctrlKey: true,
+        shiftKey: true,
+      });
 
-      expect(mockHandlers.onRedo).toHaveBeenCalledOnce();
+      expect(mockHandlers.onRedo).not.toHaveBeenCalled();
     });
 
     it("should call onRedo when Ctrl+Y is pressed", () => {
@@ -142,17 +147,27 @@ describe("UndoRedoControls", () => {
         <UndoRedoControls canUndo={false} canRedo={true} {...mockHandlers} />
       );
 
-      fireEvent.keyDown(document, { key: "y", ctrlKey: true });
+      fireEvent.keyDown(document, { key: "y", code: "KeyY", ctrlKey: true });
 
       expect(mockHandlers.onRedo).toHaveBeenCalledOnce();
     });
 
-    it("should not call onRedo when Ctrl+Shift+Z is pressed but disabled", () => {
+    it("should call onRedo when Cmd+Y is pressed (Mac)", () => {
+      render(
+        <UndoRedoControls canUndo={false} canRedo={true} {...mockHandlers} />
+      );
+
+      fireEvent.keyDown(document, { key: "y", code: "KeyY", metaKey: true });
+
+      expect(mockHandlers.onRedo).toHaveBeenCalledOnce();
+    });
+
+    it("should not call onRedo when Ctrl+Y is pressed but disabled", () => {
       render(
         <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
       );
 
-      fireEvent.keyDown(document, { key: "z", ctrlKey: true, shiftKey: true });
+      fireEvent.keyDown(document, { key: "y", code: "KeyY", ctrlKey: true });
 
       expect(mockHandlers.onRedo).not.toHaveBeenCalled();
     });
@@ -165,11 +180,13 @@ describe("UndoRedoControls", () => {
       const input = document.createElement("input");
       document.body.appendChild(input);
 
-      fireEvent.keyDown(input, { key: "z", ctrlKey: true });
+      try {
+        fireEvent.keyDown(input, { key: "z", code: "KeyZ", ctrlKey: true });
 
-      expect(mockHandlers.onUndo).not.toHaveBeenCalled();
-
-      document.body.removeChild(input);
+        expect(mockHandlers.onUndo).not.toHaveBeenCalled();
+      } finally {
+        document.body.removeChild(input);
+      }
     });
 
     it("should not trigger undo when typing in a textarea", () => {
@@ -180,11 +197,13 @@ describe("UndoRedoControls", () => {
       const textarea = document.createElement("textarea");
       document.body.appendChild(textarea);
 
-      fireEvent.keyDown(textarea, { key: "z", ctrlKey: true });
+      try {
+        fireEvent.keyDown(textarea, { key: "z", code: "KeyZ", ctrlKey: true });
 
-      expect(mockHandlers.onUndo).not.toHaveBeenCalled();
-
-      document.body.removeChild(textarea);
+        expect(mockHandlers.onUndo).not.toHaveBeenCalled();
+      } finally {
+        document.body.removeChild(textarea);
+      }
     });
 
     it("should not trigger undo when typing in a contenteditable element", () => {
@@ -199,11 +218,13 @@ describe("UndoRedoControls", () => {
       });
       document.body.appendChild(div);
 
-      fireEvent.keyDown(div, { key: "z", ctrlKey: true });
+      try {
+        fireEvent.keyDown(div, { key: "z", code: "KeyZ", ctrlKey: true });
 
-      expect(mockHandlers.onUndo).not.toHaveBeenCalled();
-
-      document.body.removeChild(div);
+        expect(mockHandlers.onUndo).not.toHaveBeenCalled();
+      } finally {
+        document.body.removeChild(div);
+      }
     });
   });
 
@@ -234,9 +255,11 @@ describe("UndoRedoControls", () => {
         <UndoRedoControls canUndo={true} canRedo={true} {...mockHandlers} />
       );
 
-      expect(screen.getByTitle(/Undo \((Ctrl|Cmd)\+Z\)/)).toBeInTheDocument();
       expect(
-        screen.getByTitle(/Redo \((Ctrl|Cmd)\+Shift\+Z\)/)
+        screen.getByTitle(/Undo \(Ctrl\+Z \/ Cmd\+Z\)/)
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTitle(/Redo \(Ctrl\+Y \/ Cmd\+Shift\+Z\)/)
       ).toBeInTheDocument();
     });
   });

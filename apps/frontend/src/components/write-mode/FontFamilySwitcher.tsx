@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { cva } from "class-variance-authority";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 export type FontFamilyOption = {
@@ -20,11 +21,27 @@ const FONT_FAMILY_OPTIONS: Readonly<FontFamilyOption[]> = [
   { label: "Noto Serif", value: "noto-serif", family: "'Noto Serif', serif" },
 ] as const;
 
+const dropdownVariants = cva(
+  "absolute z-50 bg-card border border-border rounded-md shadow-lg overflow-hidden min-w-[160px] animate-in fade-in-50 zoom-in-95 duration-150",
+  {
+    variants: {
+      direction: {
+        up: "bottom-full mb-1",
+        down: "top-full mt-1",
+      },
+    },
+    defaultVariants: {
+      direction: "down",
+    },
+  }
+);
+
 const STORAGE_KEY = "write:font-family";
 const CSS_VARIABLE = "--prose-editor-font-family";
 
 interface FontFamilySwitcherProps {
   className?: string;
+  direction?: "up" | "down";
 }
 
 /**
@@ -34,6 +51,7 @@ interface FontFamilySwitcherProps {
  */
 export function FontFamilySwitcher({
   className = "",
+  direction = "down",
 }: FontFamilySwitcherProps = {}) {
   const [fontFamily, setFontFamily] = useLocalStorage<string>(
     STORAGE_KEY,
@@ -238,7 +256,13 @@ export function FontFamilySwitcher({
         <span aria-hidden="true">{currentOption.label}</span>
         <svg
           className={`w-3 h-3 transition-transform ${
-            dropdownState.isOpen ? "rotate-180" : ""
+            dropdownState.isOpen
+              ? direction === "up"
+                ? ""
+                : "rotate-180"
+              : direction === "up"
+                ? "rotate-180"
+                : ""
           }`}
           fill="none"
           viewBox="0 0 24 24"
@@ -275,7 +299,7 @@ export function FontFamilySwitcher({
                 ? `font-family-option-${currentFocusedIndex}`
                 : undefined
             }
-            className="absolute z-50 top-full mt-1 bg-card border border-border rounded-md shadow-lg overflow-hidden min-w-[160px] animate-in fade-in-50 zoom-in-95 duration-150"
+            className={dropdownVariants({ direction })}
             onKeyDown={handleKeyDown}
           >
             {FONT_FAMILY_OPTIONS.map((option, index) => (
