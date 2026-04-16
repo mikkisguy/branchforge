@@ -7,7 +7,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { settingsApi } from "@/lib/api/settings";
-import { settingsKeys } from "@/lib/query-keys";
+import { authKeys, settingsKeys } from "@/lib/query-keys";
 import { useToast } from "@/contexts/ToastContext";
 import type { PublicUser } from "@/lib/api/auth";
 
@@ -37,11 +37,7 @@ export function useSettings(): UseSettingsReturn {
   const toast = useToast();
 
   // Get current user from auth query cache
-  const authQuery = queryClient.getQueryData<{ user: PublicUser }>([
-    "auth",
-    "user",
-  ]);
-  const user = authQuery?.user ?? null;
+  const user = queryClient.getQueryData<PublicUser>(authKeys.user()) ?? null;
 
   // Query for sign-ups status
   const { data: signUpStatus, isLoading } = useQuery({

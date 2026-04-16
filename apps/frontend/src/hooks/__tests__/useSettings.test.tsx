@@ -132,7 +132,7 @@ describe("useSettings", () => {
         email: "admin@example.com",
         role: "OWNER",
       };
-      queryClient.setQueryData(["auth", "user"], { user: mockUser });
+      queryClient.setQueryData(["auth", "user"], mockUser);
 
       const { result } = renderHook(() => useSettings(), { wrapper });
 
@@ -164,7 +164,7 @@ describe("useSettings", () => {
         email: "admin@example.com",
         role: "OWNER",
       };
-      queryClient.setQueryData(["auth", "user"], { user: mockUser });
+      queryClient.setQueryData(["auth", "user"], mockUser);
 
       const { result } = renderHook(() => useSettings(), { wrapper });
 
@@ -207,7 +207,7 @@ describe("useSettings", () => {
         email: "admin@example.com",
         role: "OWNER",
       };
-      queryClient.setQueryData(["auth", "user"], { user: mockUser });
+      queryClient.setQueryData(["auth", "user"], mockUser);
 
       const { result } = renderHook(() => useSettings(), { wrapper });
 
@@ -241,7 +241,7 @@ describe("useSettings", () => {
         email: "admin@example.com",
         role: "OWNER",
       };
-      queryClient.setQueryData(["auth", "user"], { user: mockUser });
+      queryClient.setQueryData(["auth", "user"], mockUser);
 
       const { result } = renderHook(() => useSettings(), { wrapper });
 
@@ -273,7 +273,7 @@ describe("useSettings", () => {
         email: "admin@example.com",
         role: "OWNER",
       };
-      queryClient.setQueryData(["auth", "user"], { user: mockUser });
+      queryClient.setQueryData(["auth", "user"], mockUser);
 
       const { result } = renderHook(() => useSettings(), { wrapper });
 
@@ -302,7 +302,7 @@ describe("useSettings", () => {
         email: "user@example.com",
         role: "READER",
       };
-      queryClient.setQueryData(["auth", "user"], { user: mockUser });
+      queryClient.setQueryData(["auth", "user"], mockUser);
 
       const { result } = renderHook(() => useSettings(), { wrapper });
 
@@ -360,7 +360,7 @@ describe("useSettings", () => {
         email: "admin@example.com",
         role: "OWNER",
       };
-      queryClient.setQueryData(["auth", "user"], { user: mockUser });
+      queryClient.setQueryData(["auth", "user"], mockUser);
 
       const { result } = renderHook(() => useSettings(), { wrapper });
 
