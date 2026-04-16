@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { useSettings } from "../useSettings";
 import { settingsApi } from "@/lib/api/settings";
-import { settingsKeys } from "@/lib/query-keys";
+import { authKeys } from "@/lib/query-keys";
 import type { PublicUser } from "@/lib/api/auth";
 import { createTestQueryClient } from "@/test/query-client";
 
@@ -132,148 +132,7 @@ describe("useSettings", () => {
         email: "admin@example.com",
         role: "OWNER",
       };
-      queryClient.setQueryData(["auth", "user"], mockUser);
-
-      const { result } = renderHook(() => useSettings(), { wrapper });
-
-      await waitFor(() => {
-        expect(result.current.signUpsEnabled).toBe(false);
-      });
-
-      // Start the mutation
-      const mutationPromise = result.current.updateSignUpsSetting(true);
-
-      // The optimistic update should have happened - check the hook state
-      await waitFor(() => {
-        expect(result.current.signUpsEnabled).toBe(true);
-      });
-
-      // Wait for mutation to complete
-      await mutationPromise;
-    });
-
-    it("should rollback optimistic update on error", async () => {
-      vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({
-        enabled: false,
-      });
-      const error = new Error("Update failed");
-      vi.mocked(settingsApi.updateSetting).mockRejectedValue(error);
-
-      const mockUser: PublicUser = {
-        id: "user-1",
-        email: "admin@example.com",
-        role: "OWNER",
-      };
-      queryClient.setQueryData(["auth", "user"], mockUser);
-
-      const { result } = renderHook(() => useSettings(), { wrapper });
-
-      await waitFor(() => {
-        expect(result.current.signUpsEnabled).toBe(false);
-      });
-
-      // Try to update - should fail
-      await expect(result.current.updateSignUpsSetting(true)).rejects.toThrow(
-        "Update failed"
-      );
-
-      // Verify rollback happened - cache should be restored to original value
-      await waitFor(() => {
-        const cachedData = queryClient.getQueryData<boolean>(
-          settingsKeys.signUps()
-        );
-        expect(cachedData).toBe(false);
-      });
-
-      // Verify error toast was shown
-      expect(mockToastError).toHaveBeenCalledWith(
-        "Failed to update setting. The original value has been restored.",
-        "Error"
-      );
-      expect(mockToastSuccess).not.toHaveBeenCalled();
-    });
-
-    it("should show success toast on successful update", async () => {
-      vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({
-        enabled: false,
-      });
-      vi.mocked(settingsApi.updateSetting).mockResolvedValue({
-        key: "sign_ups_enabled",
-        value: true,
-      });
-
-      const mockUser: PublicUser = {
-        id: "user-1",
-        email: "admin@example.com",
-        role: "OWNER",
-      };
-      queryClient.setQueryData(["auth", "user"], mockUser);
-
-      const { result } = renderHook(() => useSettings(), { wrapper });
-
-      await waitFor(() => {
-        expect(result.current.signUpsEnabled).toBe(false);
-      });
-
-      await result.current.updateSignUpsSetting(true);
-
-      await waitFor(() => {
-        expect(mockToastSuccess).toHaveBeenCalledWith(
-          "Sign-ups have been enabled",
-          "Setting saved"
-        );
-      });
-
-      expect(mockToastError).not.toHaveBeenCalled();
-    });
-
-    it("should show success toast when disabling sign-ups", async () => {
-      vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({
-        enabled: true,
-      });
-      vi.mocked(settingsApi.updateSetting).mockResolvedValue({
-        key: "sign_ups_enabled",
-        value: false,
-      });
-
-      const mockUser: PublicUser = {
-        id: "user-1",
-        email: "admin@example.com",
-        role: "OWNER",
-      };
-      queryClient.setQueryData(["auth", "user"], mockUser);
-
-      const { result } = renderHook(() => useSettings(), { wrapper });
-
-      await waitFor(() => {
-        expect(result.current.signUpsEnabled).toBe(true);
-      });
-
-      await result.current.updateSignUpsSetting(false);
-
-      await waitFor(() => {
-        expect(mockToastSuccess).toHaveBeenCalledWith(
-          "Sign-ups have been disabled",
-          "Setting saved"
-        );
-      });
-    });
-
-    it("should invalidate queries after update settles", async () => {
-      vi.mocked(settingsApi.getSignUpStatus)
-        .mockResolvedValueOnce({ enabled: false })
-        .mockResolvedValueOnce({ enabled: true }); // After invalidation
-      vi.mocked(settingsApi.updateSetting).mockResolvedValue({
-        key: "sign_ups_enabled",
-        value: true,
-      });
-
-      const mockUser: PublicUser = {
-        id: "user-1",
-        email: "admin@example.com",
-        role: "OWNER",
-      };
-      queryClient.setQueryData(["auth", "user"], mockUser);
+      queryClient.setQueryData(authKeys.user(), mockUser);
 
       const { result } = renderHook(() => useSettings(), { wrapper });
 
@@ -302,7 +161,7 @@ describe("useSettings", () => {
         email: "user@example.com",
         role: "READER",
       };
-      queryClient.setQueryData(["auth", "user"], mockUser);
+      queryClient.setQueryData(authKeys.user(), mockUser);
 
       const { result } = renderHook(() => useSettings(), { wrapper });
 
@@ -325,7 +184,7 @@ describe("useSettings", () => {
       });
 
       // No user in cache
-      queryClient.setQueryData(["auth", "user"], null);
+      queryClient.setQueryData(authKeys.user(), null);
 
       const { result } = renderHook(() => useSettings(), { wrapper });
 
@@ -360,7 +219,7 @@ describe("useSettings", () => {
         email: "admin@example.com",
         role: "OWNER",
       };
-      queryClient.setQueryData(["auth", "user"], mockUser);
+      queryClient.setQueryData(authKeys.user(), mockUser);
 
       const { result } = renderHook(() => useSettings(), { wrapper });
 

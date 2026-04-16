@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useSettings } from "@/hooks/useSettings";
 import { GitLabSettingsContent } from "@/components/ide-shared/GitLabSettingsContent";
@@ -75,13 +76,14 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
       <DialogContent className="w-[700px] max-w-[95vw] p-0 gap-0">
         <DialogHeader className="p-6 pb-4 flex-row items-center justify-between border-b border-border/30">
           <DialogTitle>Settings</DialogTitle>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => onOpenChange(false)}
-            className="text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Close settings"
           >
             <X className="w-5 h-5" />
-          </button>
+          </Button>
         </DialogHeader>
 
         <div className="flex h-[650px]">
