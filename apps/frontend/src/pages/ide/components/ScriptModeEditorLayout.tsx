@@ -5,16 +5,20 @@ import {
   CharacterReferencePanel,
   ScriptEditor,
 } from "@/components/script-mode";
-import { UndoRedoControls } from "@/components/ide-shared";
 import { ProjectFileTree } from "@/components/script-mode/ProjectFileTree";
 import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
-import { EditorTabBar, type EditorTabBarItem } from "@/components/ide-shared";
+import {
+  EditorTabBar,
+  type EditorTabBarItem,
+  UndoRedoControls,
+} from "@/components/ide-shared";
 import { Button } from "@/components/ui/button";
 import type { LabelDetail } from "@branchforge/shared";
 import type { Character } from "@branchforge/shared";
 import type { ScriptEditorRef } from "@/components/script-mode/ScriptEditor";
 import type { FocusModeState } from "@/hooks/useFocusModeState";
 import type { ProjectFileNode } from "@/hooks/useProjectFiles";
+import type { SaveStatus } from "@/hooks/useAutosave";
 import type {
   Dispatch,
   KeyboardEvent,
@@ -70,6 +74,9 @@ interface ScriptModeEditorLayoutProps {
   canRedo: boolean;
   onUndo: () => void;
   onRedo: () => void;
+  saveStatus?: SaveStatus;
+  saveConflict?: boolean;
+  onSaveRequest?: () => void;
 }
 
 export function ScriptModeEditorLayout({
@@ -104,6 +111,9 @@ export function ScriptModeEditorLayout({
   canRedo,
   onUndo,
   onRedo,
+  saveStatus = "saved",
+  saveConflict = false,
+  onSaveRequest,
 }: ScriptModeEditorLayoutProps) {
   const { isFocusMode, focusToggleRef } = focusModeState;
 
@@ -159,14 +169,15 @@ export function ScriptModeEditorLayout({
             </div>
 
             <div className="p-3 space-y-3">
-              <button
-                type="button"
-                onClick={onNewChapter}
-                disabled={!onNewChapter}
-                className="w-full py-2 px-3 rounded-lg text-sm font-medium transition-colors bg-[var(--theme-color)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                + New Chapter
-              </button>
+              {onNewChapter && (
+                <button
+                  type="button"
+                  onClick={onNewChapter}
+                  className="w-full py-2 px-3 rounded-lg text-sm font-medium transition-colors bg-[var(--theme-color)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  + New Chapter
+                </button>
+              )}
 
               <ProjectFileTree
                 files={projectFiles}
@@ -207,7 +218,7 @@ export function ScriptModeEditorLayout({
                 />
               </div>
               <div className="h-12 overflow-hidden rounded-lg border border-border/80 bg-card/55 opacity-100 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-                <div className="h-full flex items-center justify-end gap-2 px-3">
+                <div className="h-full flex items-center justify-end gap-3 px-3">
                   <UndoRedoControls
                     canUndo={canUndo}
                     canRedo={canRedo}
@@ -232,6 +243,10 @@ export function ScriptModeEditorLayout({
                   content={activeFileContent}
                   scrollToLine={scrollToLine}
                   onChange={onContentChange}
+                  isFocusMode={isFocusMode}
+                  saveStatus={saveStatus}
+                  saveConflict={saveConflict}
+                  onSaveRequest={onSaveRequest}
                 />
               ) : activeLabel ? (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">

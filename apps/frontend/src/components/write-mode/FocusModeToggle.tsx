@@ -36,7 +36,7 @@ export const FocusModeToggle = memo(
           "focus-visible:ring-[var(--theme-color)]/35",
           isFocusMode
             ? "gap-2 rounded-full border border-border/70 bg-card/90 px-3.5 py-2 whitespace-nowrap text-sm font-medium text-foreground shadow-lg backdrop-blur-sm hover:border-[var(--theme-color)]/35 hover:bg-card"
-            : "gap-2 rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+            : "gap-2 rounded-md px-3 py-1.5 text-sm text-muted-foreground bg-muted/30 hover:bg-muted/60 hover:text-foreground hover:border-border/80"
         )}
       >
         {isFocusMode ? (

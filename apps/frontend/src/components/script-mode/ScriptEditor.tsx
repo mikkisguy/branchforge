@@ -25,6 +25,8 @@ import {
   EDITOR_FONT_SIZE_CHANGED,
 } from "../FontSizeSwitcher";
 import { LineWrapSwitcher } from "./LineWrapSwitcher";
+import { SaveIndicator } from "../write-mode";
+import type { SaveStatus } from "@/hooks/useAutosave";
 
 export interface ScriptEditorRef {
   focus: () => void;
@@ -35,6 +37,10 @@ interface ScriptEditorProps {
   onChange?: (value: string) => void;
   scrollToLine?: number | null;
   readOnly?: boolean;
+  isFocusMode?: boolean;
+  saveStatus?: SaveStatus;
+  saveConflict?: boolean;
+  onSaveRequest?: () => void;
 }
 
 const TARGET_LINE_HIGHLIGHT_MS = 920;
@@ -78,12 +84,22 @@ const createHighlightExtension = () => {
 
 export const ScriptEditor = forwardRef<ScriptEditorRef, ScriptEditorProps>(
   function ScriptEditor(
-    { content, onChange, scrollToLine, readOnly = false }: ScriptEditorProps,
+    {
+      content,
+      onChange,
+      scrollToLine,
+      readOnly = false,
+      isFocusMode = false,
+      saveStatus,
+      saveConflict,
+      onSaveRequest,
+    }: ScriptEditorProps,
     ref
   ) {
     const [lineWrapExtension, setLineWrapExtension] = useState<
       Extension | readonly Extension[]
     >([]);
+    const [isHovered, setIsHovered] = useState(false);
     const cleanContent = useMemo(() => stripBOM(content), [content]);
 
     // Track if we've scrolled to avoid re-scrolling on every render
@@ -337,13 +353,31 @@ export const ScriptEditor = forwardRef<ScriptEditorRef, ScriptEditorProps>(
             }}
           />
         </div>
-        <div className="flex items-center justify-between px-2 py-1 border-t border-border bg-muted/20 font-code text-xs text-muted-foreground">
+        <div
+          className="flex items-center justify-between px-2 py-1 border-t border-border bg-muted/20 font-code text-xs text-muted-foreground transition-opacity duration-300 ease-out"
+          style={{
+            opacity: isFocusMode ? (isHovered ? 1 : 0.4) : 1,
+          }}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+        >
           <div className="flex items-center gap-2">
             <FontSizeSwitcher mode="script" direction="up" />
             <LineWrapSwitcher onChange={handleLineWrapChange} />
             <PaletteSwitcher />
           </div>
           <div className="flex items-center gap-3">
+            {saveStatus && (
+              <>
+                <SaveIndicator
+                  saveStatus={saveStatus}
+                  displayMode="compact"
+                  saveConflict={saveConflict}
+                  onRetry={onSaveRequest}
+                />
+                <span className="w-px h-3 bg-border" aria-hidden="true" />
+              </>
+            )}
             <span>Ren'Py</span>
             <span className="w-px h-3 bg-border" aria-hidden="true" />
             <span>UTF-8</span>

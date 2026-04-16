@@ -351,9 +351,7 @@ export function ScriptMode({
       projectName={projectName}
       gitlabBranch={gitlabBranch}
       fileSourceType={primaryFileSourceType}
-      saveStatus={activeProjectFile ? fileSaveStatus : undefined}
-      saveConflict={activeProjectFile ? hasSaveConflict : undefined}
-      onSaveRequest={activeProjectFile ? retryFileSave : undefined}
+      isFocusMode={isFocusMode}
     />
   );
 
@@ -421,6 +419,9 @@ export function ScriptMode({
         canRedo={canRedo}
         onUndo={undo}
         onRedo={redo}
+        saveStatus={activeProjectFile ? fileSaveStatus : undefined}
+        saveConflict={activeProjectFile ? hasSaveConflict : undefined}
+        onSaveRequest={activeProjectFile ? retryFileSave : undefined}
       />
 
       {statusBar}
