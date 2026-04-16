@@ -212,7 +212,7 @@ export function GitLabSettingsContent() {
     const linkedProjectsList: LinkedProjectDisplay[] = Array.from(
       linkedRepositories.values()
     ).map((repo) => ({
-      id: repo.id,
+      id: repo.projectId,
       name:
         projectMap.get(repo.projectId) ||
         `Unknown Project (${repo.projectId.substring(0, 8)})`,
