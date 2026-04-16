@@ -709,6 +709,8 @@ export const ProseEditor = forwardRef<ProseEditorRef, ProseEditorProps>(
             }}
             onMouseEnter={() => setIsBottomBarHovered(true)}
             onMouseLeave={() => setIsBottomBarHovered(false)}
+            onFocusCapture={() => setIsBottomBarHovered(true)}
+            onBlurCapture={() => setIsBottomBarHovered(false)}
           >
             <WritingGoalPill
               current={todayWordCount}
@@ -726,6 +728,8 @@ export const ProseEditor = forwardRef<ProseEditorRef, ProseEditorProps>(
           }}
           onMouseEnter={() => setIsBottomBarHovered(true)}
           onMouseLeave={() => setIsBottomBarHovered(false)}
+          onFocusCapture={() => setIsBottomBarHovered(true)}
+          onBlurCapture={() => setIsBottomBarHovered(false)}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4 text-sm">

@@ -360,6 +360,8 @@ export const ScriptEditor = forwardRef<ScriptEditorRef, ScriptEditorProps>(
           }}
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
+          onFocusCapture={() => setIsHovered(true)}
+          onBlurCapture={() => setIsHovered(false)}
         >
           <div className="flex items-center gap-2">
             <FontSizeSwitcher mode="script" direction="up" />
