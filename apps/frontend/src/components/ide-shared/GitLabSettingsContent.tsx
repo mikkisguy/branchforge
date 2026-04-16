@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { InlineMessage } from "@/components/ui/inline-error";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { SettingsSection } from "@/components/ide-shared/SettingsLayout";
 import { useGitLab } from "@/hooks/useGitLab";
 import { useProject } from "@/hooks/useProject";
 import { useToast } from "@/contexts/ToastContext";
@@ -231,14 +232,8 @@ export function GitLabSettingsContent() {
   // ============================================================================
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-medium">GitLab Integration</h3>
-        <p className="text-sm text-muted-foreground mt-1">
-          Connect your GitLab account to enable repository linking and sync
-          operations.
-        </p>
-      </div>
+    <div className="space-y-4">
+      <h3 className="text-lg font-medium">GitLab Integration</h3>
 
       {isLoadingIntegration ? (
         <div className="flex items-center justify-center py-8">
@@ -246,13 +241,13 @@ export function GitLabSettingsContent() {
         </div>
       ) : hasIntegration ? (
         // Has integration - show linked projects and remove option
-        <div className="space-y-4">
-          <div className="p-4 bg-muted/30 rounded-md border border-border/30">
-            <div className="flex items-center justify-between">
+        <div className="space-y-3">
+          <SettingsSection title="Connection">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-medium">GitLab Connected</p>
+                <p className="text-sm font-medium">GitLab connected</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Your GitLab account is linked and ready to use.
+                  Your integration is active.
                 </p>
               </div>
               <Button
@@ -269,164 +264,171 @@ export function GitLabSettingsContent() {
                 <span className="ml-2">Remove</span>
               </Button>
             </div>
-          </div>
+          </SettingsSection>
 
-          {/* Linked Projects */}
-          {linkedProjects.length > 0 ? (
-            <div className="space-y-2">
-              <Label>Linked Projects</Label>
-              {linkedProjects.map((project) => (
-                <div
-                  key={project.id}
-                  className="p-3 bg-muted/20 rounded-md border border-border/30 flex items-center justify-between"
-                >
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{project.name}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {project.gitlabRepository} · {project.defaultBranch}
-                    </p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleUnlink(project.id)}
-                    disabled={unlinkingProjectId === project.id}
+          <SettingsSection title="Linked Projects">
+            {linkedProjects.length > 0 ? (
+              <div className="space-y-3">
+                {linkedProjects.map((project) => (
+                  <div
+                    key={project.id}
+                    className="p-3 bg-muted/20 rounded-md border border-border/30 flex items-center justify-between"
                   >
-                    {unlinkingProjectId === project.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-4 h-4" />
-                    )}
-                  </Button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <p className="text-sm">No linked projects yet</p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4"
-                onClick={() => setShowLinkDialog(true)}
-              >
-                <LinkIcon className="w-4 h-4 mr-2" />
-                Link Project
-              </Button>
-            </div>
-          )}
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{project.name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {project.gitlabRepository} · {project.defaultBranch}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleUnlink(project.id)}
+                      disabled={unlinkingProjectId === project.id}
+                    >
+                      {unlinkingProjectId === project.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </Button>
+                  </div>
+                ))}
 
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => setShowLinkDialog(true)}
-          >
-            <LinkIcon className="w-4 h-4 mr-2" />
-            Link New Project
-          </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setShowLinkDialog(true)}
+                >
+                  <LinkIcon className="w-4 h-4 mr-2" />
+                  Link New Project
+                </Button>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <p className="text-sm">No linked projects yet</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4"
+                  onClick={() => setShowLinkDialog(true)}
+                >
+                  <LinkIcon className="w-4 h-4 mr-2" />
+                  Link Project
+                </Button>
+              </div>
+            )}
+          </SettingsSection>
         </div>
       ) : (
         // No integration - show token input form
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="gitlab-url">GitLab URL</Label>
-            <Input
-              id="gitlab-url"
-              type="url"
-              placeholder="https://gitlab.com"
-              value={gitlabUrl}
-              onChange={(e) => setGitlabUrl(e.target.value)}
-              disabled={isStoring}
-            />
-            <p className="text-xs text-muted-foreground">
-              Leave as default for gitlab.com, or enter your self-hosted
-              instance URL.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="token">Personal Access Token</Label>
-            <div className="relative">
+        <div className="space-y-3">
+          <SettingsSection title="Connection">
+            <div className="space-y-2">
+              <Label htmlFor="gitlab-url">GitLab URL</Label>
               <Input
-                id="token"
-                type={showToken ? "text" : "password"}
-                placeholder="glpat-example-token-replace-with-real-one"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
+                id="gitlab-url"
+                type="url"
+                placeholder="https://gitlab.com"
+                value={gitlabUrl}
+                onChange={(e) => setGitlabUrl(e.target.value)}
                 disabled={isStoring}
-                className="pr-10"
               />
-              <button
-                type="button"
-                onClick={() => setShowToken(!showToken)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {showToken ? (
-                  <EyeOff className="w-4 h-4" />
-                ) : (
-                  <Eye className="w-4 h-4" />
-                )}
-              </button>
+              <p className="text-xs text-muted-foreground">
+                Leave default for gitlab.com or provide your self-hosted URL.
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Create a token in GitLab with{" "}
-              <code className="bg-muted px-1 py-0.5 rounded">read_api</code>,{" "}
-              <code className="bg-muted px-1 py-0.5 rounded">
-                read_repository
-              </code>
-              , and{" "}
-              <code className="bg-muted px-1 py-0.5 rounded">
-                write_repository
-              </code>{" "}
-              scopes. Will be stored securely and only used to access your
-              repositories.
-            </p>
-          </div>
+          </SettingsSection>
 
-          {validationResult && (
-            <InlineMessage
-              variant={validationResult.valid ? "success" : "error"}
-            >
-              {validationResult.valid
-                ? `Validated for ${validationResult.username || "user"}`
-                : "Invalid token"}
-            </InlineMessage>
-          )}
+          <SettingsSection title="Access Token">
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="token">Personal Access Token</Label>
+                <div className="relative">
+                  <Input
+                    id="token"
+                    type={showToken ? "text" : "password"}
+                    placeholder="glpat-example-token-replace-with-real-one"
+                    value={token}
+                    onChange={(e) => setToken(e.target.value)}
+                    disabled={isStoring}
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowToken(!showToken)}
+                    className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showToken ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Required scopes:{" "}
+                  <code className="bg-muted px-1 py-0.5 rounded">read_api</code>
+                  ,{" "}
+                  <code className="bg-muted px-1 py-0.5 rounded">
+                    read_repository
+                  </code>
+                  , and{" "}
+                  <code className="bg-muted px-1 py-0.5 rounded">
+                    write_repository
+                  </code>
+                  .
+                </p>
+              </div>
 
-          {integrationError && (
-            <InlineMessage variant="error">
-              {integrationError.message || String(integrationError)}
-            </InlineMessage>
-          )}
+              {validationResult && (
+                <InlineMessage
+                  variant={validationResult.valid ? "success" : "error"}
+                >
+                  {validationResult.valid
+                    ? `Validated for ${validationResult.username || "user"}`
+                    : "Invalid token"}
+                </InlineMessage>
+              )}
 
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={handleValidate}
-              disabled={!token.trim() || isValidating || isStoring}
-              className="flex-1"
-            >
-              {isValidating ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              ) : null}
-              Validate
-            </Button>
-            <Button
-              onClick={handleStore}
-              disabled={
-                !token.trim() ||
-                validationResult?.valid !== true ||
-                isStoring ||
-                isValidating
-              }
-              className="flex-1"
-            >
-              {isStoring ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              ) : null}
-              Save Integration
-            </Button>
-          </div>
+              {integrationError && (
+                <InlineMessage variant="error">
+                  {integrationError.message || String(integrationError)}
+                </InlineMessage>
+              )}
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleValidate}
+                  disabled={!token.trim() || isValidating || isStoring}
+                  className="flex-1"
+                >
+                  {isValidating ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : null}
+                  Validate
+                </Button>
+                <Button
+                  onClick={handleStore}
+                  disabled={
+                    !token.trim() ||
+                    validationResult?.valid !== true ||
+                    isStoring ||
+                    isValidating
+                  }
+                  className="flex-1"
+                >
+                  {isStoring ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : null}
+                  Save Integration
+                </Button>
+              </div>
+            </div>
+          </SettingsSection>
         </div>
       )}
 

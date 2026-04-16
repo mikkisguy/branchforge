@@ -10,7 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useWritingGoals } from "@/hooks/useWritingGoals";
 import { useToast } from "@/contexts/ToastContext";
-import { Target, Clock, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
+import { Button } from "../ui/button";
 
 // Writing goal constraints
 const MIN_GOAL = 1;
@@ -128,7 +129,6 @@ export function WritingGoalSettings() {
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
-              <Target className="w-4 h-4 text-muted-foreground" />
               <label className="text-sm font-medium">Daily Writing Goal</label>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -174,7 +174,6 @@ export function WritingGoalSettings() {
             {/* Reset Hour Select */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-muted-foreground" />
                 <label
                   htmlFor="reset-hour-select"
                   className="text-sm text-muted-foreground"
@@ -217,22 +216,18 @@ export function WritingGoalSettings() {
       )}
 
       {/* Reset Stats Button */}
-      {(isEnabled ||
-        (settings?.dailyWordCounts && settings.dailyWordCounts.length > 0)) && (
-        <div className="pt-2 border-t border-border">
-          <button
+      {isEnabled &&
+        settings?.dailyWordCounts &&
+        settings.dailyWordCounts.length > 0 && (
+          <Button
+            variant="outline"
             onClick={handleResetStats}
-            disabled={isDisabled}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full"
           >
             <RotateCcw className="w-4 h-4" />
             <span>Clear recent word count history</span>
-          </button>
-          <p className="text-xs text-muted-foreground mt-1">
-            Clear your word count history from the last 7 days
-          </p>
-        </div>
-      )}
+          </Button>
+        )}
 
       {/* Reset Confirmation Dialog */}
       <ConfirmDialog
