@@ -1,7 +1,13 @@
 /**
  * UndoRedoControls Component
  *
- * Undo/redo buttons with keyboard shortcuts (Ctrl+Z / Ctrl+Y).
+ * Undo/redo buttons with keyboard shortcuts.
+ *
+ * Shortcuts:
+ * - Undo: Ctrl+Z (Windows/Linux) or Cmd+Z (macOS)
+ * - Redo: Ctrl+Y or Ctrl+Shift+Z (Windows/Linux)
+ *         Cmd+Y or Cmd+Shift+Z (macOS)
+ *
  * Uses local in-memory undo only for instant response.
  */
 
