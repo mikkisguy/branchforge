@@ -15,8 +15,8 @@ const panelVariants = cva(
   {
     variants: {
       collapsed: {
-        true: "w-0",
-        false: "w-56",
+        true: "w-0 opacity-0 translate-x-full pointer-events-none",
+        false: "w-56 opacity-100 translate-x-0",
       },
     },
   }
@@ -60,13 +60,7 @@ export function CharacterReferencePanel({
   return (
     <>
       <div className={panelVariants({ collapsed: isCollapsed })}>
-        <div
-          className={`h-full overflow-y-auto relative transition-all duration-300 ease-out ${
-            isCollapsed
-              ? "opacity-0 translate-x-full pointer-events-none"
-              : "opacity-100 translate-x-0"
-          }`}
-        >
+        <div className="h-full overflow-y-auto relative">
           <div className="sticky top-0 z-20 bg-card border-b border-border px-4 py-3">
             {onCollapseToggle && (
               <button
