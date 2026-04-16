@@ -91,6 +91,8 @@ export function StatusBar({
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        onFocusCapture={() => setIsHovered(true)}
+        onBlurCapture={() => setIsHovered(false)}
       >
         <div className="flex items-center gap-4">
           <div className="text-muted-foreground border-r border-border/30 pr-4">

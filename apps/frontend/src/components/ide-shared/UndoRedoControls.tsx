@@ -34,7 +34,7 @@ export function UndoRedoControls({
       }
 
       // Ctrl+Z for undo
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "z") {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyZ") {
         e.preventDefault();
         if (canUndo) {
           onUndo();
@@ -44,7 +44,8 @@ export function UndoRedoControls({
       // Ctrl+Y or Ctrl+Shift+Z for redo
       if (
         (e.ctrlKey || e.metaKey) &&
-        ((!e.shiftKey && e.key === "y") || (e.shiftKey && e.key === "z"))
+        ((!e.shiftKey && e.code === "KeyY") ||
+          (e.shiftKey && e.code === "KeyZ"))
       ) {
         e.preventDefault();
         if (canRedo) {

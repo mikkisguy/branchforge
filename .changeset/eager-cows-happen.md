@@ -2,4 +2,4 @@
 "@branchforge/frontend": patch
 ---
 
-Added undo/redo function to script editor
+Added undo/redo functionality to the script editor

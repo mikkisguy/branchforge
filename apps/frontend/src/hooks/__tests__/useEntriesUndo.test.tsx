@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { useEntriesUndo } from "../useEntriesUndo";
+import { useEntriesUndo } from "@/hooks/useEntriesUndo";
 import type { DialogueEntry } from "@/lib/prose-types";
 
 const entriesA: DialogueEntry[] = [

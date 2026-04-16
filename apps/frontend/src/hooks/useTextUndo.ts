@@ -112,7 +112,7 @@ export function useTextUndo(
 
   const clear = useCallback(
     (initialContent?: string) => {
-      const nextPresent = initialContent ?? content;
+      const nextPresent = initialContent ?? stateRef.current.present;
 
       commitState({
         past: [],
@@ -121,13 +121,13 @@ export function useTextUndo(
       });
       lastSyncedContentRef.current = nextPresent;
     },
-    [commitState, content]
+    [commitState]
   );
 
   useEffect(() => {
     if (content !== lastSyncedContentRef.current) {
       const nextState: UndoState = {
-        ...stateRef.current,
+        past: [],
         present: content,
         future: [],
       };

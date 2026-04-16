@@ -230,12 +230,7 @@ export function ScriptMode({
 
     (async () => {
       const success = await switchToFile(activeProjectFile);
-      if (success) {
-        pendingUndoClearRef.current = {
-          fileId: activeProjectFile.id,
-          content: activeProjectFile.content || "",
-        };
-      } else if (previousEditFileIdRef.current) {
+      if (!success && previousEditFileIdRef.current) {
         void selectFileTab(previousEditFileIdRef.current, { notify: false });
       }
     })();
@@ -280,23 +275,13 @@ export function ScriptMode({
   );
 
   const previousUndoFileIdRef = useRef<string | null>(activeFileId);
-  const pendingUndoClearRef = useRef<{
-    fileId: string;
-    content: string;
-  } | null>(null);
 
   useEffect(() => {
-    const pending = pendingUndoClearRef.current;
-    if (pending) {
-      if (previousUndoFileIdRef.current !== pending.fileId) {
-        previousUndoFileIdRef.current = pending.fileId;
-        clear(pending.content);
-      }
-      requestAnimationFrame(() => {
-        pendingUndoClearRef.current = null;
-      });
+    if (activeFileId && previousUndoFileIdRef.current !== activeFileId) {
+      previousUndoFileIdRef.current = activeFileId;
+      clear(activeFileContent);
     }
-  }, [activeFileContent, activeFileId, clear]);
+  }, [activeFileId, activeFileContent, clear]);
 
   const handleGitLabFileSelect = useCallback(
     (fileId: string) => {
