@@ -63,10 +63,10 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   }, [activeTab, user?.role]);
 
   // Sync derived state during render: adjustedActiveTab is computed from visibleTabs,
-  // activeTab, and currentProject. If the active tab becomes invalid (e.g., user loses
-  // project access), we must sync immediately to avoid a flash/stale UI that useEffect
-  // would cause. The condition (adjustedActiveTab !== activeTab) becomes false after
-  // setActiveTab updates state, preventing render loops.
+  // activeTab, and user?.role. If the active tab becomes invalid (e.g., user loses OWNER
+  // role), we must sync immediately to avoid a flash/stale UI that useEffect would cause.
+  // The condition (adjustedActiveTab !== activeTab) becomes false after setActiveTab
+  // updates state, preventing render loops.
   if (adjustedActiveTab !== activeTab) {
     setActiveTab(adjustedActiveTab);
   }
