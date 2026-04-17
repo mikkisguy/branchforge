@@ -15,7 +15,7 @@ const panelVariants = cva(
   {
     variants: {
       collapsed: {
-        true: "w-56 opacity-0 translate-x-full pointer-events-none",
+        true: "w-0 opacity-0 translate-x-full pointer-events-none",
         false: "w-56 opacity-100 translate-x-0",
       },
     },

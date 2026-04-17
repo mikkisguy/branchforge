@@ -163,10 +163,14 @@ export function useGitLab(): UseGitLabReturn {
 
   // Refresh integration method
   const handleRefreshIntegration = async () => {
-    await queryClient.invalidateQueries({ queryKey: gitlabKeys.integration() });
-    await queryClient.invalidateQueries({
-      queryKey: gitlabKeys.repositories(),
-    });
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: gitlabKeys.integration(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: gitlabKeys.repositories(),
+      }),
+    ]);
   };
 
   return {

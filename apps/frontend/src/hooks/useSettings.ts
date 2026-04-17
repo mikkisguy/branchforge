@@ -37,7 +37,7 @@ export function useSettings(): UseSettingsReturn {
   const toast = useToast();
 
   // Get current user from auth query cache
-  const user = queryClient.getQueryData<PublicUser>(authKeys.user()) ?? null;
+  const user = queryClient.getQueryData<PublicUser | null>(authKeys.user());
 
   // Query for sign-ups status
   const { data: signUpStatus, isLoading } = useQuery({

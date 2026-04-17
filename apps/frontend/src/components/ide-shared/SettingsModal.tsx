@@ -77,6 +77,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
         <DialogHeader className="p-6 pb-4 flex-row items-center justify-between border-b border-border/30">
           <DialogTitle>Settings</DialogTitle>
           <Button
+            type="button"
             variant="ghost"
             size="icon"
             onClick={() => onOpenChange(false)}

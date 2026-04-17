@@ -220,9 +220,11 @@ export function WritingGoalSettings() {
         settings?.dailyWordCounts &&
         settings.dailyWordCounts.length > 0 && (
           <Button
+            type="button"
             variant="outline"
             onClick={handleResetStats}
             className="w-full"
+            disabled={isDisabled}
           >
             <RotateCcw className="w-4 h-4" />
             <span>Clear recent word count history</span>
