@@ -67,7 +67,6 @@ export function useGitLab(): UseGitLabReturn {
     data: integration,
     isLoading: isLoadingIntegration,
     error: integrationError,
-    refetch: refreshIntegration,
   } = useQuery({
     queryKey: gitlabKeys.integration(),
     queryFn: async () => {
@@ -164,7 +163,14 @@ export function useGitLab(): UseGitLabReturn {
 
   // Refresh integration method
   const handleRefreshIntegration = async () => {
-    await refreshIntegration();
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: gitlabKeys.integration(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: gitlabKeys.repositories(),
+      }),
+    ]);
   };
 
   return {

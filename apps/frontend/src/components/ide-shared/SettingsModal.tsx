@@ -7,9 +7,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useSettings } from "@/hooks/useSettings";
 import { GitLabSettingsContent } from "@/components/ide-shared/GitLabSettingsContent";
+import {
+  SettingsRow,
+  SettingsSection,
+} from "@/components/ide-shared/SettingsLayout";
 import { WritingGoalSettings } from "@/components/write-mode/WritingGoalSettings";
 import { cn } from "@/lib/utils";
 import { APP_NAME, APP_VERSION } from "@/lib/version";
@@ -58,10 +63,10 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   }, [activeTab, user?.role]);
 
   // Sync derived state during render: adjustedActiveTab is computed from visibleTabs,
-  // activeTab, and currentProject. If the active tab becomes invalid (e.g., user loses
-  // project access), we must sync immediately to avoid a flash/stale UI that useEffect
-  // would cause. The condition (adjustedActiveTab !== activeTab) becomes false after
-  // setActiveTab updates state, preventing render loops.
+  // activeTab, and user?.role. If the active tab becomes invalid (e.g., user loses OWNER
+  // role), we must sync immediately to avoid a flash/stale UI that useEffect would cause.
+  // The condition (adjustedActiveTab !== activeTab) becomes false after setActiveTab
+  // updates state, preventing render loops.
   if (adjustedActiveTab !== activeTab) {
     setActiveTab(adjustedActiveTab);
   }
@@ -71,12 +76,15 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
       <DialogContent className="w-[700px] max-w-[95vw] p-0 gap-0">
         <DialogHeader className="p-6 pb-4 flex-row items-center justify-between border-b border-border/30">
           <DialogTitle>Settings</DialogTitle>
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
             onClick={() => onOpenChange(false)}
-            className="text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Close settings"
           >
             <X className="w-5 h-5" />
-          </button>
+          </Button>
         </DialogHeader>
 
         <div className="flex h-[650px]">
@@ -110,22 +118,23 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
           {/* Tab Content */}
           <div className="flex-1 overflow-y-auto p-6">
             {activeTab === "user" && (
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">User Information</h3>
-                  <div className="space-y-2">
-                    <label className="text-sm text-muted-foreground">
-                      Email
-                    </label>
-                    <p className="text-sm font-mono bg-muted/50 px-3 py-2 rounded-md">
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">User Settings</h3>
+
+                <SettingsSection title="Account">
+                  <SettingsRow
+                    label="Email address"
+                    description="Used for sign in and account identification"
+                  >
+                    <p className="max-w-[22rem] break-all rounded-md border border-border/50 bg-background/80 px-3 py-2 text-xs font-mono">
                       {user?.email || "Not available"}
                     </p>
-                  </div>
-                </div>
+                  </SettingsRow>
+                </SettingsSection>
 
-                <hr className="border-border/30" />
-
-                <WritingGoalSettings />
+                <SettingsSection title="Writing Goals">
+                  <WritingGoalSettings />
+                </SettingsSection>
               </div>
             )}
 
@@ -134,23 +143,19 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             {activeTab === "system" && (
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">System Administration</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <label className="text-sm font-medium">
-                        Sign ups enabled
-                      </label>
-                      <p className="text-xs text-muted-foreground">
-                        Allow new users to register
-                      </p>
-                    </div>
+
+                <SettingsSection title="User Registration">
+                  <SettingsRow
+                    label="Sign ups enabled"
+                    description="Allow new users to register"
+                  >
                     <Switch
                       checked={signUpsEnabled}
                       onCheckedChange={updateSignUpsSetting}
                       disabled={settingsLoading || isSaving}
                     />
-                  </div>
-                </div>
+                  </SettingsRow>
+                </SettingsSection>
               </div>
             )}
           </div>

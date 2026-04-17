@@ -135,6 +135,18 @@ function validateRequired(value: string, fieldName: string): void {
 // API Request Handler
 // ============================================================================
 
+function buildHeaders(options: RequestInit): Record<string, string> {
+  const h = new Headers(options.headers);
+  const headers: Record<string, string> = {};
+  h.forEach((value, key) => {
+    headers[key] = value;
+  });
+  if (options.body && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
+  return headers;
+}
+
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -143,10 +155,7 @@ async function request<T>(
   const response = await fetch(url, {
     ...options,
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
+    headers: buildHeaders(options),
   });
 
   if (!response.ok) {
@@ -160,7 +169,6 @@ async function request<T>(
     );
   }
 
-  // Handle 204 No Content responses (empty body)
   if (response.status === 204) {
     return undefined as T;
   }
@@ -168,9 +176,6 @@ async function request<T>(
   return response.json();
 }
 
-/**
- * Request handler for operations that return no content (204 No Content)
- */
 async function requestNoContent(
   endpoint: string,
   options: RequestInit = {}
@@ -179,10 +184,7 @@ async function requestNoContent(
   const response = await fetch(url, {
     ...options,
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
+    headers: buildHeaders(options),
   });
 
   if (!response.ok) {
@@ -195,8 +197,6 @@ async function requestNoContent(
       payload
     );
   }
-
-  // Expecting 204 No Content, but don't enforce it (some APIs may return 200 with empty body)
 }
 
 // ============================================================================

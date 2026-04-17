@@ -732,21 +732,7 @@ export const ProseEditor = forwardRef<ProseEditorRef, ProseEditorProps>(
           onBlurCapture={() => setIsBottomBarHovered(false)}
         >
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4 text-sm">
-              <span className="text-muted-foreground">
-                <span className="text-foreground font-medium">{wordCount}</span>{" "}
-                word{wordCount !== 1 ? "s" : ""}
-              </span>
-              <span className="w-px h-4 bg-border" />
-              <span className="text-muted-foreground">
-                <span className="text-foreground font-medium">{lineCount}</span>{" "}
-                line{lineCount !== 1 ? "s" : ""}
-              </span>
-            </div>
-
             <div className="flex items-center gap-4">
-              <FontFamilySwitcher direction="up" />
-              <FontSizeSwitcher mode="write" direction="up" />
               <button
                 onClick={() =>
                   setLayoutMode((prev) =>
@@ -758,6 +744,20 @@ export const ProseEditor = forwardRef<ProseEditorRef, ProseEditorProps>(
               >
                 {layoutMode === "inline" ? "Inline" : "Stacked"}
               </button>
+              <FontFamilySwitcher direction="up" />
+              <FontSizeSwitcher mode="write" direction="up" />
+            </div>
+
+            <div className="flex items-center gap-4 text-sm">
+              <span className="text-muted-foreground">
+                <span className="text-foreground font-medium">{wordCount}</span>{" "}
+                word{wordCount !== 1 ? "s" : ""}
+              </span>
+              <span className="w-px h-4 bg-border" />
+              <span className="text-muted-foreground">
+                <span className="text-foreground font-medium">{lineCount}</span>{" "}
+                line{lineCount !== 1 ? "s" : ""}
+              </span>
             </div>
           </div>
         </div>

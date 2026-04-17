@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { useSettings } from "../useSettings";
 import { settingsApi } from "@/lib/api/settings";
-import { settingsKeys } from "@/lib/query-keys";
+import { authKeys, settingsKeys } from "@/lib/query-keys";
 import type { PublicUser } from "@/lib/api/auth";
 import { createTestQueryClient } from "@/test/query-client";
 
@@ -112,7 +112,6 @@ describe("useSettings", () => {
 
   describe("Optimistic Update Pattern", () => {
     it("should optimistically update sign-ups setting", async () => {
-      // Set up initial state and user with OWNER role
       vi.mocked(settingsApi.getSignUpStatus).mockResolvedValue({
         enabled: false,
       });
@@ -126,13 +125,12 @@ describe("useSettings", () => {
           )
       );
 
-      // Set a user with OWNER role in cache
       const mockUser: PublicUser = {
         id: "user-1",
         email: "admin@example.com",
         role: "OWNER",
       };
-      queryClient.setQueryData(["auth", "user"], { user: mockUser });
+      queryClient.setQueryData(authKeys.user(), mockUser);
 
       const { result } = renderHook(() => useSettings(), { wrapper });
 
@@ -140,15 +138,12 @@ describe("useSettings", () => {
         expect(result.current.signUpsEnabled).toBe(false);
       });
 
-      // Start the mutation
       const mutationPromise = result.current.updateSignUpsSetting(true);
 
-      // The optimistic update should have happened - check the hook state
       await waitFor(() => {
         expect(result.current.signUpsEnabled).toBe(true);
       });
 
-      // Wait for mutation to complete
       await mutationPromise;
     });
 
@@ -164,7 +159,7 @@ describe("useSettings", () => {
         email: "admin@example.com",
         role: "OWNER",
       };
-      queryClient.setQueryData(["auth", "user"], { user: mockUser });
+      queryClient.setQueryData(authKeys.user(), mockUser);
 
       const { result } = renderHook(() => useSettings(), { wrapper });
 
@@ -172,12 +167,10 @@ describe("useSettings", () => {
         expect(result.current.signUpsEnabled).toBe(false);
       });
 
-      // Try to update - should fail
       await expect(result.current.updateSignUpsSetting(true)).rejects.toThrow(
         "Update failed"
       );
 
-      // Verify rollback happened - cache should be restored to original value
       await waitFor(() => {
         const cachedData = queryClient.getQueryData<boolean>(
           settingsKeys.signUps()
@@ -185,7 +178,6 @@ describe("useSettings", () => {
         expect(cachedData).toBe(false);
       });
 
-      // Verify error toast was shown
       expect(mockToastError).toHaveBeenCalledWith(
         "Failed to update setting. The original value has been restored.",
         "Error"
@@ -207,7 +199,7 @@ describe("useSettings", () => {
         email: "admin@example.com",
         role: "OWNER",
       };
-      queryClient.setQueryData(["auth", "user"], { user: mockUser });
+      queryClient.setQueryData(authKeys.user(), mockUser);
 
       const { result } = renderHook(() => useSettings(), { wrapper });
 
@@ -241,7 +233,7 @@ describe("useSettings", () => {
         email: "admin@example.com",
         role: "OWNER",
       };
-      queryClient.setQueryData(["auth", "user"], { user: mockUser });
+      queryClient.setQueryData(authKeys.user(), mockUser);
 
       const { result } = renderHook(() => useSettings(), { wrapper });
 
@@ -262,7 +254,7 @@ describe("useSettings", () => {
     it("should invalidate queries after update settles", async () => {
       vi.mocked(settingsApi.getSignUpStatus)
         .mockResolvedValueOnce({ enabled: false })
-        .mockResolvedValueOnce({ enabled: true }); // After invalidation
+        .mockResolvedValueOnce({ enabled: true });
       vi.mocked(settingsApi.updateSetting).mockResolvedValue({
         key: "sign_ups_enabled",
         value: true,
@@ -273,7 +265,7 @@ describe("useSettings", () => {
         email: "admin@example.com",
         role: "OWNER",
       };
-      queryClient.setQueryData(["auth", "user"], { user: mockUser });
+      queryClient.setQueryData(authKeys.user(), mockUser);
 
       const { result } = renderHook(() => useSettings(), { wrapper });
 
@@ -283,7 +275,6 @@ describe("useSettings", () => {
 
       await result.current.updateSignUpsSetting(true);
 
-      // Wait for invalidation to trigger refetch
       await waitFor(() => {
         expect(settingsApi.getSignUpStatus).toHaveBeenCalledTimes(2);
       });
@@ -302,7 +293,7 @@ describe("useSettings", () => {
         email: "user@example.com",
         role: "READER",
       };
-      queryClient.setQueryData(["auth", "user"], { user: mockUser });
+      queryClient.setQueryData(authKeys.user(), mockUser);
 
       const { result } = renderHook(() => useSettings(), { wrapper });
 
@@ -325,7 +316,7 @@ describe("useSettings", () => {
       });
 
       // No user in cache
-      queryClient.setQueryData(["auth", "user"], null);
+      queryClient.setQueryData(authKeys.user(), null);
 
       const { result } = renderHook(() => useSettings(), { wrapper });
 
@@ -360,7 +351,7 @@ describe("useSettings", () => {
         email: "admin@example.com",
         role: "OWNER",
       };
-      queryClient.setQueryData(["auth", "user"], { user: mockUser });
+      queryClient.setQueryData(authKeys.user(), mockUser);
 
       const { result } = renderHook(() => useSettings(), { wrapper });
 
