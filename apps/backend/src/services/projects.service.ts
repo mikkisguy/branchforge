@@ -6,7 +6,7 @@
 
 import { getDb } from "../db/index.js";
 import { projects, projectUsers } from "../db/schema/index.js";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import type { NewProject } from "../db/schema/tables/projects.js";
 import type { UserRole } from "@branchforge/shared";
 import { NotFoundError } from "../middleware/error-handler.middleware.js";
@@ -89,7 +89,7 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
   const userProjects = await db
     .select()
     .from(projects)
-    .where(and(eq(projects.userId, userId), isNull(projects.deletedAt)))
+    .where(eq(projects.userId, userId))
     .orderBy(projects.createdAt);
 
   // Get projects shared with the user via project_users junction table
@@ -106,7 +106,7 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
     })
     .from(projects)
     .innerJoin(projectUsers, eq(projectUsers.projectId, projects.id))
-    .where(and(eq(projectUsers.userId, userId), isNull(projects.deletedAt)))
+    .where(eq(projectUsers.userId, userId))
     .orderBy(projects.createdAt)) as SharedProjectRow[];
 
   // Combine both lists, removing duplicates
@@ -158,13 +158,7 @@ export async function getProject(
       updatedAt: projects.updatedAt,
     })
     .from(projects)
-    .where(
-      and(
-        eq(projects.id, projectId),
-        eq(projects.userId, userId),
-        isNull(projects.deletedAt)
-      )
-    )
+    .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
     .limit(1);
 
   if (ownerProject.length > 0) {
@@ -184,13 +178,7 @@ export async function getProject(
     })
     .from(projects)
     .innerJoin(projectUsers, eq(projectUsers.projectId, projects.id))
-    .where(
-      and(
-        eq(projects.id, projectId),
-        eq(projectUsers.userId, userId),
-        isNull(projects.deletedAt)
-      )
-    )
+    .where(and(eq(projects.id, projectId), eq(projectUsers.userId, userId)))
     .limit(1);
 
   if (sharedProject.length > 0) {
@@ -263,13 +251,7 @@ export async function updateProject(
   const result = await db
     .update(projects)
     .set(updateData)
-    .where(
-      and(
-        eq(projects.id, projectId),
-        eq(projects.userId, userId),
-        isNull(projects.deletedAt)
-      )
-    )
+    .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
     .returning();
 
   if (!result || result.length === 0 || !result[0]) {
