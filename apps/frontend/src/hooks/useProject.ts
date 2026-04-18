@@ -72,6 +72,11 @@ export interface UseProjectReturn {
   refreshProjects: () => Promise<void>;
   setCurrentProject: (project: Project | null) => void;
   createProject: (name: string) => Promise<Project>;
+  updateProject: (
+    projectId: string,
+    body: { name?: string; description?: string }
+  ) => Promise<Project>;
+  deleteProject: (projectId: string) => Promise<void>;
 }
 
 // ============================================================================
@@ -173,6 +178,62 @@ export function useProject(): UseProjectReturn {
     return createProjectMutation.mutateAsync(name);
   };
 
+  // Update project mutation
+  const updateProjectMutation = useMutation({
+    mutationFn: async ({
+      projectId,
+      body,
+    }: {
+      projectId: string;
+      body: { name?: string; description?: string };
+    }) => {
+      return projectsApi.updateProject(projectId, body);
+    },
+    onSuccess: async (updatedProject) => {
+      // Invalidate and refetch projects list
+      await queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+
+      // Update the specific project in the cache
+      queryClient.setQueryData(
+        projectKeys.detail(updatedProject.id),
+        updatedProject
+      );
+    },
+  });
+
+  // Delete project mutation
+  const deleteProjectMutation = useMutation({
+    mutationFn: async (projectId: string) => {
+      return projectsApi.deleteProject(projectId);
+    },
+    onSuccess: async (_data, variables) => {
+      // Invalidate and refetch projects list
+      await queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+
+      // If the deleted project was the current project, clear it and select next
+      const currentProjectId = queryClient.getQueryData<string | null>(
+        projectKeys.current()
+      );
+      if (currentProjectId === variables) {
+        persistCurrentProjectId(null);
+        queryClient.setQueryData(projectKeys.current(), null);
+      }
+    },
+  });
+
+  // Update project method
+  const updateProject = async (
+    projectId: string,
+    body: { name?: string; description?: string }
+  ): Promise<Project> => {
+    return updateProjectMutation.mutateAsync({ projectId, body });
+  };
+
+  // Delete project method
+  const deleteProject = async (projectId: string): Promise<void> => {
+    await deleteProjectMutation.mutateAsync(projectId);
+  };
+
   return {
     projects,
     currentProject,
@@ -181,5 +242,7 @@ export function useProject(): UseProjectReturn {
     refreshProjects,
     setCurrentProject,
     createProject,
+    updateProject,
+    deleteProject,
   };
 }

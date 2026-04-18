@@ -8,6 +8,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import Fastify from "fastify";
 import { projectsRoutes } from "../projects.routes.js";
 import * as projectsService from "../../services/projects.service.js";
+import {
+  NotFoundError,
+  ForbiddenError,
+} from "../../middleware/error-handler.middleware.js";
 
 const PROJECT_ID = "550e8400-e29b-41d4-a716-446655440000";
 
@@ -16,6 +20,8 @@ vi.mock("../../services/projects.service.js", () => ({
   listProjects: vi.fn(),
   getProject: vi.fn(),
   createProject: vi.fn(),
+  updateProject: vi.fn(),
+  deleteProject: vi.fn(),
 }));
 
 // Mock the authenticate middleware to attach a test user
@@ -174,6 +180,136 @@ describe("ProjectsRoutes", () => {
       expect(response.json()).toMatchObject({
         message: "Invalid request data",
       });
+    });
+  });
+
+  describe("PUT /projects/:projectId", () => {
+    it("should update project successfully", async () => {
+      const requestBody = {
+        name: "Updated Project",
+        description: "Updated description",
+      };
+
+      const mockProject = {
+        id: PROJECT_ID,
+        ...requestBody,
+        maxMeterDelta: 10,
+        visibility: "OWNER" as const,
+        createdAt: new Date("2024-01-01"),
+        updatedAt: new Date("2024-01-02"),
+      };
+
+      vi.mocked(projectsService.updateProject).mockResolvedValue(mockProject);
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/${PROJECT_ID}`,
+        payload: requestBody,
+      });
+
+      expect(response.statusCode).toBe(200);
+      const json = response.json();
+      expect(json.project.id).toBe(PROJECT_ID);
+      expect(json.project.name).toBe("Updated Project");
+      expect(json.project.description).toBe("Updated description");
+    });
+
+    it("should return 400 for invalid validation", async () => {
+      const requestBody = {
+        name: "",
+        description: "Too long description".repeat(100),
+      };
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/${PROJECT_ID}`,
+        payload: requestBody,
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        message: "Invalid request body",
+      });
+    });
+
+    it("should return 404 when project not found", async () => {
+      const requestBody = {
+        name: "Updated Project",
+      };
+
+      vi.mocked(projectsService.updateProject).mockRejectedValue(
+        new NotFoundError("Project")
+      );
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/${PROJECT_ID}`,
+        payload: requestBody,
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({ error: "Project not found" });
+    });
+
+    it("should return 403 for forbidden", async () => {
+      const requestBody = {
+        name: "Updated Project",
+      };
+
+      vi.mocked(projectsService.updateProject).mockRejectedValue(
+        new ForbiddenError("Insufficient permissions")
+      );
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/${PROJECT_ID}`,
+        payload: requestBody,
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({ error: "Insufficient permissions" });
+    });
+  });
+
+  describe("DELETE /projects/:projectId", () => {
+    it("should delete project successfully", async () => {
+      vi.mocked(projectsService.deleteProject).mockResolvedValue(undefined);
+
+      const response = await fastify.inject({
+        method: "DELETE",
+        url: `/projects/${PROJECT_ID}`,
+      });
+
+      expect(response.statusCode).toBe(204);
+      expect(response.body).toBe("");
+    });
+
+    it("should return 404 when project not found", async () => {
+      vi.mocked(projectsService.deleteProject).mockRejectedValue(
+        new NotFoundError("Project")
+      );
+
+      const response = await fastify.inject({
+        method: "DELETE",
+        url: `/projects/${PROJECT_ID}`,
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({ error: "Project not found" });
+    });
+
+    it("should return 403 for forbidden", async () => {
+      vi.mocked(projectsService.deleteProject).mockRejectedValue(
+        new ForbiddenError("Insufficient permissions")
+      );
+
+      const response = await fastify.inject({
+        method: "DELETE",
+        url: `/projects/${PROJECT_ID}`,
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({ error: "Insufficient permissions" });
     });
   });
 });

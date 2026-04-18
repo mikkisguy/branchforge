@@ -2,7 +2,10 @@ import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import {
   getProject,
   createProject,
+  updateProject,
+  deleteProject,
   type CreateProjectBody,
+  type UpdateProjectBody,
 } from "../projects.service.js";
 
 // Mock the database with a complete chain builder
@@ -26,16 +29,24 @@ const createMockChain = (resolveValue: any) => ({
 const createEmptyMockChain = () => createMockChain([]);
 const mockSelect = vi.fn(createEmptyMockChain);
 
-// Mock insert with flexible typing since we override it in tests
-const mockInsert = vi.fn().mockImplementation(() => ({
+const createInsertChain = (resolveValue: unknown[] = []) => ({
   values: vi.fn(() => ({
-    returning: vi.fn(() => Promise.resolve([])),
+    returning: vi.fn<() => Promise<unknown[]>>(() =>
+      Promise.resolve(resolveValue)
+    ),
   })),
-}));
+});
+
+// Mock insert with flexible typing since we override it in tests
+const mockInsert = vi.fn(createInsertChain);
+const mockUpdate = vi.fn();
+const mockDelete = vi.fn();
 
 const mockDb = {
   select: mockSelect,
   insert: mockInsert,
+  update: mockUpdate,
+  delete: mockDelete,
 };
 
 vi.mock("../../db/index.js", () => ({
@@ -121,11 +132,7 @@ describe("ProjectsService", () => {
 
   describe("createProject", () => {
     beforeEach(() => {
-      mockInsert.mockImplementation(() => ({
-        values: vi.fn(() => ({
-          returning: vi.fn(() => Promise.resolve([])),
-        })),
-      }));
+      mockInsert.mockImplementation(() => createInsertChain());
     });
 
     it("should create project with valid data", async () => {
@@ -136,11 +143,7 @@ describe("ProjectsService", () => {
       };
 
       const newProject = { ...mockProject, ...body, id: "new-project-id" };
-      mockInsert.mockImplementation(() => ({
-        values: vi.fn(() => ({
-          returning: vi.fn(() => Promise.resolve([newProject])),
-        })),
-      }));
+      mockInsert.mockImplementation(() => createInsertChain([newProject]));
 
       const project = await createProject(userId, body);
 
@@ -155,11 +158,7 @@ describe("ProjectsService", () => {
       };
 
       const newProject = { ...mockProject, ...body, maxMeterDelta: 10 };
-      mockInsert.mockImplementation(() => ({
-        values: vi.fn(() => ({
-          returning: vi.fn(() => Promise.resolve([newProject])),
-        })),
-      }));
+      mockInsert.mockImplementation(() => createInsertChain([newProject]));
 
       const project = await createProject(userId, body);
 
@@ -175,19 +174,167 @@ describe("ProjectsService", () => {
         ...mockProject,
         name: "Minimal Project",
         description: null,
-        routeLockChapter: null,
         maxMeterDelta: 10,
       };
-      mockInsert.mockImplementation(() => ({
-        values: vi.fn(() => ({
-          returning: vi.fn(() => Promise.resolve([newProject])),
-        })),
-      }));
+      mockInsert.mockImplementation(() => createInsertChain([newProject]));
 
       const project = await createProject(userId, body);
 
       expect(project.description).toBeUndefined();
-      expect(project.routeLockChapter).toBeUndefined();
+    });
+  });
+
+  describe("updateProject", () => {
+    const updateChain = {
+      set: vi.fn(() => ({
+        where: vi.fn(() => ({
+          returning: vi.fn<() => Promise<unknown[]>>(() => Promise.resolve([])),
+        })),
+      })),
+    };
+
+    beforeEach(() => {
+      mockUpdate.mockReturnValue(updateChain);
+    });
+
+    it("should update project name and description successfully", async () => {
+      const body: UpdateProjectBody = {
+        name: "Updated Project",
+        description: "Updated description",
+      };
+
+      const updatedProject = {
+        ...mockProject,
+        name: "Updated Project",
+        description: "Updated description",
+      };
+
+      updateChain.set.mockReturnValue({
+        where: vi.fn(() => ({
+          returning: vi.fn(() => Promise.resolve([updatedProject])),
+        })),
+      });
+
+      const result = await updateProject(userId, projectId, body);
+
+      expect(result.name).toBe("Updated Project");
+      expect(result.description).toBe("Updated description");
+      expect(mockUpdate).toHaveBeenCalled();
+      expect(updateChain.set).toHaveBeenCalled();
+    });
+
+    it("should update project with only name", async () => {
+      const body: UpdateProjectBody = {
+        name: "New Name",
+      };
+
+      const updatedProject = {
+        ...mockProject,
+        name: "New Name",
+      };
+
+      updateChain.set.mockReturnValue({
+        where: vi.fn(() => ({
+          returning: vi.fn(() => Promise.resolve([updatedProject])),
+        })),
+      });
+
+      const result = await updateProject(userId, projectId, body);
+
+      expect(result.name).toBe("New Name");
+    });
+
+    it("should throw NotFoundError when project does not exist", async () => {
+      const body: UpdateProjectBody = {
+        name: "Updated Project",
+      };
+
+      updateChain.set.mockReturnValue({
+        where: vi.fn(() => ({
+          returning: vi.fn(() => Promise.resolve([])),
+        })),
+      });
+
+      await expect(updateProject(userId, projectId, body)).rejects.toThrow(
+        "Project not found"
+      );
+    });
+
+    it("should throw NotFoundError when user is not the owner", async () => {
+      const otherUserId = "other-user-456";
+      const body: UpdateProjectBody = {
+        name: "Updated Project",
+      };
+
+      updateChain.set.mockReturnValue({
+        where: vi.fn(() => ({
+          returning: vi.fn(() => Promise.resolve([])),
+        })),
+      });
+
+      await expect(updateProject(otherUserId, projectId, body)).rejects.toThrow(
+        "Project not found"
+      );
+    });
+  });
+
+  describe("deleteProject", () => {
+    const deleteChain = {
+      where: vi.fn(() => ({
+        returning: vi.fn<() => Promise<unknown[]>>(() => Promise.resolve([])),
+      })),
+    };
+
+    beforeEach(() => {
+      mockDelete.mockReturnValue(deleteChain);
+    });
+
+    it("should permanently delete project successfully", async () => {
+      deleteChain.where.mockReturnValue({
+        returning: vi.fn(() => Promise.resolve([{ id: projectId }])),
+      });
+
+      await expect(deleteProject(userId, projectId)).resolves.not.toThrow();
+
+      expect(mockDelete).toHaveBeenCalled();
+      expect(deleteChain.where).toHaveBeenCalled();
+    });
+
+    it("should throw NotFoundError when project does not exist", async () => {
+      deleteChain.where.mockReturnValue({
+        returning: vi.fn(() => Promise.resolve([])),
+      });
+
+      await expect(deleteProject(userId, projectId)).rejects.toThrow(
+        "Project not found"
+      );
+    });
+
+    it("should throw NotFoundError when user is not the owner", async () => {
+      const otherUserId = "other-user-456";
+
+      deleteChain.where.mockReturnValue({
+        returning: vi.fn(() => Promise.resolve([])),
+      });
+
+      await expect(deleteProject(otherUserId, projectId)).rejects.toThrow(
+        "Project not found"
+      );
+    });
+
+    it("should return NotFoundError on repeated delete", async () => {
+      deleteChain.where
+        .mockReturnValueOnce({
+          returning: vi.fn(() => Promise.resolve([{ id: projectId }])),
+        })
+        .mockReturnValueOnce({
+          returning: vi.fn(() => Promise.resolve([])),
+        });
+
+      await expect(deleteProject(userId, projectId)).resolves.not.toThrow();
+      await expect(deleteProject(userId, projectId)).rejects.toThrow(
+        "Project not found"
+      );
     });
   });
 });

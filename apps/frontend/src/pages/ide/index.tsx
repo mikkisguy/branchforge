@@ -42,8 +42,14 @@ export function HomePageIDE() {
   const previousProjectIdRef = useRef<string | undefined>(undefined);
 
   // Project context
-  const { currentProject, projects, setCurrentProject, isLoadingProjects } =
-    useProject();
+  const {
+    currentProject,
+    projects,
+    setCurrentProject,
+    isLoadingProjects,
+    updateProject,
+    deleteProject,
+  } = useProject();
 
   // GitLab context for getting linked repository info
   const { getLinkedRepository } = useGitLab();
@@ -171,6 +177,8 @@ export function HomePageIDE() {
         isLoadingProjects={isLoadingProjects}
         isCollapsed={isSidebarCollapsed}
         onCollapsedChange={setIsSidebarCollapsed}
+        updateProject={updateProject}
+        deleteProject={deleteProject}
       />
 
       {/* Main content area */}

@@ -39,16 +39,47 @@ async function fetchInternal(
 
   // Don't set Content-Type for FormData - let browser set it with proper boundary
   const isFormData = options.body instanceof FormData;
+  const hasBody = options.body !== undefined && options.body !== null;
+
+  let headers: HeadersInit | undefined = options.headers;
+
+  // Only set JSON Content-Type when a request actually has a body.
+  // Sending Content-Type: application/json with an empty body causes
+  // Fastify to reject the request with FST_ERR_CTP_EMPTY_JSON_BODY.
+  if (!isFormData && hasBody) {
+    // Headers can be Headers, array, or plain object - handle each type
+    if (headers instanceof Headers) {
+      // Headers instance - check using has() method
+      if (!headers.has("Content-Type")) {
+        const nextHeaders = new Headers(headers);
+        nextHeaders.set("Content-Type", "application/json");
+        headers = nextHeaders;
+      }
+    } else if (Array.isArray(headers)) {
+      // Array format: [["key", "value"], ...] - check case-insensitively
+      const hasContentType = headers.some(
+        ([key]) => key.toLowerCase() === "content-type"
+      );
+      headers = hasContentType
+        ? headers
+        : [["Content-Type", "application/json"], ...headers];
+    } else {
+      // Plain object: { key: "value", ... } - check case-insensitively
+      const hasContentType =
+        headers &&
+        Object.keys(headers).some(
+          (key) => key.toLowerCase() === "content-type"
+        );
+      headers = hasContentType
+        ? headers
+        : { "Content-Type": "application/json", ...(headers ?? {}) };
+    }
+  }
 
   const response = await fetch(url, {
     ...options,
     credentials: "include",
-    headers: isFormData
-      ? options.headers // Don't add Content-Type for FormData
-      : {
-          "Content-Type": "application/json",
-          ...options.headers,
-        },
+    headers,
   });
 
   if (!response.ok) {

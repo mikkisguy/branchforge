@@ -6,7 +6,11 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { projectsApi } from "../projects";
-import type { Project, CreateProjectBody } from "../projects";
+import type {
+  Project,
+  CreateProjectBody,
+  UpdateProjectBody,
+} from "../projects";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -287,6 +291,196 @@ describe("Projects API", () => {
 
       await expect(projectsApi.listProjects()).rejects.toThrow(
         "Request failed with status 503"
+      );
+    });
+  });
+
+  describe("Update Project", () => {
+    const mockProject: Project = {
+      id: "proj-1",
+      name: "Updated Project",
+      description: "Updated description",
+      maxMeterDelta: 10,
+      visibility: "OWNER",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      updatedAt: "2024-01-02T00:00:00.000Z",
+    };
+
+    const updateBody: UpdateProjectBody = {
+      name: "Updated Project",
+      description: "Updated description",
+    };
+
+    it("should update project successfully", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ project: mockProject }),
+      });
+
+      const result = await projectsApi.updateProject("proj-1", updateBody);
+
+      expect(result).toEqual(mockProject);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain("/projects/proj-1");
+      expect(options?.method).toBe("PUT");
+    });
+
+    it("should send request body as JSON", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ project: mockProject }),
+      });
+
+      await projectsApi.updateProject("proj-1", updateBody);
+
+      const requestBody = JSON.parse(
+        mockFetch.mock.calls[0][1]?.body as string
+      );
+      expect(requestBody).toEqual(updateBody);
+    });
+
+    it("should include credentials in request", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ project: mockProject }),
+      });
+
+      await projectsApi.updateProject("proj-1", updateBody);
+
+      expect(mockFetch.mock.calls[0][1]?.credentials).toBe("include");
+    });
+
+    it("should handle not found error (404)", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: async () => ({ error: "Project not found" }),
+      });
+
+      await expect(
+        projectsApi.updateProject("unknown", updateBody)
+      ).rejects.toThrow("Project not found");
+    });
+
+    it("should handle forbidden error (403)", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        json: async () => ({ error: "Insufficient permissions" }),
+      });
+
+      await expect(
+        projectsApi.updateProject("proj-1", updateBody)
+      ).rejects.toThrow("Insufficient permissions");
+    });
+
+    it("should handle validation error (400)", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ error: "Invalid request body" }),
+      });
+
+      await expect(
+        projectsApi.updateProject("proj-1", updateBody)
+      ).rejects.toThrow("Invalid request body");
+    });
+
+    it("should handle network errors", async () => {
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+      await expect(
+        projectsApi.updateProject("proj-1", updateBody)
+      ).rejects.toThrow("Network error");
+    });
+
+    it("should encode projectId in URL", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ project: mockProject }),
+      });
+
+      await projectsApi.updateProject("project with spaces", updateBody);
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain(encodeURIComponent("project with spaces"));
+      expect(options?.method).toBe("PUT");
+    });
+  });
+
+  describe("Delete Project", () => {
+    it("should delete project successfully", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 204,
+      });
+
+      await expect(
+        projectsApi.deleteProject("proj-1")
+      ).resolves.toBeUndefined();
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain("/projects/proj-1");
+      expect(options?.method).toBe("DELETE");
+    });
+
+    it("should include credentials in request", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 204,
+      });
+
+      await projectsApi.deleteProject("proj-1");
+
+      expect(mockFetch.mock.calls[0][1]?.credentials).toBe("include");
+    });
+
+    it("should not send JSON Content-Type for DELETE without body", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 204,
+      });
+
+      await projectsApi.deleteProject("proj-1");
+
+      const headers = mockFetch.mock.calls[0][1]?.headers;
+      expect(headers?.["Content-Type"]).toBeUndefined();
+      expect(headers?.get?.("Content-Type")).toBeUndefined();
+    });
+
+    it("should handle not found error (404)", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: async () => ({ error: "Project not found" }),
+      });
+
+      await expect(projectsApi.deleteProject("unknown")).rejects.toThrow(
+        "Project not found"
+      );
+    });
+
+    it("should handle forbidden error (403)", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        json: async () => ({ error: "Insufficient permissions" }),
+      });
+
+      await expect(projectsApi.deleteProject("proj-1")).rejects.toThrow(
+        "Insufficient permissions"
+      );
+    });
+
+    it("should handle network errors", async () => {
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+      await expect(projectsApi.deleteProject("proj-1")).rejects.toThrow(
+        "Network error"
       );
     });
   });

@@ -27,6 +27,11 @@ export interface CreateProjectBody {
   maxMeterDelta?: number;
 }
 
+export interface UpdateProjectBody {
+  name?: string;
+  description?: string;
+}
+
 export interface ListProjectsResponse {
   projects: Project[];
 }
@@ -72,5 +77,31 @@ export const projectsApi = {
       body: JSON.stringify(body),
     });
     return response.project;
+  },
+
+  /**
+   * Update an existing project
+   */
+  async updateProject(
+    projectId: string,
+    body: UpdateProjectBody
+  ): Promise<Project> {
+    const response = await request<GetProjectResponse>(
+      `/projects/${encodeURIComponent(projectId)}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }
+    );
+    return response.project;
+  },
+
+  /**
+   * Delete a project permanently
+   */
+  async deleteProject(projectId: string): Promise<void> {
+    await request(`/projects/${encodeURIComponent(projectId)}`, {
+      method: "DELETE",
+    });
   },
 };

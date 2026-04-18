@@ -6,9 +6,10 @@
 
 import { getDb } from "../db/index.js";
 import { projects, projectUsers } from "../db/schema/index.js";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import type { NewProject } from "../db/schema/tables/projects.js";
 import type { UserRole } from "@branchforge/shared";
+import { NotFoundError } from "../middleware/error-handler.middleware.js";
 
 /**
  * Public project information (without sensitive data)
@@ -69,6 +70,14 @@ export interface CreateProjectBody {
 }
 
 /**
+ * Update project request body
+ */
+export interface UpdateProjectBody {
+  name?: string;
+  description?: string;
+}
+
+/**
  * List all projects for a user
  * @param userId - The user ID to fetch projects for
  * @returns Array of public projects
@@ -80,7 +89,7 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
   const userProjects = await db
     .select()
     .from(projects)
-    .where(eq(projects.userId, userId))
+    .where(and(eq(projects.userId, userId), isNull(projects.deletedAt)))
     .orderBy(projects.createdAt);
 
   // Get projects shared with the user via project_users junction table
@@ -97,7 +106,7 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
     })
     .from(projects)
     .innerJoin(projectUsers, eq(projectUsers.projectId, projects.id))
-    .where(eq(projectUsers.userId, userId))
+    .where(and(eq(projectUsers.userId, userId), isNull(projects.deletedAt)))
     .orderBy(projects.createdAt)) as SharedProjectRow[];
 
   // Combine both lists, removing duplicates
@@ -149,7 +158,13 @@ export async function getProject(
       updatedAt: projects.updatedAt,
     })
     .from(projects)
-    .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
+    .where(
+      and(
+        eq(projects.id, projectId),
+        eq(projects.userId, userId),
+        isNull(projects.deletedAt)
+      )
+    )
     .limit(1);
 
   if (ownerProject.length > 0) {
@@ -169,7 +184,13 @@ export async function getProject(
     })
     .from(projects)
     .innerJoin(projectUsers, eq(projectUsers.projectId, projects.id))
-    .where(and(eq(projects.id, projectId), eq(projectUsers.userId, userId)))
+    .where(
+      and(
+        eq(projects.id, projectId),
+        eq(projectUsers.userId, userId),
+        isNull(projects.deletedAt)
+      )
+    )
     .limit(1);
 
   if (sharedProject.length > 0) {
@@ -208,4 +229,78 @@ export async function createProject(
   }
 
   return toPublicProject(result[0]!, "OWNER");
+}
+
+/**
+ * Update an existing project
+ * @param userId - The user ID making the request (for authorization)
+ * @param projectId - The project ID to update
+ * @param body - The update data
+ * @returns The updated project
+ */
+export async function updateProject(
+  userId: string,
+  projectId: string,
+  body: UpdateProjectBody
+): Promise<PublicProject> {
+  const db = getDb();
+
+  const updateData: {
+    name?: string;
+    description?: string | null;
+    updatedAt: Date;
+  } = {
+    updatedAt: new Date(),
+  };
+
+  if (body.name !== undefined) {
+    updateData.name = body.name;
+  }
+  if (body.description !== undefined) {
+    updateData.description = body.description;
+  }
+
+  const result = await db
+    .update(projects)
+    .set(updateData)
+    .where(
+      and(
+        eq(projects.id, projectId),
+        eq(projects.userId, userId),
+        isNull(projects.deletedAt)
+      )
+    )
+    .returning();
+
+  if (!result || result.length === 0 || !result[0]) {
+    throw new NotFoundError("Project");
+  }
+
+  return toPublicProject(result[0]!, "OWNER");
+}
+
+/**
+ * Permanently delete a project.
+ *
+ * Related project data is removed via database-level ON DELETE CASCADE
+ * constraints on project_id foreign keys.
+ *
+ * @param userId - The user ID making the request (for authorization)
+ * @param projectId - The project ID to delete
+ * @returns void
+ */
+export async function deleteProject(
+  userId: string,
+  projectId: string
+): Promise<void> {
+  const db = getDb();
+
+  const result = await db
+    .delete(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
+    .returning({ id: projects.id });
+
+  if (!result || result.length === 0 || !result[0]) {
+    throw new NotFoundError("Project");
+  }
 }
