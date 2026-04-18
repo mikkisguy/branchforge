@@ -160,7 +160,7 @@ async function createProjectHandler(
 /**
  * Update an existing project
  *
- * PUT /projects/:projectId
+ * PATCH /projects/:projectId
  * Requires authentication
  */
 async function updateProjectHandler(

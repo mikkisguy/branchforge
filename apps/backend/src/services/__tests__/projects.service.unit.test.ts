@@ -266,7 +266,7 @@ describe("ProjectsService", () => {
       );
     });
 
-    it("should throw NotFoundError when user is not the owner", async () => {
+    it("should throw ForbiddenError when user is not the owner", async () => {
       const otherUserId = "other-user-456";
       const body: UpdateProjectBody = {
         name: "Updated Project",
@@ -322,7 +322,7 @@ describe("ProjectsService", () => {
       );
     });
 
-    it("should throw NotFoundError when user is not the owner", async () => {
+    it("should throw ForbiddenError when user is not the owner", async () => {
       const otherUserId = "other-user-456";
 
       mockSelect.mockImplementation(() => createMockChain([{ userId }]));
@@ -336,7 +336,7 @@ describe("ProjectsService", () => {
       );
     });
 
-    it("should return NotFoundError on repeated delete", async () => {
+    it("should throw NotFoundError on repeated delete", async () => {
       mockSelect
         .mockImplementationOnce(() => createMockChain([{ userId }]))
         .mockImplementationOnce(createEmptyMockChain);
