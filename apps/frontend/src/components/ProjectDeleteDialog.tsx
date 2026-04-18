@@ -7,6 +7,7 @@ interface ProjectDeleteDialogProps {
   onOpenChange: (open: boolean) => void;
   project: Project | null;
   onDelete: (projectId: string) => Promise<void>;
+  onError?: (error: Error) => void;
 }
 
 export function ProjectDeleteDialog({
@@ -14,6 +15,7 @@ export function ProjectDeleteDialog({
   onOpenChange,
   project,
   onDelete,
+  onError,
 }: ProjectDeleteDialogProps) {
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -25,8 +27,11 @@ export function ProjectDeleteDialog({
       await onDelete(project.id);
       onOpenChange(false);
     } catch (err) {
-      console.error("Failed to delete project:", err);
-      throw err;
+      const error =
+        err instanceof Error ? err : new Error("Failed to delete project");
+      if (onError) {
+        onError(error);
+      }
     } finally {
       setIsDeleting(false);
     }

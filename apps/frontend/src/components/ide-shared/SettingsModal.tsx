@@ -21,7 +21,7 @@ import {
 } from "@/components/ide-shared/SettingsLayout";
 import { WritingGoalSettings } from "@/components/write-mode/WritingGoalSettings";
 import { cn } from "@/lib/utils";
-import type { Project } from "@/lib/api/projects";
+import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 import { useToast } from "@/contexts/ToastContext";
 import { APP_NAME, APP_VERSION } from "@/lib/version";
 
@@ -46,10 +46,11 @@ interface SettingsModalProps {
   project: Project | null;
   onUpdateProject?: (
     projectId: string,
-    body: { name?: string; description?: string }
+    body: UpdateProjectBody
   ) => Promise<Project>;
   onDeleteProject?: (projectId: string) => Promise<void>;
   onSelectProject?: (project: Project | null) => void;
+  onProjectDeleteError?: (error: Error) => void;
 }
 
 export function SettingsModal({
@@ -60,6 +61,7 @@ export function SettingsModal({
   onUpdateProject,
   onDeleteProject,
   onSelectProject,
+  onProjectDeleteError,
 }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<Tab>("user");
   const [projectName, setProjectName] = useState("");
@@ -440,6 +442,7 @@ export function SettingsModal({
           onOpenChange={setIsProjectDeleteOpen}
           project={project}
           onDelete={handleDeleteProject}
+          onError={onProjectDeleteError}
         />
       ) : null}
     </Dialog>
