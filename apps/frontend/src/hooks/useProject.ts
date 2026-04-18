@@ -211,17 +211,30 @@ export function useProject(): UseProjectReturn {
       return projectsApi.deleteProject(projectId);
     },
     onSuccess: async (_data, variables) => {
-      // Invalidate and refetch projects list
-      await queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+      // Optimistically remove the deleted project from the projects list cache
+      queryClient.setQueryData<Project[]>(
+        projectKeys.lists(),
+        (oldProjects = []) => {
+          return oldProjects.filter((p) => p.id !== variables);
+        }
+      );
 
-      // If the deleted project was the current project, clear it and select next
+      // If the deleted project was the current project, select a fallback from the updated cache
       const currentProjectId = queryClient.getQueryData<string | null>(
         projectKeys.current()
       );
+
       if (currentProjectId === variables) {
-        persistCurrentProjectId(null);
-        queryClient.setQueryData(projectKeys.current(), null);
+        const updatedProjects =
+          queryClient.getQueryData<Project[]>(projectKeys.lists()) ?? [];
+        const fallbackProjectId = updatedProjects[0]?.id ?? null;
+
+        persistCurrentProjectId(fallbackProjectId);
+        queryClient.setQueryData(projectKeys.current(), fallbackProjectId);
       }
+
+      // Invalidate and refetch projects list to get fresh data
+      await queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
 
       // Remove the deleted project's detail cache
       queryClient.removeQueries({ queryKey: projectKeys.detail(variables) });
