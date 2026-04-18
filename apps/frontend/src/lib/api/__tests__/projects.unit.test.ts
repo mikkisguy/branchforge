@@ -10,7 +10,7 @@ import type {
   Project,
   CreateProjectBody,
   UpdateProjectBody,
-} from "../projects";
+} from "@/lib/api/projects";
 
 // Mock fetch globally
 const mockFetch = vi.fn();

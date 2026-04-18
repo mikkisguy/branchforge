@@ -13,7 +13,7 @@ import {
   FolderOpen,
 } from "lucide-react";
 import type { ThemePalette } from "@/contexts/ThemeContext";
-import type { Project } from "@/lib/api/projects";
+import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 import { SettingsModal } from "./SettingsModal";
 import { RouteSettingsModal } from "./RouteSettingsModal";
 import { StateVariablesModal } from "./StateVariablesModal";
@@ -41,7 +41,7 @@ interface LeftSidebarProps {
   onCollapsedChange: (collapsed: boolean) => void;
   updateProject?: (
     projectId: string,
-    body: { name?: string; description?: string }
+    body: UpdateProjectBody
   ) => Promise<Project>;
   deleteProject?: (projectId: string) => Promise<void>;
 }

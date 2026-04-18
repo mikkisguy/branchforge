@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, type FormEvent } from "react";
 import { Loader2, X } from "lucide-react";
 import {
   Dialog,
@@ -102,6 +102,8 @@ export function SettingsModal({
     setProjectError(null);
   }, [open, project?.description, project?.id, project?.name]);
 
+  const isProjectOwner = project?.visibility === "OWNER";
+
   const hasProjectChanges = useMemo(() => {
     if (!project) {
       return false;
@@ -116,7 +118,7 @@ export function SettingsModal({
     );
   }, [project, projectDescription, projectName]);
 
-  const handleSaveProject = async (event: React.FormEvent) => {
+  const handleSaveProject = async (event: FormEvent) => {
     event.preventDefault();
 
     if (!project || !onUpdateProject) {
@@ -137,7 +139,7 @@ export function SettingsModal({
     try {
       const updatedProject = await onUpdateProject(project.id, {
         name: trimmedName,
-        description: trimmedDescription || undefined,
+        description: trimmedDescription,
       });
       setProjectName(updatedProject.name);
       setProjectDescription(updatedProject.description ?? "");
@@ -308,6 +310,12 @@ export function SettingsModal({
                 ) : (
                   <>
                     <SettingsSection title="Details">
+                      {!isProjectOwner && (
+                        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-600 dark:text-amber-400">
+                          This project is read-only. Only the project owner can
+                          edit project details.
+                        </div>
+                      )}
                       <form onSubmit={handleSaveProject} className="space-y-4">
                         <div className="space-y-2">
                           <Label htmlFor="settings-project-name">
@@ -317,7 +325,11 @@ export function SettingsModal({
                             id="settings-project-name"
                             value={projectName}
                             onChange={(e) => setProjectName(e.target.value)}
-                            disabled={!onUpdateProject || isSavingProject}
+                            disabled={
+                              !onUpdateProject ||
+                              isSavingProject ||
+                              !isProjectOwner
+                            }
                             maxLength={200}
                           />
                         </div>
@@ -332,7 +344,11 @@ export function SettingsModal({
                             onChange={(e) =>
                               setProjectDescription(e.target.value)
                             }
-                            disabled={!onUpdateProject || isSavingProject}
+                            disabled={
+                              !onUpdateProject ||
+                              isSavingProject ||
+                              !isProjectOwner
+                            }
                             maxLength={2000}
                             rows={4}
                             className="resize-y"
@@ -351,7 +367,8 @@ export function SettingsModal({
                             disabled={
                               !onUpdateProject ||
                               isSavingProject ||
-                              !hasProjectChanges
+                              !hasProjectChanges ||
+                              !isProjectOwner
                             }
                           >
                             {isSavingProject ? (
@@ -367,21 +384,27 @@ export function SettingsModal({
                       </form>
                     </SettingsSection>
 
-                    <SettingsSection title="Danger Zone">
-                      <SettingsRow
-                        label="Delete project"
-                        description="Permanently deletes this project and all related data."
-                      >
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => setIsProjectDeleteOpen(true)}
-                          disabled={!onDeleteProject || isSavingProject}
+                    {isProjectOwner && (
+                      <SettingsSection title="Danger Zone">
+                        <SettingsRow
+                          label="Delete project"
+                          description="Permanently deletes this project and all related data."
                         >
-                          Delete Project
-                        </Button>
-                      </SettingsRow>
-                    </SettingsSection>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => setIsProjectDeleteOpen(true)}
+                            disabled={
+                              !onDeleteProject ||
+                              isSavingProject ||
+                              !isProjectOwner
+                            }
+                          >
+                            Delete Project
+                          </Button>
+                        </SettingsRow>
+                      </SettingsSection>
+                    )}
                   </>
                 )}
               </div>

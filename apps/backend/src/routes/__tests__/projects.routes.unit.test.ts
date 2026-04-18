@@ -212,6 +212,11 @@ describe("ProjectsRoutes", () => {
       expect(json.project.id).toBe(PROJECT_ID);
       expect(json.project.name).toBe("Updated Project");
       expect(json.project.description).toBe("Updated description");
+      expect(projectsService.updateProject).toHaveBeenCalledWith(
+        "user-123",
+        PROJECT_ID,
+        requestBody
+      );
     });
 
     it("should return 400 for invalid validation", async () => {
@@ -249,6 +254,11 @@ describe("ProjectsRoutes", () => {
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toEqual({ error: "Not found" });
+      expect(projectsService.updateProject).toHaveBeenCalledWith(
+        "user-123",
+        PROJECT_ID,
+        requestBody
+      );
     });
 
     it("should return 403 for forbidden", async () => {
@@ -268,6 +278,11 @@ describe("ProjectsRoutes", () => {
 
       expect(response.statusCode).toBe(403);
       expect(response.json()).toEqual({ error: "Forbidden" });
+      expect(projectsService.updateProject).toHaveBeenCalledWith(
+        "user-123",
+        PROJECT_ID,
+        requestBody
+      );
     });
   });
 

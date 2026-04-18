@@ -11,7 +11,11 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { projectsApi, type Project } from "@/lib/api/projects";
+import {
+  projectsApi,
+  type Project,
+  type UpdateProjectBody,
+} from "@/lib/api/projects";
 import { projectKeys } from "@/lib/query-keys";
 import {
   getPrefixedStorageKey,
@@ -74,7 +78,7 @@ export interface UseProjectReturn {
   createProject: (name: string) => Promise<Project>;
   updateProject: (
     projectId: string,
-    body: { name?: string; description?: string }
+    body: UpdateProjectBody
   ) => Promise<Project>;
   deleteProject: (projectId: string) => Promise<void>;
 }
@@ -185,7 +189,7 @@ export function useProject(): UseProjectReturn {
       body,
     }: {
       projectId: string;
-      body: { name?: string; description?: string };
+      body: UpdateProjectBody;
     }) => {
       return projectsApi.updateProject(projectId, body);
     },
@@ -218,13 +222,16 @@ export function useProject(): UseProjectReturn {
         persistCurrentProjectId(null);
         queryClient.setQueryData(projectKeys.current(), null);
       }
+
+      // Remove the deleted project's detail cache
+      queryClient.removeQueries({ queryKey: projectKeys.detail(variables) });
     },
   });
 
   // Update project method
   const updateProject = async (
     projectId: string,
-    body: { name?: string; description?: string }
+    body: UpdateProjectBody
   ): Promise<Project> => {
     return updateProjectMutation.mutateAsync({ projectId, body });
   };
