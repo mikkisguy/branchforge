@@ -9,7 +9,10 @@ import { projects, projectUsers } from "../db/schema/index.js";
 import { eq, and } from "drizzle-orm";
 import type { NewProject } from "../db/schema/tables/projects.js";
 import type { UserRole } from "@branchforge/shared";
-import { NotFoundError } from "../middleware/error-handler.middleware.js";
+import {
+  NotFoundError,
+  ForbiddenError,
+} from "../middleware/error-handler.middleware.js";
 
 /**
  * Public project information (without sensitive data)
@@ -248,6 +251,20 @@ export async function updateProject(
     updateData.description = body.description;
   }
 
+  const project = await db
+    .select({ userId: projects.userId })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+
+  if (!project || project.length === 0) {
+    throw new NotFoundError("Project");
+  }
+
+  if (project[0]!.userId !== userId) {
+    throw new ForbiddenError("Only project owners can update projects");
+  }
+
   const result = await db
     .update(projects)
     .set(updateData)
@@ -276,6 +293,20 @@ export async function deleteProject(
   projectId: string
 ): Promise<void> {
   const db = getDb();
+
+  const project = await db
+    .select({ userId: projects.userId })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+
+  if (!project || project.length === 0) {
+    throw new NotFoundError("Project");
+  }
+
+  if (project[0]!.userId !== userId) {
+    throw new ForbiddenError("Only project owners can delete projects");
+  }
 
   const result = await db
     .delete(projects)
