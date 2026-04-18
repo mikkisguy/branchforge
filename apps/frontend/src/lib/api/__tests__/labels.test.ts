@@ -4,16 +4,33 @@
  * Tests for label management API methods.
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  beforeAll,
+  afterAll,
+  vi,
+} from "vitest";
 import { labelsApi } from "../labels";
 import type { ListLabelsParams } from "../labels";
 import type { PublicLabel, LabelDetail } from "@branchforge/shared";
 
-// Mock fetch globally
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
-
 describe("Labels API", () => {
+  let mockFetch: ReturnType<typeof vi.fn> & typeof globalThis.fetch;
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeAll(() => {
+    originalFetch = globalThis.fetch;
+    mockFetch = vi.fn() as ReturnType<typeof vi.fn> & typeof globalThis.fetch;
+    globalThis.fetch = mockFetch;
+  });
+
+  afterAll(() => {
+    globalThis.fetch = originalFetch;
+  });
   const mockLabel: PublicLabel = {
     id: "label-1",
     projectId: "proj-1",
@@ -37,6 +54,10 @@ describe("Labels API", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    mockFetch.mockReset();
   });
 
   describe("List Labels", () => {
@@ -262,7 +283,7 @@ describe("Labels API", () => {
   });
 
   describe("Request Headers", () => {
-    it("should set Content-Type header", async () => {
+    it("should not set Content-Type header for GET requests", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ label: mockLabelDetail }),
@@ -270,10 +291,7 @@ describe("Labels API", () => {
 
       await labelsApi.getLabel("label-1");
 
-      expect(mockFetch.mock.calls[0][1]?.headers).toHaveProperty(
-        "Content-Type",
-        "application/json"
-      );
+      expect(mockFetch.mock.calls[0][1]?.headers).toBeUndefined();
     });
   });
 

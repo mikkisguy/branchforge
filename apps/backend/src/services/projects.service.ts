@@ -9,6 +9,10 @@ import { projects, projectUsers } from "../db/schema/index.js";
 import { eq, and } from "drizzle-orm";
 import type { NewProject } from "../db/schema/tables/projects.js";
 import type { UserRole } from "@branchforge/shared";
+import {
+  NotFoundError,
+  ForbiddenError,
+} from "../middleware/error-handler.middleware.js";
 
 /**
  * Public project information (without sensitive data)
@@ -66,6 +70,14 @@ export interface CreateProjectBody {
   name: string;
   description?: string;
   maxMeterDelta?: number;
+}
+
+/**
+ * Update project request body
+ */
+export interface UpdateProjectBody {
+  name?: string;
+  description?: string;
 }
 
 /**
@@ -208,4 +220,100 @@ export async function createProject(
   }
 
   return toPublicProject(result[0]!, "OWNER");
+}
+
+/**
+ * Update an existing project
+ * @param userId - The user ID making the request (for authorization)
+ * @param projectId - The project ID to update
+ * @param body - The update data
+ * @returns The updated project
+ */
+export async function updateProject(
+  userId: string,
+  projectId: string,
+  body: UpdateProjectBody
+): Promise<PublicProject> {
+  const db = getDb();
+
+  const updateData: {
+    name?: string;
+    description?: string | null;
+    updatedAt: Date;
+  } = {
+    updatedAt: new Date(),
+  };
+
+  if (body.name !== undefined) {
+    updateData.name = body.name;
+  }
+  if (body.description !== undefined) {
+    updateData.description = body.description;
+  }
+
+  const project = await db
+    .select({ userId: projects.userId })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+
+  if (!project || project.length === 0) {
+    throw new NotFoundError("Project");
+  }
+
+  if (project[0]!.userId !== userId) {
+    throw new ForbiddenError("Only project owners can update projects");
+  }
+
+  const result = await db
+    .update(projects)
+    .set(updateData)
+    .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
+    .returning();
+
+  if (!result || result.length === 0 || !result[0]) {
+    throw new NotFoundError("Project");
+  }
+
+  return toPublicProject(result[0]!, "OWNER");
+}
+
+/**
+ * Permanently delete a project.
+ *
+ * Related project data is removed via database-level ON DELETE CASCADE
+ * constraints on project_id foreign keys.
+ *
+ * @param userId - The user ID making the request (for authorization)
+ * @param projectId - The project ID to delete
+ * @returns void
+ */
+export async function deleteProject(
+  userId: string,
+  projectId: string
+): Promise<void> {
+  const db = getDb();
+
+  const project = await db
+    .select({ userId: projects.userId })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+
+  if (!project || project.length === 0) {
+    throw new NotFoundError("Project");
+  }
+
+  if (project[0]!.userId !== userId) {
+    throw new ForbiddenError("Only project owners can delete projects");
+  }
+
+  const result = await db
+    .delete(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
+    .returning({ id: projects.id });
+
+  if (!result || result.length === 0 || !result[0]) {
+    throw new NotFoundError("Project");
+  }
 }

@@ -65,7 +65,7 @@ describe("API Client", () => {
       expect(mockFetch.mock.calls[0][1]?.credentials).toBe("include");
     });
 
-    it("should set Content-Type header", async () => {
+    it("should not set Content-Type header without request body", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({}),
@@ -73,10 +73,7 @@ describe("API Client", () => {
 
       await request("/test");
 
-      expect(mockFetch.mock.calls[0][1]?.headers).toHaveProperty(
-        "Content-Type",
-        "application/json"
-      );
+      expect(mockFetch.mock.calls[0][1]?.headers).toBeUndefined();
     });
 
     it("should allow custom headers", async () => {
@@ -93,7 +90,115 @@ describe("API Client", () => {
 
       const headers = mockFetch.mock.calls[0][1]?.headers;
       expect(headers).toHaveProperty("X-Custom-Header", "custom-value");
+      expect(headers).not.toHaveProperty("Content-Type");
+    });
+
+    it("should set Content-Type when custom headers do not include it and body is present", async () => {
+      const requestBody = { name: "Test" };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: "1" }),
+      });
+
+      await request("/test", {
+        method: "POST",
+        body: JSON.stringify(requestBody),
+        headers: {
+          "X-Custom-Header": "custom-value",
+        },
+      });
+
+      const headers = mockFetch.mock.calls[0][1]?.headers;
       expect(headers).toHaveProperty("Content-Type", "application/json");
+      expect(headers).toHaveProperty("X-Custom-Header", "custom-value");
+    });
+
+    it("should preserve custom Content-Type header when explicitly provided", async () => {
+      const requestBody = { name: "Test" };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: "1" }),
+      });
+
+      await request("/test", {
+        method: "POST",
+        body: JSON.stringify(requestBody),
+        headers: {
+          "Content-Type": "text/plain",
+        },
+      });
+
+      const headers = mockFetch.mock.calls[0][1]?.headers;
+      expect(headers).toHaveProperty("Content-Type", "text/plain");
+    });
+
+    it("should preserve custom Content-Type when headers is a Headers instance", async () => {
+      const requestBody = { name: "Test" };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: "1" }),
+      });
+
+      await request("/test", {
+        method: "POST",
+        body: JSON.stringify(requestBody),
+        headers: new Headers({
+          "Content-Type": "text/plain",
+          "X-Custom": "v",
+        }),
+      });
+
+      const headers = new Headers(
+        mockFetch.mock.calls[0][1]?.headers as HeadersInit
+      );
+      expect(headers.get("content-type")).toBe("text/plain");
+      expect(headers.get("x-custom")).toBe("v");
+    });
+
+    it("should preserve tuple-array Content-Type header", async () => {
+      const requestBody = { name: "Test" };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: "1" }),
+      });
+
+      await request("/test", {
+        method: "POST",
+        body: JSON.stringify(requestBody),
+        headers: [
+          ["content-type", "text/plain"],
+          ["x-custom", "v"],
+        ],
+      });
+
+      const headers = new Headers(
+        mockFetch.mock.calls[0][1]?.headers as HeadersInit
+      );
+      expect(headers.get("content-type")).toBe("text/plain");
+      expect(headers.get("x-custom")).toBe("v");
+    });
+
+    it("should set Content-Type header when request has JSON body", async () => {
+      const requestBody = { name: "Test" };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: "1" }),
+      });
+
+      await request("/test", {
+        method: "POST",
+        body: JSON.stringify(requestBody),
+      });
+
+      expect(mockFetch.mock.calls[0][1]?.headers).toHaveProperty(
+        "Content-Type",
+        "application/json"
+      );
     });
 
     it("should handle 204 No Content response", async () => {
@@ -213,7 +318,7 @@ describe("API Client", () => {
       expect(mockFetch.mock.calls[0][1]?.credentials).toBe("include");
     });
 
-    it("should set Content-Type header", async () => {
+    it("should not set Content-Type header without request body", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 204,
@@ -222,10 +327,7 @@ describe("API Client", () => {
 
       await requestVoid("/test");
 
-      expect(mockFetch.mock.calls[0][1]?.headers).toHaveProperty(
-        "Content-Type",
-        "application/json"
-      );
+      expect(mockFetch.mock.calls[0][1]?.headers).toBeUndefined();
     });
 
     it("should throw error on non-OK response", async () => {

@@ -13,7 +13,7 @@ import {
   FolderOpen,
 } from "lucide-react";
 import type { ThemePalette } from "@/contexts/ThemeContext";
-import type { Project } from "@/lib/api/projects";
+import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 import { SettingsModal } from "./SettingsModal";
 import { RouteSettingsModal } from "./RouteSettingsModal";
 import { StateVariablesModal } from "./StateVariablesModal";
@@ -39,6 +39,11 @@ interface LeftSidebarProps {
   isLoadingProjects?: boolean;
   isCollapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
+  updateProject?: (
+    projectId: string,
+    body: UpdateProjectBody
+  ) => Promise<Project>;
+  deleteProject?: (projectId: string) => Promise<void>;
 }
 
 export function LeftSidebar({
@@ -54,6 +59,8 @@ export function LeftSidebar({
   isLoadingProjects,
   isCollapsed,
   onCollapsedChange,
+  updateProject,
+  deleteProject,
 }: LeftSidebarProps) {
   const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -165,8 +172,8 @@ export function LeftSidebar({
                 </button>
 
                 {isProjectPopoverOpen && (
-                  <div className="absolute left-full top-0 ml-2 bg-card border border-border/30 rounded-lg shadow-xl min-w-[200px] max-w-[300px] z-50">
-                    <div className="p-2 max-h-[300px] overflow-y-auto">
+                  <div className="absolute left-full top-0 ml-2 bg-card border border-border/30 rounded-lg shadow-xl min-w-[300px] max-w-[400px] z-50">
+                    <div className="p-2 max-h-[400px] overflow-y-auto">
                       {isLoadingProjects ? (
                         <div className="px-3 py-2 text-sm text-muted-foreground">
                           Loading...
@@ -178,14 +185,15 @@ export function LeftSidebar({
                       ) : (
                         projects.map((project) => (
                           <button
+                            type="button"
                             key={project.id}
                             onClick={() => {
                               setCurrentProject(project);
                               setIsProjectPopoverOpen(false);
                             }}
-                            className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-left transition-colors ${
                               projectId === project.id
-                                ? "text-white bg-[var(--theme-color)]"
+                                ? "bg-[var(--theme-color)]/20 text-foreground"
                                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                             }`}
                           >
@@ -397,7 +405,15 @@ export function LeftSidebar({
       </div>
 
       {/* Modals */}
-      <SettingsModal open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
+      <SettingsModal
+        open={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
+        projects={projects}
+        project={projects.find((p) => p.id === projectId) ?? null}
+        onUpdateProject={updateProject}
+        onDeleteProject={deleteProject}
+        onSelectProject={setCurrentProject}
+      />
       {projectId && (
         <>
           <RouteSettingsModal

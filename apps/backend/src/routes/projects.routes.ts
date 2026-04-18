@@ -1,7 +1,7 @@
 /**
  * Projects Routes
  *
- * Routes for project management operations including listing, getting, and creating projects.
+ * Routes for project management operations including listing, getting, creating, updating, and deleting projects.
  */
 
 import type { FastifyInstance } from "fastify";
@@ -10,6 +10,8 @@ import {
   listProjects,
   getProject,
   createProject,
+  updateProject,
+  deleteProject,
   type PublicProject,
 } from "../services/projects.service.js";
 import { authenticate } from "../middleware/auth.middleware.js";
@@ -20,6 +22,7 @@ import {
 } from "../middleware/validation.middleware.js";
 import {
   createProjectSchema,
+  updateProjectSchema,
   projectIdParamsSchema,
   projectFilesQuerySchema,
   fileIdParamsSchema,
@@ -27,6 +30,7 @@ import {
   type CreateProjectInput,
   type FileIdParams,
   type UpdateFileContentInput,
+  type UpdateProjectInput,
 } from "../lib/validation.js";
 import { getDb } from "../db/index.js";
 import { projectFiles, labels, projects } from "../db/schema/index.js";
@@ -57,6 +61,10 @@ interface GetProjectResponse {
 }
 
 interface CreateProjectResponse {
+  project: PublicProject;
+}
+
+interface UpdateProjectResponse {
   project: PublicProject;
 }
 
@@ -147,6 +155,84 @@ async function createProjectHandler(
   const project = await createProject(user.id, body);
 
   reply.status(201).send({ project } as CreateProjectResponse);
+}
+
+/**
+ * Update an existing project
+ *
+ * PATCH /projects/:projectId
+ * Requires authentication
+ */
+async function updateProjectHandler(
+  request: FastifyRequest<{
+    Params: { projectId: string };
+    Body: UpdateProjectInput;
+  }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { projectId } = request.params;
+  const body = request.body;
+  const user = request.user!;
+
+  try {
+    const project = await updateProject(user.id, projectId, body);
+
+    reply.status(200).send({ project } as UpdateProjectResponse);
+  } catch (error) {
+    request.log.error(
+      { err: error, projectId },
+      `updateProjectHandler: Failed to update project: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+
+    if (error instanceof NotFoundError) {
+      reply.status(404).send({ error: "Not found" } as ErrorResponse);
+      return;
+    }
+    if (error instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      return;
+    }
+    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+  }
+}
+
+/**
+ * Delete a project permanently.
+ *
+ * DELETE /projects/:projectId
+ * Requires authentication
+ */
+async function deleteProjectHandler(
+  request: FastifyRequest<{ Params: { projectId: string } }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { projectId } = request.params;
+  const user = request.user!;
+
+  try {
+    await deleteProject(user.id, projectId);
+
+    reply.status(204).send();
+  } catch (error) {
+    request.log.error(
+      { err: error, projectId },
+      `deleteProjectHandler: Failed to delete project: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+
+    if (error instanceof NotFoundError) {
+      reply.status(404).send({ error: "Not found" } as ErrorResponse);
+      return;
+    }
+    if (error instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      return;
+    }
+    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+  }
 }
 
 /**
@@ -457,6 +543,25 @@ export async function projectsRoutes(fastify: FastifyInstance): Promise<void> {
       preValidation: validateBody(createProjectSchema),
     },
     createProjectHandler
+  );
+  fastify.patch<{ Params: { projectId: string }; Body: UpdateProjectInput }>(
+    "/projects/:projectId",
+    {
+      onRequest: authenticate,
+      preValidation: validateRequest({
+        params: projectIdParamsSchema,
+        body: updateProjectSchema,
+      }),
+    },
+    updateProjectHandler
+  );
+  fastify.delete<{ Params: { projectId: string } }>(
+    "/projects/:projectId",
+    {
+      onRequest: authenticate,
+      preValidation: validateParams(projectIdParamsSchema),
+    },
+    deleteProjectHandler
   );
   // Project files routes
   fastify.get<{

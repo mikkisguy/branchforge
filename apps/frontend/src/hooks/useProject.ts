@@ -11,7 +11,11 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { projectsApi, type Project } from "@/lib/api/projects";
+import {
+  projectsApi,
+  type Project,
+  type UpdateProjectBody,
+} from "@/lib/api/projects";
 import { projectKeys } from "@/lib/query-keys";
 import {
   getPrefixedStorageKey,
@@ -72,6 +76,11 @@ export interface UseProjectReturn {
   refreshProjects: () => Promise<void>;
   setCurrentProject: (project: Project | null) => void;
   createProject: (name: string) => Promise<Project>;
+  updateProject: (
+    projectId: string,
+    body: UpdateProjectBody
+  ) => Promise<Project>;
+  deleteProject: (projectId: string) => Promise<void>;
 }
 
 // ============================================================================
@@ -173,6 +182,78 @@ export function useProject(): UseProjectReturn {
     return createProjectMutation.mutateAsync(name);
   };
 
+  // Update project mutation
+  const updateProjectMutation = useMutation({
+    mutationFn: async ({
+      projectId,
+      body,
+    }: {
+      projectId: string;
+      body: UpdateProjectBody;
+    }) => {
+      return projectsApi.updateProject(projectId, body);
+    },
+    onSuccess: async (updatedProject) => {
+      // Invalidate and refetch projects list
+      await queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+
+      // Update the specific project in the cache
+      queryClient.setQueryData(
+        projectKeys.detail(updatedProject.id),
+        updatedProject
+      );
+    },
+  });
+
+  // Delete project mutation
+  const deleteProjectMutation = useMutation({
+    mutationFn: async (projectId: string) => {
+      return projectsApi.deleteProject(projectId);
+    },
+    onSuccess: async (_data, variables) => {
+      // Optimistically remove the deleted project from the projects list cache
+      queryClient.setQueryData<Project[]>(
+        projectKeys.lists(),
+        (oldProjects = []) => {
+          return oldProjects.filter((p) => p.id !== variables);
+        }
+      );
+
+      // If the deleted project was the current project, select a fallback from the updated cache
+      const currentProjectId = queryClient.getQueryData<string | null>(
+        projectKeys.current()
+      );
+
+      if (currentProjectId === variables) {
+        const updatedProjects =
+          queryClient.getQueryData<Project[]>(projectKeys.lists()) ?? [];
+        const fallbackProjectId = updatedProjects[0]?.id ?? null;
+
+        persistCurrentProjectId(fallbackProjectId);
+        queryClient.setQueryData(projectKeys.current(), fallbackProjectId);
+      }
+
+      // Invalidate and refetch projects list to get fresh data
+      await queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+
+      // Remove the deleted project's detail cache
+      queryClient.removeQueries({ queryKey: projectKeys.detail(variables) });
+    },
+  });
+
+  // Update project method
+  const updateProject = async (
+    projectId: string,
+    body: UpdateProjectBody
+  ): Promise<Project> => {
+    return updateProjectMutation.mutateAsync({ projectId, body });
+  };
+
+  // Delete project method
+  const deleteProject = async (projectId: string): Promise<void> => {
+    await deleteProjectMutation.mutateAsync(projectId);
+  };
+
   return {
     projects,
     currentProject,
@@ -181,5 +262,7 @@ export function useProject(): UseProjectReturn {
     refreshProjects,
     setCurrentProject,
     createProject,
+    updateProject,
+    deleteProject,
   };
 }
