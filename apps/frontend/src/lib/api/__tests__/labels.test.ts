@@ -4,17 +4,33 @@
  * Tests for label management API methods.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  beforeAll,
+  afterAll,
+  vi,
+} from "vitest";
 import { labelsApi } from "../labels";
 import type { ListLabelsParams } from "../labels";
 import type { PublicLabel, LabelDetail } from "@branchforge/shared";
 
-// Mock fetch globally
-const mockFetch = vi.fn();
-const originalFetch = globalThis.fetch;
-globalThis.fetch = mockFetch;
-
 describe("Labels API", () => {
+  let mockFetch: ReturnType<typeof vi.fn> & typeof globalThis.fetch;
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeAll(() => {
+    originalFetch = globalThis.fetch;
+    mockFetch = vi.fn() as ReturnType<typeof vi.fn> & typeof globalThis.fetch;
+    globalThis.fetch = mockFetch;
+  });
+
+  afterAll(() => {
+    globalThis.fetch = originalFetch;
+  });
   const mockLabel: PublicLabel = {
     id: "label-1",
     projectId: "proj-1",
@@ -41,8 +57,7 @@ describe("Labels API", () => {
   });
 
   afterEach(() => {
-    globalThis.fetch = originalFetch;
-    vi.resetAllMocks();
+    mockFetch.mockReset();
   });
 
   describe("List Labels", () => {

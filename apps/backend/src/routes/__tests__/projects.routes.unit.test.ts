@@ -248,7 +248,7 @@ describe("ProjectsRoutes", () => {
       });
 
       expect(response.statusCode).toBe(404);
-      expect(response.json()).toEqual({ error: "Project not found" });
+      expect(response.json()).toEqual({ error: "Not found" });
     });
 
     it("should return 403 for forbidden", async () => {
@@ -267,7 +267,7 @@ describe("ProjectsRoutes", () => {
       });
 
       expect(response.statusCode).toBe(403);
-      expect(response.json()).toEqual({ error: "Insufficient permissions" });
+      expect(response.json()).toEqual({ error: "Forbidden" });
     });
   });
 
@@ -295,7 +295,7 @@ describe("ProjectsRoutes", () => {
       });
 
       expect(response.statusCode).toBe(404);
-      expect(response.json()).toEqual({ error: "Project not found" });
+      expect(response.json()).toEqual({ error: "Not found" });
     });
 
     it("should return 403 for forbidden", async () => {
@@ -309,7 +309,7 @@ describe("ProjectsRoutes", () => {
       });
 
       expect(response.statusCode).toBe(403);
-      expect(response.json()).toEqual({ error: "Insufficient permissions" });
+      expect(response.json()).toEqual({ error: "Forbidden" });
     });
   });
 });
