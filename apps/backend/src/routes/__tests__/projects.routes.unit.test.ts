@@ -183,7 +183,7 @@ describe("ProjectsRoutes", () => {
     });
   });
 
-  describe("PUT /projects/:projectId", () => {
+  describe("PATCH /projects/:projectId", () => {
     it("should update project successfully", async () => {
       const requestBody = {
         name: "Updated Project",
@@ -202,7 +202,7 @@ describe("ProjectsRoutes", () => {
       vi.mocked(projectsService.updateProject).mockResolvedValue(mockProject);
 
       const response = await fastify.inject({
-        method: "PUT",
+        method: "PATCH",
         url: `/projects/${PROJECT_ID}`,
         payload: requestBody,
       });
@@ -226,7 +226,7 @@ describe("ProjectsRoutes", () => {
       };
 
       const response = await fastify.inject({
-        method: "PUT",
+        method: "PATCH",
         url: `/projects/${PROJECT_ID}`,
         payload: requestBody,
       });
@@ -247,7 +247,7 @@ describe("ProjectsRoutes", () => {
       );
 
       const response = await fastify.inject({
-        method: "PUT",
+        method: "PATCH",
         url: `/projects/${PROJECT_ID}`,
         payload: requestBody,
       });
@@ -271,7 +271,7 @@ describe("ProjectsRoutes", () => {
       );
 
       const response = await fastify.inject({
-        method: "PUT",
+        method: "PATCH",
         url: `/projects/${PROJECT_ID}`,
         payload: requestBody,
       });

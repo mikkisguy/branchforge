@@ -544,7 +544,7 @@ export async function projectsRoutes(fastify: FastifyInstance): Promise<void> {
     },
     createProjectHandler
   );
-  fastify.put<{ Params: { projectId: string }; Body: UpdateProjectInput }>(
+  fastify.patch<{ Params: { projectId: string }; Body: UpdateProjectInput }>(
     "/projects/:projectId",
     {
       onRequest: authenticate,

@@ -89,7 +89,7 @@ export const projectsApi = {
     const response = await request<GetProjectResponse>(
       `/projects/${encodeURIComponent(projectId)}`,
       {
-        method: "PUT",
+        method: "PATCH",
         body: JSON.stringify(body),
       }
     );

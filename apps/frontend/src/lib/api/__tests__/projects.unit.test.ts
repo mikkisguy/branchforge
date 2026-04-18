@@ -324,7 +324,7 @@ describe("Projects API", () => {
 
       const [url, options] = mockFetch.mock.calls[0];
       expect(url).toContain("/projects/proj-1");
-      expect(options?.method).toBe("PUT");
+      expect(options?.method).toBe("PATCH");
     });
 
     it("should send request body as JSON", async () => {
@@ -406,7 +406,7 @@ describe("Projects API", () => {
 
       const [url, options] = mockFetch.mock.calls[0];
       expect(url).toContain(encodeURIComponent("project with spaces"));
-      expect(options?.method).toBe("PUT");
+      expect(options?.method).toBe("PATCH");
     });
   });
 
