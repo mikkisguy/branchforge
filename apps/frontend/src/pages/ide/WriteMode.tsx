@@ -181,20 +181,6 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
     ? conflictByLabel.get(activeLabelId)
     : false;
 
-  if (isLoadingLabels) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center">
-        <div className="relative">
-          <div className="w-16 h-16 rounded-full bg-[var(--theme-color)]/10 flex items-center justify-center">
-            <Loader2 className="w-8 h-8 text-[var(--theme-color)] animate-spin" />
-          </div>
-          <div className="absolute inset-0 w-16 h-16 rounded-full bg-[var(--theme-color)]/5 animate-ping" />
-        </div>
-        <p className="text-muted-foreground mt-4">Loading labels...</p>
-      </div>
-    );
-  }
-
   if (!currentProject) {
     return (
       <div className="h-screen flex flex-col items-center justify-center">
@@ -210,6 +196,20 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
             Open Settings
           </Button>
         )}
+      </div>
+    );
+  }
+
+  if (isLoadingLabels) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center">
+        <div className="relative">
+          <div className="w-16 h-16 rounded-full bg-[var(--theme-color)]/10 flex items-center justify-center">
+            <Loader2 className="w-8 h-8 text-[var(--theme-color)] animate-spin" />
+          </div>
+          <div className="absolute inset-0 w-16 h-16 rounded-full bg-[var(--theme-color)]/5 animate-ping" />
+        </div>
+        <p className="text-muted-foreground mt-4">Loading labels...</p>
       </div>
     );
   }
