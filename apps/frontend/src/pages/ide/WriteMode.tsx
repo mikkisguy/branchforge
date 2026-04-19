@@ -8,12 +8,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ProseEditor,
-  SceneNavigator,
+  LabelNavigator,
   CharacterReferencePanel,
 } from "@/components/write-mode";
 import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
-import { ChevronRight, FileQuestion, Loader2 } from "lucide-react";
+import { ChevronRight, FileText, Loader2 } from "lucide-react";
 import { EditorTabBar } from "@/components/ide-shared";
+import { Button } from "@/components/ui/button";
 import { useLabels } from "@/hooks/useLabels";
 import { useCharacters } from "@/hooks/useCharacters";
 import { useProject } from "@/hooks/useProject";
@@ -47,9 +48,10 @@ const sidebarVariants = cva(
 
 interface WriteModeProps {
   projectName?: string;
+  onOpenSettings?: () => void;
 }
 
-export function WriteMode({ projectName }: WriteModeProps) {
+export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
   const { currentProject } = useProject();
   const { error: showErrorToast } = useToast();
   const {
@@ -179,6 +181,25 @@ export function WriteMode({ projectName }: WriteModeProps) {
     ? conflictByLabel.get(activeLabelId)
     : false;
 
+  if (!currentProject) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center">
+        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-4">
+          <FileText className="w-10 h-10 text-muted-foreground/60" />
+        </div>
+        <p className="text-foreground font-medium">No project selected</p>
+        <p className="text-sm text-muted-foreground/70 mt-1 text-center max-w-md px-4">
+          To start writing, import a project in Settings.
+        </p>
+        {onOpenSettings && (
+          <Button type="button" className="mt-4" onClick={onOpenSettings}>
+            Open Settings
+          </Button>
+        )}
+      </div>
+    );
+  }
+
   if (isLoadingLabels) {
     return (
       <div className="h-screen flex flex-col items-center justify-center">
@@ -188,7 +209,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
           </div>
           <div className="absolute inset-0 w-16 h-16 rounded-full bg-[var(--theme-color)]/5 animate-ping" />
         </div>
-        <p className="text-muted-foreground mt-4">Loading scenes...</p>
+        <p className="text-muted-foreground mt-4">Loading labels...</p>
       </div>
     );
   }
@@ -197,22 +218,12 @@ export function WriteMode({ projectName }: WriteModeProps) {
     return (
       <div className="h-screen flex flex-col items-center justify-center">
         <div className="w-20 h-20 rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-4">
-          <FileQuestion className="w-10 h-10 text-muted-foreground/60" />
+          <FileText className="w-10 h-10 text-muted-foreground/60" />
         </div>
-        <p className="text-foreground font-medium">
-          No scenes found in this project
+        <p className="text-foreground font-medium">No labels in this project</p>
+        <p className="text-sm text-muted-foreground/70 mt-1 text-center max-w-md px-4">
+          Import content or create labels to start writing.
         </p>
-        <p className="text-sm text-muted-foreground/70 mt-1">
-          Create scenes to start writing
-        </p>
-        <button
-          className="mt-4 px-4 py-2 rounded-md bg-[var(--theme-color)] text-white text-sm font-medium hover:opacity-90 transition-opacity"
-          onClick={() => {
-            // Navigate to scene creation.
-          }}
-        >
-          Create your first scene
-        </button>
       </div>
     );
   }
@@ -238,7 +249,7 @@ export function WriteMode({ projectName }: WriteModeProps) {
           })}
         >
           <div className="h-full overflow-y-auto relative">
-            <SceneNavigator
+            <LabelNavigator
               labels={labels}
               activeLabelId={activeLabelId}
               onSelect={handleLabelSelect}
@@ -255,8 +266,8 @@ export function WriteMode({ projectName }: WriteModeProps) {
               type="button"
               onClick={() => setIsLeftSidebarCollapsed(false)}
               className="p-2 rounded-lg border border-border bg-card/50 hover:bg-muted/80 transition-colors"
-              aria-label="Expand scene navigator sidebar"
-              title="Expand scene navigator sidebar"
+              aria-label="Expand label navigator sidebar"
+              title="Expand label navigator sidebar"
             >
               <ChevronRight className="w-4 h-4 text-muted-foreground" />
             </button>

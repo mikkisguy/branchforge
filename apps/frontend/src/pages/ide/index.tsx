@@ -38,6 +38,7 @@ export function HomePageIDE() {
     false
   );
   const [scriptModeKey, setScriptModeKey] = useState(0);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const isFlushing = useRef(false);
   const previousProjectIdRef = useRef<string | undefined>(undefined);
 
@@ -153,6 +154,8 @@ export function HomePageIDE() {
     setScriptModeKey((prev) => prev + 1);
   };
 
+  const handleOpenSettings = () => setIsSettingsOpen(true);
+
   // Get GitLab branch for current project (if linked)
   const gitlabRepo = currentProject
     ? getLinkedRepository(currentProject.id)
@@ -179,6 +182,8 @@ export function HomePageIDE() {
         onCollapsedChange={setIsSidebarCollapsed}
         updateProject={updateProject}
         deleteProject={deleteProject}
+        isSettingsOpenExternally={isSettingsOpen}
+        onSettingsOpenChangeExternally={setIsSettingsOpen}
       />
 
       {/* Main content area */}
@@ -190,7 +195,10 @@ export function HomePageIDE() {
         }`}
       >
         {mode === "write" ? (
-          <WriteMode projectName={currentProject?.name} />
+          <WriteMode
+            projectName={currentProject?.name}
+            onOpenSettings={handleOpenSettings}
+          />
         ) : (
           <ErrorBoundary
             key={scriptModeKey}
@@ -225,6 +233,7 @@ export function HomePageIDE() {
                 projectId={currentProject?.id}
                 projectName={currentProject?.name}
                 gitlabBranch={gitlabBranch}
+                onOpenSettings={handleOpenSettings}
               />
             </Suspense>
           </ErrorBoundary>

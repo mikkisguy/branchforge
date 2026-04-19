@@ -1,15 +1,21 @@
 /**
- * SceneNavigator Component
+ * LabelNavigator Component
  *
- * Left sidebar for navigating scenes in WriteMode.
+ * Left sidebar for navigating labels in WriteMode.
  * Matches app design system with theme colors and simple styling.
  */
 
 import { useMemo } from "react";
-import type { PublicLabel } from "@branchforge/shared";
+import type { PublicLabel, LabelStatus } from "@branchforge/shared";
 import { Sparkles, ChevronLeft } from "lucide-react";
 
-interface SceneNavigatorProps {
+const STATUS_COLORS: Record<LabelStatus, string> = {
+  FINAL: "var(--theme-color)",
+  REVIEW: "var(--theme-review-color)",
+  DRAFT: "var(--theme-draft-color)",
+};
+
+interface LabelNavigatorProps {
   labels: PublicLabel[];
   activeLabelId: string | null;
   onSelect: (labelId: string) => void;
@@ -18,14 +24,14 @@ interface SceneNavigatorProps {
   onToggleCollapse?: () => void;
 }
 
-export function SceneNavigator({
+export function LabelNavigator({
   labels,
   activeLabelId,
   onSelect,
   projectName,
   projectLabelCount,
   onToggleCollapse,
-}: SceneNavigatorProps) {
+}: LabelNavigatorProps) {
   const groupedLabels = useMemo(() => {
     const groups = new Map<string, PublicLabel[]>();
 
@@ -71,8 +77,8 @@ export function SceneNavigator({
             type="button"
             onClick={onToggleCollapse}
             className="absolute top-2 left-2 z-30 p-1 rounded-md hover:bg-muted/80 transition-colors"
-            aria-label="Collapse scene navigator sidebar"
-            title="Collapse scene navigator sidebar"
+            aria-label="Collapse label navigator sidebar"
+            title="Collapse label navigator sidebar"
           >
             <ChevronLeft className="w-4 h-4 text-muted-foreground" />
           </button>
@@ -86,18 +92,18 @@ export function SceneNavigator({
               {projectName || "Write Mode"}
             </span>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {projectLabelCount ?? labels.length} scene
+              {projectLabelCount ?? labels.length} label
               {(projectLabelCount ?? labels.length) !== 1 ? "s" : ""}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Scene List */}
+      {/* Label List */}
       <div className="p-3 space-y-2">
         {groupedLabels.size === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
-            No scenes yet
+            No labels yet
           </p>
         ) : (
           <div className="space-y-3">
@@ -111,9 +117,12 @@ export function SceneNavigator({
                   <div className="space-y-1.5">
                     {groupLabels.map((label) => {
                       const isActive = label.id === activeLabelId;
+                      const statusColor =
+                        STATUS_COLORS[label.status ?? "DRAFT"];
 
                       return (
                         <button
+                          type="button"
                           key={label.id}
                           onClick={() => onSelect(label.id)}
                           aria-pressed={isActive}
@@ -127,17 +136,12 @@ export function SceneNavigator({
                           <div
                             className="absolute left-0 top-2 bottom-2 w-1 rounded-r"
                             style={{
-                              backgroundColor:
-                                label.status === "FINAL"
-                                  ? "var(--theme-color)"
-                                  : label.status === "REVIEW"
-                                    ? "var(--theme-review-color)"
-                                    : "var(--theme-draft-color)",
+                              backgroundColor: statusColor,
                               opacity: isActive ? 1 : 0.5,
                             }}
                           />
 
-                          {/* Scene Title */}
+                          {/* Label Title */}
                           <div className="ml-2.5" title={label.title}>
                             <h3
                               className={`text-sm font-medium truncate ${
