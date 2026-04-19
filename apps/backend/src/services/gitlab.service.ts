@@ -18,6 +18,7 @@ import {
   decryptPAT,
   validateGitLabUrl,
 } from "./encryption.service.js";
+import { NotFoundError } from "../middleware/error-handler.middleware.js";
 
 const DEFAULT_TIMEOUT_MS = 30000;
 
@@ -308,20 +309,39 @@ export async function linkRepository(
   defaultBranch: string = "main"
 ): Promise<void> {
   const db = getDb();
-  await db
-    .insert(gitlabRepositories)
-    .values({
-      projectId,
-      gitlabProjectId,
-      repositoryName,
-      defaultBranch,
-    })
-    .onConflictDoNothing({
-      target: [
-        gitlabRepositories.projectId,
-        gitlabRepositories.gitlabProjectId,
-      ],
-    });
+
+  await db.transaction(async (tx) => {
+    // Insert into gitlab_repositories, updating repositoryName and defaultBranch on conflict
+    await tx
+      .insert(gitlabRepositories)
+      .values({
+        projectId,
+        gitlabProjectId,
+        repositoryName,
+        defaultBranch,
+      })
+      .onConflictDoUpdate({
+        target: [
+          gitlabRepositories.projectId,
+          gitlabRepositories.gitlabProjectId,
+        ],
+        set: {
+          repositoryName,
+          defaultBranch,
+        },
+      });
+
+    // Ensure project source is set to GITLAB
+    const updateResult = await tx
+      .update(projects)
+      .set({ source: "GITLAB", updatedAt: new Date() })
+      .where(eq(projects.id, projectId));
+
+    // Validate that the project exists by checking affected row count
+    if (updateResult.rowCount === 0) {
+      throw new NotFoundError("Project");
+    }
+  });
 }
 
 /**

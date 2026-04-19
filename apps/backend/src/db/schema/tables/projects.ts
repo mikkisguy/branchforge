@@ -13,7 +13,11 @@ import {
   index,
   primaryKey,
 } from "drizzle-orm/pg-core";
-import { userRoleEnum, projectVisibilityEnum } from "../enums.js";
+import {
+  userRoleEnum,
+  projectVisibilityEnum,
+  fileSourceEnum,
+} from "../enums.js";
 import { users } from "./users.js";
 
 /**
@@ -30,6 +34,7 @@ export const projects = pgTable(
     description: text("description"),
     maxMeterDelta: integer("max_meter_delta").default(10),
     visibility: projectVisibilityEnum("visibility").default("PRIVATE"),
+    source: fileSourceEnum("source").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

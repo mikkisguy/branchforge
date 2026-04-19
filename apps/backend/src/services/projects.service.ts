@@ -8,24 +8,15 @@ import { getDb } from "../db/index.js";
 import { projects, projectUsers } from "../db/schema/index.js";
 import { eq, and } from "drizzle-orm";
 import type { NewProject } from "../db/schema/tables/projects.js";
-import type { UserRole } from "@branchforge/shared";
+import type {
+  UserRole,
+  FileSourceType,
+  PublicProject,
+} from "@branchforge/shared";
 import {
   NotFoundError,
   ForbiddenError,
 } from "../middleware/error-handler.middleware.js";
-
-/**
- * Public project information (without sensitive data)
- */
-export interface PublicProject {
-  id: string;
-  name: string;
-  description?: string;
-  maxMeterDelta?: number;
-  visibility?: UserRole;
-  createdAt: Date;
-  updatedAt: Date;
-}
 
 /**
  * Project row type from database queries (with optional role for shared projects)
@@ -35,6 +26,7 @@ type ProjectRow = {
   name: string;
   description: string | null;
   maxMeterDelta: number | null;
+  source: FileSourceType;
   createdAt: Date;
   updatedAt: Date;
   role?: UserRole;
@@ -58,6 +50,7 @@ function toPublicProject(
     description: project.description ?? undefined,
     maxMeterDelta: project.maxMeterDelta ?? undefined,
     visibility,
+    source: project.source,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
   };
@@ -70,6 +63,7 @@ export interface CreateProjectBody {
   name: string;
   description?: string;
   maxMeterDelta?: number;
+  source?: FileSourceType;
 }
 
 /**
@@ -103,6 +97,7 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
       name: projects.name,
       description: projects.description,
       maxMeterDelta: projects.maxMeterDelta,
+      source: projects.source,
       role: projectUsers.role, // User's role from project_users
       createdAt: projects.createdAt,
       updatedAt: projects.updatedAt,
@@ -157,6 +152,7 @@ export async function getProject(
       name: projects.name,
       description: projects.description,
       maxMeterDelta: projects.maxMeterDelta,
+      source: projects.source,
       createdAt: projects.createdAt,
       updatedAt: projects.updatedAt,
     })
@@ -175,6 +171,7 @@ export async function getProject(
       name: projects.name,
       description: projects.description,
       maxMeterDelta: projects.maxMeterDelta,
+      source: projects.source,
       role: projectUsers.role,
       createdAt: projects.createdAt,
       updatedAt: projects.updatedAt,
@@ -209,6 +206,7 @@ export async function createProject(
     name: body.name,
     description: body.description,
     maxMeterDelta: body.maxMeterDelta ?? 10,
+    source: body.source ?? "ZIP",
   };
 
   const result = await db.insert(projects).values(newProject).returning();

@@ -37,6 +37,8 @@ import {
   detectConflicts,
   type ConflictResolution,
 } from "../services/gitlab-sync.service.js";
+import { isValidConflictResolution } from "../lib/validation.js";
+import { createProject, deleteProject } from "../services/projects.service.js";
 import { syncLabelsFromGitLabFile } from "../services/gitlab-file-sync.service.js";
 
 /**
@@ -112,6 +114,15 @@ interface ExportBody {
 interface DetectConflictsBody {
   projectId: string;
   branch: string;
+}
+
+interface ImportProjectBody {
+  projectName: string;
+  projectDescription?: string;
+  gitlabProjectId: number;
+  gitlabProjectName: string;
+  branch: string;
+  conflictResolution: ConflictResolution;
 }
 
 interface UpdateFileContentBody {
@@ -729,12 +740,7 @@ async function importHandler(
     return;
   }
 
-  const validResolutions: ConflictResolution[] = [
-    "branchforge_wins",
-    "gitlab_wins",
-    "manual_review",
-  ];
-  if (!validResolutions.includes(conflictResolution)) {
+  if (!isValidConflictResolution(conflictResolution)) {
     reply.status(400).send({ error: "Invalid conflictResolution" });
     return;
   }
@@ -758,6 +764,92 @@ async function importHandler(
     );
     reply.status(500).send({
       error: "Failed to import from GitLab",
+      details: err instanceof Error ? err.message : "Unknown error",
+    });
+  }
+}
+
+/**
+ * Import project from GitLab
+ *
+ * POST /api/gitlab/import-project
+ * Body: { projectName, projectDescription?, gitlabProjectId, gitlabProjectName, branch, conflictResolution }
+ *
+ * Creates a new project, links it to a GitLab repository, and imports files.
+ */
+async function importProjectHandler(
+  request: FastifyRequest<{ Body: ImportProjectBody }>,
+  reply: FastifyReply
+): Promise<void> {
+  const userId = getAuthenticatedUserId(request);
+  const {
+    projectName,
+    projectDescription,
+    gitlabProjectId,
+    gitlabProjectName,
+    branch,
+    conflictResolution,
+  } = request.body;
+
+  if (!projectName || !gitlabProjectId || !gitlabProjectName || !branch) {
+    reply.status(400).send({ error: "Missing required fields" });
+    return;
+  }
+
+  if (!isValidConflictResolution(conflictResolution)) {
+    reply.status(400).send({ error: "Invalid conflictResolution" });
+    return;
+  }
+
+  let newProject: Awaited<ReturnType<typeof createProject>> | null = null;
+
+  try {
+    newProject = await createProject(userId, {
+      name: projectName,
+      description: projectDescription,
+      source: "GITLAB",
+    });
+
+    await linkRepository(
+      newProject.id,
+      gitlabProjectId,
+      gitlabProjectName,
+      branch
+    );
+
+    const operation = await importFromGitlab(
+      newProject.id,
+      branch,
+      conflictResolution
+    );
+
+    reply.status(202).send({
+      project: newProject,
+      operation,
+    });
+  } catch (err) {
+    request.log.error(
+      { err },
+      "importProjectHandler: Failed to import project from GitLab"
+    );
+
+    if (newProject?.id) {
+      try {
+        await deleteProject(userId, newProject.id);
+        request.log.info(
+          { projectId: newProject.id },
+          "importProjectHandler: Cleaned up partially created project"
+        );
+      } catch (deleteErr) {
+        request.log.error(
+          { err: deleteErr, projectId: newProject.id },
+          "importProjectHandler: Failed to cleanup partially created project"
+        );
+      }
+    }
+
+    reply.status(500).send({
+      error: "Failed to import project from GitLab",
       details: err instanceof Error ? err.message : "Unknown error",
     });
   }
@@ -1174,6 +1266,14 @@ export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
     importHandler
   );
 
+  fastify.post<{ Body: ImportProjectBody }>(
+    "/gitlab/import-project",
+    {
+      onRequest: [authenticate],
+    },
+    importProjectHandler
+  );
+
   fastify.get<{ Params: { operationId: string } }>(
     "/gitlab/operations/:operationId",
     {
@@ -1216,3 +1316,5 @@ export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
     updateGitLabFileHandler
   );
 }
+
+export type { ImportProjectBody };
