@@ -383,7 +383,8 @@ async function importProjectHandler(
     );
     reply.status(500).send({
       success: false,
-      error: err instanceof Error ? err.message : "Unknown error",
+      error:
+        "Failed to import project from ZIP file. Please check the file format and try again.",
     } as ImportProjectResponse);
   }
 }

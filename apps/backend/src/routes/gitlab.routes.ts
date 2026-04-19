@@ -7,6 +7,7 @@
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { authenticate } from "../middleware/auth.middleware.js";
+import { validateBody } from "../middleware/validation.middleware.js";
 import { checkRateLimit } from "../services/rate-limiter.service.js";
 import { getDb } from "../db/index.js";
 import {
@@ -37,7 +38,11 @@ import {
   detectConflicts,
   type ConflictResolution,
 } from "../services/gitlab-sync.service.js";
-import { isValidConflictResolution } from "../lib/validation.js";
+import {
+  importProjectSchema,
+  type ImportProjectInput,
+  isValidConflictResolution,
+} from "../lib/validation.js";
 import { createProject, deleteProject } from "../services/projects.service.js";
 import { syncLabelsFromGitLabFile } from "../services/gitlab-file-sync.service.js";
 
@@ -114,15 +119,6 @@ interface ExportBody {
 interface DetectConflictsBody {
   projectId: string;
   branch: string;
-}
-
-interface ImportProjectBody {
-  projectName: string;
-  projectDescription?: string;
-  gitlabProjectId: number;
-  gitlabProjectName: string;
-  branch: string;
-  conflictResolution: ConflictResolution;
 }
 
 interface UpdateFileContentBody {
@@ -276,7 +272,7 @@ async function validateTokenHandler(
     );
     reply.status(500).send({
       error: "Failed to validate token",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -318,7 +314,7 @@ async function storeIntegrationHandler(
     );
     reply.status(500).send({
       error: "Failed to store integration",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -360,7 +356,7 @@ async function getIntegrationHandler(
     );
     reply.status(500).send({
       error: "Failed to get integration",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -388,7 +384,7 @@ async function deleteIntegrationHandler(
     );
     reply.status(500).send({
       error: "Failed to delete integration",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -426,7 +422,7 @@ async function listProjectsHandler(
 
     reply.status(500).send({
       error: "Failed to list GitLab repositories",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -480,14 +476,14 @@ async function linkRepositoryHandler(
     if (err instanceof Error && err.message.includes("duplicate key value")) {
       reply.status(409).send({
         error: "Repository already linked",
-        details: err.message,
+        message: "This repository is already linked to your project.",
       });
       return;
     }
 
     reply.status(500).send({
       error: "Failed to link repository",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -521,7 +517,7 @@ async function unlinkRepositoryHandler(
     );
     reply.status(500).send({
       error: "Failed to unlink repository",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -558,7 +554,7 @@ async function listRepositoriesHandler(
     );
     reply.status(500).send({
       error: "Failed to list linked repositories",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -605,14 +601,14 @@ async function listBranchesHandler(
     if (err instanceof Error && err.message.startsWith("GitLab API error:")) {
       reply.status(502).send({
         error: "Failed to fetch branches from GitLab",
-        details: err.message,
+        message: "Unable to communicate with GitLab. Please try again later.",
       });
       return;
     }
 
     reply.status(500).send({
       error: "Failed to list branches",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -668,14 +664,14 @@ async function listFilesHandler(
     if (err instanceof Error && err.message.startsWith("GitLab API error:")) {
       reply.status(502).send({
         error: "Failed to fetch files from GitLab",
-        details: err.message,
+        message: "Unable to communicate with GitLab. Please try again later.",
       });
       return;
     }
 
     reply.status(500).send({
       error: "Failed to list RPY files",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -715,7 +711,7 @@ async function exportHandler(
     );
     reply.status(500).send({
       error: "Failed to export to GitLab",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -764,7 +760,7 @@ async function importHandler(
     );
     reply.status(500).send({
       error: "Failed to import from GitLab",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -778,7 +774,7 @@ async function importHandler(
  * Creates a new project, links it to a GitLab repository, and imports files.
  */
 async function importProjectHandler(
-  request: FastifyRequest<{ Body: ImportProjectBody }>,
+  request: FastifyRequest<{ Body: ImportProjectInput }>,
   reply: FastifyReply
 ): Promise<void> {
   const userId = getAuthenticatedUserId(request);
@@ -790,16 +786,6 @@ async function importProjectHandler(
     branch,
     conflictResolution,
   } = request.body;
-
-  if (!projectName || !gitlabProjectId || !gitlabProjectName || !branch) {
-    reply.status(400).send({ error: "Missing required fields" });
-    return;
-  }
-
-  if (!isValidConflictResolution(conflictResolution)) {
-    reply.status(400).send({ error: "Invalid conflictResolution" });
-    return;
-  }
 
   let newProject: Awaited<ReturnType<typeof createProject>> | null = null;
 
@@ -850,7 +836,7 @@ async function importProjectHandler(
 
     reply.status(500).send({
       error: "Failed to import project from GitLab",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -892,7 +878,7 @@ async function getOperationHandler(
     );
     reply.status(500).send({
       error: "Failed to get sync operation",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -926,7 +912,7 @@ async function listOperationsHandler(
     );
     reply.status(500).send({
       error: "Failed to list sync operations",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -966,7 +952,7 @@ async function detectConflictsHandler(
     );
     reply.status(500).send({
       error: "Failed to detect conflicts",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -1051,7 +1037,7 @@ async function getGitLabFilesHandler(
     );
     reply.status(500).send({
       error: "Failed to get GitLab files",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -1159,7 +1145,7 @@ async function updateGitLabFileHandler(
     );
     reply.status(500).send({
       error: "Failed to update GitLab file",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -1266,10 +1252,11 @@ export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
     importHandler
   );
 
-  fastify.post<{ Body: ImportProjectBody }>(
+  fastify.post<{ Body: ImportProjectInput }>(
     "/gitlab/import-project",
     {
       onRequest: [authenticate],
+      preValidation: validateBody(importProjectSchema),
     },
     importProjectHandler
   );
@@ -1316,5 +1303,3 @@ export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
     updateGitLabFileHandler
   );
 }
-
-export type { ImportProjectBody };

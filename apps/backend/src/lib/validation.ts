@@ -943,6 +943,27 @@ export const createGitLabIntegrationSchema = z
   })
   .strict();
 
+/**
+ * Import project request validation
+ */
+export const importProjectSchema = z
+  .object({
+    projectName: requiredString(200, "Project name is too long"),
+    projectDescription: optionalString(2000, "Project description is too long"),
+    gitlabProjectId: z
+      .number()
+      .int()
+      .positive("GitLab project ID must be positive"),
+    gitlabProjectName: requiredString(500, "GitLab project name is too long"),
+    branch: z
+      .string()
+      .min(1, "Branch is required")
+      .max(255, "Branch name is too long")
+      .regex(/^[a-zA-Z0-9-_/]+$/, "Branch name contains invalid characters"),
+    conflictResolution: conflictResolutionSchema,
+  })
+  .strict();
+
 // ============================================================================
 // Export/Import Schemas
 // ============================================================================
@@ -1112,6 +1133,7 @@ export const updateWritingGoalSchema = z
 
 export type UpdateWritingGoalInput = z.infer<typeof updateWritingGoalSchema>;
 export type ConflictResolutionValue = z.infer<typeof conflictResolutionSchema>;
+export type ImportProjectInput = z.infer<typeof importProjectSchema>;
 
 // ============================================================================
 // Helper Functions
