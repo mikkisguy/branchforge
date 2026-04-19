@@ -16,7 +16,7 @@ export { UndoRedoControls } from "./UndoRedoControls";
 export {
   ProseEditor,
   DialogueLine,
-  SceneNavigator,
+  LabelNavigator,
   CharacterReferencePanel,
   FocusModeToggle,
 } from "../write-mode";

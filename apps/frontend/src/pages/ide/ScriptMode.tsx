@@ -25,12 +25,14 @@ interface ScriptModeProps {
   projectId?: string;
   projectName?: string;
   gitlabBranch?: string;
+  onOpenSettings?: () => void;
 }
 
 export function ScriptMode({
   projectId,
   projectName,
   gitlabBranch,
+  onOpenSettings,
 }: ScriptModeProps) {
   const { error: showErrorToast } = useToast();
   const { activeLabel, activeLabelId, setActiveLabelId, isLoadingLabels } =
@@ -329,17 +331,6 @@ export function ScriptMode({
     return projectFiles[0].sourceType;
   }, [projectFiles, isLinked]);
 
-  const statusBar = (
-    <StatusBar
-      language="Ren'Py"
-      projectId={projectId}
-      projectName={projectName}
-      gitlabBranch={gitlabBranch}
-      fileSourceType={primaryFileSourceType}
-      isFocusMode={isFocusMode}
-    />
-  );
-
   if (isLoadingLabels || isLoadingFiles) {
     return (
       <div className="h-screen flex flex-col overflow-hidden">
@@ -348,7 +339,6 @@ export function ScriptMode({
             <p className="text-muted-foreground">Loading project...</p>
           </div>
         </div>
-        {statusBar}
       </div>
     );
   }
@@ -365,8 +355,8 @@ export function ScriptMode({
           onShowSyncDialogChange={setShowSyncDialog}
           showZipImportDialog={showZipImportDialog}
           onShowZipImportDialogChange={setShowZipImportDialog}
+          onOpenSettings={onOpenSettings}
         />
-        {statusBar}
       </div>
     );
   }
@@ -409,7 +399,14 @@ export function ScriptMode({
         onSaveRequest={activeProjectFile ? retryFileSave : undefined}
       />
 
-      {statusBar}
+      <StatusBar
+        language="Ren'Py"
+        projectId={projectId}
+        projectName={projectName}
+        gitlabBranch={gitlabBranch}
+        fileSourceType={primaryFileSourceType}
+        isFocusMode={isFocusMode}
+      />
 
       {projectId && isLinked && linkedRepo && (
         <GitLabSyncDialog

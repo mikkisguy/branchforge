@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   BookOpen,
   SquarePen,
@@ -26,7 +26,7 @@ export interface ThemePaletteOption {
   color: string;
 }
 
-interface LeftSidebarProps {
+interface LeftSidebarPropsBase {
   mode: "write" | "script";
   setMode: (mode: "write" | "script") => void;
   theme: string;
@@ -46,30 +46,60 @@ interface LeftSidebarProps {
   deleteProject?: (projectId: string) => Promise<void>;
 }
 
-export function LeftSidebar({
-  mode,
-  setMode,
-  theme,
-  setTheme,
-  themePalettes,
-  onLogout,
-  projectId,
-  projects,
-  setCurrentProject,
-  isLoadingProjects,
-  isCollapsed,
-  onCollapsedChange,
-  updateProject,
-  deleteProject,
-}: LeftSidebarProps) {
+interface ControlledSettingsProps extends LeftSidebarPropsBase {
+  isSettingsOpenExternally: boolean;
+  onSettingsOpenChangeExternally: (open: boolean) => void;
+}
+
+interface UncontrolledSettingsProps extends LeftSidebarPropsBase {
+  isSettingsOpenExternally?: never;
+  onSettingsOpenChangeExternally?: never;
+}
+
+export type LeftSidebarProps =
+  | ControlledSettingsProps
+  | UncontrolledSettingsProps;
+
+export function LeftSidebar(props: LeftSidebarProps) {
+  const {
+    mode,
+    setMode,
+    theme,
+    setTheme,
+    themePalettes,
+    onLogout,
+    projectId,
+    projects,
+    setCurrentProject,
+    isLoadingProjects,
+    isCollapsed,
+    onCollapsedChange,
+    updateProject,
+    deleteProject,
+  } = props;
+
+  const isSettingsOpenExternally = props.isSettingsOpenExternally;
+  const onSettingsOpenChangeExternally = props.onSettingsOpenChangeExternally;
   const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSettingsOpenInternal, setIsSettingsOpenInternal] = useState(false);
   const [isRoutesOpen, setIsRoutesOpen] = useState(false);
   const [isStateVarsOpen, setIsStateVarsOpen] = useState(false);
   const [isCharactersOpen, setIsCharactersOpen] = useState(false);
   const [isProjectPopoverOpen, setIsProjectPopoverOpen] = useState(false);
   const themeDropdownRef = useRef<HTMLDivElement>(null);
   const projectPopoverRef = useRef<HTMLDivElement>(null);
+
+  const isSettingsOpen = isSettingsOpenExternally ?? isSettingsOpenInternal;
+  const setSettingsOpen = useCallback(
+    (value: boolean) => {
+      if (onSettingsOpenChangeExternally) {
+        onSettingsOpenChangeExternally(value);
+      } else {
+        setIsSettingsOpenInternal(value);
+      }
+    },
+    [onSettingsOpenChangeExternally, setIsSettingsOpenInternal]
+  );
 
   const handleToggleCollapse = () => {
     const newState = !isCollapsed;
@@ -180,7 +210,8 @@ export function LeftSidebar({
                         </div>
                       ) : projects.length === 0 ? (
                         <div className="px-3 py-2 text-sm text-muted-foreground">
-                          No projects
+                          No projects found. Create a new project to get
+                          started.
                         </div>
                       ) : (
                         projects.map((project) => (
@@ -380,7 +411,7 @@ export function LeftSidebar({
 
           {/* Settings */}
           <button
-            onClick={() => setIsSettingsOpen(true)}
+            onClick={() => setSettingsOpen(true)}
             className={`flex items-center ${
               isCollapsed ? "justify-center px-2.5 py-2.5" : "gap-3 px-2 py-2"
             } rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors`}
@@ -407,7 +438,7 @@ export function LeftSidebar({
       {/* Modals */}
       <SettingsModal
         open={isSettingsOpen}
-        onOpenChange={setIsSettingsOpen}
+        onOpenChange={setSettingsOpen}
         projects={projects}
         project={projects.find((p) => p.id === projectId) ?? null}
         onUpdateProject={updateProject}

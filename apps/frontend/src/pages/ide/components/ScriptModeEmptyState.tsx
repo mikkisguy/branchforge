@@ -1,4 +1,4 @@
-import { Download, Package } from "lucide-react";
+import { Download, FileCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GitLabSyncDialog } from "@/components/script-mode/GitLabSyncDialog";
 import { ZipImportDialog } from "@/components/zip-import";
@@ -12,6 +12,7 @@ interface ScriptModeEmptyStateProps {
   onShowSyncDialogChange: (open: boolean) => void;
   showZipImportDialog: boolean;
   onShowZipImportDialogChange: (open: boolean) => void;
+  onOpenSettings?: () => void;
 }
 
 export function ScriptModeEmptyState({
@@ -23,40 +24,57 @@ export function ScriptModeEmptyState({
   onShowSyncDialogChange,
   showZipImportDialog,
   onShowZipImportDialogChange,
+  onOpenSettings,
 }: ScriptModeEmptyStateProps) {
-  return (
-    <div className="flex-1 flex flex-col pt-16">
-      <div className="flex-1 flex flex-col items-center justify-center gap-4">
-        <p className="text-muted-foreground">No files imported yet</p>
-        <p className="text-sm text-muted-foreground">
-          {isLinked
-            ? "Import from GitLab or import from a zip file to get started"
-            : "Import from a zip file to get started"}
+  if (!projectId) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center">
+        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-4">
+          <FileCode className="w-10 h-10 text-muted-foreground/60" />
+        </div>
+        <p className="text-foreground font-medium">No project selected</p>
+        <p className="text-sm text-muted-foreground/70 mt-1 text-center max-w-md px-4">
+          To edit scripts, import a project in Settings.
         </p>
-        <div className="flex gap-2">
-          {projectId && isLinked && linkedRepoDefaultBranch && (
-            <Button
-              variant="outline"
-              onClick={() => onShowSyncDialogChange(true)}
-              className="mt-2"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Import from GitLab
-            </Button>
-          )}
+        {onOpenSettings && (
+          <Button type="button" className="mt-4" onClick={onOpenSettings}>
+            Open Settings
+          </Button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center">
+      <div className="w-20 h-20 rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-4">
+        <FileCode className="w-10 h-10 text-muted-foreground/60" />
+      </div>
+      <p className="text-foreground font-medium">No files imported yet</p>
+      <p className="text-sm text-muted-foreground/70 mt-1 text-center max-w-md px-4">
+        {isLinked
+          ? "Import from GitLab or import from a zip file to get started"
+          : "Import from a zip file to get started"}
+      </p>
+
+      <div className="flex gap-2 mt-4">
+        {isLinked && linkedRepoDefaultBranch && (
           <Button
             variant="outline"
-            onClick={() => onShowZipImportDialogChange(true)}
-            className="mt-2"
-            disabled={!projectId}
+            onClick={() => onShowSyncDialogChange(true)}
+            type="button"
           >
-            <Package className="w-4 h-4 mr-2" />
-            Import from Zip
+            <Download className="w-4 h-4 mr-2" />
+            Import from GitLab
           </Button>
-        </div>
+        )}
+        <Button type="button" onClick={() => onShowZipImportDialogChange(true)}>
+          <FileCode className="w-4 h-4 mr-2" />
+          Import from Zip
+        </Button>
       </div>
 
-      {projectId && isLinked && linkedRepoDefaultBranch && (
+      {isLinked && linkedRepoDefaultBranch && (
         <GitLabSyncDialog
           open={showSyncDialog}
           onOpenChange={onShowSyncDialogChange}
@@ -67,14 +85,12 @@ export function ScriptModeEmptyState({
         />
       )}
 
-      {projectId && (
-        <ZipImportDialog
-          open={showZipImportDialog}
-          onOpenChange={onShowZipImportDialogChange}
-          projectId={projectId}
-          projectName={projectName}
-        />
-      )}
+      <ZipImportDialog
+        open={showZipImportDialog}
+        onOpenChange={onShowZipImportDialogChange}
+        projectId={projectId}
+        projectName={projectName}
+      />
     </div>
   );
 }

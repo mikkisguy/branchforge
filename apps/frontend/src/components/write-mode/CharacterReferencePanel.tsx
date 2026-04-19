@@ -35,7 +35,7 @@ export function CharacterReferencePanel({
   isCollapsed = false,
   onCollapseToggle,
 }: CharacterReferencePanelProps) {
-  const sceneCharacters = useMemo(() => {
+  const labelCharacters = useMemo(() => {
     return activeLabel?.characters ?? [];
   }, [activeLabel?.characters]);
 
@@ -43,19 +43,19 @@ export function CharacterReferencePanel({
     return new Map(characters.map((c) => [c.id, c]));
   }, [characters]);
 
-  const sceneCharacterIds = useMemo(() => {
-    return new Set(sceneCharacters.map((sc) => sc.id));
-  }, [sceneCharacters]);
+  const labelCharacterIds = useMemo(() => {
+    return new Set(labelCharacters.map((sc) => sc.id));
+  }, [labelCharacters]);
 
   const otherCharacters = useMemo(() => {
-    return characters.filter((c) => !sceneCharacterIds.has(c.id));
-  }, [characters, sceneCharacterIds]);
+    return characters.filter((c) => !labelCharacterIds.has(c.id));
+  }, [characters, labelCharacterIds]);
 
-  const resolvedSceneChars = useMemo(() => {
-    return sceneCharacters
+  const resolvedLabelChars = useMemo(() => {
+    return labelCharacters
       .map((sc) => characterById.get(sc.id))
       .filter((c): c is Character => c !== undefined);
-  }, [sceneCharacters, characterById]);
+  }, [labelCharacters, characterById]);
 
   return (
     <>
@@ -79,29 +79,29 @@ export function CharacterReferencePanel({
             )}
             <h2 className="text-sm font-semibold tracking-wide">Characters</h2>
             <p className="text-xs text-muted-foreground mt-1">
-              {resolvedSceneChars.length} in scene · {characters.length} total
+              {resolvedLabelChars.length} in label · {characters.length} total
             </p>
           </div>
 
           <div className="p-3 space-y-4">
-            {/* Scene Characters */}
+            {/* Label Characters */}
             <div>
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
-                In This Scene
+                In This Label
               </h3>
 
-              {resolvedSceneChars.length === 0 ? (
+              {resolvedLabelChars.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-2">
                     <span className="text-2xl opacity-40">👥</span>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    No characters in this scene
+                    No characters in this label
                   </p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {resolvedSceneChars.map((character) => (
+                  {resolvedLabelChars.map((character) => (
                     <div
                       key={character.id}
                       className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-muted transition-colors focus-within:bg-muted group"
