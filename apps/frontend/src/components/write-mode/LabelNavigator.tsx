@@ -6,14 +6,14 @@
  */
 
 import { useMemo } from "react";
-import type { PublicLabel } from "@branchforge/shared";
+import type { PublicLabel, LabelStatus } from "@branchforge/shared";
 import { Sparkles, ChevronLeft } from "lucide-react";
 
-const STATUS_COLORS = {
+const STATUS_COLORS: Record<LabelStatus, string> = {
   FINAL: "var(--theme-color)",
   REVIEW: "var(--theme-review-color)",
   DRAFT: "var(--theme-draft-color)",
-} as const;
+};
 
 interface LabelNavigatorProps {
   labels: PublicLabel[];
@@ -117,6 +117,8 @@ export function LabelNavigator({
                   <div className="space-y-1.5">
                     {groupLabels.map((label) => {
                       const isActive = label.id === activeLabelId;
+                      const statusColor =
+                        STATUS_COLORS[label.status ?? "DRAFT"];
 
                       return (
                         <button
@@ -134,10 +136,7 @@ export function LabelNavigator({
                           <div
                             className="absolute left-0 top-2 bottom-2 w-1 rounded-r"
                             style={{
-                              backgroundColor:
-                                STATUS_COLORS[
-                                  label.status as keyof typeof STATUS_COLORS
-                                ] || STATUS_COLORS.DRAFT,
+                              backgroundColor: statusColor,
                               opacity: isActive ? 1 : 0.5,
                             }}
                           />

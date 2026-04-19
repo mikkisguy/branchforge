@@ -195,26 +195,26 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
     );
   }
 
-  if (!labels.length) {
-    if (!currentProject) {
-      return (
-        <div className="h-screen flex flex-col items-center justify-center">
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-4">
-            <FileText className="w-10 h-10 text-muted-foreground/60" />
-          </div>
-          <p className="text-foreground font-medium">No project selected</p>
-          <p className="text-sm text-muted-foreground/70 mt-1 text-center max-w-md px-4">
-            To start writing, import a project in Settings.
-          </p>
-          {onOpenSettings && (
-            <Button type="button" className="mt-4" onClick={onOpenSettings}>
-              Open Settings
-            </Button>
-          )}
+  if (!currentProject) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center">
+        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-4">
+          <FileText className="w-10 h-10 text-muted-foreground/60" />
         </div>
-      );
-    }
+        <p className="text-foreground font-medium">No project selected</p>
+        <p className="text-sm text-muted-foreground/70 mt-1 text-center max-w-md px-4">
+          To start writing, import a project in Settings.
+        </p>
+        {onOpenSettings && (
+          <Button type="button" className="mt-4" onClick={onOpenSettings}>
+            Open Settings
+          </Button>
+        )}
+      </div>
+    );
+  }
 
+  if (!labels.length) {
     return (
       <div className="h-screen flex flex-col items-center justify-center">
         <div className="w-20 h-20 rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-4">
