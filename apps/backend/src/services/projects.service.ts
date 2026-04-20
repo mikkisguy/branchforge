@@ -10,7 +10,7 @@ import { eq, and } from "drizzle-orm";
 import type { NewProject } from "../db/schema/tables/projects.js";
 import type {
   UserRole,
-  FileSourceType,
+  SourceOrigin,
   PublicProject,
 } from "@branchforge/shared";
 import {
@@ -28,7 +28,7 @@ type ProjectRow = {
   name: string;
   description: string | null;
   maxMeterDelta: number | null;
-  source: FileSourceType;
+  source: SourceOrigin;
   createdAt: Date;
   updatedAt: Date;
   role?: UserRole;

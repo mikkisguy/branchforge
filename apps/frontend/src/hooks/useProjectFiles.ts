@@ -9,7 +9,7 @@ import { useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { projectFilesApi } from "@/lib/api/project-files";
 import { projectFilesKeys } from "@/lib/query-keys";
-import type { ProjectFile, ProjectSource } from "@branchforge/shared";
+import type { ProjectFile, SourceOrigin } from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -26,7 +26,7 @@ export interface ProjectFileNode extends ProjectFile {
 }
 
 export interface UseProjectFilesOptions {
-  source?: ProjectSource;
+  source?: SourceOrigin;
 }
 
 export interface UseProjectFilesReturn {

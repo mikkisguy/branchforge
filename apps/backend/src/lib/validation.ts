@@ -284,9 +284,9 @@ export const loginSchema = z.object({
 // ============================================================================
 
 /**
- * Project source enum
+ * Source origin enum
  */
-export const projectSourceSchema = z.enum(["GITLAB", "ZIP"], {
+export const sourceOriginSchema = z.enum(["GITLAB", "ZIP"], {
   message: "Source must be GITLAB or ZIP",
 });
 
@@ -298,7 +298,7 @@ export const createProjectSchema = z
     name: requiredString(200, "Project name is too long"),
     description: optionalString(2000, "Description is too long"),
     maxMeterDelta: z.number().int().optional(),
-    source: projectSourceSchema.optional(),
+    source: sourceOriginSchema.optional(),
   })
   .strict();
 
@@ -323,7 +323,7 @@ export const projectIdParamsSchema = z.object({
  * Project files query validation
  */
 export const projectFilesQuerySchema = z.object({
-  source: projectSourceSchema.optional(),
+  source: sourceOriginSchema.optional(),
 });
 
 export type ProjectFilesQuery = z.infer<typeof projectFilesQuerySchema>;
@@ -1009,7 +1009,7 @@ export const paginationQuerySchema = z.object({
 // Export inferred types for use in route handlers
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
-export type ProjectSource = z.infer<typeof projectSourceSchema>;
+export type SourceOrigin = z.infer<typeof sourceOriginSchema>;
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type ListLabelsQuery = z.infer<typeof listLabelsQuerySchema>;

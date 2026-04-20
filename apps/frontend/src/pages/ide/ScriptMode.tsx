@@ -14,7 +14,7 @@ import { useLabelFileSync } from "@/hooks/useLabelFileSync";
 import { useProjectReset } from "@/hooks/useProjectReset";
 import { useScriptModeRefresh } from "@/hooks/useScriptModeRefresh";
 import { useToast } from "@/contexts/ToastContext";
-import type { FileSourceType } from "@branchforge/shared";
+import type { SourceOrigin } from "@branchforge/shared";
 import type { ScriptEditorRef } from "@/components/script-mode/ScriptEditor";
 import { useLocalStorageBoolean } from "@/hooks/useLocalStorage";
 import { ScriptModeEditorLayout } from "./components/ScriptModeEditorLayout";
@@ -320,7 +320,7 @@ export function ScriptMode({
   const isLinked = projectId ? isProjectLinked(projectId) : false;
   const linkedRepo = projectId ? getLinkedRepository(projectId) : null;
 
-  const primaryFileSourceType: FileSourceType | undefined = useMemo(() => {
+  const primaryFileSourceType: SourceOrigin | undefined = useMemo(() => {
     if (projectFiles.length === 0) {
       if (isLinked) {
         return "GITLAB";

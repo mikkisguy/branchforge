@@ -11,7 +11,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import type { ProjectSource } from "@branchforge/shared";
+import type { SourceOrigin } from "@branchforge/shared";
 import {
   projectsApi,
   type Project,
@@ -68,7 +68,7 @@ function persistCurrentProjectId(projectId: string | null): void {
 
 export interface CreateProjectOptions {
   name: string;
-  source?: ProjectSource;
+  source?: SourceOrigin;
 }
 
 export interface UseProjectReturn {

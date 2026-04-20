@@ -7,7 +7,7 @@ import {
 import { ConflictReviewDialog } from "@/components/script-mode/ConflictReviewDialog";
 import { ZipImportDialog } from "@/components/zip-import";
 import { cn } from "@/lib/utils";
-import type { FileSourceType } from "@branchforge/shared";
+import type { SourceOrigin } from "@branchforge/shared";
 
 // Status bar styled like a storybook footer
 interface StatusBarProps {
@@ -16,7 +16,7 @@ interface StatusBarProps {
   projectName?: string;
   gitlabBranch?: string;
   // File source type - determines which import/export controls to show
-  fileSourceType?: FileSourceType;
+  fileSourceType?: SourceOrigin;
   // Focus mode
   isFocusMode?: boolean;
 }
