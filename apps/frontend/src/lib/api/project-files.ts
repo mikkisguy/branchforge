@@ -7,7 +7,8 @@
 
 import { request } from "./client.js";
 import type { ProjectFile } from "@branchforge/shared";
-import { FileSourceType, isValidFileSourceType } from "@branchforge/shared";
+import type { SourceOrigin } from "@branchforge/shared";
+import { isValidSourceOrigin } from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -88,13 +89,13 @@ export const projectFilesApi = {
    */
   async listFiles(
     projectId: string,
-    options?: { source?: FileSourceType }
+    options?: { source?: SourceOrigin }
   ): Promise<ProjectFileNode[]> {
     validateRequired(projectId, "Project ID");
 
     const searchParams = new URLSearchParams();
     if (options?.source) {
-      if (!isValidFileSourceType(options.source)) {
+      if (!isValidSourceOrigin(options.source)) {
         throw new Error(VALIDATION_ERRORS.INVALID_SOURCE);
       }
       searchParams.append("source", options.source);
@@ -113,12 +114,12 @@ export const projectFilesApi = {
   async getFile(
     projectId: string,
     filePath: string,
-    source: FileSourceType
+    source: SourceOrigin
   ): Promise<ProjectFile> {
     validateRequired(projectId, "Project ID");
     validateRequired(filePath, "File path");
 
-    if (!isValidFileSourceType(source)) {
+    if (!isValidSourceOrigin(source)) {
       throw new Error(VALIDATION_ERRORS.INVALID_SOURCE);
     }
 

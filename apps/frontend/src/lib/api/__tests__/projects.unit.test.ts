@@ -29,6 +29,7 @@ describe("Projects API", () => {
         description: "A test project",
         maxMeterDelta: 5,
         visibility: "OWNER",
+        source: "ZIP",
         createdAt: "2024-01-01T00:00:00.000Z",
         updatedAt: "2024-01-01T00:00:00.000Z",
       },
@@ -96,6 +97,7 @@ describe("Projects API", () => {
       description: "A test project",
       maxMeterDelta: 5,
       visibility: "OWNER",
+      source: "ZIP",
       createdAt: "2024-01-01T00:00:00.000Z",
       updatedAt: "2024-01-01T00:00:00.000Z",
     };
@@ -157,6 +159,7 @@ describe("Projects API", () => {
       name: "New Project",
       description: "A new project",
       maxMeterDelta: 10,
+      source: "ZIP",
     };
 
     const mockProject: Project = {
@@ -165,6 +168,7 @@ describe("Projects API", () => {
       description: "A new project",
       maxMeterDelta: 10,
       visibility: "OWNER",
+      source: "ZIP",
       createdAt: "2024-01-01T00:00:00.000Z",
       updatedAt: "2024-01-01T00:00:00.000Z",
     };
@@ -211,13 +215,14 @@ describe("Projects API", () => {
     });
 
     it("should create project with only required fields", async () => {
-      const minimalBody = { name: "Minimal Project" };
+      const minimalBody = { name: "Minimal Project", source: "ZIP" as const };
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           project: {
             id: "proj-min",
             name: "Minimal Project",
+            source: "ZIP" as const,
             visibility: "OWNER",
             createdAt: "2024-01-01T00:00:00.000Z",
             updatedAt: "2024-01-01T00:00:00.000Z",
@@ -262,7 +267,7 @@ describe("Projects API", () => {
         json: async () => ({ project: {} }),
       });
 
-      await projectsApi.createProject({ name: "Test" });
+      await projectsApi.createProject({ name: "Test", source: "ZIP" });
 
       expect(mockFetch.mock.calls[0][1]?.headers).toHaveProperty(
         "Content-Type",
@@ -302,6 +307,7 @@ describe("Projects API", () => {
       description: "Updated description",
       maxMeterDelta: 10,
       visibility: "OWNER",
+      source: "ZIP",
       createdAt: "2024-01-01T00:00:00.000Z",
       updatedAt: "2024-01-02T00:00:00.000Z",
     };

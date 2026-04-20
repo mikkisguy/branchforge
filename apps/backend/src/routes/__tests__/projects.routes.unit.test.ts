@@ -77,8 +77,9 @@ describe("ProjectsRoutes", () => {
           description: "A test project",
           maxMeterDelta: 10,
           visibility: "OWNER" as const,
-          createdAt: new Date("2024-01-01"),
-          updatedAt: new Date("2024-01-01"),
+          source: "ZIP" as const,
+          createdAt: new Date("2024-01-01").toISOString(),
+          updatedAt: new Date("2024-01-01").toISOString(),
         },
       ];
 
@@ -105,8 +106,9 @@ describe("ProjectsRoutes", () => {
         description: "A test project",
         maxMeterDelta: 10,
         visibility: "OWNER" as const,
-        createdAt: new Date("2024-01-01"),
-        updatedAt: new Date("2024-01-01"),
+        source: "ZIP" as const,
+        createdAt: new Date("2024-01-01").toISOString(),
+        updatedAt: new Date("2024-01-01").toISOString(),
       };
 
       vi.mocked(projectsService.getProject).mockResolvedValue(mockProject);
@@ -141,14 +143,15 @@ describe("ProjectsRoutes", () => {
         name: "New Project",
         description: "A new project",
         maxMeterDelta: 15,
+        source: "ZIP" as const,
       };
 
       const mockProject = {
         id: "new-project-id",
         ...requestBody,
         visibility: "OWNER" as const,
-        createdAt: new Date("2024-01-01"),
-        updatedAt: new Date("2024-01-01"),
+        createdAt: new Date("2024-01-01").toISOString(),
+        updatedAt: new Date("2024-01-01").toISOString(),
       };
 
       vi.mocked(projectsService.createProject).mockResolvedValue(mockProject);
@@ -163,6 +166,7 @@ describe("ProjectsRoutes", () => {
       const json = response.json();
       expect(json.project.id).toBe("new-project-id");
       expect(json.project.name).toBe("New Project");
+      expect(json.project.source).toBe("ZIP");
     });
 
     it("should return 400 when name is missing", async () => {
@@ -195,8 +199,9 @@ describe("ProjectsRoutes", () => {
         ...requestBody,
         maxMeterDelta: 10,
         visibility: "OWNER" as const,
-        createdAt: new Date("2024-01-01"),
-        updatedAt: new Date("2024-01-02"),
+        source: "ZIP" as const,
+        createdAt: new Date("2024-01-01").toISOString(),
+        updatedAt: new Date("2024-01-02").toISOString(),
       };
 
       vi.mocked(projectsService.updateProject).mockResolvedValue(mockProject);

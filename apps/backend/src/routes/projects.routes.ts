@@ -13,7 +13,7 @@ import {
   updateProject,
   deleteProject,
 } from "../services/projects.service.js";
-import type { FileSourceType, PublicProject } from "@branchforge/shared";
+import type { SourceOrigin, PublicProject } from "@branchforge/shared";
 import { authenticate } from "../middleware/auth.middleware.js";
 import {
   validateBody,
@@ -247,7 +247,7 @@ async function deleteProjectHandler(
 async function getProjectFilesHandler(
   request: FastifyRequest<{
     Params: { projectId: string };
-    Querystring: { source?: FileSourceType };
+    Querystring: { source?: SourceOrigin };
   }>,
   reply: FastifyReply
 ): Promise<void> {
@@ -326,12 +326,10 @@ async function getProjectFilesHandler(
 
     // Attach labels to each file and map database field names to API field names
     const filesWithLabels = files.map((file) => {
-      const { source: fileSource, ...fileWithoutSource } = file;
+      const labels = labelsByFileId.get(file.id) ?? [];
       return {
-        ...fileWithoutSource,
-        // Map database 'source' column to API 'sourceType' field
-        sourceType: fileSource,
-        labels: labelsByFileId.get(file.id) ?? [],
+        ...file,
+        labels,
       };
     });
 
@@ -566,7 +564,7 @@ export async function projectsRoutes(fastify: FastifyInstance): Promise<void> {
   // Project files routes
   fastify.get<{
     Params: { projectId: string };
-    Querystring: { source?: FileSourceType };
+    Querystring: { source?: SourceOrigin };
   }>(
     "/projects/:projectId/files",
     {

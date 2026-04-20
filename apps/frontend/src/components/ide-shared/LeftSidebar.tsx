@@ -11,6 +11,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   FolderOpen,
+  X,
 } from "lucide-react";
 import type { ThemePalette } from "@/contexts/ThemeContext";
 import type { Project, UpdateProjectBody } from "@/lib/api/projects";
@@ -19,6 +20,13 @@ import { RouteSettingsModal } from "./RouteSettingsModal";
 import { StateVariablesModal } from "./StateVariablesModal";
 import { CharactersModal } from "./CharactersModal";
 import { Logo } from "@/components/ui/logo";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 export interface ThemePaletteOption {
   name: string;
@@ -86,6 +94,8 @@ export function LeftSidebar(props: LeftSidebarProps) {
   const [isStateVarsOpen, setIsStateVarsOpen] = useState(false);
   const [isCharactersOpen, setIsCharactersOpen] = useState(false);
   const [isProjectPopoverOpen, setIsProjectPopoverOpen] = useState(false);
+  const [showGitLabImportDialog, setShowGitLabImportDialog] = useState(false);
+  const [showZipImportDialog, setShowZipImportDialog] = useState(false);
   const themeDropdownRef = useRef<HTMLDivElement>(null);
   const projectPopoverRef = useRef<HTMLDivElement>(null);
 
@@ -440,10 +450,10 @@ export function LeftSidebar(props: LeftSidebarProps) {
         open={isSettingsOpen}
         onOpenChange={setSettingsOpen}
         projects={projects}
-        project={projects.find((p) => p.id === projectId) ?? null}
         onUpdateProject={updateProject}
         onDeleteProject={deleteProject}
-        onSelectProject={setCurrentProject}
+        onImportFromGitLab={() => setShowGitLabImportDialog(true)}
+        onImportZip={() => setShowZipImportDialog(true)}
       />
       {projectId && (
         <>
@@ -464,6 +474,66 @@ export function LeftSidebar(props: LeftSidebarProps) {
           />
         </>
       )}
+
+      {/* GitLab Import Dialog - Placeholder for Phase 3 */}
+      <Dialog
+        open={showGitLabImportDialog}
+        onOpenChange={setShowGitLabImportDialog}
+      >
+        <DialogContent className="w-[500px] max-w-[95vw]">
+          <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <DialogTitle>Import from GitLab</DialogTitle>
+            <button
+              type="button"
+              onClick={() => setShowGitLabImportDialog(false)}
+              className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
+            >
+              <X className="w-5 h-5" />
+              <span className="sr-only">Close</span>
+            </button>
+          </DialogHeader>
+          <div className="py-6">
+            <p className="text-sm text-muted-foreground">
+              GitLab project import will be available in Phase 3. This will
+              allow you to import a Ren'Py project directly from a GitLab
+              repository.
+            </p>
+            <div className="mt-4 flex justify-end">
+              <Button onClick={() => setShowGitLabImportDialog(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ZIP Import Dialog - Placeholder for Phase 3 */}
+      <Dialog open={showZipImportDialog} onOpenChange={setShowZipImportDialog}>
+        <DialogContent className="w-[500px] max-w-[95vw]">
+          <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <DialogTitle>Import from ZIP</DialogTitle>
+            <button
+              type="button"
+              onClick={() => setShowZipImportDialog(false)}
+              className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
+            >
+              <X className="w-5 h-5" />
+              <span className="sr-only">Close</span>
+            </button>
+          </DialogHeader>
+          <div className="py-6">
+            <p className="text-sm text-muted-foreground">
+              ZIP file import will be available in Phase 3. This will allow you
+              to upload a ZIP file containing your Ren'Py project files.
+            </p>
+            <div className="mt-4 flex justify-end">
+              <Button onClick={() => setShowZipImportDialog(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

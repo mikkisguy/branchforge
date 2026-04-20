@@ -478,20 +478,21 @@ export const GitLabFileType = {
 } as const;
 
 /**
- * File source type enumeration (where files come from)
+ * Source origin enumeration
+ * Indicates where content originated from (GitLab repository or ZIP file)
  */
-export type FileSourceType = "GITLAB" | "ZIP";
-export const FileSourceType = {
+export type SourceOrigin = "GITLAB" | "ZIP";
+export const SourceOrigin = {
   GITLAB: "GITLAB",
   ZIP: "ZIP",
 } as const;
 
 /**
- * Validates that a value is a valid FileSourceType.
+ * Validates that a value is a valid SourceOrigin.
  * @param value - The value to validate
- * @returns true if the value is a valid FileSourceType
+ * @returns true if the value is a valid SourceOrigin
  */
-export function isValidFileSourceType(value: string): value is FileSourceType {
+export function isValidSourceOrigin(value: string): value is SourceOrigin {
   return value === "GITLAB" || value === "ZIP";
 }
 
@@ -505,7 +506,7 @@ export interface ProjectFile {
   filePath: string; // e.g., "labels/act_i.rpy" or "gui/screens.rpy"
   fileType: GitLabFileType;
   content: string; // Full RPY content for Script Mode
-  sourceType: FileSourceType;
+  source: SourceOrigin;
   contentHash: string; // SHA-256 hash for idempotency
   // GitLab-only fields (optional/nullable for non-GitLab sources)
   lastSyncedAt?: string | null;
@@ -517,7 +518,7 @@ export interface ProjectFile {
 /**
  * Legacy: GitLab file information (use ProjectFile instead)
  * Represents a GitLab file tracked in the system
- * @deprecated Use ProjectFile with sourceType: "GITLAB" instead
+ * @deprecated Use ProjectFile with source: "GITLAB" instead
  */
 export interface GitLabFile {
   id: string;
@@ -643,7 +644,7 @@ export interface PublicProject {
   description?: string;
   maxMeterDelta?: number;
   visibility?: UserRole;
-  source: FileSourceType;
+  source: SourceOrigin;
   createdAt: string;
   updatedAt: string;
 }
