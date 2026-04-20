@@ -284,6 +284,13 @@ export const loginSchema = z.object({
 // ============================================================================
 
 /**
+ * Project source enum
+ */
+export const projectSourceSchema = z.enum(["GITLAB", "ZIP"], {
+  message: "Source must be GITLAB or ZIP",
+});
+
+/**
  * Create project request validation
  */
 export const createProjectSchema = z
@@ -291,6 +298,7 @@ export const createProjectSchema = z
     name: requiredString(200, "Project name is too long"),
     description: optionalString(2000, "Description is too long"),
     maxMeterDelta: z.number().int().optional(),
+    source: projectSourceSchema.optional(),
   })
   .strict();
 
@@ -315,7 +323,7 @@ export const projectIdParamsSchema = z.object({
  * Project files query validation
  */
 export const projectFilesQuerySchema = z.object({
-  source: z.enum(["GITLAB", "ZIP"]).optional(),
+  source: projectSourceSchema.optional(),
 });
 
 export type ProjectFilesQuery = z.infer<typeof projectFilesQuerySchema>;
@@ -818,6 +826,39 @@ export const characterIdParamsSchema = z.object({
 // ============================================================================
 
 /**
+ * Conflict resolution enum
+ */
+export const conflictResolutionSchema = z.enum(
+  ["branchforge_wins", "gitlab_wins", "manual_review"],
+  {
+    message:
+      "Conflict resolution must be branchforge_wins, gitlab_wins, or manual_review",
+  }
+);
+
+/**
+ * Get the valid conflict resolution values
+ * @returns Array of valid conflict resolution values
+ */
+export function getValidConflictResolutions(): ConflictResolutionValue[] {
+  return ["branchforge_wins", "gitlab_wins", "manual_review"];
+}
+
+/**
+ * Check if a value is a valid conflict resolution
+ * @param value - The value to check
+ * @returns true if the value is a valid conflict resolution
+ */
+export function isValidConflictResolution(
+  value: unknown
+): value is ConflictResolutionValue {
+  return (
+    typeof value === "string" &&
+    getValidConflictResolutions().includes(value as ConflictResolutionValue)
+  );
+}
+
+/**
  * Check if a hostname is a private/local IP address
  * Uses proper IP parsing to detect numeric IPs and various formats
  */
@@ -902,6 +943,27 @@ export const createGitLabIntegrationSchema = z
   })
   .strict();
 
+/**
+ * Import project request validation
+ */
+export const importProjectSchema = z
+  .object({
+    projectName: requiredString(200, "Project name is too long"),
+    projectDescription: optionalString(2000, "Project description is too long"),
+    gitlabProjectId: z
+      .number()
+      .int()
+      .positive("GitLab project ID must be positive"),
+    gitlabProjectName: requiredString(500, "GitLab project name is too long"),
+    branch: z
+      .string()
+      .min(1, "Branch is required")
+      .max(255, "Branch name is too long")
+      .regex(/^[a-zA-Z0-9-_/]+$/, "Branch name contains invalid characters"),
+    conflictResolution: conflictResolutionSchema,
+  })
+  .strict();
+
 // ============================================================================
 // Export/Import Schemas
 // ============================================================================
@@ -947,6 +1009,7 @@ export const paginationQuerySchema = z.object({
 // Export inferred types for use in route handlers
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type ProjectSource = z.infer<typeof projectSourceSchema>;
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type ListLabelsQuery = z.infer<typeof listLabelsQuerySchema>;
@@ -1069,6 +1132,8 @@ export const updateWritingGoalSchema = z
   .strict();
 
 export type UpdateWritingGoalInput = z.infer<typeof updateWritingGoalSchema>;
+export type ConflictResolutionValue = z.infer<typeof conflictResolutionSchema>;
+export type ImportProjectInput = z.infer<typeof importProjectSchema>;
 
 // ============================================================================
 // Helper Functions

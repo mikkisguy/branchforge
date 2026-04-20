@@ -63,6 +63,7 @@ describe("GitLabService (Integration)", () => {
     name: "Owned Project",
     description: "A project owned by the user",
     maxMeterDelta: 10,
+    source: "ZIP",
   };
 
   const otherProject: NewProject = {
@@ -71,6 +72,7 @@ describe("GitLabService (Integration)", () => {
     name: "Other Project",
     description: "Another project",
     maxMeterDelta: 10,
+    source: "ZIP",
   };
 
   // Mock encryption service for testing

@@ -12,8 +12,8 @@ import {
   createProject,
   updateProject,
   deleteProject,
-  type PublicProject,
 } from "../services/projects.service.js";
+import type { FileSourceType, PublicProject } from "@branchforge/shared";
 import { authenticate } from "../middleware/auth.middleware.js";
 import {
   validateBody,
@@ -43,7 +43,6 @@ import {
   ForbiddenError,
   ValidationError,
 } from "../middleware/error-handler.middleware.js";
-import type { ProjectSource } from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -248,7 +247,7 @@ async function deleteProjectHandler(
 async function getProjectFilesHandler(
   request: FastifyRequest<{
     Params: { projectId: string };
-    Querystring: { source?: ProjectSource };
+    Querystring: { source?: FileSourceType };
   }>,
   reply: FastifyReply
 ): Promise<void> {
@@ -567,7 +566,7 @@ export async function projectsRoutes(fastify: FastifyInstance): Promise<void> {
   // Project files routes
   fastify.get<{
     Params: { projectId: string };
-    Querystring: { source?: ProjectSource };
+    Querystring: { source?: FileSourceType };
   }>(
     "/projects/:projectId/files",
     {
