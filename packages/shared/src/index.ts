@@ -628,3 +628,22 @@ export function isValidAvatarMimeType(
     mimeType.toLowerCase() as (typeof AVATAR_ALLOWED_MIME_TYPES)[number]
   );
 }
+
+// ============================================================================
+// Public Project Types (API Response Types)
+// ============================================================================
+
+/**
+ * Public project information (without sensitive data)
+ * This matches the backend's PublicProject interface
+ */
+export interface PublicProject {
+  id: string;
+  name: string;
+  description?: string;
+  maxMeterDelta?: number;
+  visibility?: UserRole;
+  source: FileSourceType;
+  createdAt: string;
+  updatedAt: string;
+}
