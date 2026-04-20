@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import { Loader2, X } from "lucide-react";
 import {
   Dialog,
@@ -35,12 +35,18 @@ export function ProjectEditDialog({
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const previousProjectIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    // Only reset form when dialog first opens or project ID changes
     if (open && project) {
-      setName(project.name);
-      setDescription(project.description ?? "");
-      setError(null);
+      const projectIdChanged = previousProjectIdRef.current !== project.id;
+      if (projectIdChanged) {
+        setName(project.name);
+        setDescription(project.description ?? "");
+        setError(null);
+        previousProjectIdRef.current = project.id;
+      }
     }
   }, [open, project]);
 

@@ -66,7 +66,7 @@ export const gitlabKeys = {
 export const projectFilesKeys = {
   all: ["projectFiles"] as const,
   lists: (projectId: string) => ["projectFiles", projectId, "list"] as const,
-  listsWithSource: (projectId: string, source?: SourceOrigin) =>
+  listsWithSource: (projectId: string, source: SourceOrigin) =>
     ["projectFiles", projectId, "list", source] as const,
   detail: (projectId: string, fileId: string) =>
     ["projectFiles", projectId, "detail", fileId] as const,

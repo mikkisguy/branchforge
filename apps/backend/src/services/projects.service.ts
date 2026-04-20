@@ -203,7 +203,7 @@ export async function createProject(
     name: body.name,
     description: body.description,
     maxMeterDelta: body.maxMeterDelta ?? 10,
-    source: body.source ?? "ZIP",
+    source: body.source,
   };
 
   const result = await db.insert(projects).values(newProject).returning();

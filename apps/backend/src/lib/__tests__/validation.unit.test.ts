@@ -551,15 +551,51 @@ describe("Project Schemas", () => {
       const validData = {
         name: "Test Project",
         description: "A test project",
+        source: "ZIP" as const,
       };
 
       const result = createProjectSchema.safeParse(validData);
       expect(result.success).toBe(true);
     });
 
+    it("should accept valid source values", () => {
+      const validSources = ["ZIP" as const, "GITLAB" as const];
+
+      for (const source of validSources) {
+        const validData = {
+          name: "Test Project",
+          source: source,
+        };
+
+        const result = createProjectSchema.safeParse(validData);
+        expect(result.success).toBe(true);
+      }
+    });
+
+    it("should reject invalid source", () => {
+      const invalidData = {
+        name: "Test Project",
+        source: "INVALID",
+      };
+
+      const result = createProjectSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject missing source", () => {
+      const invalidData = {
+        name: "Test Project",
+        // source field is missing
+      };
+
+      const result = createProjectSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+    });
+
     it("should reject empty project name", () => {
       const invalidData = {
         name: "   ",
+        source: "ZIP" as const,
       };
 
       const result = createProjectSchema.safeParse(invalidData);

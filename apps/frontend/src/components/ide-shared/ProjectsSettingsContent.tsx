@@ -103,7 +103,7 @@ export function ProjectsSettingsContent({
               </Button>
             )}
           </div>
-          {!hasIntegration && onImportFromGitLab && (
+          {!hasIntegration && !isLoadingIntegration && onImportFromGitLab && (
             <div className="flex items-start gap-2 max-w-md text-sm text-muted-foreground mt-2">
               <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <p>
@@ -146,7 +146,7 @@ export function ProjectsSettingsContent({
               </Button>
             )}
           </div>
-          {!hasIntegration && onImportFromGitLab && (
+          {!hasIntegration && !isLoadingIntegration && onImportFromGitLab && (
             <div className="flex items-start gap-2 text-xs text-muted-foreground mt-1 max-w-[300px]">
               <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
               <p>
@@ -203,6 +203,7 @@ export function ProjectsSettingsContent({
                         variant="ghost"
                         size="sm"
                         onClick={() => handleEditClick(project)}
+                        aria-label={`Edit ${project.name}`}
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
@@ -212,6 +213,7 @@ export function ProjectsSettingsContent({
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDeleteClick(project)}
+                        aria-label={`Delete ${project.name}`}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>

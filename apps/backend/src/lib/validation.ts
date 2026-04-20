@@ -298,7 +298,7 @@ export const createProjectSchema = z
     name: requiredString(200, "Project name is too long"),
     description: optionalString(2000, "Description is too long"),
     maxMeterDelta: z.number().int().optional(),
-    source: sourceOriginSchema.optional(),
+    source: sourceOriginSchema,
   })
   .strict();
 
@@ -1009,7 +1009,6 @@ export const paginationQuerySchema = z.object({
 // Export inferred types for use in route handlers
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
-export type SourceOrigin = z.infer<typeof sourceOriginSchema>;
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type ListLabelsQuery = z.infer<typeof listLabelsQuerySchema>;

@@ -506,7 +506,7 @@ export interface ProjectFile {
   filePath: string; // e.g., "labels/act_i.rpy" or "gui/screens.rpy"
   fileType: GitLabFileType;
   content: string; // Full RPY content for Script Mode
-  sourceType: SourceOrigin;
+  source: SourceOrigin;
   contentHash: string; // SHA-256 hash for idempotency
   // GitLab-only fields (optional/nullable for non-GitLab sources)
   lastSyncedAt?: string | null;
@@ -518,7 +518,7 @@ export interface ProjectFile {
 /**
  * Legacy: GitLab file information (use ProjectFile instead)
  * Represents a GitLab file tracked in the system
- * @deprecated Use ProjectFile with sourceType: "GITLAB" instead
+ * @deprecated Use ProjectFile with source: "GITLAB" instead
  */
 export interface GitLabFile {
   id: string;

@@ -328,7 +328,7 @@ export function ScriptMode({
       return undefined;
     }
 
-    return projectFiles[0].sourceType;
+    return projectFiles[0].source;
   }, [projectFiles, isLinked]);
 
   if (isLoadingLabels || isLoadingFiles) {
