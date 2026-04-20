@@ -11,6 +11,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
+import type { ProjectSource } from "@branchforge/shared";
 import {
   projectsApi,
   type Project,
@@ -65,6 +66,11 @@ function persistCurrentProjectId(projectId: string | null): void {
 // Types
 // ============================================================================
 
+export interface CreateProjectOptions {
+  name: string;
+  source?: ProjectSource;
+}
+
 export interface UseProjectReturn {
   // Projects state
   projects: Project[];
@@ -75,7 +81,7 @@ export interface UseProjectReturn {
   // Methods
   refreshProjects: () => Promise<void>;
   setCurrentProject: (project: Project | null) => void;
-  createProject: (name: string) => Promise<Project>;
+  createProject: (options: CreateProjectOptions) => Promise<Project>;
   updateProject: (
     projectId: string,
     body: UpdateProjectBody
@@ -151,8 +157,11 @@ export function useProject(): UseProjectReturn {
 
   // Create project mutation
   const createProjectMutation = useMutation({
-    mutationFn: async (name: string) => {
-      return projectsApi.createProject({ name });
+    mutationFn: async (options: CreateProjectOptions) => {
+      return projectsApi.createProject({
+        name: options.name,
+        source: options.source ?? "ZIP",
+      });
     },
     onSuccess: async (newProject) => {
       // Invalidate and refetch projects list
@@ -178,8 +187,10 @@ export function useProject(): UseProjectReturn {
   };
 
   // Create project method
-  const createProject = async (name: string): Promise<Project> => {
-    return createProjectMutation.mutateAsync(name);
+  const createProject = async (
+    options: CreateProjectOptions
+  ): Promise<Project> => {
+    return createProjectMutation.mutateAsync(options);
   };
 
   // Update project mutation

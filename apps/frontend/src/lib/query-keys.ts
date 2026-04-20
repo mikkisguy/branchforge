@@ -7,6 +7,8 @@
  * - Predictable cache organization
  */
 
+import type { ProjectSource } from "@branchforge/shared";
+
 // ============================================================================
 // Auth Keys
 // ============================================================================
@@ -64,11 +66,11 @@ export const gitlabKeys = {
 export const projectFilesKeys = {
   all: ["projectFiles"] as const,
   lists: (projectId: string) => ["projectFiles", projectId, "list"] as const,
-  listsWithSource: (projectId: string, source?: "GITLAB" | "ZIP") =>
+  listsWithSource: (projectId: string, source?: ProjectSource) =>
     ["projectFiles", projectId, "list", source] as const,
   detail: (projectId: string, fileId: string) =>
     ["projectFiles", projectId, "detail", fileId] as const,
-  content: (projectId: string, filePath: string, source: "GITLAB" | "ZIP") =>
+  content: (projectId: string, filePath: string, source: ProjectSource) =>
     ["projectFiles", projectId, "content", filePath, source] as const,
 } as const;
 

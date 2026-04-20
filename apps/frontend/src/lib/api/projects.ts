@@ -1,4 +1,4 @@
-import type { UserRole } from "@branchforge/shared";
+import type { ProjectSource, UserRole } from "@branchforge/shared";
 import { request } from "./client";
 
 /**
@@ -17,6 +17,7 @@ export interface Project {
   description?: string;
   maxMeterDelta?: number;
   visibility?: UserRole;
+  source: ProjectSource;
   createdAt: string;
   updatedAt: string;
 }
@@ -25,6 +26,7 @@ export interface CreateProjectBody {
   name: string;
   description?: string;
   maxMeterDelta?: number;
+  source: ProjectSource;
 }
 
 export interface UpdateProjectBody {

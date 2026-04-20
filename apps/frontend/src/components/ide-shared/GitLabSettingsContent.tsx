@@ -1,34 +1,26 @@
 /**
  * GitLab Settings Content
  *
- * Content component for the GitLab tab in SettingsModal.
- * Handles PAT input, validation, and linked projects management.
+ * Content component for the Integrations tab in SettingsModal.
+ * Handles PAT input, validation, and integration management.
+ * Repository linking is now handled in the import flow, not here.
  */
 
-import { useState, useCallback, useEffect } from "react";
-import { Eye, EyeOff, Trash2, Link as LinkIcon, Loader2 } from "lucide-react";
+import { useState, useCallback } from "react";
+import { Eye, EyeOff, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { InlineMessage } from "@/components/ui/inline-error";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { SettingsSection } from "@/components/ide-shared/SettingsLayout";
 import { useGitLab } from "@/hooks/useGitLab";
-import { useProject } from "@/hooks/useProject";
 import { useToast } from "@/contexts/ToastContext";
-import { gitlabApi } from "@/lib/api/gitlab";
-import { GitLabRepositoryLinkingDialog } from "./GitLabRepositoryLinkingDialog";
-
-// ============================================================================
-// Types
-// ============================================================================
-
-interface LinkedProjectDisplay {
-  id: string;
-  name: string;
-  gitlabRepository: string;
-  defaultBranch: string;
-}
 
 // ============================================================================
 // Component
@@ -39,13 +31,11 @@ export function GitLabSettingsContent() {
     hasIntegration,
     isLoadingIntegration,
     integrationError,
-    linkedRepositories,
     refreshIntegration,
     validateToken,
     storeToken,
     removeIntegration,
   } = useGitLab();
-  const { projects } = useProject();
 
   const { success, error } = useToast();
 
@@ -61,19 +51,8 @@ export function GitLabSettingsContent() {
     username?: string;
   } | null>(null);
 
-  // Linked projects display state
-  const [linkedProjects, setLinkedProjects] = useState<LinkedProjectDisplay[]>(
-    []
-  );
-
   // Dialog state
-  const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [showRemoveConfirmDialog, setShowRemoveConfirmDialog] = useState(false);
-
-  // Unlinking state - track which project ID is being unlinked
-  const [unlinkingProjectId, setUnlinkingProjectId] = useState<string | null>(
-    null
-  );
 
   /**
    * Validate token
@@ -180,74 +159,25 @@ export function GitLabSettingsContent() {
     setShowRemoveConfirmDialog(false);
   }, []);
 
-  /**
-   * Unlink a GitLab repository from a project
-   */
-  const handleUnlink = useCallback(
-    async (projectId: string) => {
-      setUnlinkingProjectId(projectId);
-
-      try {
-        await gitlabApi.unlinkRepository(projectId);
-        success("GitLab repository unlinked successfully");
-        await refreshIntegration();
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Failed to unlink repository";
-        error(message);
-      } finally {
-        setUnlinkingProjectId(null);
-      }
-    },
-    [refreshIntegration, success, error]
-  );
-
-  /**
-   * Load linked projects
-   */
-  const loadLinkedProjects = useCallback(() => {
-    // Create a map of project IDs to project names for efficient lookup
-    const projectMap = new Map(projects.map((p) => [p.id, p.name]));
-
-    // Map linked repositories with actual project names
-    const linkedProjectsList: LinkedProjectDisplay[] = Array.from(
-      linkedRepositories.values()
-    ).map((repo) => ({
-      id: repo.projectId,
-      name:
-        projectMap.get(repo.projectId) ||
-        `Unknown Project (${repo.projectId.substring(0, 8)})`,
-      gitlabRepository: repo.repositoryName,
-      defaultBranch: repo.defaultBranch,
-    }));
-    setLinkedProjects(linkedProjectsList);
-  }, [linkedRepositories, projects]);
-
-  useEffect(() => {
-    loadLinkedProjects();
-  }, [loadLinkedProjects]);
-
   // ============================================================================
   // Render
   // ============================================================================
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-medium">GitLab Integration</h3>
-
       {isLoadingIntegration ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
         </div>
       ) : hasIntegration ? (
-        // Has integration - show linked projects and remove option
+        // Has integration - show status and remove option
         <div className="space-y-3">
-          <SettingsSection title="Connection">
+          <SettingsSection title="Connection Status">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-medium">GitLab connected</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Your integration is active.
+                  Your integration is active and ready to import projects.
                 </p>
               </div>
               <Button
@@ -265,65 +195,11 @@ export function GitLabSettingsContent() {
               </Button>
             </div>
           </SettingsSection>
-
-          <SettingsSection title="Linked Projects">
-            {linkedProjects.length > 0 ? (
-              <div className="space-y-3">
-                {linkedProjects.map((project) => (
-                  <div
-                    key={project.id}
-                    className="p-3 bg-muted/20 rounded-md border border-border/30 flex items-center justify-between"
-                  >
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{project.name}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {project.gitlabRepository} · {project.defaultBranch}
-                      </p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleUnlink(project.id)}
-                      disabled={unlinkingProjectId === project.id}
-                    >
-                      {unlinkingProjectId === project.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4" />
-                      )}
-                    </Button>
-                  </div>
-                ))}
-
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => setShowLinkDialog(true)}
-                >
-                  <LinkIcon className="w-4 h-4 mr-2" />
-                  Link New Project
-                </Button>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <p className="text-sm">No linked projects yet</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4"
-                  onClick={() => setShowLinkDialog(true)}
-                >
-                  <LinkIcon className="w-4 h-4 mr-2" />
-                  Link Project
-                </Button>
-              </div>
-            )}
-          </SettingsSection>
         </div>
       ) : (
         // No integration - show token input form
         <div className="space-y-3">
-          <SettingsSection title="Connection">
+          <SettingsSection title="GitLab Configuration">
             <div className="space-y-2">
               <Label htmlFor="gitlab-url">GitLab URL</Label>
               <Input
@@ -340,10 +216,10 @@ export function GitLabSettingsContent() {
             </div>
           </SettingsSection>
 
-          <SettingsSection title="Access Token">
+          <SettingsSection title="Personal Access Token">
             <div className="space-y-3">
               <div className="space-y-2">
-                <Label htmlFor="token">Personal Access Token</Label>
+                <Label htmlFor="token">Access Token</Label>
                 <div className="relative">
                   <Input
                     id="token"
@@ -395,7 +271,9 @@ export function GitLabSettingsContent() {
 
               {integrationError && (
                 <InlineMessage variant="error">
-                  {integrationError.message || String(integrationError)}
+                  {integrationError instanceof Error
+                    ? integrationError.message
+                    : String(integrationError)}
                 </InlineMessage>
               )}
 
@@ -432,13 +310,6 @@ export function GitLabSettingsContent() {
         </div>
       )}
 
-      {/* Link Project Dialog */}
-      <GitLabRepositoryLinkingDialog
-        open={showLinkDialog}
-        onOpenChange={setShowLinkDialog}
-        onLinkSuccess={loadLinkedProjects}
-      />
-
       {/* Remove Confirmation Dialog */}
       <Dialog
         open={showRemoveConfirmDialog}
@@ -447,11 +318,14 @@ export function GitLabSettingsContent() {
         <DialogContent className="max-w-md w-full p-0 gap-0">
           {/* Header */}
           <div className="p-6">
-            <h2 className="text-lg font-medium">Remove GitLab Integration</h2>
-            <p className="text-sm text-muted-foreground mt-1">
+            <DialogTitle className="text-lg font-medium">
+              Remove GitLab Integration
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground mt-1">
               Are you sure you want to remove your GitLab integration? This will
-              unlink all repositories.
-            </p>
+              remove your credentials but will not affect existing imported
+              projects.
+            </DialogDescription>
           </div>
 
           {/* Footer */}

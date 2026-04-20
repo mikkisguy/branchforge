@@ -496,6 +496,25 @@ export function isValidFileSourceType(value: string): value is FileSourceType {
 }
 
 /**
+ * Project source enumeration
+ * Indicates where a project originated from
+ */
+export type ProjectSource = "GITLAB" | "ZIP";
+export const ProjectSource = {
+  GITLAB: "GITLAB",
+  ZIP: "ZIP",
+} as const;
+
+/**
+ * Validates that a value is a valid ProjectSource.
+ * @param value - The value to validate
+ * @returns true if the value is a valid ProjectSource
+ */
+export function isValidProjectSource(value: string): value is ProjectSource {
+  return value === "GITLAB" || value === "ZIP";
+}
+
+/**
  * Project file information (unified for all sources)
  * Represents a file tracked in the system from any source (GitLab, zip, etc.)
  */

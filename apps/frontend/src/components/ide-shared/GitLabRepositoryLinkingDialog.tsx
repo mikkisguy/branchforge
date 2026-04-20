@@ -155,7 +155,10 @@ export function GitLabRepositoryLinkingDialog({
 
       setIsCreatingProject(true);
       try {
-        const newProject = await createProject(newProjectName.trim());
+        const newProject = await createProject({
+          name: newProjectName.trim(),
+          source: "GITLAB",
+        });
         projectId = newProject.id;
       } catch (err) {
         const message =

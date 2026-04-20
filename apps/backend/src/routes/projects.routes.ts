@@ -43,6 +43,7 @@ import {
   ForbiddenError,
   ValidationError,
 } from "../middleware/error-handler.middleware.js";
+import type { ProjectSource } from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -247,7 +248,7 @@ async function deleteProjectHandler(
 async function getProjectFilesHandler(
   request: FastifyRequest<{
     Params: { projectId: string };
-    Querystring: { source?: "GITLAB" | "ZIP" };
+    Querystring: { source?: ProjectSource };
   }>,
   reply: FastifyReply
 ): Promise<void> {
@@ -566,7 +567,7 @@ export async function projectsRoutes(fastify: FastifyInstance): Promise<void> {
   // Project files routes
   fastify.get<{
     Params: { projectId: string };
-    Querystring: { source?: "GITLAB" | "ZIP" };
+    Querystring: { source?: ProjectSource };
   }>(
     "/projects/:projectId/files",
     {
