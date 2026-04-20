@@ -644,6 +644,6 @@ export interface PublicProject {
   maxMeterDelta?: number;
   visibility?: UserRole;
   source: FileSourceType;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }

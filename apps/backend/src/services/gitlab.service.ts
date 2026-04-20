@@ -311,6 +311,17 @@ export async function linkRepository(
   const db = getDb();
 
   await db.transaction(async (tx) => {
+    // Ensure project source is set to GITLAB and validate project exists
+    const updateResult = await tx
+      .update(projects)
+      .set({ source: "GITLAB", updatedAt: new Date() })
+      .where(eq(projects.id, projectId));
+
+    // Validate that the project exists by checking affected row count
+    if (updateResult.rowCount === 0) {
+      throw new NotFoundError("Project");
+    }
+
     // Insert into gitlab_repositories, updating repositoryName and defaultBranch on conflict
     await tx
       .insert(gitlabRepositories)
@@ -330,17 +341,6 @@ export async function linkRepository(
           defaultBranch,
         },
       });
-
-    // Ensure project source is set to GITLAB
-    const updateResult = await tx
-      .update(projects)
-      .set({ source: "GITLAB", updatedAt: new Date() })
-      .where(eq(projects.id, projectId));
-
-    // Validate that the project exists by checking affected row count
-    if (updateResult.rowCount === 0) {
-      throw new NotFoundError("Project");
-    }
   });
 }
 

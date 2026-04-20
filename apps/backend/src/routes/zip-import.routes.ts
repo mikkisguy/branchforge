@@ -12,12 +12,16 @@ import { projects } from "../db/schema/index.js";
 import { eq } from "drizzle-orm";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { validateParams } from "../middleware/validation.middleware.js";
-import { projectIdParamsSchema } from "../lib/validation.js";
+import {
+  projectIdParamsSchema,
+  createProjectSchema,
+  validateData,
+} from "../lib/validation.js";
 import {
   importZipFile,
   type ImportZipResult,
 } from "../services/zip-import.service.js";
-import { createProject } from "../services/projects.service.js";
+import { createProject, deleteProject } from "../services/projects.service.js";
 import type { PublicProject } from "@branchforge/shared";
 import type { MultipartFile } from "@fastify/multipart";
 import {
@@ -312,12 +316,17 @@ async function importProjectHandler(
       ? projectDescriptionField.value
       : undefined;
 
-  if (!projectName || typeof projectName !== "string") {
-    reply.status(400).send({ error: "Project name is required" });
-    return;
-  }
-
   try {
+    // Validate project data against schema (handles trimming and max length)
+    const validatedProjectData = validateData(
+      {
+        name: projectName,
+        description: projectDescription,
+        source: "ZIP",
+      },
+      createProjectSchema,
+      "Invalid project data"
+    );
     let buffer: Buffer;
     try {
       buffer = await file.toBuffer();
@@ -345,19 +354,46 @@ async function importProjectHandler(
       return;
     }
 
-    const newProject = await createProject(userId, {
-      name: projectName,
-      description:
-        typeof projectDescription === "string" ? projectDescription : undefined,
-      source: "ZIP",
-    });
+    // Only create project after file validations pass
+    const newProject = await createProject(userId, validatedProjectData);
 
-    const result: ImportZipResult = await importZipFile(newProject.id, buffer);
+    let result: ImportZipResult;
+    try {
+      result = await importZipFile(newProject.id, buffer);
+    } catch (importErr) {
+      // Clean up orphaned project if importZipFile throws
+      try {
+        await deleteProject(userId, newProject.id);
+        request.log.info(
+          { projectId: newProject.id },
+          "Cleaned up partially created project after importZipFile threw"
+        );
+      } catch (deleteErr) {
+        request.log.error(
+          { err: deleteErr, projectId: newProject.id },
+          "Failed to cleanup partially created project after importZipFile threw"
+        );
+      }
+      // Re-throw to be handled by outer catch or global error handler
+      throw importErr;
+    }
 
     if (!result.success) {
+      try {
+        await deleteProject(userId, newProject.id);
+        request.log.info(
+          { projectId: newProject.id },
+          "Cleaned up partially created project due to failed zip import"
+        );
+      } catch (deleteErr) {
+        request.log.error(
+          { err: deleteErr, projectId: newProject.id },
+          "Failed to cleanup partially created project"
+        );
+      }
+
       reply.status(400).send({
         success: result.success,
-        project: newProject,
         filesImported: result.filesImported,
         filesUpdated: result.filesUpdated,
         filesSkipped: result.filesSkipped,
@@ -377,6 +413,10 @@ async function importProjectHandler(
       error: result.error,
     } as ImportProjectResponse);
   } catch (err) {
+    // Re-throw HttpError instances (e.g., ValidationError) so the global error handler can use their status code
+    if (err instanceof HttpError) {
+      throw err;
+    }
     request.log.error(
       { err },
       "importProjectHandler: Failed to import project from ZIP"

@@ -782,7 +782,6 @@ async function importProjectHandler(
     projectName,
     projectDescription,
     gitlabProjectId,
-    gitlabProjectName,
     branch,
     conflictResolution,
   } = request.body;
@@ -796,10 +795,30 @@ async function importProjectHandler(
       source: "GITLAB",
     });
 
+    // Fetch GitLab project details to get the authoritative repository name
+    const gitlabProject = await getGitlabProject(userId, gitlabProjectId);
+    if (!gitlabProject) {
+      reply.status(404).send({ error: "GitLab project not found" });
+      if (newProject?.id) {
+        try {
+          await deleteProject(userId, newProject.id);
+        } catch (deleteErr) {
+          // Log but don't throw - response already sent
+          request.log.error(
+            { err: deleteErr, projectId: newProject.id },
+            "importProjectHandler: Failed to cleanup project after GitLab project not found"
+          );
+        }
+      }
+      return;
+    }
+
+    const repositoryName = gitlabProject.path_with_namespace;
+
     await linkRepository(
       newProject.id,
       gitlabProjectId,
-      gitlabProjectName,
+      repositoryName,
       branch
     );
 

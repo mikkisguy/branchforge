@@ -17,6 +17,8 @@ import {
   NotFoundError,
   ForbiddenError,
 } from "../middleware/error-handler.middleware.js";
+import { z } from "zod";
+import { createProjectSchema } from "../lib/validation.js";
 
 /**
  * Project row type from database queries (with optional role for shared projects)
@@ -51,20 +53,15 @@ function toPublicProject(
     maxMeterDelta: project.maxMeterDelta ?? undefined,
     visibility,
     source: project.source,
-    createdAt: project.createdAt,
-    updatedAt: project.updatedAt,
+    createdAt: project.createdAt.toISOString(),
+    updatedAt: project.updatedAt.toISOString(),
   };
 }
 
 /**
  * Create project request body
  */
-export interface CreateProjectBody {
-  name: string;
-  description?: string;
-  maxMeterDelta?: number;
-  source?: FileSourceType;
-}
+export type CreateProjectBody = z.infer<typeof createProjectSchema>;
 
 /**
  * Update project request body

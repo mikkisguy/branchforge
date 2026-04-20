@@ -90,8 +90,8 @@ describe("ProjectsService", () => {
         description: "A test project",
         maxMeterDelta: 10,
         visibility: "OWNER",
-        createdAt: mockProject.createdAt,
-        updatedAt: mockProject.updatedAt,
+        createdAt: mockProject.createdAt.toISOString(),
+        updatedAt: mockProject.updatedAt.toISOString(),
       });
     });
 
