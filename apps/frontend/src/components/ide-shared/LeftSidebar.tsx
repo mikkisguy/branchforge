@@ -144,6 +144,19 @@ export function LeftSidebar(props: LeftSidebarProps) {
   const width = isCollapsed ? "w-14" : "w-56";
   const showLabel = !isCollapsed;
 
+  // Helper for handling successful project imports
+  const handleImportSuccess = useCallback(
+    async (logMessage: string) => {
+      try {
+        await refetchProjects?.();
+      } catch {
+        // Refetch failure is non-critical; user can manually refresh
+        console.warn(logMessage);
+      }
+    },
+    [refetchProjects]
+  );
+
   return (
     <>
       <div
@@ -479,30 +492,18 @@ export function LeftSidebar(props: LeftSidebarProps) {
       <GitLabImportDialog
         open={showGitLabImportDialog}
         onOpenChange={setShowGitLabImportDialog}
-        onSuccess={async () => {
-          // Refresh projects list after successful import
-          try {
-            await refetchProjects?.();
-          } catch {
-            // Refetch failure is non-critical; user can manually refresh
-            console.warn("Failed to refresh projects after GitLab import");
-          }
-        }}
+        onSuccess={() =>
+          handleImportSuccess("Failed to refresh projects after GitLab import")
+        }
       />
 
       {/* ZIP Import Dialog */}
       <ZipImportProjectDialog
         open={showZipImportDialog}
         onOpenChange={setShowZipImportDialog}
-        onSuccess={async () => {
-          // Refresh projects list after successful import
-          try {
-            await refetchProjects?.();
-          } catch {
-            // Refetch failure is non-critical; user can manually refresh
-            console.warn("Failed to refresh projects after ZIP import");
-          }
-        }}
+        onSuccess={() =>
+          handleImportSuccess("Failed to refresh projects after ZIP import")
+        }
       />
     </>
   );

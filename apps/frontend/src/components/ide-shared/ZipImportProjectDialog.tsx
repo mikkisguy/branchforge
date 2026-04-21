@@ -21,8 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useToast } from "@/contexts/ToastContext";
-import { projectKeys } from "@/lib/query-keys";
-import { useQueryClient } from "@tanstack/react-query";
+import { useImportZipProject } from "@/hooks/useImportZipProject";
 
 // ============================================================================
 // Types
@@ -74,37 +73,27 @@ export function ZipImportProjectDialog({
   });
 
   const { success, error } = useToast();
-  const queryClient = useQueryClient();
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
   );
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const importMutation = useImportZipProject();
 
-  // Abort in-flight request and clean up on unmount
+  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
     };
   }, []);
 
-  // Reset state and abort in-flight request when dialog closes
+  // Reset state when dialog closes
   useEffect(() => {
     if (!open) {
       // Clear any pending success timeout
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = undefined;
-      }
-
-      // Abort any in-flight import request
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
       }
 
       setSelectedFile(null);
@@ -146,7 +135,8 @@ export function ZipImportProjectDialog({
 
       const validationResult = validateZipFile(file);
       if (typeof validationResult === "string") {
-        error(validationResult);
+        setSelectedFile(null);
+        error(`${validationResult}: ${file.name}`);
         return;
       }
 
@@ -166,7 +156,8 @@ export function ZipImportProjectDialog({
 
       const validationResult = validateZipFile(file);
       if (typeof validationResult === "string") {
-        error(validationResult);
+        setSelectedFile(null);
+        error(`${validationResult}: ${file.name}`);
         return;
       }
 
@@ -188,115 +179,34 @@ export function ZipImportProjectDialog({
       return;
     }
 
-    // Create abort controller for this import
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
     setImportState({
       status: "uploading",
       message: "Uploading file...",
     });
 
-    // Compute dynamic timeout: 30s base + 5s per MB, minimum 60s for large files
-    const baseTimeout = 30000;
-    const fileSizeMB = selectedFile.size / (1024 * 1024);
-    const perMBTimeout = 5000; // 5 seconds per MB
-    const dynamicTimeout = Math.max(
-      baseTimeout + fileSizeMB * perMBTimeout,
-      60000
-    );
-
-    const timeoutId = setTimeout(() => controller.abort(), dynamicTimeout);
-
     try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-      formData.append("projectName", projectName.trim());
-      if (projectDescription.trim()) {
-        formData.append("projectDescription", projectDescription.trim());
-      }
+      const data = await importMutation.mutateAsync({
+        file: selectedFile,
+        projectName: projectName.trim(),
+        projectDescription: projectDescription.trim() || undefined,
+      });
 
-      try {
-        const response = await fetch("/api/projects/import/zip", {
-          method: "POST",
-          headers: {
-            // Don't set Content-Type, let browser set it with boundary
-          },
-          body: formData,
-          credentials: "include",
-          signal: controller.signal,
-        });
+      setImportState({
+        status: "success",
+        message: "Import completed successfully",
+        result: {
+          filesImported: data.filesImported || 0,
+          labelsCreated: data.labelsCreated || 0,
+        },
+      });
 
-        // Clear timeout on successful response
-        clearTimeout(timeoutId);
+      success("Project imported successfully");
 
-        if (!response.ok) {
-          let errorMessage = "Import failed";
-          try {
-            const contentType = response.headers.get("content-type");
-            if (contentType?.includes("application/json")) {
-              const errorData = await response.json();
-              errorMessage = errorData.error || errorMessage;
-            } else {
-              errorMessage = (await response.text()) || errorMessage;
-            }
-          } catch {
-            errorMessage = `${errorMessage} (${response.status}: ${response.statusText})`;
-          }
-          throw new Error(errorMessage);
-        }
-
-        const data = await response.json();
-
-        // Don't update state or call callbacks if dialog was closed
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setImportState({
-          status: "success",
-          message: "Import completed successfully",
-          result: {
-            filesImported: data.filesImported || 0,
-            labelsCreated: data.labelsCreated || 0,
-          },
-        });
-
-        // Invalidate projects cache
-        await queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
-
-        success("Project imported successfully");
-
-        timeoutRef.current = setTimeout(() => {
-          // Double-check request wasn't aborted before invoking callbacks
-          if (!controller.signal.aborted) {
-            onSuccess?.();
-            onOpenChange(false);
-          }
-        }, 1500);
-      } catch (fetchErr) {
-        // Clear timeout on error
-        clearTimeout(timeoutId);
-
-        // Handle abort/timeout - don't show error if user closed dialog
-        if (
-          fetchErr instanceof Error &&
-          fetchErr.name === "AbortError" &&
-          controller.signal.aborted
-        ) {
-          // Dialog was closed, silently return without updating state
-          return;
-        }
-
-        // Re-throw to be handled by outer catch
-        throw fetchErr;
-      }
+      timeoutRef.current = setTimeout(() => {
+        onSuccess?.();
+        onOpenChange(false);
+      }, 1500);
     } catch (err) {
-      // Don't update error state if dialog was closed
-      if (controller.signal.aborted) {
-        return;
-      }
-
       const message =
         err instanceof Error ? err.message : "Failed to import project";
       setImportState({
@@ -305,15 +215,11 @@ export function ZipImportProjectDialog({
         error: message,
       });
       error(message, "Import failed");
-    } finally {
-      // Clear controller reference when complete
-      if (abortControllerRef.current === controller) {
-        abortControllerRef.current = null;
-      }
     }
   };
 
-  const isImporting = importState.status === "uploading";
+  const isImporting =
+    importState.status === "uploading" || importMutation.isPending;
 
   // ============================================================================
   // Render

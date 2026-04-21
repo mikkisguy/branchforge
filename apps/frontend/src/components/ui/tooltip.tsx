@@ -75,9 +75,20 @@ export function Tooltip({
     window.addEventListener("resize", handleWindowChange);
     window.addEventListener("scroll", handleWindowChange, true);
 
+    // Observe size changes to tooltip content and trigger element
+    const resizeObserver = new ResizeObserver(() => updatePosition());
+
+    if (tooltipRef.current) {
+      resizeObserver.observe(tooltipRef.current);
+    }
+    if (triggerRef.current) {
+      resizeObserver.observe(triggerRef.current);
+    }
+
     return () => {
       window.removeEventListener("resize", handleWindowChange);
       window.removeEventListener("scroll", handleWindowChange, true);
+      resizeObserver.disconnect();
     };
   }, [isVisible, updatePosition]);
 
@@ -89,13 +100,21 @@ export function Tooltip({
     setIsVisible(false);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setIsVisible(false);
+    }
+  };
+
   return (
     <div
       ref={triggerRef}
+      tabIndex={0}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onFocus={handleMouseEnter}
       onBlur={handleMouseLeave}
+      onKeyDown={handleKeyDown}
       className={cn("relative inline-block", triggerClassName)}
       aria-describedby={isVisible ? tooltipId : undefined}
     >

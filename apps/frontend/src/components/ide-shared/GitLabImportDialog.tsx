@@ -42,7 +42,6 @@ interface GitLabImportDialogProps {
 
 type ImportStateStatus =
   | "idle"
-  | "checking"
   | "selecting"
   | "importing"
   | "success"
@@ -82,6 +81,7 @@ export function GitLabImportDialog({
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasLoadedReposRef = useRef(false);
   const hasSetSelectingState = useRef(false);
+  const loadReposRequestIdRef = useRef(0);
 
   const { success, error } = useToast();
   const {
@@ -94,6 +94,13 @@ export function GitLabImportDialog({
   // Reset state when dialog opens/closes
   useEffect(() => {
     if (!open) {
+      // Clear pending success timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      // Increment request ID to ignore stale listRepositories responses
+      loadReposRequestIdRef.current += 1;
       setProjectName("");
       setProjectDescription("");
       setSelectedRepository(null);
@@ -117,24 +124,34 @@ export function GitLabImportDialog({
         }
         // Load repositories (only once per dialog session)
         if (!hasLoadedReposRef.current) {
+          const requestId = ++loadReposRequestIdRef.current;
           setIsLoadingRepos(true);
           listRepositories()
             .then((repos) => {
-              setRepositories(repos);
-              hasLoadedReposRef.current = true;
+              // Only update if this is still the current request and dialog is open
+              if (requestId === loadReposRequestIdRef.current && open) {
+                setRepositories(repos);
+                hasLoadedReposRef.current = true;
+              }
             })
             .catch((err) => {
-              const message =
-                err instanceof Error
-                  ? err.message
-                  : "Failed to load repositories";
-              // Note: error is intentionally excluded from deps. The error function
-              // is only called in catch blocks, and including it would cause the effect
-              // to re-run on every render since useToast returns a new error reference.
-              error(message, "Load failed");
+              // Only show error if this is still the current request and dialog is open
+              if (requestId === loadReposRequestIdRef.current && open) {
+                const message =
+                  err instanceof Error
+                    ? err.message
+                    : "Failed to load repositories";
+                // Note: error is intentionally excluded from deps. The error function
+                // is only called in catch blocks, and including it would cause the effect
+                // to re-run on every render since useToast returns a new error reference.
+                error(message, "Load failed");
+              }
             })
             .finally(() => {
-              setIsLoadingRepos(false);
+              // Only clear loading if this is still the current request
+              if (requestId === loadReposRequestIdRef.current) {
+                setIsLoadingRepos(false);
+              }
             });
         }
       } else {

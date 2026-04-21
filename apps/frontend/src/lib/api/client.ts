@@ -5,7 +5,7 @@
  * credentials management, and response type safety.
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
+export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 export interface ApiError {
   error: string;
