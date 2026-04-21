@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tooltip } from "@/components/ui/tooltip";
 import { ProjectEditDialog } from "@/components/ide-shared/ProjectEditDialog";
 import { ProjectDeleteDialog } from "@/components/ProjectDeleteDialog";
 import { useToast } from "@/contexts/ToastContext";
@@ -121,15 +122,15 @@ export function ProjectsSettingsContent({
   return (
     <div className="space-y-6">
       {/* Header with import actions */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-lg font-medium">Projects</h3>
           <p className="text-sm text-muted-foreground">
             Manage your visual novel projects
           </p>
         </div>
-        <div className="flex gap-2 flex-col items-end">
-          <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:items-end">
+          <div className="flex flex-wrap gap-2 sm:justify-end">
             {onImportFromGitLab && (
               <Button
                 size="sm"
@@ -147,7 +148,7 @@ export function ProjectsSettingsContent({
             )}
           </div>
           {!hasIntegration && !isLoadingIntegration && onImportFromGitLab && (
-            <div className="flex items-start gap-2 text-xs text-muted-foreground mt-1 max-w-[300px]">
+            <div className="flex items-start gap-2 text-xs text-muted-foreground max-w-[300px]">
               <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
               <p>
                 Configure GitLab integration in{" "}
@@ -159,45 +160,72 @@ export function ProjectsSettingsContent({
       </div>
 
       {/* Projects table */}
-      <div className="border rounded-lg">
-        <Table>
+      <div className="overflow-hidden rounded-lg border border-border/60 bg-card">
+        <Table className="table-fixed">
           <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Source</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Updated</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+            <TableRow className="bg-muted/20 hover:bg-muted/20">
+              <TableHead className="h-11">Project</TableHead>
+              <TableHead className="h-11 w-[9rem] whitespace-nowrap">
+                Updated
+              </TableHead>
+              <TableHead className="h-11 w-24 whitespace-nowrap text-right">
+                Actions
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {projects.map((project) => (
-              <TableRow key={project.id}>
-                <TableCell className="font-medium">{project.name}</TableCell>
-                <TableCell>
-                  <Badge
-                    variant={
-                      project.source === "GITLAB" ? "default" : "secondary"
-                    }
-                  >
-                    {project.source === "GITLAB" ? (
-                      "GitLab"
+              <TableRow
+                key={project.id}
+                className="align-top hover:bg-muted/35"
+              >
+                <TableCell className="py-4">
+                  <div className="space-y-3">
+                    {project.description ? (
+                      <Tooltip
+                        side="top"
+                        content={project.description}
+                        className="max-w-md"
+                        triggerClassName="block w-full group cursor-help"
+                      >
+                        <div className="inline-flex items-center gap-1.5 flex-wrap">
+                          <span className="break-words font-medium text-base leading-snug">
+                            {project.name}
+                          </span>
+                          <Info
+                            className="w-3.5 h-3.5 text-muted-foreground/70 flex-shrink-0"
+                            aria-hidden="true"
+                          />
+                          <span className="sr-only">{project.description}</span>
+                        </div>
+                      </Tooltip>
                     ) : (
-                      <>
-                        <FileArchive className="w-3 h-3 mr-1" />
-                        ZIP
-                      </>
+                      <span className="block w-full break-words font-medium text-base leading-snug">
+                        {project.name}
+                      </span>
                     )}
-                  </Badge>
+                    <Badge
+                      className="w-fit"
+                      variant={
+                        project.source === "GITLAB" ? "default" : "secondary"
+                      }
+                    >
+                      {project.source === "GITLAB" ? (
+                        "GitLab"
+                      ) : (
+                        <>
+                          <FileArchive className="w-3 h-3 mr-1" />
+                          ZIP
+                        </>
+                      )}
+                    </Badge>
+                  </div>
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
-                  {project.description || "-"}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
+                <TableCell className="whitespace-nowrap py-4 text-sm text-muted-foreground">
                   {formatDate(project.updatedAt)}
                 </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
+                <TableCell className="w-24 py-4 text-right">
+                  <div className="flex justify-end gap-1">
                     {onUpdateProject && (
                       <Button
                         variant="ghost"
@@ -212,6 +240,7 @@ export function ProjectsSettingsContent({
                       <Button
                         variant="ghost"
                         size="sm"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                         onClick={() => handleDeleteClick(project)}
                         aria-label={`Delete ${project.name}`}
                       >

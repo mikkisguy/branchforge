@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { X } from "lucide-react";
 import {
   Dialog,
@@ -46,6 +46,7 @@ interface SettingsModalProps {
   onDeleteProject?: (projectId: string) => Promise<void>;
   onImportFromGitLab?: () => void;
   onImportZip?: () => void;
+  initialTab?: Tab;
 }
 
 export function SettingsModal({
@@ -56,8 +57,16 @@ export function SettingsModal({
   onDeleteProject,
   onImportFromGitLab,
   onImportZip,
+  initialTab,
 }: SettingsModalProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("user");
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab ?? "user");
+
+  // Reset to initial tab when dialog opens
+  useEffect(() => {
+    if (open && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [open, initialTab]);
 
   const { user } = useAuth();
   const {

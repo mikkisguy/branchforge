@@ -91,6 +91,27 @@ export interface LinkedRepository {
   createdAt: string;
 }
 
+export interface ImportProjectBody {
+  projectName: string;
+  projectDescription?: string;
+  gitlabProjectId: number;
+  gitlabProjectName: string;
+  branch: string;
+  conflictResolution: ConflictResolution;
+}
+
+export interface ImportProjectResponse {
+  project: {
+    id: string;
+    name: string;
+    description?: string;
+    source: "GITLAB";
+    createdAt: string;
+    updatedAt: string;
+  };
+  operation: SyncOperation;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -475,6 +496,26 @@ export const gitlabApi = {
         projectId,
         branch,
       }),
+    });
+  },
+
+  /**
+   * Import a new project from GitLab
+   * Creates a new project, links it to GitLab, and imports files
+   */
+  async importProject(
+    body: ImportProjectBody,
+    signal?: AbortSignal
+  ): Promise<ImportProjectResponse> {
+    validateRequired(body.projectName, "Project name");
+    validateRequired(body.branch, "Branch");
+    if (!body.gitlabProjectId) {
+      throw new Error(VALIDATION_ERRORS.GITLAB_PROJECT_ID_REQUIRED);
+    }
+    return request<ImportProjectResponse>("/gitlab/import-project", {
+      method: "POST",
+      signal,
+      body: JSON.stringify(body),
     });
   },
 

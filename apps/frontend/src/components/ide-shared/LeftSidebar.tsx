@@ -11,7 +11,6 @@ import {
   ChevronsLeft,
   ChevronsRight,
   FolderOpen,
-  X,
 } from "lucide-react";
 import type { ThemePalette } from "@/contexts/ThemeContext";
 import type { Project, UpdateProjectBody } from "@/lib/api/projects";
@@ -19,14 +18,9 @@ import { SettingsModal } from "./SettingsModal";
 import { RouteSettingsModal } from "./RouteSettingsModal";
 import { StateVariablesModal } from "./StateVariablesModal";
 import { CharactersModal } from "./CharactersModal";
+import { GitLabImportDialog } from "./GitLabImportDialog";
+import { ZipImportProjectDialog } from "./ZipImportProjectDialog";
 import { Logo } from "@/components/ui/logo";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 
 export interface ThemePaletteOption {
   name: string;
@@ -52,16 +46,19 @@ interface LeftSidebarPropsBase {
     body: UpdateProjectBody
   ) => Promise<Project>;
   deleteProject?: (projectId: string) => Promise<void>;
+  refetchProjects?: () => Promise<void>;
 }
 
 interface ControlledSettingsProps extends LeftSidebarPropsBase {
   isSettingsOpenExternally: boolean;
   onSettingsOpenChangeExternally: (open: boolean) => void;
+  initialSettingsTab?: "user" | "projects" | "integrations" | "system";
 }
 
 interface UncontrolledSettingsProps extends LeftSidebarPropsBase {
   isSettingsOpenExternally?: never;
   onSettingsOpenChangeExternally?: never;
+  initialSettingsTab?: never;
 }
 
 export type LeftSidebarProps =
@@ -84,6 +81,8 @@ export function LeftSidebar(props: LeftSidebarProps) {
     onCollapsedChange,
     updateProject,
     deleteProject,
+    refetchProjects,
+    initialSettingsTab,
   } = props;
 
   const isSettingsOpenExternally = props.isSettingsOpenExternally;
@@ -454,6 +453,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
         onDeleteProject={deleteProject}
         onImportFromGitLab={() => setShowGitLabImportDialog(true)}
         onImportZip={() => setShowZipImportDialog(true)}
+        initialTab={initialSettingsTab}
       />
       {projectId && (
         <>
@@ -475,65 +475,35 @@ export function LeftSidebar(props: LeftSidebarProps) {
         </>
       )}
 
-      {/* GitLab Import Dialog - Placeholder for Phase 3 */}
-      <Dialog
+      {/* GitLab Import Dialog */}
+      <GitLabImportDialog
         open={showGitLabImportDialog}
         onOpenChange={setShowGitLabImportDialog}
-      >
-        <DialogContent className="w-[500px] max-w-[95vw]">
-          <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <DialogTitle>Import from GitLab</DialogTitle>
-            <button
-              type="button"
-              onClick={() => setShowGitLabImportDialog(false)}
-              className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
-            >
-              <X className="w-5 h-5" />
-              <span className="sr-only">Close</span>
-            </button>
-          </DialogHeader>
-          <div className="py-6">
-            <p className="text-sm text-muted-foreground">
-              GitLab project import will be available in Phase 3. This will
-              allow you to import a Ren'Py project directly from a GitLab
-              repository.
-            </p>
-            <div className="mt-4 flex justify-end">
-              <Button onClick={() => setShowGitLabImportDialog(false)}>
-                Close
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+        onSuccess={async () => {
+          // Refresh projects list after successful import
+          try {
+            await refetchProjects?.();
+          } catch {
+            // Refetch failure is non-critical; user can manually refresh
+            console.warn("Failed to refresh projects after GitLab import");
+          }
+        }}
+      />
 
-      {/* ZIP Import Dialog - Placeholder for Phase 3 */}
-      <Dialog open={showZipImportDialog} onOpenChange={setShowZipImportDialog}>
-        <DialogContent className="w-[500px] max-w-[95vw]">
-          <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <DialogTitle>Import from ZIP</DialogTitle>
-            <button
-              type="button"
-              onClick={() => setShowZipImportDialog(false)}
-              className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
-            >
-              <X className="w-5 h-5" />
-              <span className="sr-only">Close</span>
-            </button>
-          </DialogHeader>
-          <div className="py-6">
-            <p className="text-sm text-muted-foreground">
-              ZIP file import will be available in Phase 3. This will allow you
-              to upload a ZIP file containing your Ren'Py project files.
-            </p>
-            <div className="mt-4 flex justify-end">
-              <Button onClick={() => setShowZipImportDialog(false)}>
-                Close
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* ZIP Import Dialog */}
+      <ZipImportProjectDialog
+        open={showZipImportDialog}
+        onOpenChange={setShowZipImportDialog}
+        onSuccess={async () => {
+          // Refresh projects list after successful import
+          try {
+            await refetchProjects?.();
+          } catch {
+            // Refetch failure is non-critical; user can manually refresh
+            console.warn("Failed to refresh projects after ZIP import");
+          }
+        }}
+      />
     </>
   );
 }

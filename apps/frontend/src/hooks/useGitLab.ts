@@ -6,7 +6,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { gitlabApi, type GitLabRepository } from "@/lib/api/gitlab";
 import { gitlabKeys } from "@/lib/query-keys";
 
@@ -127,17 +127,24 @@ export function useGitLab(): UseGitLabReturn {
   );
 
   // Helper: Validate token (no mutation, direct API call)
-  const validateToken = async (
-    token: string,
-    gitlabUrl?: string
-  ): Promise<{ valid: boolean; username?: string }> => {
-    return gitlabApi.validateToken(token, gitlabUrl);
-  };
+  // Stable reference - no dependencies
+  const validateToken = useCallback(
+    async (
+      token: string,
+      gitlabUrl?: string
+    ): Promise<{ valid: boolean; username?: string }> => {
+      return gitlabApi.validateToken(token, gitlabUrl);
+    },
+    []
+  );
 
   // Helper: List repositories (no mutation, direct API call)
-  const listRepositories = async (): Promise<GitLabRepository[]> => {
+  // Stable reference - no dependencies
+  const listRepositories = useCallback(async (): Promise<
+    GitLabRepository[]
+  > => {
     return gitlabApi.getRepositories();
-  };
+  }, []);
 
   // Helper: Check if project is linked
   const isProjectLinked = (projectId: string): boolean => {
