@@ -5,7 +5,6 @@ import {
   SyncOperationType,
 } from "@/components/script-mode/GitLabSyncDialog";
 import { ConflictReviewDialog } from "@/components/script-mode/ConflictReviewDialog";
-import { ZipImportDialog } from "@/components/zip-import";
 import { cn } from "@/lib/utils";
 import type { SourceOrigin } from "@branchforge/shared";
 
@@ -19,6 +18,7 @@ interface StatusBarProps {
   fileSourceType?: SourceOrigin;
   // Focus mode
   isFocusMode?: boolean;
+  onOpenZipImportDialog?: () => void;
 }
 
 export function StatusBar({
@@ -28,13 +28,13 @@ export function StatusBar({
   gitlabBranch,
   fileSourceType,
   isFocusMode = false,
+  onOpenZipImportDialog,
 }: StatusBarProps) {
   // Dialog state
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
   const [syncOperationType, setSyncOperationType] =
     useState<SyncOperationType>("export");
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
-  const [zipImportDialogOpen, setZipImportDialogOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
   /**
@@ -57,8 +57,8 @@ export function StatusBar({
    * Handle ZIP import click
    */
   const handleZipImportClick = useCallback(() => {
-    setZipImportDialogOpen(true);
-  }, []);
+    onOpenZipImportDialog?.();
+  }, [onOpenZipImportDialog]);
 
   /**
    * Handle conflict resolution from ConflictReviewDialog
@@ -138,8 +138,8 @@ export function StatusBar({
             </>
           )}
 
-          {/* ZIP Controls - only show for ZIP source type */}
-          {isZipAvailable && (
+          {/* ZIP Controls - only show for ZIP source type when callback exists */}
+          {isZipAvailable && onOpenZipImportDialog && (
             <div className="flex items-center gap-2 border-l border-border/30 pl-4">
               <button
                 onClick={handleZipImportClick}
@@ -181,16 +181,6 @@ export function StatusBar({
             onApplyResolutions={handleApplyResolutions}
           />
         )}
-
-      {/* ZIP Import Dialog */}
-      {projectId !== undefined && isZipAvailable && (
-        <ZipImportDialog
-          open={zipImportDialogOpen}
-          onOpenChange={setZipImportDialogOpen}
-          projectId={projectId}
-          projectName={projectName}
-        />
-      )}
     </>
   );
 }

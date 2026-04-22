@@ -29,6 +29,9 @@ import { gitlabApi } from "@/lib/api/gitlab";
 import { projectKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
 import type { GitLabRepository } from "@/lib/api/gitlab";
+import { CharacterImportWizard } from "@/components/CharacterImportWizard";
+import type { DetectCharactersResponse } from "@branchforge/shared";
+import { charactersApi } from "@/lib/api/characters";
 
 // ============================================================================
 // Types
@@ -73,6 +76,16 @@ export function GitLabImportDialog({
     message: "",
   });
 
+  // Character wizard state
+  const [showCharacterWizard, setShowCharacterWizard] = useState(false);
+  const [detectedCharacters, setDetectedCharacters] =
+    useState<DetectCharactersResponse | null>(null);
+  const [importedProjectId, setImportedProjectId] = useState<string | null>(
+    null
+  );
+  // Guard to prevent calling onSuccess/onOpenChange(false) twice
+  const [didCallOnSuccess, setDidCallOnSuccess] = useState(false);
+
   // Repositories state
   const [repositories, setRepositories] = useState<GitLabRepository[]>([]);
   const [isLoadingRepos, setIsLoadingRepos] = useState(false);
@@ -108,6 +121,10 @@ export function GitLabImportDialog({
       setSearchQuery("");
       setImportState({ status: "idle", message: "" });
       setRepositories([]);
+      setShowCharacterWizard(false);
+      setDetectedCharacters(null);
+      setImportedProjectId(null);
+      setDidCallOnSuccess(false);
       hasLoadedReposRef.current = false;
       hasSetSelectingState.current = false;
     }
@@ -199,6 +216,38 @@ export function GitLabImportDialog({
       // Invalidate projects cache
       await queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
 
+      // Detect characters from imported RPY files
+      try {
+        const detectionResult = await charactersApi.detectCharacters(
+          result.project.id
+        );
+
+        // Filter out characters that already exist in the database
+        // For a newly created project, existingTags will be empty
+        const existingTagsSet = new Set(detectionResult.existingTags);
+        const newCharacters = detectionResult.characters.filter(
+          (char) => !existingTagsSet.has(char.tag)
+        );
+
+        if (newCharacters.length > 0) {
+          setImportedProjectId(result.project.id);
+          setDetectedCharacters({
+            ...detectionResult,
+            characters: newCharacters,
+          });
+          setShowCharacterWizard(true);
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to detect characters:", err);
+        // Non-blocking: notify user but don't fail the import
+        error(
+          "Project imported, but character detection failed. You can import characters manually later.",
+          "Warning"
+        );
+      }
+
+      // Only show success and close if no characters detected
       success("Project imported successfully");
       // Clear any existing timeout before scheduling a new one
       if (timeoutRef.current) {
@@ -449,6 +498,33 @@ export function GitLabImportDialog({
           )}
         </div>
       </DialogContent>
+
+      {/* Character Import Wizard */}
+      {showCharacterWizard && detectedCharacters && importedProjectId && (
+        <CharacterImportWizard
+          open={showCharacterWizard}
+          onOpenChange={(open) => {
+            setShowCharacterWizard(open);
+            if (!open && !didCallOnSuccess) {
+              // Close the import dialog after character wizard is closed
+              setDidCallOnSuccess(true);
+              onSuccess?.();
+              onOpenChange(false);
+            }
+          }}
+          projectId={importedProjectId}
+          detectedCharacters={detectedCharacters.characters}
+          conflicts={detectedCharacters.conflicts}
+          excludedTags={detectedCharacters.excludedTags}
+          onComplete={() => {
+            if (!didCallOnSuccess) {
+              setDidCallOnSuccess(true);
+              onSuccess?.();
+              onOpenChange(false);
+            }
+          }}
+        />
+      )}
     </Dialog>
   );
 }

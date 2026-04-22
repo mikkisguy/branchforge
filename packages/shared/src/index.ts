@@ -574,6 +574,44 @@ export interface Character {
 }
 
 // ============================================================================
+// Character Detection Types
+// ============================================================================
+
+/**
+ * Character detected from RPY files
+ */
+export interface DetectedCharacter {
+  tag: string;
+  name: string | null;
+  displayName: string;
+  color: string;
+  isSpecial: boolean;
+  sourceFile: string;
+  confidence: number;
+}
+
+/**
+ * Character conflict between detected and existing characters
+ */
+export interface CharacterConflict {
+  tag: string;
+  detectedName: string | null;
+  existingName: string;
+  detectedColor: string;
+  existingColor: string;
+}
+
+/**
+ * Response from character detection API
+ */
+export interface DetectCharactersResponse {
+  characters: DetectedCharacter[];
+  excludedTags: string[];
+  conflicts: CharacterConflict[];
+  existingTags: string[]; // Tags of all characters that exist in database (not just conflicts)
+}
+
+// ============================================================================
 // File Upload Configuration
 // ============================================================================
 
@@ -627,6 +665,50 @@ export function isValidAvatarMimeType(
   }
   return AVATAR_ALLOWED_MIME_TYPES.includes(
     mimeType.toLowerCase() as (typeof AVATAR_ALLOWED_MIME_TYPES)[number]
+  );
+}
+
+// ============================================================================
+// ZIP Import Configuration
+// ============================================================================
+
+/**
+ * Maximum file size for ZIP imports in megabytes
+ */
+export const ZIP_IMPORT_MAX_SIZE_MB = 50;
+
+/**
+ * Maximum file size for ZIP imports in bytes
+ */
+export const ZIP_IMPORT_MAX_SIZE = ZIP_IMPORT_MAX_SIZE_MB * 1024 * 1024; // 50MB in bytes
+
+/**
+ * Allowed MIME types for ZIP files
+ *
+ * Note: MIME types can be unreliable, so the .zip extension check
+ * is the primary validation. This list includes common zip MIME types
+ * that some systems send.
+ */
+export const ZIP_ALLOWED_MIME_TYPES = [
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/x-zip",
+  "application/octet-stream",
+] as const;
+
+/**
+ * Validates if a MIME type is allowed for ZIP file uploads.
+ * @param mimeType - The MIME type to validate (can be undefined, null, or empty string)
+ * @returns true if the MIME type is allowed
+ */
+export function isValidZipMimeType(
+  mimeType: string | undefined | null
+): boolean {
+  if (!mimeType || typeof mimeType !== "string") {
+    return false;
+  }
+  return ZIP_ALLOWED_MIME_TYPES.includes(
+    mimeType.toLowerCase() as (typeof ZIP_ALLOWED_MIME_TYPES)[number]
   );
 }
 

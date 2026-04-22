@@ -1162,8 +1162,10 @@ export function validateData<T extends z.ZodTypeAny>(
   try {
     return schema.parse(data);
   } catch (error) {
-    if (error instanceof Error && error.name === "ZodError") {
-      throw new ValidationError(errorMessage, error);
+    if (error instanceof z.ZodError) {
+      throw new ValidationError(errorMessage, {
+        issues: error.issues,
+      });
     }
     throw new ValidationError(errorMessage, error);
   }

@@ -50,3 +50,21 @@ export function formatDate(date: string | Date): string {
   }
   return format(dateObj, "MMM d, yyyy");
 }
+
+/**
+ * Formats a byte count into a human-readable file size string.
+ * Automatically selects the appropriate unit (B, KB, MB).
+ *
+ * @param bytes - The number of bytes to format
+ * @returns A formatted string with the appropriate unit
+ *
+ * @example
+ * formatFileSize(500) // "500 B"
+ * formatFileSize(2048) // "2.0 KB"
+ * formatFileSize(5242880) // "5.0 MB"
+ */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}

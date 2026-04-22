@@ -1,5 +1,10 @@
 import type { SourceOrigin, UserRole } from "@branchforge/shared";
-import { request, ApiRequestError, API_BASE } from "./client";
+import {
+  request,
+  ApiRequestError,
+  API_BASE,
+  getApiErrorMessage,
+} from "./client";
 
 /**
  * Projects API Client
@@ -134,11 +139,13 @@ export const projectsApi = {
     signal?: AbortSignal
   ): Promise<ImportZipResponse> {
     const formData = new FormData();
-    formData.append("file", body.file);
     formData.append("projectName", body.projectName);
     if (body.projectDescription) {
       formData.append("projectDescription", body.projectDescription);
     }
+    // Keep text fields before file so backend multipart parsing works
+    // regardless of part consumption order.
+    formData.append("file", body.file);
 
     const response = await fetch(`${API_BASE}/projects/import/zip`, {
       method: "POST",
@@ -152,7 +159,7 @@ export const projectsApi = {
         .json()
         .catch(() => ({ error: "Unknown error" }));
       throw new ApiRequestError(
-        errorData.error || `Request failed with status ${response.status}`,
+        getApiErrorMessage(errorData, response.status),
         response.status,
         errorData
       );

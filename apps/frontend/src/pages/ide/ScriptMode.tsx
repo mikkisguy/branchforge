@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StatusBar } from "@/components/script-mode";
 import { GitLabSyncDialog } from "@/components/script-mode/GitLabSyncDialog";
-import { ZipImportDialog } from "@/components/zip-import";
+import { ZipImportFilesDialog } from "@/components/ide-shared/ZipImportFilesDialog";
 import { useLabels } from "@/hooks/useLabels";
 import { useFocusModeKeyboardHandler } from "@/hooks/useFocusModeKeyboardHandler";
 import { useFocusModeState } from "@/hooks/useFocusModeState";
@@ -406,6 +406,7 @@ export function ScriptMode({
         gitlabBranch={gitlabBranch}
         fileSourceType={primaryFileSourceType}
         isFocusMode={isFocusMode}
+        onOpenZipImportDialog={() => setShowZipImportDialog(true)}
       />
 
       {projectId && isLinked && linkedRepo && (
@@ -420,7 +421,7 @@ export function ScriptMode({
       )}
 
       {projectId && (
-        <ZipImportDialog
+        <ZipImportFilesDialog
           open={showZipImportDialog}
           onOpenChange={setShowZipImportDialog}
           projectId={projectId}

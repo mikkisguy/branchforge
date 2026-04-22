@@ -28,31 +28,11 @@ import {
   HttpError,
   ValidationError,
 } from "../middleware/error-handler.middleware.js";
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-/**
- * Maximum zip file size for import (50MB)
- * Ren'Py projects can be large, so we allow a reasonable size.
- */
-export const ZIP_IMPORT_MAX_SIZE_MB = 50;
-export const ZIP_IMPORT_MAX_SIZE = ZIP_IMPORT_MAX_SIZE_MB * 1024 * 1024;
-
-/**
- * Allowed MIME types for zip files
- *
- * Note: MIME types can be unreliable, so the .zip extension check
- * (isZipFile) is the primary validation. This list includes common
- * zip MIME types that some systems send.
- */
-const ZIP_ALLOWED_MIME_TYPES = [
-  "application/zip",
-  "application/x-zip-compressed",
-  "application/x-zip",
-  "application/octet-stream",
-];
+import {
+  ZIP_IMPORT_MAX_SIZE,
+  ZIP_IMPORT_MAX_SIZE_MB,
+  isValidZipMimeType,
+} from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -88,18 +68,6 @@ interface ErrorResponse {
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
-/**
- * Validate MIME type for zip files
- */
-function isValidZipMimeType(mimeType: string | undefined | null): boolean {
-  if (!mimeType || typeof mimeType !== "string") {
-    return false;
-  }
-  return ZIP_ALLOWED_MIME_TYPES.includes(
-    mimeType.toLowerCase() as (typeof ZIP_ALLOWED_MIME_TYPES)[number]
-  );
-}
 
 /**
  * Normalize multipart file-size errors from Fastify/Busboy variants.
@@ -304,8 +272,9 @@ async function importProjectHandler(
     return;
   }
 
-  const projectNameField = data.fields.projectName;
-  const projectDescriptionField = data.fields.projectDescription;
+  const projectNameField = data.fields.projectName ?? data.fields.name;
+  const projectDescriptionField =
+    data.fields.projectDescription ?? data.fields.description;
 
   const projectName =
     projectNameField && "value" in projectNameField
