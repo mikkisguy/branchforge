@@ -574,6 +574,44 @@ export interface Character {
 }
 
 // ============================================================================
+// Character Detection Types
+// ============================================================================
+
+/**
+ * Character detected from RPY files
+ */
+export interface DetectedCharacter {
+  tag: string;
+  name: string | null;
+  displayName: string;
+  color: string;
+  isSpecial: boolean;
+  sourceFile: string;
+  confidence: number;
+}
+
+/**
+ * Character conflict between detected and existing characters
+ */
+export interface CharacterConflict {
+  tag: string;
+  detectedName: string | null;
+  existingName: string;
+  detectedColor: string;
+  existingColor: string;
+}
+
+/**
+ * Response from character detection API
+ */
+export interface DetectCharactersResponse {
+  characters: DetectedCharacter[];
+  excludedTags: string[];
+  conflicts: CharacterConflict[];
+  existingTags: string[]; // Tags of all characters that exist in database (not just conflicts)
+}
+
+// ============================================================================
 // File Upload Configuration
 // ============================================================================
 

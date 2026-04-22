@@ -30,7 +30,7 @@ import { projectKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
 import type { GitLabRepository } from "@/lib/api/gitlab";
 import { CharacterImportWizard } from "@/components/CharacterImportWizard";
-import type { DetectCharactersResponse } from "@/lib/api/characters";
+import type { DetectCharactersResponse } from "@branchforge/shared";
 import { charactersApi } from "@/lib/api/characters";
 
 // ============================================================================
@@ -83,6 +83,8 @@ export function GitLabImportDialog({
   const [importedProjectId, setImportedProjectId] = useState<string | null>(
     null
   );
+  // Guard to prevent calling onSuccess/onOpenChange(false) twice
+  const [didCallOnSuccess, setDidCallOnSuccess] = useState(false);
 
   // Repositories state
   const [repositories, setRepositories] = useState<GitLabRepository[]>([]);
@@ -122,6 +124,7 @@ export function GitLabImportDialog({
       setShowCharacterWizard(false);
       setDetectedCharacters(null);
       setImportedProjectId(null);
+      setDidCallOnSuccess(false);
       hasLoadedReposRef.current = false;
       hasSetSelectingState.current = false;
     }
@@ -237,6 +240,11 @@ export function GitLabImportDialog({
         }
       } catch (err) {
         console.error("Failed to detect characters:", err);
+        // Non-blocking: notify user but don't fail the import
+        error(
+          "Project imported, but character detection failed. You can import characters manually later.",
+          "Warning"
+        );
       }
 
       // Only show success and close if no characters detected
@@ -497,8 +505,9 @@ export function GitLabImportDialog({
           open={showCharacterWizard}
           onOpenChange={(open) => {
             setShowCharacterWizard(open);
-            if (!open) {
+            if (!open && !didCallOnSuccess) {
               // Close the import dialog after character wizard is closed
+              setDidCallOnSuccess(true);
               onSuccess?.();
               onOpenChange(false);
             }
@@ -508,8 +517,11 @@ export function GitLabImportDialog({
           conflicts={detectedCharacters.conflicts}
           excludedTags={detectedCharacters.excludedTags}
           onComplete={() => {
-            onSuccess?.();
-            onOpenChange(false);
+            if (!didCallOnSuccess) {
+              setDidCallOnSuccess(true);
+              onSuccess?.();
+              onOpenChange(false);
+            }
           }}
         />
       )}

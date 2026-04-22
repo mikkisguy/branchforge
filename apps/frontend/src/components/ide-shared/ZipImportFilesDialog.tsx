@@ -22,7 +22,7 @@ import { useLabels } from "@/hooks/useLabels";
 import { projectFilesKeys, characterKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
 import { CharacterImportWizard } from "@/components/CharacterImportWizard";
-import type { DetectCharactersResponse } from "@/lib/api/characters";
+import type { DetectCharactersResponse } from "@branchforge/shared";
 import { charactersApi } from "@/lib/api/characters";
 import { validateZipFile } from "@/lib/zip-validation";
 import { formatFileSize } from "@/lib/utils";
@@ -305,7 +305,7 @@ export function ZipImportFilesDialog({
             size="icon"
             onClick={handleClose}
             className="text-muted-foreground hover:text-foreground transition-colors"
-            disabled={importState.status === "uploading"}
+            disabled={importState.status === "uploading" || showCharacterWizard}
             aria-label="Close dialog"
           >
             <X className="w-5 h-5" />

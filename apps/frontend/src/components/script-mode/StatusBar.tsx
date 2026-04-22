@@ -138,8 +138,8 @@ export function StatusBar({
             </>
           )}
 
-          {/* ZIP Controls - only show for ZIP source type */}
-          {isZipAvailable && (
+          {/* ZIP Controls - only show for ZIP source type when callback exists */}
+          {isZipAvailable && onOpenZipImportDialog && (
             <div className="flex items-center gap-2 border-l border-border/30 pl-4">
               <button
                 onClick={handleZipImportClick}

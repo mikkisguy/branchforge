@@ -5,7 +5,7 @@
  * Shows new characters, existing characters with conflicts, and special characters.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useId } from "react";
 import {
   X,
   User,
@@ -21,12 +21,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import {
-  charactersApi,
-  type DetectedCharacter,
-  type CharacterConflict,
-  type ImportCharacter,
-} from "@/lib/api/characters";
+import { charactersApi, type ImportCharacter } from "@/lib/api/characters";
+import type { DetectedCharacter, CharacterConflict } from "@branchforge/shared";
 import { useToast } from "@/contexts/ToastContext";
 
 // ============================================================================
@@ -113,6 +109,8 @@ export function CharacterImportWizard({
   excludedTags,
   onComplete,
 }: CharacterImportWizardProps) {
+  // Generate unique ID for checkbox to prevent collisions when multiple wizards are mounted
+  const linkToLinesId = useId();
   const { success, error } = useToast();
 
   // Group characters on mount
@@ -759,14 +757,14 @@ export function CharacterImportWizard({
               <div className="flex items-center gap-2">
                 <Settings className="w-4 h-4 text-muted-foreground" />
                 <label
-                  htmlFor="link-to-lines"
+                  htmlFor={linkToLinesId}
                   className="text-sm font-medium cursor-pointer"
                 >
                   Automatically link characters to dialogue lines
                 </label>
               </div>
               <input
-                id="link-to-lines"
+                id={linkToLinesId}
                 type="checkbox"
                 checked={linkToLines}
                 onChange={(e) => setLinkToLines(e.target.checked)}
