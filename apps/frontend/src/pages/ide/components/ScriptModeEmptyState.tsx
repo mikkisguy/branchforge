@@ -85,12 +85,14 @@ export function ScriptModeEmptyState({
         />
       )}
 
-      <ZipImportDialog
-        open={showZipImportDialog}
-        onOpenChange={onShowZipImportDialogChange}
-        projectId={projectId}
-        projectName={projectName}
-      />
+      {projectId && (
+        <ZipImportDialog
+          open={showZipImportDialog}
+          onOpenChange={onShowZipImportDialogChange}
+          projectId={projectId}
+          projectName={projectName}
+        />
+      )}
     </div>
   );
 }

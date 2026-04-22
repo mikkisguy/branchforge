@@ -9,6 +9,79 @@ export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 export interface ApiError {
   error: string;
+  message?: string;
+  statusCode?: number;
+  details?: unknown;
+}
+
+interface ZodIssueLike {
+  path?: unknown;
+  message?: unknown;
+}
+
+interface ZodErrorLike {
+  issues?: unknown;
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function toReadableField(path: unknown): string {
+  if (!Array.isArray(path) || path.length === 0) {
+    return "Field";
+  }
+
+  const joined = path
+    .map((segment) => String(segment).trim())
+    .filter((segment) => segment.length > 0)
+    .join(".");
+
+  if (joined.length === 0) {
+    return "Field";
+  }
+
+  return `${joined.charAt(0).toUpperCase()}${joined.slice(1)}`;
+}
+
+function getFirstValidationIssue(errorData: Partial<ApiError> | undefined): {
+  field: string;
+  message: string;
+} | null {
+  if (!errorData || !isObject(errorData.details)) {
+    return null;
+  }
+
+  const zodError = errorData.details as ZodErrorLike;
+  if (!Array.isArray(zodError.issues) || zodError.issues.length === 0) {
+    return null;
+  }
+
+  const firstIssue = zodError.issues[0] as ZodIssueLike;
+  if (!isObject(firstIssue) || typeof firstIssue.message !== "string") {
+    return null;
+  }
+
+  return {
+    field: toReadableField(firstIssue.path),
+    message: firstIssue.message,
+  };
+}
+
+export function getApiErrorMessage(
+  errorData: Partial<ApiError> | undefined,
+  status: number
+): string {
+  const firstIssue = getFirstValidationIssue(errorData);
+  if (firstIssue) {
+    return `${firstIssue.field}: ${firstIssue.message}`;
+  }
+
+  return (
+    errorData?.message ||
+    errorData?.error ||
+    `Request failed with status ${status}`
+  );
 }
 
 export class ApiRequestError extends Error {
@@ -92,7 +165,7 @@ async function fetchInternal(
       .json()
       .catch(() => ({ error: "Unknown error" }));
     throw new ApiRequestError(
-      errorData.error || `Request failed with status ${response.status}`,
+      getApiErrorMessage(errorData, response.status),
       response.status,
       errorData
     );

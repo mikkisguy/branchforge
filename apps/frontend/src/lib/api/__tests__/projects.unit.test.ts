@@ -490,4 +490,174 @@ describe("Projects API", () => {
       );
     });
   });
+
+  describe("Import ZIP", () => {
+    const mockProject: Project = {
+      id: "proj-zip",
+      name: "zip test",
+      description: "",
+      maxMeterDelta: 5,
+      visibility: "OWNER",
+      source: "ZIP",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      updatedAt: "2024-01-01T00:00:00.000Z",
+    };
+
+    it("should import ZIP file successfully", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          project: mockProject,
+          filesImported: 1,
+          labelsCreated: 0,
+        }),
+      });
+
+      const file = new File(["zip-content"], "BranchForgeTest.zip", {
+        type: "application/zip",
+      });
+
+      const result = await projectsApi.importZip({
+        file,
+        projectName: "zip test",
+      });
+
+      expect(result).toEqual({
+        project: mockProject,
+        filesImported: 1,
+        labelsCreated: 0,
+      });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain("/projects/import/zip");
+      expect(options?.method).toBe("POST");
+    });
+
+    it("should send project metadata before file in multipart body", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          project: mockProject,
+          filesImported: 1,
+          labelsCreated: 0,
+        }),
+      });
+
+      const file = new File(["zip-content"], "BranchForgeTest.zip", {
+        type: "application/zip",
+      });
+
+      await projectsApi.importZip({
+        file,
+        projectName: "zip test",
+      });
+
+      const [, options] = mockFetch.mock.calls[0];
+      const body = options?.body;
+
+      if (!(body instanceof FormData)) {
+        throw new Error("Expected body to be FormData");
+      }
+
+      const keys = Array.from(body.keys());
+
+      expect(keys[0]).toBe("projectName");
+      expect(keys[keys.length - 1]).toBe("file");
+      expect(body.get("projectName")).toBe("zip test");
+    });
+
+    it("should include credentials in request", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          project: mockProject,
+          filesImported: 1,
+          labelsCreated: 0,
+        }),
+      });
+
+      const file = new File(["zip-content"], "test.zip", {
+        type: "application/zip",
+      });
+
+      await projectsApi.importZip({
+        file,
+        projectName: "test",
+      });
+
+      expect(mockFetch.mock.calls[0][1]?.credentials).toBe("include");
+    });
+
+    it("should attach file with correct properties", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          project: mockProject,
+          filesImported: 1,
+          labelsCreated: 0,
+        }),
+      });
+
+      const file = new File(["zip-content"], "TestProject.zip", {
+        type: "application/zip",
+      });
+
+      await projectsApi.importZip({
+        file,
+        projectName: "TestProject",
+      });
+
+      const [, options] = mockFetch.mock.calls[0];
+      const body = options?.body;
+
+      if (!(body instanceof FormData)) {
+        throw new Error("Expected body to be FormData");
+      }
+
+      const uploadedFile = body.get("file");
+
+      expect(uploadedFile).toBeInstanceOf(File);
+      expect(uploadedFile).not.toBeNull();
+
+      if (uploadedFile instanceof File) {
+        expect(uploadedFile.name).toBe("TestProject.zip");
+        expect(uploadedFile.type).toBe("application/zip");
+      }
+    });
+
+    it("should handle validation error (400)", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ error: "Invalid ZIP file" }),
+      });
+
+      const file = new File(["invalid"], "test.zip", {
+        type: "application/zip",
+      });
+
+      await expect(
+        projectsApi.importZip({
+          file,
+          projectName: "test",
+        })
+      ).rejects.toThrow("Invalid ZIP file");
+    });
+
+    it("should handle network errors", async () => {
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+      const file = new File(["content"], "test.zip", {
+        type: "application/zip",
+      });
+
+      await expect(
+        projectsApi.importZip({
+          file,
+          projectName: "test",
+        })
+      ).rejects.toThrow("Network error");
+    });
+  });
 });

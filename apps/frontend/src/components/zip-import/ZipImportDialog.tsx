@@ -15,7 +15,6 @@ import {
   Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { projectFilesApi } from "@/lib/api/project-files";
 import { useToast } from "@/contexts/ToastContext";
@@ -69,18 +68,8 @@ export function ZipImportDialog({
     message: "",
   });
 
-  // Ref to track the timeout so we can clear it on unmount
-  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
-
-  // Clear timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
-
+  // Refs
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // Reset state when dialog opens/closes
   useEffect(() => {
     if (!open) {
@@ -207,14 +196,6 @@ export function ZipImportDialog({
             queryKey: projectFilesKeys.lists(projectId),
           }),
         ]);
-
-        // Close dialog after delay
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-        }
-        timeoutRef.current = setTimeout(() => {
-          onOpenChange(false);
-        }, 2000);
       } else {
         setImportState({
           status: "error",
@@ -234,15 +215,7 @@ export function ZipImportDialog({
       });
       error(errorMessage);
     }
-  }, [
-    selectedFile,
-    projectId,
-    success,
-    error,
-    invalidateLabels,
-    queryClient,
-    onOpenChange,
-  ]);
+  }, [selectedFile, projectId, success, error, invalidateLabels, queryClient]);
 
   /**
    * Handle close
@@ -335,13 +308,15 @@ export function ZipImportDialog({
                       <p className="font-medium">Drop zip file here</p>
                       <p className="text-sm text-muted-foreground">or</p>
                     </div>
-                    <Label htmlFor="zip-file-input">
-                      <Button variant="outline" type="button" asChild>
-                        <span>Browse Files</span>
-                      </Button>
-                    </Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      Browse Files
+                    </Button>
                     <input
-                      id="zip-file-input"
+                      ref={fileInputRef}
                       type="file"
                       accept=".zip,application/zip,application/x-zip-compressed"
                       onChange={handleFileChange}

@@ -5,7 +5,7 @@
  * Handles file listing, content retrieval, updates, and zip import.
  */
 
-import { request } from "./client.js";
+import { request, getApiErrorMessage } from "./client.js";
 import type { ProjectFile } from "@branchforge/shared";
 import type { SourceOrigin } from "@branchforge/shared";
 import { isValidSourceOrigin } from "@branchforge/shared";
@@ -228,8 +228,12 @@ export const projectFilesApi = {
             }
           } else {
             try {
-              const error = JSON.parse(xhr.responseText) as { error: string };
-              reject(new Error(error.error || "Upload failed"));
+              const error = JSON.parse(xhr.responseText) as {
+                error?: string;
+                message?: string;
+                statusCode?: number;
+              };
+              reject(new Error(getApiErrorMessage(error, xhr.status)));
             } catch {
               reject(new Error(`Upload failed with status ${xhr.status}`));
             }
@@ -266,12 +270,9 @@ export const projectFilesApi = {
     });
 
     if (!response.ok) {
-      const error: { error: string } = await response
-        .json()
-        .catch(() => ({ error: "Unknown error" }));
-      throw new Error(
-        error.error || `Request failed with status ${response.status}`
-      );
+      const error: { error?: string; message?: string; statusCode?: number } =
+        await response.json().catch(() => ({ error: "Unknown error" }));
+      throw new Error(getApiErrorMessage(error, response.status));
     }
 
     return response.json();

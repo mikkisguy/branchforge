@@ -5,7 +5,12 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { request, requestVoid, type ApiError } from "../client";
+import {
+  request,
+  requestVoid,
+  getApiErrorMessage,
+  type ApiError,
+} from "../client";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -14,6 +19,190 @@ globalThis.fetch = mockFetch;
 describe("API Client", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe("getApiErrorMessage", () => {
+    it("prefers message over error field", () => {
+      const result = getApiErrorMessage(
+        {
+          error: "Bad Request",
+          message: "Invalid project data",
+          statusCode: 400,
+        },
+        400
+      );
+
+      expect(result).toBe("Invalid project data");
+    });
+
+    it("falls back to error field when message is missing", () => {
+      const result = getApiErrorMessage({ error: "Unauthorized" }, 401);
+
+      expect(result).toBe("Unauthorized");
+    });
+
+    it("falls back to status-based message when payload is empty", () => {
+      const result = getApiErrorMessage({}, 503);
+
+      expect(result).toBe("Request failed with status 503");
+    });
+
+    it("returns first validation issue when details include zod issues", () => {
+      const result = getApiErrorMessage(
+        {
+          error: "ValidationError",
+          message: "Invalid request data",
+          details: {
+            issues: [
+              {
+                path: ["name"],
+                message: "This field is required",
+              },
+            ],
+          },
+        },
+        400
+      );
+
+      expect(result).toBe("Name: This field is required");
+    });
+
+    it("handles nested validation issue paths", () => {
+      const result = getApiErrorMessage(
+        {
+          error: "ValidationError",
+          details: {
+            issues: [
+              {
+                path: ["project", "name"],
+                message: "Must be 200 characters or less",
+              },
+            ],
+          },
+        },
+        400
+      );
+
+      expect(result).toBe("Project.name: Must be 200 characters or less");
+    });
+
+    it("falls back to message when details.issues is an empty array", () => {
+      const result = getApiErrorMessage(
+        {
+          error: "ValidationError",
+          message: "Validation failed",
+          details: {
+            issues: [],
+          },
+        },
+        400
+      );
+
+      expect(result).toBe("Validation failed");
+    });
+
+    it("falls back to error when details.issues is empty and message is missing", () => {
+      const result = getApiErrorMessage(
+        {
+          error: "ValidationError",
+          details: {
+            issues: [],
+          },
+        },
+        400
+      );
+
+      expect(result).toBe("ValidationError");
+    });
+
+    it("falls back to status-based default when details.issues is empty and both message and error are missing", () => {
+      const result = getApiErrorMessage(
+        {
+          details: {
+            issues: [],
+          },
+        },
+        400
+      );
+
+      expect(result).toBe("Request failed with status 400");
+    });
+
+    it("uses 'Field' prefix when issue has empty path array", () => {
+      const result = getApiErrorMessage(
+        {
+          error: "ValidationError",
+          details: {
+            issues: [
+              {
+                path: [],
+                message: "This field is required",
+              },
+            ],
+          },
+        },
+        400
+      );
+
+      expect(result).toBe("Field: This field is required");
+    });
+
+    it("safely falls back when details is present but issues is null", () => {
+      const result = getApiErrorMessage(
+        {
+          error: "ValidationError",
+          message: "Validation failed",
+          details: {
+            issues: null,
+          },
+        },
+        400
+      );
+
+      expect(result).toBe("Validation failed");
+    });
+
+    it("safely falls back when details is present but issues is an object", () => {
+      const result = getApiErrorMessage(
+        {
+          error: "ValidationError",
+          message: "Invalid data",
+          details: {
+            issues: { foo: "bar" },
+          },
+        },
+        400
+      );
+
+      expect(result).toBe("Invalid data");
+    });
+
+    it("safely falls back when details is present but issues is a string", () => {
+      const result = getApiErrorMessage(
+        {
+          error: "ValidationError",
+          details: {
+            issues: "not-an-array",
+          },
+        },
+        400
+      );
+
+      expect(result).toBe("ValidationError");
+    });
+
+    it("safely falls back to status-based default when details has malformed issues and no message/error", () => {
+      const result = getApiErrorMessage(
+        {
+          details: {
+            issues: null,
+          },
+        },
+        503
+      );
+
+      expect(result).toBe("Request failed with status 503");
+    });
   });
 
   describe("request function", () => {

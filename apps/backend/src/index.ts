@@ -18,6 +18,7 @@ import {
 import { routeConfigsRoutes } from "./routes/route-configs.routes.js";
 import { stateVariablesRoutes } from "./routes/state-variables.routes.js";
 import { renpyDefinitionsRoutes } from "./routes/renpy-definitions.routes.js";
+import { zipImportRoutes } from "./routes/zip-import.routes.js";
 import { createDrizzleSessionStore } from "./services/session-store.service.js";
 import { setupShutdownHandlers } from "./lib/shutdown.js";
 import { globalErrorHandler } from "./middleware/error-handler.middleware.js";
@@ -108,6 +109,8 @@ await server.register(characterAvatarRoutes, { prefix: basePath });
 await server.register(routeConfigsRoutes, { prefix: basePath });
 await server.register(stateVariablesRoutes, { prefix: basePath });
 await server.register(renpyDefinitionsRoutes, { prefix: basePath });
+// Register zip import routes after multipart plugin (for file uploads)
+await server.register(zipImportRoutes, { prefix: basePath });
 
 // Start server
 const start = async () => {

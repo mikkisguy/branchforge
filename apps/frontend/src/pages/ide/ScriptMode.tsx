@@ -406,6 +406,7 @@ export function ScriptMode({
         gitlabBranch={gitlabBranch}
         fileSourceType={primaryFileSourceType}
         isFocusMode={isFocusMode}
+        onOpenZipImportDialog={() => setShowZipImportDialog(true)}
       />
 
       {projectId && isLinked && linkedRepo && (

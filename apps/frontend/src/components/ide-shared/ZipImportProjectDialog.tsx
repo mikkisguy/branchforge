@@ -73,29 +73,12 @@ export function ZipImportProjectDialog({
   });
 
   const { success, error } = useToast();
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(
-    undefined
-  );
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const importMutation = useImportZipProject();
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
 
   // Reset state when dialog closes
   useEffect(() => {
     if (!open) {
-      // Clear any pending success timeout
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = undefined;
-      }
-
       setSelectedFile(null);
       setProjectName("");
       setProjectDescription("");
@@ -201,11 +184,6 @@ export function ZipImportProjectDialog({
       });
 
       success("Project imported successfully");
-
-      timeoutRef.current = setTimeout(() => {
-        onSuccess?.();
-        onOpenChange(false);
-      }, 1500);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to import project";
@@ -326,13 +304,16 @@ export function ZipImportProjectDialog({
                       <p className="font-medium">Drop zip file here</p>
                       <p className="text-sm text-muted-foreground">or</p>
                     </div>
-                    <Label htmlFor="zip-file-input">
-                      <Button type="button" variant="outline" size="sm" asChild>
-                        <span>Browse Files</span>
-                      </Button>
-                    </Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      Browse Files
+                    </Button>
                     <input
-                      id="zip-file-input"
+                      ref={fileInputRef}
                       type="file"
                       accept=".zip,application/zip,application/x-zip-compressed"
                       onChange={handleFileChange}
@@ -384,7 +365,14 @@ export function ZipImportProjectDialog({
                 {importState.result?.filesImported} files imported,{" "}
                 {importState.result?.labelsCreated} labels created
               </p>
-              <Button onClick={() => onOpenChange(false)}>Close</Button>
+              <Button
+                onClick={() => {
+                  onSuccess?.();
+                  onOpenChange(false);
+                }}
+              >
+                Close
+              </Button>
             </div>
           )}
 

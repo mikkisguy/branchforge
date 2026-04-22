@@ -304,8 +304,9 @@ async function importProjectHandler(
     return;
   }
 
-  const projectNameField = data.fields.projectName;
-  const projectDescriptionField = data.fields.projectDescription;
+  const projectNameField = data.fields.projectName ?? data.fields.name;
+  const projectDescriptionField =
+    data.fields.projectDescription ?? data.fields.description;
 
   const projectName =
     projectNameField && "value" in projectNameField
