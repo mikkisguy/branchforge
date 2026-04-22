@@ -159,11 +159,19 @@ export function GitLabSyncDialog({
         try {
           const detectionResult =
             await charactersApi.detectCharacters(projectId);
-          if (detectionResult.characters.length > 0) {
+
+          // Filter out characters that already exist in the database
+          const existingTagsSet = new Set(detectionResult.existingTags);
+          const newCharacters = detectionResult.characters.filter(
+            (char) => !existingTagsSet.has(char.tag)
+          );
+
+          if (newCharacters.length > 0) {
             setDetectedCharacters({
-              characters: detectionResult.characters,
+              characters: newCharacters,
               conflicts: detectionResult.conflicts,
               excludedTags: detectionResult.excludedTags,
+              existingTags: detectionResult.existingTags,
             });
             setShowCharacterWizard(true);
             return;

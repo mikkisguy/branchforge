@@ -76,6 +76,8 @@ export function ZipImportProjectDialog({
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
   // Track if we've already notified parent of successful import
   const [importSucceeded, setImportSucceeded] = useState(false);
+  // Guard to prevent calling onSuccess twice
+  const [didCallOnSuccess, setDidCallOnSuccess] = useState(false);
 
   const { success, error } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -95,6 +97,7 @@ export function ZipImportProjectDialog({
       setDetectedCharacters(null);
       setCreatedProjectId(null);
       setImportSucceeded(false);
+      setDidCallOnSuccess(false);
     }
   }, [open]);
 
@@ -184,8 +187,19 @@ export function ZipImportProjectDialog({
         const detectionResult = await charactersApi.detectCharacters(
           data.project.id
         );
-        if (detectionResult.characters.length > 0) {
-          setDetectedCharacters(detectionResult);
+
+        // Filter out characters that already exist in the database
+        // For a newly created project, existingTags will be empty
+        const existingTagsSet = new Set(detectionResult.existingTags);
+        const newCharacters = detectionResult.characters.filter(
+          (char) => !existingTagsSet.has(char.tag)
+        );
+
+        if (newCharacters.length > 0) {
+          setDetectedCharacters({
+            ...detectionResult,
+            characters: newCharacters,
+          });
           setShowCharacterWizard(true);
           return;
         }
@@ -441,7 +455,8 @@ export function ZipImportProjectDialog({
             setShowCharacterWizard(open);
             if (!open) {
               // Notify parent of successful import when wizard closes
-              if (importSucceeded) {
+              if (importSucceeded && !didCallOnSuccess) {
+                setDidCallOnSuccess(true);
                 onSuccess?.();
               }
               // Close the import dialog after character wizard is closed
@@ -453,7 +468,8 @@ export function ZipImportProjectDialog({
           conflicts={detectedCharacters.conflicts}
           excludedTags={detectedCharacters.excludedTags}
           onComplete={() => {
-            if (importSucceeded) {
+            if (importSucceeded && !didCallOnSuccess) {
+              setDidCallOnSuccess(true);
               onSuccess?.();
             }
             onOpenChange(false);

@@ -218,9 +218,20 @@ export function GitLabImportDialog({
         const detectionResult = await charactersApi.detectCharacters(
           result.project.id
         );
-        if (detectionResult.characters.length > 0) {
+
+        // Filter out characters that already exist in the database
+        // For a newly created project, existingTags will be empty
+        const existingTagsSet = new Set(detectionResult.existingTags);
+        const newCharacters = detectionResult.characters.filter(
+          (char) => !existingTagsSet.has(char.tag)
+        );
+
+        if (newCharacters.length > 0) {
           setImportedProjectId(result.project.id);
-          setDetectedCharacters(detectionResult);
+          setDetectedCharacters({
+            ...detectionResult,
+            characters: newCharacters,
+          });
           setShowCharacterWizard(true);
           return;
         }

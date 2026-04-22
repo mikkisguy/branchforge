@@ -33,6 +33,7 @@ export interface DetectCharactersResponse {
   characters: DetectedCharacter[];
   excludedTags: string[];
   conflicts: CharacterConflict[];
+  existingTags: string[]; // Tags of all characters that exist in database (not just conflicts)
 }
 
 export interface ImportCharacter {

@@ -19,7 +19,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { projectFilesApi } from "@/lib/api/project-files";
 import { useToast } from "@/contexts/ToastContext";
 import { useLabels } from "@/hooks/useLabels";
-import { projectFilesKeys } from "@/lib/query-keys";
+import { projectFilesKeys, characterKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
 import { CharacterImportWizard } from "@/components/CharacterImportWizard";
 import type { DetectCharactersResponse } from "@/lib/api/characters";
@@ -179,17 +179,26 @@ export function ZipImportFilesDialog({
           },
         });
 
-        // Invalidate queries to refresh data
+        // Invalidate and refetch queries to get fresh data before detecting characters
         try {
           await Promise.all([
             invalidateLabels(),
-            queryClient.invalidateQueries({
+            queryClient.refetchQueries({
               queryKey: projectFilesKeys.lists(projectId),
+            }),
+            queryClient.refetchQueries({
+              queryKey: projectFilesKeys.listsWithSource(projectId, "GITLAB"),
+            }),
+            queryClient.refetchQueries({
+              queryKey: projectFilesKeys.listsWithSource(projectId, "ZIP"),
+            }),
+            queryClient.refetchQueries({
+              queryKey: characterKeys.lists(projectId),
             }),
           ]);
         } catch (cacheError) {
-          // Log cache invalidation error but don't fail the import
-          console.error("Failed to invalidate cache after import:", cacheError);
+          // Log cache refresh error but don't fail the import
+          console.error("Failed to refresh cache after import:", cacheError);
           // Non-blocking: import succeeded even if cache refresh failed
         }
 
@@ -197,8 +206,22 @@ export function ZipImportFilesDialog({
         try {
           const detectionResult =
             await charactersApi.detectCharacters(projectId);
-          if (detectionResult.characters.length > 0) {
-            setDetectedCharacters(detectionResult);
+
+          // Filter out characters that already exist in the database
+          // The backend now provides existingTags which includes ALL existing
+          // character tags, not just conflicts
+          const existingTagsSet = new Set(detectionResult.existingTags);
+          const newCharacters = detectionResult.characters.filter(
+            (char) => !existingTagsSet.has(char.tag)
+          );
+
+          if (newCharacters.length > 0) {
+            setDetectedCharacters({
+              characters: newCharacters,
+              excludedTags: detectionResult.excludedTags,
+              conflicts: [], // No conflicts since we filtered them out
+              existingTags: detectionResult.existingTags,
+            });
             setShowCharacterWizard(true);
             return;
           }
@@ -206,7 +229,7 @@ export function ZipImportFilesDialog({
           console.error("Failed to detect characters:", err);
         }
 
-        // Only show success if no characters detected
+        // Only show success if no NEW characters detected
         success(
           `Imported ${result.filesImported} files, ${result.labelsCreated} labels`
         );
