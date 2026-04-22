@@ -1,7 +1,7 @@
 /**
- * Zip Import Dialog
+ * Zip Import Files Dialog
  *
- * Dialog for importing Ren'Py projects from zip files.
+ * Dialog for importing Ren'Py files from zip files into an existing project.
  * Shows file selection, upload progress, and import results.
  */
 
@@ -21,12 +21,18 @@ import { useToast } from "@/contexts/ToastContext";
 import { useLabels } from "@/hooks/useLabels";
 import { projectFilesKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
+import { CharacterImportWizard } from "@/components/CharacterImportWizard";
+import type { DetectCharactersResponse } from "@/lib/api/characters";
+import { charactersApi } from "@/lib/api/characters";
+import { validateZipFile } from "@/lib/zip-validation";
+import { formatFileSize } from "@/lib/utils";
+import { ZIP_IMPORT_MAX_SIZE_MB } from "@branchforge/shared";
 
 // ============================================================================
 // Types
 // ============================================================================
 
-interface ZipImportDialogProps {
+interface ZipImportFilesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;
@@ -50,12 +56,12 @@ interface ImportState {
 // Component
 // ============================================================================
 
-export function ZipImportDialog({
+export function ZipImportFilesDialog({
   open,
   onOpenChange,
   projectId,
   projectName,
-}: ZipImportDialogProps) {
+}: ZipImportFilesDialogProps) {
   const { success, error } = useToast();
   const { invalidateLabels } = useLabels();
   const queryClient = useQueryClient();
@@ -68,38 +74,26 @@ export function ZipImportDialog({
     message: "",
   });
 
+  // Character wizard state
+  const [showCharacterWizard, setShowCharacterWizard] = useState(false);
+  const [detectedCharacters, setDetectedCharacters] =
+    useState<DetectCharactersResponse | null>(null);
+
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Reset state when dialog opens/closes
   useEffect(() => {
     if (!open) {
-      setSelectedFile(() => null);
-      setImportState(() => ({
+      setSelectedFile(null);
+      setImportState({
         status: "idle",
         progress: 0,
         message: "",
-      }));
+      });
+      setShowCharacterWizard(false);
+      setDetectedCharacters(null);
     }
   }, [open]);
-
-  /**
-   * Validate a zip file
-   * Returns the file if valid, or an error message string if invalid
-   */
-  const validateZipFile = useCallback((file: File): File | string => {
-    // Validate file extension
-    if (!file.name.toLowerCase().endsWith(".zip")) {
-      return "Please select a .zip file";
-    }
-
-    // Validate file size (30MB max)
-    const maxSize = 30 * 1024 * 1024;
-    if (file.size > maxSize) {
-      return "File must be smaller than 30MB";
-    }
-
-    return file;
-  }, []);
 
   /**
    * Handle file selection
@@ -117,7 +111,7 @@ export function ZipImportDialog({
 
       setSelectedFile(validationResult);
     },
-    [error, validateZipFile]
+    [error]
   );
 
   /**
@@ -137,7 +131,7 @@ export function ZipImportDialog({
 
       setSelectedFile(validationResult);
     },
-    [error, validateZipFile]
+    [error]
   );
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -185,17 +179,37 @@ export function ZipImportDialog({
           },
         });
 
+        // Invalidate queries to refresh data
+        try {
+          await Promise.all([
+            invalidateLabels(),
+            queryClient.invalidateQueries({
+              queryKey: projectFilesKeys.lists(projectId),
+            }),
+          ]);
+        } catch (cacheError) {
+          // Log cache invalidation error but don't fail the import
+          console.error("Failed to invalidate cache after import:", cacheError);
+          // Non-blocking: import succeeded even if cache refresh failed
+        }
+
+        // Detect characters from imported RPY files
+        try {
+          const detectionResult =
+            await charactersApi.detectCharacters(projectId);
+          if (detectionResult.characters.length > 0) {
+            setDetectedCharacters(detectionResult);
+            setShowCharacterWizard(true);
+            return;
+          }
+        } catch (err) {
+          console.error("Failed to detect characters:", err);
+        }
+
+        // Only show success if no characters detected
         success(
           `Imported ${result.filesImported} files, ${result.labelsCreated} labels`
         );
-
-        // Invalidate queries to refresh data
-        await Promise.all([
-          invalidateLabels(),
-          queryClient.refetchQueries({
-            queryKey: projectFilesKeys.lists(projectId),
-          }),
-        ]);
       } else {
         setImportState({
           status: "error",
@@ -221,25 +235,32 @@ export function ZipImportDialog({
    * Handle close
    */
   const handleClose = useCallback(() => {
-    if (importState.status === "uploading") return; // Prevent close during upload
+    if (importState.status === "uploading" || showCharacterWizard) return; // Prevent close during upload or when character wizard is open
     onOpenChange(false);
-  }, [importState.status, onOpenChange]);
+  }, [importState.status, showCharacterWizard, onOpenChange]);
 
-  /**
-   * Format file size
-   */
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
+  const handleDialogOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (nextOpen) {
+        onOpenChange(true);
+        return;
+      }
+
+      if (importState.status === "uploading" || showCharacterWizard) {
+        return;
+      }
+
+      onOpenChange(false);
+    },
+    [importState.status, onOpenChange, showCharacterWizard]
+  );
 
   // ============================================================================
   // Render
   // ============================================================================
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="max-w-md w-full p-0 gap-0">
         {/* Header */}
         <div className="p-6 border-b border-border/30 flex items-start justify-between">
@@ -256,14 +277,16 @@ export function ZipImportDialog({
               </p>
             </div>
           </div>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={handleClose}
             className="text-muted-foreground hover:text-foreground transition-colors"
             disabled={importState.status === "uploading"}
             aria-label="Close dialog"
           >
             <X className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
 
         {/* Content */}
@@ -323,7 +346,7 @@ export function ZipImportDialog({
                       className="hidden"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Maximum file size: 50MB
+                      Maximum file size: {ZIP_IMPORT_MAX_SIZE_MB}MB
                     </p>
                   </div>
                 )}
@@ -331,10 +354,11 @@ export function ZipImportDialog({
 
               {/* Info */}
               <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md text-sm text-blue-800 dark:text-blue-200">
-                <p>
-                  The zip file should contain a Ren'Py project with .rpy files.
-                  .rpyc files and game/saves/ directories will be skipped.
-                </p>
+                <ul className="space-y-1.5 list-disc list-inside">
+                  <li>Include your script files (.rpy)</li>
+                  <li>Exclude media like image/audio folders</li>
+                  <li>Maximum file size: {ZIP_IMPORT_MAX_SIZE_MB}MB</li>
+                </ul>
               </div>
             </>
           )}
@@ -451,6 +475,27 @@ export function ZipImportDialog({
           )}
         </div>
       </DialogContent>
+
+      {/* Character Import Wizard */}
+      {showCharacterWizard && detectedCharacters && (
+        <CharacterImportWizard
+          open={showCharacterWizard}
+          onOpenChange={(open) => {
+            setShowCharacterWizard(open);
+            if (!open) {
+              // Close the import dialog after character wizard is closed
+              onOpenChange(false);
+            }
+          }}
+          projectId={projectId}
+          detectedCharacters={detectedCharacters.characters}
+          conflicts={detectedCharacters.conflicts}
+          excludedTags={detectedCharacters.excludedTags}
+          onComplete={() => {
+            onOpenChange(false);
+          }}
+        />
+      )}
     </Dialog>
   );
 }

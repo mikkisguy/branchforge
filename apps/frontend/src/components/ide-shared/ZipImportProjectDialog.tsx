@@ -22,6 +22,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useToast } from "@/contexts/ToastContext";
 import { useImportZipProject } from "@/hooks/useImportZipProject";
+import { CharacterImportWizard } from "@/components/CharacterImportWizard";
+import type { DetectCharactersResponse } from "@/lib/api/characters";
+import { charactersApi } from "@/lib/api/characters";
+import { validateZipFile } from "@/lib/zip-validation";
+import { formatFileSize } from "@/lib/utils";
+import { ZIP_IMPORT_MAX_SIZE_MB } from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -45,15 +51,6 @@ interface ImportState {
   error?: string;
 }
 
-/**
- * Format file size for display
- */
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 // ============================================================================
 // Component
 // ============================================================================
@@ -72,6 +69,14 @@ export function ZipImportProjectDialog({
     message: "",
   });
 
+  // Character wizard state
+  const [showCharacterWizard, setShowCharacterWizard] = useState(false);
+  const [detectedCharacters, setDetectedCharacters] =
+    useState<DetectCharactersResponse | null>(null);
+  const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
+  // Track if we've already notified parent of successful import
+  const [importSucceeded, setImportSucceeded] = useState(false);
+
   const { success, error } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importMutation = useImportZipProject();
@@ -86,27 +91,12 @@ export function ZipImportProjectDialog({
         status: "idle",
         message: "",
       });
+      setShowCharacterWizard(false);
+      setDetectedCharacters(null);
+      setCreatedProjectId(null);
+      setImportSucceeded(false);
     }
   }, [open]);
-
-  /**
-   * Validate a zip file
-   * Returns the file if valid, or an error message string if invalid
-   */
-  const validateZipFile = useCallback((file: File): File | string => {
-    // Validate file extension
-    if (!file.name.toLowerCase().endsWith(".zip")) {
-      return "Please select a .zip file";
-    }
-
-    // Validate file size (50MB max - backend uses ZIP_IMPORT_MAX_SIZE)
-    const maxSize = 50 * 1024 * 1024;
-    if (file.size > maxSize) {
-      return "File must be smaller than 50MB";
-    }
-
-    return file;
-  }, []);
 
   /**
    * Handle file selection
@@ -125,7 +115,7 @@ export function ZipImportProjectDialog({
 
       setSelectedFile(validationResult);
     },
-    [error, validateZipFile]
+    [error]
   );
 
   /**
@@ -146,7 +136,7 @@ export function ZipImportProjectDialog({
 
       setSelectedFile(validationResult);
     },
-    [error, validateZipFile]
+    [error]
   );
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -183,6 +173,27 @@ export function ZipImportProjectDialog({
         },
       });
 
+      // Mark import as succeeded so we notify parent when wizard closes
+      setImportSucceeded(true);
+
+      // Store the created project ID for character detection
+      setCreatedProjectId(data.project.id);
+
+      // Detect characters from imported RPY files
+      try {
+        const detectionResult = await charactersApi.detectCharacters(
+          data.project.id
+        );
+        if (detectionResult.characters.length > 0) {
+          setDetectedCharacters(detectionResult);
+          setShowCharacterWizard(true);
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to detect characters:", err);
+      }
+
+      // Only show success if no characters detected
       success("Project imported successfully");
     } catch (err) {
       const message =
@@ -199,76 +210,91 @@ export function ZipImportProjectDialog({
   const isImporting =
     importState.status === "uploading" || importMutation.isPending;
 
+  const handleDialogOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (
+        !nextOpen &&
+        (importState.status === "uploading" || showCharacterWizard)
+      ) {
+        return; // Prevent closing during upload or character wizard
+      }
+      onOpenChange(nextOpen);
+    },
+    [importState.status, showCharacterWizard, onOpenChange]
+  );
+
   // ============================================================================
   // Render
   // ============================================================================
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[600px] max-w-[95vw]">
-        {/* Header */}
-        {importState.status !== "success" && importState.status !== "error" && (
-          <div className="flex items-center justify-between border-b border-border/30 pb-4 mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-muted rounded-md">
-                <Package className="w-5 h-5" />
+    <>
+      <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+        <DialogContent className="w-[600px] max-w-[95vw]">
+          {/* Header */}
+          {importState.status !== "success" &&
+            importState.status !== "error" && (
+              <div className="flex items-center justify-between border-b border-border/30 pb-4 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-muted rounded-md">
+                    <Package className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-medium">Import ZIP File</h2>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      Create a new project from a Ren'Py ZIP archive
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onOpenChange(false)}
+                  disabled={isImporting}
+                  aria-label="Close dialog"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
               </div>
-              <div>
-                <h2 className="text-lg font-medium">Import ZIP File</h2>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  Create a new project from a Ren'Py ZIP archive
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onOpenChange(false)}
-              disabled={isImporting}
-              aria-label="Close dialog"
-            >
-              <X className="w-5 h-5" />
-            </Button>
-          </div>
-        )}
+            )}
 
-        {/* Content */}
-        <div className="space-y-4">
-          {/* Idle / Form state */}
-          {importState.status === "idle" && (
-            <>
-              {/* Project details */}
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <Label htmlFor="zip-project-name">Project name *</Label>
-                  <Input
-                    id="zip-project-name"
-                    value={projectName}
-                    onChange={(e) => setProjectName(e.target.value)}
-                    placeholder="My Visual Novel"
-                    maxLength={200}
-                  />
+          {/* Content */}
+          <div className="space-y-4">
+            {/* Idle / Form state */}
+            {importState.status === "idle" && (
+              <>
+                {/* Project details */}
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="zip-project-name">Project name *</Label>
+                    <Input
+                      id="zip-project-name"
+                      value={projectName}
+                      onChange={(e) => setProjectName(e.target.value)}
+                      placeholder="My Visual Novel"
+                      maxLength={200}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="zip-project-description">Description</Label>
+                    <Textarea
+                      id="zip-project-description"
+                      value={projectDescription}
+                      onChange={(e) => setProjectDescription(e.target.value)}
+                      placeholder="Optional description"
+                      maxLength={2000}
+                      rows={2}
+                      className="resize-y"
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="zip-project-description">Description</Label>
-                  <Textarea
-                    id="zip-project-description"
-                    value={projectDescription}
-                    onChange={(e) => setProjectDescription(e.target.value)}
-                    placeholder="Optional description"
-                    maxLength={2000}
-                    rows={2}
-                    className="resize-y"
-                  />
-                </div>
-              </div>
-
-              {/* File upload */}
-              <div
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                className={`
+                {/* File upload */}
+                <div
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  className={`
                   border-2 border-dashed rounded-lg p-8 text-center
                   transition-colors
                   ${
@@ -277,133 +303,163 @@ export function ZipImportProjectDialog({
                       : "border-border/50 hover:border-border hover:bg-muted/50"
                   }
                 `}
-              >
-                {selectedFile ? (
-                  <div className="space-y-3">
-                    <FileArchive className="w-12 h-12 mx-auto text-primary" />
-                    <p className="font-medium">{selectedFile.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {formatFileSize(selectedFile.size)}
-                    </p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedFile(null);
-                      }}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <Upload className="w-12 h-12 mx-auto text-muted-foreground" />
-                    <div>
-                      <p className="font-medium">Drop zip file here</p>
-                      <p className="text-sm text-muted-foreground">or</p>
+                >
+                  {selectedFile ? (
+                    <div className="space-y-3">
+                      <FileArchive className="w-12 h-12 mx-auto text-primary" />
+                      <p className="font-medium">{selectedFile.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {formatFileSize(selectedFile.size)}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedFile(null);
+                        }}
+                      >
+                        Remove
+                      </Button>
                     </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      Browse Files
-                    </Button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".zip,application/zip,application/x-zip-compressed"
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Maximum file size: 50MB
-                    </p>
-                  </div>
-                )}
-              </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <Upload className="w-12 h-12 mx-auto text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Drop zip file here</p>
+                        <p className="text-sm text-muted-foreground">or</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        Browse Files
+                      </Button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".zip,application/zip,application/x-zip-compressed"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Maximum file size: {ZIP_IMPORT_MAX_SIZE_MB}MB
+                      </p>
+                    </div>
+                  )}
+                </div>
 
-              {/* Info */}
-              <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md text-sm text-blue-800 dark:text-blue-200">
-                <p>
-                  The ZIP file should contain a Ren'Py project with .rpy files.
-                  .rpyc files and game/saves/ directories will be skipped.
+                {/* Info */}
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md text-sm text-blue-800 dark:text-blue-200">
+                  <ul className="space-y-1.5 list-disc list-inside">
+                    <li>Include your script files (.rpy)</li>
+                    <li>Exclude media like image/audio folders</li>
+                    <li>Maximum file size: {ZIP_IMPORT_MAX_SIZE_MB}MB</li>
+                  </ul>
+                </div>
+
+                {/* Import button */}
+                <Button
+                  onClick={handleImport}
+                  disabled={!selectedFile || !projectName.trim()}
+                  className="w-full"
+                >
+                  <Package className="mr-2 h-4 w-4" />
+                  Import Project
+                </Button>
+              </>
+            )}
+
+            {/* Uploading state */}
+            {importState.status === "uploading" && (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin mb-4" />
+                <p className="text-sm text-muted-foreground">
+                  {importState.message}
                 </p>
               </div>
+            )}
 
-              {/* Import button */}
-              <Button
-                onClick={handleImport}
-                disabled={!selectedFile || !projectName.trim()}
-                className="w-full"
-              >
-                <Package className="mr-2 h-4 w-4" />
-                Import Project
-              </Button>
-            </>
-          )}
-
-          {/* Uploading state */}
-          {importState.status === "uploading" && (
-            <div className="flex flex-col items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin mb-4" />
-              <p className="text-sm text-muted-foreground">
-                {importState.message}
-              </p>
-            </div>
-          )}
-
-          {/* Success state */}
-          {importState.status === "success" && (
-            <div className="flex flex-col items-center justify-center py-12">
-              <CheckCircle2 className="w-12 h-12 text-green-500 mb-4" />
-              <h3 className="text-lg font-medium mb-2">Import Successful!</h3>
-              <p className="text-sm text-muted-foreground text-center mb-4">
-                {importState.result?.filesImported} files imported,{" "}
-                {importState.result?.labelsCreated} labels created
-              </p>
-              <Button
-                onClick={() => {
-                  onSuccess?.();
-                  onOpenChange(false);
-                }}
-              >
-                Close
-              </Button>
-            </div>
-          )}
-
-          {/* Error state */}
-          {importState.status === "error" && (
-            <div className="flex flex-col items-center justify-center py-12">
-              <AlertCircle className="w-12 h-12 text-destructive mb-4" />
-              <h3 className="text-lg font-medium mb-2">Import Failed</h3>
-              <p className="text-sm text-muted-foreground text-center mb-4">
-                {importState.error}
-              </p>
-              <div className="flex gap-2">
+            {/* Success state */}
+            {importState.status === "success" && (
+              <div className="flex flex-col items-center justify-center py-12">
+                <CheckCircle2 className="w-12 h-12 text-green-500 mb-4" />
+                <h3 className="text-lg font-medium mb-2">Import Successful!</h3>
+                <p className="text-sm text-muted-foreground text-center mb-4">
+                  {importState.result?.filesImported} files imported,{" "}
+                  {importState.result?.labelsCreated} labels created
+                </p>
                 <Button
-                  variant="outline"
-                  onClick={() =>
-                    setImportState({
-                      status: "idle",
-                      message: "",
-                    })
-                  }
+                  onClick={() => {
+                    onSuccess?.();
+                    onOpenChange(false);
+                  }}
                 >
-                  Try Again
-                </Button>
-                <Button variant="outline" onClick={() => onOpenChange(false)}>
-                  Cancel
+                  Close
                 </Button>
               </div>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+            )}
+
+            {/* Error state */}
+            {importState.status === "error" && (
+              <div className="flex flex-col items-center justify-center py-12">
+                <AlertCircle className="w-12 h-12 text-destructive mb-4" />
+                <h3 className="text-lg font-medium mb-2">Import Failed</h3>
+                <p className="text-sm text-muted-foreground text-center mb-4">
+                  {importState.error}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      setImportState({
+                        status: "idle",
+                        message: "",
+                      })
+                    }
+                  >
+                    Try Again
+                  </Button>
+                  <Button variant="outline" onClick={() => onOpenChange(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Character Import Wizard - rendered as sibling to avoid focus/z-index conflicts */}
+      {showCharacterWizard && detectedCharacters && createdProjectId && (
+        <CharacterImportWizard
+          open={showCharacterWizard}
+          onOpenChange={(open) => {
+            setShowCharacterWizard(open);
+            if (!open) {
+              // Notify parent of successful import when wizard closes
+              if (importSucceeded) {
+                onSuccess?.();
+              }
+              // Close the import dialog after character wizard is closed
+              onOpenChange(false);
+            }
+          }}
+          projectId={createdProjectId}
+          detectedCharacters={detectedCharacters.characters}
+          conflicts={detectedCharacters.conflicts}
+          excludedTags={detectedCharacters.excludedTags}
+          onComplete={() => {
+            if (importSucceeded) {
+              onSuccess?.();
+            }
+            onOpenChange(false);
+          }}
+        />
+      )}
+    </>
   );
 }

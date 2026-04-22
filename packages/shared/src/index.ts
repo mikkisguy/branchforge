@@ -631,6 +631,50 @@ export function isValidAvatarMimeType(
 }
 
 // ============================================================================
+// ZIP Import Configuration
+// ============================================================================
+
+/**
+ * Maximum file size for ZIP imports in megabytes
+ */
+export const ZIP_IMPORT_MAX_SIZE_MB = 50;
+
+/**
+ * Maximum file size for ZIP imports in bytes
+ */
+export const ZIP_IMPORT_MAX_SIZE = ZIP_IMPORT_MAX_SIZE_MB * 1024 * 1024; // 50MB in bytes
+
+/**
+ * Allowed MIME types for ZIP files
+ *
+ * Note: MIME types can be unreliable, so the .zip extension check
+ * is the primary validation. This list includes common zip MIME types
+ * that some systems send.
+ */
+export const ZIP_ALLOWED_MIME_TYPES = [
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/x-zip",
+  "application/octet-stream",
+] as const;
+
+/**
+ * Validates if a MIME type is allowed for ZIP file uploads.
+ * @param mimeType - The MIME type to validate (can be undefined, null, or empty string)
+ * @returns true if the MIME type is allowed
+ */
+export function isValidZipMimeType(
+  mimeType: string | undefined | null
+): boolean {
+  if (!mimeType || typeof mimeType !== "string") {
+    return false;
+  }
+  return ZIP_ALLOWED_MIME_TYPES.includes(
+    mimeType.toLowerCase() as (typeof ZIP_ALLOWED_MIME_TYPES)[number]
+  );
+}
+
+// ============================================================================
 // Public Project Types (API Response Types)
 // ============================================================================
 

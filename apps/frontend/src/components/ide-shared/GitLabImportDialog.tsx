@@ -29,6 +29,9 @@ import { gitlabApi } from "@/lib/api/gitlab";
 import { projectKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
 import type { GitLabRepository } from "@/lib/api/gitlab";
+import { CharacterImportWizard } from "@/components/CharacterImportWizard";
+import type { DetectCharactersResponse } from "@/lib/api/characters";
+import { charactersApi } from "@/lib/api/characters";
 
 // ============================================================================
 // Types
@@ -73,6 +76,14 @@ export function GitLabImportDialog({
     message: "",
   });
 
+  // Character wizard state
+  const [showCharacterWizard, setShowCharacterWizard] = useState(false);
+  const [detectedCharacters, setDetectedCharacters] =
+    useState<DetectCharactersResponse | null>(null);
+  const [importedProjectId, setImportedProjectId] = useState<string | null>(
+    null
+  );
+
   // Repositories state
   const [repositories, setRepositories] = useState<GitLabRepository[]>([]);
   const [isLoadingRepos, setIsLoadingRepos] = useState(false);
@@ -108,6 +119,9 @@ export function GitLabImportDialog({
       setSearchQuery("");
       setImportState({ status: "idle", message: "" });
       setRepositories([]);
+      setShowCharacterWizard(false);
+      setDetectedCharacters(null);
+      setImportedProjectId(null);
       hasLoadedReposRef.current = false;
       hasSetSelectingState.current = false;
     }
@@ -199,6 +213,22 @@ export function GitLabImportDialog({
       // Invalidate projects cache
       await queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
 
+      // Detect characters from imported RPY files
+      try {
+        const detectionResult = await charactersApi.detectCharacters(
+          result.project.id
+        );
+        if (detectionResult.characters.length > 0) {
+          setImportedProjectId(result.project.id);
+          setDetectedCharacters(detectionResult);
+          setShowCharacterWizard(true);
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to detect characters:", err);
+      }
+
+      // Only show success and close if no characters detected
       success("Project imported successfully");
       // Clear any existing timeout before scheduling a new one
       if (timeoutRef.current) {
@@ -449,6 +479,29 @@ export function GitLabImportDialog({
           )}
         </div>
       </DialogContent>
+
+      {/* Character Import Wizard */}
+      {showCharacterWizard && detectedCharacters && importedProjectId && (
+        <CharacterImportWizard
+          open={showCharacterWizard}
+          onOpenChange={(open) => {
+            setShowCharacterWizard(open);
+            if (!open) {
+              // Close the import dialog after character wizard is closed
+              onSuccess?.();
+              onOpenChange(false);
+            }
+          }}
+          projectId={importedProjectId}
+          detectedCharacters={detectedCharacters.characters}
+          conflicts={detectedCharacters.conflicts}
+          excludedTags={detectedCharacters.excludedTags}
+          onComplete={() => {
+            onSuccess?.();
+            onOpenChange(false);
+          }}
+        />
+      )}
     </Dialog>
   );
 }

@@ -1,7 +1,7 @@
 import { Download, FileCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GitLabSyncDialog } from "@/components/script-mode/GitLabSyncDialog";
-import { ZipImportDialog } from "@/components/zip-import";
+import { ZipImportFilesDialog } from "@/components/ide-shared/ZipImportFilesDialog";
 
 interface ScriptModeEmptyStateProps {
   projectId?: string;
@@ -85,14 +85,12 @@ export function ScriptModeEmptyState({
         />
       )}
 
-      {projectId && (
-        <ZipImportDialog
-          open={showZipImportDialog}
-          onOpenChange={onShowZipImportDialogChange}
-          projectId={projectId}
-          projectName={projectName}
-        />
-      )}
+      <ZipImportFilesDialog
+        open={showZipImportDialog}
+        onOpenChange={onShowZipImportDialogChange}
+        projectId={projectId}
+        projectName={projectName}
+      />
     </div>
   );
 }

@@ -340,23 +340,6 @@ export function CharacterImportWizard({
 
         {/* Content - Scrollable */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {/* Settings */}
-          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-md">
-            <div className="flex items-center gap-2">
-              <Settings className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">
-                Link speakers to dialogue lines
-              </span>
-            </div>
-            <input
-              type="checkbox"
-              checked={linkToLines}
-              onChange={(e) => setLinkToLines(e.target.checked)}
-              className="w-4 h-4 rounded"
-              disabled={isImporting}
-            />
-          </div>
-
           {/* No characters detected - show add button */}
           {newCount === 0 && existingCount === 0 && specialCount === 0 && (
             <div className="text-center p-6 border border-dashed border-border/50 rounded-md">
@@ -770,6 +753,28 @@ export function CharacterImportWizard({
               )}
             </div>
           )}
+          {/* Settings */}
+          <div className="p-3 bg-muted/50 rounded-md space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Settings className="w-4 h-4 text-muted-foreground" />
+                <label
+                  htmlFor="link-to-lines"
+                  className="text-sm font-medium cursor-pointer"
+                >
+                  Automatically link characters to dialogue lines
+                </label>
+              </div>
+              <input
+                id="link-to-lines"
+                type="checkbox"
+                checked={linkToLines}
+                onChange={(e) => setLinkToLines(e.target.checked)}
+                className="w-4 h-4 rounded"
+                disabled={isImporting}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Footer */}
