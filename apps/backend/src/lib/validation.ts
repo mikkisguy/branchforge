@@ -939,7 +939,15 @@ export const createGitLabIntegrationSchema = z
       .string()
       .min(1, "Branch name is required")
       .max(255, "Branch name is too long")
-      .regex(/^[a-zA-Z0-9-_/]+$/, "Branch name contains invalid characters"),
+      .regex(/^[a-zA-Z0-9_/$.-]+$/, "Branch name contains invalid characters")
+      .refine(
+        (name) =>
+          !name.startsWith("-") &&
+          !name.startsWith("/") &&
+          !name.endsWith("/") &&
+          !name.includes(".."),
+        "Branch name cannot start with '-' or '/', end with '/', or contain '..'"
+      ),
   })
   .strict();
 
@@ -959,7 +967,15 @@ export const importProjectSchema = z
       .string()
       .min(1, "Branch is required")
       .max(255, "Branch name is too long")
-      .regex(/^[a-zA-Z0-9-_/]+$/, "Branch name contains invalid characters"),
+      .regex(/^[a-zA-Z0-9_/$.-]+$/, "Branch name contains invalid characters")
+      .refine(
+        (name) =>
+          !name.startsWith("-") &&
+          !name.startsWith("/") &&
+          !name.endsWith("/") &&
+          !name.includes(".."),
+        "Branch name cannot start with '-' or '/', end with '/', or contain '..'"
+      ),
     conflictResolution: conflictResolutionSchema,
   })
   .strict();

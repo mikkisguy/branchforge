@@ -219,7 +219,7 @@ export function ProjectsSettingsContent({
                 </TableCell>
                 <TableCell className="w-24 py-4 text-right">
                   <div className="flex justify-end gap-1">
-                    {onUpdateProject && (
+                    {onUpdateProject && isProjectOwner(project) && (
                       <Button
                         variant="ghost"
                         size="sm"

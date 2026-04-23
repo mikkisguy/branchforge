@@ -730,3 +730,72 @@ export interface PublicProject {
   createdAt: string;
   updatedAt: string;
 }
+
+// ============================================================================
+// ZIP Import Types
+// ============================================================================
+
+/**
+ * Successful ZIP file import into existing project
+ * Contains import statistics only (no project field)
+ */
+export interface ImportZipSuccess {
+  success: true;
+  filesImported: number;
+  filesUpdated: number;
+  filesSkipped: number;
+  filesFailed: number;
+  labelsCreated: number;
+}
+
+/**
+ * Failed ZIP file import
+ * Contains error information only
+ */
+export interface ImportZipFailure {
+  success: false;
+  error: string;
+}
+
+/**
+ * Response from ZIP file import endpoint (importing into existing project)
+ * Discriminated union: use response.success to narrow between success and failure
+ * POST /projects/:projectId/import/zip
+ */
+export type ImportZipResponse = ImportZipSuccess | ImportZipFailure;
+
+/**
+ * Successful project creation from ZIP import
+ * Contains the created project and import statistics
+ */
+export interface ImportProjectSuccess {
+  success: true;
+  project: {
+    id: string;
+    name: string;
+    description?: string;
+    source: "ZIP";
+    createdAt: string;
+    updatedAt: string;
+  };
+  filesImported: number;
+  filesUpdated: number;
+  filesSkipped: number;
+  labelsCreated: number;
+}
+
+/**
+ * Failed project creation from ZIP import
+ * Contains error information only
+ */
+export interface ImportProjectFailure {
+  success: false;
+  error: string;
+}
+
+/**
+ * Response from project creation via ZIP import endpoint
+ * Discriminated union: use response.success to narrow between success and failure
+ * POST /projects/import/zip
+ */
+export type ImportProjectResponse = ImportProjectSuccess | ImportProjectFailure;

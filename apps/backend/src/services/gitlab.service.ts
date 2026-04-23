@@ -18,7 +18,10 @@ import {
   decryptPAT,
   validateGitLabUrl,
 } from "./encryption.service.js";
-import { NotFoundError } from "../middleware/error-handler.middleware.js";
+import {
+  NotFoundError,
+  ConflictError,
+} from "../middleware/error-handler.middleware.js";
 
 const DEFAULT_TIMEOUT_MS = 30000;
 
@@ -301,6 +304,7 @@ export async function getGitlabProject(
  * @param gitlabProjectId - The GitLab project ID
  * @param repositoryName - The repository name
  * @param defaultBranch - The default branch (default: main)
+ * @throws ConflictError if the GitLab repository is already linked to a different project
  */
 export async function linkRepository(
   projectId: string,
@@ -311,6 +315,19 @@ export async function linkRepository(
   const db = getDb();
 
   await db.transaction(async (tx) => {
+    // Check if this GitLab repository is already linked to a different project
+    const [existingLink] = await tx
+      .select({ projectId: gitlabRepositories.projectId })
+      .from(gitlabRepositories)
+      .where(eq(gitlabRepositories.gitlabProjectId, gitlabProjectId))
+      .limit(1);
+
+    if (existingLink && existingLink.projectId !== projectId) {
+      throw new ConflictError(
+        "GitLab repository is already linked to another project"
+      );
+    }
+
     // Ensure project source is set to GITLAB and validate project exists
     const updateResult = await tx
       .update(projects)
@@ -322,7 +339,7 @@ export async function linkRepository(
       throw new NotFoundError("Project");
     }
 
-    // Insert into gitlab_repositories, updating repositoryName and defaultBranch on conflict
+    // Insert into gitlab_repositories, updating all fields on conflict
     await tx
       .insert(gitlabRepositories)
       .values({
@@ -332,11 +349,9 @@ export async function linkRepository(
         defaultBranch,
       })
       .onConflictDoUpdate({
-        target: [
-          gitlabRepositories.projectId,
-          gitlabRepositories.gitlabProjectId,
-        ],
+        target: gitlabRepositories.projectId,
         set: {
+          gitlabProjectId,
           repositoryName,
           defaultBranch,
         },

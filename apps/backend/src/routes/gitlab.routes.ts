@@ -8,6 +8,10 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { validateBody } from "../middleware/validation.middleware.js";
+import {
+  NotFoundError,
+  ConflictError,
+} from "../middleware/error-handler.middleware.js";
 import { checkRateLimit } from "../services/rate-limiter.service.js";
 import { getDb } from "../db/index.js";
 import {
@@ -83,6 +87,10 @@ function getClientIp(request: FastifyRequest): string {
   // Fall back to socket address
   return request.ip;
 }
+
+// ============================================================================
+// Constants
+// ============================================================================
 
 // ============================================================================
 // Types
@@ -473,12 +481,9 @@ async function linkRepositoryHandler(
       "linkRepositoryHandler: Failed to link repository"
     );
 
-    if (err instanceof Error && err.message.includes("duplicate key value")) {
-      reply.status(409).send({
-        error: "Repository already linked",
-        message: "This repository is already linked to your project.",
-      });
-      return;
+    // Rethrow NotFoundError and ConflictError to let global error handler return appropriate status
+    if (err instanceof NotFoundError || err instanceof ConflictError) {
+      throw err;
     }
 
     reply.status(500).send({
@@ -837,6 +842,31 @@ async function importProjectHandler(
       { err },
       "importProjectHandler: Failed to import project from GitLab"
     );
+
+    // Check for conflict error from linkRepository (repository already linked)
+    if (err instanceof ConflictError) {
+      // Delete the partially created project before sending response
+      if (newProject?.id) {
+        try {
+          await deleteProject(userId, newProject.id);
+          request.log.info(
+            { projectId: newProject.id },
+            "importProjectHandler: Cleaned up partially created project after duplicate-link error"
+          );
+        } catch (deleteErr) {
+          request.log.error(
+            { err: deleteErr, projectId: newProject.id },
+            "importProjectHandler: Failed to cleanup partially created project"
+          );
+        }
+      }
+
+      reply.status(409).send({
+        error: "Repository already linked",
+        message: "This repository is already linked to your project.",
+      });
+      return;
+    }
 
     if (newProject?.id) {
       try {

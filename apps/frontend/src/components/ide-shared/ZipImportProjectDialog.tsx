@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/contexts/ToastContext";
 import { useImportZipProject } from "@/hooks/useImportZipProject";
 import { CharacterImportWizard } from "@/components/CharacterImportWizard";
@@ -74,10 +74,10 @@ export function ZipImportProjectDialog({
   const [detectedCharacters, setDetectedCharacters] =
     useState<DetectCharactersResponse | null>(null);
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
-  // Track if we've already notified parent of successful import
+  // Track if import succeeded so we notify parent when wizard closes
   const [importSucceeded, setImportSucceeded] = useState(false);
-  // Guard to prevent calling onSuccess twice
-  const [didCallOnSuccess, setDidCallOnSuccess] = useState(false);
+  // Guard to prevent calling onSuccess twice (synchronous check)
+  const didCallOnSuccessRef = useRef(false);
 
   const { success, error } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -97,7 +97,7 @@ export function ZipImportProjectDialog({
       setDetectedCharacters(null);
       setCreatedProjectId(null);
       setImportSucceeded(false);
-      setDidCallOnSuccess(false);
+      didCallOnSuccessRef.current = false;
     }
   }, [open]);
 
@@ -112,6 +112,9 @@ export function ZipImportProjectDialog({
       const validationResult = validateZipFile(file);
       if (typeof validationResult === "string") {
         setSelectedFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
         error(`${validationResult}: ${file.name}`);
         return;
       }
@@ -133,6 +136,9 @@ export function ZipImportProjectDialog({
       const validationResult = validateZipFile(file);
       if (typeof validationResult === "string") {
         setSelectedFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
         error(`${validationResult}: ${file.name}`);
         return;
       }
@@ -167,6 +173,12 @@ export function ZipImportProjectDialog({
         projectDescription: projectDescription.trim() || undefined,
       });
 
+      // Narrow the discriminated union - API throws on non-OK responses
+      // so data is always ImportZipSuccess here
+      if (!data.success) {
+        throw new Error(data.error || "Failed to import project");
+      }
+
       setImportState({
         status: "success",
         message: "Import completed successfully",
@@ -178,6 +190,7 @@ export function ZipImportProjectDialog({
 
       // Mark import as succeeded so we notify parent when wizard closes
       setImportSucceeded(true);
+      didCallOnSuccessRef.current = false;
 
       // Store the created project ID for character detection
       setCreatedProjectId(data.project.id);
@@ -245,6 +258,9 @@ export function ZipImportProjectDialog({
     <>
       <Dialog open={open} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="w-[600px] max-w-[95vw]">
+          {/* Visually-hidden DialogTitle for accessibility - always present */}
+          <DialogTitle className="sr-only">Import ZIP File</DialogTitle>
+
           {/* Header */}
           {importState.status !== "success" &&
             importState.status !== "error" && (
@@ -332,6 +348,9 @@ export function ZipImportProjectDialog({
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedFile(null);
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = "";
+                          }
                         }}
                       >
                         Remove
@@ -408,7 +427,10 @@ export function ZipImportProjectDialog({
                 </p>
                 <Button
                   onClick={() => {
-                    onSuccess?.();
+                    if (!didCallOnSuccessRef.current) {
+                      didCallOnSuccessRef.current = true;
+                      onSuccess?.();
+                    }
                     onOpenChange(false);
                   }}
                 >
@@ -455,8 +477,8 @@ export function ZipImportProjectDialog({
             setShowCharacterWizard(open);
             if (!open) {
               // Notify parent of successful import when wizard closes
-              if (importSucceeded && !didCallOnSuccess) {
-                setDidCallOnSuccess(true);
+              if (importSucceeded && !didCallOnSuccessRef.current) {
+                didCallOnSuccessRef.current = true;
                 onSuccess?.();
               }
               // Close the import dialog after character wizard is closed
@@ -468,8 +490,8 @@ export function ZipImportProjectDialog({
           conflicts={detectedCharacters.conflicts}
           excludedTags={detectedCharacters.excludedTags}
           onComplete={() => {
-            if (importSucceeded && !didCallOnSuccess) {
-              setDidCallOnSuccess(true);
+            if (importSucceeded && !didCallOnSuccessRef.current) {
+              didCallOnSuccessRef.current = true;
               onSuccess?.();
             }
             onOpenChange(false);

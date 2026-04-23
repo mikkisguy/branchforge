@@ -52,20 +52,50 @@ function getFirstValidationIssue(errorData: Partial<ApiError> | undefined): {
     return null;
   }
 
-  const zodError = errorData.details as ZodErrorLike;
-  if (!Array.isArray(zodError.issues) || zodError.issues.length === 0) {
-    return null;
+  const details = errorData.details;
+
+  // Try Zod-style error format first (issues array)
+  const zodError = details as ZodErrorLike;
+  if (Array.isArray(zodError.issues) && zodError.issues.length > 0) {
+    const firstIssue = zodError.issues[0] as ZodIssueLike;
+    if (isObject(firstIssue) && typeof firstIssue.message === "string") {
+      return {
+        field: toReadableField(firstIssue.path),
+        message: firstIssue.message,
+      };
+    }
   }
 
-  const firstIssue = zodError.issues[0] as ZodIssueLike;
-  if (!isObject(firstIssue) || typeof firstIssue.message !== "string") {
-    return null;
+  // Try flattened validation map format (object with field names as keys)
+  if (!Array.isArray(details)) {
+    for (const [key, value] of Object.entries(details)) {
+      // Skip known non-field keys
+      if (key === "issues" || key === "_errors" || key === "message") {
+        continue;
+      }
+
+      // Check if the value is a string or array of strings (validation message)
+      if (typeof value === "string") {
+        return {
+          field: toReadableField([key]),
+          message: value,
+        };
+      }
+
+      if (
+        Array.isArray(value) &&
+        value.length > 0 &&
+        typeof value[0] === "string"
+      ) {
+        return {
+          field: toReadableField([key]),
+          message: value.join(", "),
+        };
+      }
+    }
   }
 
-  return {
-    field: toReadableField(firstIssue.path),
-    message: firstIssue.message,
-  };
+  return null;
 }
 
 export function getApiErrorMessage(

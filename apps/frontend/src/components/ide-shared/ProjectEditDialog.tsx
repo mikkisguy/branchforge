@@ -35,18 +35,19 @@ export function ProjectEditDialog({
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const previousProjectIdRef = useRef<string | null>(null);
+  const previousOpenRef = useRef(false);
 
   useEffect(() => {
-    // Only reset form when dialog first opens or project ID changes
-    if (open && project) {
-      const projectIdChanged = previousProjectIdRef.current !== project.id;
-      if (projectIdChanged) {
-        setName(project.name);
-        setDescription(project.description ?? "");
-        setError(null);
-        previousProjectIdRef.current = project.id;
-      }
+    // Detect when dialog opens (transition from false to true)
+    if (open && !previousOpenRef.current && project) {
+      setName(project.name);
+      setDescription(project.description ?? "");
+      setError(null);
+      previousOpenRef.current = true;
+    }
+    // Reset open ref when dialog closes
+    if (!open) {
+      previousOpenRef.current = false;
     }
   }, [open, project]);
 
@@ -75,7 +76,7 @@ export function ProjectEditDialog({
     try {
       const updatedProject = await onUpdate(project.id, {
         name: trimmedName,
-        description: description.trim() || undefined,
+        description: description.trim() || "",
       });
 
       // Update local state with the server-returned values

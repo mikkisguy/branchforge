@@ -22,7 +22,6 @@ import {
   type ImportZipResult,
 } from "../services/zip-import.service.js";
 import { createProject, deleteProject } from "../services/projects.service.js";
-import type { PublicProject } from "@branchforge/shared";
 import type { MultipartFile } from "@fastify/multipart";
 import {
   HttpError,
@@ -32,6 +31,9 @@ import {
   ZIP_IMPORT_MAX_SIZE,
   ZIP_IMPORT_MAX_SIZE_MB,
   isValidZipMimeType,
+  type ImportZipResponse,
+  type ImportProjectSuccess,
+  type ImportProjectFailure,
 } from "@branchforge/shared";
 
 // ============================================================================
@@ -40,25 +42,6 @@ import {
 
 interface ImportZipParams {
   projectId: string;
-}
-
-interface ImportZipResponse {
-  success: boolean;
-  filesImported: number;
-  filesUpdated: number;
-  filesSkipped: number;
-  labelsCreated: number;
-  error?: string;
-}
-
-interface ImportProjectResponse {
-  success: boolean;
-  project?: PublicProject;
-  filesImported: number;
-  filesUpdated: number;
-  filesSkipped: number;
-  labelsCreated: number;
-  error?: string;
 }
 
 interface ErrorResponse {
@@ -272,6 +255,11 @@ async function importProjectHandler(
     return;
   }
 
+  if (file.mimetype && !isValidZipMimeType(file.mimetype)) {
+    reply.status(400).send({ error: "File must be a valid zip file" });
+    return;
+  }
+
   const projectNameField = data.fields.projectName ?? data.fields.name;
   const projectDescriptionField =
     data.fields.projectDescription ?? data.fields.description;
@@ -361,26 +349,23 @@ async function importProjectHandler(
         );
       }
 
-      reply.status(400).send({
-        success: result.success,
-        filesImported: result.filesImported,
-        filesUpdated: result.filesUpdated,
-        filesSkipped: result.filesSkipped,
-        labelsCreated: result.labelsCreated,
+      const failureResponse: ImportProjectFailure = {
+        success: false,
         error: result.error || "Failed to import zip file",
-      } as ImportProjectResponse);
+      };
+      reply.status(400).send(failureResponse);
       return;
     }
 
-    reply.status(201).send({
-      success: result.success,
-      project: newProject,
+    const successResponse: ImportProjectSuccess = {
+      success: true,
+      project: newProject as ImportProjectSuccess["project"],
       filesImported: result.filesImported,
       filesUpdated: result.filesUpdated,
       filesSkipped: result.filesSkipped,
       labelsCreated: result.labelsCreated,
-      error: result.error,
-    } as ImportProjectResponse);
+    };
+    reply.status(201).send(successResponse);
   } catch (err) {
     // Re-throw HttpError instances (e.g., ValidationError) so the global error handler can use their status code
     if (err instanceof HttpError) {
@@ -390,11 +375,12 @@ async function importProjectHandler(
       { err },
       "importProjectHandler: Failed to import project from ZIP"
     );
-    reply.status(500).send({
+    const errorResponse: ImportProjectFailure = {
       success: false,
       error:
         "Failed to import project from ZIP file. Please check the file format and try again.",
-    } as ImportProjectResponse);
+    };
+    reply.status(500).send(errorResponse);
   }
 }
 
