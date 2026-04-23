@@ -11,7 +11,6 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import type { SourceOrigin } from "@branchforge/shared";
 import {
   projectsApi,
   type Project,
@@ -66,11 +65,6 @@ function persistCurrentProjectId(projectId: string | null): void {
 // Types
 // ============================================================================
 
-export interface CreateProjectOptions {
-  name: string;
-  source?: SourceOrigin;
-}
-
 export interface UseProjectReturn {
   // Projects state
   projects: Project[];
@@ -81,7 +75,6 @@ export interface UseProjectReturn {
   // Methods
   refreshProjects: () => Promise<void>;
   setCurrentProject: (project: Project | null) => void;
-  createProject: (options: CreateProjectOptions) => Promise<Project>;
   updateProject: (
     projectId: string,
     body: UpdateProjectBody
@@ -155,24 +148,6 @@ export function useProject(): UseProjectReturn {
     queryClient,
   ]);
 
-  // Create project mutation
-  const createProjectMutation = useMutation({
-    mutationFn: async (options: CreateProjectOptions) => {
-      return projectsApi.createProject({
-        name: options.name,
-        source: options.source ?? "ZIP",
-      });
-    },
-    onSuccess: async (newProject) => {
-      // Invalidate and refetch projects list
-      await queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
-
-      // Set the new project as current
-      persistCurrentProjectId(newProject.id);
-      queryClient.setQueryData(projectKeys.current(), newProject.id);
-    },
-  });
-
   // Refresh projects method
   const refreshProjects = async () => {
     await queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
@@ -184,13 +159,6 @@ export function useProject(): UseProjectReturn {
     persistCurrentProjectId(projectId);
     // Also update query cache for reactive updates
     queryClient.setQueryData(projectKeys.current(), projectId);
-  };
-
-  // Create project method
-  const createProject = async (
-    options: CreateProjectOptions
-  ): Promise<Project> => {
-    return createProjectMutation.mutateAsync(options);
   };
 
   // Update project mutation
@@ -272,7 +240,6 @@ export function useProject(): UseProjectReturn {
     projectsError: projectsError as Error | null,
     refreshProjects,
     setCurrentProject,
-    createProject,
     updateProject,
     deleteProject,
   };

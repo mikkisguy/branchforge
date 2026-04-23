@@ -96,6 +96,12 @@ export const projectsApi = {
 
   /**
    * Create a new project
+   *
+   * Direct project creation through the UI is not supported - projects
+   * must be created through import flows.
+   *
+   * @param body - Project data including required source field
+   * @returns The created project
    */
   async createProject(body: CreateProjectBody): Promise<Project> {
     const response = await request<GetProjectResponse>("/projects", {

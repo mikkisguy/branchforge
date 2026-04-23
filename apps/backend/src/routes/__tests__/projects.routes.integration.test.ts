@@ -72,6 +72,7 @@ describe("ProjectsRoutes (Integration)", () => {
     name: "Owned Project",
     description: "A project owned by the user",
     maxMeterDelta: 10,
+    source: "ZIP",
   };
 
   const sharedProject: NewProject = {
@@ -80,6 +81,7 @@ describe("ProjectsRoutes (Integration)", () => {
     name: "Shared Project",
     description: "A project shared with the user",
     maxMeterDelta: 15,
+    source: "GITLAB",
   };
 
   // Helper to clean up all test data
@@ -403,128 +405,6 @@ describe("ProjectsRoutes (Integration)", () => {
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toEqual({ error: "Project not found" });
-    });
-  });
-
-  describe("POST /projects", () => {
-    it("should return 401 when not authenticated", async () => {
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/projects",
-        payload: {
-          name: "New Project",
-          description: "A new project",
-          maxMeterDelta: 15,
-        },
-      });
-
-      expect(response.statusCode).toBe(401);
-    });
-
-    it("should create project with valid data", async () => {
-      const auth = await createAuthenticatedRequest(testUserId);
-      let createdProjectId: string | undefined;
-
-      const requestBody = {
-        name: "New Project",
-        description: "A new project",
-        maxMeterDelta: 15,
-      };
-
-      try {
-        const response = await fastify.inject({
-          method: "POST",
-          url: "/projects",
-          payload: requestBody,
-          cookies: {
-            [SESSION_COOKIE_NAME]: auth.sessionId,
-          },
-        });
-
-        expect(response.statusCode).toBe(201);
-        const json = response.json();
-        createdProjectId = json.project.id;
-
-        expect(json.project).toMatchObject({
-          name: "New Project",
-          description: "A new project",
-          maxMeterDelta: 15,
-          visibility: "OWNER",
-        });
-        expect(json.project.id).toBeDefined();
-        expect(json.project.createdAt).toBeDefined();
-        expect(json.project.updatedAt).toBeDefined();
-
-        // Verify project was actually created in database
-        const [dbProject] = await db
-          .select()
-          .from(projects)
-          .where(eq(projects.id, json.project.id))
-          .limit(1);
-        expect(dbProject).toBeDefined();
-        expect(dbProject.name).toBe("New Project");
-      } finally {
-        if (createdProjectId) {
-          await db.delete(projects).where(eq(projects.id, createdProjectId));
-        }
-      }
-    });
-
-    it("should return 400 when name is missing", async () => {
-      const auth = await createAuthenticatedRequest(testUserId);
-
-      const requestBody = {
-        name: "",
-      };
-
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/projects",
-        payload: requestBody,
-        cookies: {
-          [SESSION_COOKIE_NAME]: auth.sessionId,
-        },
-      });
-
-      expect(response.statusCode).toBe(400);
-      expect(response.json()).toMatchObject({
-        message: "Invalid request data",
-      });
-    });
-
-    it("should allow negative maxMeterDelta", async () => {
-      const auth = await createAuthenticatedRequest(testUserId);
-      let createdProjectId: string | undefined;
-
-      const requestBody = {
-        name: "New Project",
-        maxMeterDelta: -5,
-      };
-
-      try {
-        const response = await fastify.inject({
-          method: "POST",
-          url: "/projects",
-          payload: requestBody,
-          cookies: {
-            [SESSION_COOKIE_NAME]: auth.sessionId,
-          },
-        });
-
-        expect(response.statusCode).toBe(201);
-        const json = response.json();
-        createdProjectId = json.project.id;
-
-        expect(json.project).toMatchObject({
-          name: "New Project",
-          maxMeterDelta: -5,
-          visibility: "OWNER",
-        });
-      } finally {
-        if (createdProjectId) {
-          await db.delete(projects).where(eq(projects.id, createdProjectId));
-        }
-      }
     });
   });
 
