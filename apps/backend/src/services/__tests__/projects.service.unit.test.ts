@@ -140,6 +140,7 @@ describe("ProjectsService", () => {
         name: "New Project",
         description: "A new project",
         maxMeterDelta: 15,
+        source: "GITLAB",
       };
 
       const newProject = { ...mockProject, ...body, id: "new-project-id" };
@@ -155,6 +156,7 @@ describe("ProjectsService", () => {
     it("should use default maxMeterDelta when not provided", async () => {
       const body: CreateProjectBody = {
         name: "New Project",
+        source: "ZIP",
       };
 
       const newProject = { ...mockProject, ...body, maxMeterDelta: 10 };
@@ -168,6 +170,7 @@ describe("ProjectsService", () => {
     it("should create project with optional fields undefined", async () => {
       const body: CreateProjectBody = {
         name: "Minimal Project",
+        source: "ZIP",
       };
 
       const newProject = {
@@ -175,12 +178,51 @@ describe("ProjectsService", () => {
         name: "Minimal Project",
         description: null,
         maxMeterDelta: 10,
+        source: "ZIP" as const,
       };
       mockInsert.mockImplementation(() => createInsertChain([newProject]));
 
       const project = await createProject(userId, body);
 
       expect(project.description).toBeUndefined();
+    });
+
+    it("should create project with GITLAB source", async () => {
+      const body: CreateProjectBody = {
+        name: "GitLab Project",
+        source: "GITLAB",
+      };
+
+      const newProject = {
+        ...mockProject,
+        ...body,
+        id: "gitlab-project-id",
+      };
+      mockInsert.mockImplementation(() => createInsertChain([newProject]));
+
+      const project = await createProject(userId, body);
+
+      expect(project.name).toBe("GitLab Project");
+      expect(project.source).toBe("GITLAB");
+    });
+
+    it("should create project with ZIP source", async () => {
+      const body: CreateProjectBody = {
+        name: "ZIP Project",
+        source: "ZIP",
+      };
+
+      const newProject = {
+        ...mockProject,
+        ...body,
+        id: "zip-project-id",
+      };
+      mockInsert.mockImplementation(() => createInsertChain([newProject]));
+
+      const project = await createProject(userId, body);
+
+      expect(project.name).toBe("ZIP Project");
+      expect(project.source).toBe("ZIP");
     });
   });
 

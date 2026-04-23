@@ -19,7 +19,6 @@ const PROJECT_ID = "550e8400-e29b-41d4-a716-446655440000";
 vi.mock("../../services/projects.service.js", () => ({
   listProjects: vi.fn(),
   getProject: vi.fn(),
-  createProject: vi.fn(),
   updateProject: vi.fn(),
   deleteProject: vi.fn(),
 }));
@@ -134,56 +133,6 @@ describe("ProjectsRoutes", () => {
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toEqual({ error: "Project not found" });
-    });
-  });
-
-  describe("POST /projects", () => {
-    it("should create project with valid data", async () => {
-      const requestBody = {
-        name: "New Project",
-        description: "A new project",
-        maxMeterDelta: 15,
-        source: "ZIP" as const,
-      };
-
-      const mockProject = {
-        id: "new-project-id",
-        ...requestBody,
-        visibility: "OWNER" as const,
-        createdAt: new Date("2024-01-01").toISOString(),
-        updatedAt: new Date("2024-01-01").toISOString(),
-      };
-
-      vi.mocked(projectsService.createProject).mockResolvedValue(mockProject);
-
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/projects",
-        payload: requestBody,
-      });
-
-      expect(response.statusCode).toBe(201);
-      const json = response.json();
-      expect(json.project.id).toBe("new-project-id");
-      expect(json.project.name).toBe("New Project");
-      expect(json.project.source).toBe("ZIP");
-    });
-
-    it("should return 400 when name is missing", async () => {
-      const requestBody = {
-        name: "",
-      };
-
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/projects",
-        payload: requestBody,
-      });
-
-      expect(response.statusCode).toBe(400);
-      expect(response.json()).toMatchObject({
-        message: "Invalid request data",
-      });
     });
   });
 

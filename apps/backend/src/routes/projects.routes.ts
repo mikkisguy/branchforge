@@ -9,25 +9,21 @@ import type { FastifyRequest, FastifyReply } from "fastify";
 import {
   listProjects,
   getProject,
-  createProject,
   updateProject,
   deleteProject,
 } from "../services/projects.service.js";
 import type { SourceOrigin, PublicProject } from "@branchforge/shared";
 import { authenticate } from "../middleware/auth.middleware.js";
 import {
-  validateBody,
   validateParams,
   validateRequest,
 } from "../middleware/validation.middleware.js";
 import {
-  createProjectSchema,
   updateProjectSchema,
   projectIdParamsSchema,
   projectFilesQuerySchema,
   fileIdParamsSchema,
   updateFileContentSchema,
-  type CreateProjectInput,
   type FileIdParams,
   type UpdateFileContentInput,
   type UpdateProjectInput,
@@ -57,10 +53,6 @@ interface GetProjectParams {
 }
 
 interface GetProjectResponse {
-  project: PublicProject;
-}
-
-interface CreateProjectResponse {
   project: PublicProject;
 }
 
@@ -140,22 +132,14 @@ async function getProjectHandler(
 }
 
 /**
- * Create a new project
+ * NOTE: Generic project creation endpoint has been removed.
  *
- * POST /projects
- * Requires authentication
+ * Projects must be created through import flows:
+ * - POST /api/gitlab/import-project (GitLab import)
+ * - POST /api/projects/import/zip (ZIP file import)
+ *
+ * There is no generic project creation UI or API endpoint.
  */
-async function createProjectHandler(
-  request: FastifyRequest<{ Body: CreateProjectInput }>,
-  reply: FastifyReply
-): Promise<void> {
-  const user = request.user!;
-  const body = request.body;
-
-  const project = await createProject(user.id, body);
-
-  reply.status(201).send({ project } as CreateProjectResponse);
-}
 
 /**
  * Update an existing project
@@ -533,14 +517,6 @@ export async function projectsRoutes(fastify: FastifyInstance): Promise<void> {
       preValidation: validateParams(projectIdParamsSchema),
     },
     getProjectHandler
-  );
-  fastify.post<{ Body: CreateProjectInput }>(
-    "/projects",
-    {
-      onRequest: authenticate,
-      preValidation: validateBody(createProjectSchema),
-    },
-    createProjectHandler
   );
   fastify.patch<{ Params: { projectId: string }; Body: UpdateProjectInput }>(
     "/projects/:projectId",

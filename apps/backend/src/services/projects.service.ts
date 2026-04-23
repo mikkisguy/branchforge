@@ -16,9 +16,11 @@ import type {
 import {
   NotFoundError,
   ForbiddenError,
+  ValidationError,
 } from "../middleware/error-handler.middleware.js";
 import { z } from "zod";
 import { createProjectSchema } from "../lib/validation.js";
+import { isValidSourceOrigin } from "@branchforge/shared";
 
 /**
  * Project row type from database queries (with optional role for shared projects)
@@ -192,11 +194,40 @@ export async function getProject(
  * @param body - The project data
  * @returns The created project
  */
+/**
+ * Create a new project (internal helper).
+ *
+ * IMPORTANT: This is an internal function used ONLY by import flows (GitLab, ZIP).
+ * Projects must always be created through import flows - there is no generic
+ * project creation UI or API endpoint.
+ *
+ * @param userId - The user ID creating the project
+ * @param body - The project data (must include source field: "GITLAB" or "ZIP")
+ * @returns The created project
+ * @internal
+ */
 export async function createProject(
   userId: string,
   body: CreateProjectBody
 ): Promise<PublicProject> {
   const db = getDb();
+
+  if (!isValidSourceOrigin(body.source)) {
+    throw new ValidationError(
+      "Invalid project source: must be GITLAB or ZIP (import flows only)",
+      {
+        issues: [
+          {
+            code: "invalid_value",
+            path: ["source"],
+            message: "Source must be GITLAB or ZIP",
+            received: body.source,
+            options: ["GITLAB", "ZIP"],
+          },
+        ],
+      }
+    );
+  }
 
   const newProject: NewProject = {
     userId,

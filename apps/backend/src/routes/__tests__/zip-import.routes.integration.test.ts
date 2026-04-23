@@ -1,0 +1,417 @@
+/**
+ * ZIP Import Routes Integration Tests
+ *
+ * Route-level integration tests for ZIP import API routes.
+ *
+ * This test suite exercises the ZIP import routes with a real Fastify instance,
+ * registered auth/session plugins, mocked downstream services, and mocked
+ * authorization DB lookups.
+ *
+ * Why this is an integration test:
+ * - Tests route wiring, middleware chains, validation, and auth flow together
+ * - Verifies HTTP responses, error handling, and status codes end-to-end
+ * - Uses real Fastify request/response lifecycle (inject() method)
+ *
+ * What is mocked:
+ * - Database authorization lookups (projects table)
+ * - ZIP import service operations (file parsing, label creation)
+ * - Project service operations (create, delete)
+ *
+ * This provides confidence that routes are wired correctly while keeping
+ * tests fast by avoiding full DB fixture setup.
+ */
+
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import Fastify, { type FastifyInstance } from "fastify";
+import cookie from "@fastify/cookie";
+import session from "@fastify/session";
+import multipart from "@fastify/multipart";
+import { zipImportRoutes } from "../zip-import.routes.js";
+import * as zipImportService from "../../services/zip-import.service.js";
+import * as projectsService from "../../services/projects.service.js";
+import * as db from "../../db/index.js";
+
+// Mock drizzle-orm's eq function
+vi.mock("drizzle-orm", () => ({
+  eq: vi.fn(),
+}));
+
+// Mock the database
+vi.mock("../../db/index.js", () => ({
+  getDb: vi.fn(),
+}));
+
+// Mock the database schema - only mock what's used by authorization helpers
+vi.mock("../../db/schema/index.js", () => ({
+  projects: {
+    userId: "userId",
+    id: "id",
+  },
+}));
+
+// Mock the services
+vi.mock("../../services/zip-import.service.js", () => ({
+  importZipFile: vi.fn(),
+}));
+
+vi.mock("../../services/projects.service.js", () => ({
+  createProject: vi.fn(),
+  deleteProject: vi.fn(),
+}));
+
+// Mock the authenticate middleware
+vi.mock("../../middleware/auth.middleware.js", () => ({
+  authenticate: vi.fn(async (request: any, _reply) => {
+    // Simulate authenticated user
+    request.session = {
+      user: {
+        id: "user-123",
+        email: "test@example.com",
+        role: "OWNER" as const,
+      },
+    };
+    request.user = request.session.user;
+    request.userId = request.session.user.id;
+  }),
+}));
+
+// Test fixtures
+const testUserId = "user-123";
+const testProjectId = "project-123";
+
+describe("ZIP Import Routes (Integration)", () => {
+  let fastify: FastifyInstance;
+
+  beforeEach(async () => {
+    fastify = Fastify();
+
+    // Register cookie plugin
+    await fastify.register(cookie);
+
+    // Register session plugin
+    await fastify.register(session, {
+      secret: "a".repeat(32),
+      cookie: { secure: false },
+    });
+
+    // Register multipart plugin (required for ZIP import routes)
+    await fastify.register(multipart, {
+      limits: {
+        fileSize: 50 * 1024 * 1024, // 50MB
+      },
+    });
+
+    // Set up database mock for authorization helpers
+    const mockSelect = vi.fn(() => ({ from: mockFrom }));
+    const mockFrom = vi.fn(() => ({ where: mockWhere }));
+    const mockWhere = vi.fn(() => ({ limit: mockLimit }));
+    const mockLimit = vi.fn(() => {
+      // Default: project belongs to user
+      return Promise.resolve([{ userId: testUserId }]);
+    });
+    const mockDb = {
+      select: mockSelect,
+    };
+    vi.mocked(db.getDb).mockReturnValue(mockDb as any);
+
+    // Store mock references for test customization
+    (fastify as any).mockDb = {
+      mockSelect,
+      mockFrom,
+      mockWhere,
+      mockLimit,
+    };
+
+    // Create a shared mock file that will be used by default
+    const mockZipBuffer = Buffer.from("PK\x03\x04...mock zip content");
+    const createMockFile = (projectName?: string, description?: string) => ({
+      filename: "test.zip",
+      mimetype: "application/zip",
+      fieldname: "file",
+      toBuffer: vi.fn().mockResolvedValue(mockZipBuffer),
+      file: {
+        truncated: false,
+      } as any,
+      fields: {
+        projectName: projectName ? { value: projectName } : undefined,
+        projectDescription: description ? { value: description } : undefined,
+      },
+    });
+
+    // Store mock file creator for test customization
+    (fastify as any).createMockFile = createMockFile;
+
+    // Register ZIP import routes with mocked request.file()
+    await fastify.register(async function (fastifyInstance: any) {
+      fastifyInstance.addHook("onRequest", async (request: any) => {
+        // Use a default mock file that can be overridden per test
+        (request as any)._testFile = createMockFile(
+          "Test Project",
+          "Test Description"
+        );
+        (request as any).file = vi.fn(async function () {
+          return (request as any)._testFile;
+        });
+      });
+      await fastifyInstance.register(zipImportRoutes);
+    });
+    await fastify.ready();
+  });
+
+  afterEach(async () => {
+    await fastify.close();
+    vi.clearAllMocks();
+  });
+
+  describe("POST /projects/import/zip", () => {
+    it("should create project with ZIP source when importing", async () => {
+      const mockProject = {
+        id: "new-project-id",
+        userId: testUserId,
+        name: "ZIP Project",
+        description: "Imported from ZIP",
+        source: "ZIP",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const mockImportResult = {
+        success: true,
+        filesImported: 5,
+        filesUpdated: 0,
+        filesSkipped: 0,
+        labelsCreated: 3,
+      };
+
+      vi.spyOn(projectsService, "createProject").mockResolvedValue(
+        mockProject as any
+      );
+      vi.spyOn(zipImportService, "importZipFile").mockResolvedValue(
+        mockImportResult as any
+      );
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/projects/import/zip",
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(projectsService.createProject).toHaveBeenCalled();
+      expect(zipImportService.importZipFile).toHaveBeenCalled();
+    });
+
+    it("should handle ZIP parsing errors", async () => {
+      const mockProject = {
+        id: "new-project-id",
+        userId: testUserId,
+        name: "ZIP Project",
+        description: "Imported from ZIP",
+        source: "ZIP",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      vi.spyOn(projectsService, "createProject").mockResolvedValue(
+        mockProject as any
+      );
+      vi.spyOn(zipImportService, "importZipFile").mockResolvedValue({
+        success: false,
+        filesImported: 0,
+        filesUpdated: 0,
+        filesSkipped: 0,
+        labelsCreated: 0,
+        error: "Invalid ZIP file",
+      } as any);
+
+      // Mock deleteProject to verify cleanup
+      vi.spyOn(projectsService, "deleteProject").mockResolvedValue(undefined);
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/projects/import/zip",
+      });
+
+      expect(response.statusCode).toBe(400);
+      // Verify cleanup was attempted
+      expect(projectsService.deleteProject).toHaveBeenCalled();
+    });
+
+    it("should import RPY files correctly", async () => {
+      const mockProject = {
+        id: "new-project-id",
+        userId: testUserId,
+        name: "ZIP Project",
+        description: "Imported from ZIP",
+        source: "ZIP",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const mockImportResult = {
+        success: true,
+        filesImported: 10,
+        filesUpdated: 2,
+        filesSkipped: 1,
+        labelsCreated: 5,
+      };
+
+      vi.spyOn(projectsService, "createProject").mockResolvedValue(
+        mockProject as any
+      );
+      vi.spyOn(zipImportService, "importZipFile").mockResolvedValue(
+        mockImportResult as any
+      );
+
+      // Create a mock ZIP file buffer
+      const mockZipBuffer = Buffer.from("PK\x03\x04...mock zip content");
+
+      // Construct multipart/form-data boundary
+      const boundary = "----formdata-test-boundary";
+      const multipartBody = [
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="projectName"',
+        "",
+        "ZIP Project",
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="file"; filename="test.zip"',
+        "Content-Type: application/zip",
+        "",
+        mockZipBuffer.toString("binary"),
+        `--${boundary}--`,
+        "",
+      ].join("\r\n");
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/projects/import/zip",
+        payload: Buffer.from(multipartBody, "binary"),
+        headers: {
+          "content-type": `multipart/form-data; boundary=${boundary}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      // Verify the import service was called
+      expect(zipImportService.importZipFile).toHaveBeenCalled();
+    });
+  });
+
+  describe("POST /projects/:projectId/import/zip", () => {
+    it("should import ZIP into existing project", async () => {
+      const mockImportResult = {
+        success: true,
+        filesImported: 3,
+        filesUpdated: 1,
+        filesSkipped: 0,
+        labelsCreated: 2,
+      };
+
+      vi.spyOn(zipImportService, "importZipFile").mockResolvedValue(
+        mockImportResult as any
+      );
+
+      // Create a mock ZIP file buffer
+      const mockZipBuffer = Buffer.from("PK\x03\x04...mock zip content");
+
+      // Construct multipart/form-data boundary
+      const boundary = "----formdata-test-boundary";
+      const multipartBody = [
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="file"; filename="test.zip"',
+        "Content-Type: application/zip",
+        "",
+        mockZipBuffer.toString("binary"),
+        `--${boundary}--`,
+        "",
+      ].join("\r\n");
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: `/projects/${testProjectId}/import/zip`,
+        payload: Buffer.from(multipartBody, "binary"),
+        headers: {
+          "content-type": `multipart/form-data; boundary=${boundary}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      // Verify the import service was called with the correct project ID
+      expect(zipImportService.importZipFile).toHaveBeenCalledWith(
+        testProjectId,
+        expect.any(Buffer)
+      );
+    });
+
+    it("should verify user owns project", async () => {
+      const mockLimit = (fastify as any).mockDb.mockLimit;
+
+      // Override to return different userId (user does not own project)
+      mockLimit.mockResolvedValueOnce([{ userId: "other-user-id" }]);
+
+      // Create a mock ZIP file buffer
+      const mockZipBuffer = Buffer.from("PK\x03\x04...mock zip content");
+
+      // Construct multipart/form-data boundary
+      const boundary = "----formdata-test-boundary";
+      const multipartBody = [
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="file"; filename="test.zip"',
+        "Content-Type: application/zip",
+        "",
+        mockZipBuffer.toString("binary"),
+        `--${boundary}--`,
+        "",
+      ].join("\r\n");
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: `/projects/${testProjectId}/import/zip`,
+        payload: Buffer.from(multipartBody, "binary"),
+        headers: {
+          "content-type": `multipart/form-data; boundary=${boundary}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toMatchObject({
+        error: "Forbidden",
+      });
+    });
+
+    it("should return 404 when project not found", async () => {
+      const mockLimit = (fastify as any).mockDb.mockLimit;
+
+      // Override to return empty array (project not found)
+      mockLimit.mockResolvedValueOnce([]);
+
+      // Create a mock ZIP file buffer
+      const mockZipBuffer = Buffer.from("PK\x03\x04...mock zip content");
+
+      // Construct multipart/form-data boundary
+      const boundary = "----formdata-test-boundary";
+      const multipartBody = [
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="file"; filename="test.zip"',
+        "Content-Type: application/zip",
+        "",
+        mockZipBuffer.toString("binary"),
+        `--${boundary}--`,
+        "",
+      ].join("\r\n");
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: `/projects/${testProjectId}/import/zip`,
+        payload: Buffer.from(multipartBody, "binary"),
+        headers: {
+          "content-type": `multipart/form-data; boundary=${boundary}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({
+        error: "Not Found",
+      });
+    });
+  });
+});
