@@ -6,11 +6,7 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { projectsApi } from "../projects";
-import type {
-  Project,
-  CreateProjectBody,
-  UpdateProjectBody,
-} from "@/lib/api/projects";
+import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -150,128 +146,6 @@ describe("Projects API", () => {
 
       await expect(projectsApi.getProject("unknown")).rejects.toThrow(
         "Project not found"
-      );
-    });
-  });
-
-  describe("Create Project", () => {
-    const validBody: CreateProjectBody = {
-      name: "New Project",
-      description: "A new project",
-      maxMeterDelta: 10,
-      source: "ZIP",
-    };
-
-    const mockProject: Project = {
-      id: "proj-new",
-      name: "New Project",
-      description: "A new project",
-      maxMeterDelta: 10,
-      visibility: "OWNER",
-      source: "ZIP",
-      createdAt: "2024-01-01T00:00:00.000Z",
-      updatedAt: "2024-01-01T00:00:00.000Z",
-    };
-
-    it("should create project successfully", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ project: mockProject }),
-      });
-
-      const result = await projectsApi.createProject(validBody);
-
-      expect(result).toEqual(mockProject);
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-
-      const [url, options] = mockFetch.mock.calls[0];
-      expect(url).toContain("/projects");
-      expect(options?.method).toBe("POST");
-    });
-
-    it("should send request body as JSON", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ project: mockProject }),
-      });
-
-      await projectsApi.createProject(validBody);
-
-      const requestBody = JSON.parse(
-        mockFetch.mock.calls[0][1]?.body as string
-      );
-      expect(requestBody).toEqual(validBody);
-    });
-
-    it("should include credentials in request", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ project: mockProject }),
-      });
-
-      await projectsApi.createProject(validBody);
-
-      expect(mockFetch.mock.calls[0][1]?.credentials).toBe("include");
-    });
-
-    it("should create project with only required fields", async () => {
-      const minimalBody = { name: "Minimal Project", source: "ZIP" as const };
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          project: {
-            id: "proj-min",
-            name: "Minimal Project",
-            source: "ZIP" as const,
-            visibility: "OWNER",
-            createdAt: "2024-01-01T00:00:00.000Z",
-            updatedAt: "2024-01-01T00:00:00.000Z",
-          },
-        }),
-      });
-
-      const result = await projectsApi.createProject(minimalBody);
-
-      const requestBody = JSON.parse(
-        mockFetch.mock.calls[0][1]?.body as string
-      );
-      expect(requestBody).toEqual(minimalBody);
-      expect(result.name).toBe("Minimal Project");
-    });
-
-    it("should handle validation error", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        json: async () => ({ error: "Invalid project data" }),
-      });
-
-      await expect(projectsApi.createProject(validBody)).rejects.toThrow(
-        "Invalid project data"
-      );
-    });
-
-    it("should handle network errors", async () => {
-      mockFetch.mockRejectedValueOnce(new Error("Network error"));
-
-      await expect(projectsApi.createProject(validBody)).rejects.toThrow(
-        "Network error"
-      );
-    });
-  });
-
-  describe("Request Headers", () => {
-    it("should set Content-Type header", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ project: {} }),
-      });
-
-      await projectsApi.createProject({ name: "Test", source: "ZIP" });
-
-      expect(mockFetch.mock.calls[0][1]?.headers).toHaveProperty(
-        "Content-Type",
-        "application/json"
       );
     });
   });

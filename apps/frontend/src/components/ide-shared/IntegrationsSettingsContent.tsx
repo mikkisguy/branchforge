@@ -1,4 +1,4 @@
-import { GitLabSettingsContent } from "./GitLabSettingsContent";
+import { GitLabSettingsContent } from "@/components/ide-shared/GitLabSettingsContent";
 
 export function IntegrationsSettingsContent() {
   return (

@@ -5,7 +5,7 @@
  * Checks integration status, allows repository selection, and creates projects.
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Loader2,
   GitFork,
@@ -84,7 +84,7 @@ export function GitLabImportDialog({
     null
   );
   // Guard to prevent calling onSuccess/onOpenChange(false) twice
-  const [didCallOnSuccess, setDidCallOnSuccess] = useState(false);
+  const didCallOnSuccessRef = useRef(false);
 
   // Repositories state
   const [repositories, setRepositories] = useState<GitLabRepository[]>([]);
@@ -124,7 +124,7 @@ export function GitLabImportDialog({
       setShowCharacterWizard(false);
       setDetectedCharacters(null);
       setImportedProjectId(null);
-      setDidCallOnSuccess(false);
+      didCallOnSuccessRef.current = false;
       hasLoadedReposRef.current = false;
       hasSetSelectingState.current = false;
     }
@@ -254,7 +254,10 @@ export function GitLabImportDialog({
         clearTimeout(timeoutRef.current);
       }
       timeoutRef.current = setTimeout(() => {
-        onSuccess?.();
+        if (!didCallOnSuccessRef.current) {
+          didCallOnSuccessRef.current = true;
+          onSuccess?.();
+        }
         onOpenChange(false);
       }, 1500);
     } catch (err) {
@@ -271,12 +274,27 @@ export function GitLabImportDialog({
       repo.path_with_namespace.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Guarded close handler that ensures onSuccess is called if import completed
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen) {
+        // Check if import succeeded but timeout hasn't fired yet
+        if (importState.status === "success" && !didCallOnSuccessRef.current) {
+          didCallOnSuccessRef.current = true;
+          onSuccess?.();
+        }
+      }
+      onOpenChange(nextOpen);
+    },
+    [importState.status, onSuccess, onOpenChange]
+  );
+
   // ============================================================================
   // Render
   // ============================================================================
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="w-[700px] max-w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -304,7 +322,7 @@ export function GitLabImportDialog({
                     variant="outline"
                     onClick={() => {
                       // Close this dialog and open Settings to Integrations tab
-                      onOpenChange(false);
+                      handleOpenChange(false);
                       // Parent should handle opening Settings with Integrations tab
                       window.dispatchEvent(
                         new CustomEvent("open-settings", {
@@ -505,11 +523,9 @@ export function GitLabImportDialog({
           open={showCharacterWizard}
           onOpenChange={(open) => {
             setShowCharacterWizard(open);
-            if (!open && !didCallOnSuccess) {
+            if (!open) {
               // Close the import dialog after character wizard is closed
-              setDidCallOnSuccess(true);
-              onSuccess?.();
-              onOpenChange(false);
+              handleOpenChange(false);
             }
           }}
           projectId={importedProjectId}
@@ -517,11 +533,7 @@ export function GitLabImportDialog({
           conflicts={detectedCharacters.conflicts}
           excludedTags={detectedCharacters.excludedTags}
           onComplete={() => {
-            if (!didCallOnSuccess) {
-              setDidCallOnSuccess(true);
-              onSuccess?.();
-              onOpenChange(false);
-            }
+            handleOpenChange(false);
           }}
         />
       )}

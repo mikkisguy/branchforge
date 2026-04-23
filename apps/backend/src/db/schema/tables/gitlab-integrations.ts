@@ -92,12 +92,8 @@ export const gitlabRepositories = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
-    index("gitlab_repositories_project_id_idx").on(table.projectId),
+    unique("gitlab_repositories_project_id_unique").on(table.projectId),
     index("gitlab_repositories_gitlab_project_id_idx").on(
-      table.gitlabProjectId
-    ),
-    unique("gitlab_repositories_project_gitlab_project_uidx").on(
-      table.projectId,
       table.gitlabProjectId
     ),
   ]

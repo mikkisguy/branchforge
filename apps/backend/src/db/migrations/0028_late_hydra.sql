@@ -1,0 +1,2 @@
+ALTER TABLE "gitlab_repositories" DROP CONSTRAINT "gitlab_repositories_project_gitlab_project_uidx";--> statement-breakpoint
+ALTER TABLE "gitlab_repositories" ADD CONSTRAINT "gitlab_repositories_project_id_unique" UNIQUE("project_id");

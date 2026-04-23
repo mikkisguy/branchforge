@@ -1,4 +1,9 @@
-import type { SourceOrigin, UserRole } from "@branchforge/shared";
+import type {
+  SourceOrigin,
+  UserRole,
+  ImportZipResponse,
+  ImportProjectResponse,
+} from "@branchforge/shared";
 import {
   request,
   ApiRequestError,
@@ -27,13 +32,6 @@ export interface Project {
   updatedAt: string;
 }
 
-export interface CreateProjectBody {
-  name: string;
-  description?: string;
-  maxMeterDelta?: number;
-  source: SourceOrigin;
-}
-
 export interface UpdateProjectBody {
   name?: string;
   description?: string;
@@ -45,18 +43,8 @@ export interface ImportZipBody {
   projectDescription?: string;
 }
 
-export interface ImportZipResponse {
-  project: {
-    id: string;
-    name: string;
-    description?: string;
-    source: "ZIP";
-    createdAt: string;
-    updatedAt: string;
-  };
-  filesImported: number;
-  labelsCreated: number;
-}
+// Re-export ImportZipResponse and ImportProjectResponse from shared package for convenience
+export type { ImportZipResponse, ImportProjectResponse };
 
 export interface ListProjectsResponse {
   projects: Project[];
@@ -95,23 +83,6 @@ export const projectsApi = {
   },
 
   /**
-   * Create a new project
-   *
-   * Direct project creation through the UI is not supported - projects
-   * must be created through import flows.
-   *
-   * @param body - Project data including required source field
-   * @returns The created project
-   */
-  async createProject(body: CreateProjectBody): Promise<Project> {
-    const response = await request<GetProjectResponse>("/projects", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-    return response.project;
-  },
-
-  /**
    * Update an existing project
    */
   async updateProject(
@@ -143,7 +114,7 @@ export const projectsApi = {
   async importZip(
     body: ImportZipBody,
     signal?: AbortSignal
-  ): Promise<ImportZipResponse> {
+  ): Promise<ImportProjectResponse> {
     const formData = new FormData();
     formData.append("projectName", body.projectName);
     if (body.projectDescription) {

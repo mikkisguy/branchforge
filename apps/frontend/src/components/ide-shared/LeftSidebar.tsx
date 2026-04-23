@@ -464,8 +464,14 @@ export function LeftSidebar(props: LeftSidebarProps) {
         projects={projects}
         onUpdateProject={updateProject}
         onDeleteProject={deleteProject}
-        onImportFromGitLab={() => setShowGitLabImportDialog(true)}
-        onImportZip={() => setShowZipImportDialog(true)}
+        onImportFromGitLab={() => {
+          setSettingsOpen(false);
+          setShowGitLabImportDialog(true);
+        }}
+        onImportZip={() => {
+          setSettingsOpen(false);
+          setShowZipImportDialog(true);
+        }}
         initialTab={initialSettingsTab}
       />
       {projectId && (

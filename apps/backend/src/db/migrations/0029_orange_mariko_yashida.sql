@@ -1,0 +1,1 @@
+DROP INDEX "gitlab_repositories_project_id_idx";

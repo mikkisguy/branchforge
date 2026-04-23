@@ -100,15 +100,10 @@ export interface ImportProjectBody {
   conflictResolution: ConflictResolution;
 }
 
+import type { PublicProject } from "@branchforge/shared";
+
 export interface ImportProjectResponse {
-  project: {
-    id: string;
-    name: string;
-    description?: string;
-    source: "GITLAB";
-    createdAt: string;
-    updatedAt: string;
-  };
+  project: PublicProject;
   operation: SyncOperation;
 }
 
@@ -132,7 +127,7 @@ const VALIDATION_ERRORS = {
   TOKEN_INVALID_PREFIX: "Token must start with glpat-",
   PROJECT_ID_REQUIRED: "Project ID is required",
   GITLAB_PROJECT_ID_REQUIRED: "GitLab Project ID is required",
-  GITLAB_PROJECT_ID_INVALID: "GitLab Project ID must be a positive number",
+  GITLAB_PROJECT_ID_INVALID: "GitLab Project ID must be a positive integer",
   BRANCH_REQUIRED: "Branch is required",
   CONFLICT_RESOLUTION_REQUIRED: "Conflict resolution is required",
   CONFLICT_RESOLUTION_INVALID:
@@ -512,15 +507,21 @@ export const gitlabApi = {
     signal?: AbortSignal
   ): Promise<ImportProjectResponse> {
     validateRequired(body.projectName, "Project name");
+    validateRequired(body.gitlabProjectName, "GitLab project name");
     validateRequired(body.branch, "Branch");
 
-    // Validate gitlabProjectId is a finite positive number
+    // Validate gitlabProjectId is present
+    if (body.gitlabProjectId === undefined || body.gitlabProjectId === null) {
+      throw new Error(VALIDATION_ERRORS.GITLAB_PROJECT_ID_REQUIRED);
+    }
+
+    // Validate gitlabProjectId is a positive integer
     if (
       typeof body.gitlabProjectId !== "number" ||
-      !Number.isFinite(body.gitlabProjectId) ||
+      !Number.isInteger(body.gitlabProjectId) ||
       body.gitlabProjectId <= 0
     ) {
-      throw new Error(VALIDATION_ERRORS.GITLAB_PROJECT_ID_REQUIRED);
+      throw new Error(VALIDATION_ERRORS.GITLAB_PROJECT_ID_INVALID);
     }
 
     // Validate conflictResolution is present and valid

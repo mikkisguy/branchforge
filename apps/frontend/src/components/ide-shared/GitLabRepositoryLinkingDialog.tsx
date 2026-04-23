@@ -173,9 +173,12 @@ export function GitLabRepositoryLinkingDialog({
       // Store the linked project info and open sync dialog directly
       setLinkedProjectId(selectedProjectId);
       setLinkedProjectName(projectName ?? "Unknown project");
+
+      // Close the main dialog before opening the sync dialog
+      onOpenChange(false);
       setShowSyncDialog(true);
 
-      // Close the main dialog but keep the sync dialog open
+      // Notify parent and refresh integration
       onLinkSuccess?.();
       await refreshIntegration();
     } catch (err) {
@@ -194,6 +197,7 @@ export function GitLabRepositoryLinkingDialog({
     refreshIntegration,
     success,
     error,
+    onOpenChange,
   ]);
 
   /**
@@ -236,7 +240,7 @@ export function GitLabRepositoryLinkingDialog({
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {/* BranchForge Project Section */}
             <div className="space-y-3">
-              <Label>BranchForge Project</Label>
+              <Label htmlFor="branchforge-project">BranchForge Project</Label>
               {projects.length === 0 && !isLoadingProjects ? (
                 <div className="p-3 border border-dashed border-border/30 rounded-md text-center">
                   <p className="text-sm text-muted-foreground">

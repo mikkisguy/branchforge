@@ -6,7 +6,7 @@
  */
 
 import { request, getApiErrorMessage } from "./client.js";
-import type { ProjectFile } from "@branchforge/shared";
+import type { ProjectFile, ImportZipResponse } from "@branchforge/shared";
 import type { SourceOrigin } from "@branchforge/shared";
 import { isValidSourceOrigin } from "@branchforge/shared";
 
@@ -20,15 +20,6 @@ export interface ProjectFileNode extends ProjectFile {
     labelName: string | null;
     title: string;
   }>;
-}
-
-export interface ImportZipResponse {
-  success: boolean;
-  filesImported: number;
-  filesUpdated: number;
-  filesSkipped: number;
-  labelsCreated: number;
-  error?: string;
 }
 
 export type UpdateFileResponse =

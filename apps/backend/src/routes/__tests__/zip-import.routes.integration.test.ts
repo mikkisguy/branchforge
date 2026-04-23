@@ -65,7 +65,7 @@ vi.mock("../../middleware/auth.middleware.js", () => ({
     // Simulate authenticated user
     request.session = {
       user: {
-        id: "user-123",
+        id: "123e4567-e89b-12d3-a456-426614174000",
         email: "test@example.com",
         role: "OWNER" as const,
       },
@@ -76,8 +76,8 @@ vi.mock("../../middleware/auth.middleware.js", () => ({
 }));
 
 // Test fixtures
-const testUserId = "user-123";
-const testProjectId = "project-123";
+const testUserId = "123e4567-e89b-12d3-a456-426614174000";
+const testProjectId = "123e4567-e89b-12d3-a456-426614174001";
 
 describe("ZIP Import Routes (Integration)", () => {
   let fastify: FastifyInstance;
@@ -122,39 +122,8 @@ describe("ZIP Import Routes (Integration)", () => {
       mockLimit,
     };
 
-    // Create a shared mock file that will be used by default
-    const mockZipBuffer = Buffer.from("PK\x03\x04...mock zip content");
-    const createMockFile = (projectName?: string, description?: string) => ({
-      filename: "test.zip",
-      mimetype: "application/zip",
-      fieldname: "file",
-      toBuffer: vi.fn().mockResolvedValue(mockZipBuffer),
-      file: {
-        truncated: false,
-      } as any,
-      fields: {
-        projectName: projectName ? { value: projectName } : undefined,
-        projectDescription: description ? { value: description } : undefined,
-      },
-    });
-
-    // Store mock file creator for test customization
-    (fastify as any).createMockFile = createMockFile;
-
-    // Register ZIP import routes with mocked request.file()
-    await fastify.register(async function (fastifyInstance: any) {
-      fastifyInstance.addHook("onRequest", async (request: any) => {
-        // Use a default mock file that can be overridden per test
-        (request as any)._testFile = createMockFile(
-          "Test Project",
-          "Test Description"
-        );
-        (request as any).file = vi.fn(async function () {
-          return (request as any)._testFile;
-        });
-      });
-      await fastifyInstance.register(zipImportRoutes);
-    });
+    // Register ZIP import routes with real multipart plugin
+    await fastify.register(zipImportRoutes);
     await fastify.ready();
   });
 
@@ -190,9 +159,27 @@ describe("ZIP Import Routes (Integration)", () => {
         mockImportResult as any
       );
 
+      const mockZipBuffer = Buffer.from("PK\x03\x04...mock zip content");
+      const boundary = "----formdata-test-boundary";
+
+      // Build multipart body properly with binary data
+      const header1 = `--${boundary}\r\nContent-Disposition: form-data; name="projectName"\r\n\r\nZIP Project\r\n`;
+      const header2 = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="test.zip"\r\nContent-Type: application/zip\r\n\r\n`;
+      const footer = `\r\n--${boundary}--\r\n`;
+      const multipartBody = Buffer.concat([
+        Buffer.from(header1),
+        Buffer.from(header2),
+        mockZipBuffer,
+        Buffer.from(footer),
+      ]);
+
       const response = await fastify.inject({
         method: "POST",
         url: "/projects/import/zip",
+        payload: multipartBody,
+        headers: {
+          "content-type": `multipart/form-data; boundary=${boundary}`,
+        },
       });
 
       expect(response.statusCode).toBe(201);
@@ -223,16 +210,32 @@ describe("ZIP Import Routes (Integration)", () => {
         error: "Invalid ZIP file",
       } as any);
 
-      // Mock deleteProject to verify cleanup
       vi.spyOn(projectsService, "deleteProject").mockResolvedValue(undefined);
+
+      const mockZipBuffer = Buffer.from("PK\x03\x04...mock zip content");
+      const boundary = "----formdata-test-boundary";
+
+      // Build multipart body properly with binary data
+      const header1 = `--${boundary}\r\nContent-Disposition: form-data; name="projectName"\r\n\r\nZIP Project\r\n`;
+      const header2 = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="test.zip"\r\nContent-Type: application/zip\r\n\r\n`;
+      const footer = `\r\n--${boundary}--\r\n`;
+      const multipartBody = Buffer.concat([
+        Buffer.from(header1),
+        Buffer.from(header2),
+        mockZipBuffer,
+        Buffer.from(footer),
+      ]);
 
       const response = await fastify.inject({
         method: "POST",
         url: "/projects/import/zip",
+        payload: multipartBody,
+        headers: {
+          "content-type": `multipart/form-data; boundary=${boundary}`,
+        },
       });
 
       expect(response.statusCode).toBe(400);
-      // Verify cleanup was attempted
       expect(projectsService.deleteProject).toHaveBeenCalled();
     });
 
@@ -315,20 +318,18 @@ describe("ZIP Import Routes (Integration)", () => {
 
       // Construct multipart/form-data boundary
       const boundary = "----formdata-test-boundary";
-      const multipartBody = [
-        `--${boundary}`,
-        'Content-Disposition: form-data; name="file"; filename="test.zip"',
-        "Content-Type: application/zip",
-        "",
-        mockZipBuffer.toString("binary"),
-        `--${boundary}--`,
-        "",
-      ].join("\r\n");
+      const header = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="test.zip"\r\nContent-Type: application/zip\r\n\r\n`;
+      const footer = `\r\n--${boundary}--\r\n`;
+      const multipartBody = Buffer.concat([
+        Buffer.from(header),
+        mockZipBuffer,
+        Buffer.from(footer),
+      ]);
 
       const response = await fastify.inject({
         method: "POST",
         url: `/projects/${testProjectId}/import/zip`,
-        payload: Buffer.from(multipartBody, "binary"),
+        payload: multipartBody,
         headers: {
           "content-type": `multipart/form-data; boundary=${boundary}`,
         },
@@ -353,20 +354,18 @@ describe("ZIP Import Routes (Integration)", () => {
 
       // Construct multipart/form-data boundary
       const boundary = "----formdata-test-boundary";
-      const multipartBody = [
-        `--${boundary}`,
-        'Content-Disposition: form-data; name="file"; filename="test.zip"',
-        "Content-Type: application/zip",
-        "",
-        mockZipBuffer.toString("binary"),
-        `--${boundary}--`,
-        "",
-      ].join("\r\n");
+      const header = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="test.zip"\r\nContent-Type: application/zip\r\n\r\n`;
+      const footer = `\r\n--${boundary}--\r\n`;
+      const multipartBody = Buffer.concat([
+        Buffer.from(header),
+        mockZipBuffer,
+        Buffer.from(footer),
+      ]);
 
       const response = await fastify.inject({
         method: "POST",
         url: `/projects/${testProjectId}/import/zip`,
-        payload: Buffer.from(multipartBody, "binary"),
+        payload: multipartBody,
         headers: {
           "content-type": `multipart/form-data; boundary=${boundary}`,
         },
@@ -389,20 +388,18 @@ describe("ZIP Import Routes (Integration)", () => {
 
       // Construct multipart/form-data boundary
       const boundary = "----formdata-test-boundary";
-      const multipartBody = [
-        `--${boundary}`,
-        'Content-Disposition: form-data; name="file"; filename="test.zip"',
-        "Content-Type: application/zip",
-        "",
-        mockZipBuffer.toString("binary"),
-        `--${boundary}--`,
-        "",
-      ].join("\r\n");
+      const header = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="test.zip"\r\nContent-Type: application/zip\r\n\r\n`;
+      const footer = `\r\n--${boundary}--\r\n`;
+      const multipartBody = Buffer.concat([
+        Buffer.from(header),
+        mockZipBuffer,
+        Buffer.from(footer),
+      ]);
 
       const response = await fastify.inject({
         method: "POST",
         url: `/projects/${testProjectId}/import/zip`,
-        payload: Buffer.from(multipartBody, "binary"),
+        payload: multipartBody,
         headers: {
           "content-type": `multipart/form-data; boundary=${boundary}`,
         },
