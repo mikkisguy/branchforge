@@ -68,6 +68,7 @@ describe("CharactersRoutes (Integration)", () => {
     name: "Test Project",
     description: "A test project for character routes",
     maxMeterDelta: 10,
+    source: "ZIP",
   };
 
   const otherProject: NewProject = {
@@ -76,6 +77,7 @@ describe("CharactersRoutes (Integration)", () => {
     name: "Other User's Project",
     description: "A project owned by another user",
     maxMeterDelta: 15,
+    source: "ZIP",
   };
 
   // Test characters

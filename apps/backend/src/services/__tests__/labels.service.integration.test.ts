@@ -70,6 +70,7 @@ describe("LabelsService (Integration)", () => {
     name: "Owned Project",
     description: "A project owned by the user",
     maxMeterDelta: 10,
+    source: "ZIP",
   };
 
   const sharedProject: NewProject = {
@@ -78,6 +79,7 @@ describe("LabelsService (Integration)", () => {
     name: "Shared Project",
     description: "A project shared with the user",
     maxMeterDelta: 15,
+    source: "ZIP",
   };
 
   const routeConfig1: NewRouteConfig = {

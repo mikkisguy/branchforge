@@ -91,9 +91,9 @@ describe("GitLabSyncService (Integration)", () => {
     id: testProjectId,
     userId: testUserId,
     name: "Test Project",
-    type: "ACT_BASED" as const,
     description: "A test project",
     maxMeterDelta: 10,
+    source: "GITLAB" as const,
   };
 
   const testGitlabFile = createProjectFileFixture({

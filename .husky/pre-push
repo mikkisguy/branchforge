@@ -1,5 +1,4 @@
 #!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
 
 # Run full typecheck and tests before pushing
 echo "Running pre-push checks..."

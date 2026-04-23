@@ -459,7 +459,7 @@ describe("GitLabService (Integration)", () => {
       expect(result2?.projectId).toBe(otherProject.id);
     });
 
-    it("should allow different GitLab projects for same BranchForge project", async () => {
+    it("should enforce unique constraint on projectId (one repo per project)", async () => {
       const repository1: NewGitlabRepository = {
         id: testUuid("14000002", 1),
         projectId: ownedProject.id!,
@@ -469,6 +469,9 @@ describe("GitLabService (Integration)", () => {
         gitlabUrl: "https://gitlab.com",
       };
 
+      await db.insert(gitlabRepositories).values(repository1);
+
+      // Try to insert a second repository for the same project
       const repository2: NewGitlabRepository = {
         id: testUuid("14000002", 2),
         projectId: ownedProject.id!,
@@ -478,14 +481,10 @@ describe("GitLabService (Integration)", () => {
         gitlabUrl: "https://gitlab.com",
       };
 
-      await db.insert(gitlabRepositories).values([repository1, repository2]);
-
-      const repos = await db
-        .select()
-        .from(gitlabRepositories)
-        .where(eq(gitlabRepositories.projectId, ownedProject.id!));
-
-      expect(repos).toHaveLength(2);
+      // This should throw due to unique constraint on projectId
+      await expect(
+        db.insert(gitlabRepositories).values(repository2)
+      ).rejects.toThrow();
     });
   });
 

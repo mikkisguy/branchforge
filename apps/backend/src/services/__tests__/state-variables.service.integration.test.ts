@@ -60,6 +60,7 @@ describe("StateVariablesService (Integration)", () => {
     name: "Owned Project",
     description: "A project owned by the user",
     maxMeterDelta: 10,
+    source: "ZIP",
   };
 
   const otherProject: NewProject = {
@@ -68,6 +69,7 @@ describe("StateVariablesService (Integration)", () => {
     name: "Other Project",
     description: "A project owned by another user",
     maxMeterDelta: 10,
+    source: "ZIP",
   };
 
   const testStateVariable1: NewStateVariable = {
@@ -147,6 +149,7 @@ describe("StateVariablesService (Integration)", () => {
         userId: testUserId,
         name: "Empty Project",
         maxMeterDelta: 10,
+        source: "ZIP",
       });
 
       const result = await listStateVariables(newProjectId, testUserId);
