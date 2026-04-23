@@ -27,13 +27,6 @@ export interface Project {
   updatedAt: string;
 }
 
-export interface CreateProjectBody {
-  name: string;
-  description?: string;
-  maxMeterDelta?: number;
-  source: SourceOrigin;
-}
-
 export interface UpdateProjectBody {
   name?: string;
   description?: string;
@@ -91,23 +84,6 @@ export const projectsApi = {
         method: "GET",
       }
     );
-    return response.project;
-  },
-
-  /**
-   * Create a new project
-   *
-   * Direct project creation through the UI is not supported - projects
-   * must be created through import flows.
-   *
-   * @param body - Project data including required source field
-   * @returns The created project
-   */
-  async createProject(body: CreateProjectBody): Promise<Project> {
-    const response = await request<GetProjectResponse>("/projects", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
     return response.project;
   },
 

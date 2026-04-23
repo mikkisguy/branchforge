@@ -21,7 +21,14 @@ import { cn } from "@/lib/utils";
 import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 import { APP_NAME, APP_VERSION } from "@/lib/version";
 
-type Tab = "user" | "projects" | "integrations" | "system";
+export type Tab = "user" | "projects" | "integrations" | "system";
+
+export const SETTINGS_TABS = [
+  "user",
+  "projects",
+  "integrations",
+  "system",
+] as const;
 
 interface TabOption {
   id: Tab;

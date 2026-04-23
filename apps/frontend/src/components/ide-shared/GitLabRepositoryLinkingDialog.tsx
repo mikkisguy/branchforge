@@ -173,9 +173,12 @@ export function GitLabRepositoryLinkingDialog({
       // Store the linked project info and open sync dialog directly
       setLinkedProjectId(selectedProjectId);
       setLinkedProjectName(projectName ?? "Unknown project");
+
+      // Close the main dialog before opening the sync dialog
+      onOpenChange(false);
       setShowSyncDialog(true);
 
-      // Close the main dialog but keep the sync dialog open
+      // Notify parent and refresh integration
       onLinkSuccess?.();
       await refreshIntegration();
     } catch (err) {

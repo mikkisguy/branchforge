@@ -64,6 +64,7 @@ describe("ProjectsService", () => {
     description: "A test project",
     maxMeterDelta: 10,
     visibility: "OWNER",
+    source: "GITLAB",
     createdAt: new Date("2024-01-01"),
     updatedAt: new Date("2024-01-01"),
   };
@@ -90,6 +91,7 @@ describe("ProjectsService", () => {
         description: "A test project",
         maxMeterDelta: 10,
         visibility: "OWNER",
+        source: "GITLAB",
         createdAt: mockProject.createdAt.toISOString(),
         updatedAt: mockProject.updatedAt.toISOString(),
       });

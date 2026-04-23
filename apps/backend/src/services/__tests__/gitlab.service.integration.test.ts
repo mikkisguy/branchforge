@@ -660,6 +660,7 @@ describe("GitLabService (Integration)", () => {
         userId: otherUserId,
         name: "Other User Project",
         maxMeterDelta: 10,
+        source: "GITLAB",
       };
 
       // Track this project ID for cleanup

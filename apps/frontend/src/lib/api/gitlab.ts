@@ -100,15 +100,10 @@ export interface ImportProjectBody {
   conflictResolution: ConflictResolution;
 }
 
+import type { PublicProject } from "@branchforge/shared";
+
 export interface ImportProjectResponse {
-  project: {
-    id: string;
-    name: string;
-    description?: string;
-    source: "GITLAB";
-    createdAt: string;
-    updatedAt: string;
-  };
+  project: PublicProject;
   operation: SyncOperation;
 }
 

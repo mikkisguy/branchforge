@@ -15,6 +15,8 @@ import {
   useLocalStorage,
   useLocalStorageBoolean,
 } from "@/hooks/useLocalStorage";
+import type { Tab } from "@/components/ide-shared/SettingsModal";
+import { SETTINGS_TABS } from "@/components/ide-shared/SettingsModal";
 
 const ScriptMode = lazy(() =>
   import("./ScriptMode").then((m) => ({ default: m.ScriptMode }))
@@ -39,9 +41,9 @@ export function HomePageIDE() {
   );
   const [scriptModeKey, setScriptModeKey] = useState(0);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [initialSettingsTab, setInitialSettingsTab] = useState<
-    "user" | "projects" | "integrations" | "system" | undefined
-  >(undefined);
+  const [initialSettingsTab, setInitialSettingsTab] = useState<Tab | undefined>(
+    undefined
+  );
   const isFlushing = useRef(false);
   const previousProjectIdRef = useRef<string | undefined>(undefined);
 
@@ -174,11 +176,10 @@ export function HomePageIDE() {
       // Validate event.detail exists
       if (!event.detail) return;
 
-      const validTabs = ["user", "projects", "integrations", "system"] as const;
       const tab = event.detail.tab;
 
       // Only set tab if it's one of the allowed values
-      if (tab && validTabs.includes(tab)) {
+      if (tab && SETTINGS_TABS.includes(tab)) {
         setInitialSettingsTab(tab);
       } else if (tab != null) {
         // Invalid tab value provided - ignore the event entirely
