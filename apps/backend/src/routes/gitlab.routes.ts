@@ -251,7 +251,7 @@ async function validateTokenHandler(
       "validateTokenHandler: Rate limit exceeded"
     );
     reply.status(429).send({
-      error: "Too many import requests. Please try again later.",
+      error: "Too many validation attempts. Please try again later.",
       retryAfter: rateLimit.retryAfter,
     });
     return;
@@ -792,7 +792,7 @@ async function importProjectHandler(
       "importProjectHandler: Rate limit exceeded"
     );
     reply.status(429).send({
-      error: "Too many validation attempts. Please try again later.",
+      error: "Too many import requests. Please try again later.",
       retryAfter: rateLimit.retryAfter,
     });
     return;
