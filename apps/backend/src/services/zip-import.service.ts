@@ -40,15 +40,21 @@ export interface ExtractedFile {
   content: string;
 }
 
-export interface ImportZipResult {
-  success: boolean;
+export interface ImportZipSuccess {
+  success: true;
   filesImported: number;
   filesUpdated: number;
   filesSkipped: number;
   filesFailed: number;
   labelsCreated: number;
-  error?: string;
 }
+
+export interface ImportZipFailure {
+  success: false;
+  error: string;
+}
+
+export type ImportZipResult = ImportZipSuccess | ImportZipFailure;
 
 // ============================================================================
 // File Extraction
@@ -182,14 +188,6 @@ export async function importZipFile(
   zipBuffer: Buffer
 ): Promise<ImportZipResult> {
   const db = getDb();
-  const result: ImportZipResult = {
-    success: false,
-    filesImported: 0,
-    filesUpdated: 0,
-    filesSkipped: 0,
-    filesFailed: 0,
-    labelsCreated: 0,
-  };
 
   try {
     if (zipBuffer.byteLength > MAX_ZIP_BUFFER_BYTES) {
@@ -205,8 +203,15 @@ export async function importZipFile(
     const extractedFiles = await extractRpyFiles(zip);
 
     if (extractedFiles.length === 0) {
-      result.success = true;
-      return result;
+      const success: ImportZipSuccess = {
+        success: true,
+        filesImported: 0,
+        filesUpdated: 0,
+        filesSkipped: 0,
+        filesFailed: 0,
+        labelsCreated: 0,
+      };
+      return success;
     }
 
     // Step 3: Pre-process all files (parse and hash) - outside transaction
@@ -220,6 +225,13 @@ export async function importZipFile(
       };
     });
 
+    // Counters for tracking import statistics
+    let filesImported = 0;
+    let filesUpdated = 0;
+    let filesSkipped = 0;
+    let filesFailed = 0;
+    let labelsCreated = 0;
+
     // Step 4: Process all files in a single transaction with savepoints
     const syncStoryLabels = async (
       projectId: string,
@@ -227,8 +239,7 @@ export async function importZipFile(
       fileType: string,
       fileId: string,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      tx: any,
-      result: ImportZipResult
+      tx: any
     ) => {
       if (fileType === "STORY") {
         const syncResult = await syncLabelsFromFile(
@@ -238,7 +249,7 @@ export async function importZipFile(
           fileId,
           { skipCleanup: false, tx }
         );
-        result.labelsCreated += syncResult.labelsCreated;
+        labelsCreated += syncResult.labelsCreated;
       }
     };
 
@@ -267,7 +278,7 @@ export async function importZipFile(
           if (existing) {
             // Check if content has changed
             if (existing.contentHash === contentHash) {
-              result.filesSkipped++;
+              filesSkipped++;
               await tx.execute(`RELEASE SAVEPOINT ${savepointName}`);
               continue;
             }
@@ -285,17 +296,10 @@ export async function importZipFile(
               })
               .where(eq(projectFiles.id, existing.id));
 
-            result.filesUpdated++;
+            filesUpdated++;
 
             // Sync labels for STORY files to create/update labels in database
-            await syncStoryLabels(
-              projectId,
-              file,
-              fileType,
-              existing.id,
-              tx,
-              result
-            );
+            await syncStoryLabels(projectId, file, fileType, existing.id, tx);
           } else {
             // Insert new file
             const [newFile] = await tx
@@ -315,17 +319,10 @@ export async function importZipFile(
               throw new Error(`Failed to insert file: ${file.filePath}`);
             }
 
-            result.filesImported++;
+            filesImported++;
 
             // Sync labels for STORY files to create labels in database
-            await syncStoryLabels(
-              projectId,
-              file,
-              fileType,
-              newFile.id,
-              tx,
-              result
-            );
+            await syncStoryLabels(projectId, file, fileType, newFile.id, tx);
           }
 
           // Release savepoint on success
@@ -352,19 +349,27 @@ export async function importZipFile(
             error: error instanceof Error ? error.message : "Unknown error",
           });
 
-          result.filesFailed++;
+          filesFailed++;
         }
 
         fileIndex++;
       }
     });
 
-    result.success = result.filesFailed === 0;
-    return result;
+    // Construct success result
+    const success: ImportZipSuccess = {
+      success: true,
+      filesImported,
+      filesUpdated,
+      filesSkipped,
+      filesFailed,
+      labelsCreated,
+    };
+    return success;
   } catch (error) {
+    // Log the detailed error for debugging
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    result.error = errorMessage;
 
     logError(LogEventType.SERVICE_ERROR, {
       event: "zip_import_failed",
@@ -372,6 +377,17 @@ export async function importZipFile(
       error: errorMessage,
     });
 
-    return result;
+    // Return a safe, client-friendly error message
+    const safeErrorMessage =
+      error instanceof ZipImportLimitError
+        ? "Zip file exceeds import limits"
+        : "Failed to import zip file";
+
+    // Construct failure result
+    const failure: ImportZipFailure = {
+      success: false,
+      error: safeErrorMessage,
+    };
+    return failure;
   }
 }

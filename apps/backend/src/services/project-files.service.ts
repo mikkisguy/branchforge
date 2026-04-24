@@ -9,13 +9,14 @@ import { getDb } from "../db/index.js";
 import { projectFiles } from "../db/schema/index.js";
 import { eq, and, desc, ne } from "drizzle-orm";
 import { calculateContentHash } from "../lib/hash.js";
+import type { SourceOrigin } from "@branchforge/shared";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface GetProjectFilesOptions {
-  source?: "GITLAB" | "ZIP";
+  source?: SourceOrigin;
 }
 
 // ============================================================================
@@ -62,7 +63,7 @@ export async function getProjectFiles(
 export async function getFileByPath(
   projectId: string,
   filePath: string,
-  source: "GITLAB" | "ZIP"
+  source: SourceOrigin
 ) {
   const db = getDb();
 

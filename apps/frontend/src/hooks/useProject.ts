@@ -75,7 +75,6 @@ export interface UseProjectReturn {
   // Methods
   refreshProjects: () => Promise<void>;
   setCurrentProject: (project: Project | null) => void;
-  createProject: (name: string) => Promise<Project>;
   updateProject: (
     projectId: string,
     body: UpdateProjectBody
@@ -149,21 +148,6 @@ export function useProject(): UseProjectReturn {
     queryClient,
   ]);
 
-  // Create project mutation
-  const createProjectMutation = useMutation({
-    mutationFn: async (name: string) => {
-      return projectsApi.createProject({ name });
-    },
-    onSuccess: async (newProject) => {
-      // Invalidate and refetch projects list
-      await queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
-
-      // Set the new project as current
-      persistCurrentProjectId(newProject.id);
-      queryClient.setQueryData(projectKeys.current(), newProject.id);
-    },
-  });
-
   // Refresh projects method
   const refreshProjects = async () => {
     await queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
@@ -175,11 +159,6 @@ export function useProject(): UseProjectReturn {
     persistCurrentProjectId(projectId);
     // Also update query cache for reactive updates
     queryClient.setQueryData(projectKeys.current(), projectId);
-  };
-
-  // Create project method
-  const createProject = async (name: string): Promise<Project> => {
-    return createProjectMutation.mutateAsync(name);
   };
 
   // Update project mutation
@@ -261,7 +240,6 @@ export function useProject(): UseProjectReturn {
     projectsError: projectsError as Error | null,
     refreshProjects,
     setCurrentProject,
-    createProject,
     updateProject,
     deleteProject,
   };

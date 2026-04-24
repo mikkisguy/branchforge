@@ -60,6 +60,7 @@ describe("RenpyDefinitionsService (Integration)", () => {
     name: "Owned Project",
     description: "A project owned by the user",
     maxMeterDelta: 10,
+    source: "ZIP",
   };
 
   const otherProject: NewProject = {
@@ -68,6 +69,7 @@ describe("RenpyDefinitionsService (Integration)", () => {
     name: "Other Project",
     description: "A project owned by another user",
     maxMeterDelta: 10,
+    source: "ZIP",
   };
 
   const testDefinition1: NewRenpyDefinition = {
@@ -173,6 +175,7 @@ describe("RenpyDefinitionsService (Integration)", () => {
         userId: testUserId,
         name: "Empty Project",
         maxMeterDelta: 10,
+        source: "ZIP",
       });
 
       const result = await listRenpyDefinitions(newProjectId, testUserId);
@@ -701,6 +704,7 @@ describe("RenpyDefinitionsService (Integration)", () => {
         userId: testUserId,
         name: "Cascade Test Project",
         maxMeterDelta: 10,
+        source: "ZIP",
       });
 
       const cascadeDefId = testUuid("25000000", 6);

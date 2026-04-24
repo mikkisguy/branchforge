@@ -5,35 +5,15 @@
  */
 
 import { request } from "./client";
-import type { Character } from "@branchforge/shared";
+import type {
+  Character,
+  DetectedCharacter,
+  CharacterConflict,
+  DetectCharactersResponse,
+} from "@branchforge/shared";
 
-// ============================================================================
-// Types
-// ============================================================================
-
-export interface DetectedCharacter {
-  tag: string;
-  name: string | null;
-  displayName: string;
-  color: string;
-  isSpecial: boolean;
-  sourceFile: string;
-  confidence: number;
-}
-
-export interface CharacterConflict {
-  tag: string;
-  detectedName: string | null;
-  existingName: string;
-  detectedColor: string;
-  existingColor: string;
-}
-
-export interface DetectCharactersResponse {
-  characters: DetectedCharacter[];
-  excludedTags: string[];
-  conflicts: CharacterConflict[];
-}
+// Re-export types for convenience
+export type { DetectedCharacter, CharacterConflict, DetectCharactersResponse };
 
 export interface ImportCharacter {
   tag: string;

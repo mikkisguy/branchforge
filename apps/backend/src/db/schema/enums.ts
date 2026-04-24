@@ -114,5 +114,9 @@ export const projectFileTypeEnum = pgEnum("project_file_type", [
   "SETTINGS",
 ]);
 
-// File source types (where files come from)
+// Source types (unified for projects and files)
+// Represents where data comes from: GITLAB or ZIP
+// Note: Using ENUM for consistency with other enums in this schema. Values are stable and
+// unlikely to change frequently. If future extensibility requires dynamic source types,
+// consider migrating to a lookup table approach.
 export const fileSourceEnum = pgEnum("file_source", ["GITLAB", "ZIP"]);

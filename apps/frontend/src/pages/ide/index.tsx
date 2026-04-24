@@ -15,6 +15,8 @@ import {
   useLocalStorage,
   useLocalStorageBoolean,
 } from "@/hooks/useLocalStorage";
+import type { Tab } from "@/components/ide-shared/SettingsModal";
+import { SETTINGS_TABS } from "@/components/ide-shared/SettingsModal";
 
 const ScriptMode = lazy(() =>
   import("./ScriptMode").then((m) => ({ default: m.ScriptMode }))
@@ -39,6 +41,9 @@ export function HomePageIDE() {
   );
   const [scriptModeKey, setScriptModeKey] = useState(0);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [initialSettingsTab, setInitialSettingsTab] = useState<Tab | undefined>(
+    undefined
+  );
   const isFlushing = useRef(false);
   const previousProjectIdRef = useRef<string | undefined>(undefined);
 
@@ -50,6 +55,7 @@ export function HomePageIDE() {
     isLoadingProjects,
     updateProject,
     deleteProject,
+    refreshProjects,
   } = useProject();
 
   // GitLab context for getting linked repository info
@@ -73,6 +79,14 @@ export function HomePageIDE() {
 
     previousProjectIdRef.current = nextProjectId;
   }, [currentProject?.id, setActiveLabelId]);
+
+  // Wrapped setter that resets tab state when closing
+  const handleSetIsSettingsOpen = (open: boolean) => {
+    setIsSettingsOpen(open);
+    if (!open) {
+      setInitialSettingsTab(undefined);
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -154,7 +168,38 @@ export function HomePageIDE() {
     setScriptModeKey((prev) => prev + 1);
   };
 
-  const handleOpenSettings = () => setIsSettingsOpen(true);
+  const handleOpenSettings = () => handleSetIsSettingsOpen(true);
+
+  // Listen for custom event to open Settings with specific tab
+  useEffect(() => {
+    const handleOpenSettingsEvent = (event: CustomEvent) => {
+      // Validate event.detail exists
+      if (!event.detail) return;
+
+      const tab = event.detail.tab;
+
+      // Only set tab if it's one of the allowed values
+      if (tab && SETTINGS_TABS.includes(tab)) {
+        setInitialSettingsTab(tab);
+      } else if (tab != null) {
+        // Invalid tab value provided - ignore the event entirely
+        return;
+      }
+
+      setIsSettingsOpen(true);
+    };
+
+    window.addEventListener(
+      "open-settings",
+      handleOpenSettingsEvent as EventListener
+    );
+    return () => {
+      window.removeEventListener(
+        "open-settings",
+        handleOpenSettingsEvent as EventListener
+      );
+    };
+  }, []);
 
   // Get GitLab branch for current project (if linked)
   const gitlabRepo = currentProject
@@ -182,8 +227,10 @@ export function HomePageIDE() {
         onCollapsedChange={setIsSidebarCollapsed}
         updateProject={updateProject}
         deleteProject={deleteProject}
+        refetchProjects={refreshProjects}
         isSettingsOpenExternally={isSettingsOpen}
-        onSettingsOpenChangeExternally={setIsSettingsOpen}
+        onSettingsOpenChangeExternally={handleSetIsSettingsOpen}
+        initialSettingsTab={initialSettingsTab}
       />
 
       {/* Main content area */}

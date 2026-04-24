@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StatusBar } from "@/components/script-mode";
 import { GitLabSyncDialog } from "@/components/script-mode/GitLabSyncDialog";
-import { ZipImportDialog } from "@/components/zip-import";
+import { ZipImportFilesDialog } from "@/components/ide-shared/ZipImportFilesDialog";
 import { useLabels } from "@/hooks/useLabels";
 import { useFocusModeKeyboardHandler } from "@/hooks/useFocusModeKeyboardHandler";
 import { useFocusModeState } from "@/hooks/useFocusModeState";
@@ -14,7 +14,7 @@ import { useLabelFileSync } from "@/hooks/useLabelFileSync";
 import { useProjectReset } from "@/hooks/useProjectReset";
 import { useScriptModeRefresh } from "@/hooks/useScriptModeRefresh";
 import { useToast } from "@/contexts/ToastContext";
-import type { FileSourceType } from "@branchforge/shared";
+import type { SourceOrigin } from "@branchforge/shared";
 import type { ScriptEditorRef } from "@/components/script-mode/ScriptEditor";
 import { useLocalStorageBoolean } from "@/hooks/useLocalStorage";
 import { ScriptModeEditorLayout } from "./components/ScriptModeEditorLayout";
@@ -320,7 +320,7 @@ export function ScriptMode({
   const isLinked = projectId ? isProjectLinked(projectId) : false;
   const linkedRepo = projectId ? getLinkedRepository(projectId) : null;
 
-  const primaryFileSourceType: FileSourceType | undefined = useMemo(() => {
+  const primaryFileSourceType: SourceOrigin | undefined = useMemo(() => {
     if (projectFiles.length === 0) {
       if (isLinked) {
         return "GITLAB";
@@ -328,7 +328,7 @@ export function ScriptMode({
       return undefined;
     }
 
-    return projectFiles[0].sourceType;
+    return projectFiles[0].source;
   }, [projectFiles, isLinked]);
 
   if (isLoadingLabels || isLoadingFiles) {
@@ -406,6 +406,7 @@ export function ScriptMode({
         gitlabBranch={gitlabBranch}
         fileSourceType={primaryFileSourceType}
         isFocusMode={isFocusMode}
+        onOpenZipImportDialog={() => setShowZipImportDialog(true)}
       />
 
       {projectId && isLinked && linkedRepo && (
@@ -420,7 +421,7 @@ export function ScriptMode({
       )}
 
       {projectId && (
-        <ZipImportDialog
+        <ZipImportFilesDialog
           open={showZipImportDialog}
           onOpenChange={setShowZipImportDialog}
           projectId={projectId}

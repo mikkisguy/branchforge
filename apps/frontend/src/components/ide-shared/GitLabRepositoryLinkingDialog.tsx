@@ -2,8 +2,8 @@
  * GitLab Project Link Dialog
  *
  * Dialog for linking a BranchForge project to a GitLab repository.
- * Allows users to select an existing project or create a new one,
- * then link it to a GitLab repository.
+ * Users must select an existing project to link.
+ * To create new projects, use the GitLab Import or ZIP Import flows.
  */
 
 import { useState, useCallback, useEffect } from "react";
@@ -41,21 +41,14 @@ export function GitLabRepositoryLinkingDialog({
   onLinkSuccess,
 }: GitLabRepositoryLinkingDialogProps) {
   const { listRepositories, refreshIntegration } = useGitLab();
-  const { projects, isLoadingProjects, createProject } = useProject();
+  const { projects, isLoadingProjects } = useProject();
   const { success, error } = useToast();
-
-  // Mode toggle: select existing vs create new
-  const [isCreatingNewProject, setIsCreatingNewProject] = useState(false);
 
   // Form state
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [selectedGitlabProject, setSelectedGitlabProject] =
     useState<GitLabRepository | null>(null);
   const [branch, setBranch] = useState("main");
-
-  // New project form state
-  const [newProjectName, setNewProjectName] = useState("");
-  const [isCreatingProject, setIsCreatingProject] = useState(false);
 
   // GitLab repositories state
   const [gitlabRepositories, setGitlabRepositories] = useState<
@@ -112,13 +105,11 @@ export function GitLabRepositoryLinkingDialog({
    * Reset form state
    */
   const reset = useCallback(() => {
-    setIsCreatingNewProject(false);
     setSelectedProjectId("");
     setSelectedGitlabProject(null);
     setBranch("main");
     setProjectSearch("");
     setGitlabLoadError(null);
-    setNewProjectName("");
     setShowSyncDialog(false);
     setLinkedProjectId(null);
     setLinkedProjectName(null);
@@ -136,56 +127,24 @@ export function GitLabRepositoryLinkingDialog({
    * Handle link project
    */
   const handleLink = useCallback(async () => {
-    let projectId = selectedProjectId;
-
-    // If creating a new project, validate and create it first
-    if (isCreatingNewProject) {
-      if (!newProjectName.trim()) {
-        error("Please enter a project name");
-        return;
-      }
-      if (!selectedGitlabProject) {
-        error("Please select a GitLab repository");
-        return;
-      }
-      if (!branch.trim()) {
-        error("Please enter a branch name");
-        return;
-      }
-
-      setIsCreatingProject(true);
-      try {
-        const newProject = await createProject(newProjectName.trim());
-        projectId = newProject.id;
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Failed to create project";
-        error(message);
-        return;
-      } finally {
-        setIsCreatingProject(false);
-      }
-    } else {
-      // Selecting existing project
-      if (!projectId) {
-        error("Please select a BranchForge project");
-        return;
-      }
-      if (!selectedGitlabProject) {
-        error("Please select a GitLab repository");
-        return;
-      }
-      if (!branch.trim()) {
-        error("Please enter a branch name");
-        return;
-      }
+    if (!selectedProjectId) {
+      error("Please select a BranchForge project");
+      return;
+    }
+    if (!selectedGitlabProject) {
+      error("Please select a GitLab repository");
+      return;
+    }
+    if (!branch.trim()) {
+      error("Please enter a branch name");
+      return;
     }
 
     setIsLinking(true);
 
     try {
       const request: LinkRepositoryRequest = {
-        projectId,
+        projectId: selectedProjectId,
         gitlabProjectId: selectedGitlabProject.id,
         branch: branch.trim(),
       };
@@ -201,22 +160,25 @@ export function GitLabRepositoryLinkingDialog({
       );
 
       // Get project name for the sync dialog
-      const project = projects.find((p) => p.id === projectId);
-      const projectName = isCreatingNewProject ? newProjectName : project?.name;
+      const project = projects.find((p) => p.id === selectedProjectId);
+      const projectName = project?.name;
 
       // Log if project not found in projects array (stale data condition)
-      if (!isCreatingNewProject && !project) {
+      if (!project) {
         console.warn(
-          `[GitLabRepositoryLinkingDialog] Linked project not found in projects array. projectId: ${projectId}. This may indicate stale data.`
+          `[GitLabRepositoryLinkingDialog] Linked project not found in projects array. projectId: ${selectedProjectId}. This may indicate stale data.`
         );
       }
 
       // Store the linked project info and open sync dialog directly
-      setLinkedProjectId(projectId);
+      setLinkedProjectId(selectedProjectId);
       setLinkedProjectName(projectName ?? "Unknown project");
+
+      // Close the main dialog before opening the sync dialog
+      onOpenChange(false);
       setShowSyncDialog(true);
 
-      // Close the main dialog but keep the sync dialog open
+      // Notify parent and refresh integration
       onLinkSuccess?.();
       await refreshIntegration();
     } catch (err) {
@@ -230,14 +192,12 @@ export function GitLabRepositoryLinkingDialog({
     selectedProjectId,
     selectedGitlabProject,
     branch,
-    isCreatingNewProject,
-    newProjectName,
     projects,
     onLinkSuccess,
     refreshIntegration,
-    createProject,
     success,
     error,
+    onOpenChange,
   ]);
 
   /**
@@ -280,69 +240,46 @@ export function GitLabRepositoryLinkingDialog({
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {/* BranchForge Project Section */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>BranchForge Project</Label>
-                <button
-                  type="button"
-                  onClick={() => setIsCreatingNewProject(!isCreatingNewProject)}
-                  disabled={isLinking || isCreatingProject}
-                  className="text-xs text-primary hover:underline disabled:opacity-50 disabled:no-underline"
+              <Label htmlFor="branchforge-project">BranchForge Project</Label>
+              {projects.length === 0 && isLoadingProjects ? (
+                <div
+                  className="p-3 flex items-center justify-center"
+                  role="status"
+                  aria-busy="true"
                 >
-                  {isCreatingNewProject ? "Select existing" : "Create new"}
-                </button>
-              </div>
-
-              {isCreatingNewProject ? (
-                // Create new project form
-                <div className="space-y-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="new-project-name">Project Name</Label>
-                    <Input
-                      id="new-project-name"
-                      type="text"
-                      placeholder="My Visual Novel"
-                      value={newProjectName}
-                      onChange={(e) => setNewProjectName(e.target.value)}
-                      disabled={isCreatingProject || isLinking}
-                    />
-                  </div>
-
-                  <p className="text-xs text-muted-foreground">
-                    Create a new BranchForge project to link with GitLab.
+                  <Loader2
+                    className="w-5 h-5 animate-spin text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <span className="sr-only">Loading projects...</span>
+                </div>
+              ) : projects.length === 0 && !isLoadingProjects ? (
+                <div className="p-3 border border-dashed border-border/30 rounded-md text-center">
+                  <p className="text-sm text-muted-foreground">
+                    No projects found. Import a project from GitLab or upload a
+                    ZIP file first.
                   </p>
                 </div>
               ) : (
-                // Select existing project dropdown
-                <div className="space-y-2">
-                  {projects.length === 0 && !isLoadingProjects ? (
-                    <div className="p-3 border border-dashed border-border/30 rounded-md text-center">
-                      <p className="text-sm text-muted-foreground">
-                        No projects found. Create a new project to get started.
-                      </p>
-                    </div>
-                  ) : (
-                    <>
-                      <select
-                        id="-project"
-                        value={selectedProjectId}
-                        onChange={(e) => setSelectedProjectId(e.target.value)}
-                        disabled={isLoadingProjects || isLinking}
-                        className="w-full px-3 py-2 rounded-md border border-border/30 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-                      >
-                        <option value="">Select a project...</option>
-                        {projects.map((project) => (
-                          <option key={project.id} value={project.id}>
-                            {project.name}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-muted-foreground">
-                        Select an existing BranchForge project to sync with
-                        GitLab.
-                      </p>
-                    </>
-                  )}
-                </div>
+                <>
+                  <select
+                    id="branchforge-project"
+                    value={selectedProjectId}
+                    onChange={(e) => setSelectedProjectId(e.target.value)}
+                    disabled={isLoadingProjects || isLinking}
+                    className="w-full px-3 py-2 rounded-md border border-border/30 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                  >
+                    <option value="">Select a project...</option>
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    Select an existing BranchForge project to link with GitLab.
+                  </p>
+                </>
               )}
             </div>
 
@@ -440,29 +377,21 @@ export function GitLabRepositoryLinkingDialog({
             <Button
               variant="outline"
               onClick={closeDialog}
-              disabled={isLinking || isCreatingProject}
+              disabled={isLinking}
             >
               Cancel
             </Button>
             <Button
               onClick={handleLink}
               disabled={
-                isCreatingNewProject
-                  ? !newProjectName.trim() ||
-                    !selectedGitlabProject ||
-                    !branch.trim() ||
-                    isCreatingProject ||
-                    isLinking
-                  : !selectedProjectId ||
-                    !selectedGitlabProject ||
-                    !branch.trim() ||
-                    isLinking
+                !selectedProjectId ||
+                !selectedGitlabProject ||
+                !branch.trim() ||
+                isLinking
               }
             >
-              {(isCreatingProject || isLinking) && (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              )}
-              {isCreatingNewProject ? "Create & Link" : "Link Repository"}
+              {isLinking && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Link Repository
             </Button>
           </div>
         </DialogContent>

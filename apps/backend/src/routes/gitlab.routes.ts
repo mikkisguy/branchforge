@@ -7,6 +7,11 @@
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { authenticate } from "../middleware/auth.middleware.js";
+import { validateBody } from "../middleware/validation.middleware.js";
+import {
+  NotFoundError,
+  ConflictError,
+} from "../middleware/error-handler.middleware.js";
 import { checkRateLimit } from "../services/rate-limiter.service.js";
 import { getDb } from "../db/index.js";
 import {
@@ -37,6 +42,12 @@ import {
   detectConflicts,
   type ConflictResolution,
 } from "../services/gitlab-sync.service.js";
+import {
+  importProjectSchema,
+  type ImportProjectInput,
+  isValidConflictResolution,
+} from "../lib/validation.js";
+import { createProject, deleteProject } from "../services/projects.service.js";
 import { syncLabelsFromGitLabFile } from "../services/gitlab-file-sync.service.js";
 
 /**
@@ -76,6 +87,10 @@ function getClientIp(request: FastifyRequest): string {
   // Fall back to socket address
   return request.ip;
 }
+
+// ============================================================================
+// Constants
+// ============================================================================
 
 // ============================================================================
 // Types
@@ -265,7 +280,7 @@ async function validateTokenHandler(
     );
     reply.status(500).send({
       error: "Failed to validate token",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -307,7 +322,7 @@ async function storeIntegrationHandler(
     );
     reply.status(500).send({
       error: "Failed to store integration",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -349,7 +364,7 @@ async function getIntegrationHandler(
     );
     reply.status(500).send({
       error: "Failed to get integration",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -377,7 +392,7 @@ async function deleteIntegrationHandler(
     );
     reply.status(500).send({
       error: "Failed to delete integration",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -415,7 +430,7 @@ async function listProjectsHandler(
 
     reply.status(500).send({
       error: "Failed to list GitLab repositories",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -466,17 +481,14 @@ async function linkRepositoryHandler(
       "linkRepositoryHandler: Failed to link repository"
     );
 
-    if (err instanceof Error && err.message.includes("duplicate key value")) {
-      reply.status(409).send({
-        error: "Repository already linked",
-        details: err.message,
-      });
-      return;
+    // Rethrow NotFoundError and ConflictError to let global error handler return appropriate status
+    if (err instanceof NotFoundError || err instanceof ConflictError) {
+      throw err;
     }
 
     reply.status(500).send({
       error: "Failed to link repository",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -510,7 +522,7 @@ async function unlinkRepositoryHandler(
     );
     reply.status(500).send({
       error: "Failed to unlink repository",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -547,7 +559,7 @@ async function listRepositoriesHandler(
     );
     reply.status(500).send({
       error: "Failed to list linked repositories",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -594,14 +606,14 @@ async function listBranchesHandler(
     if (err instanceof Error && err.message.startsWith("GitLab API error:")) {
       reply.status(502).send({
         error: "Failed to fetch branches from GitLab",
-        details: err.message,
+        message: "Unable to communicate with GitLab. Please try again later.",
       });
       return;
     }
 
     reply.status(500).send({
       error: "Failed to list branches",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -657,14 +669,14 @@ async function listFilesHandler(
     if (err instanceof Error && err.message.startsWith("GitLab API error:")) {
       reply.status(502).send({
         error: "Failed to fetch files from GitLab",
-        details: err.message,
+        message: "Unable to communicate with GitLab. Please try again later.",
       });
       return;
     }
 
     reply.status(500).send({
       error: "Failed to list RPY files",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -704,7 +716,7 @@ async function exportHandler(
     );
     reply.status(500).send({
       error: "Failed to export to GitLab",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -729,12 +741,7 @@ async function importHandler(
     return;
   }
 
-  const validResolutions: ConflictResolution[] = [
-    "branchforge_wins",
-    "gitlab_wins",
-    "manual_review",
-  ];
-  if (!validResolutions.includes(conflictResolution)) {
+  if (!isValidConflictResolution(conflictResolution)) {
     reply.status(400).send({ error: "Invalid conflictResolution" });
     return;
   }
@@ -758,7 +765,156 @@ async function importHandler(
     );
     reply.status(500).send({
       error: "Failed to import from GitLab",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
+    });
+  }
+}
+
+/**
+ * Import project from GitLab
+ *
+ * POST /api/gitlab/import-project
+ * Body: { projectName, projectDescription?, gitlabProjectId, gitlabProjectName, branch, conflictResolution }
+ *
+ * Creates a new project, links it to a GitLab repository, and imports files.
+ */
+async function importProjectHandler(
+  request: FastifyRequest<{ Body: ImportProjectInput }>,
+  reply: FastifyReply
+): Promise<void> {
+  const clientIp = getClientIp(request);
+
+  // Check rate limit to prevent abuse
+  const rateLimit = checkRateLimit(clientIp);
+  if (!rateLimit.allowed) {
+    request.log.warn(
+      { ip: clientIp, retryAfter: rateLimit.retryAfter },
+      "importProjectHandler: Rate limit exceeded"
+    );
+    reply.status(429).send({
+      error: "Too many import requests. Please try again later.",
+      retryAfter: rateLimit.retryAfter,
+    });
+    return;
+  }
+
+  const userId = getAuthenticatedUserId(request);
+  const {
+    projectName,
+    projectDescription,
+    gitlabProjectId,
+    branch,
+    conflictResolution,
+  } = request.body;
+
+  /**
+   * Cleanup helper for partially created projects
+   *
+   * Attempts to delete a partially created project and logs the result.
+   * Used throughout importProjectHandler to clean up on errors.
+   *
+   * @param projectId - The ID of the project to delete
+   * @param context - Context string for logging (e.g., error type)
+   */
+  async function cleanupPartialProject(
+    projectId: string,
+    context: string
+  ): Promise<void> {
+    try {
+      await deleteProject(userId, projectId);
+      request.log.info(
+        { projectId },
+        `importProjectHandler: Cleaned up partially created project ${context}`
+      );
+    } catch (deleteErr) {
+      request.log.error(
+        { err: deleteErr, projectId },
+        "importProjectHandler: Failed to cleanup partially created project"
+      );
+    }
+  }
+
+  let newProject: Awaited<ReturnType<typeof createProject>> | null = null;
+
+  try {
+    newProject = await createProject(userId, {
+      name: projectName,
+      description: projectDescription,
+      source: "GITLAB",
+    });
+
+    // Fetch GitLab project details to get the authoritative repository name
+    const gitlabProject = await getGitlabProject(userId, gitlabProjectId);
+    if (!gitlabProject) {
+      reply.status(404).send({ error: "GitLab project not found" });
+      if (newProject?.id) {
+        await cleanupPartialProject(
+          newProject.id,
+          "after GitLab project not found"
+        );
+      }
+      return;
+    }
+
+    const repositoryName = gitlabProject.path_with_namespace;
+
+    await linkRepository(
+      newProject.id,
+      gitlabProjectId,
+      repositoryName,
+      branch
+    );
+
+    const operation = await importFromGitlab(
+      newProject.id,
+      branch,
+      conflictResolution
+    );
+
+    reply.status(202).send({
+      project: newProject,
+      operation,
+    });
+  } catch (err) {
+    request.log.error(
+      { err },
+      "importProjectHandler: Failed to import project from GitLab"
+    );
+
+    // Check for conflict error from linkRepository (repository already linked)
+    if (err instanceof ConflictError) {
+      // Delete the partially created project before sending response
+      if (newProject?.id) {
+        await cleanupPartialProject(
+          newProject.id,
+          "after duplicate-link error"
+        );
+      }
+
+      reply.status(409).send({
+        error: "Repository already linked",
+        message: "This repository is already linked to your project.",
+      });
+      return;
+    }
+
+    // Check for NotFoundError and rethrow after cleanup
+    if (err instanceof NotFoundError) {
+      // Delete the partially created project before rethrowing
+      if (newProject?.id) {
+        await cleanupPartialProject(newProject.id, "after NotFoundError");
+      }
+      // Rethrow NotFoundError so global error handler returns 404
+      throw err;
+    }
+
+    if (newProject?.id) {
+      await cleanupPartialProject(newProject.id, "");
+    }
+
+    reply.status(500).send({
+      error: "Failed to import project from GitLab",
+      message: "An internal error occurred",
     });
   }
 }
@@ -800,7 +956,7 @@ async function getOperationHandler(
     );
     reply.status(500).send({
       error: "Failed to get sync operation",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -834,7 +990,7 @@ async function listOperationsHandler(
     );
     reply.status(500).send({
       error: "Failed to list sync operations",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -874,7 +1030,7 @@ async function detectConflictsHandler(
     );
     reply.status(500).send({
       error: "Failed to detect conflicts",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -959,7 +1115,7 @@ async function getGitLabFilesHandler(
     );
     reply.status(500).send({
       error: "Failed to get GitLab files",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -1067,7 +1223,7 @@ async function updateGitLabFileHandler(
     );
     reply.status(500).send({
       error: "Failed to update GitLab file",
-      details: err instanceof Error ? err.message : "Unknown error",
+      message: "An internal error occurred",
     });
   }
 }
@@ -1172,6 +1328,15 @@ export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
       onRequest: [authenticate],
     },
     importHandler
+  );
+
+  fastify.post<{ Body: ImportProjectInput }>(
+    "/gitlab/import-project",
+    {
+      onRequest: [authenticate],
+      preValidation: validateBody(importProjectSchema),
+    },
+    importProjectHandler
   );
 
   fastify.get<{ Params: { operationId: string } }>(

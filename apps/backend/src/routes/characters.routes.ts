@@ -40,6 +40,7 @@ import {
 import {
   characterParserService,
   type DetectedCharacter,
+  type CharacterConflict,
 } from "../services/character-parser.service.js";
 import { characterLinkerService } from "../services/character-linker.service.js";
 import {
@@ -67,6 +68,8 @@ interface DetectCharactersParams {
 interface DetectCharactersResponse {
   characters: DetectedCharacter[];
   excludedTags: string[];
+  existingTags: string[]; // Tags of characters that already exist in database
+  conflicts: CharacterConflict[]; // Conflicts between detected and existing characters
 }
 
 interface ImportCharactersResponse {
@@ -285,11 +288,15 @@ async function detectCharactersHandler(
       }))
     );
 
+    // Get all existing character tags (not just conflicts)
+    const existingTags = existingCharacters.map((c) => c.renpyTag);
+
     reply.status(200).send({
       characters: uniqueCharacters,
       excludedTags: Array.from(excludedTags),
+      existingTags,
       conflicts,
-    } as DetectCharactersResponse & { conflicts: typeof conflicts });
+    } as DetectCharactersResponse);
   } catch (error) {
     request.log.error(error);
     reply.status(500).send({ error: "Internal server error" } as ErrorResponse);

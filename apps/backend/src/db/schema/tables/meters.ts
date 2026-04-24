@@ -12,7 +12,9 @@ import {
   integer,
   index,
   unique,
+  check,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { projects } from "./projects.js";
 import { characters } from "./characters.js";
 
@@ -38,6 +40,10 @@ export const meters = pgTable(
     index("meters_project_id_idx").on(table.projectId),
     index("meters_character_id_idx").on(table.characterId),
     unique("meters_project_key_idx").on(table.projectId, table.key),
+    check(
+      "min_value_lte_max_value",
+      sql`${table.minValue} <= ${table.maxValue}`
+    ),
   ]
 );
 

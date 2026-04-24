@@ -176,6 +176,55 @@
       "when": 1775126270558,
       "tag": "0024_charming_glorian",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1776618574627,
+      "tag": "0025_bright_morgan_stark",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1776626162025,
+      "tag": "0026_wakeful_nebula",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1776634602879,
+      "tag": "0027_careless_toxin",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1776958307582,
+      "tag": "0028_late_hydra",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1776967873187,
+      "tag": "0029_orange_mariko_yashida",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1776982257955,
+      "tag": "0030_wonderful_unus",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1777021999498,
+      "tag": "0031_naive_legion",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,15 @@
-import type { UserRole } from "@branchforge/shared";
-import { request } from "./client";
+import type {
+  SourceOrigin,
+  UserRole,
+  ImportZipResponse,
+  ImportProjectResponse,
+} from "@branchforge/shared";
+import {
+  request,
+  ApiRequestError,
+  API_BASE,
+  getApiErrorMessage,
+} from "./client";
 
 /**
  * Projects API Client
@@ -17,20 +27,24 @@ export interface Project {
   description?: string;
   maxMeterDelta?: number;
   visibility?: UserRole;
+  source: SourceOrigin;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface CreateProjectBody {
-  name: string;
-  description?: string;
-  maxMeterDelta?: number;
 }
 
 export interface UpdateProjectBody {
   name?: string;
   description?: string;
 }
+
+export interface ImportZipBody {
+  file: File;
+  projectName: string;
+  projectDescription?: string;
+}
+
+// Re-export ImportZipResponse and ImportProjectResponse from shared package for convenience
+export type { ImportZipResponse, ImportProjectResponse };
 
 export interface ListProjectsResponse {
   projects: Project[];
@@ -69,17 +83,6 @@ export const projectsApi = {
   },
 
   /**
-   * Create a new project
-   */
-  async createProject(body: CreateProjectBody): Promise<Project> {
-    const response = await request<GetProjectResponse>("/projects", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-    return response.project;
-  },
-
-  /**
    * Update an existing project
    */
   async updateProject(
@@ -103,5 +106,42 @@ export const projectsApi = {
     await request(`/projects/${encodeURIComponent(projectId)}`, {
       method: "DELETE",
     });
+  },
+
+  /**
+   * Import a new project from a ZIP file
+   */
+  async importZip(
+    body: ImportZipBody,
+    signal?: AbortSignal
+  ): Promise<ImportProjectResponse> {
+    const formData = new FormData();
+    formData.append("projectName", body.projectName);
+    if (body.projectDescription) {
+      formData.append("projectDescription", body.projectDescription);
+    }
+    // Keep text fields before file so backend multipart parsing works
+    // regardless of part consumption order.
+    formData.append("file", body.file);
+
+    const response = await fetch(`${API_BASE}/projects/import/zip`, {
+      method: "POST",
+      credentials: "include",
+      body: formData,
+      signal,
+    });
+
+    if (!response.ok) {
+      const errorData = await response
+        .json()
+        .catch(() => ({ error: "Unknown error" }));
+      throw new ApiRequestError(
+        getApiErrorMessage(errorData, response.status),
+        response.status,
+        errorData
+      );
+    }
+
+    return response.json();
   },
 };

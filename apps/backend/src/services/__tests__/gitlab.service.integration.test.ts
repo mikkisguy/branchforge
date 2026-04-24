@@ -63,6 +63,7 @@ describe("GitLabService (Integration)", () => {
     name: "Owned Project",
     description: "A project owned by the user",
     maxMeterDelta: 10,
+    source: "ZIP",
   };
 
   const otherProject: NewProject = {
@@ -71,6 +72,7 @@ describe("GitLabService (Integration)", () => {
     name: "Other Project",
     description: "Another project",
     maxMeterDelta: 10,
+    source: "ZIP",
   };
 
   // Mock encryption service for testing
@@ -429,7 +431,7 @@ describe("GitLabService (Integration)", () => {
       ).rejects.toThrow();
     });
 
-    it("should allow same GitLab project for different BranchForge projects", async () => {
+    it("should enforce unique constraint on gitlabProjectId", async () => {
       const repository1: NewGitlabRepository = {
         id: testUuid("14000002", 1),
         projectId: ownedProject.id!,
@@ -442,22 +444,21 @@ describe("GitLabService (Integration)", () => {
       const repository2: NewGitlabRepository = {
         id: testUuid("14000002", 2),
         projectId: otherProject.id!,
-        gitlabProjectId: 12345,
+        gitlabProjectId: 12345, // Same GitLab project
         repositoryName: "test-repo",
         defaultBranch: "main",
         gitlabUrl: "https://gitlab.com",
       };
 
-      await db.insert(gitlabRepositories).values([repository1, repository2]);
+      await db.insert(gitlabRepositories).values(repository1);
 
-      const result1 = await getRepositoryLink(ownedProject.id!);
-      const result2 = await getRepositoryLink(otherProject.id!);
-
-      expect(result1?.projectId).toBe(ownedProject.id);
-      expect(result2?.projectId).toBe(otherProject.id);
+      // Should reject duplicate gitlabProjectId even for different projects
+      await expect(
+        db.insert(gitlabRepositories).values(repository2)
+      ).rejects.toThrow();
     });
 
-    it("should allow different GitLab projects for same BranchForge project", async () => {
+    it("should enforce unique constraint on projectId (one repo per project)", async () => {
       const repository1: NewGitlabRepository = {
         id: testUuid("14000002", 1),
         projectId: ownedProject.id!,
@@ -467,6 +468,9 @@ describe("GitLabService (Integration)", () => {
         gitlabUrl: "https://gitlab.com",
       };
 
+      await db.insert(gitlabRepositories).values(repository1);
+
+      // Try to insert a second repository for the same project
       const repository2: NewGitlabRepository = {
         id: testUuid("14000002", 2),
         projectId: ownedProject.id!,
@@ -476,14 +480,10 @@ describe("GitLabService (Integration)", () => {
         gitlabUrl: "https://gitlab.com",
       };
 
-      await db.insert(gitlabRepositories).values([repository1, repository2]);
-
-      const repos = await db
-        .select()
-        .from(gitlabRepositories)
-        .where(eq(gitlabRepositories.projectId, ownedProject.id!));
-
-      expect(repos).toHaveLength(2);
+      // This should throw due to unique constraint on projectId
+      await expect(
+        db.insert(gitlabRepositories).values(repository2)
+      ).rejects.toThrow();
     });
   });
 
@@ -658,6 +658,7 @@ describe("GitLabService (Integration)", () => {
         userId: otherUserId,
         name: "Other User Project",
         maxMeterDelta: 10,
+        source: "GITLAB",
       };
 
       // Track this project ID for cleanup

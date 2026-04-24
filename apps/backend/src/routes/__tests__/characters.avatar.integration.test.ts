@@ -78,6 +78,7 @@ const testProject: NewProject = {
   name: "Test Avatar Project",
   description: "A test project for avatar routes",
   maxMeterDelta: 10,
+  source: "ZIP",
 };
 
 const testCharacter: NewCharacter = {

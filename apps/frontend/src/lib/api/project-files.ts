@@ -5,9 +5,10 @@
  * Handles file listing, content retrieval, updates, and zip import.
  */
 
-import { request } from "./client.js";
-import type { ProjectFile } from "@branchforge/shared";
-import { FileSourceType, isValidFileSourceType } from "@branchforge/shared";
+import { API_BASE, request, getApiErrorMessage } from "./client.js";
+import type { ProjectFile, ImportZipResponse } from "@branchforge/shared";
+import type { SourceOrigin } from "@branchforge/shared";
+import { isValidSourceOrigin } from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -19,15 +20,6 @@ export interface ProjectFileNode extends ProjectFile {
     labelName: string | null;
     title: string;
   }>;
-}
-
-export interface ImportZipResponse {
-  success: boolean;
-  filesImported: number;
-  filesUpdated: number;
-  filesSkipped: number;
-  labelsCreated: number;
-  error?: string;
 }
 
 export type UpdateFileResponse =
@@ -88,13 +80,13 @@ export const projectFilesApi = {
    */
   async listFiles(
     projectId: string,
-    options?: { source?: FileSourceType }
+    options?: { source?: SourceOrigin }
   ): Promise<ProjectFileNode[]> {
     validateRequired(projectId, "Project ID");
 
     const searchParams = new URLSearchParams();
     if (options?.source) {
-      if (!isValidFileSourceType(options.source)) {
+      if (!isValidSourceOrigin(options.source)) {
         throw new Error(VALIDATION_ERRORS.INVALID_SOURCE);
       }
       searchParams.append("source", options.source);
@@ -113,12 +105,12 @@ export const projectFilesApi = {
   async getFile(
     projectId: string,
     filePath: string,
-    source: FileSourceType
+    source: SourceOrigin
   ): Promise<ProjectFile> {
     validateRequired(projectId, "Project ID");
     validateRequired(filePath, "File path");
 
-    if (!isValidFileSourceType(source)) {
+    if (!isValidSourceOrigin(source)) {
       throw new Error(VALIDATION_ERRORS.INVALID_SOURCE);
     }
 
@@ -174,8 +166,6 @@ export const projectFilesApi = {
       throw new Error("File must be a .zip file");
     }
 
-    const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
-
     // Create FormData for multipart upload
     const formData = new FormData();
     formData.append("file", file);
@@ -227,8 +217,12 @@ export const projectFilesApi = {
             }
           } else {
             try {
-              const error = JSON.parse(xhr.responseText) as { error: string };
-              reject(new Error(error.error || "Upload failed"));
+              const error = JSON.parse(xhr.responseText) as {
+                error?: string;
+                message?: string;
+                statusCode?: number;
+              };
+              reject(new Error(getApiErrorMessage(error, xhr.status)));
             } catch {
               reject(new Error(`Upload failed with status ${xhr.status}`));
             }
@@ -265,12 +259,9 @@ export const projectFilesApi = {
     });
 
     if (!response.ok) {
-      const error: { error: string } = await response
-        .json()
-        .catch(() => ({ error: "Unknown error" }));
-      throw new Error(
-        error.error || `Request failed with status ${response.status}`
-      );
+      const error: { error?: string; message?: string; statusCode?: number } =
+        await response.json().catch(() => ({ error: "Unknown error" }));
+      throw new Error(getApiErrorMessage(error, response.status));
     }
 
     return response.json();

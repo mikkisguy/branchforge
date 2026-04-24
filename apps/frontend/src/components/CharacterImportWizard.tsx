@@ -5,7 +5,7 @@
  * Shows new characters, existing characters with conflicts, and special characters.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useId } from "react";
 import {
   X,
   User,
@@ -21,12 +21,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import {
-  charactersApi,
-  type DetectedCharacter,
-  type CharacterConflict,
-  type ImportCharacter,
-} from "@/lib/api/characters";
+import { charactersApi, type ImportCharacter } from "@/lib/api/characters";
+import type { DetectedCharacter, CharacterConflict } from "@branchforge/shared";
 import { useToast } from "@/contexts/ToastContext";
 
 // ============================================================================
@@ -113,6 +109,8 @@ export function CharacterImportWizard({
   excludedTags,
   onComplete,
 }: CharacterImportWizardProps) {
+  // Generate unique ID for checkbox to prevent collisions when multiple wizards are mounted
+  const linkToLinesId = useId();
   const { success, error } = useToast();
 
   // Group characters on mount
@@ -340,23 +338,6 @@ export function CharacterImportWizard({
 
         {/* Content - Scrollable */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {/* Settings */}
-          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-md">
-            <div className="flex items-center gap-2">
-              <Settings className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">
-                Link speakers to dialogue lines
-              </span>
-            </div>
-            <input
-              type="checkbox"
-              checked={linkToLines}
-              onChange={(e) => setLinkToLines(e.target.checked)}
-              className="w-4 h-4 rounded"
-              disabled={isImporting}
-            />
-          </div>
-
           {/* No characters detected - show add button */}
           {newCount === 0 && existingCount === 0 && specialCount === 0 && (
             <div className="text-center p-6 border border-dashed border-border/50 rounded-md">
@@ -770,6 +751,28 @@ export function CharacterImportWizard({
               )}
             </div>
           )}
+          {/* Settings */}
+          <div className="p-3 bg-muted/50 rounded-md space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Settings className="w-4 h-4 text-muted-foreground" />
+                <label
+                  htmlFor={linkToLinesId}
+                  className="text-sm font-medium cursor-pointer"
+                >
+                  Automatically link characters to dialogue lines
+                </label>
+              </div>
+              <input
+                id={linkToLinesId}
+                type="checkbox"
+                checked={linkToLines}
+                onChange={(e) => setLinkToLines(e.target.checked)}
+                className="w-4 h-4 rounded"
+                disabled={isImporting}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Footer */}

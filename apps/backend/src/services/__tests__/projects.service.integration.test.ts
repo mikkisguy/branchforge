@@ -65,6 +65,7 @@ describe("ProjectsService (Integration)", () => {
     name: "Owned Project",
     description: "A project owned by the user",
     maxMeterDelta: 10,
+    source: "ZIP",
   };
 
   const sharedProject: NewProject = {
@@ -73,6 +74,7 @@ describe("ProjectsService (Integration)", () => {
     name: "Shared Project",
     description: "A project shared with the user",
     maxMeterDelta: 15,
+    source: "ZIP",
   };
 
   // Helper to clean up all test data including additional users created during tests
@@ -136,8 +138,10 @@ describe("ProjectsService (Integration)", () => {
         description: "A project owned by the user",
         maxMeterDelta: 10,
       });
-      expect(projects[0].createdAt).toBeInstanceOf(Date);
-      expect(projects[0].updatedAt).toBeInstanceOf(Date);
+      expect(projects[0].createdAt).toBeDefined();
+      expect(projects[0].updatedAt).toBeDefined();
+      expect(typeof projects[0].createdAt).toBe("string");
+      expect(typeof projects[0].updatedAt).toBe("string");
     });
 
     it("should return both owned and shared projects", async () => {
@@ -218,8 +222,10 @@ describe("ProjectsService (Integration)", () => {
         maxMeterDelta: 10,
         visibility: "OWNER",
       });
-      expect(project?.createdAt).toBeInstanceOf(Date);
-      expect(project?.updatedAt).toBeInstanceOf(Date);
+      expect(project?.createdAt).toBeDefined();
+      expect(project?.updatedAt).toBeDefined();
+      expect(typeof project?.createdAt).toBe("string");
+      expect(typeof project?.updatedAt).toBe("string");
     });
 
     it("should return project when user has shared access", async () => {
@@ -311,6 +317,7 @@ describe("ProjectsService (Integration)", () => {
         name: "New Test Project",
         description: "A newly created test project",
         maxMeterDelta: 15,
+        source: "ZIP",
       };
 
       const project = await createProject(testUserId, newProjectData);
@@ -323,8 +330,10 @@ describe("ProjectsService (Integration)", () => {
         visibility: "OWNER",
       });
       expect(project.id).toBeDefined();
-      expect(project.createdAt).toBeInstanceOf(Date);
-      expect(project.updatedAt).toBeInstanceOf(Date);
+      expect(project.createdAt).toBeDefined();
+      expect(project.updatedAt).toBeDefined();
+      expect(typeof project.createdAt).toBe("string");
+      expect(typeof project.updatedAt).toBe("string");
 
       // Verify project was actually created in database
       const [dbProject] = await db
@@ -340,6 +349,7 @@ describe("ProjectsService (Integration)", () => {
     it("should create project with minimal data", async () => {
       const minimalProjectData = {
         name: "Minimal Project",
+        source: "ZIP",
       };
 
       const project = await createProject(testUserId, minimalProjectData);
@@ -357,6 +367,7 @@ describe("ProjectsService (Integration)", () => {
       const customProjectData = {
         name: "Custom Delta Project",
         maxMeterDelta: 25,
+        source: "ZIP",
       };
 
       const project = await createProject(testUserId, customProjectData);
@@ -368,6 +379,7 @@ describe("ProjectsService (Integration)", () => {
     it("should assign correct userId to created project", async () => {
       const projectData = {
         name: "User Assignment Test",
+        source: "ZIP",
       };
 
       const project = await createProject(otherUserId, projectData);
@@ -386,6 +398,7 @@ describe("ProjectsService (Integration)", () => {
     it("should set createdAt and updatedAt timestamps", async () => {
       const projectData = {
         name: "Timestamp Test",
+        source: "ZIP",
       };
 
       const beforeCreate = new Date();
@@ -393,20 +406,22 @@ describe("ProjectsService (Integration)", () => {
       createdProjectIds.push(project.id);
       const afterCreate = new Date();
 
-      expect(project.createdAt).toBeInstanceOf(Date);
-      expect(project.updatedAt).toBeInstanceOf(Date);
-      expect(project.createdAt.getTime()).toBeGreaterThanOrEqual(
+      expect(project.createdAt).toBeDefined();
+      expect(project.updatedAt).toBeDefined();
+      expect(typeof project.createdAt).toBe("string");
+      expect(typeof project.updatedAt).toBe("string");
+
+      // Verify timestamps are within expected range
+      const createdAt = new Date(project.createdAt);
+      const updatedAt = new Date(project.updatedAt);
+      expect(createdAt.getTime()).toBeGreaterThanOrEqual(
         beforeCreate.getTime()
       );
-      expect(project.createdAt.getTime()).toBeLessThanOrEqual(
-        afterCreate.getTime()
-      );
-      expect(project.updatedAt.getTime()).toBeGreaterThanOrEqual(
+      expect(createdAt.getTime()).toBeLessThanOrEqual(afterCreate.getTime());
+      expect(updatedAt.getTime()).toBeGreaterThanOrEqual(
         beforeCreate.getTime()
       );
-      expect(project.updatedAt.getTime()).toBeLessThanOrEqual(
-        afterCreate.getTime()
-      );
+      expect(updatedAt.getTime()).toBeLessThanOrEqual(afterCreate.getTime());
     });
   });
 });

@@ -9,12 +9,14 @@ const TEST_PROJECTS: Project[] = [
   {
     id: "project-1",
     name: "Project One",
+    source: "ZIP",
     createdAt: "2026-03-08T00:00:00.000Z",
     updatedAt: "2026-03-08T00:00:00.000Z",
   },
   {
     id: "project-2",
     name: "Project Two",
+    source: "GITLAB",
     createdAt: "2026-03-08T00:00:00.000Z",
     updatedAt: "2026-03-08T00:00:00.000Z",
   },

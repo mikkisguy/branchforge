@@ -8,24 +8,19 @@ import { getDb } from "../db/index.js";
 import { projects, projectUsers } from "../db/schema/index.js";
 import { eq, and } from "drizzle-orm";
 import type { NewProject } from "../db/schema/tables/projects.js";
-import type { UserRole } from "@branchforge/shared";
+import type {
+  UserRole,
+  SourceOrigin,
+  PublicProject,
+} from "@branchforge/shared";
 import {
   NotFoundError,
   ForbiddenError,
+  ValidationError,
 } from "../middleware/error-handler.middleware.js";
-
-/**
- * Public project information (without sensitive data)
- */
-export interface PublicProject {
-  id: string;
-  name: string;
-  description?: string;
-  maxMeterDelta?: number;
-  visibility?: UserRole;
-  createdAt: Date;
-  updatedAt: Date;
-}
+import { z } from "zod";
+import { createProjectSchema } from "../lib/validation.js";
+import { isValidSourceOrigin } from "@branchforge/shared";
 
 /**
  * Project row type from database queries (with optional role for shared projects)
@@ -35,6 +30,7 @@ type ProjectRow = {
   name: string;
   description: string | null;
   maxMeterDelta: number | null;
+  source: SourceOrigin;
   createdAt: Date;
   updatedAt: Date;
   role?: UserRole;
@@ -58,19 +54,16 @@ function toPublicProject(
     description: project.description ?? undefined,
     maxMeterDelta: project.maxMeterDelta ?? undefined,
     visibility,
-    createdAt: project.createdAt,
-    updatedAt: project.updatedAt,
+    source: project.source,
+    createdAt: project.createdAt.toISOString(),
+    updatedAt: project.updatedAt.toISOString(),
   };
 }
 
 /**
  * Create project request body
  */
-export interface CreateProjectBody {
-  name: string;
-  description?: string;
-  maxMeterDelta?: number;
-}
+export type CreateProjectBody = z.infer<typeof createProjectSchema>;
 
 /**
  * Update project request body
@@ -103,6 +96,7 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
       name: projects.name,
       description: projects.description,
       maxMeterDelta: projects.maxMeterDelta,
+      source: projects.source,
       role: projectUsers.role, // User's role from project_users
       createdAt: projects.createdAt,
       updatedAt: projects.updatedAt,
@@ -157,6 +151,7 @@ export async function getProject(
       name: projects.name,
       description: projects.description,
       maxMeterDelta: projects.maxMeterDelta,
+      source: projects.source,
       createdAt: projects.createdAt,
       updatedAt: projects.updatedAt,
     })
@@ -175,6 +170,7 @@ export async function getProject(
       name: projects.name,
       description: projects.description,
       maxMeterDelta: projects.maxMeterDelta,
+      source: projects.source,
       role: projectUsers.role,
       createdAt: projects.createdAt,
       updatedAt: projects.updatedAt,
@@ -198,17 +194,47 @@ export async function getProject(
  * @param body - The project data
  * @returns The created project
  */
+/**
+ * Create a new project (internal helper).
+ *
+ * IMPORTANT: This is an internal function used ONLY by import flows (GitLab, ZIP).
+ * Projects must always be created through import flows - there is no generic
+ * project creation UI or API endpoint.
+ *
+ * @param userId - The user ID creating the project
+ * @param body - The project data (must include source field: "GITLAB" or "ZIP")
+ * @returns The created project
+ * @internal
+ */
 export async function createProject(
   userId: string,
   body: CreateProjectBody
 ): Promise<PublicProject> {
   const db = getDb();
 
+  if (!isValidSourceOrigin(body.source)) {
+    throw new ValidationError(
+      "Invalid project source: must be GITLAB or ZIP (import flows only)",
+      {
+        issues: [
+          {
+            code: "invalid_value",
+            path: ["source"],
+            message: "Source must be GITLAB or ZIP",
+            received: body.source,
+            options: ["GITLAB", "ZIP"],
+          },
+        ],
+      }
+    );
+  }
+
   const newProject: NewProject = {
     userId,
     name: body.name,
     description: body.description,
     maxMeterDelta: body.maxMeterDelta ?? 10,
+    source: body.source,
   };
 
   const result = await db.insert(projects).values(newProject).returning();

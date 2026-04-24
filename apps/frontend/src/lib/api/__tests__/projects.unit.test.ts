@@ -6,11 +6,7 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { projectsApi } from "../projects";
-import type {
-  Project,
-  CreateProjectBody,
-  UpdateProjectBody,
-} from "@/lib/api/projects";
+import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -29,6 +25,7 @@ describe("Projects API", () => {
         description: "A test project",
         maxMeterDelta: 5,
         visibility: "OWNER",
+        source: "ZIP",
         createdAt: "2024-01-01T00:00:00.000Z",
         updatedAt: "2024-01-01T00:00:00.000Z",
       },
@@ -96,6 +93,7 @@ describe("Projects API", () => {
       description: "A test project",
       maxMeterDelta: 5,
       visibility: "OWNER",
+      source: "ZIP",
       createdAt: "2024-01-01T00:00:00.000Z",
       updatedAt: "2024-01-01T00:00:00.000Z",
     };
@@ -152,125 +150,6 @@ describe("Projects API", () => {
     });
   });
 
-  describe("Create Project", () => {
-    const validBody: CreateProjectBody = {
-      name: "New Project",
-      description: "A new project",
-      maxMeterDelta: 10,
-    };
-
-    const mockProject: Project = {
-      id: "proj-new",
-      name: "New Project",
-      description: "A new project",
-      maxMeterDelta: 10,
-      visibility: "OWNER",
-      createdAt: "2024-01-01T00:00:00.000Z",
-      updatedAt: "2024-01-01T00:00:00.000Z",
-    };
-
-    it("should create project successfully", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ project: mockProject }),
-      });
-
-      const result = await projectsApi.createProject(validBody);
-
-      expect(result).toEqual(mockProject);
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-
-      const [url, options] = mockFetch.mock.calls[0];
-      expect(url).toContain("/projects");
-      expect(options?.method).toBe("POST");
-    });
-
-    it("should send request body as JSON", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ project: mockProject }),
-      });
-
-      await projectsApi.createProject(validBody);
-
-      const requestBody = JSON.parse(
-        mockFetch.mock.calls[0][1]?.body as string
-      );
-      expect(requestBody).toEqual(validBody);
-    });
-
-    it("should include credentials in request", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ project: mockProject }),
-      });
-
-      await projectsApi.createProject(validBody);
-
-      expect(mockFetch.mock.calls[0][1]?.credentials).toBe("include");
-    });
-
-    it("should create project with only required fields", async () => {
-      const minimalBody = { name: "Minimal Project" };
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          project: {
-            id: "proj-min",
-            name: "Minimal Project",
-            visibility: "OWNER",
-            createdAt: "2024-01-01T00:00:00.000Z",
-            updatedAt: "2024-01-01T00:00:00.000Z",
-          },
-        }),
-      });
-
-      const result = await projectsApi.createProject(minimalBody);
-
-      const requestBody = JSON.parse(
-        mockFetch.mock.calls[0][1]?.body as string
-      );
-      expect(requestBody).toEqual(minimalBody);
-      expect(result.name).toBe("Minimal Project");
-    });
-
-    it("should handle validation error", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        json: async () => ({ error: "Invalid project data" }),
-      });
-
-      await expect(projectsApi.createProject(validBody)).rejects.toThrow(
-        "Invalid project data"
-      );
-    });
-
-    it("should handle network errors", async () => {
-      mockFetch.mockRejectedValueOnce(new Error("Network error"));
-
-      await expect(projectsApi.createProject(validBody)).rejects.toThrow(
-        "Network error"
-      );
-    });
-  });
-
-  describe("Request Headers", () => {
-    it("should set Content-Type header", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ project: {} }),
-      });
-
-      await projectsApi.createProject({ name: "Test" });
-
-      expect(mockFetch.mock.calls[0][1]?.headers).toHaveProperty(
-        "Content-Type",
-        "application/json"
-      );
-    });
-  });
-
   describe("Error Handling", () => {
     it("should throw generic error when response has no error message", async () => {
       mockFetch.mockResolvedValueOnce({
@@ -302,6 +181,7 @@ describe("Projects API", () => {
       description: "Updated description",
       maxMeterDelta: 10,
       visibility: "OWNER",
+      source: "ZIP",
       createdAt: "2024-01-01T00:00:00.000Z",
       updatedAt: "2024-01-02T00:00:00.000Z",
     };
@@ -482,6 +362,176 @@ describe("Projects API", () => {
       await expect(projectsApi.deleteProject("proj-1")).rejects.toThrow(
         "Network error"
       );
+    });
+  });
+
+  describe("Import ZIP", () => {
+    const mockProject: Project = {
+      id: "proj-zip",
+      name: "zip test",
+      description: "",
+      maxMeterDelta: 5,
+      visibility: "OWNER",
+      source: "ZIP",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      updatedAt: "2024-01-01T00:00:00.000Z",
+    };
+
+    it("should import ZIP file successfully", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          project: mockProject,
+          filesImported: 1,
+          labelsCreated: 0,
+        }),
+      });
+
+      const file = new File(["zip-content"], "BranchForgeTest.zip", {
+        type: "application/zip",
+      });
+
+      const result = await projectsApi.importZip({
+        file,
+        projectName: "zip test",
+      });
+
+      expect(result).toEqual({
+        project: mockProject,
+        filesImported: 1,
+        labelsCreated: 0,
+      });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain("/projects/import/zip");
+      expect(options?.method).toBe("POST");
+    });
+
+    it("should send project metadata before file in multipart body", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          project: mockProject,
+          filesImported: 1,
+          labelsCreated: 0,
+        }),
+      });
+
+      const file = new File(["zip-content"], "BranchForgeTest.zip", {
+        type: "application/zip",
+      });
+
+      await projectsApi.importZip({
+        file,
+        projectName: "zip test",
+      });
+
+      const [, options] = mockFetch.mock.calls[0];
+      const body = options?.body;
+
+      if (!(body instanceof FormData)) {
+        throw new Error("Expected body to be FormData");
+      }
+
+      const keys = Array.from(body.keys());
+
+      expect(keys[0]).toBe("projectName");
+      expect(keys[keys.length - 1]).toBe("file");
+      expect(body.get("projectName")).toBe("zip test");
+    });
+
+    it("should include credentials in request", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          project: mockProject,
+          filesImported: 1,
+          labelsCreated: 0,
+        }),
+      });
+
+      const file = new File(["zip-content"], "test.zip", {
+        type: "application/zip",
+      });
+
+      await projectsApi.importZip({
+        file,
+        projectName: "test",
+      });
+
+      expect(mockFetch.mock.calls[0][1]?.credentials).toBe("include");
+    });
+
+    it("should attach file with correct properties", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          project: mockProject,
+          filesImported: 1,
+          labelsCreated: 0,
+        }),
+      });
+
+      const file = new File(["zip-content"], "TestProject.zip", {
+        type: "application/zip",
+      });
+
+      await projectsApi.importZip({
+        file,
+        projectName: "TestProject",
+      });
+
+      const [, options] = mockFetch.mock.calls[0];
+      const body = options?.body;
+
+      if (!(body instanceof FormData)) {
+        throw new Error("Expected body to be FormData");
+      }
+
+      const uploadedFile = body.get("file");
+
+      expect(uploadedFile).toBeInstanceOf(File);
+      expect(uploadedFile).not.toBeNull();
+
+      if (uploadedFile instanceof File) {
+        expect(uploadedFile.name).toBe("TestProject.zip");
+        expect(uploadedFile.type).toBe("application/zip");
+      }
+    });
+
+    it("should handle validation error (400)", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ error: "Invalid ZIP file" }),
+      });
+
+      const file = new File(["invalid"], "test.zip", {
+        type: "application/zip",
+      });
+
+      await expect(
+        projectsApi.importZip({
+          file,
+          projectName: "test",
+        })
+      ).rejects.toThrow("Invalid ZIP file");
+    });
+
+    it("should handle network errors", async () => {
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+      const file = new File(["content"], "test.zip", {
+        type: "application/zip",
+      });
+
+      await expect(
+        projectsApi.importZip({
+          file,
+          projectName: "test",
+        })
+      ).rejects.toThrow("Network error");
     });
   });
 });

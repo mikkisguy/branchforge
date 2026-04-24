@@ -48,6 +48,7 @@ describe("LabelsRoutes (Integration)", () => {
     name: "Labels Route Test Project",
     description: "Project used by labels route integration tests",
     maxMeterDelta: 10,
+    source: "ZIP",
   };
 
   const initialOriginalContent = ["label intro:", '    "Intro old"'].join("\n");

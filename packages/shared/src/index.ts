@@ -478,20 +478,21 @@ export const GitLabFileType = {
 } as const;
 
 /**
- * File source type enumeration (where files come from)
+ * Source origin enumeration
+ * Indicates where content originated from (GitLab repository or ZIP file)
  */
-export type FileSourceType = "GITLAB" | "ZIP";
-export const FileSourceType = {
+export type SourceOrigin = "GITLAB" | "ZIP";
+export const SourceOrigin = {
   GITLAB: "GITLAB",
   ZIP: "ZIP",
 } as const;
 
 /**
- * Validates that a value is a valid FileSourceType.
+ * Validates that a value is a valid SourceOrigin.
  * @param value - The value to validate
- * @returns true if the value is a valid FileSourceType
+ * @returns true if the value is a valid SourceOrigin
  */
-export function isValidFileSourceType(value: string): value is FileSourceType {
+export function isValidSourceOrigin(value: string): value is SourceOrigin {
   return value === "GITLAB" || value === "ZIP";
 }
 
@@ -505,7 +506,7 @@ export interface ProjectFile {
   filePath: string; // e.g., "labels/act_i.rpy" or "gui/screens.rpy"
   fileType: GitLabFileType;
   content: string; // Full RPY content for Script Mode
-  sourceType: FileSourceType;
+  source: SourceOrigin;
   contentHash: string; // SHA-256 hash for idempotency
   // GitLab-only fields (optional/nullable for non-GitLab sources)
   lastSyncedAt?: string | null;
@@ -517,7 +518,7 @@ export interface ProjectFile {
 /**
  * Legacy: GitLab file information (use ProjectFile instead)
  * Represents a GitLab file tracked in the system
- * @deprecated Use ProjectFile with sourceType: "GITLAB" instead
+ * @deprecated Use ProjectFile with source: "GITLAB" instead
  */
 export interface GitLabFile {
   id: string;
@@ -570,6 +571,44 @@ export interface Character {
   conditionalPrefix: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+// ============================================================================
+// Character Detection Types
+// ============================================================================
+
+/**
+ * Character detected from RPY files
+ */
+export interface DetectedCharacter {
+  tag: string;
+  name: string | null;
+  displayName: string;
+  color: string;
+  isSpecial: boolean;
+  sourceFile: string;
+  confidence: number;
+}
+
+/**
+ * Character conflict between detected and existing characters
+ */
+export interface CharacterConflict {
+  tag: string;
+  detectedName: string | null;
+  existingName: string;
+  detectedColor: string;
+  existingColor: string;
+}
+
+/**
+ * Response from character detection API
+ */
+export interface DetectCharactersResponse {
+  characters: DetectedCharacter[];
+  excludedTags: string[];
+  conflicts: CharacterConflict[];
+  existingTags: string[]; // Tags of all characters that exist in database (not just conflicts)
 }
 
 // ============================================================================
@@ -628,3 +667,128 @@ export function isValidAvatarMimeType(
     mimeType.toLowerCase() as (typeof AVATAR_ALLOWED_MIME_TYPES)[number]
   );
 }
+
+// ============================================================================
+// ZIP Import Configuration
+// ============================================================================
+
+/**
+ * Maximum file size for ZIP imports in megabytes
+ */
+export const ZIP_IMPORT_MAX_SIZE_MB = 50;
+
+/**
+ * Maximum file size for ZIP imports in bytes
+ */
+export const ZIP_IMPORT_MAX_SIZE = ZIP_IMPORT_MAX_SIZE_MB * 1024 * 1024; // 50MB in bytes
+
+/**
+ * Allowed MIME types for ZIP files
+ *
+ * Note: MIME types can be unreliable, so the .zip extension check
+ * is the primary validation. This list includes common zip MIME types
+ * that some systems send.
+ */
+export const ZIP_ALLOWED_MIME_TYPES = [
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/x-zip",
+  "application/octet-stream",
+] as const;
+
+/**
+ * Validates if a MIME type is allowed for ZIP file uploads.
+ * @param mimeType - The MIME type to validate (can be undefined, null, or empty string)
+ * @returns true if the MIME type is allowed
+ */
+export function isValidZipMimeType(
+  mimeType: string | undefined | null
+): boolean {
+  if (!mimeType || typeof mimeType !== "string") {
+    return false;
+  }
+  return ZIP_ALLOWED_MIME_TYPES.includes(
+    mimeType.toLowerCase() as (typeof ZIP_ALLOWED_MIME_TYPES)[number]
+  );
+}
+
+// ============================================================================
+// Public Project Types (API Response Types)
+// ============================================================================
+
+/**
+ * Public project information (without sensitive data)
+ * This matches the backend's PublicProject interface
+ */
+export interface PublicProject {
+  id: string;
+  name: string;
+  description?: string;
+  maxMeterDelta?: number;
+  visibility?: UserRole;
+  source: SourceOrigin;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================================================
+// ZIP Import Types
+// ============================================================================
+
+/**
+ * Successful ZIP file import into existing project
+ * Contains import statistics only (no project field)
+ */
+export interface ImportZipSuccess {
+  success: true;
+  filesImported: number;
+  filesUpdated: number;
+  filesSkipped: number;
+  filesFailed: number;
+  labelsCreated: number;
+}
+
+/**
+ * Failed ZIP file import
+ * Contains error information only
+ */
+export interface ImportZipFailure {
+  success: false;
+  error: string;
+}
+
+/**
+ * Response from ZIP file import endpoint (importing into existing project)
+ * Discriminated union: use response.success to narrow between success and failure
+ * POST /projects/:projectId/import/zip
+ */
+export type ImportZipResponse = ImportZipSuccess | ImportZipFailure;
+
+/**
+ * Successful project creation from ZIP import
+ * Contains the created project and import statistics
+ */
+export interface ImportProjectSuccess {
+  success: true;
+  project: PublicProject & { source: "ZIP" };
+  filesImported: number;
+  filesUpdated: number;
+  filesSkipped: number;
+  labelsCreated: number;
+}
+
+/**
+ * Failed project creation from ZIP import
+ * Contains error information only
+ */
+export interface ImportProjectFailure {
+  success: false;
+  error: string;
+}
+
+/**
+ * Response from project creation via ZIP import endpoint
+ * Discriminated union: use response.success to narrow between success and failure
+ * POST /projects/import/zip
+ */
+export type ImportProjectResponse = ImportProjectSuccess | ImportProjectFailure;

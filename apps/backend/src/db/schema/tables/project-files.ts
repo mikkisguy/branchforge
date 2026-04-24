@@ -5,7 +5,14 @@
  * Replaces the gitlab_files table with a source-agnostic approach.
  */
 
-import { pgTable, uuid, text, timestamp, unique } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  uuid,
+  text,
+  timestamp,
+  unique,
+  index,
+} from "drizzle-orm/pg-core";
 import { projectFileTypeEnum, fileSourceEnum } from "../enums.js";
 import { projects } from "./projects.js";
 
@@ -42,6 +49,7 @@ export const projectFiles = pgTable(
       table.source,
       table.filePath
     ),
+    index("project_files_project_id_idx").on(table.projectId),
   ]
 );
 

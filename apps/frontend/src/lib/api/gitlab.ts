@@ -91,6 +91,22 @@ export interface LinkedRepository {
   createdAt: string;
 }
 
+export interface ImportProjectBody {
+  projectName: string;
+  projectDescription?: string;
+  gitlabProjectId: number;
+  gitlabProjectName: string;
+  branch: string;
+  conflictResolution: ConflictResolution;
+}
+
+import type { PublicProject } from "@branchforge/shared";
+
+export interface ImportProjectResponse {
+  project: PublicProject;
+  operation: SyncOperation;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -111,7 +127,11 @@ const VALIDATION_ERRORS = {
   TOKEN_INVALID_PREFIX: "Token must start with glpat-",
   PROJECT_ID_REQUIRED: "Project ID is required",
   GITLAB_PROJECT_ID_REQUIRED: "GitLab Project ID is required",
+  GITLAB_PROJECT_ID_INVALID: "GitLab Project ID must be a positive integer",
   BRANCH_REQUIRED: "Branch is required",
+  CONFLICT_RESOLUTION_REQUIRED: "Conflict resolution is required",
+  CONFLICT_RESOLUTION_INVALID:
+    "Conflict resolution must be one of: branchforge_wins, gitlab_wins, manual_review",
 };
 
 /**
@@ -475,6 +495,51 @@ export const gitlabApi = {
         projectId,
         branch,
       }),
+    });
+  },
+
+  /**
+   * Import a new project from GitLab
+   * Creates a new project, links it to GitLab, and imports files
+   */
+  async importProject(
+    body: ImportProjectBody,
+    signal?: AbortSignal
+  ): Promise<ImportProjectResponse> {
+    validateRequired(body.projectName, "Project name");
+    validateRequired(body.gitlabProjectName, "GitLab project name");
+    validateRequired(body.branch, "Branch");
+
+    // Validate gitlabProjectId is present
+    if (body.gitlabProjectId === undefined || body.gitlabProjectId === null) {
+      throw new Error(VALIDATION_ERRORS.GITLAB_PROJECT_ID_REQUIRED);
+    }
+
+    // Validate gitlabProjectId is a positive integer
+    if (
+      typeof body.gitlabProjectId !== "number" ||
+      !Number.isInteger(body.gitlabProjectId) ||
+      body.gitlabProjectId <= 0
+    ) {
+      throw new Error(VALIDATION_ERRORS.GITLAB_PROJECT_ID_INVALID);
+    }
+
+    // Validate conflictResolution is present and valid
+    const validConflictResolutions: ConflictResolution[] = [
+      "branchforge_wins",
+      "gitlab_wins",
+      "manual_review",
+    ];
+    if (!validConflictResolutions.includes(body.conflictResolution)) {
+      throw new Error(
+        "Conflict resolution is required and must be one of: branchforge_wins, gitlab_wins, manual_review"
+      );
+    }
+
+    return request<ImportProjectResponse>("/gitlab/import-project", {
+      method: "POST",
+      signal,
+      body: JSON.stringify(body),
     });
   },
 

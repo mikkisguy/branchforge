@@ -14,10 +14,13 @@ import {
 } from "lucide-react";
 import type { ThemePalette } from "@/contexts/ThemeContext";
 import type { Project, UpdateProjectBody } from "@/lib/api/projects";
+import type { Tab } from "./SettingsModal";
 import { SettingsModal } from "./SettingsModal";
 import { RouteSettingsModal } from "./RouteSettingsModal";
 import { StateVariablesModal } from "./StateVariablesModal";
 import { CharactersModal } from "./CharactersModal";
+import { GitLabImportDialog } from "./GitLabImportDialog";
+import { ZipImportProjectDialog } from "./ZipImportProjectDialog";
 import { Logo } from "@/components/ui/logo";
 
 export interface ThemePaletteOption {
@@ -44,16 +47,19 @@ interface LeftSidebarPropsBase {
     body: UpdateProjectBody
   ) => Promise<Project>;
   deleteProject?: (projectId: string) => Promise<void>;
+  refetchProjects?: () => Promise<void>;
 }
 
 interface ControlledSettingsProps extends LeftSidebarPropsBase {
   isSettingsOpenExternally: boolean;
   onSettingsOpenChangeExternally: (open: boolean) => void;
+  initialSettingsTab?: Tab;
 }
 
 interface UncontrolledSettingsProps extends LeftSidebarPropsBase {
   isSettingsOpenExternally?: never;
   onSettingsOpenChangeExternally?: never;
+  initialSettingsTab?: never;
 }
 
 export type LeftSidebarProps =
@@ -76,6 +82,8 @@ export function LeftSidebar(props: LeftSidebarProps) {
     onCollapsedChange,
     updateProject,
     deleteProject,
+    refetchProjects,
+    initialSettingsTab,
   } = props;
 
   const isSettingsOpenExternally = props.isSettingsOpenExternally;
@@ -86,6 +94,8 @@ export function LeftSidebar(props: LeftSidebarProps) {
   const [isStateVarsOpen, setIsStateVarsOpen] = useState(false);
   const [isCharactersOpen, setIsCharactersOpen] = useState(false);
   const [isProjectPopoverOpen, setIsProjectPopoverOpen] = useState(false);
+  const [showGitLabImportDialog, setShowGitLabImportDialog] = useState(false);
+  const [showZipImportDialog, setShowZipImportDialog] = useState(false);
   const themeDropdownRef = useRef<HTMLDivElement>(null);
   const projectPopoverRef = useRef<HTMLDivElement>(null);
 
@@ -134,6 +144,19 @@ export function LeftSidebar(props: LeftSidebarProps) {
 
   const width = isCollapsed ? "w-14" : "w-56";
   const showLabel = !isCollapsed;
+
+  // Helper for handling successful project imports
+  const handleImportSuccess = useCallback(
+    async (logMessage: string) => {
+      try {
+        await refetchProjects?.();
+      } catch {
+        // Refetch failure is non-critical; user can manually refresh
+        console.warn(logMessage);
+      }
+    },
+    [refetchProjects]
+  );
 
   return (
     <>
@@ -440,10 +463,17 @@ export function LeftSidebar(props: LeftSidebarProps) {
         open={isSettingsOpen}
         onOpenChange={setSettingsOpen}
         projects={projects}
-        project={projects.find((p) => p.id === projectId) ?? null}
         onUpdateProject={updateProject}
         onDeleteProject={deleteProject}
-        onSelectProject={setCurrentProject}
+        onImportFromGitLab={() => {
+          setSettingsOpen(false);
+          setShowGitLabImportDialog(true);
+        }}
+        onImportZip={() => {
+          setSettingsOpen(false);
+          setShowZipImportDialog(true);
+        }}
+        initialTab={initialSettingsTab}
       />
       {projectId && (
         <>
@@ -464,6 +494,24 @@ export function LeftSidebar(props: LeftSidebarProps) {
           />
         </>
       )}
+
+      {/* GitLab Import Dialog */}
+      <GitLabImportDialog
+        open={showGitLabImportDialog}
+        onOpenChange={setShowGitLabImportDialog}
+        onSuccess={() =>
+          handleImportSuccess("Failed to refresh projects after GitLab import")
+        }
+      />
+
+      {/* ZIP Import Dialog */}
+      <ZipImportProjectDialog
+        open={showZipImportDialog}
+        onOpenChange={setShowZipImportDialog}
+        onSuccess={() =>
+          handleImportSuccess("Failed to refresh projects after ZIP import")
+        }
+      />
     </>
   );
 }
