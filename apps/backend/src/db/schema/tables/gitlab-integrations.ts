@@ -40,9 +40,6 @@ export const gitlabIntegrations = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [unique("gitlab_integrations_user_id_unique").on(table.userId)]
-  // TODO: Consider adding an index on project_files.project_id.
-  // The project_files table has no indexes defined, but project_id is frequently queried for project-scoped file lookups.
-  // Adding this index in your schema definition would improve query performance as data grows.
 );
 
 /**
@@ -93,7 +90,7 @@ export const gitlabRepositories = pgTable(
   },
   (table) => [
     unique("gitlab_repositories_project_id_unique").on(table.projectId),
-    index("gitlab_repositories_gitlab_project_id_idx").on(
+    unique("gitlab_repositories_gitlab_project_id_unique").on(
       table.gitlabProjectId
     ),
   ]

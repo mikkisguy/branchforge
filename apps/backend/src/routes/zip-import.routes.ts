@@ -26,6 +26,8 @@ import type { MultipartFile } from "@fastify/multipart";
 import {
   HttpError,
   ValidationError,
+  NotFoundError,
+  ForbiddenError,
 } from "../middleware/error-handler.middleware.js";
 import {
   ZIP_IMPORT_MAX_SIZE,
@@ -117,13 +119,11 @@ async function importZipHandler(
       .limit(1);
 
     if (!project) {
-      reply.status(404).send({ error: "Not Found" } as ErrorResponse);
-      return;
+      throw new NotFoundError("Project");
     }
 
     if (project.userId !== user.id) {
-      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
-      return;
+      throw new ForbiddenError("You do not have access to this project");
     }
 
     // Parse multipart form data with fileSize limit enforced at stream creation
@@ -142,8 +142,7 @@ async function importZipHandler(
     }
 
     if (!data) {
-      reply.status(400).send({ error: "No file uploaded" } as ErrorResponse);
-      return;
+      throw new ValidationError("No file uploaded");
     }
 
     const file = data as MultipartFile;
@@ -235,29 +234,25 @@ async function importProjectHandler(
     });
   } catch (error) {
     if (isMultipartFileTooLargeError(error)) {
-      reply.status(413).send({
-        error: `File size exceeds ${ZIP_IMPORT_MAX_SIZE_MB}MB limit`,
-      });
-      return;
+      throw new ValidationError(
+        `File size exceeds ${ZIP_IMPORT_MAX_SIZE_MB}MB limit`
+      );
     }
     throw error;
   }
 
   if (!data) {
-    reply.status(400).send({ error: "No file provided" });
-    return;
+    throw new ValidationError("No file provided");
   }
 
   const file = data as MultipartFile;
 
   if (!isZipFile(file.filename)) {
-    reply.status(400).send({ error: "File must be a .zip file" });
-    return;
+    throw new ValidationError("File must be a .zip file");
   }
 
   if (file.mimetype && !isValidZipMimeType(file.mimetype)) {
-    reply.status(400).send({ error: "File must be a valid zip file" });
-    return;
+    throw new ValidationError("File must be a valid zip file");
   }
 
   const projectNameField = data.fields.projectName ?? data.fields.name;
@@ -289,26 +284,23 @@ async function importProjectHandler(
       buffer = await file.toBuffer();
     } catch (err: unknown) {
       if (isMultipartFileTooLargeError(err)) {
-        reply.status(413).send({
-          error: `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`,
-        });
-        return;
+        throw new ValidationError(
+          `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`
+        );
       }
       throw err;
     }
 
     if (file.file.truncated) {
-      reply.status(413).send({
-        error: `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`,
-      });
-      return;
+      throw new ValidationError(
+        `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`
+      );
     }
 
     if (buffer.length > ZIP_IMPORT_MAX_SIZE) {
-      reply.status(413).send({
-        error: `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`,
-      });
-      return;
+      throw new ValidationError(
+        `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`
+      );
     }
 
     // Only create project after file validations pass
@@ -359,7 +351,10 @@ async function importProjectHandler(
 
     const successResponse: ImportProjectSuccess = {
       success: true,
-      project: newProject as ImportProjectSuccess["project"],
+      project: {
+        ...newProject,
+        source: "ZIP",
+      },
       filesImported: result.filesImported,
       filesUpdated: result.filesUpdated,
       filesSkipped: result.filesSkipped,

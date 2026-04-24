@@ -170,8 +170,10 @@ export function Tooltip({
       ),
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const clonedChild = React.cloneElement(child, mergedProps as any);
+    const clonedChild = React.cloneElement(
+      child,
+      mergedProps as Partial<React.HTMLAttributes<HTMLElement>>
+    );
 
     return (
       <>

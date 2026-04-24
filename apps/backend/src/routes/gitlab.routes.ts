@@ -251,7 +251,7 @@ async function validateTokenHandler(
       "validateTokenHandler: Rate limit exceeded"
     );
     reply.status(429).send({
-      error: "Too many validation attempts. Please try again later.",
+      error: "Too many import requests. Please try again later.",
       retryAfter: rateLimit.retryAfter,
     });
     return;
@@ -782,6 +782,22 @@ async function importProjectHandler(
   request: FastifyRequest<{ Body: ImportProjectInput }>,
   reply: FastifyReply
 ): Promise<void> {
+  const clientIp = getClientIp(request);
+
+  // Check rate limit to prevent abuse
+  const rateLimit = checkRateLimit(clientIp);
+  if (!rateLimit.allowed) {
+    request.log.warn(
+      { ip: clientIp, retryAfter: rateLimit.retryAfter },
+      "importProjectHandler: Rate limit exceeded"
+    );
+    reply.status(429).send({
+      error: "Too many validation attempts. Please try again later.",
+      retryAfter: rateLimit.retryAfter,
+    });
+    return;
+  }
+
   const userId = getAuthenticatedUserId(request);
   const {
     projectName,
@@ -790,6 +806,33 @@ async function importProjectHandler(
     branch,
     conflictResolution,
   } = request.body;
+
+  /**
+   * Cleanup helper for partially created projects
+   *
+   * Attempts to delete a partially created project and logs the result.
+   * Used throughout importProjectHandler to clean up on errors.
+   *
+   * @param projectId - The ID of the project to delete
+   * @param context - Context string for logging (e.g., error type)
+   */
+  async function cleanupPartialProject(
+    projectId: string,
+    context: string
+  ): Promise<void> {
+    try {
+      await deleteProject(userId, projectId);
+      request.log.info(
+        { projectId },
+        `importProjectHandler: Cleaned up partially created project ${context}`
+      );
+    } catch (deleteErr) {
+      request.log.error(
+        { err: deleteErr, projectId },
+        "importProjectHandler: Failed to cleanup partially created project"
+      );
+    }
+  }
 
   let newProject: Awaited<ReturnType<typeof createProject>> | null = null;
 
@@ -805,15 +848,10 @@ async function importProjectHandler(
     if (!gitlabProject) {
       reply.status(404).send({ error: "GitLab project not found" });
       if (newProject?.id) {
-        try {
-          await deleteProject(userId, newProject.id);
-        } catch (deleteErr) {
-          // Log but don't throw - response already sent
-          request.log.error(
-            { err: deleteErr, projectId: newProject.id },
-            "importProjectHandler: Failed to cleanup project after GitLab project not found"
-          );
-        }
+        await cleanupPartialProject(
+          newProject.id,
+          "after GitLab project not found"
+        );
       }
       return;
     }
@@ -847,18 +885,10 @@ async function importProjectHandler(
     if (err instanceof ConflictError) {
       // Delete the partially created project before sending response
       if (newProject?.id) {
-        try {
-          await deleteProject(userId, newProject.id);
-          request.log.info(
-            { projectId: newProject.id },
-            "importProjectHandler: Cleaned up partially created project after duplicate-link error"
-          );
-        } catch (deleteErr) {
-          request.log.error(
-            { err: deleteErr, projectId: newProject.id },
-            "importProjectHandler: Failed to cleanup partially created project"
-          );
-        }
+        await cleanupPartialProject(
+          newProject.id,
+          "after duplicate-link error"
+        );
       }
 
       reply.status(409).send({
@@ -868,19 +898,18 @@ async function importProjectHandler(
       return;
     }
 
-    if (newProject?.id) {
-      try {
-        await deleteProject(userId, newProject.id);
-        request.log.info(
-          { projectId: newProject.id },
-          "importProjectHandler: Cleaned up partially created project"
-        );
-      } catch (deleteErr) {
-        request.log.error(
-          { err: deleteErr, projectId: newProject.id },
-          "importProjectHandler: Failed to cleanup partially created project"
-        );
+    // Check for NotFoundError and rethrow after cleanup
+    if (err instanceof NotFoundError) {
+      // Delete the partially created project before rethrowing
+      if (newProject?.id) {
+        await cleanupPartialProject(newProject.id, "after NotFoundError");
       }
+      // Rethrow NotFoundError so global error handler returns 404
+      throw err;
+    }
+
+    if (newProject?.id) {
+      await cleanupPartialProject(newProject.id, "");
     }
 
     reply.status(500).send({

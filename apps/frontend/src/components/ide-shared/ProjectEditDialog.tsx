@@ -36,24 +36,34 @@ export function ProjectEditDialog({
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const previousOpenRef = useRef(false);
+  const previousProjectIdRef = useRef<string | null>(null);
+
+  const nameErrorId = "edit-project-name-error";
 
   useEffect(() => {
-    // Detect when dialog opens (transition from false to true)
-    if (open && !previousOpenRef.current && project) {
+    // Detect when dialog opens (transition from false to true) or project changes
+    const projectId = project?.id ?? null;
+    const isOpenOrProjectChanged =
+      (open && !previousOpenRef.current) ||
+      (open && previousProjectIdRef.current !== projectId);
+
+    if (isOpenOrProjectChanged && project) {
       setName(project.name);
       setDescription(project.description ?? "");
       setError(null);
       previousOpenRef.current = true;
+      previousProjectIdRef.current = projectId;
     }
     // Reset open ref when dialog closes
     if (!open) {
       previousOpenRef.current = false;
+      previousProjectIdRef.current = null;
     }
   }, [open, project]);
 
   const hasChanges =
     project &&
-    (name.trim() !== project.name.trim() ||
+    (name.trim() !== project.name ||
       description.trim() !== (project.description ?? "").trim());
 
   const handleSubmit = async (event: FormEvent) => {
@@ -138,6 +148,8 @@ export function ProjectEditDialog({
                 onChange={(e) => setName(e.target.value)}
                 disabled={isSaving}
                 maxLength={200}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? nameErrorId : undefined}
               />
             </div>
 
@@ -154,7 +166,11 @@ export function ProjectEditDialog({
               />
             </div>
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && (
+              <p id={nameErrorId} className="text-sm text-destructive">
+                {error}
+              </p>
+            )}
 
             <div className="flex justify-end gap-2 pt-2">
               <Button

@@ -241,7 +241,19 @@ export function GitLabRepositoryLinkingDialog({
             {/* BranchForge Project Section */}
             <div className="space-y-3">
               <Label htmlFor="branchforge-project">BranchForge Project</Label>
-              {projects.length === 0 && !isLoadingProjects ? (
+              {projects.length === 0 && isLoadingProjects ? (
+                <div
+                  className="p-3 flex items-center justify-center"
+                  role="status"
+                  aria-busy="true"
+                >
+                  <Loader2
+                    className="w-5 h-5 animate-spin text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <span className="sr-only">Loading projects...</span>
+                </div>
+              ) : projects.length === 0 && !isLoadingProjects ? (
                 <div className="p-3 border border-dashed border-border/30 rounded-md text-center">
                   <p className="text-sm text-muted-foreground">
                     No projects found. Import a project from GitLab or upload a

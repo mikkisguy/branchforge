@@ -770,14 +770,7 @@ export type ImportZipResponse = ImportZipSuccess | ImportZipFailure;
  */
 export interface ImportProjectSuccess {
   success: true;
-  project: {
-    id: string;
-    name: string;
-    description?: string;
-    source: "ZIP";
-    createdAt: string;
-    updatedAt: string;
-  };
+  project: PublicProject & { source: "ZIP" };
   filesImported: number;
   filesUpdated: number;
   filesSkipped: number;

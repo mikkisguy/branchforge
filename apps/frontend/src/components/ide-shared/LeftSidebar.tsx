@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import type { ThemePalette } from "@/contexts/ThemeContext";
 import type { Project, UpdateProjectBody } from "@/lib/api/projects";
+import type { Tab } from "./SettingsModal";
 import { SettingsModal } from "./SettingsModal";
 import { RouteSettingsModal } from "./RouteSettingsModal";
 import { StateVariablesModal } from "./StateVariablesModal";
@@ -52,7 +53,7 @@ interface LeftSidebarPropsBase {
 interface ControlledSettingsProps extends LeftSidebarPropsBase {
   isSettingsOpenExternally: boolean;
   onSettingsOpenChangeExternally: (open: boolean) => void;
-  initialSettingsTab?: "user" | "projects" | "integrations" | "system";
+  initialSettingsTab?: Tab;
 }
 
 interface UncontrolledSettingsProps extends LeftSidebarPropsBase {

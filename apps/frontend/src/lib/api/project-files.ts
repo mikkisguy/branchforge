@@ -5,7 +5,7 @@
  * Handles file listing, content retrieval, updates, and zip import.
  */
 
-import { request, getApiErrorMessage } from "./client.js";
+import { API_BASE, request, getApiErrorMessage } from "./client.js";
 import type { ProjectFile, ImportZipResponse } from "@branchforge/shared";
 import type { SourceOrigin } from "@branchforge/shared";
 import { isValidSourceOrigin } from "@branchforge/shared";
@@ -165,8 +165,6 @@ export const projectFilesApi = {
     if (!file.name.toLowerCase().endsWith(".zip")) {
       throw new Error("File must be a .zip file");
     }
-
-    const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
     // Create FormData for multipart upload
     const formData = new FormData();

@@ -533,7 +533,7 @@ export function GitLabImportDialog({
           conflicts={detectedCharacters.conflicts}
           excludedTags={detectedCharacters.excludedTags}
           onComplete={() => {
-            handleOpenChange(false);
+            setShowCharacterWizard(false);
           }}
         />
       )}

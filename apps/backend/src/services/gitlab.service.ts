@@ -22,6 +22,7 @@ import {
   NotFoundError,
   ConflictError,
 } from "../middleware/error-handler.middleware.js";
+import { isPostgresError } from "../lib/db.js";
 
 const DEFAULT_TIMEOUT_MS = 30000;
 
@@ -314,49 +315,59 @@ export async function linkRepository(
 ): Promise<void> {
   const db = getDb();
 
-  await db.transaction(async (tx) => {
-    // Check if this GitLab repository is already linked to a different project
-    const [existingLink] = await tx
-      .select({ projectId: gitlabRepositories.projectId })
-      .from(gitlabRepositories)
-      .where(eq(gitlabRepositories.gitlabProjectId, gitlabProjectId))
-      .limit(1);
+  try {
+    await db.transaction(async (tx) => {
+      // Check if this GitLab repository is already linked to a different project
+      const [existingLink] = await tx
+        .select({ projectId: gitlabRepositories.projectId })
+        .from(gitlabRepositories)
+        .where(eq(gitlabRepositories.gitlabProjectId, gitlabProjectId))
+        .limit(1);
 
-    if (existingLink && existingLink.projectId !== projectId) {
+      if (existingLink && existingLink.projectId !== projectId) {
+        throw new ConflictError(
+          "GitLab repository is already linked to another project"
+        );
+      }
+
+      // Ensure project source is set to GITLAB and validate project exists
+      const updateResult = await tx
+        .update(projects)
+        .set({ source: "GITLAB", updatedAt: new Date() })
+        .where(eq(projects.id, projectId));
+
+      // Validate that the project exists by checking affected row count
+      if (updateResult.rowCount === 0) {
+        throw new NotFoundError("Project");
+      }
+
+      // Insert into gitlab_repositories, updating all fields on conflict
+      await tx
+        .insert(gitlabRepositories)
+        .values({
+          projectId,
+          gitlabProjectId,
+          repositoryName,
+          defaultBranch,
+        })
+        .onConflictDoUpdate({
+          target: gitlabRepositories.projectId,
+          set: {
+            gitlabProjectId,
+            repositoryName,
+            defaultBranch,
+          },
+        });
+    });
+  } catch (err) {
+    // Handle unique constraint violation on gitlabProjectId (race condition)
+    if (isPostgresError(err) && err.code === "23505") {
       throw new ConflictError(
         "GitLab repository is already linked to another project"
       );
     }
-
-    // Ensure project source is set to GITLAB and validate project exists
-    const updateResult = await tx
-      .update(projects)
-      .set({ source: "GITLAB", updatedAt: new Date() })
-      .where(eq(projects.id, projectId));
-
-    // Validate that the project exists by checking affected row count
-    if (updateResult.rowCount === 0) {
-      throw new NotFoundError("Project");
-    }
-
-    // Insert into gitlab_repositories, updating all fields on conflict
-    await tx
-      .insert(gitlabRepositories)
-      .values({
-        projectId,
-        gitlabProjectId,
-        repositoryName,
-        defaultBranch,
-      })
-      .onConflictDoUpdate({
-        target: gitlabRepositories.projectId,
-        set: {
-          gitlabProjectId,
-          repositoryName,
-          defaultBranch,
-        },
-      });
-  });
+    throw err;
+  }
 }
 
 /**

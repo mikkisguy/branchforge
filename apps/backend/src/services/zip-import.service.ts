@@ -367,6 +367,7 @@ export async function importZipFile(
     };
     return success;
   } catch (error) {
+    // Log the detailed error for debugging
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
 
@@ -376,10 +377,16 @@ export async function importZipFile(
       error: errorMessage,
     });
 
+    // Return a safe, client-friendly error message
+    const safeErrorMessage =
+      error instanceof ZipImportLimitError
+        ? "Zip file exceeds import limits"
+        : "Failed to import zip file";
+
     // Construct failure result
     const failure: ImportZipFailure = {
       success: false,
-      error: errorMessage,
+      error: safeErrorMessage,
     };
     return failure;
   }
