@@ -2,7 +2,7 @@
 
 # BranchForge
 
-**A creative workspace for visual novel writers**
+**A creative workspace for Ren'Py visual novel writers**
 
 [![Version](https://img.shields.io/badge/version-0.7.0-yellow)](CHANGELOG.md)
 ![Alpha](https://img.shields.io/badge/status-alpha-orange)
@@ -43,7 +43,7 @@ When you need to code, we've got your back. Custom Ren'Py syntax highlighting wi
 
 ### Import & Export
 
-- **Zip Import**: Bring in existing Ren'Py projects (experimental)
+- **Zip Import**: Bring in existing Ren'Py projects
 - **GitLab Sync**: Collaborate with conflict detection
 - **Export to GitLab**: Push your work directly to repositories
 
@@ -321,5 +321,9 @@ See [CHANGELOG.md](CHANGELOG.md) for a history of changes.
 <div align="center">
 
 **Made with ❤️ for visual novel writers**
+
+### Check out Ren'Py!
+[<img width="130" height="200" alt="image" src="https://github.com/user-attachments/assets/3d9cda19-492f-4486-9e24-264eadd20d1d" />
+](https://www.renpy.org/)
 
 </div>
