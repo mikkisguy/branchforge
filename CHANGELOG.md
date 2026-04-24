@@ -4,6 +4,14 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.8.0 - 2026-04-24
+
+- Unified project imports and management in a single settings view
+- Added undo/redo functionality to the script editor
+- Refined the Settings modal UI and improved toggle accessibility
+- Fixed autosave sync
+- Added editing and deleting projects
+
 ## v0.7.4 - 2026-04-13
 
 - Fixed release workflow
