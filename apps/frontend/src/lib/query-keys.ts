@@ -102,6 +102,7 @@ export const labelKeys = {
   activeLabelId: (projectId: string) =>
     ["labels", projectId, "activeLabelId"] as const,
   versions: (labelId: string) => ["labels", labelId, "versions"] as const,
+  characters: (labelId: string) => ["labels", labelId, "characters"] as const,
 } as const;
 
 // ============================================================================

@@ -13,9 +13,14 @@ import {
   createLabel,
   updateLabel,
   deleteLabel,
+  getLabelCharacters,
+  addCharacterToLabel,
+  updateCharacterInLabel,
+  removeCharacterFromLabel,
   type PublicLabel,
   type LabelDetail,
   type ListLabelsFilters,
+  type LabelCharacterWithInfo,
 } from "../services/labels.service.js";
 import { authenticate } from "../middleware/auth.middleware.js";
 import {
@@ -26,17 +31,23 @@ import {
 import {
   NotFoundError,
   ForbiddenError,
+  ConflictError,
 } from "../middleware/error-handler.middleware.js";
 import {
   listLabelsQuerySchema,
   labelIdParamsSchema,
+  labelCharacterIdParamsSchema,
   updateLabelDialogueBodySchema,
   createLabelSchema,
   updateLabelSchema,
+  addCharacterToLabelSchema,
+  updateCharacterInLabelSchema,
   type ListLabelsQuery,
   type UpdateLabelDialogueInput,
   type CreateLabelInput,
   type UpdateLabelInput,
+  type AddCharacterToLabelInput,
+  type UpdateCharacterInLabelInput,
 } from "../lib/validation.js";
 import { getDb } from "../db/index.js";
 import {
@@ -94,6 +105,14 @@ interface UpdateLabelDialogueResponse {
     currentVersion: number;
     currentContentHash: string | null;
   };
+}
+
+interface LabelCharactersResponse {
+  characters: LabelCharacterWithInfo[];
+}
+
+interface LabelCharacterResponse {
+  character: LabelCharacterWithInfo;
 }
 
 /**
@@ -797,6 +816,172 @@ async function deleteLabelHandler(
   }
 }
 
+/**
+ * Get all characters for a label
+ *
+ * GET /labels/:labelId/characters
+ * Requires authentication
+ */
+async function getLabelCharactersHandler(
+  request: FastifyRequest<{ Params: GetLabelParams }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { labelId } = request.params;
+  const user = request.user!;
+
+  try {
+    const characters = await getLabelCharacters(labelId, user.id);
+    reply.status(200).send({ characters } as LabelCharactersResponse);
+  } catch (error) {
+    request.log.error(error);
+
+    // Handle known error types
+    if (error instanceof NotFoundError) {
+      reply.status(404).send({ error: "Label not found" } as ErrorResponse);
+      return;
+    }
+    if (error instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      return;
+    }
+
+    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+  }
+}
+
+/**
+ * Add a character to a label
+ *
+ * POST /labels/:labelId/characters
+ * Body: AddCharacterToLabelInput
+ * Requires authentication
+ */
+async function addCharacterToLabelHandler(
+  request: FastifyRequest<{
+    Params: GetLabelParams;
+    Body: AddCharacterToLabelInput;
+  }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { labelId } = request.params;
+  const user = request.user!;
+
+  try {
+    const character = await addCharacterToLabel(
+      labelId,
+      request.body.characterId,
+      user.id,
+      {
+        notes: request.body.notes ?? null,
+      }
+    );
+    reply.status(201).send({ character } as LabelCharacterResponse);
+  } catch (error) {
+    request.log.error(error);
+
+    // Handle known error types
+    if (error instanceof NotFoundError) {
+      reply
+        .status(404)
+        .send({ error: "Label or character not found" } as ErrorResponse);
+      return;
+    }
+    if (error instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      return;
+    }
+    if (error instanceof ConflictError) {
+      reply.status(409).send({
+        error: "Character already associated with this label",
+      } as ErrorResponse);
+      return;
+    }
+
+    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+  }
+}
+
+/**
+ * Update a character in a label
+ *
+ * PUT /labels/:labelId/characters/:characterId
+ * Body: UpdateCharacterInLabelInput
+ * Requires authentication
+ */
+async function updateCharacterInLabelHandler(
+  request: FastifyRequest<{
+    Params: { labelId: string; characterId: string };
+    Body: UpdateCharacterInLabelInput;
+  }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { labelId, characterId } = request.params;
+  const user = request.user!;
+
+  try {
+    const character = await updateCharacterInLabel(
+      labelId,
+      characterId,
+      user.id,
+      request.body
+    );
+    reply.status(200).send({ character } as LabelCharacterResponse);
+  } catch (error) {
+    request.log.error(error);
+
+    // Handle known error types
+    if (error instanceof NotFoundError) {
+      reply.status(404).send({
+        error: "Label, character, or association not found",
+      } as ErrorResponse);
+      return;
+    }
+    if (error instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      return;
+    }
+
+    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+  }
+}
+
+/**
+ * Remove a character from a label
+ *
+ * DELETE /labels/:labelId/characters/:characterId
+ * Requires authentication
+ */
+async function removeCharacterFromLabelHandler(
+  request: FastifyRequest<{
+    Params: { labelId: string; characterId: string };
+  }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { labelId, characterId } = request.params;
+  const user = request.user!;
+
+  try {
+    await removeCharacterFromLabel(labelId, characterId, user.id);
+    reply.status(204).send();
+  } catch (error) {
+    request.log.error(error);
+
+    // Handle known error types
+    if (error instanceof NotFoundError) {
+      reply
+        .status(404)
+        .send({ error: "Label or association not found" } as ErrorResponse);
+      return;
+    }
+    if (error instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      return;
+    }
+
+    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+  }
+}
+
 // ============================================================================
 // Routes Registration
 // ============================================================================
@@ -856,5 +1041,46 @@ export async function labelsRoutes(fastify: FastifyInstance): Promise<void> {
       ],
     },
     updateLabelDialogueHandler
+  );
+  fastify.get<{ Params: GetLabelParams }>(
+    "/labels/:labelId/characters",
+    {
+      onRequest: authenticate,
+      preValidation: validateParams(labelIdParamsSchema),
+    },
+    getLabelCharactersHandler
+  );
+  fastify.post<{ Params: GetLabelParams; Body: AddCharacterToLabelInput }>(
+    "/labels/:labelId/characters",
+    {
+      onRequest: authenticate,
+      preValidation: [
+        validateParams(labelIdParamsSchema),
+        validateBody(addCharacterToLabelSchema),
+      ],
+    },
+    addCharacterToLabelHandler
+  );
+  fastify.put<{
+    Params: { labelId: string; characterId: string };
+    Body: UpdateCharacterInLabelInput;
+  }>(
+    "/labels/:labelId/characters/:characterId",
+    {
+      onRequest: authenticate,
+      preValidation: [
+        validateParams(labelCharacterIdParamsSchema),
+        validateBody(updateCharacterInLabelSchema),
+      ],
+    },
+    updateCharacterInLabelHandler
+  );
+  fastify.delete<{ Params: { labelId: string; characterId: string } }>(
+    "/labels/:labelId/characters/:characterId",
+    {
+      onRequest: authenticate,
+      preValidation: validateParams(labelCharacterIdParamsSchema),
+    },
+    removeCharacterFromLabelHandler
   );
 }

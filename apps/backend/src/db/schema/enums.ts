@@ -65,14 +65,6 @@ export const suggestionStatusEnum = pgEnum("suggestion_status", [
   "REJECTED",
 ]);
 
-// Character role in a label
-export const characterRoleEnum = pgEnum("character_role", [
-  "PRIMARY",
-  "SECONDARY",
-  "BACKGROUND",
-  "MENTIONED",
-]);
-
 // Ren'Py definition categories
 export const renpyDefinitionCategoryEnum = pgEnum("renpy_definition_category", [
   "CHARACTER",

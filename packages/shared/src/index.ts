@@ -369,15 +369,6 @@ export interface LabelLine {
   updatedAt: string;
 }
 
-/**
- * Label character role enumeration
- */
-export type LabelCharacterRole =
-  | "PRIMARY"
-  | "SECONDARY"
-  | "BACKGROUND"
-  | "MENTIONED";
-
 // ============================================================================
 // Validation Helpers (Shared Patterns for Frontend & Backend)
 // ============================================================================
@@ -533,15 +524,13 @@ export interface GitLabFile {
 }
 
 /**
- * Character in a label with role information
+ * Character in a label with notes
  */
 export interface LabelCharacter {
   id: string;
   name: string;
   displayName: string;
   renpyTag: string;
-  role: LabelCharacterRole;
-  emotion: string | null;
   notes: string | null;
 }
 

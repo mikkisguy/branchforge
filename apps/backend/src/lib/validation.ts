@@ -222,17 +222,6 @@ export const suggestionStatusSchema = z.enum(
 );
 
 /**
- * Character role enum
- */
-export const characterRoleSchema = z.enum(
-  ["PRIMARY", "SECONDARY", "BACKGROUND", "MENTIONED"],
-  {
-    message:
-      "Character role must be PRIMARY, SECONDARY, BACKGROUND, or MENTIONED",
-  }
-);
-
-/**
  * Label visibility enum
  */
 export const labelVisibilitySchema = z.enum(
@@ -418,6 +407,36 @@ export const updateLabelDialogueBodySchema = z
     expectedContentHash: expectedContentHashSchema,
   })
   .strict();
+
+/**
+ * Label character association params validation
+ */
+export const labelCharacterIdParamsSchema = z
+  .object({
+    labelId: uuidSchema,
+    characterId: uuidSchema,
+  })
+  .strict();
+
+/**
+ * Add character to label request validation
+ */
+export const addCharacterToLabelSchema = z
+  .object({
+    characterId: uuidSchema,
+    notes: z.string().trim().max(2000, "Notes are too long").nullish(),
+  })
+  .strict();
+
+/**
+ * Update character in label request validation
+ */
+export const updateCharacterInLabelSchema = z
+  .object({
+    notes: z.string().trim().max(2000, "Notes are too long").nullish(),
+  })
+  .strict()
+  .partial();
 
 // ============================================================================
 // Route Configuration Schemas
@@ -1149,6 +1168,12 @@ export const updateWritingGoalSchema = z
 export type UpdateWritingGoalInput = z.infer<typeof updateWritingGoalSchema>;
 export type ConflictResolutionValue = z.infer<typeof conflictResolutionSchema>;
 export type ImportProjectInput = z.infer<typeof importProjectSchema>;
+export type AddCharacterToLabelInput = z.infer<
+  typeof addCharacterToLabelSchema
+>;
+export type UpdateCharacterInLabelInput = z.infer<
+  typeof updateCharacterInLabelSchema
+>;
 
 // ============================================================================
 // Helper Functions

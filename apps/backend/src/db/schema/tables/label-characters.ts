@@ -1,11 +1,10 @@
 /**
  * Label Characters Table (Junction)
  *
- * Links labels to characters with role and emotion state.
+ * Links labels to characters with optional notes.
  */
 
 import { pgTable, uuid, text, primaryKey, index } from "drizzle-orm/pg-core";
-import { characterRoleEnum } from "../enums.js";
 import { labels } from "./labels.js";
 import { characters } from "./characters.js";
 
@@ -18,8 +17,6 @@ export const labelCharacters = pgTable(
     characterId: uuid("character_id")
       .notNull()
       .references(() => characters.id, { onDelete: "cascade" }),
-    role: characterRoleEnum("role").default("PRIMARY").notNull(),
-    emotion: text("emotion"),
     notes: text("notes"),
   },
   (table) => ({

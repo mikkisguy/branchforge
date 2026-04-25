@@ -11,7 +11,11 @@ import { request } from "./client";
 // ============================================================================
 
 // Import types from shared package - these match backend response types
-import type { PublicLabel, LabelDetail } from "@branchforge/shared";
+import type {
+  PublicLabel,
+  LabelDetail,
+  LabelCharacter,
+} from "@branchforge/shared";
 
 export interface ListLabelsParams {
   projectId: string;
@@ -43,6 +47,23 @@ export type UpdateDialogueResponse =
         currentContentHash: string | null;
       };
     };
+
+export interface LabelCharactersResponse {
+  characters: LabelCharacter[];
+}
+
+export interface LabelCharacterResponse {
+  character: LabelCharacter;
+}
+
+export interface AddCharacterToLabelInput {
+  characterId: string;
+  notes?: string | null;
+}
+
+export interface UpdateCharacterInLabelInput {
+  notes?: string | null;
+}
 
 // ============================================================================
 // Labels API
@@ -95,5 +116,62 @@ export const labelsApi = {
       },
       true // allowConflict: true - handle 409 responses as success with success: false
     );
+  },
+
+  /**
+   * Get all characters associated with a label
+   */
+  async getLabelCharacters(labelId: string): Promise<LabelCharacter[]> {
+    const response = await request<LabelCharactersResponse>(
+      `/labels/${labelId}/characters`
+    );
+    return response.characters;
+  },
+
+  /**
+   * Add a character to a label
+   */
+  async addCharacterToLabel(
+    labelId: string,
+    data: AddCharacterToLabelInput
+  ): Promise<LabelCharacter> {
+    const response = await request<LabelCharacterResponse>(
+      `/labels/${labelId}/characters`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    );
+    return response.character;
+  },
+
+  /**
+   * Update a character's association with a label
+   */
+  async updateCharacterInLabel(
+    labelId: string,
+    characterId: string,
+    data: UpdateCharacterInLabelInput
+  ): Promise<LabelCharacter> {
+    const response = await request<LabelCharacterResponse>(
+      `/labels/${labelId}/characters/${characterId}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }
+    );
+    return response.character;
+  },
+
+  /**
+   * Remove a character from a label
+   */
+  async removeCharacterFromLabel(
+    labelId: string,
+    characterId: string
+  ): Promise<void> {
+    await request(`/labels/${labelId}/characters/${characterId}`, {
+      method: "DELETE",
+    });
   },
 };

@@ -5,10 +5,13 @@
  * Matches app design system with theme colors and simple styling.
  */
 
-import { useMemo } from "react";
-import { Heart, ChevronRight, ChevronLeft } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Heart, ChevronRight, ChevronLeft, Settings } from "lucide-react";
 import type { Character, LabelDetail } from "@branchforge/shared";
 import { cva } from "class-variance-authority";
+import { LabelCharactersDialog } from "@/components/ide-shared/LabelCharactersDialog";
+import { useProject } from "@/hooks/useProject";
+import { Button } from "../ui/button";
 
 const panelVariants = cva(
   "min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3 transition-all duration-300 ease-out",
@@ -35,6 +38,8 @@ export function CharacterReferencePanel({
   isCollapsed = false,
   onCollapseToggle,
 }: CharacterReferencePanelProps) {
+  const { currentProject } = useProject();
+  const [isManageDialogOpen, setIsManageDialogOpen] = useState(false);
   const labelCharacters = useMemo(() => {
     return activeLabel?.characters ?? [];
   }, [activeLabel?.characters]);
@@ -66,23 +71,44 @@ export function CharacterReferencePanel({
       >
         <div className="h-full overflow-y-auto relative">
           <div className="sticky top-0 z-20 bg-card border-b border-border px-4 py-3">
-            {onCollapseToggle && (
-              <button
-                type="button"
-                onClick={onCollapseToggle}
-                className="absolute top-2 right-2 z-30 p-1 rounded-md hover:bg-muted/80 transition-colors"
-                aria-label="Collapse character reference sidebar"
-                title="Collapse character reference sidebar"
-              >
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </button>
-            )}
-            <h2 className="text-sm font-semibold tracking-wide">Characters</h2>
-            {activeLabel && (
-              <p className="text-xs text-muted-foreground mt-1">
-                {resolvedLabelChars.length} in label · {characters.length} total
-              </p>
-            )}
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold tracking-wide">
+                    Characters
+                  </h2>
+                  {activeLabel && currentProject && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setIsManageDialogOpen(true)}
+                      className="p-1 rounded hover:bg-muted/80 transition-colors"
+                      aria-label="Manage characters in this label"
+                      title="Manage characters in this label"
+                    >
+                      <Settings className="w-3.5 h-3.5 text-muted-foreground" />
+                    </Button>
+                  )}
+                </div>
+                {activeLabel && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {resolvedLabelChars.length} in label · {characters.length}{" "}
+                    total
+                  </p>
+                )}
+              </div>
+              {onCollapseToggle && (
+                <button
+                  type="button"
+                  onClick={onCollapseToggle}
+                  className="p-1 rounded-md hover:bg-muted/80 transition-colors"
+                  aria-label="Collapse character reference sidebar"
+                  title="Collapse character reference sidebar"
+                >
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="p-3 space-y-4">
@@ -201,6 +227,17 @@ export function CharacterReferencePanel({
             <ChevronLeft className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
+      )}
+
+      {/* Label Characters Dialog */}
+      {activeLabel && currentProject && (
+        <LabelCharactersDialog
+          open={isManageDialogOpen}
+          onOpenChange={setIsManageDialogOpen}
+          labelId={activeLabel.id}
+          labelTitle={activeLabel.title}
+          projectId={currentProject.id}
+        />
       )}
     </>
   );
