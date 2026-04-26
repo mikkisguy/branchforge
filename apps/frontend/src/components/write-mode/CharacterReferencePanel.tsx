@@ -5,13 +5,10 @@
  * Matches app design system with theme colors and simple styling.
  */
 
-import { useMemo, useState } from "react";
-import { Heart, ChevronRight, ChevronLeft, Settings } from "lucide-react";
+import { useMemo } from "react";
+import { Heart, ChevronRight, ChevronLeft } from "lucide-react";
 import type { Character, LabelDetail } from "@branchforge/shared";
 import { cva } from "class-variance-authority";
-import { LabelCharactersDialog } from "@/components/ide-shared/LabelCharactersDialog";
-import { useProject } from "@/hooks/useProject";
-import { Button } from "../ui/button";
 
 const panelVariants = cva(
   "min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3 transition-all duration-300 ease-out",
@@ -38,8 +35,6 @@ export function CharacterReferencePanel({
   isCollapsed = false,
   onCollapseToggle,
 }: CharacterReferencePanelProps) {
-  const { currentProject } = useProject();
-  const [isManageDialogOpen, setIsManageDialogOpen] = useState(false);
   const labelCharacters = useMemo(() => {
     return activeLabel?.characters ?? [];
   }, [activeLabel?.characters]);
@@ -73,23 +68,9 @@ export function CharacterReferencePanel({
           <div className="sticky top-0 z-20 bg-card border-b border-border px-4 py-3">
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-semibold tracking-wide">
-                    Characters
-                  </h2>
-                  {activeLabel && currentProject && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setIsManageDialogOpen(true)}
-                      className="p-1 rounded hover:bg-muted/80 transition-colors"
-                      aria-label="Manage characters in this label"
-                      title="Manage characters in this label"
-                    >
-                      <Settings className="w-3.5 h-3.5 text-muted-foreground" />
-                    </Button>
-                  )}
-                </div>
+                <h2 className="text-sm font-semibold tracking-wide">
+                  Characters
+                </h2>
                 {activeLabel && (
                   <p className="text-xs text-muted-foreground mt-1">
                     {resolvedLabelChars.length} in label · {characters.length}{" "}
@@ -152,7 +133,7 @@ export function CharacterReferencePanel({
                       {resolvedLabelChars.map((character) => (
                         <div
                           key={character.id}
-                          className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-muted transition-colors focus-within:bg-muted group"
+                          className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-muted transition-colors group"
                         >
                           <div
                             className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0 shadow-sm"
@@ -190,7 +171,7 @@ export function CharacterReferencePanel({
                       {otherCharacters.map((character) => (
                         <div
                           key={character.id}
-                          className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted transition-colors focus-within:bg-muted group"
+                          className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted transition-colors group"
                         >
                           <div
                             className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs shrink-0 shadow-sm"
@@ -227,17 +208,6 @@ export function CharacterReferencePanel({
             <ChevronLeft className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
-      )}
-
-      {/* Label Characters Dialog */}
-      {activeLabel && currentProject && (
-        <LabelCharactersDialog
-          open={isManageDialogOpen}
-          onOpenChange={setIsManageDialogOpen}
-          labelId={activeLabel.id}
-          labelTitle={activeLabel.title}
-          projectId={currentProject.id}
-        />
       )}
     </>
   );

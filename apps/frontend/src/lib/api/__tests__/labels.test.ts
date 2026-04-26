@@ -237,7 +237,6 @@ describe("Labels API", () => {
             name: "a",
             displayName: "Eileen",
             renpyTag: "a",
-            notes: null,
           },
         ],
       };

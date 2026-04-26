@@ -524,14 +524,18 @@ export interface GitLabFile {
 }
 
 /**
- * Character in a label with notes
+ * Character in a label (derived from label_lines.speakerId)
+ *
+ * NOTE: This data is automatically computed from dialogue speakers.
+ *
+ * To manually add notes about characters in a scene, use label-level notes
+ * (planned feature) with character @mentions.
  */
 export interface LabelCharacter {
   id: string;
   name: string;
   displayName: string;
   renpyTag: string;
-  notes: string | null;
 }
 
 /**

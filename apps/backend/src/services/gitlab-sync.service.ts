@@ -164,6 +164,44 @@ function getCharacterIdByTag(
   return charactersByTag.get(renpyTag) ?? null;
 }
 
+/**
+ * Helper function to map parsed entries to LabelLineInsertValues
+ * Extracted to eliminate duplication between create and update paths
+ */
+function mapEntriesToLabelLineValues(
+  entries: Array<{
+    type: string;
+    text?: string;
+    target?: string;
+    speaker?: string;
+    lineNumber?: number;
+    indentLevel?: number;
+  }>,
+  labelId: string,
+  projectFileId: string,
+  charactersByTag: Map<string, string>
+): LabelLineInsertValues[] {
+  return entries.map((entry, index) => {
+    const mapped = mapEntryToDbContentType(entry);
+    const entryContentHash = calculateContentHash(mapped.content);
+    const speakerId = getCharacterIdByTag(entry.speaker, charactersByTag);
+    return {
+      labelId,
+      sequence: index + 1,
+      contentType: mapped.contentType,
+      content: mapped.content,
+      speakerId,
+      projectFileId,
+      linePosition: index,
+      contentHash: entryContentHash,
+      lastSyncedHash: entryContentHash,
+      lastSyncedAt: new Date(),
+      rpyLineNumber: entry.lineNumber,
+      rpyIndentLevel: entry.indentLevel ?? 0,
+    };
+  });
+}
+
 // Type for Drizzle transaction - flexible interface to accept both typed and generic transactions
 // This avoids schema type inference issues while maintaining type safety for query methods
 interface Transaction {
@@ -658,74 +696,57 @@ export async function importFromGitlab(
     });
 
     // Phase 3: Process parsed files to create labels with speaker linking
-    for (const { parsed, projectFile, content } of parsedFiles) {
-      // For STORY files, import labels as scenes
-      if (parsed.fileType === "STORY") {
-        // Fetch all scenes for this file once to avoid N+1 queries
-        const fileScenes = await db
-          .select()
-          .from(labels)
-          .where(eq(labels.projectFileId, projectFile.id));
+    // Use a single transaction for all label operations (consistent with character import)
+    await db.transaction(async (tx) => {
+      // Fetch characters once at transaction start for speaker linking
+      const charactersByTag = await fetchCharactersByTag(tx, projectId);
 
-        // Build a Map keyed by labelName for O(1) lookups
-        const scenesByLabel = new Map<string, (typeof fileScenes)[0]>();
-        for (const scene of fileScenes) {
-          if (scene.labelName) {
-            scenesByLabel.set(scene.labelName, scene);
+      for (const { parsed, projectFile, content } of parsedFiles) {
+        // For STORY files, import labels as scenes
+        if (parsed.fileType === "STORY") {
+          // Fetch all scenes for this file once to avoid N+1 queries
+          const fileScenes = await tx
+            .select()
+            .from(labels)
+            .where(eq(labels.projectFileId, projectFile.id));
+
+          // Build a Map keyed by labelName for O(1) lookups
+          const scenesByLabel = new Map<string, (typeof fileScenes)[0]>();
+          for (const scene of fileScenes) {
+            if (scene.labelName) {
+              scenesByLabel.set(scene.labelName, scene);
+            }
           }
-        }
 
-        for (let i = 0; i < parsed.labels.length; i++) {
-          const label = parsed.labels[i];
+          for (let i = 0; i < parsed.labels.length; i++) {
+            const label = parsed.labels[i];
 
-          // Check if scene already exists for this file+label (Map lookup)
-          const existingScene = scenesByLabel.get(label.label);
+            // Check if scene already exists for this file+label (Map lookup)
+            const existingScene = scenesByLabel.get(label.label);
 
-          const labelData = convertToBranchForgeFormatFromLabels(
-            parsed,
-            label.label,
-            content
-          );
+            const labelData = convertToBranchForgeFormatFromLabels(
+              parsed,
+              label.label,
+              content
+            );
 
-          // Calculate content hash for the label's lines
-          const contentHash = calculateLinesHash(labelData.entries);
+            // Calculate content hash for the label's lines
+            const contentHash = calculateLinesHash(labelData.entries);
 
-          if (existingScene && conflictResolution === "manual_review") {
-            // Count as conflict for manual review
-            conflictCount++;
-          } else if (existingScene && conflictResolution === "gitlab_wins") {
-            // Update existing scene
-            await db.transaction(async (tx) => {
+            if (existingScene && conflictResolution === "manual_review") {
+              // Count as conflict for manual review
+              conflictCount++;
+            } else if (existingScene && conflictResolution === "gitlab_wins") {
+              // Update existing scene
               await tx
                 .delete(labelLines)
                 .where(eq(labelLines.labelId, existingScene.id));
 
-              // Fetch characters inside transaction to get latest state
-              const charactersByTag = await fetchCharactersByTag(tx, projectId);
-
-              const allValues: LabelLineInsertValues[] = labelData.entries.map(
-                (entry, index) => {
-                  const mapped = mapEntryToDbContentType(entry);
-                  const entryContentHash = calculateContentHash(mapped.content);
-                  const speakerId = getCharacterIdByTag(
-                    entry.speaker,
-                    charactersByTag
-                  );
-                  return {
-                    labelId: existingScene.id,
-                    sequence: index + 1,
-                    contentType: mapped.contentType,
-                    content: mapped.content,
-                    speakerId,
-                    projectFileId: projectFile.id,
-                    linePosition: index,
-                    contentHash: entryContentHash,
-                    lastSyncedHash: entryContentHash,
-                    lastSyncedAt: new Date(),
-                    rpyLineNumber: entry.lineNumber,
-                    rpyIndentLevel: entry.indentLevel ?? 0,
-                  };
-                }
+              const allValues = mapEntriesToLabelLineValues(
+                labelData.entries,
+                existingScene.id,
+                projectFile.id,
+                charactersByTag
               );
 
               if (allValues.length > 0) {
@@ -744,10 +765,8 @@ export async function importFromGitlab(
                   updatedAt: new Date(),
                 })
                 .where(eq(labels.id, existingScene.id));
-            });
-          } else if (!existingScene) {
-            // Create new scene with proper file linkage
-            await db.transaction(async (tx) => {
+            } else if (!existingScene) {
+              // Create new scene with proper file linkage
               const [newScene] = await tx
                 .insert(labels)
                 .values({
@@ -771,43 +790,22 @@ export async function importFromGitlab(
                 })
                 .returning();
 
-              // Fetch characters inside transaction to get latest state
-              const charactersByTag = await fetchCharactersByTag(tx, projectId);
-
-              const allValues: LabelLineInsertValues[] = labelData.entries.map(
-                (entry, index) => {
-                  const mapped = mapEntryToDbContentType(entry);
-                  const entryContentHash = calculateContentHash(mapped.content);
-                  const speakerId = getCharacterIdByTag(
-                    entry.speaker,
-                    charactersByTag
-                  );
-                  return {
-                    labelId: newScene.id,
-                    sequence: index + 1,
-                    contentType: mapped.contentType,
-                    content: mapped.content,
-                    speakerId,
-                    projectFileId: projectFile.id,
-                    linePosition: index,
-                    contentHash: entryContentHash,
-                    lastSyncedHash: entryContentHash,
-                    lastSyncedAt: new Date(),
-                    rpyLineNumber: entry.lineNumber,
-                    rpyIndentLevel: entry.indentLevel ?? 0,
-                  };
-                }
+              const allValues = mapEntriesToLabelLineValues(
+                labelData.entries,
+                newScene.id,
+                projectFile.id,
+                charactersByTag
               );
 
               if (allValues.length > 0) {
                 await tx.insert(labelLines).values(allValues);
               }
-            });
+            }
+            // If branchforge_wins, do nothing (keep local data)
           }
-          // If branchforge_wins, do nothing (keep local data)
         }
       }
-    }
+    });
 
     // If all file fetches failed, mark operation as failed
     if (!anySuccess && rpyFiles.length > 0) {

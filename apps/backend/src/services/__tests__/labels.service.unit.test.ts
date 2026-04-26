@@ -12,26 +12,11 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { RENPY_LABEL_REGEX } from "@branchforge/shared";
 
-// Mock the label-characters schema table before importing the service
-// This prevents circular dependency issues in the test environment
-vi.mock("../../db/schema/tables/label-characters.js", () => ({
-  labelCharacters: {
-    role: "role",
-    emotion: "emotion",
-    notes: "notes",
-    labelId: "labelId",
-    characterId: "characterId",
-  },
-}));
-
 // Now import the service after the mock is set up
 import {
   listLabels,
   deleteLabel,
   getLabelCharacters,
-  addCharacterToLabel,
-  updateCharacterInLabel,
-  removeCharacterFromLabel,
 } from "../labels.service.js";
 
 // Mock the RPY parser service
@@ -342,17 +327,6 @@ describe("LabelsService", () => {
       },
     ];
 
-    const mockLabelCharacters = [
-      {
-        character: mockCharacters[0],
-        notes: "Main character",
-      },
-      {
-        character: mockCharacters[1],
-        notes: "Villain",
-      },
-    ];
-
     it("should return characters for a label when user has access", async () => {
       // Mock label query and characters query
       let callCount = 0;
@@ -363,7 +337,7 @@ describe("LabelsService", () => {
           return createMockChain([{ projectOwnerId: userId }]); // Simulate label ownership
         }
         // For labelCharactersTable query (second call)
-        return createMockChain(mockLabelCharacters);
+        return createMockChain(mockCharacters);
       });
 
       const result = await getLabelCharacters(labelId, userId);
@@ -374,7 +348,6 @@ describe("LabelsService", () => {
         name: "protagonist",
         displayName: "Protagonist",
         renpyTag: "p",
-        notes: "Main character",
       });
     });
 
@@ -396,291 +369,6 @@ describe("LabelsService", () => {
       await expect(getLabelCharacters(labelId, userId)).rejects.toThrow(
         "Insufficient permissions"
       );
-    });
-  });
-
-  describe("addCharacterToLabel", () => {
-    const mockCharacter = {
-      id: "char-1",
-      name: "protagonist",
-      displayName: "Protagonist",
-      renpyTag: "p",
-    };
-
-    const mockLabelWithProject = {
-      label: { id: labelId, projectId },
-      projectOwnerId: userId,
-    };
-
-    it("should successfully add character to label", async () => {
-      // Mock insert operation
-      mockInsert.mockReturnValue({
-        values: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([
-            {
-              labelId,
-              characterId: "char-1",
-              notes: null,
-            },
-          ]),
-        }),
-      });
-
-      let callCount = 0;
-      mockSelect.mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          // First call: get label with project
-          return createMockChain([mockLabelWithProject]);
-        } else if (callCount === 2) {
-          // Second call: check character exists
-          return createMockChain([mockCharacter]);
-        } else if (callCount === 3) {
-          // Third call: check existing association
-          return createMockChain([]);
-        } else {
-          // Fourth call: fetch result with character info
-          return createMockChain([
-            {
-              character: mockCharacter,
-              notes: "Main character",
-            },
-          ]);
-        }
-      });
-
-      const result = await addCharacterToLabel(labelId, "char-1", userId, {
-        notes: "Main character",
-      });
-
-      expect(result).toEqual({
-        id: "char-1",
-        name: "protagonist",
-        displayName: "Protagonist",
-        renpyTag: "p",
-        notes: "Main character",
-      });
-
-      expect(mockInsert).toHaveBeenCalled();
-    });
-
-    it("should throw NotFoundError when label not found", async () => {
-      mockSelect.mockImplementation(createEmptyMockChain);
-
-      await expect(
-        addCharacterToLabel(labelId, "char-1", userId, {})
-      ).rejects.toThrow("Label");
-    });
-
-    it("should throw ForbiddenError when user is not project owner", async () => {
-      mockSelect.mockImplementation(() =>
-        createMockChain([
-          {
-            label: { id: labelId, projectId },
-            projectOwnerId: "other-user",
-          },
-        ])
-      );
-
-      await expect(
-        addCharacterToLabel(labelId, "char-1", userId, {})
-      ).rejects.toThrow("Insufficient permissions");
-    });
-
-    it("should throw NotFoundError when character not found", async () => {
-      let callCount = 0;
-      mockSelect.mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          return createMockChain([mockLabelWithProject]);
-        } else {
-          return createMockChain([]);
-        }
-      });
-
-      await expect(
-        addCharacterToLabel(labelId, "char-1", userId, {})
-      ).rejects.toThrow("Character");
-    });
-
-    it("should throw ConflictError when character already associated", async () => {
-      let callCount = 0;
-      mockSelect.mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          return createMockChain([mockLabelWithProject]);
-        } else if (callCount === 2) {
-          return createMockChain([mockCharacter]);
-        } else {
-          return createMockChain([{ id: "existing" }]);
-        }
-      });
-
-      await expect(
-        addCharacterToLabel(labelId, "char-1", userId, {
-          role: "PRIMARY",
-        })
-      ).rejects.toThrow("Character already associated with this label");
-    });
-  });
-
-  describe("updateCharacterInLabel", () => {
-    const mockCharacter = {
-      id: "char-1",
-      name: "protagonist",
-      displayName: "Protagonist",
-      renpyTag: "p",
-    };
-
-    const mockLabelWithProject = {
-      label: { id: labelId, projectId },
-      projectOwnerId: userId,
-    };
-
-    it("should successfully update character in label", async () => {
-      // Mock update operation
-      mockUpdate.mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue(undefined),
-        }),
-      });
-
-      let callCount = 0;
-      mockSelect.mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          // First call: get label with project
-          return createMockChain([mockLabelWithProject]);
-        } else if (callCount === 2) {
-          // Second call: check existing association
-          return createMockChain([{ id: "existing" }]);
-        } else {
-          // Third call: fetch result with character info
-          return createMockChain([
-            {
-              character: mockCharacter,
-              notes: "Updated notes",
-            },
-          ]);
-        }
-      });
-
-      const result = await updateCharacterInLabel(labelId, "char-1", userId, {
-        notes: "Updated notes",
-      });
-
-      expect(result).toEqual({
-        id: "char-1",
-        name: "protagonist",
-        displayName: "Protagonist",
-        renpyTag: "p",
-        notes: "Updated notes",
-      });
-    });
-
-    it("should throw NotFoundError when label not found", async () => {
-      mockSelect.mockImplementation(createEmptyMockChain);
-
-      await expect(
-        updateCharacterInLabel(labelId, "char-1", userId, {})
-      ).rejects.toThrow("Label");
-    });
-
-    it("should throw ForbiddenError when user is not project owner", async () => {
-      mockSelect.mockImplementation(() =>
-        createMockChain([
-          {
-            label: { id: labelId, projectId },
-            projectOwnerId: "other-user",
-          },
-        ])
-      );
-
-      await expect(
-        updateCharacterInLabel(labelId, "char-1", userId, {})
-      ).rejects.toThrow("Insufficient permissions");
-    });
-
-    it("should throw NotFoundError when association not found", async () => {
-      let callCount = 0;
-      mockSelect.mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          return createMockChain([mockLabelWithProject]);
-        } else {
-          return createMockChain([]);
-        }
-      });
-
-      await expect(
-        updateCharacterInLabel(labelId, "char-1", userId, {})
-      ).rejects.toThrow("Label character association");
-    });
-  });
-
-  describe("removeCharacterFromLabel", () => {
-    const mockLabelWithProject = {
-      label: { id: labelId, projectId },
-      projectOwnerId: userId,
-    };
-
-    it("should successfully remove character from label", async () => {
-      const mockDelete = vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([{ id: "deleted" }]),
-        }),
-      });
-
-      mockDb.delete = mockDelete;
-      mockSelect.mockImplementation(() =>
-        createMockChain([mockLabelWithProject])
-      );
-
-      await removeCharacterFromLabel(labelId, "char-1", userId);
-
-      expect(mockDelete).toHaveBeenCalled();
-    });
-
-    it("should throw NotFoundError when label not found", async () => {
-      mockSelect.mockImplementation(createEmptyMockChain);
-
-      await expect(
-        removeCharacterFromLabel(labelId, "char-1", userId)
-      ).rejects.toThrow("Label");
-    });
-
-    it("should throw ForbiddenError when user is not project owner", async () => {
-      mockSelect.mockImplementation(() =>
-        createMockChain([
-          {
-            label: { id: labelId, projectId },
-            projectOwnerId: "other-user",
-          },
-        ])
-      );
-
-      await expect(
-        removeCharacterFromLabel(labelId, "char-1", userId)
-      ).rejects.toThrow("Insufficient permissions");
-    });
-
-    it("should throw NotFoundError when association not found", async () => {
-      const mockDelete = vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([]),
-        }),
-      });
-
-      mockDb.delete = mockDelete;
-
-      // Mock label query (authorization check)
-      mockSelect.mockImplementation(() =>
-        createMockChain([mockLabelWithProject])
-      );
-
-      await expect(
-        removeCharacterFromLabel(labelId, "char-1", userId)
-      ).rejects.toThrow("Label character association");
     });
   });
 });

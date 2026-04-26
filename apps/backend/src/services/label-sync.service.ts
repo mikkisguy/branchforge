@@ -127,6 +127,7 @@ async function syncLabelsInTransaction(
   labelsDeleted: number;
   linesProcessed: number;
   errors: Array<{ label: string; error: string }>;
+  affectedLabelIds: string[];
 }> {
   // Fetch existing labels for this source file
   const existingLabels = await tx
@@ -182,6 +183,7 @@ async function syncLabelsInTransaction(
   let labelsUpdated = 0;
   let linesProcessed = 0;
   const errors: Array<{ label: string; error: string }> = [];
+  const affectedLabelIds: string[] = [];
 
   // Process each label
   for (let i = 0; i < parsed.labels.length; i++) {
@@ -229,6 +231,7 @@ async function syncLabelsInTransaction(
           })
           .where(eq(labels.id, existingLabel.id));
 
+        affectedLabelIds.push(existingLabel.id);
         labelsUpdated++;
       } else {
         // Create new scene
@@ -254,6 +257,8 @@ async function syncLabelsInTransaction(
             syncStatus: "SYNCED",
           })
           .returning();
+
+        affectedLabelIds.push(newScene.id);
 
         // Insert lines in batch
         if (labelData.entries.length > 0) {
@@ -312,6 +317,9 @@ async function syncLabelsInTransaction(
         .where(and(inArray(labels.id, orphanedIds), isNull(labels.deletedAt)));
 
       labelsDeleted = orphanedIds.length;
+
+      // Track orphaned label IDs as affected for downstream cache/webhook handling
+      affectedLabelIds.push(...orphanedIds);
     }
   }
 
@@ -321,6 +329,7 @@ async function syncLabelsInTransaction(
     labelsDeleted,
     linesProcessed,
     errors,
+    affectedLabelIds,
   };
 }
 

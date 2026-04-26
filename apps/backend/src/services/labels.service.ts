@@ -16,8 +16,7 @@ import {
   routeConfigs,
   projectFiles,
 } from "../db/schema/index.js";
-import { labelCharacters as labelCharactersTable } from "../db/schema/tables/label-characters.js";
-import { eq, and, asc, or, isNull } from "drizzle-orm";
+import { eq, and, asc, or, isNull, inArray } from "drizzle-orm";
 import type { Label, LabelLine } from "../db/schema/index.js";
 import type { PublicLabel } from "@branchforge/shared";
 import { LabelStatus } from "@branchforge/shared";
@@ -25,12 +24,49 @@ import { createAuditFields, updateAuditFields } from "../lib/audit.js";
 import {
   NotFoundError,
   ForbiddenError,
-  ConflictError,
 } from "../middleware/error-handler.middleware.js";
 import { logWarn, LogEventType } from "../lib/logger.js";
 
 // Re-export PublicLabel from shared for route handlers
 export type { PublicLabel };
+
+// ============================================================================
+// Derived Character Query
+// ============================================================================
+
+/**
+ * Get characters that appear in a label (derived from dialogue speakers)
+ *
+ * This function automatically derives character appearances from label_lines.speakerId,
+ * ensuring the data is always in sync with actual dialogue content.
+ *
+ * @param labelId - The label ID
+ * @returns Array of characters who speak in this label
+ */
+async function getDerivedCharactersForLabel(
+  labelId: string
+): Promise<LabelCharacterWithInfo[]> {
+  const db = getDb();
+
+  // Single query: join characters with labelLines speakers, using DISTINCT to deduplicate
+  const result = await db
+    .selectDistinct({
+      id: characters.id,
+      name: characters.name,
+      displayName: characters.displayName,
+      renpyTag: characters.renpyTag,
+    })
+    .from(characters)
+    .innerJoin(labelLines, eq(labelLines.speakerId, characters.id))
+    .where(and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt)));
+
+  return result.map((c) => ({
+    id: c.id,
+    name: c.name,
+    displayName: c.displayName,
+    renpyTag: c.renpyTag,
+  }));
+}
 
 // ============================================================================
 // Type Guards for Enum Values
@@ -77,14 +113,13 @@ export interface LabelLineWithSpeaker extends Omit<
 }
 
 /**
- * Character in a label with notes
+ * Character in a label (derived from label_lines.speakerId)
  */
 export interface LabelCharacterWithInfo {
   id: string;
   name: string;
   displayName: string;
   renpyTag: string;
-  notes: string | null;
 }
 
 /**
@@ -224,34 +259,17 @@ export async function getLabel(
 
   const { label } = labelResult[0];
 
-  // Fetch label lines and characters in parallel using Promise.all
-  // This fixes the N+1 query issue by running both queries concurrently
-  const [linesResult, charactersResult] = await Promise.all([
-    // Fetch label lines with speaker information (excluding soft-deleted)
-    db
-      .select({
-        line: labelLines,
-        speakerName: characters.displayName,
-        speakerTag: characters.renpyTag,
-      })
-      .from(labelLines)
-      .leftJoin(characters, eq(labelLines.speakerId, characters.id))
-      .where(and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt)))
-      .orderBy(asc(labelLines.sequence)),
-
-    // Fetch label characters with their information
-    db
-      .select({
-        character: characters,
-        notes: labelCharactersTable.notes,
-      })
-      .from(labelCharactersTable)
-      .innerJoin(
-        characters,
-        eq(labelCharactersTable.characterId, characters.id)
-      )
-      .where(eq(labelCharactersTable.labelId, labelId)),
-  ]);
+  // Fetch label lines with speaker information (excluding soft-deleted)
+  const linesResult = await db
+    .select({
+      line: labelLines,
+      speakerName: characters.displayName,
+      speakerTag: characters.renpyTag,
+    })
+    .from(labelLines)
+    .leftJoin(characters, eq(labelLines.speakerId, characters.id))
+    .where(and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt)))
+    .orderBy(asc(labelLines.sequence));
 
   // Map results to the expected format
   const lines: LabelLineWithSpeaker[] = linesResult.map((row) => ({
@@ -262,14 +280,29 @@ export async function getLabel(
     updatedAt: row.line.updatedAt.toISOString(),
   }));
 
-  const labelCharactersWithInfo: LabelCharacterWithInfo[] =
-    charactersResult.map((row) => ({
-      id: row.character.id,
-      name: row.character.name,
-      displayName: row.character.displayName,
-      renpyTag: row.character.renpyTag,
-      notes: row.notes,
+  // Derive characters from the already-fetched lines to avoid redundant query
+  const speakerIds = Array.from(
+    new Set(
+      linesResult
+        .map((r) => r.line.speakerId)
+        .filter((id): id is string => id !== null)
+    )
+  );
+
+  let labelCharactersWithInfo: LabelCharacterWithInfo[] = [];
+  if (speakerIds.length > 0) {
+    const characterDetails = await db
+      .select()
+      .from(characters)
+      .where(inArray(characters.id, speakerIds));
+
+    labelCharactersWithInfo = characterDetails.map((c) => ({
+      id: c.id,
+      name: c.name,
+      displayName: c.displayName,
+      renpyTag: c.renpyTag,
     }));
+  }
 
   return {
     ...mapToPublicLabel(label),
@@ -622,49 +655,8 @@ export async function deleteLabel(
 }
 
 // ============================================================================
-// Label-Character Association Management
+// Label-Character Queries
 // ============================================================================
-
-/**
- * Fetch label character info by ID
- * @param db - Database instance
- * @param labelId - The label ID
- * @param characterId - The character ID
- * @returns The label character with info
- * @throws NotFoundError if association not found
- */
-async function fetchLabelCharacterInfo(
-  db: ReturnType<typeof getDb>,
-  labelId: string,
-  characterId: string
-): Promise<LabelCharacterWithInfo> {
-  const [result] = await db
-    .select({
-      character: characters,
-      notes: labelCharactersTable.notes,
-    })
-    .from(labelCharactersTable)
-    .innerJoin(characters, eq(labelCharactersTable.characterId, characters.id))
-    .where(
-      and(
-        eq(labelCharactersTable.labelId, labelId),
-        eq(labelCharactersTable.characterId, characterId)
-      )
-    )
-    .limit(1);
-
-  if (!result) {
-    throw new NotFoundError("Label character association");
-  }
-
-  return {
-    id: result.character.id,
-    name: result.character.name,
-    displayName: result.character.displayName,
-    renpyTag: result.character.renpyTag,
-    notes: result.notes,
-  };
-}
 
 /**
  * Get all characters associated with a label
@@ -699,233 +691,6 @@ export async function getLabelCharacters(
     throw new ForbiddenError("Insufficient permissions");
   }
 
-  // Fetch label characters with their information
-  const charactersResult = await db
-    .select({
-      character: characters,
-      notes: labelCharactersTable.notes,
-    })
-    .from(labelCharactersTable)
-    .innerJoin(characters, eq(labelCharactersTable.characterId, characters.id))
-    .where(eq(labelCharactersTable.labelId, labelId));
-
-  return charactersResult.map((row) => ({
-    id: row.character.id,
-    name: row.character.name,
-    displayName: row.character.displayName,
-    renpyTag: row.character.renpyTag,
-    notes: row.notes,
-  }));
-}
-
-/**
- * Add a character to a label
- * @param labelId - The label ID to add the character to
- * @param characterId - The character ID to add
- * @param userId - The user ID making the request
- * @param data - The character association data
- * @returns The created label character association
- * @throws NotFoundError if label or character not found
- * @throws ForbiddenError if user lacks permission
- * @throws ConflictError if character already associated with label
- */
-export async function addCharacterToLabel(
-  labelId: string,
-  characterId: string,
-  userId: string,
-  data: {
-    notes?: string | null;
-  }
-): Promise<LabelCharacterWithInfo> {
-  const db = getDb();
-
-  // Get label with project owner info
-  const [labelWithProject] = await db
-    .select({
-      label: labels,
-      projectOwnerId: projects.userId,
-    })
-    .from(labels)
-    .innerJoin(projects, eq(labels.projectId, projects.id))
-    .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
-    .limit(1);
-
-  if (!labelWithProject) {
-    throw new NotFoundError("Label");
-  }
-
-  if (labelWithProject.projectOwnerId !== userId) {
-    throw new ForbiddenError("Insufficient permissions");
-  }
-
-  // Check if character exists
-  const [character] = await db
-    .select()
-    .from(characters)
-    .where(eq(characters.id, characterId))
-    .limit(1);
-
-  if (!character) {
-    throw new NotFoundError("Character");
-  }
-
-  // Check if association already exists
-  const [existing] = await db
-    .select()
-    .from(labelCharactersTable)
-    .where(
-      and(
-        eq(labelCharactersTable.labelId, labelId),
-        eq(labelCharactersTable.characterId, characterId)
-      )
-    )
-    .limit(1);
-
-  if (existing) {
-    throw new ConflictError("Character already associated with this label");
-  }
-
-  // Insert the association
-  await db
-    .insert(labelCharactersTable)
-    .values({
-      labelId,
-      characterId,
-      notes: data.notes ?? null,
-    })
-    .returning();
-
-  // Fetch and return the complete character info
-  return fetchLabelCharacterInfo(db, labelId, characterId);
-}
-
-/**
- * Update a character's association with a label
- * @param labelId - The label ID
- * @param characterId - The character ID
- * @param userId - The user ID making the request
- * @param data - The data to update
- * @returns The updated label character association
- * @throws NotFoundError if label, character, or association not found
- * @throws ForbiddenError if user lacks permission
- */
-export async function updateCharacterInLabel(
-  labelId: string,
-  characterId: string,
-  userId: string,
-  data: {
-    notes?: string | null;
-  }
-): Promise<LabelCharacterWithInfo> {
-  const db = getDb();
-
-  // Get label with project owner info
-  const [labelWithProject] = await db
-    .select({
-      label: labels,
-      projectOwnerId: projects.userId,
-    })
-    .from(labels)
-    .innerJoin(projects, eq(labels.projectId, projects.id))
-    .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
-    .limit(1);
-
-  if (!labelWithProject) {
-    throw new NotFoundError("Label");
-  }
-
-  if (labelWithProject.projectOwnerId !== userId) {
-    throw new ForbiddenError("Insufficient permissions");
-  }
-
-  // Check if association exists
-  const [existing] = await db
-    .select()
-    .from(labelCharactersTable)
-    .where(
-      and(
-        eq(labelCharactersTable.labelId, labelId),
-        eq(labelCharactersTable.characterId, characterId)
-      )
-    )
-    .limit(1);
-
-  if (!existing) {
-    throw new NotFoundError("Label character association");
-  }
-
-  // Build update object with only provided fields
-  const updateData: Record<string, unknown> = {};
-  if (data.notes !== undefined) {
-    updateData.notes = data.notes;
-  }
-
-  // Skip update if no fields to change
-  if (Object.keys(updateData).length === 0) {
-    return fetchLabelCharacterInfo(db, labelId, characterId);
-  }
-
-  // Update the association
-  await db
-    .update(labelCharactersTable)
-    .set(updateData)
-    .where(
-      and(
-        eq(labelCharactersTable.labelId, labelId),
-        eq(labelCharactersTable.characterId, characterId)
-      )
-    );
-
-  // Fetch and return the complete character info
-  return fetchLabelCharacterInfo(db, labelId, characterId);
-}
-
-/**
- * Remove a character from a label
- * @param labelId - The label ID
- * @param characterId - The character ID to remove
- * @param userId - The user ID making the request
- * @throws NotFoundError if label or association not found
- * @throws ForbiddenError if user lacks permission
- */
-export async function removeCharacterFromLabel(
-  labelId: string,
-  characterId: string,
-  userId: string
-): Promise<void> {
-  const db = getDb();
-
-  // Get label with project owner info
-  const [labelWithProject] = await db
-    .select({
-      label: labels,
-      projectOwnerId: projects.userId,
-    })
-    .from(labels)
-    .innerJoin(projects, eq(labels.projectId, projects.id))
-    .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
-    .limit(1);
-
-  if (!labelWithProject) {
-    throw new NotFoundError("Label");
-  }
-
-  if (labelWithProject.projectOwnerId !== userId) {
-    throw new ForbiddenError("Insufficient permissions");
-  }
-
-  // Delete the association
-  const result = await db
-    .delete(labelCharactersTable)
-    .where(
-      and(
-        eq(labelCharactersTable.labelId, labelId),
-        eq(labelCharactersTable.characterId, characterId)
-      )
-    )
-    .returning();
-
-  if (result.length === 0) {
-    throw new NotFoundError("Label character association");
-  }
+  // Return characters derived from dialogue speakers
+  return await getDerivedCharactersForLabel(labelId);
 }

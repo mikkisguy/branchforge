@@ -323,6 +323,7 @@ See [CHANGELOG.md](CHANGELOG.md) for a history of changes.
 **Made with ❤️ for visual novel writers**
 
 ### Check out Ren'Py!
+
 [<img width="130" height="200" alt="image" src="https://github.com/user-attachments/assets/3d9cda19-492f-4486-9e24-264eadd20d1d" />
 ](https://www.renpy.org/)
 
