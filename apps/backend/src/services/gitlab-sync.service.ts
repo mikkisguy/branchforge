@@ -696,12 +696,12 @@ export async function importFromGitlab(
     });
 
     // Phase 3: Process parsed files to create labels with speaker linking
-    // Use a single transaction for all label operations (consistent with character import)
-    await db.transaction(async (tx) => {
-      // Fetch characters once at transaction start for speaker linking
-      const charactersByTag = await fetchCharactersByTag(tx, projectId);
+    // Fetch characters once before processing files for speaker linking
+    const charactersByTag = await fetchCharactersByTag(db, projectId);
 
-      for (const { parsed, projectFile, content } of parsedFiles) {
+    // Process each file in its own transaction to avoid long-lived locks
+    for (const { parsed, projectFile, content } of parsedFiles) {
+      await db.transaction(async (tx) => {
         // For STORY files, import labels as scenes
         if (parsed.fileType === "STORY") {
           // Fetch all scenes for this file once to avoid N+1 queries
@@ -804,8 +804,8 @@ export async function importFromGitlab(
             // If branchforge_wins, do nothing (keep local data)
           }
         }
-      }
-    });
+      });
+    }
 
     // If all file fetches failed, mark operation as failed
     if (!anySuccess && rpyFiles.length > 0) {

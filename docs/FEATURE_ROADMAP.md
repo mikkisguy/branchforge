@@ -376,32 +376,7 @@ DELETE /api/projects/:id/meters/:id   // Delete meter
 
 ---
 
-### 16. Label Characters 🟡 Partially Implemented
-
-**Schema**: `label_characters` junction table
-
-- Links labels to characters with role and emotion
-
-**Implementation Status**:
-
-- ✅ Schema exists
-- ✅ Fetched in label detail (via service)
-- ❌ No routes to manage label-character relationships
-- ❌ No UI to add/remove characters from labels
-
-**TODO**:
-
-```typescript
-// Label character routes needed
-GET    /api/labels/:id/characters       // Get label characters
-POST   /api/labels/:id/characters       // Add character to label
-PUT    /api/labels/:id/characters/:cid  // Update character role/emotion
-DELETE /api/labels/:id/characters/:cid  // Remove character from label
-```
-
----
-
-### 17. World Elements ❌ Not Implemented
+### 16. World Elements ❌ Not Implemented
 
 **Schema**: `world_elements` table
 

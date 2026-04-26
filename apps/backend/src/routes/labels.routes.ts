@@ -817,8 +817,10 @@ async function getLabelCharactersHandler(
   const user = request.user!;
 
   try {
-    const characters = await getLabelCharacters(labelId, user.id);
-    reply.status(200).send({ characters } as LabelCharactersResponse);
+    const labelCharacters = await getLabelCharacters(labelId, user.id);
+    reply
+      .status(200)
+      .send({ characters: labelCharacters } as LabelCharactersResponse);
   } catch (error) {
     request.log.error(error);
 

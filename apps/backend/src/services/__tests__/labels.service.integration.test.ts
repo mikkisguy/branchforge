@@ -17,14 +17,12 @@ import {
   projectUsers,
   labels,
   labelLines,
-  labelCharacters,
   characters,
   routeConfigs,
   type NewUser,
   type NewProject,
   type NewLabel,
   type NewLabelLine,
-  type NewLabelCharacter,
   type NewCharacter,
   type NewRouteConfig,
 } from "../../db/schema/index.js";
@@ -113,17 +111,6 @@ describe("LabelsService (Integration)", () => {
       .where(
         inArray(
           labelLines.labelId,
-          db
-            .select({ id: labels.id })
-            .from(labels)
-            .where(inArray(labels.projectId, projectIds))
-        )
-      );
-    await db
-      .delete(labelCharacters)
-      .where(
-        inArray(
-          labelCharacters.labelId,
           db
             .select({ id: labels.id })
             .from(labels)
@@ -463,16 +450,6 @@ describe("LabelsService (Integration)", () => {
 
       await db.insert(labelLines).values(line);
 
-      // Create a label character association
-      const labelChar: NewLabelCharacter = {
-        labelId: label.id!,
-        characterId: character.id!,
-        role: "PRIMARY",
-        emotion: "happy",
-      };
-
-      await db.insert(labelCharacters).values(labelChar);
-
       const result = await getLabel(label.id!, testUserId);
 
       expect(result).not.toBeNull();
@@ -484,8 +461,8 @@ describe("LabelsService (Integration)", () => {
       expect(result?.lines[0].speakerTag).toBe("a");
       expect(result?.characters).toHaveLength(1);
       expect(result?.characters[0].name).toBe("Eileen");
-      expect(result?.characters[0].role).toBe("PRIMARY");
-      expect(result?.characters[0].emotion).toBe("happy");
+      expect(result?.characters[0].displayName).toBe("Eileen");
+      expect(result?.characters[0].renpyTag).toBe("a");
     });
 
     it("should return null when label not found", async () => {

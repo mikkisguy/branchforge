@@ -558,7 +558,7 @@ projects
 
 labels
 ├── label_lines (1:m, ordered by sequence)
-├── label_characters (m:m via junction)
+├── characters (derived from label_lines.speakerId)
 ├── ai_suggestions (1:m)
 ├── project_file_id (FK to project_files)
 └── route (soft reference to route_configs.route_key, same project)
@@ -570,7 +570,7 @@ label_lines
 characters
 ├── meters (1:m, optional)
 ├── pair_groups (m:1, optional, via character_a/b_id)
-├── label_characters (m:m)
+├── label_lines (1:m, as speakerId)
 └── renpy_definitions (1:m, optional)
 
 pair_groups

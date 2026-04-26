@@ -49,8 +49,9 @@ async function getDerivedCharactersForLabel(
   const db = getDb();
 
   // Query to get all characters who speak in this label
+  // Use selectDistinct to ensure unique rows at the database level
   const result = await db
-    .select({
+    .selectDistinct({
       id: characters.id,
       name: characters.name,
       displayName: characters.displayName,
@@ -60,20 +61,8 @@ async function getDerivedCharactersForLabel(
     .innerJoin(labelLines, eq(labelLines.speakerId, characters.id))
     .where(and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt)));
 
-  // Deduplicate by character ID (a character may speak multiple lines)
-  const uniqueCharacters = new Map();
-  for (const character of result) {
-    if (!uniqueCharacters.has(character.id)) {
-      uniqueCharacters.set(character.id, character);
-    }
-  }
-
-  return Array.from(uniqueCharacters.values()).map((c) => ({
-    id: c.id,
-    name: c.name,
-    displayName: c.displayName,
-    renpyTag: c.renpyTag,
-  }));
+  // Result is already unique and correctly typed
+  return result as LabelCharacterWithInfo[];
 }
 
 // ============================================================================
@@ -680,22 +669,22 @@ export async function getLabelCharacters(
 ): Promise<LabelCharacterWithInfo[]> {
   const db = getDb();
 
-  // Get label with project owner info
-  const [labelWithProject] = await db
-    .select({
-      label: labels,
-      projectOwnerId: projects.userId,
-    })
-    .from(labels)
-    .innerJoin(projects, eq(labels.projectId, projects.id))
-    .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
-    .limit(1);
+  // Check if user has access to this label (owner or shared via project_users)
+  const hasAccess = await authorizeLabelAccess(labelId, userId);
 
-  if (!labelWithProject) {
-    throw new NotFoundError("Label");
-  }
+  if (!hasAccess) {
+    // Label doesn't exist or user lacks permission
+    // Verify label exists to throw appropriate error
+    const [label] = await db
+      .select()
+      .from(labels)
+      .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
+      .limit(1);
 
-  if (labelWithProject.projectOwnerId !== userId) {
+    if (!label) {
+      throw new NotFoundError("Label");
+    }
+
     throw new ForbiddenError("Insufficient permissions");
   }
 

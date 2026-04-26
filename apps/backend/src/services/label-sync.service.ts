@@ -35,6 +35,7 @@ export interface SyncLabelsFromResult {
   linesProcessed: number;
   errors: Array<{ label: string; error: string }>;
   skipped: boolean; // True if sync was skipped due to idempotency
+  affectedLabelIds: string[]; // IDs of labels created, updated, or deleted
 }
 
 export interface SyncLabelsFromOptions {
@@ -526,6 +527,7 @@ export async function syncLabelsFromFile(
     linesProcessed: 0,
     errors: [],
     skipped: false,
+    affectedLabelIds: [],
   };
 
   try {
@@ -572,6 +574,7 @@ export async function syncLabelsFromFile(
       linesProcessed: syncResult.linesProcessed,
       errors: syncResult.errors,
       skipped: false,
+      affectedLabelIds: syncResult.affectedLabelIds,
     };
   } catch (error) {
     // Sync failed

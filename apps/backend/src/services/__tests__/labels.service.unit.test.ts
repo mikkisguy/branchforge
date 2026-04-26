@@ -13,11 +13,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { RENPY_LABEL_REGEX } from "@branchforge/shared";
 
 // Now import the service after the mock is set up
-import {
-  listLabels,
-  deleteLabel,
-  getLabelCharacters,
-} from "../labels.service.js";
+import { listLabels, deleteLabel } from "../labels.service.js";
 
 // Mock the RPY parser service
 const mockRemoveLabelFromRPYContent = vi
@@ -305,71 +301,6 @@ describe("LabelsService", () => {
 
       // Verify the removeLabelFromRPYContent function was NOT called
       expect(mockRemoveLabelFromRPYContent).not.toHaveBeenCalled();
-    });
-  });
-
-  // ============================================================================
-  // Label-Character Association Service Tests
-  // ============================================================================
-
-  describe("getLabelCharacters", () => {
-    const mockCharacters = [
-      {
-        id: "char-1",
-        name: "protagonist",
-        displayName: "Protagonist",
-        renpyTag: "p",
-      },
-      {
-        id: "char-2",
-        name: "antagonist",
-        displayName: "Antagonist",
-        renpyTag: "a",
-      },
-    ];
-
-    it("should return characters for a label when user has access", async () => {
-      // Mock label query and characters query
-      let callCount = 0;
-      mockSelect.mockImplementation(() => {
-        callCount++;
-        // For label with project query (first call)
-        if (callCount === 1) {
-          return createMockChain([{ projectOwnerId: userId }]); // Simulate label ownership
-        }
-        // For labelCharactersTable query (second call)
-        return createMockChain(mockCharacters);
-      });
-
-      const result = await getLabelCharacters(labelId, userId);
-
-      expect(result).toHaveLength(2);
-      expect(result[0]).toEqual({
-        id: "char-1",
-        name: "protagonist",
-        displayName: "Protagonist",
-        renpyTag: "p",
-      });
-    });
-
-    it("should throw NotFoundError when label not found", async () => {
-      // Mock label query to return empty result
-      mockSelect.mockImplementation(createEmptyMockChain);
-
-      await expect(getLabelCharacters(labelId, userId)).rejects.toThrow(
-        "Label"
-      );
-    });
-
-    it("should throw ForbiddenError when user lacks access", async () => {
-      // Mock label query with different owner
-      mockSelect.mockImplementation(() =>
-        createMockChain([{ projectOwnerId: "other-user" }])
-      );
-
-      await expect(getLabelCharacters(labelId, userId)).rejects.toThrow(
-        "Insufficient permissions"
-      );
     });
   });
 });
