@@ -48,9 +48,9 @@ async function getDerivedCharactersForLabel(
 ): Promise<LabelCharacterWithInfo[]> {
   const db = getDb();
 
-  // Single query: join characters with labelLines speakers, using DISTINCT to deduplicate
+  // Query to get all characters who speak in this label
   const result = await db
-    .selectDistinct({
+    .select({
       id: characters.id,
       name: characters.name,
       displayName: characters.displayName,
@@ -60,7 +60,15 @@ async function getDerivedCharactersForLabel(
     .innerJoin(labelLines, eq(labelLines.speakerId, characters.id))
     .where(and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt)));
 
-  return result.map((c) => ({
+  // Deduplicate by character ID (a character may speak multiple lines)
+  const uniqueCharacters = new Map();
+  for (const character of result) {
+    if (!uniqueCharacters.has(character.id)) {
+      uniqueCharacters.set(character.id, character);
+    }
+  }
+
+  return Array.from(uniqueCharacters.values()).map((c) => ({
     id: c.id,
     name: c.name,
     displayName: c.displayName,

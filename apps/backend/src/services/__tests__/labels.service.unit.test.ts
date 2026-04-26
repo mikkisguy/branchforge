@@ -73,6 +73,7 @@ const mockDelete = vi.fn();
 
 const mockDb = {
   select: mockSelect,
+  selectDistinct: mockSelect,
   update: mockUpdate,
   transaction: mockTransaction,
   insert: mockInsert,
