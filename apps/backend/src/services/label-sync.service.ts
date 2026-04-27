@@ -22,6 +22,7 @@ import {
   type ParsedRPYFileWithLabels,
 } from "./rpy-parser.service.js";
 import { calculateContentHash, calculateLinesHash } from "../lib/hash.js";
+import { mapEntryToDbType } from "./label-line-mapper.js";
 
 // ============================================================================
 // Types
@@ -332,27 +333,6 @@ async function syncLabelsInTransaction(
     errors,
     affectedLabelIds,
   };
-}
-
-/**
- * Map BranchForge entry type to content type enum
- */
-function mapEntryToDbType(entry: {
-  type: string;
-}): "NARRATION" | "DIALOGUE" | "JUMP" {
-  if (entry.type === "FLAG") {
-    return "JUMP";
-  }
-  if (
-    entry.type === "NARRATION" ||
-    entry.type === "DIALOGUE" ||
-    entry.type === "JUMP"
-  ) {
-    return entry.type as "NARRATION" | "DIALOGUE" | "JUMP";
-  }
-  // Don't default to NARRATION - skip unrecognized types
-  // This prevents non-dialogue entries from becoming label_lines
-  throw new Error(`Unrecognized entry type: ${entry.type}`);
 }
 
 interface CharacterLookupMaps {

@@ -6,11 +6,11 @@
 
 ## Summary
 
-- **Total Database Tables**: 27 tables
-- **Fully Implemented**: 17 tables (63%)
-- **Partially Implemented**: 3 tables (11%)
-- **Not Implemented**: 4 tables (15%)
-- **Other Statuses** (🔧/🔄/⚠️): 3 tables (11%)
+- **Total Database Tables**: 26 tables
+- **Fully Implemented**: 17 tables (65%)
+- **Partially Implemented**: 3 tables (12%)
+- **Not Implemented**: 3 tables (12%)
+- **Other Statuses** (🔧/🔄/⚠️): 3 tables (12%)
 
 ---
 
@@ -400,7 +400,11 @@ DELETE /api/projects/:id/world-elements/:id // Delete element
 
 ---
 
-### 18. AI Suggestions ❌ Not Implemented
+> **Note**: Section 17 (label_characters junction table) was removed. Characters are now derived from `label_lines.speakerId` via a read-only association. See the Labels section (14) and the GET `/:id/characters` endpoint for details.
+
+---
+
+### 17. AI Suggestions ❌ Not Implemented
 
 **Schema**: `ai_suggestions` table
 
@@ -433,7 +437,7 @@ DELETE /api/suggestions/:id/reject           // Reject suggestion
 
 ---
 
-### 19. Exports 🟡 Partially Implemented
+### 18. Exports 🟡 Partially Implemented
 
 **Schema**: `exports` table
 
@@ -467,7 +471,7 @@ GET    /api/projects/:id/exports/:id/download // Download export
 
 ---
 
-### 20. Demo Sessions ⚠️ Out of Scope
+### 19. Demo Sessions ⚠️ Out of Scope
 
 **Schema**: `demo_sessions` table
 
@@ -486,7 +490,7 @@ GET    /api/projects/:id/exports/:id/download // Download export
 
 ---
 
-### 21. GitLab Integrations ✅ Fully Implemented
+### 20. GitLab Integrations ✅ Fully Implemented
 
 **Schema**: `gitlab_integrations` table
 
@@ -501,7 +505,7 @@ GET    /api/projects/:id/exports/:id/download // Download export
 
 ---
 
-### 22. GitLab Files ✅ Fully Implemented
+### 21. GitLab Files ✅ Fully Implemented
 
 **Schema**: `gitlab_files` table
 
@@ -516,7 +520,7 @@ GET    /api/projects/:id/exports/:id/download // Download export
 
 ---
 
-### 23. GitLab File Sync State ✅ Fully Implemented
+### 22. GitLab File Sync State ✅ Fully Implemented
 
 **Schema**: `gitlab_file_sync_state` table
 
@@ -531,7 +535,7 @@ GET    /api/projects/:id/exports/:id/download // Download export
 
 ---
 
-### 24. GitLab Repositories ✅ Fully Implemented
+### 23. GitLab Repositories ✅ Fully Implemented
 
 **Schema**: `gitlab_repositories` table
 
@@ -546,7 +550,7 @@ GET    /api/projects/:id/exports/:id/download // Download export
 
 ---
 
-### 25. GitLab Sync Operations ✅ Fully Implemented
+### 24. GitLab Sync Operations ✅ Fully Implemented
 
 **Schema**: `gitlab_sync_operations` table
 
@@ -561,7 +565,7 @@ GET    /api/projects/:id/exports/:id/download // Download export
 
 ---
 
-### 26. Writing Goals ✅ Fully Implemented (NEW)
+### 25. Writing Goals ✅ Fully Implemented (NEW)
 
 **Backend**:
 
@@ -578,7 +582,7 @@ GET    /api/projects/:id/exports/:id/download // Download export
 
 ---
 
-### 27. Zip Import ✅ Fully Implemented (NEW)
+### 26. Zip Import ✅ Fully Implemented (NEW)
 
 **Backend**:
 
@@ -608,12 +612,7 @@ GET    /api/projects/:id/exports/:id/download // Download export
    - Effort: Medium
    - Dependencies: None
 
-3. **Label-Character Relationships** (Label Characters junction)
-   - Impact: Can't associate characters with labels
-   - Effort: Low
-   - Dependencies: None
-
-4. **Project Management** (Projects table - 🟡 PARTIAL)
+3. **Project Management** (Projects table - 🟡 PARTIAL)
    - Missing: Update/delete routes, beta reader management
    - Impact: Can't fully manage projects
    - Effort: Low
@@ -666,9 +665,8 @@ GET    /api/projects/:id/exports/:id/download // Download export
 
 1. Export Generation (zip file download)
 2. Project update/delete routes
-3. Label-Character Relationships
-4. User Settings UI
-5. Visual System Configuration
+3. User Settings UI
+4. Visual System Configuration
 
 ### Phase 2: Story Management
 
@@ -750,10 +748,7 @@ GET    /api/projects/:id/exports/:id/download // Download export
 │   ├── PUT    /:id
 │   ├── DELETE /:id
 │   ├── PUT    /:id/dialogue
-│   ├── GET    /:id/characters      # Label characters ❌
-│   ├── POST   /:id/characters
-│   ├── PUT    /:id/characters/:lcid
-│   ├── DELETE /:id/characters/:lcid
+│   ├── GET    /:id/characters      # Label characters ✅
 │   └── POST   /:id/suggestions/generate # AI suggestions ❌
 ├── /renpy-definitions
 │   ├── GET    /:renpyDefinitionId

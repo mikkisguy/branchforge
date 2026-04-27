@@ -40,7 +40,7 @@ import { charactersApi } from "@/lib/api/characters";
 interface GitLabImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: () => void;
+  onSuccess?: (importedProject?: { id: string }) => void;
 }
 
 type ImportStateStatus =
@@ -80,7 +80,7 @@ export function GitLabImportDialog({
   const [showCharacterWizard, setShowCharacterWizard] = useState(false);
   const [detectedCharacters, setDetectedCharacters] =
     useState<DetectCharactersResponse | null>(null);
-  const [importedProjectId, setImportedProjectId] = useState<string | null>(
+  const [importedProject, setImportedProject] = useState<{ id: string } | null>(
     null
   );
   // Guard to prevent calling onSuccess/onOpenChange(false) twice
@@ -123,7 +123,7 @@ export function GitLabImportDialog({
       setRepositories([]);
       setShowCharacterWizard(false);
       setDetectedCharacters(null);
-      setImportedProjectId(null);
+      setImportedProject(null);
       didCallOnSuccessRef.current = false;
       hasLoadedReposRef.current = false;
       hasSetSelectingState.current = false;
@@ -230,7 +230,7 @@ export function GitLabImportDialog({
         );
 
         if (newCharacters.length > 0) {
-          setImportedProjectId(result.project.id);
+          setImportedProject(result.project);
           setDetectedCharacters({
             ...detectionResult,
             characters: newCharacters,
@@ -256,7 +256,8 @@ export function GitLabImportDialog({
       timeoutRef.current = setTimeout(() => {
         if (!didCallOnSuccessRef.current) {
           didCallOnSuccessRef.current = true;
-          onSuccess?.();
+          // Pass the imported project to switch to it
+          onSuccess?.(result.project);
         }
         onOpenChange(false);
       }, 1500);
@@ -518,7 +519,7 @@ export function GitLabImportDialog({
       </DialogContent>
 
       {/* Character Import Wizard */}
-      {showCharacterWizard && detectedCharacters && importedProjectId && (
+      {showCharacterWizard && detectedCharacters && importedProject && (
         <CharacterImportWizard
           open={showCharacterWizard}
           onOpenChange={(open) => {
@@ -528,12 +529,14 @@ export function GitLabImportDialog({
               handleOpenChange(false);
             }
           }}
-          projectId={importedProjectId}
+          projectId={importedProject.id}
           detectedCharacters={detectedCharacters.characters}
           conflicts={detectedCharacters.conflicts}
           excludedTags={detectedCharacters.excludedTags}
           onComplete={() => {
             setShowCharacterWizard(false);
+            // Switch to the imported project after character import completes
+            onSuccess?.(importedProject);
           }}
         />
       )}

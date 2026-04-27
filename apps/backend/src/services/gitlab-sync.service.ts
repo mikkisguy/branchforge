@@ -35,6 +35,7 @@ import {
 import { calculateLinesHash, calculateContentHash } from "../lib/hash.js";
 import { type DetectedCharacter } from "./character-parser.service.js";
 import { projectSettings } from "../db/schema/index.js";
+import { mapEntriesToLabelLineValues } from "./label-line-mapper.js";
 
 /**
  * Simple concurrency limiter for parallel async operations
@@ -99,107 +100,6 @@ export interface ConflictDetectionResult {
   hasConflicts: boolean;
   conflicts: ConflictInfo[];
   error?: string;
-}
-
-// Type for label line insert values
-interface LabelLineInsertValues {
-  labelId: string;
-  sequence: number;
-  contentType: "NARRATION" | "DIALOGUE" | "CHOICE" | "MENU" | "JUMP";
-  content: string;
-  speakerId?: string | null; // Optional speaker ID for dialogue lines
-  projectFileId?: string;
-  linePosition?: number;
-  contentHash?: string;
-  lastSyncedHash?: string;
-  lastSyncedAt?: Date;
-  rpyLineNumber?: number;
-  rpyIndentLevel?: number;
-}
-
-/**
- * Helper function to map RPY parser entry types to DB content types
- * Extracted to eliminate code duplication
- */
-function mapEntryToDbContentType(entry: {
-  type: string;
-  text?: string;
-  target?: string;
-}): {
-  contentType: "NARRATION" | "DIALOGUE" | "CHOICE" | "MENU" | "JUMP";
-  content: string;
-} {
-  let dbContentType: "NARRATION" | "DIALOGUE" | "CHOICE" | "MENU" | "JUMP";
-
-  if (entry.type === "FLAG") {
-    dbContentType = "JUMP"; // Map FLAG to JUMP for now
-  } else if (
-    entry.type === "NARRATION" ||
-    entry.type === "DIALOGUE" ||
-    entry.type === "JUMP"
-  ) {
-    dbContentType = entry.type as "NARRATION" | "DIALOGUE" | "JUMP";
-  } else {
-    dbContentType = "NARRATION"; // Default fallback
-  }
-
-  let content: string = entry.text || "";
-
-  if (entry.target && dbContentType === "JUMP") {
-    content = `jump ${entry.target}`;
-  }
-
-  return { contentType: dbContentType, content };
-}
-
-/**
- * Helper function to get character ID by renpyTag
- * Returns null if character not found
- */
-function getCharacterIdByTag(
-  renpyTag: string | undefined,
-  charactersByTag: Map<string, string>
-): string | null {
-  if (!renpyTag) return null;
-  return charactersByTag.get(renpyTag) ?? null;
-}
-
-/**
- * Helper function to map parsed entries to LabelLineInsertValues
- * Extracted to eliminate duplication between create and update paths
- */
-function mapEntriesToLabelLineValues(
-  entries: Array<{
-    type: string;
-    text?: string;
-    target?: string;
-    speaker?: string;
-    lineNumber?: number;
-    indentLevel?: number;
-  }>,
-  labelId: string,
-  projectFileId: string,
-  charactersByTag: Map<string, string>
-): LabelLineInsertValues[] {
-  return entries.map((entry, index) => {
-    const mapped = mapEntryToDbContentType(entry);
-    const entryContentHash = calculateContentHash(mapped.content);
-    const speakerId = getCharacterIdByTag(entry.speaker, charactersByTag);
-    return {
-      labelId,
-      sequence: index + 1,
-      contentType: mapped.contentType,
-      content: mapped.content,
-      speakerId,
-      projectFileId,
-      linePosition: index,
-      contentHash: entryContentHash,
-      lastSyncedHash: entryContentHash,
-      lastSyncedAt: new Date(),
-      rpyLineNumber: entry.lineNumber,
-      rpyIndentLevel: entry.indentLevel ?? 0,
-    };
-  });
 }
 
 // Type for Drizzle transaction - flexible interface to accept both typed and generic transactions
@@ -608,7 +508,10 @@ export async function importFromGitlab(
       parsedFiles.push({ file, content, parsed, projectFile });
     }
 
-    // Phase 2: Import/update all detected characters
+    // Phase 2: Collect detected characters for return value
+    // Note: We don't import them here - let the frontend call detectCharacters
+    // after the sync, which will parse from project_files.content and show
+    // the import wizard for NEW characters only.
     const allDetected: DetectedCharacter[] = [];
     for (const { parsed } of parsedFiles) {
       allDetected.push(
@@ -634,69 +537,11 @@ export async function importFromGitlab(
       }
     }
 
-    // Set detectedCharacters for return value
+    // Set detectedCharacters for return value (for backwards compatibility)
     detectedCharacters = uniqueCharacters;
 
-    // Import detected characters into the database
-    const existingCharacters = await db
-      .select()
-      .from(characters)
-      .where(eq(characters.projectId, projectId));
-
-    const existingByTag = new Map(
-      existingCharacters.map((c) => [c.renpyTag, c])
-    );
-
-    // Create or update characters in a single transaction with bulk operations
-    await db.transaction(async (tx) => {
-      // Separate characters into new and existing for bulk operations
-      const newCharacters: typeof uniqueCharacters = [];
-      const existingCharactersToUpdate: Array<{
-        existing: (typeof existingCharacters)[0];
-        data: (typeof uniqueCharacters)[0];
-      }> = [];
-
-      for (const charData of uniqueCharacters) {
-        const existing = existingByTag.get(charData.tag);
-        if (existing) {
-          existingCharactersToUpdate.push({ existing, data: charData });
-        } else {
-          newCharacters.push(charData);
-        }
-      }
-
-      // Bulk insert new characters (all-or-nothing)
-      if (newCharacters.length > 0) {
-        await tx.insert(characters).values(
-          newCharacters.map((charData) => ({
-            projectId,
-            name: charData.name ?? charData.tag,
-            displayName: charData.displayName,
-            renpyTag: charData.tag,
-            color: charData.color,
-          }))
-        );
-      }
-
-      // Update existing characters (within transaction for atomicity)
-      if (existingCharactersToUpdate.length > 0) {
-        const now = new Date();
-        for (const { existing, data } of existingCharactersToUpdate) {
-          await tx
-            .update(characters)
-            .set({
-              name: data.name ?? data.tag,
-              displayName: data.displayName,
-              color: data.color,
-              updatedAt: now,
-            })
-            .where(eq(characters.id, existing.id));
-        }
-      }
-    });
-
-    // Phase 3: Process parsed files to create labels with speaker linking
-    // Fetch characters once before processing files for speaker linking
+    // Phase 3: Process parsed files to create labels
+    // Fetch existing characters for speaker linking (will be empty if none imported yet)
     const charactersByTag = await fetchCharactersByTag(db, projectId);
 
     // Process each file in its own transaction to avoid long-lived locks

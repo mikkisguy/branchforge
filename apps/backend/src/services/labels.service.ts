@@ -16,7 +16,7 @@ import {
   routeConfigs,
   projectFiles,
 } from "../db/schema/index.js";
-import { eq, and, asc, or, isNull, inArray } from "drizzle-orm";
+import { eq, and, asc, or, isNull } from "drizzle-orm";
 import type { Label, LabelLine } from "../db/schema/index.js";
 import type { PublicLabel } from "@branchforge/shared";
 import { LabelStatus } from "@branchforge/shared";
@@ -277,29 +277,8 @@ export async function getLabel(
     updatedAt: row.line.updatedAt.toISOString(),
   }));
 
-  // Derive characters from the already-fetched lines to avoid redundant query
-  const speakerIds = Array.from(
-    new Set(
-      linesResult
-        .map((r) => r.line.speakerId)
-        .filter((id): id is string => id !== null)
-    )
-  );
-
-  let labelCharactersWithInfo: LabelCharacterWithInfo[] = [];
-  if (speakerIds.length > 0) {
-    const characterDetails = await db
-      .select()
-      .from(characters)
-      .where(inArray(characters.id, speakerIds));
-
-    labelCharactersWithInfo = characterDetails.map((c) => ({
-      id: c.id,
-      name: c.name,
-      displayName: c.displayName,
-      renpyTag: c.renpyTag,
-    }));
-  }
+  // Derive characters using the shared helper function
+  const labelCharactersWithInfo = await getDerivedCharactersForLabel(labelId);
 
   return {
     ...mapToPublicLabel(label),

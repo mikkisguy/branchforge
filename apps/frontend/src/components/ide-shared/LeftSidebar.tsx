@@ -98,6 +98,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
   const [showZipImportDialog, setShowZipImportDialog] = useState(false);
   const themeDropdownRef = useRef<HTMLDivElement>(null);
   const projectPopoverRef = useRef<HTMLDivElement>(null);
+  const projectsRef = useRef(projects);
 
   const isSettingsOpen = isSettingsOpenExternally ?? isSettingsOpenInternal;
   const setSettingsOpen = useCallback(
@@ -115,6 +116,11 @@ export function LeftSidebar(props: LeftSidebarProps) {
     const newState = !isCollapsed;
     onCollapsedChange(newState);
   };
+
+  // Keep projectsRef in sync with projects
+  useEffect(() => {
+    projectsRef.current = projects;
+  }, [projects]);
 
   // Close theme dropdown when clicking outside
   useEffect(() => {
@@ -147,15 +153,38 @@ export function LeftSidebar(props: LeftSidebarProps) {
 
   // Helper for handling successful project imports
   const handleImportSuccess = useCallback(
-    async (logMessage: string) => {
+    async (importedProject?: { id: string }) => {
       try {
+        // Refetch projects to get the latest list
         await refetchProjects?.();
+
+        // If a project was provided, switch to it
+        if (importedProject?.id) {
+          // Try to find the full project object in the updated list
+          // Use projectsRef.current to access the latest projects array after refetch
+          const latestProjects = projectsRef.current;
+          if (latestProjects) {
+            const fullProject = latestProjects.find(
+              (p) => p.id === importedProject.id
+            );
+            if (fullProject) {
+              setCurrentProject(fullProject);
+            } else {
+              // Project not found in list yet (race condition), will be available after refetch completes
+              // The refetch above should have updated the cache, so trigger a re-render
+              // Next render cycle should have the project in the list
+              console.warn(
+                "Imported project not found in list, will retry on next render"
+              );
+            }
+          }
+        }
       } catch {
         // Refetch failure is non-critical; user can manually refresh
-        console.warn(logMessage);
+        console.warn("Failed to refresh projects after import");
       }
     },
-    [refetchProjects]
+    [refetchProjects, setCurrentProject]
   );
 
   return (
@@ -499,18 +528,14 @@ export function LeftSidebar(props: LeftSidebarProps) {
       <GitLabImportDialog
         open={showGitLabImportDialog}
         onOpenChange={setShowGitLabImportDialog}
-        onSuccess={() =>
-          handleImportSuccess("Failed to refresh projects after GitLab import")
-        }
+        onSuccess={handleImportSuccess}
       />
 
       {/* ZIP Import Dialog */}
       <ZipImportProjectDialog
         open={showZipImportDialog}
         onOpenChange={setShowZipImportDialog}
-        onSuccess={() =>
-          handleImportSuccess("Failed to refresh projects after ZIP import")
-        }
+        onSuccess={handleImportSuccess}
       />
     </>
   );

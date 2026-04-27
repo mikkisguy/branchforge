@@ -465,6 +465,98 @@ describe("LabelsService (Integration)", () => {
       expect(result?.characters[0].renpyTag).toBe("a");
     });
 
+    it("should dedupe characters with multiple speaking lines", async () => {
+      // Create two characters for the label
+      const character1: NewCharacter = {
+        id: testUuid("13000003", 1),
+        projectId: ownedProject.id!,
+        name: "Eileen",
+        displayName: "Eileen",
+        renpyTag: "a",
+        color: "#FF5733",
+      };
+
+      const character2: NewCharacter = {
+        id: testUuid("13000003", 2),
+        projectId: ownedProject.id!,
+        name: "Ben",
+        displayName: "Ben",
+        renpyTag: "b",
+        color: "#33FF57",
+      };
+
+      await db.insert(characters).values([character1, character2]);
+
+      // Create a label
+      const label: NewLabel = {
+        id: testUuid("13000002", 1),
+        projectId: ownedProject.id!,
+        title: "test_label",
+        labelNumber: 1,
+        sequenceOrder: 0,
+        visibility: "EXCLUSIVE",
+        status: "DRAFT",
+        prerequisites: {},
+        effects: {},
+        createdBy: testUserId,
+        updatedBy: testUserId,
+      };
+
+      await db.insert(labels).values(label);
+
+      // Create label lines with one character appearing multiple times
+      const line1: NewLabelLine = {
+        id: testUuid("13000004", 1),
+        labelId: label.id!,
+        sequence: 1,
+        content: "Hello from Eileen!",
+        contentType: "DIALOGUE",
+        speakerId: character1.id!,
+        visualType: "GENERATED",
+      };
+
+      const line2: NewLabelLine = {
+        id: testUuid("13000004", 2),
+        labelId: label.id!,
+        sequence: 2,
+        content: "Hi Eileen!",
+        contentType: "DIALOGUE",
+        speakerId: character2.id!,
+        visualType: "GENERATED",
+      };
+
+      const line3: NewLabelLine = {
+        id: testUuid("13000004", 3),
+        labelId: label.id!,
+        sequence: 3,
+        content: "Eileen again!",
+        contentType: "DIALOGUE",
+        speakerId: character1.id!,
+        visualType: "GENERATED",
+      };
+
+      await db.insert(labelLines).values([line1, line2, line3]);
+
+      const result = await getLabel(label.id!, testUserId);
+
+      // Should return exactly 2 unique characters despite Eileen appearing twice
+      expect(result?.characters).toHaveLength(2);
+
+      // Verify both characters are present with correct properties
+      const eileenChar = result?.characters.find((c) => c.renpyTag === "a");
+      const benChar = result?.characters.find((c) => c.renpyTag === "b");
+
+      expect(eileenChar).toBeDefined();
+      expect(eileenChar?.name).toBe("Eileen");
+      expect(eileenChar?.displayName).toBe("Eileen");
+      expect(eileenChar?.renpyTag).toBe("a");
+
+      expect(benChar).toBeDefined();
+      expect(benChar?.name).toBe("Ben");
+      expect(benChar?.displayName).toBe("Ben");
+      expect(benChar?.renpyTag).toBe("b");
+    });
+
     it("should return null when label not found", async () => {
       const result = await getLabel(testUuid("13000002", 999999), testUserId);
       expect(result).toBeNull();

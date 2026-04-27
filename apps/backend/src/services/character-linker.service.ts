@@ -3,11 +3,23 @@
  *
  * Links character tags in dialogue to labelLines.speakerId.
  * Handles exact matches, case-insensitive fallback, and special characters.
+ *
+ * Parses RPY files directly to extract speaker information, ensuring that
+ * label_lines.content contains only the dialogue/narration text without speaker prefix.
  */
 
 import { getDb } from "../db/index.js";
-import { labelLines, characters, labels } from "../db/schema/index.js";
+import {
+  labelLines,
+  characters,
+  labels,
+  projectFiles,
+} from "../db/schema/index.js";
 import { eq, and, inArray, isNull, sql } from "drizzle-orm";
+import {
+  parseRPYFileWithLabels,
+  convertToBranchForgeFormatFromLabels,
+} from "./rpy-parser.service.js";
 
 /**
  * Conflict information for speaker linking
@@ -50,36 +62,16 @@ class CharacterLinkerService {
   }
 
   /**
-   * Extract speaker tag from dialogue content
-   * Handles RPY dialogue format: tag "text" or "text" for narration
-   */
-  private extractSpeakerTag(
-    content: string,
-    contentType: string
-  ): string | null {
-    // Only process DIALOGUE type
-    if (contentType !== "DIALOGUE") return null;
-
-    const trimmed = content.trim();
-
-    // Try to match dialogue with speaker: tag "text"
-    // Handles both single and double quotes
-    const speakerMatch = trimmed.match(
-      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"([^"]*)"$/
-    );
-    if (speakerMatch) return speakerMatch[1];
-
-    const speakerMatch2 = trimmed.match(
-      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+'([^']*)'$/
-    );
-    if (speakerMatch2) return speakerMatch2[1];
-
-    // No speaker found (narration)
-    return null;
-  }
-
-  /**
-   * Link speakers to lines for a single label
+   * Link speakers to lines for labels in a project
+   *
+   * This method parses the original RPY files to extract speaker information,
+   * then links speakers to label_lines by matching character tags.
+   *
+   * Process:
+   * 1. Get all labels and their project_files
+   * 2. Parse RPY files to extract dialogue entries with speakers
+   * 3. Match speakers to characters by renpyTag
+   * 4. Update label_lines.speakerId for each dialogue line
    */
   async linkSpeakersToLines(
     projectId: string,
@@ -107,17 +99,39 @@ class CharacterLinkerService {
       characterByTagLower.set(char.renpyTag.toLowerCase(), char.id);
     }
 
+    // Get all labels with their project files
+    const labelsWithFiles = await db
+      .select({
+        labelId: labels.id,
+        labelName: labels.labelName,
+        projectFileId: labels.projectFileId,
+      })
+      .from(labels)
+      .where(inArray(labels.id, labelIds));
+
     // Get all dialogue lines for these labels
     const allLines = await db
       .select({
         id: labelLines.id,
-        content: labelLines.content,
+        labelId: labelLines.labelId,
+        rpyLineNumber: labelLines.rpyLineNumber,
         contentType: labelLines.contentType,
       })
       .from(labelLines)
       .where(
         and(inArray(labelLines.labelId, labelIds), isNull(labelLines.deletedAt))
       );
+
+    // Group lines by labelId for efficient processing
+    const linesByLabel = new Map<string, typeof allLines>();
+    for (const line of allLines) {
+      const existing = linesByLabel.get(line.labelId);
+      if (existing) {
+        existing.push(line);
+      } else {
+        linesByLabel.set(line.labelId, [line]);
+      }
+    }
 
     // Track unique speaker tags that couldn't be matched
     const unmatchedTags = new Set<string>();
@@ -126,33 +140,123 @@ class CharacterLinkerService {
     // Build updates in batch
     const updates: Array<{ lineId: string; speakerId: string | null }> = [];
 
-    for (const line of allLines) {
-      const speakerTag = this.extractSpeakerTag(line.content, line.contentType);
+    // Collect unique project file IDs to avoid N+1 queries
+    const uniqueProjectFileIds = Array.from(
+      new Set(
+        labelsWithFiles
+          .map((l) => l.projectFileId)
+          .filter((id): id is string => !!id)
+      )
+    );
 
-      if (!this.shouldLinkTag(speakerTag, excludedTags)) {
-        // Set to null for excluded/special tags
-        if (speakerTag) {
+    // Fetch all unique project files in a single query
+    const projectFileMap = new Map<
+      string,
+      { content: string; filePath: string }
+    >();
+    if (uniqueProjectFileIds.length > 0) {
+      const files = await db
+        .select({
+          id: projectFiles.id,
+          content: projectFiles.content,
+          filePath: projectFiles.filePath,
+        })
+        .from(projectFiles)
+        .where(inArray(projectFiles.id, uniqueProjectFileIds));
+
+      for (const file of files) {
+        projectFileMap.set(file.id, {
+          content: file.content,
+          filePath: file.filePath,
+        });
+      }
+    }
+
+    // Parse each unique file once and cache the parsed result
+    const parsedFileCache = new Map<
+      string,
+      ReturnType<typeof parseRPYFileWithLabels>
+    >();
+    for (const [fileId, fileData] of projectFileMap) {
+      const parsed = parseRPYFileWithLabels(
+        fileData.content,
+        fileData.filePath
+      );
+      parsedFileCache.set(fileId, parsed);
+    }
+
+    // Process each label
+    for (const labelInfo of labelsWithFiles) {
+      if (!labelInfo.projectFileId || !labelInfo.labelName) continue;
+
+      // Get the project file content and parsed data from cache
+      const projectFileData = projectFileMap.get(labelInfo.projectFileId);
+      const parsed = parsedFileCache.get(labelInfo.projectFileId);
+
+      if (!projectFileData?.content || !parsed) continue;
+
+      // Find the label in the parsed file
+      const parsedLabel = parsed.labels.find(
+        (l) => l.label === labelInfo.labelName
+      );
+      if (!parsedLabel) continue;
+
+      // Convert to BranchForge format to get entries
+      const labelData = convertToBranchForgeFormatFromLabels(
+        parsed,
+        labelInfo.labelName,
+        projectFileData.content
+      );
+
+      // Build a map of RPY line number -> speaker for this label
+      const speakerByLineNumber = new Map<number, string | null>();
+      for (const entry of labelData.entries) {
+        if (
+          entry.type === "DIALOGUE" &&
+          entry.speaker &&
+          entry.lineNumber !== undefined
+        ) {
+          speakerByLineNumber.set(entry.lineNumber, entry.speaker);
+        }
+      }
+
+      // Get lines for this label
+      const linesForLabel = linesByLabel.get(labelInfo.labelId) || [];
+      for (const line of linesForLabel) {
+        // Skip non-dialogue lines
+        if (line.contentType !== "DIALOGUE") continue;
+
+        // Skip lines without RPY line number
+        if (!line.rpyLineNumber) continue;
+
+        // Get the speaker from the parsed RPY content using RPY line number
+        const speakerTag = speakerByLineNumber.get(line.rpyLineNumber) || null;
+
+        if (!this.shouldLinkTag(speakerTag, excludedTags)) {
+          // Set to null for excluded/special tags
+          if (speakerTag) {
+            updates.push({ lineId: line.id, speakerId: null });
+          }
+          continue;
+        }
+
+        if (!speakerTag) continue;
+
+        // Try exact match
+        let characterId = characterByTag.get(speakerTag);
+
+        // Try case-insensitive match
+        if (!characterId) {
+          characterId = characterByTagLower.get(speakerTag.toLowerCase());
+        }
+
+        if (characterId) {
+          updates.push({ lineId: line.id, speakerId: characterId });
+          linkedCount++;
+        } else {
+          unmatchedTags.add(speakerTag);
           updates.push({ lineId: line.id, speakerId: null });
         }
-        continue;
-      }
-
-      if (!speakerTag) continue;
-
-      // Try exact match
-      let characterId = characterByTag.get(speakerTag);
-
-      // Try case-insensitive match
-      if (!characterId) {
-        characterId = characterByTagLower.get(speakerTag.toLowerCase());
-      }
-
-      if (characterId) {
-        updates.push({ lineId: line.id, speakerId: characterId });
-        linkedCount++;
-      } else {
-        unmatchedTags.add(speakerTag);
-        updates.push({ lineId: line.id, speakerId: null });
       }
     }
 
@@ -184,26 +288,57 @@ class CharacterLinkerService {
 
   /**
    * Get all unique speaker tags from a label's lines
+   * Parses RPY files directly to extract speaker information
    */
   async getSpeakerTagsForLabel(labelId: string): Promise<string[]> {
     const db = getDb();
 
-    const lines = await db
+    // Get the label with its project file
+    const [label] = await db
       .select({
-        content: labelLines.content,
-        contentType: labelLines.contentType,
+        labelName: labels.labelName,
+        projectFileId: labels.projectFileId,
       })
-      .from(labelLines)
-      .where(
-        and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt))
-      );
+      .from(labels)
+      .where(eq(labels.id, labelId))
+      .limit(1);
 
+    if (!label?.projectFileId || !label.labelName) return [];
+
+    // Get the project file content
+    const [projectFile] = await db
+      .select({
+        content: projectFiles.content,
+        filePath: projectFiles.filePath,
+      })
+      .from(projectFiles)
+      .where(eq(projectFiles.id, label.projectFileId))
+      .limit(1);
+
+    if (!projectFile?.content) return [];
+
+    // Parse the RPY file
+    const parsed = parseRPYFileWithLabels(
+      projectFile.content,
+      projectFile.filePath
+    );
+
+    // Find the label in the parsed file
+    const parsedLabel = parsed.labels.find((l) => l.label === label.labelName);
+    if (!parsedLabel) return [];
+
+    // Convert to BranchForge format to get entries
+    const labelData = convertToBranchForgeFormatFromLabels(
+      parsed,
+      label.labelName,
+      projectFile.content
+    );
+
+    // Extract unique speaker tags
     const speakerTags = new Set<string>();
-
-    for (const line of lines) {
-      const speakerTag = this.extractSpeakerTag(line.content, line.contentType);
-      if (speakerTag) {
-        speakerTags.add(speakerTag);
+    for (const entry of labelData.entries) {
+      if (entry.type === "DIALOGUE" && entry.speaker) {
+        speakerTags.add(entry.speaker);
       }
     }
 
@@ -222,18 +357,17 @@ class CharacterLinkerService {
     const db = getDb();
 
     // Get total lines for project (via labels)
-    const [totalResult] = await db
+    const totalResult = await db
       .select({ count: sql<number>`count(*)` })
       .from(labelLines)
       .innerJoin(labels, eq(labelLines.labelId, labels.id))
-      .where(
-        and(eq(labels.projectId, projectId), isNull(labelLines.deletedAt))
-      );
+      .where(and(eq(labels.projectId, projectId), isNull(labelLines.deletedAt)))
+      .then((rows) => rows[0]);
 
     const totalLines = Number(totalResult?.count) || 0;
 
     // Get linked lines for project
-    const [linkedResult] = await db
+    const linkedResult = await db
       .select({ count: sql<number>`count(*)` })
       .from(labelLines)
       .innerJoin(labels, eq(labelLines.labelId, labels.id))
@@ -243,12 +377,13 @@ class CharacterLinkerService {
           isNull(labelLines.deletedAt),
           sql`${labelLines.speakerId} IS NOT NULL`
         )
-      );
+      )
+      .then((rows) => rows[0]);
 
     const linkedLines = Number(linkedResult?.count) || 0;
 
     // Get unique speakers for project
-    const [uniqueSpeakersResult] = await db
+    const uniqueSpeakersResult = await db
       .select({ count: sql<number>`count(distinct ${labelLines.speakerId})` })
       .from(labelLines)
       .innerJoin(labels, eq(labelLines.labelId, labels.id))
@@ -258,7 +393,8 @@ class CharacterLinkerService {
           isNull(labelLines.deletedAt),
           sql`${labelLines.speakerId} IS NOT NULL`
         )
-      );
+      )
+      .then((rows) => rows[0]);
 
     const uniqueSpeakers = Number(uniqueSpeakersResult?.count) || 0;
 
