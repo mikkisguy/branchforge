@@ -36,6 +36,8 @@ import { calculateLinesHash, calculateContentHash } from "../lib/hash.js";
 import { type DetectedCharacter } from "./character-parser.service.js";
 import { projectSettings } from "../db/schema/index.js";
 import { mapEntriesToLabelLineValues } from "./label-line-mapper.js";
+import { logError, logWarn } from "../lib/logger.js";
+import type { ProjectFile } from "../db/schema/tables/project-files.js";
 
 /**
  * Simple concurrency limiter for parallel async operations
@@ -452,7 +454,7 @@ export async function importFromGitlab(
       file: (typeof rpyFiles)[0];
       content: string;
       parsed: ParsedRPYFileWithLabels;
-      projectFile: { id: string };
+      projectFile: ProjectFile;
     }> = [];
 
     for (const result of fileFetchResults) {
@@ -550,118 +552,171 @@ export async function importFromGitlab(
     const charactersByTag = await fetchCharactersByTag(db, projectId);
 
     // Process each file in its own transaction to avoid long-lived locks
+    // Wrap each transaction in try-catch so individual file failures don't
+    // abort the whole import — earlier files that already committed are preserved.
+    const fileProcessingFailures: Array<{
+      projectFileId: string;
+      error: string;
+    }> = [];
+
     for (const { parsed, projectFile, content } of parsedFiles) {
-      await db.transaction(async (tx) => {
-        // For STORY files, import labels as scenes
-        if (parsed.fileType === "STORY") {
-          // Fetch all scenes for this file once to avoid N+1 queries
-          // Exclude soft-deleted rows so scenesByLabel only treats active labels as existing
-          const fileScenes = await tx
-            .select()
-            .from(labels)
-            .where(
-              and(
-                eq(labels.projectFileId, projectFile.id),
-                isNull(labels.deletedAt)
-              )
-            );
+      try {
+        await db.transaction(async (tx) => {
+          // For STORY files, import labels as scenes
+          if (parsed.fileType === "STORY") {
+            // Fetch all scenes for this file once to avoid N+1 queries
+            // Include soft-deleted rows so the revive path can clear deletedAt
+            const fileScenes = await tx
+              .select()
+              .from(labels)
+              .where(eq(labels.projectFileId, projectFile.id));
 
-          // Build a Map keyed by labelName for O(1) lookups
-          const scenesByLabel = new Map<string, (typeof fileScenes)[0]>();
-          for (const scene of fileScenes) {
-            if (scene.labelName) {
-              scenesByLabel.set(scene.labelName, scene);
-            }
-          }
-
-          for (let i = 0; i < parsed.labels.length; i++) {
-            const label = parsed.labels[i];
-
-            // Check if scene already exists for this file+label (Map lookup)
-            const existingScene = scenesByLabel.get(label.label);
-
-            const labelData = convertToBranchForgeFormatFromLabels(
-              parsed,
-              label.label,
-              content
-            );
-
-            // Calculate content hash for the label's lines
-            const contentHash = calculateLinesHash(labelData.entries);
-
-            if (existingScene && conflictResolution === "manual_review") {
-              // Count as conflict for manual review
-              conflictCount++;
-            } else if (existingScene && conflictResolution === "gitlab_wins") {
-              // Update existing scene
-              await tx
-                .delete(labelLines)
-                .where(eq(labelLines.labelId, existingScene.id));
-
-              const allValues = mapEntriesToLabelLineValues(
-                labelData.entries,
-                existingScene.id,
-                projectFile.id,
-                charactersByTag
-              );
-
-              if (allValues.length > 0) {
-                await tx.insert(labelLines).values(allValues);
-              }
-
-              // Update label metadata (clear deletedAt to revive if soft-deleted)
-              await tx
-                .update(labels)
-                .set({
-                  contentHash,
-                  lastSyncedHash: contentHash,
-                  syncStatus: "SYNCED",
-                  lastImportedAt: new Date(),
-                  importCommitSha,
-                  updatedAt: new Date(),
-                  deletedAt: null,
-                })
-                .where(eq(labels.id, existingScene.id));
-            } else if (!existingScene) {
-              // Create new scene with proper file linkage
-              const [newScene] = await tx
-                .insert(labels)
-                .values({
-                  projectId,
-                  title: label.label,
-                  projectFileId: projectFile.id,
-                  labelName: label.label,
-                  labelPosition: i,
-                  sequenceOrder: i,
-                  route: null, // User will assign route later
-                  labelNumber: i + 1,
-                  status: "DRAFT",
-                  prerequisites: {},
-                  effects: {},
-                  // Sync fields
-                  contentHash,
-                  lastSyncedHash: contentHash,
-                  syncStatus: "SYNCED",
-                  lastImportedAt: new Date(),
-                  importCommitSha,
-                })
-                .returning();
-
-              const allValues = mapEntriesToLabelLineValues(
-                labelData.entries,
-                newScene.id,
-                projectFile.id,
-                charactersByTag
-              );
-
-              if (allValues.length > 0) {
-                await tx.insert(labelLines).values(allValues);
+            // Build a Map keyed by labelName for O(1) lookups
+            const scenesByLabel = new Map<string, (typeof fileScenes)[0]>();
+            for (const scene of fileScenes) {
+              if (scene.labelName) {
+                scenesByLabel.set(scene.labelName, scene);
               }
             }
-            // If branchforge_wins, do nothing (keep local data)
+
+            for (let i = 0; i < parsed.labels.length; i++) {
+              const label = parsed.labels[i];
+
+              // Check if scene already exists for this file+label (Map lookup)
+              const existingScene = scenesByLabel.get(label.label);
+
+              const labelData = convertToBranchForgeFormatFromLabels(
+                parsed,
+                label.label,
+                content
+              );
+
+              // Calculate content hash for the label's lines
+              const contentHash = calculateLinesHash(labelData.entries);
+
+              if (existingScene && existingScene.deletedAt) {
+                // Scene exists but is soft-deleted - revive it (update lines and clear deletedAt)
+                await tx
+                  .delete(labelLines)
+                  .where(eq(labelLines.labelId, existingScene.id));
+
+                const allValues = mapEntriesToLabelLineValues(
+                  labelData.entries,
+                  existingScene.id,
+                  projectFile.id,
+                  charactersByTag
+                );
+
+                if (allValues.length > 0) {
+                  await tx.insert(labelLines).values(allValues);
+                }
+
+                // Revive the soft-deleted label
+                await tx
+                  .update(labels)
+                  .set({
+                    contentHash,
+                    lastSyncedHash: contentHash,
+                    syncStatus: "SYNCED",
+                    lastImportedAt: new Date(),
+                    importCommitSha,
+                    updatedAt: new Date(),
+                    deletedAt: null,
+                  })
+                  .where(eq(labels.id, existingScene.id));
+              } else if (existingScene && !existingScene.deletedAt) {
+                // Scene exists and is active - apply conflict resolution
+                if (conflictResolution === "manual_review") {
+                  // Only count as a conflict if the content has actually changed
+                  if (
+                    existingScene.contentHash !== contentHash &&
+                    existingScene.lastSyncedHash !== contentHash
+                  ) {
+                    conflictCount++;
+                  }
+                } else if (conflictResolution === "gitlab_wins") {
+                  // Update existing scene
+                  await tx
+                    .delete(labelLines)
+                    .where(eq(labelLines.labelId, existingScene.id));
+
+                  const allValues = mapEntriesToLabelLineValues(
+                    labelData.entries,
+                    existingScene.id,
+                    projectFile.id,
+                    charactersByTag
+                  );
+
+                  if (allValues.length > 0) {
+                    await tx.insert(labelLines).values(allValues);
+                  }
+
+                  // Update label metadata
+                  await tx
+                    .update(labels)
+                    .set({
+                      contentHash,
+                      lastSyncedHash: contentHash,
+                      syncStatus: "SYNCED",
+                      lastImportedAt: new Date(),
+                      importCommitSha,
+                      updatedAt: new Date(),
+                    })
+                    .where(eq(labels.id, existingScene.id));
+                }
+                // If branchforge_wins, do nothing (keep local data)
+              } else {
+                // Scene doesn't exist - create new scene
+                const [newScene] = await tx
+                  .insert(labels)
+                  .values({
+                    projectId,
+                    title: label.label,
+                    projectFileId: projectFile.id,
+                    labelName: label.label,
+                    labelPosition: i,
+                    sequenceOrder: i,
+                    route: null, // User will assign route later
+                    labelNumber: i + 1,
+                    status: "DRAFT",
+                    prerequisites: {},
+                    effects: {},
+                    // Sync fields
+                    contentHash,
+                    lastSyncedHash: contentHash,
+                    syncStatus: "SYNCED",
+                    lastImportedAt: new Date(),
+                    importCommitSha,
+                  })
+                  .returning();
+
+                const allValues = mapEntriesToLabelLineValues(
+                  labelData.entries,
+                  newScene.id,
+                  projectFile.id,
+                  charactersByTag
+                );
+
+                if (allValues.length > 0) {
+                  await tx.insert(labelLines).values(allValues);
+                }
+              }
+            }
           }
-        }
-      });
+        });
+      } catch (fileError) {
+        const errorMessage =
+          fileError instanceof Error ? fileError.message : String(fileError);
+        logError("gitlab_sync.file_import_failed", {
+          projectId,
+          projectFileId: projectFile.id,
+          error: errorMessage,
+        });
+        fileProcessingFailures.push({
+          projectFileId: projectFile.id,
+          error: errorMessage,
+        });
+      }
     }
 
     // If all file fetches failed, mark operation as failed
@@ -679,18 +734,65 @@ export async function importFromGitlab(
       };
     }
 
-    // Mark operation as completed
-    await updateSyncOperation(operation.id, {
-      status: "COMPLETED",
-      conflictCount,
-    });
+    // Determine final status based on file processing failures
+    const successfulFiles = parsedFiles.length - fileProcessingFailures.length;
+    const totalFiles = parsedFiles.length;
 
-    return {
-      ...operation,
-      status: "COMPLETED",
-      conflictCount,
-      detectedCharacters,
-    };
+    if (fileProcessingFailures.length === 0) {
+      // All files processed successfully
+      await updateSyncOperation(operation.id, {
+        status: "COMPLETED",
+        conflictCount,
+      });
+
+      return {
+        ...operation,
+        status: "COMPLETED",
+        conflictCount,
+        detectedCharacters,
+      };
+    } else if (successfulFiles === 0) {
+      // Every file failed during processing
+      const errorMessage = `All ${totalFiles} file(s) failed during import`;
+      await updateSyncOperation(operation.id, {
+        status: "FAILED",
+        errorMessage,
+      });
+
+      return {
+        ...operation,
+        status: "FAILED",
+        errorMessage,
+        detectedCharacters,
+      };
+    } else {
+      // Partial success: some files succeeded, some failed
+      const failureSummary = fileProcessingFailures
+        .map((f) => f.projectFileId)
+        .join(", ");
+      const errorMessage =
+        `${successfulFiles}/${totalFiles} file(s) imported successfully. ` +
+        `Failed file(s): ${failureSummary}`;
+      logWarn("gitlab_sync.partial_import", {
+        projectId,
+        successfulFiles,
+        totalFiles,
+        failures: fileProcessingFailures,
+      });
+      await updateSyncOperation(operation.id, {
+        status: "COMPLETED",
+        conflictCount,
+        errorMessage,
+      });
+
+      return {
+        ...operation,
+        status: "COMPLETED",
+        conflictCount,
+        errorMessage,
+        detectedCharacters,
+      };
+    }
   } catch (error) {
     // Mark operation as failed
     const errorMessage =

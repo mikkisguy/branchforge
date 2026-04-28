@@ -373,7 +373,7 @@ export async function syncLabelsFromGitLabFile(
                 linesProcessed += lineValues.length;
               }
 
-              // Update label sync metadata
+              // Update label sync metadata (clear deletedAt to revive if soft-deleted)
               await tx
                 .update(labels)
                 .set({
@@ -381,6 +381,7 @@ export async function syncLabelsFromGitLabFile(
                   lastSyncedHash: labelLinesHash,
                   syncStatus: "SYNCED",
                   updatedAt: new Date(),
+                  deletedAt: null,
                 })
                 .where(eq(labels.id, existingLabel.id));
 

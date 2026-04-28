@@ -134,8 +134,8 @@ class CharacterLinkerService {
       }
     }
 
-    // Track unique speaker tags that couldn't be matched
-    const unmatchedTags = new Set<string>();
+    // Track unmatched speaker tags and their occurrence counts
+    const unmatchedTagCounts = new Map<string, number>();
     let linkedCount = 0;
 
     // Build updates in batch
@@ -238,19 +238,17 @@ class CharacterLinkerService {
         // Get the speaker from the parsed RPY content using RPY line number
         const speakerTag = speakerByLineNumber.get(line.rpyLineNumber) || null;
 
-        if (!this.shouldLinkTag(speakerTag, excludedTags)) {
-          // Set to null for excluded/special tags
-          if (speakerTag) {
-            updates.push({ lineId: line.id, speakerId: null });
-          }
-          continue;
-        }
-
         // Clear stale speakerId for lines with no matching speaker tag
         if (!speakerTag) {
           if (line.speakerId) {
             updates.push({ lineId: line.id, speakerId: null });
           }
+          continue;
+        }
+
+        if (!this.shouldLinkTag(speakerTag, excludedTags)) {
+          // Set to null for excluded/special tags
+          updates.push({ lineId: line.id, speakerId: null });
           continue;
         }
 
@@ -266,7 +264,8 @@ class CharacterLinkerService {
           updates.push({ lineId: line.id, speakerId: characterId });
           linkedCount++;
         } else {
-          unmatchedTags.add(speakerTag);
+          const currentCount = unmatchedTagCounts.get(speakerTag) || 0;
+          unmatchedTagCounts.set(speakerTag, currentCount + 1);
           updates.push({ lineId: line.id, speakerId: null });
         }
       }
@@ -297,17 +296,17 @@ class CharacterLinkerService {
     }
 
     // Build conflict info for unmatched tags
-    const conflicts: SpeakerLinkConflict[] = Array.from(unmatchedTags).map(
-      (tag) => ({
-        speakerTag: tag,
-        matchedCharacterId: null,
-        lineCount: 0, // Would need additional query to count
-      })
-    );
+    const conflicts: SpeakerLinkConflict[] = Array.from(
+      unmatchedTagCounts.keys()
+    ).map((speakerTag) => ({
+      speakerTag,
+      matchedCharacterId: null,
+      lineCount: unmatchedTagCounts.get(speakerTag) || 0,
+    }));
 
     return {
       linked: linkedCount,
-      unmatched: Array.from(unmatchedTags),
+      unmatched: Array.from(unmatchedTagCounts.keys()),
       conflicts,
     };
   }

@@ -151,6 +151,7 @@ export function mapEntryToDbType(entry: {
 /**
  * Helper function to get character ID by renpyTag
  * Returns null if character not found
+ * Performs exact match first, then falls back to case-insensitive lookup.
  *
  * @param renpyTag - Character's Ren'Py tag
  * @param charactersByTag - Map of renpyTag to character ID
@@ -161,7 +162,16 @@ export function getCharacterIdByTag(
   charactersByTag: Map<string, string>
 ): string | null {
   if (!renpyTag) return null;
-  return charactersByTag.get(renpyTag) ?? null;
+
+  const exact = charactersByTag.get(renpyTag);
+  if (exact) return exact;
+
+  const lower = renpyTag.toLowerCase();
+  for (const [key, value] of charactersByTag) {
+    if (key.toLowerCase() === lower) return value;
+  }
+
+  return null;
 }
 
 /**
