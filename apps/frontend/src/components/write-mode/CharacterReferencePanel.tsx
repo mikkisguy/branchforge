@@ -66,23 +66,30 @@ export function CharacterReferencePanel({
       >
         <div className="h-full overflow-y-auto relative">
           <div className="sticky top-0 z-20 bg-card border-b border-border px-4 py-3">
-            {onCollapseToggle && (
-              <button
-                type="button"
-                onClick={onCollapseToggle}
-                className="absolute top-2 right-2 z-30 p-1 rounded-md hover:bg-muted/80 transition-colors"
-                aria-label="Collapse character reference sidebar"
-                title="Collapse character reference sidebar"
-              >
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </button>
-            )}
-            <h2 className="text-sm font-semibold tracking-wide">Characters</h2>
-            {activeLabel && (
-              <p className="text-xs text-muted-foreground mt-1">
-                {resolvedLabelChars.length} in label · {characters.length} total
-              </p>
-            )}
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-sm font-semibold tracking-wide">
+                  Characters
+                </h2>
+                {activeLabel && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {resolvedLabelChars.length} in label · {characters.length}{" "}
+                    total
+                  </p>
+                )}
+              </div>
+              {onCollapseToggle && (
+                <button
+                  type="button"
+                  onClick={onCollapseToggle}
+                  className="p-1 rounded-md hover:bg-muted/80 transition-colors"
+                  aria-label="Collapse character reference sidebar"
+                  title="Collapse character reference sidebar"
+                >
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="p-3 space-y-4">
@@ -126,7 +133,7 @@ export function CharacterReferencePanel({
                       {resolvedLabelChars.map((character) => (
                         <div
                           key={character.id}
-                          className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-muted transition-colors focus-within:bg-muted group"
+                          className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-muted transition-colors group"
                         >
                           <div
                             className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0 shadow-sm"
@@ -164,7 +171,7 @@ export function CharacterReferencePanel({
                       {otherCharacters.map((character) => (
                         <div
                           key={character.id}
-                          className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted transition-colors focus-within:bg-muted group"
+                          className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted transition-colors group"
                         >
                           <div
                             className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs shrink-0 shadow-sm"

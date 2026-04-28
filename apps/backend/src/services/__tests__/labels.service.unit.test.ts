@@ -12,18 +12,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { RENPY_LABEL_REGEX } from "@branchforge/shared";
 
-// Mock the label-characters schema table before importing the service
-// This prevents circular dependency issues in the test environment
-vi.mock("../../db/schema/tables/label-characters.js", () => ({
-  labelCharacters: {
-    role: "role",
-    emotion: "emotion",
-    notes: "notes",
-    labelId: "labelId",
-    characterId: "characterId",
-  },
-}));
-
 // Now import the service after the mock is set up
 import { listLabels, deleteLabel } from "../labels.service.js";
 
@@ -76,11 +64,16 @@ const mockSelect = vi.fn(createEmptyMockChain);
 // Additional mocks for deleteLabel tests (project file sync)
 const mockUpdate = vi.fn();
 const mockTransaction = vi.fn();
+const mockInsert = vi.fn();
+const mockDelete = vi.fn();
 
 const mockDb = {
   select: mockSelect,
+  selectDistinct: mockSelect,
   update: mockUpdate,
   transaction: mockTransaction,
+  insert: mockInsert,
+  delete: mockDelete,
 };
 
 vi.mock("../../db/index.js", () => ({

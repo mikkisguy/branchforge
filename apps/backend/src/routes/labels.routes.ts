@@ -13,9 +13,11 @@ import {
   createLabel,
   updateLabel,
   deleteLabel,
+  getLabelCharacters,
   type PublicLabel,
   type LabelDetail,
   type ListLabelsFilters,
+  type LabelCharacterWithInfo,
 } from "../services/labels.service.js";
 import { authenticate } from "../middleware/auth.middleware.js";
 import {
@@ -94,6 +96,10 @@ interface UpdateLabelDialogueResponse {
     currentVersion: number;
     currentContentHash: string | null;
   };
+}
+
+interface LabelCharactersResponse {
+  characters: LabelCharacterWithInfo[];
 }
 
 /**
@@ -797,6 +803,41 @@ async function deleteLabelHandler(
   }
 }
 
+/**
+ * Get all characters for a label
+ *
+ * GET /labels/:labelId/characters
+ * Requires authentication
+ */
+async function getLabelCharactersHandler(
+  request: FastifyRequest<{ Params: GetLabelParams }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { labelId } = request.params;
+  const user = request.user!;
+
+  try {
+    const labelCharacters = await getLabelCharacters(labelId, user.id);
+    reply
+      .status(200)
+      .send({ characters: labelCharacters } as LabelCharactersResponse);
+  } catch (error) {
+    request.log.error(error);
+
+    // Handle known error types
+    if (error instanceof NotFoundError) {
+      reply.status(404).send({ error: "Label not found" } as ErrorResponse);
+      return;
+    }
+    if (error instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      return;
+    }
+
+    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+  }
+}
+
 // ============================================================================
 // Routes Registration
 // ============================================================================
@@ -856,5 +897,13 @@ export async function labelsRoutes(fastify: FastifyInstance): Promise<void> {
       ],
     },
     updateLabelDialogueHandler
+  );
+  fastify.get<{ Params: GetLabelParams }>(
+    "/labels/:labelId/characters",
+    {
+      onRequest: authenticate,
+      preValidation: validateParams(labelIdParamsSchema),
+    },
+    getLabelCharactersHandler
   );
 }

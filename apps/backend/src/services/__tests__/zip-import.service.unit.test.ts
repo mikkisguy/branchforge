@@ -59,6 +59,7 @@ vi.mock("../label-sync.service.js", () => ({
     linesProcessed: 0,
     errors: [],
     skipped: false,
+    affectedLabelIds: [],
   }),
 }));
 
@@ -324,6 +325,7 @@ describe("ZipImportService", () => {
         linesProcessed: 0,
         errors: [{ label: "start", error: "Failed to process label" }],
         skipped: false,
+        affectedLabelIds: [],
       });
 
       const result = await importZipFile(mockProjectId, mockBuffer);

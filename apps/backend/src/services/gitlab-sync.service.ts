@@ -35,6 +35,9 @@ import {
 import { calculateLinesHash, calculateContentHash } from "../lib/hash.js";
 import { type DetectedCharacter } from "./character-parser.service.js";
 import { projectSettings } from "../db/schema/index.js";
+import { mapEntriesToLabelLineValues } from "./label-line-mapper.js";
+import { logError, logWarn } from "../lib/logger.js";
+import type { ProjectFile } from "../db/schema/tables/project-files.js";
 
 /**
  * Simple concurrency limiter for parallel async operations
@@ -101,69 +104,6 @@ export interface ConflictDetectionResult {
   error?: string;
 }
 
-// Type for label line insert values
-interface LabelLineInsertValues {
-  labelId: string;
-  sequence: number;
-  contentType: "NARRATION" | "DIALOGUE" | "CHOICE" | "MENU" | "JUMP";
-  content: string;
-  speakerId?: string | null; // Optional speaker ID for dialogue lines
-  projectFileId?: string;
-  linePosition?: number;
-  contentHash?: string;
-  lastSyncedHash?: string;
-  lastSyncedAt?: Date;
-  rpyLineNumber?: number;
-  rpyIndentLevel?: number;
-}
-
-/**
- * Helper function to map RPY parser entry types to DB content types
- * Extracted to eliminate code duplication
- */
-function mapEntryToDbContentType(entry: {
-  type: string;
-  text?: string;
-  target?: string;
-}): {
-  contentType: "NARRATION" | "DIALOGUE" | "CHOICE" | "MENU" | "JUMP";
-  content: string;
-} {
-  let dbContentType: "NARRATION" | "DIALOGUE" | "CHOICE" | "MENU" | "JUMP";
-
-  if (entry.type === "FLAG") {
-    dbContentType = "JUMP"; // Map FLAG to JUMP for now
-  } else if (
-    entry.type === "NARRATION" ||
-    entry.type === "DIALOGUE" ||
-    entry.type === "JUMP"
-  ) {
-    dbContentType = entry.type as "NARRATION" | "DIALOGUE" | "JUMP";
-  } else {
-    dbContentType = "NARRATION"; // Default fallback
-  }
-
-  let content: string = entry.text || "";
-
-  if (entry.target && dbContentType === "JUMP") {
-    content = `jump ${entry.target}`;
-  }
-
-  return { contentType: dbContentType, content };
-}
-
-/**
- * Helper function to get character ID by renpyTag
- * Returns null if character not found
- */
-function getCharacterIdByTag(
-  renpyTag: string | undefined,
-  charactersByTag: Map<string, string>
-): string | null {
-  if (!renpyTag) return null;
-  return charactersByTag.get(renpyTag) ?? null;
-}
-
 // Type for Drizzle transaction - flexible interface to accept both typed and generic transactions
 // This avoids schema type inference issues while maintaining type safety for query methods
 interface Transaction {
@@ -182,12 +122,17 @@ async function fetchCharactersByTag(
   projectId: string
 ): Promise<Map<string, string>> {
   const projectCharacters = await tx
-    .select()
+    .select({
+      id: characters.id,
+      renpyTag: characters.renpyTag,
+    })
     .from(characters)
     .where(eq(characters.projectId, projectId));
 
   const charactersByTag = new Map<string, string>();
   for (const char of projectCharacters) {
+    // Skip characters with null/undefined/empty renpyTag
+    if (!char.renpyTag) continue;
     charactersByTag.set(char.renpyTag, char.id);
   }
   return charactersByTag;
@@ -509,7 +454,7 @@ export async function importFromGitlab(
       file: (typeof rpyFiles)[0];
       content: string;
       parsed: ParsedRPYFileWithLabels;
-      projectFile: { id: string };
+      projectFile: ProjectFile;
     }> = [];
 
     for (const result of fileFetchResults) {
@@ -570,7 +515,10 @@ export async function importFromGitlab(
       parsedFiles.push({ file, content, parsed, projectFile });
     }
 
-    // Phase 2: Import/update all detected characters
+    // Phase 2: Collect detected characters for return value
+    // Note: We don't import them here - let the frontend call detectCharacters
+    // after the sync, which will parse from project_files.content and show
+    // the import wizard for NEW characters only.
     const allDetected: DetectedCharacter[] = [];
     for (const { parsed } of parsedFiles) {
       allDetected.push(
@@ -596,216 +544,178 @@ export async function importFromGitlab(
       }
     }
 
-    // Set detectedCharacters for return value
+    // Set detectedCharacters for return value (for backwards compatibility)
     detectedCharacters = uniqueCharacters;
 
-    // Import detected characters into the database
-    const existingCharacters = await db
-      .select()
-      .from(characters)
-      .where(eq(characters.projectId, projectId));
+    // Phase 3: Process parsed files to create labels
+    // Fetch existing characters for speaker linking (will be empty if none imported yet)
+    const charactersByTag = await fetchCharactersByTag(db, projectId);
 
-    const existingByTag = new Map(
-      existingCharacters.map((c) => [c.renpyTag, c])
-    );
+    // Process each file in its own transaction to avoid long-lived locks
+    // Wrap each transaction in try-catch so individual file failures don't
+    // abort the whole import — earlier files that already committed are preserved.
+    const fileProcessingFailures: Array<{
+      projectFileId: string;
+      error: string;
+    }> = [];
 
-    // Create or update characters in a single transaction with bulk operations
-    await db.transaction(async (tx) => {
-      // Separate characters into new and existing for bulk operations
-      const newCharacters: typeof uniqueCharacters = [];
-      const existingCharactersToUpdate: Array<{
-        existing: (typeof existingCharacters)[0];
-        data: (typeof uniqueCharacters)[0];
-      }> = [];
-
-      for (const charData of uniqueCharacters) {
-        const existing = existingByTag.get(charData.tag);
-        if (existing) {
-          existingCharactersToUpdate.push({ existing, data: charData });
-        } else {
-          newCharacters.push(charData);
-        }
-      }
-
-      // Bulk insert new characters (all-or-nothing)
-      if (newCharacters.length > 0) {
-        await tx.insert(characters).values(
-          newCharacters.map((charData) => ({
-            projectId,
-            name: charData.name ?? charData.tag,
-            displayName: charData.displayName,
-            renpyTag: charData.tag,
-            color: charData.color,
-          }))
-        );
-      }
-
-      // Update existing characters (within transaction for atomicity)
-      if (existingCharactersToUpdate.length > 0) {
-        const now = new Date();
-        for (const { existing, data } of existingCharactersToUpdate) {
-          await tx
-            .update(characters)
-            .set({
-              name: data.name ?? data.tag,
-              displayName: data.displayName,
-              color: data.color,
-              updatedAt: now,
-            })
-            .where(eq(characters.id, existing.id));
-        }
-      }
-    });
-
-    // Phase 3: Process parsed files to create labels with speaker linking
     for (const { parsed, projectFile, content } of parsedFiles) {
-      // For STORY files, import labels as scenes
-      if (parsed.fileType === "STORY") {
-        // Fetch all scenes for this file once to avoid N+1 queries
-        const fileScenes = await db
-          .select()
-          .from(labels)
-          .where(eq(labels.projectFileId, projectFile.id));
+      try {
+        await db.transaction(async (tx) => {
+          // For STORY files, import labels as scenes
+          if (parsed.fileType === "STORY") {
+            // Fetch all scenes for this file once to avoid N+1 queries
+            // Include soft-deleted rows so the revive path can clear deletedAt
+            const fileScenes = await tx
+              .select()
+              .from(labels)
+              .where(eq(labels.projectFileId, projectFile.id));
 
-        // Build a Map keyed by labelName for O(1) lookups
-        const scenesByLabel = new Map<string, (typeof fileScenes)[0]>();
-        for (const scene of fileScenes) {
-          if (scene.labelName) {
-            scenesByLabel.set(scene.labelName, scene);
-          }
-        }
+            // Build a Map keyed by labelName for O(1) lookups
+            const scenesByLabel = new Map<string, (typeof fileScenes)[0]>();
+            for (const scene of fileScenes) {
+              if (scene.labelName) {
+                scenesByLabel.set(scene.labelName, scene);
+              }
+            }
 
-        for (let i = 0; i < parsed.labels.length; i++) {
-          const label = parsed.labels[i];
+            for (let i = 0; i < parsed.labels.length; i++) {
+              const label = parsed.labels[i];
 
-          // Check if scene already exists for this file+label (Map lookup)
-          const existingScene = scenesByLabel.get(label.label);
+              // Check if scene already exists for this file+label (Map lookup)
+              const existingScene = scenesByLabel.get(label.label);
 
-          const labelData = convertToBranchForgeFormatFromLabels(
-            parsed,
-            label.label,
-            content
-          );
-
-          // Calculate content hash for the label's lines
-          const contentHash = calculateLinesHash(labelData.entries);
-
-          if (existingScene && conflictResolution === "manual_review") {
-            // Count as conflict for manual review
-            conflictCount++;
-          } else if (existingScene && conflictResolution === "gitlab_wins") {
-            // Update existing scene
-            await db.transaction(async (tx) => {
-              await tx
-                .delete(labelLines)
-                .where(eq(labelLines.labelId, existingScene.id));
-
-              // Fetch characters inside transaction to get latest state
-              const charactersByTag = await fetchCharactersByTag(tx, projectId);
-
-              const allValues: LabelLineInsertValues[] = labelData.entries.map(
-                (entry, index) => {
-                  const mapped = mapEntryToDbContentType(entry);
-                  const entryContentHash = calculateContentHash(mapped.content);
-                  const speakerId = getCharacterIdByTag(
-                    entry.speaker,
-                    charactersByTag
-                  );
-                  return {
-                    labelId: existingScene.id,
-                    sequence: index + 1,
-                    contentType: mapped.contentType,
-                    content: mapped.content,
-                    speakerId,
-                    projectFileId: projectFile.id,
-                    linePosition: index,
-                    contentHash: entryContentHash,
-                    lastSyncedHash: entryContentHash,
-                    lastSyncedAt: new Date(),
-                    rpyLineNumber: entry.lineNumber,
-                    rpyIndentLevel: entry.indentLevel ?? 0,
-                  };
-                }
+              const labelData = convertToBranchForgeFormatFromLabels(
+                parsed,
+                label.label,
+                content
               );
 
-              if (allValues.length > 0) {
-                await tx.insert(labelLines).values(allValues);
-              }
+              // Calculate content hash for the label's lines
+              const contentHash = calculateLinesHash(labelData.entries);
 
-              // Update label metadata
-              await tx
-                .update(labels)
-                .set({
-                  contentHash,
-                  lastSyncedHash: contentHash,
-                  syncStatus: "SYNCED",
-                  lastImportedAt: new Date(),
-                  importCommitSha,
-                  updatedAt: new Date(),
-                })
-                .where(eq(labels.id, existingScene.id));
-            });
-          } else if (!existingScene) {
-            // Create new scene with proper file linkage
-            await db.transaction(async (tx) => {
-              const [newScene] = await tx
-                .insert(labels)
-                .values({
-                  projectId,
-                  title: label.label,
-                  projectFileId: projectFile.id,
-                  labelName: label.label,
-                  labelPosition: i,
-                  sequenceOrder: i,
-                  route: null, // User will assign route later
-                  labelNumber: i + 1,
-                  status: "DRAFT",
-                  prerequisites: {},
-                  effects: {},
-                  // Sync fields
-                  contentHash,
-                  lastSyncedHash: contentHash,
-                  syncStatus: "SYNCED",
-                  lastImportedAt: new Date(),
-                  importCommitSha,
-                })
-                .returning();
+              if (existingScene && existingScene.deletedAt) {
+                // Scene exists but is soft-deleted - revive it (update lines and clear deletedAt)
+                await tx
+                  .delete(labelLines)
+                  .where(eq(labelLines.labelId, existingScene.id));
 
-              // Fetch characters inside transaction to get latest state
-              const charactersByTag = await fetchCharactersByTag(tx, projectId);
+                const allValues = mapEntriesToLabelLineValues(
+                  labelData.entries,
+                  existingScene.id,
+                  projectFile.id,
+                  charactersByTag
+                );
 
-              const allValues: LabelLineInsertValues[] = labelData.entries.map(
-                (entry, index) => {
-                  const mapped = mapEntryToDbContentType(entry);
-                  const entryContentHash = calculateContentHash(mapped.content);
-                  const speakerId = getCharacterIdByTag(
-                    entry.speaker,
+                if (allValues.length > 0) {
+                  await tx.insert(labelLines).values(allValues);
+                }
+
+                // Revive the soft-deleted label
+                await tx
+                  .update(labels)
+                  .set({
+                    contentHash,
+                    lastSyncedHash: contentHash,
+                    syncStatus: "SYNCED",
+                    lastImportedAt: new Date(),
+                    importCommitSha,
+                    updatedAt: new Date(),
+                    deletedAt: null,
+                  })
+                  .where(eq(labels.id, existingScene.id));
+              } else if (existingScene && !existingScene.deletedAt) {
+                // Scene exists and is active - apply conflict resolution
+                if (conflictResolution === "manual_review") {
+                  // Only count as a conflict if the content has actually changed
+                  if (
+                    existingScene.contentHash !== contentHash &&
+                    existingScene.lastSyncedHash !== contentHash
+                  ) {
+                    conflictCount++;
+                  }
+                } else if (conflictResolution === "gitlab_wins") {
+                  // Update existing scene
+                  await tx
+                    .delete(labelLines)
+                    .where(eq(labelLines.labelId, existingScene.id));
+
+                  const allValues = mapEntriesToLabelLineValues(
+                    labelData.entries,
+                    existingScene.id,
+                    projectFile.id,
                     charactersByTag
                   );
-                  return {
-                    labelId: newScene.id,
-                    sequence: index + 1,
-                    contentType: mapped.contentType,
-                    content: mapped.content,
-                    speakerId,
-                    projectFileId: projectFile.id,
-                    linePosition: index,
-                    contentHash: entryContentHash,
-                    lastSyncedHash: entryContentHash,
-                    lastSyncedAt: new Date(),
-                    rpyLineNumber: entry.lineNumber,
-                    rpyIndentLevel: entry.indentLevel ?? 0,
-                  };
-                }
-              );
 
-              if (allValues.length > 0) {
-                await tx.insert(labelLines).values(allValues);
+                  if (allValues.length > 0) {
+                    await tx.insert(labelLines).values(allValues);
+                  }
+
+                  // Update label metadata
+                  await tx
+                    .update(labels)
+                    .set({
+                      contentHash,
+                      lastSyncedHash: contentHash,
+                      syncStatus: "SYNCED",
+                      lastImportedAt: new Date(),
+                      importCommitSha,
+                      updatedAt: new Date(),
+                    })
+                    .where(eq(labels.id, existingScene.id));
+                }
+                // If branchforge_wins, do nothing (keep local data)
+              } else {
+                // Scene doesn't exist - create new scene
+                const [newScene] = await tx
+                  .insert(labels)
+                  .values({
+                    projectId,
+                    title: label.label,
+                    projectFileId: projectFile.id,
+                    labelName: label.label,
+                    labelPosition: i,
+                    sequenceOrder: i,
+                    route: null, // User will assign route later
+                    labelNumber: i + 1,
+                    status: "DRAFT",
+                    prerequisites: {},
+                    effects: {},
+                    // Sync fields
+                    contentHash,
+                    lastSyncedHash: contentHash,
+                    syncStatus: "SYNCED",
+                    lastImportedAt: new Date(),
+                    importCommitSha,
+                  })
+                  .returning();
+
+                const allValues = mapEntriesToLabelLineValues(
+                  labelData.entries,
+                  newScene.id,
+                  projectFile.id,
+                  charactersByTag
+                );
+
+                if (allValues.length > 0) {
+                  await tx.insert(labelLines).values(allValues);
+                }
               }
-            });
+            }
           }
-          // If branchforge_wins, do nothing (keep local data)
-        }
+        });
+      } catch (fileError) {
+        const errorMessage =
+          fileError instanceof Error ? fileError.message : String(fileError);
+        logError("gitlab_sync.file_import_failed", {
+          projectId,
+          projectFileId: projectFile.id,
+          error: errorMessage,
+        });
+        fileProcessingFailures.push({
+          projectFileId: projectFile.id,
+          error: errorMessage,
+        });
       }
     }
 
@@ -824,18 +734,65 @@ export async function importFromGitlab(
       };
     }
 
-    // Mark operation as completed
-    await updateSyncOperation(operation.id, {
-      status: "COMPLETED",
-      conflictCount,
-    });
+    // Determine final status based on file processing failures
+    const successfulFiles = parsedFiles.length - fileProcessingFailures.length;
+    const totalFiles = parsedFiles.length;
 
-    return {
-      ...operation,
-      status: "COMPLETED",
-      conflictCount,
-      detectedCharacters,
-    };
+    if (fileProcessingFailures.length === 0) {
+      // All files processed successfully
+      await updateSyncOperation(operation.id, {
+        status: "COMPLETED",
+        conflictCount,
+      });
+
+      return {
+        ...operation,
+        status: "COMPLETED",
+        conflictCount,
+        detectedCharacters,
+      };
+    } else if (successfulFiles === 0) {
+      // Every file failed during processing
+      const errorMessage = `All ${totalFiles} file(s) failed during import`;
+      await updateSyncOperation(operation.id, {
+        status: "FAILED",
+        errorMessage,
+      });
+
+      return {
+        ...operation,
+        status: "FAILED",
+        errorMessage,
+        detectedCharacters,
+      };
+    } else {
+      // Partial success: some files succeeded, some failed
+      const failureSummary = fileProcessingFailures
+        .map((f) => f.projectFileId)
+        .join(", ");
+      const errorMessage =
+        `${successfulFiles}/${totalFiles} file(s) imported successfully. ` +
+        `Failed file(s): ${failureSummary}`;
+      logWarn("gitlab_sync.partial_import", {
+        projectId,
+        successfulFiles,
+        totalFiles,
+        failures: fileProcessingFailures,
+      });
+      await updateSyncOperation(operation.id, {
+        status: "COMPLETED",
+        conflictCount,
+        errorMessage,
+      });
+
+      return {
+        ...operation,
+        status: "COMPLETED",
+        conflictCount,
+        errorMessage,
+        detectedCharacters,
+      };
+    }
   } catch (error) {
     // Mark operation as failed
     const errorMessage =

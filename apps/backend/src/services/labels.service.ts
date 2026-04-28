@@ -16,7 +16,6 @@ import {
   routeConfigs,
   projectFiles,
 } from "../db/schema/index.js";
-import { labelCharacters as labelCharactersTable } from "../db/schema/tables/label-characters.js";
 import { eq, and, asc, or, isNull } from "drizzle-orm";
 import type { Label, LabelLine } from "../db/schema/index.js";
 import type { PublicLabel } from "@branchforge/shared";
@@ -30,6 +29,41 @@ import { logWarn, LogEventType } from "../lib/logger.js";
 
 // Re-export PublicLabel from shared for route handlers
 export type { PublicLabel };
+
+// ============================================================================
+// Derived Character Query
+// ============================================================================
+
+/**
+ * Get characters that appear in a label (derived from dialogue speakers)
+ *
+ * This function automatically derives character appearances from label_lines.speakerId,
+ * ensuring the data is always in sync with actual dialogue content.
+ *
+ * @param labelId - The label ID
+ * @returns Array of characters who speak in this label
+ */
+async function getDerivedCharactersForLabel(
+  labelId: string
+): Promise<LabelCharacterWithInfo[]> {
+  const db = getDb();
+
+  // Query to get all characters who speak in this label
+  // Use selectDistinct to ensure unique rows at the database level
+  const result = await db
+    .selectDistinct({
+      id: characters.id,
+      name: characters.name,
+      displayName: characters.displayName,
+      renpyTag: characters.renpyTag,
+    })
+    .from(characters)
+    .innerJoin(labelLines, eq(labelLines.speakerId, characters.id))
+    .where(and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt)));
+
+  // Result is already unique and correctly typed
+  return result as LabelCharacterWithInfo[];
+}
 
 // ============================================================================
 // Type Guards for Enum Values
@@ -76,16 +110,13 @@ export interface LabelLineWithSpeaker extends Omit<
 }
 
 /**
- * Character in a label with role information
+ * Character in a label (derived from label_lines.speakerId)
  */
 export interface LabelCharacterWithInfo {
   id: string;
   name: string;
   displayName: string;
   renpyTag: string;
-  role: "PRIMARY" | "SECONDARY" | "BACKGROUND" | "MENTIONED";
-  emotion: string | null;
-  notes: string | null;
 }
 
 /**
@@ -225,36 +256,17 @@ export async function getLabel(
 
   const { label } = labelResult[0];
 
-  // Fetch label lines and characters in parallel using Promise.all
-  // This fixes the N+1 query issue by running both queries concurrently
-  const [linesResult, charactersResult] = await Promise.all([
-    // Fetch label lines with speaker information (excluding soft-deleted)
-    db
-      .select({
-        line: labelLines,
-        speakerName: characters.displayName,
-        speakerTag: characters.renpyTag,
-      })
-      .from(labelLines)
-      .leftJoin(characters, eq(labelLines.speakerId, characters.id))
-      .where(and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt)))
-      .orderBy(asc(labelLines.sequence)),
-
-    // Fetch label characters with their information
-    db
-      .select({
-        character: characters,
-        role: labelCharactersTable.role,
-        emotion: labelCharactersTable.emotion,
-        notes: labelCharactersTable.notes,
-      })
-      .from(labelCharactersTable)
-      .innerJoin(
-        characters,
-        eq(labelCharactersTable.characterId, characters.id)
-      )
-      .where(eq(labelCharactersTable.labelId, labelId)),
-  ]);
+  // Fetch label lines with speaker information (excluding soft-deleted)
+  const linesResult = await db
+    .select({
+      line: labelLines,
+      speakerName: characters.displayName,
+      speakerTag: characters.renpyTag,
+    })
+    .from(labelLines)
+    .leftJoin(characters, eq(labelLines.speakerId, characters.id))
+    .where(and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt)))
+    .orderBy(asc(labelLines.sequence));
 
   // Map results to the expected format
   const lines: LabelLineWithSpeaker[] = linesResult.map((row) => ({
@@ -265,16 +277,8 @@ export async function getLabel(
     updatedAt: row.line.updatedAt.toISOString(),
   }));
 
-  const labelCharactersWithInfo: LabelCharacterWithInfo[] =
-    charactersResult.map((row) => ({
-      id: row.character.id,
-      name: row.character.name,
-      displayName: row.character.displayName,
-      renpyTag: row.character.renpyTag,
-      role: row.role,
-      emotion: row.emotion,
-      notes: row.notes,
-    }));
+  // Derive characters using the shared helper function
+  const labelCharactersWithInfo = await getDerivedCharactersForLabel(labelId);
 
   return {
     ...mapToPublicLabel(label),
@@ -624,4 +628,45 @@ export async function deleteLabel(
         .where(eq(projectFiles.id, labelWithProject.projectFileId));
     }
   });
+}
+
+// ============================================================================
+// Label-Character Queries
+// ============================================================================
+
+/**
+ * Get all characters associated with a label
+ * @param labelId - The label ID to fetch characters for
+ * @param userId - The user ID making the request (for authorization)
+ * @returns Array of label characters with their information
+ * @throws NotFoundError if label not found
+ * @throws ForbiddenError if user lacks permission
+ */
+export async function getLabelCharacters(
+  labelId: string,
+  userId: string
+): Promise<LabelCharacterWithInfo[]> {
+  const db = getDb();
+
+  // Check if user has access to this label (owner or shared via project_users)
+  const hasAccess = await authorizeLabelAccess(labelId, userId);
+
+  if (!hasAccess) {
+    // Label doesn't exist or user lacks permission
+    // Verify label exists to throw appropriate error
+    const [label] = await db
+      .select()
+      .from(labels)
+      .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
+      .limit(1);
+
+    if (!label) {
+      throw new NotFoundError("Label");
+    }
+
+    throw new ForbiddenError("Insufficient permissions");
+  }
+
+  // Return characters derived from dialogue speakers
+  return await getDerivedCharactersForLabel(labelId);
 }

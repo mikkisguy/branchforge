@@ -24,6 +24,8 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { charactersApi, type ImportCharacter } from "@/lib/api/characters";
 import type { DetectedCharacter, CharacterConflict } from "@branchforge/shared";
 import { useToast } from "@/contexts/ToastContext";
+import { useQueryClient } from "@tanstack/react-query";
+import { labelKeys, characterKeys } from "@/lib/query-keys";
 
 // ============================================================================
 // Types
@@ -112,6 +114,7 @@ export function CharacterImportWizard({
   // Generate unique ID for checkbox to prevent collisions when multiple wizards are mounted
   const linkToLinesId = useId();
   const { success, error } = useToast();
+  const queryClient = useQueryClient();
 
   // Group characters on mount
   const [groups, setGroups] = useState<CharacterGroup>(() =>
@@ -229,6 +232,18 @@ export function CharacterImportWizard({
         error(`${result.unmatched.length} speaker(s) could not be matched`);
       }
 
+      // Invalidate label queries to refresh speaker information
+      // This ensures the UI shows the newly linked speakers instead of null
+      // Also invalidate characters query to show the newly imported characters
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: labelKeys.scoped(projectId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: characterKeys.lists(projectId),
+        }),
+      ]);
+
       // Close dialog after short delay
       setTimeout(() => {
         onOpenChange(false);
@@ -248,6 +263,7 @@ export function CharacterImportWizard({
     onComplete,
     success,
     error,
+    queryClient,
   ]);
 
   /**

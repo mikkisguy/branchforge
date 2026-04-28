@@ -19,6 +19,7 @@ import {
   projectFileSyncState,
   labels,
   labelLines,
+  characters,
 } from "../db/schema/index.js";
 import { eq, and, inArray, desc, isNull } from "drizzle-orm";
 import {
@@ -28,6 +29,7 @@ import {
 } from "./rpy-parser.service.js";
 import { calculateContentHash, calculateLinesHash } from "../lib/hash.js";
 import { logError, LogEventType } from "../lib/logger.js";
+import { mapEntriesToLabelLineValues } from "./label-line-mapper.js";
 
 // ============================================================================
 // Types
@@ -198,47 +200,6 @@ export async function completeSyncState(
 // ============================================================================
 
 /**
- * Map BranchForge entry type to content type enum
- */
-function mapEntryToDbType(entry: {
-  type: string;
-}): "NARRATION" | "DIALOGUE" | "JUMP" {
-  if (entry.type === "FLAG") {
-    return "JUMP";
-  }
-  if (
-    entry.type === "NARRATION" ||
-    entry.type === "DIALOGUE" ||
-    entry.type === "JUMP"
-  ) {
-    return entry.type as "NARRATION" | "DIALOGUE" | "JUMP";
-  }
-  // Don't default to NARRATION - skip unrecognized types
-  // This prevents non-dialogue entries from becoming label_lines
-  throw new Error(`Unrecognized entry type: ${entry.type}`);
-}
-
-/**
- * Format entry content in RPY format for proper speaker extraction
- * Used by characterLinkerService to parse dialogue speakers from label_lines
- */
-function formatEntryContent(entry: {
-  target?: string | null;
-  type: string;
-  speaker?: string | null;
-  text?: string | null;
-}): string {
-  if (entry.target) {
-    return `jump ${entry.target}`;
-  }
-  if (entry.type === "DIALOGUE" && entry.speaker) {
-    const escapedText = (entry.text ?? "").replace(/"/g, '\\"');
-    return `${entry.speaker} "${escapedText}"`;
-  }
-  return entry.text ?? "";
-}
-
-/**
  * Sync labels from project file content
  *
  * This is the main sync function that:
@@ -340,6 +301,21 @@ export async function syncLabelsFromGitLabFile(
 
       // Step 9: Execute sync in atomic transaction
       const syncResult = await db.transaction(async (tx) => {
+        // Fetch characters for speaker linking
+        const projectCharacters = await tx
+          .select({
+            id: characters.id,
+            renpyTag: characters.renpyTag,
+          })
+          .from(characters)
+          .where(eq(characters.projectId, file.projectId));
+
+        const charactersByTag = new Map<string, string>();
+        for (const char of projectCharacters) {
+          if (!char.renpyTag) continue;
+          charactersByTag.set(char.renpyTag, char.id);
+        }
+
         // Fetch existing labels for this file
         const existingLabels = await tx
           .select()
@@ -384,34 +360,20 @@ export async function syncLabelsFromGitLabFile(
               // Calculate label lines hash
               const labelLinesHash = calculateLinesHash(labelData.entries);
 
-              // Insert new lines in batch
+              // Insert new lines in batch using shared mapper
               if (labelData.entries.length > 0) {
-                const lineValues = labelData.entries.map((entry, index) => {
-                  const contentType = mapEntryToDbType(entry);
-                  const content = formatEntryContent(entry);
-                  const lineHash = calculateContentHash(content);
-
-                  return {
-                    labelId: existingLabel.id,
-                    sequence: index + 1,
-                    contentType,
-                    content,
-                    visualType: "GENERATED" as const,
-                    projectFileId,
-                    linePosition: index,
-                    contentHash: lineHash,
-                    lastSyncedHash: lineHash,
-                    lastSyncedAt: new Date(),
-                    rpyLineNumber: entry.lineNumber,
-                    rpyIndentLevel: entry.indentLevel ?? 0,
-                  };
-                });
+                const lineValues = mapEntriesToLabelLineValues(
+                  labelData.entries,
+                  existingLabel.id,
+                  projectFileId,
+                  charactersByTag
+                );
 
                 await tx.insert(labelLines).values(lineValues);
                 linesProcessed += lineValues.length;
               }
 
-              // Update label sync metadata
+              // Update label sync metadata (clear deletedAt to revive if soft-deleted)
               await tx
                 .update(labels)
                 .set({
@@ -419,6 +381,7 @@ export async function syncLabelsFromGitLabFile(
                   lastSyncedHash: labelLinesHash,
                   syncStatus: "SYNCED",
                   updatedAt: new Date(),
+                  deletedAt: null,
                 })
                 .where(eq(labels.id, existingLabel.id));
 
@@ -448,28 +411,14 @@ export async function syncLabelsFromGitLabFile(
                 })
                 .returning();
 
-              // Insert lines in batch
+              // Insert lines in batch using shared mapper
               if (labelData.entries.length > 0) {
-                const lineValues = labelData.entries.map((entry, index) => {
-                  const contentType = mapEntryToDbType(entry);
-                  const content = formatEntryContent(entry);
-                  const lineHash = calculateContentHash(content);
-
-                  return {
-                    labelId: newScene.id,
-                    sequence: index + 1,
-                    contentType,
-                    content,
-                    visualType: "GENERATED" as const,
-                    projectFileId,
-                    linePosition: index,
-                    contentHash: lineHash,
-                    lastSyncedHash: lineHash,
-                    lastSyncedAt: new Date(),
-                    rpyLineNumber: entry.lineNumber,
-                    rpyIndentLevel: entry.indentLevel ?? 0,
-                  };
-                });
+                const lineValues = mapEntriesToLabelLineValues(
+                  labelData.entries,
+                  newScene.id,
+                  projectFileId,
+                  charactersByTag
+                );
 
                 await tx.insert(labelLines).values(lineValues);
                 linesProcessed += lineValues.length;

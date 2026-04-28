@@ -222,17 +222,6 @@ export const suggestionStatusSchema = z.enum(
 );
 
 /**
- * Character role enum
- */
-export const characterRoleSchema = z.enum(
-  ["PRIMARY", "SECONDARY", "BACKGROUND", "MENTIONED"],
-  {
-    message:
-      "Character role must be PRIMARY, SECONDARY, BACKGROUND, or MENTIONED",
-  }
-);
-
-/**
  * Label visibility enum
  */
 export const labelVisibilitySchema = z.enum(

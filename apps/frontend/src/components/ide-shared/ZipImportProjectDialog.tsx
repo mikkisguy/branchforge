@@ -36,7 +36,7 @@ import { ZIP_IMPORT_MAX_SIZE_MB } from "@branchforge/shared";
 interface ZipImportProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: () => void;
+  onSuccess?: (importedProject?: { id: string }) => void;
 }
 
 type ImportStateStatus = "idle" | "uploading" | "success" | "error";
@@ -73,7 +73,9 @@ export function ZipImportProjectDialog({
   const [showCharacterWizard, setShowCharacterWizard] = useState(false);
   const [detectedCharacters, setDetectedCharacters] =
     useState<DetectCharactersResponse | null>(null);
-  const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
+  const [createdProject, setCreatedProject] = useState<{ id: string } | null>(
+    null
+  );
   // Track if import succeeded so we notify parent when wizard closes
   const [importSucceeded, setImportSucceeded] = useState(false);
   // Guard to prevent calling onSuccess twice (synchronous check)
@@ -95,7 +97,7 @@ export function ZipImportProjectDialog({
       });
       setShowCharacterWizard(false);
       setDetectedCharacters(null);
-      setCreatedProjectId(null);
+      setCreatedProject(null);
       setImportSucceeded(false);
       didCallOnSuccessRef.current = false;
     }
@@ -192,8 +194,8 @@ export function ZipImportProjectDialog({
       setImportSucceeded(true);
       didCallOnSuccessRef.current = false;
 
-      // Store the created project ID for character detection
-      setCreatedProjectId(data.project.id);
+      // Store the created project for switching after character import
+      setCreatedProject(data.project);
 
       // Detect characters from imported RPY files
       try {
@@ -429,7 +431,9 @@ export function ZipImportProjectDialog({
                   onClick={() => {
                     if (!didCallOnSuccessRef.current) {
                       didCallOnSuccessRef.current = true;
-                      onSuccess?.();
+                      if (createdProject) {
+                        onSuccess?.(createdProject);
+                      }
                     }
                     onOpenChange(false);
                   }}
@@ -470,7 +474,7 @@ export function ZipImportProjectDialog({
       </Dialog>
 
       {/* Character Import Wizard - rendered as sibling to avoid focus/z-index conflicts */}
-      {showCharacterWizard && detectedCharacters && createdProjectId && (
+      {showCharacterWizard && detectedCharacters && createdProject && (
         <CharacterImportWizard
           open={showCharacterWizard}
           onOpenChange={(open) => {
@@ -479,20 +483,26 @@ export function ZipImportProjectDialog({
               // Notify parent of successful import when wizard closes
               if (importSucceeded && !didCallOnSuccessRef.current) {
                 didCallOnSuccessRef.current = true;
-                onSuccess?.();
+                if (createdProject) {
+                  onSuccess?.(createdProject);
+                }
               }
               // Close the import dialog after character wizard is closed
               onOpenChange(false);
             }
           }}
-          projectId={createdProjectId}
+          projectId={createdProject.id}
           detectedCharacters={detectedCharacters.characters}
           conflicts={detectedCharacters.conflicts}
           excludedTags={detectedCharacters.excludedTags}
           onComplete={() => {
+            setShowCharacterWizard(false);
             if (importSucceeded && !didCallOnSuccessRef.current) {
               didCallOnSuccessRef.current = true;
-              onSuccess?.();
+              // Switch to the created project after character import completes
+              if (createdProject) {
+                onSuccess?.(createdProject);
+              }
             }
             onOpenChange(false);
           }}

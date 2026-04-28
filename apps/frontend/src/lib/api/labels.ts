@@ -11,7 +11,11 @@ import { request } from "./client";
 // ============================================================================
 
 // Import types from shared package - these match backend response types
-import type { PublicLabel, LabelDetail } from "@branchforge/shared";
+import type {
+  PublicLabel,
+  LabelDetail,
+  LabelCharacter,
+} from "@branchforge/shared";
 
 export interface ListLabelsParams {
   projectId: string;
@@ -43,6 +47,10 @@ export type UpdateDialogueResponse =
         currentContentHash: string | null;
       };
     };
+
+export interface LabelCharactersResponse {
+  characters: LabelCharacter[];
+}
 
 // ============================================================================
 // Labels API
@@ -95,5 +103,18 @@ export const labelsApi = {
       },
       true // allowConflict: true - handle 409 responses as success with success: false
     );
+  },
+
+  /**
+   * Get all characters associated with a label
+   *
+   * NOTE: Character associations are automatically derived from dialogue speakers.
+   * This returns characters who have dialogue lines in the label.
+   */
+  async getLabelCharacters(labelId: string): Promise<LabelCharacter[]> {
+    const response = await request<LabelCharactersResponse>(
+      `/labels/${labelId}/characters`
+    );
+    return response.characters;
   },
 };

@@ -22,6 +22,7 @@ import {
   type ParsedRPYFileWithLabels,
 } from "./rpy-parser.service.js";
 import { calculateContentHash, calculateLinesHash } from "../lib/hash.js";
+import { mapEntryToDbType, type ContentType } from "./label-line-mapper.js";
 
 // ============================================================================
 // Types
@@ -35,6 +36,7 @@ export interface SyncLabelsFromResult {
   linesProcessed: number;
   errors: Array<{ label: string; error: string }>;
   skipped: boolean; // True if sync was skipped due to idempotency
+  affectedLabelIds: string[]; // IDs of labels created, updated, or deleted
 }
 
 export interface SyncLabelsFromOptions {
@@ -127,6 +129,7 @@ async function syncLabelsInTransaction(
   labelsDeleted: number;
   linesProcessed: number;
   errors: Array<{ label: string; error: string }>;
+  affectedLabelIds: string[];
 }> {
   // Fetch existing labels for this source file
   const existingLabels = await tx
@@ -182,6 +185,7 @@ async function syncLabelsInTransaction(
   let labelsUpdated = 0;
   let linesProcessed = 0;
   const errors: Array<{ label: string; error: string }> = [];
+  const affectedLabelIds: string[] = [];
 
   // Process each label
   for (let i = 0; i < parsed.labels.length; i++) {
@@ -229,6 +233,7 @@ async function syncLabelsInTransaction(
           })
           .where(eq(labels.id, existingLabel.id));
 
+        affectedLabelIds.push(existingLabel.id);
         labelsUpdated++;
       } else {
         // Create new scene
@@ -254,6 +259,8 @@ async function syncLabelsInTransaction(
             syncStatus: "SYNCED",
           })
           .returning();
+
+        affectedLabelIds.push(newScene.id);
 
         // Insert lines in batch
         if (labelData.entries.length > 0) {
@@ -312,6 +319,9 @@ async function syncLabelsInTransaction(
         .where(and(inArray(labels.id, orphanedIds), isNull(labels.deletedAt)));
 
       labelsDeleted = orphanedIds.length;
+
+      // Track orphaned label IDs as affected for downstream cache/webhook handling
+      affectedLabelIds.push(...orphanedIds);
     }
   }
 
@@ -321,28 +331,8 @@ async function syncLabelsInTransaction(
     labelsDeleted,
     linesProcessed,
     errors,
+    affectedLabelIds,
   };
-}
-
-/**
- * Map BranchForge entry type to content type enum
- */
-function mapEntryToDbType(entry: {
-  type: string;
-}): "NARRATION" | "DIALOGUE" | "JUMP" {
-  if (entry.type === "FLAG") {
-    return "JUMP";
-  }
-  if (
-    entry.type === "NARRATION" ||
-    entry.type === "DIALOGUE" ||
-    entry.type === "JUMP"
-  ) {
-    return entry.type as "NARRATION" | "DIALOGUE" | "JUMP";
-  }
-  // Don't default to NARRATION - skip unrecognized types
-  // This prevents non-dialogue entries from becoming label_lines
-  throw new Error(`Unrecognized entry type: ${entry.type}`);
 }
 
 interface CharacterLookupMaps {
@@ -421,7 +411,7 @@ function resolveSpeakerId(
 function buildLineValues(
   labelId: string,
   entries: Array<{
-    type: string;
+    type: ContentType;
     speaker?: string;
     target?: string;
     text?: string;
@@ -517,6 +507,7 @@ export async function syncLabelsFromFile(
     linesProcessed: 0,
     errors: [],
     skipped: false,
+    affectedLabelIds: [],
   };
 
   try {
@@ -563,6 +554,7 @@ export async function syncLabelsFromFile(
       linesProcessed: syncResult.linesProcessed,
       errors: syncResult.errors,
       skipped: false,
+      affectedLabelIds: syncResult.affectedLabelIds,
     };
   } catch (error) {
     // Sync failed

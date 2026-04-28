@@ -19,6 +19,7 @@ import {
   labels,
   labelLines,
   userSessions,
+  characters,
   type NewUser,
   type NewProject,
 } from "../../db/schema/index.js";
@@ -34,6 +35,8 @@ describe("LabelsRoutes (Integration)", () => {
   const testFileId = testUuid("23000002", 1);
   const introLabelId = testUuid("23000003", 1);
   const sideSceneLabelId = testUuid("23000003", 2);
+  const testCharacterId = testUuid("23000004", 1);
+  const testCharacterId2 = testUuid("23000004", 2);
 
   const testUser: NewUser = {
     id: testUserId,
@@ -67,6 +70,9 @@ describe("LabelsRoutes (Integration)", () => {
     await db
       .delete(labels)
       .where(inArray(labels.id, [introLabelId, sideSceneLabelId]));
+    await db
+      .delete(characters)
+      .where(inArray(characters.id, [testCharacterId, testCharacterId2]));
     await db.delete(projectFiles).where(eq(projectFiles.id, testFileId));
     await db.delete(projects).where(eq(projects.id, testProjectId));
     await db.delete(userSessions).where(eq(userSessions.userId, testUserId));
@@ -133,6 +139,25 @@ describe("LabelsRoutes (Integration)", () => {
         contentType: "NARRATION",
         content: "Side old",
         projectFileId: testFileId,
+      },
+    ]);
+
+    await db.insert(characters).values([
+      {
+        id: testCharacterId,
+        projectId: testProjectId,
+        name: "protagonist",
+        displayName: "Protagonist",
+        renpyTag: "p",
+        color: "#FF0000",
+      },
+      {
+        id: testCharacterId2,
+        projectId: testProjectId,
+        name: "antagonist",
+        displayName: "Antagonist",
+        renpyTag: "a",
+        color: "#0000FF",
       },
     ]);
   }

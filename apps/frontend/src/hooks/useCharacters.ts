@@ -73,7 +73,10 @@ export interface UseCharactersReturn {
 // Hook
 // ============================================================================
 
-export function useCharacters(projectId: string): UseCharactersReturn {
+export function useCharacters(
+  projectId: string,
+  options?: { enabled?: boolean }
+): UseCharactersReturn {
   const queryClient = useQueryClient();
   const toast = useToast();
 
@@ -88,7 +91,10 @@ export function useCharacters(projectId: string): UseCharactersReturn {
     queryFn: async () => {
       return charactersApi.listCharacters(projectId);
     },
-    enabled: !!projectId, // Only fetch when projectId exists
+    enabled:
+      options?.enabled !== undefined
+        ? options.enabled && !!projectId
+        : !!projectId,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
