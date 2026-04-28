@@ -22,7 +22,7 @@ import {
   type ParsedRPYFileWithLabels,
 } from "./rpy-parser.service.js";
 import { calculateContentHash, calculateLinesHash } from "../lib/hash.js";
-import { mapEntryToDbType } from "./label-line-mapper.js";
+import { mapEntryToDbType, type ContentType } from "./label-line-mapper.js";
 
 // ============================================================================
 // Types
@@ -411,7 +411,7 @@ function resolveSpeakerId(
 function buildLineValues(
   labelId: string,
   entries: Array<{
-    type: string;
+    type: ContentType;
     speaker?: string;
     target?: string;
     text?: string;

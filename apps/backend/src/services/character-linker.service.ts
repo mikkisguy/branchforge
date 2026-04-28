@@ -260,14 +260,28 @@ class CharacterLinkerService {
       }
     }
 
-    // Apply updates in batch
+    // Apply updates in batch - group by speakerId to avoid N+1 queries
     if (updates.length > 0) {
+      // Group updates by speakerId (including null/unmatched)
+      const updatesBySpeakerId = new Map<string | null, string[]>();
       for (const update of updates) {
-        await db
-          .update(labelLines)
-          .set({ speakerId: update.speakerId, updatedAt: new Date() })
-          .where(eq(labelLines.id, update.lineId));
+        const speakerId = update.speakerId;
+        if (!updatesBySpeakerId.has(speakerId)) {
+          updatesBySpeakerId.set(speakerId, []);
+        }
+        updatesBySpeakerId.get(speakerId)!.push(update.lineId);
       }
+
+      // Execute one UPDATE per distinct speakerId in parallel
+      const updatePromises = Array.from(updatesBySpeakerId.entries()).map(
+        ([speakerId, lineIds]) =>
+          db
+            .update(labelLines)
+            .set({ speakerId, updatedAt: new Date() })
+            .where(inArray(labelLines.id, lineIds))
+      );
+
+      await Promise.all(updatePromises);
     }
 
     // Build conflict info for unmatched tags
@@ -356,46 +370,53 @@ class CharacterLinkerService {
   }> {
     const db = getDb();
 
-    // Get total lines for project (via labels)
-    const totalResult = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(labelLines)
-      .innerJoin(labels, eq(labelLines.labelId, labels.id))
-      .where(and(eq(labels.projectId, projectId), isNull(labelLines.deletedAt)))
-      .then((rows) => rows[0]);
+    // Execute all three count queries in parallel for better performance
+    const [totalResult, linkedResult, uniqueSpeakersResult] = await Promise.all(
+      [
+        // Get total lines for project (via labels)
+        db
+          .select({ count: sql<number>`count(*)` })
+          .from(labelLines)
+          .innerJoin(labels, eq(labelLines.labelId, labels.id))
+          .where(
+            and(eq(labels.projectId, projectId), isNull(labelLines.deletedAt))
+          )
+          .then((rows) => rows[0]),
+
+        // Get linked lines for project
+        db
+          .select({ count: sql<number>`count(*)` })
+          .from(labelLines)
+          .innerJoin(labels, eq(labelLines.labelId, labels.id))
+          .where(
+            and(
+              eq(labels.projectId, projectId),
+              isNull(labelLines.deletedAt),
+              sql`${labelLines.speakerId} IS NOT NULL`
+            )
+          )
+          .then((rows) => rows[0]),
+
+        // Get unique speakers for project
+        db
+          .select({
+            count: sql<number>`count(distinct ${labelLines.speakerId})`,
+          })
+          .from(labelLines)
+          .innerJoin(labels, eq(labelLines.labelId, labels.id))
+          .where(
+            and(
+              eq(labels.projectId, projectId),
+              isNull(labelLines.deletedAt),
+              sql`${labelLines.speakerId} IS NOT NULL`
+            )
+          )
+          .then((rows) => rows[0]),
+      ]
+    );
 
     const totalLines = Number(totalResult?.count) || 0;
-
-    // Get linked lines for project
-    const linkedResult = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(labelLines)
-      .innerJoin(labels, eq(labelLines.labelId, labels.id))
-      .where(
-        and(
-          eq(labels.projectId, projectId),
-          isNull(labelLines.deletedAt),
-          sql`${labelLines.speakerId} IS NOT NULL`
-        )
-      )
-      .then((rows) => rows[0]);
-
     const linkedLines = Number(linkedResult?.count) || 0;
-
-    // Get unique speakers for project
-    const uniqueSpeakersResult = await db
-      .select({ count: sql<number>`count(distinct ${labelLines.speakerId})` })
-      .from(labelLines)
-      .innerJoin(labels, eq(labelLines.labelId, labels.id))
-      .where(
-        and(
-          eq(labels.projectId, projectId),
-          isNull(labelLines.deletedAt),
-          sql`${labelLines.speakerId} IS NOT NULL`
-        )
-      )
-      .then((rows) => rows[0]);
-
     const uniqueSpeakers = Number(uniqueSpeakersResult?.count) || 0;
 
     return {

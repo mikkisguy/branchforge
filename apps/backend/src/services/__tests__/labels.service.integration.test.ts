@@ -539,6 +539,9 @@ describe("LabelsService (Integration)", () => {
 
       const result = await getLabel(label.id!, testUserId);
 
+      // Sanity check: verify lines were NOT deduped (should have 3 lines)
+      expect(result?.lines).toHaveLength(3);
+
       // Should return exactly 2 unique characters despite Eileen appearing twice
       expect(result?.characters).toHaveLength(2);
 

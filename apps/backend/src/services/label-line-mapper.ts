@@ -6,6 +6,7 @@
  */
 
 import { calculateContentHash } from "../lib/hash.js";
+import type { NewLabelLine } from "../db/schema/index.js";
 
 // ============================================================================
 // Type Definitions
@@ -15,7 +16,13 @@ import { calculateContentHash } from "../lib/hash.js";
  * Supported content types for label lines
  * Matches the database enum for label_lines.contentType
  */
-export type ContentType = "NARRATION" | "DIALOGUE" | "CHOICE" | "MENU" | "JUMP";
+export type ContentType =
+  | "NARRATION"
+  | "DIALOGUE"
+  | "CHOICE"
+  | "MENU"
+  | "JUMP"
+  | "FLAG";
 
 /**
  * Strict content types for label sync operations
@@ -25,22 +32,23 @@ export type StrictContentType = "NARRATION" | "DIALOGUE" | "JUMP";
 
 /**
  * Type for label line insert values
- * Matches the schema for label_lines table inserts
+ * Inferred from the label_lines table schema to stay in sync
  */
-export interface LabelLineInsertValues {
-  labelId: string;
-  sequence: number;
-  contentType: ContentType;
-  content: string;
-  speakerId?: string | null; // Optional speaker ID for dialogue lines
-  projectFileId?: string;
-  linePosition?: number;
-  contentHash?: string;
-  lastSyncedHash?: string;
-  lastSyncedAt?: Date;
-  rpyLineNumber?: number;
-  rpyIndentLevel?: number;
-}
+export type LabelLineInsertValues = Pick<
+  NewLabelLine,
+  | "labelId"
+  | "sequence"
+  | "contentType"
+  | "content"
+  | "speakerId"
+  | "projectFileId"
+  | "linePosition"
+  | "contentHash"
+  | "lastSyncedHash"
+  | "lastSyncedAt"
+  | "rpyLineNumber"
+  | "rpyIndentLevel"
+>;
 
 // ============================================================================
 // Constants
@@ -55,7 +63,7 @@ const FLAG_MAPPED_TYPE: StrictContentType = "JUMP";
 /**
  * Default fallback content type when entry type is unrecognized
  */
-const DEFAULT_CONTENT_TYPE: ContentType = "NARRATION";
+const DEFAULT_CONTENT_TYPE: StrictContentType = "NARRATION";
 
 // ============================================================================
 // Type Mapping Functions
@@ -79,11 +87,11 @@ function isStrictContentType(type: string): type is StrictContentType {
  * @returns Object with contentType and formatted content string
  */
 export function mapEntryToDbContentType(entry: {
-  type: string;
+  type: ContentType;
   text?: string;
   target?: string;
 }): {
-  contentType: ContentType;
+  contentType: StrictContentType;
   content: string;
 } {
   // Map FLAG to JUMP
@@ -93,9 +101,12 @@ export function mapEntryToDbContentType(entry: {
   }
 
   // Use strict content types if recognized, otherwise default to NARRATION
-  const contentType: ContentType = isStrictContentType(entry.type)
-    ? entry.type
-    : DEFAULT_CONTENT_TYPE;
+  let contentType: StrictContentType;
+  if (isStrictContentType(entry.type)) {
+    contentType = entry.type as StrictContentType;
+  } else {
+    contentType = DEFAULT_CONTENT_TYPE;
+  }
 
   // Format content for JUMP entries with targets
   const content =
@@ -114,7 +125,9 @@ export function mapEntryToDbContentType(entry: {
  * @returns Strict content type enum value
  * @throws Error if entry type is not recognized
  */
-export function mapEntryToDbType(entry: { type: string }): StrictContentType {
+export function mapEntryToDbType(entry: {
+  type: ContentType;
+}): StrictContentType {
   // Map FLAG to JUMP
   if (entry.type === "FLAG") {
     return FLAG_MAPPED_TYPE;
@@ -122,7 +135,7 @@ export function mapEntryToDbType(entry: { type: string }): StrictContentType {
 
   // Validate and return strict content type
   if (isStrictContentType(entry.type)) {
-    return entry.type;
+    return entry.type as StrictContentType;
   }
 
   // Don't default to NARRATION - fail explicitly on unrecognized types
@@ -158,7 +171,7 @@ export function getCharacterIdByTag(
  */
 export function mapEntriesToLabelLineValues(
   entries: Array<{
-    type: string;
+    type: ContentType;
     text?: string;
     target?: string;
     speaker?: string;

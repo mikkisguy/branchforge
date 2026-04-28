@@ -303,7 +303,10 @@ export async function syncLabelsFromGitLabFile(
       const syncResult = await db.transaction(async (tx) => {
         // Fetch characters for speaker linking
         const projectCharacters = await tx
-          .select()
+          .select({
+            id: characters.id,
+            renpyTag: characters.renpyTag,
+          })
           .from(characters)
           .where(eq(characters.projectId, file.projectId));
 

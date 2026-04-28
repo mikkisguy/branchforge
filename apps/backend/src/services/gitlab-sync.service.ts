@@ -120,12 +120,17 @@ async function fetchCharactersByTag(
   projectId: string
 ): Promise<Map<string, string>> {
   const projectCharacters = await tx
-    .select()
+    .select({
+      id: characters.id,
+      renpyTag: characters.renpyTag,
+    })
     .from(characters)
     .where(eq(characters.projectId, projectId));
 
   const charactersByTag = new Map<string, string>();
   for (const char of projectCharacters) {
+    // Skip characters with null/undefined/empty renpyTag
+    if (!char.renpyTag) continue;
     charactersByTag.set(char.renpyTag, char.id);
   }
   return charactersByTag;

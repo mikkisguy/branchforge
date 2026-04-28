@@ -525,6 +525,8 @@ export function GitLabImportDialog({
           onOpenChange={(open) => {
             setShowCharacterWizard(open);
             if (!open) {
+              // Set flag to prevent duplicate onSuccess calls
+              didCallOnSuccessRef.current = true;
               // Close the import dialog after character wizard is closed
               handleOpenChange(false);
             }
@@ -535,6 +537,8 @@ export function GitLabImportDialog({
           excludedTags={detectedCharacters.excludedTags}
           onComplete={() => {
             setShowCharacterWizard(false);
+            // Set flag to prevent duplicate onSuccess calls
+            didCallOnSuccessRef.current = true;
             // Switch to the imported project after character import completes
             onSuccess?.(importedProject);
           }}

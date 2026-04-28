@@ -25,6 +25,7 @@ import { charactersApi, type ImportCharacter } from "@/lib/api/characters";
 import type { DetectedCharacter, CharacterConflict } from "@branchforge/shared";
 import { useToast } from "@/contexts/ToastContext";
 import { useQueryClient } from "@tanstack/react-query";
+import { labelKeys, characterKeys } from "@/lib/query-keys";
 
 // ============================================================================
 // Types
@@ -235,8 +236,12 @@ export function CharacterImportWizard({
       // This ensures the UI shows the newly linked speakers instead of null
       // Also invalidate characters query to show the newly imported characters
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["labels", projectId] }),
-        queryClient.invalidateQueries({ queryKey: ["characters", projectId] }),
+        queryClient.invalidateQueries({
+          queryKey: labelKeys.scoped(projectId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: characterKeys.lists(projectId),
+        }),
       ]);
 
       // Close dialog after short delay
