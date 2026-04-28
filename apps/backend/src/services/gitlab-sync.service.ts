@@ -555,10 +555,16 @@ export async function importFromGitlab(
         // For STORY files, import labels as scenes
         if (parsed.fileType === "STORY") {
           // Fetch all scenes for this file once to avoid N+1 queries
+          // Exclude soft-deleted rows so scenesByLabel only treats active labels as existing
           const fileScenes = await tx
             .select()
             .from(labels)
-            .where(eq(labels.projectFileId, projectFile.id));
+            .where(
+              and(
+                eq(labels.projectFileId, projectFile.id),
+                isNull(labels.deletedAt)
+              )
+            );
 
           // Build a Map keyed by labelName for O(1) lookups
           const scenesByLabel = new Map<string, (typeof fileScenes)[0]>();
@@ -603,7 +609,7 @@ export async function importFromGitlab(
                 await tx.insert(labelLines).values(allValues);
               }
 
-              // Update label metadata
+              // Update label metadata (clear deletedAt to revive if soft-deleted)
               await tx
                 .update(labels)
                 .set({
@@ -613,6 +619,7 @@ export async function importFromGitlab(
                   lastImportedAt: new Date(),
                   importCommitSha,
                   updatedAt: new Date(),
+                  deletedAt: null,
                 })
                 .where(eq(labels.id, existingScene.id));
             } else if (!existingScene) {

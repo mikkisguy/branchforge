@@ -312,6 +312,7 @@ export async function syncLabelsFromGitLabFile(
 
         const charactersByTag = new Map<string, string>();
         for (const char of projectCharacters) {
+          if (!char.renpyTag) continue;
           charactersByTag.set(char.renpyTag, char.id);
         }
 

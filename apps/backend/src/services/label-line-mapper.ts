@@ -7,6 +7,8 @@
 
 import { calculateContentHash } from "../lib/hash.js";
 import type { NewLabelLine } from "../db/schema/index.js";
+import { ValidationError } from "../middleware/error-handler.middleware.js";
+import { logError, LogEventType } from "../lib/logger.js";
 
 // ============================================================================
 // Type Definitions
@@ -140,7 +142,10 @@ export function mapEntryToDbType(entry: {
 
   // Don't default to NARRATION - fail explicitly on unrecognized types
   // This prevents non-dialogue entries from becoming label_lines
-  throw new Error(`Unrecognized entry type: ${entry.type}`);
+  logError(LogEventType.SERVICE_ERROR, {
+    message: `Unrecognized entry type: ${entry.type}`,
+  });
+  throw new ValidationError("Invalid content type");
 }
 
 /**

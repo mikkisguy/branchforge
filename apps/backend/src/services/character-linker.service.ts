@@ -116,6 +116,7 @@ class CharacterLinkerService {
         labelId: labelLines.labelId,
         rpyLineNumber: labelLines.rpyLineNumber,
         contentType: labelLines.contentType,
+        speakerId: labelLines.speakerId,
       })
       .from(labelLines)
       .where(
@@ -226,8 +227,13 @@ class CharacterLinkerService {
         // Skip non-dialogue lines
         if (line.contentType !== "DIALOGUE") continue;
 
-        // Skip lines without RPY line number
-        if (!line.rpyLineNumber) continue;
+        // Clear stale speakerId for lines without RPY line number
+        if (!line.rpyLineNumber) {
+          if (line.speakerId) {
+            updates.push({ lineId: line.id, speakerId: null });
+          }
+          continue;
+        }
 
         // Get the speaker from the parsed RPY content using RPY line number
         const speakerTag = speakerByLineNumber.get(line.rpyLineNumber) || null;
@@ -240,7 +246,13 @@ class CharacterLinkerService {
           continue;
         }
 
-        if (!speakerTag) continue;
+        // Clear stale speakerId for lines with no matching speaker tag
+        if (!speakerTag) {
+          if (line.speakerId) {
+            updates.push({ lineId: line.id, speakerId: null });
+          }
+          continue;
+        }
 
         // Try exact match
         let characterId = characterByTag.get(speakerTag);
