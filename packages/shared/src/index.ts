@@ -332,7 +332,7 @@ export interface PublicLabel {
   version?: number | null;
   /** SHA hash of label content for change detection */
   contentHash?: string | null;
-  /** ID of the project file this label is associated with (from GitLab import) */
+  /** ID of the project file this label is associated with (from an imported project file) */
   projectFileId: string | null;
   /** Basename of the file path (e.g., "act_i.rpy" from "labels/act_i.rpy") */
   fileName: string | null;

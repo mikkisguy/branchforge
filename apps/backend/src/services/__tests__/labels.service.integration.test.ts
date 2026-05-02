@@ -37,6 +37,7 @@ import {
   deleteLabel,
 } from "../labels.service.js";
 import { testEmail, testUuid } from "../../utils/test-ids.js";
+import { calculateContentHash } from "../../lib/hash.js";
 
 describe("LabelsService (Integration)", () => {
   let db: ReturnType<typeof getDb>;
@@ -887,6 +888,45 @@ describe("LabelsService (Integration)", () => {
       expect(result?.lines[0].speakerName).toBeNull();
       expect(result?.lines[0].speakerTag).toBeNull();
     });
+
+    it("should return fileName when label has a project file association", async () => {
+      // Create a project file
+      const testFile: NewProjectFile = {
+        id: testUuid("15000000", 1),
+        projectId: ownedProject.id!,
+        source: "GITLAB",
+        filePath: "labels/act_i.rpy",
+        fileType: "STORY",
+        content: "init python:\n    pass",
+        contentHash: calculateContentHash("init python:\n    pass"),
+      };
+
+      await db.insert(projectFiles).values(testFile);
+
+      // Create a label with projectFileId
+      const label: NewLabel = {
+        id: testUuid("13000002", 1),
+        projectId: ownedProject.id!,
+        title: "test_label",
+        labelNumber: 1,
+        sequenceOrder: 0,
+        visibility: "EXCLUSIVE",
+        status: "DRAFT",
+        prerequisites: {},
+        effects: {},
+        projectFileId: testFile.id!,
+        createdBy: testUserId,
+        updatedBy: testUserId,
+      };
+
+      await db.insert(labels).values(label);
+
+      const result = await getLabel(label.id!, testUserId);
+
+      expect(result).not.toBeNull();
+      expect(result?.projectFileId).toBe(testFile.id);
+      expect(result?.fileName).toBe("act_i.rpy");
+    });
   });
 
   describe("createLabel", () => {
@@ -1071,7 +1111,7 @@ describe("LabelsService (Integration)", () => {
         fileType: "STORY",
         content: 'label start:\n    "Hello"',
         source: "ZIP",
-        contentHash: "abc123",
+        contentHash: calculateContentHash('label start:\n    "Hello"'),
       };
 
       await db.insert(projectFiles).values(projectFile);
