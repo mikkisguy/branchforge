@@ -66,6 +66,21 @@ async function getDerivedCharactersForLabel(
 }
 
 // ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Extract the basename from a file path
+ * @param filePath - Full file path (e.g., "labels/act_i.rpy" or "labels/chapter1/scene_01.rpy")
+ * @returns Basename of the file (e.g., "act_i.rpy" or "scene_01.rpy") or null if filePath is null
+ */
+function extractFileName(filePath: string | null): string | null {
+  if (!filePath) return null;
+  const parts = filePath.split("/");
+  return parts[parts.length - 1] || null;
+}
+
+// ============================================================================
 // Type Guards for Enum Values
 // ============================================================================
 
@@ -144,9 +159,13 @@ type LabelForPublic = Pick<
   | "visibility"
   | "version"
   | "contentHash"
+  | "projectFileId"
   | "createdAt"
   | "updatedAt"
->;
+> & {
+  // filePath from LEFT JOIN with project_files
+  filePath: string | null;
+};
 
 /**
  * List labels request filters
@@ -212,12 +231,32 @@ export async function listLabels(
 
   // Fetch labels with all conditions ANDed together
   const result = await db
-    .select()
+    .select({
+      // All label fields
+      id: labels.id,
+      projectId: labels.projectId,
+      title: labels.title,
+      groupType: labels.groupType,
+      groupValue: labels.groupValue,
+      labelNumber: labels.labelNumber,
+      sequenceOrder: labels.sequenceOrder,
+      route: labels.route,
+      status: labels.status,
+      visibility: labels.visibility,
+      version: labels.version,
+      contentHash: labels.contentHash,
+      projectFileId: labels.projectFileId,
+      createdAt: labels.createdAt,
+      updatedAt: labels.updatedAt,
+      // File data from LEFT JOIN
+      filePath: projectFiles.filePath,
+    })
     .from(labels)
+    .leftJoin(projectFiles, eq(labels.projectFileId, projectFiles.id))
     .where(and(...whereConditions))
     .orderBy(asc(labels.sequenceOrder), asc(labels.labelNumber));
 
-  return result.map(mapToPublicLabel);
+  return result.map((row) => mapToPublicLabel(row));
 }
 
 /**
@@ -237,10 +276,12 @@ export async function getLabel(
   const labelResult = await db
     .select({
       label: labels,
+      filePath: projectFiles.filePath,
     })
     .from(labels)
     .innerJoin(projects, eq(labels.projectId, projects.id))
     .leftJoin(projectUsers, eq(projectUsers.projectId, projects.id))
+    .leftJoin(projectFiles, eq(labels.projectFileId, projectFiles.id))
     .where(
       and(
         eq(labels.id, labelId),
@@ -254,7 +295,7 @@ export async function getLabel(
     return null;
   }
 
-  const { label } = labelResult[0];
+  const { label, filePath } = labelResult[0];
 
   // Fetch label lines with speaker information (excluding soft-deleted)
   const linesResult = await db
@@ -281,7 +322,7 @@ export async function getLabel(
   const labelCharactersWithInfo = await getDerivedCharactersForLabel(labelId);
 
   return {
-    ...mapToPublicLabel(label),
+    ...mapToPublicLabel({ ...label, filePath: filePath ?? null }),
     lines,
     characters: labelCharactersWithInfo,
   };
@@ -338,6 +379,7 @@ export async function authorizeLabelAccess(
 
 /**
  * Map a Label to PublicLabel (already excludes sensitive data)
+ * @param label - The label data (with filePath from JOIN)
  */
 function mapToPublicLabel(label: LabelForPublic): PublicLabel {
   return {
@@ -353,6 +395,8 @@ function mapToPublicLabel(label: LabelForPublic): PublicLabel {
     visibility: label.visibility,
     version: label.version,
     contentHash: label.contentHash,
+    projectFileId: label.projectFileId ?? null,
+    fileName: extractFileName(label.filePath ?? null),
     createdAt: label.createdAt.toISOString(),
     updatedAt: label.updatedAt.toISOString(),
   };
@@ -406,6 +450,7 @@ export async function createLabel(
     sequenceOrder?: number;
     status?: LabelStatus | null;
     visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR" | null;
+    projectFileId?: string | null;
   }
 ): Promise<PublicLabel> {
   const db = getDb();
@@ -444,6 +489,33 @@ export async function createLabel(
     }
   }
 
+  // Validate projectFileId and fetch filePath in a single query to avoid extra round-trip
+  let filePath: string | null = null;
+  const validProjectFileId = data.projectFileId ?? null;
+  if (validProjectFileId !== null) {
+    const [projectFile] = await db
+      .select({
+        id: projectFiles.id,
+        filePath: projectFiles.filePath,
+        projectId: projectFiles.projectId,
+      })
+      .from(projectFiles)
+      .where(eq(projectFiles.id, validProjectFileId))
+      .limit(1);
+
+    if (!projectFile) {
+      throw new NotFoundError("ProjectFile");
+    }
+
+    if (projectFile.projectId !== data.projectId) {
+      throw new ForbiddenError(
+        "Project file does not belong to the specified project"
+      );
+    }
+
+    filePath = projectFile.filePath;
+  }
+
   const auditFields = createAuditFields(userId);
 
   const [label] = await db
@@ -458,13 +530,14 @@ export async function createLabel(
       sequenceOrder: data.sequenceOrder ?? 0,
       status: data.status ?? "DRAFT",
       visibility: data.visibility ?? "EXCLUSIVE",
+      projectFileId: data.projectFileId ?? null,
       prerequisites: {},
       effects: {},
       ...auditFields,
     })
     .returning();
 
-  return mapToPublicLabel(label);
+  return mapToPublicLabel({ ...label, filePath });
 }
 
 /**
@@ -488,14 +561,16 @@ export async function updateLabel(
 ): Promise<PublicLabel> {
   const db = getDb();
 
-  // Get label with project owner info
+  // Get label with project owner info and filePath (to avoid extra round-trip)
   const [labelWithProject] = await db
     .select({
       label: labels,
       projectOwnerId: projects.userId,
+      filePath: projectFiles.filePath,
     })
     .from(labels)
     .innerJoin(projects, eq(labels.projectId, projects.id))
+    .leftJoin(projectFiles, eq(labels.projectFileId, projectFiles.id))
     .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
     .limit(1);
 
@@ -544,7 +619,10 @@ export async function updateLabel(
     .where(eq(labels.id, labelId))
     .returning();
 
-  return mapToPublicLabel(updated);
+  return mapToPublicLabel({
+    ...updated,
+    filePath: labelWithProject.filePath ?? null,
+  });
 }
 
 /**
