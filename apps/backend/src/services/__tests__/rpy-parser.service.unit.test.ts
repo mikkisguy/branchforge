@@ -23,6 +23,9 @@ import {
   parseRPYFileWithLabels,
   convertToBranchForgeFormatFromLabels,
   reconstructRPYFile,
+  addLabelToRPYContent,
+  reorderLabelsInRPYContent,
+  parseLabelBoundaries,
 } from "../rpy-parser.service.js";
 
 describe("RPYParserService", () => {
@@ -1121,6 +1124,368 @@ label chapter1:
       });
 
       expect(result).toContain('e "Updated speaker"');
+    });
+  });
+
+  describe("addLabelToRPYContent", () => {
+    it("should insert label at end when afterLabelName is null", () => {
+      const content = `label first:
+    return`;
+      const result = addLabelToRPYContent(content, "new_label");
+      expect(result).toContain("label new_label:");
+      expect(result).toContain("label first:");
+      // New label should come after the original label
+      expect(result.indexOf("label first:")).toBeLessThan(
+        result.indexOf("label new_label:")
+      );
+    });
+
+    it("should insert label after specified label", () => {
+      const content = `label first:
+    return
+
+label second:
+    return`;
+      const result = addLabelToRPYContent(content, "middle", "first");
+      expect(result).toContain("label middle:");
+      // Verify the order: first, middle, second
+      const firstIndex = result.indexOf("label first:");
+      const middleIndex = result.indexOf("label middle:");
+      const secondIndex = result.indexOf("label second:");
+      expect(firstIndex).toBeLessThan(middleIndex);
+      expect(middleIndex).toBeLessThan(secondIndex);
+    });
+
+    it("should throw error if afterLabelName not found", () => {
+      const content = `label first:
+    return`;
+      expect(() => addLabelToRPYContent(content, "new", "nonexistent")).toThrow(
+        'Label "nonexistent" not found in RPY content'
+      );
+    });
+
+    it("should preserve indentation", () => {
+      const content = `label first:
+    return`;
+      const result = addLabelToRPYContent(content, "second");
+      expect(result).toMatch(/label second:\n {4}return/);
+    });
+
+    it("should handle empty file", () => {
+      const result = addLabelToRPYContent("", "first_label");
+      expect(result).toContain("label first_label:");
+      expect(result).toContain("return");
+    });
+
+    it("should handle file with no labels", () => {
+      const content = `# Character definitions
+define e = Character("Eileen")`;
+      const result = addLabelToRPYContent(content, "first_label");
+      expect(result).toContain("# Character definitions");
+      expect(result).toContain("label first_label:");
+    });
+
+    it("should add blank line before new label when inserting at end", () => {
+      const content = `label first:
+    return`;
+      const result = addLabelToRPYContent(content, "second");
+      // Should have a blank line between labels
+      expect(result).toMatch(/return\n\nlabel second:/);
+    });
+
+    it("should add blank line before new label when inserting after label", () => {
+      const content = `label first:
+    return
+label second:
+    return`;
+      const result = addLabelToRPYContent(content, "middle", "first");
+      // Should have a blank line between first and middle
+      expect(result).toMatch(/label first:.*return\n\nlabel middle:/s);
+    });
+
+    it("should insert label with content that has complex blocks", () => {
+      const content = `label first:
+    if True:
+        "Yes"
+    else:
+        "No"
+    return`;
+      const result = addLabelToRPYContent(content, "second", "first");
+      expect(result).toContain("label second:");
+      // Should preserve the if/else block in first label
+      expect(result).toContain("if True:");
+      expect(result).toContain("else:");
+    });
+
+    it("should detect indentation from existing labels", () => {
+      const content = `label first:
+  return`;
+      const result = addLabelToRPYContent(content, "second");
+      // Should use 2 spaces if that's what the existing label uses
+      expect(result).toMatch(/label second:\n {2}return/);
+    });
+
+    it("should default to 4 spaces when no indentation can be detected", () => {
+      const result = addLabelToRPYContent("", "first_label");
+      expect(result).toMatch(/label first_label:\n {4}return/);
+    });
+  });
+
+  describe("parseLabelBoundaries", () => {
+    it("should parse simple labels", () => {
+      const content = `label a:
+    return
+label b:
+    return`;
+      const result = parseLabelBoundaries(content);
+      expect(result).toHaveLength(2);
+      expect(result[0].name).toBe("a");
+      expect(result[1].name).toBe("b");
+    });
+
+    it("should handle labels with complex content", () => {
+      const content = `label a:
+    if True:
+        "test"
+    return`;
+      const result = parseLabelBoundaries(content);
+      expect(result[0].endLine).toBeGreaterThan(result[0].startLine);
+      expect(result[0].endLine).toBe(3); // Line 0-3 inclusive
+    });
+
+    it("should handle empty file", () => {
+      const result = parseLabelBoundaries("");
+      expect(result).toHaveLength(0);
+    });
+
+    it("should handle labels with if/else blocks", () => {
+      const content = `label a:
+    if True:
+        "yes"
+    else:
+        "no"
+    return`;
+      const result = parseLabelBoundaries(content);
+      expect(result[0].endLine).toBe(5); // Lines 0-5 inclusive
+    });
+
+    it("should handle labels with menu blocks", () => {
+      const content = `label a:
+    menu:
+        "Choice 1":
+            jump route1
+        "Choice 2":
+            jump route2
+    return`;
+      const result = parseLabelBoundaries(content);
+      expect(result[0].endLine).toBeGreaterThan(result[0].startLine);
+      expect(result[0].endLine).toBe(6); // Lines 0-6 inclusive (not 7)
+    });
+
+    it("should track correct line numbers", () => {
+      const content = `label first:
+    return
+
+label second:
+    return`;
+      const result = parseLabelBoundaries(content);
+      expect(result[0].startLine).toBe(0);
+      expect(result[0].endLine).toBe(1);
+      expect(result[1].startLine).toBe(3);
+      expect(result[1].endLine).toBe(4);
+    });
+
+    it("should handle labels with nested blocks", () => {
+      const content = `label a:
+    if condition1:
+        if condition2:
+            "deeply nested"
+    return`;
+      const result = parseLabelBoundaries(content);
+      expect(result[0].startLine).toBe(0);
+      expect(result[0].endLine).toBe(4);
+    });
+  });
+
+  describe("reorderLabelsInRPYContent", () => {
+    it("should reverse label order", () => {
+      const content = `label a:
+    return
+label b:
+    return`;
+      const result = reorderLabelsInRPYContent(content, ["b", "a"]);
+      expect(result.indexOf("label b:")).toBeLessThan(
+        result.indexOf("label a:")
+      );
+    });
+
+    it("should preserve preamble", () => {
+      const content = `# Comment
+define e = Character("Eileen")
+
+label a:
+    return`;
+      const result = reorderLabelsInRPYContent(content, ["a"]);
+      expect(result).toContain("# Comment");
+      expect(result).toContain('define e = Character("Eileen")');
+    });
+
+    it("should preserve interstitial content", () => {
+      const content = `label a:
+    return
+# Comment between
+label b:
+    return`;
+      const result = reorderLabelsInRPYContent(content, ["b", "a"]);
+      expect(result).toContain("# Comment between");
+      // Each label keeps its associated content
+      // "Comment between" was after label a, so it stays with a
+      const bIndex = result.indexOf("label b:");
+      const aIndex = result.indexOf("label a:");
+      const commentIndex = result.indexOf("# Comment between");
+      expect(bIndex).toBeLessThan(aIndex);
+      expect(commentIndex).toBeGreaterThan(aIndex);
+    });
+
+    it("should throw error for missing label", () => {
+      const content = `label a:
+    return`;
+      expect(() => reorderLabelsInRPYContent(content, ["b"])).toThrow(
+        'Label "b" not found in RPY content'
+      );
+    });
+
+    it("should handle single label", () => {
+      const content = `label a:
+    return`;
+      const result = reorderLabelsInRPYContent(content, ["a"]);
+      expect(result).toContain("label a:");
+    });
+
+    it("should preserve blank lines between labels", () => {
+      const content = `label a:
+    return
+
+label b:
+    return`;
+      const result = reorderLabelsInRPYContent(content, ["b", "a"]);
+      // Each label keeps its associated content
+      // The blank line should be preserved somewhere in the result
+      expect(result).toContain("label b:");
+      expect(result).toContain("label a:");
+      // Check that we have the same number of blank lines as original
+      // Since each label keeps its associated content (including blank lines after it),
+      // reordering should preserve the exact count of blank lines
+      const originalBlankLines = (content.match(/\n\n/g) || []).length;
+      const resultBlankLines = (result.match(/\n\n/g) || []).length;
+      expect(resultBlankLines).toBe(originalBlankLines);
+    });
+
+    it("should handle multiple label reordering", () => {
+      const content = `label a:
+    return
+label b:
+    return
+label c:
+    return
+label d:
+    return`;
+      const result = reorderLabelsInRPYContent(content, ["d", "b", "a", "c"]);
+      const lines = result.split("\n");
+      const labelLines = lines
+        .filter((line) => line.match(/^label\s+\w+:/))
+        .map((line) => line.replace(/^label\s+(\w+):.*/, "$1"));
+      expect(labelLines).toEqual(["d", "b", "a", "c"]);
+    });
+
+    it("should preserve epilogue (content after last label)", () => {
+      const content = `label a:
+    return
+label b:
+    return
+
+# Epilogue comment
+# More epilogue`;
+      const result = reorderLabelsInRPYContent(content, ["b", "a"]);
+      expect(result).toContain("# Epilogue comment");
+      expect(result).toContain("# More epilogue");
+      // The epilogue was after label b, so it stays with b
+      const bIndex = result.indexOf("label b:");
+      const epilogueIndex = result.indexOf("# Epilogue comment");
+      expect(epilogueIndex).toBeGreaterThan(bIndex);
+    });
+
+    it("should preserve all label content when reordering", () => {
+      const content = `label a:
+    "Dialogue in a"
+    return
+label b:
+    "Dialogue in b"
+    if True:
+        "Nested in b"
+    return`;
+      const result = reorderLabelsInRPYContent(content, ["b", "a"]);
+      expect(result).toContain("Dialogue in a");
+      expect(result).toContain("Dialogue in b");
+      expect(result).toContain("Nested in b");
+    });
+
+    it("should handle labels with complex nested structures", () => {
+      const content = `label a:
+    menu:
+        "Choice 1":
+            jump x
+        "Choice 2":
+            jump y
+    return
+label b:
+    if condition:
+        "branch content"
+    return`;
+      const result = reorderLabelsInRPYContent(content, ["b", "a"]);
+      // Both labels should have their full content preserved
+      expect(result).toContain("    menu:");
+      expect(result).toContain('        "Choice 1":');
+      expect(result).toContain("    if condition:");
+    });
+
+    it("should preserve comments between labels", () => {
+      const content = `label a:
+    return
+# Comment after a
+# More comments
+
+label b:
+    return
+# Comment after b`;
+
+      const result = reorderLabelsInRPYContent(content, ["b", "a"]);
+      expect(result).toContain("# Comment after a");
+      expect(result).toContain("# Comment after b");
+      // Each label's comments stay with that label during reordering
+      const bIndex = result.indexOf("label b:");
+      const commentAfterBIndex = result.indexOf("# Comment after b");
+      const aIndex = result.indexOf("label a:");
+      const commentAfterAIndex = result.indexOf("# Comment after a");
+
+      expect(bIndex).toBeLessThan(commentAfterBIndex);
+      expect(commentAfterBIndex).toBeLessThan(aIndex);
+      expect(commentAfterAIndex).toBeGreaterThan(aIndex);
+    });
+
+    it("should handle partial label reordering", () => {
+      const content = `label a:
+    return
+label b:
+    return
+label c:
+    return`;
+      // Only reorder a and b, leave c out (should only include specified labels)
+      const result = reorderLabelsInRPYContent(content, ["b", "a"]);
+      expect(result).toContain("label b:");
+      expect(result).toContain("label a:");
+      // c should not be in the result since it's not in newOrder
+      expect(result).not.toContain("label c:");
     });
   });
 });
