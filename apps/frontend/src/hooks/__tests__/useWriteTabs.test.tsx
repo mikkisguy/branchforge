@@ -21,6 +21,8 @@ function createLabel(
     routeKey: null,
     status: "DRAFT",
     visibility: "EXCLUSIVE",
+    projectFileId: null,
+    fileName: null,
     createdAt: "2024-01-01T00:00:00.000Z",
     updatedAt: "2024-01-01T00:00:00.000Z",
   };

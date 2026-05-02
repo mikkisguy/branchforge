@@ -19,12 +19,14 @@ import {
   labelLines,
   characters,
   routeConfigs,
+  projectFiles,
   type NewUser,
   type NewProject,
   type NewLabel,
   type NewLabelLine,
   type NewCharacter,
   type NewRouteConfig,
+  type NewProjectFile,
 } from "../../db/schema/index.js";
 import { eq, inArray } from "drizzle-orm";
 import {
@@ -124,6 +126,9 @@ describe("LabelsService (Integration)", () => {
     await db
       .delete(routeConfigs)
       .where(inArray(routeConfigs.projectId, projectIds));
+    await db
+      .delete(projectFiles)
+      .where(inArray(projectFiles.projectId, projectIds));
     await db
       .delete(projectUsers)
       .where(inArray(projectUsers.userId, testUserIds));
@@ -403,6 +408,163 @@ describe("LabelsService (Integration)", () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].title).toBe("shared_label");
+    });
+
+    describe("file association", () => {
+      it("should return labels with fileName when associated with a project file", async () => {
+        // Create a project file
+        const projectFile: NewProjectFile = {
+          id: testUuid("13000005", 1),
+          projectId: ownedProject.id!,
+          filePath: "labels/act_i.rpy",
+          fileType: "STORY",
+          content: 'label start:\n    "Hello World"',
+          source: "ZIP",
+          contentHash: "abc123",
+        };
+
+        await db.insert(projectFiles).values(projectFile);
+
+        // Create a label associated with the file
+        const testLabel: NewLabel = {
+          id: testUuid("13000002", 1),
+          projectId: ownedProject.id!,
+          title: "act1_label1",
+          labelNumber: 1,
+          sequenceOrder: 0,
+          projectFileId: projectFile.id,
+          visibility: "EXCLUSIVE",
+          status: "DRAFT",
+          prerequisites: {},
+          effects: {},
+          createdBy: testUserId,
+          updatedBy: testUserId,
+        };
+
+        await db.insert(labels).values(testLabel);
+
+        const result = await listLabels(ownedProject.id!, testUserId);
+
+        expect(result).toHaveLength(1);
+        expect(result[0]).toMatchObject({
+          id: testLabel.id,
+          projectFileId: projectFile.id,
+          fileName: "act_i.rpy",
+        });
+      });
+
+      it("should return null fileName for labels without file association", async () => {
+        // Create a label without projectFileId
+        const testLabel: NewLabel = {
+          id: testUuid("13000002", 1),
+          projectId: ownedProject.id!,
+          title: "unassociated_label",
+          labelNumber: 1,
+          sequenceOrder: 0,
+          visibility: "EXCLUSIVE",
+          status: "DRAFT",
+          prerequisites: {},
+          effects: {},
+          createdBy: testUserId,
+          updatedBy: testUserId,
+        };
+
+        await db.insert(labels).values(testLabel);
+
+        const result = await listLabels(ownedProject.id!, testUserId);
+
+        expect(result).toHaveLength(1);
+        expect(result[0]).toMatchObject({
+          id: testLabel.id,
+          projectFileId: null,
+          fileName: null,
+        });
+      });
+
+      it("should extract basename from nested file path", async () => {
+        // Create a project file with nested path
+        const projectFile: NewProjectFile = {
+          id: testUuid("13000005", 1),
+          projectId: ownedProject.id!,
+          filePath: "labels/chapter1/scene_01.rpy",
+          fileType: "STORY",
+          content: 'label start:\n    "Nested file"',
+          source: "ZIP",
+          contentHash: "def456",
+        };
+
+        await db.insert(projectFiles).values(projectFile);
+
+        // Create a label associated with the file
+        const testLabel: NewLabel = {
+          id: testUuid("13000002", 1),
+          projectId: ownedProject.id!,
+          title: "chapter1_scene1",
+          labelNumber: 1,
+          sequenceOrder: 0,
+          projectFileId: projectFile.id,
+          visibility: "EXCLUSIVE",
+          status: "DRAFT",
+          prerequisites: {},
+          effects: {},
+          createdBy: testUserId,
+          updatedBy: testUserId,
+        };
+
+        await db.insert(labels).values(testLabel);
+
+        const result = await listLabels(ownedProject.id!, testUserId);
+
+        expect(result).toHaveLength(1);
+        expect(result[0]).toMatchObject({
+          projectFileId: projectFile.id,
+          fileName: "scene_01.rpy",
+        });
+      });
+
+      it("should handle labels with deleted project files", async () => {
+        // This tests the ON DELETE SET NULL behavior
+        // When a project file is deleted, the database sets labels.projectFileId to NULL
+        const testFile: NewProjectFile = {
+          id: testUuid("13000005", 1),
+          projectId: ownedProject.id!,
+          source: "ZIP",
+          filePath: "labels/deleted.rpy",
+          fileType: "STORY",
+          content: 'label start:\n    "Hello"',
+          contentHash: "abc123",
+        };
+
+        await db.insert(projectFiles).values(testFile);
+
+        // Create a label associated with the file
+        const testLabel: NewLabel = {
+          id: testUuid("13000002", 1),
+          projectId: ownedProject.id!,
+          title: "orphan_label",
+          labelNumber: 1,
+          sequenceOrder: 0,
+          visibility: "EXCLUSIVE",
+          status: "DRAFT",
+          projectFileId: testFile.id!,
+          prerequisites: {},
+          effects: {},
+          createdBy: testUserId,
+          updatedBy: testUserId,
+        };
+
+        await db.insert(labels).values(testLabel);
+
+        // Delete the file - this will trigger ON DELETE SET NULL
+        await db.delete(projectFiles).where(eq(projectFiles.id, testFile.id!));
+
+        const result = await listLabels(ownedProject.id!, testUserId);
+
+        // Label should still be returned, but with null projectFileId and fileName
+        expect(result).toHaveLength(1);
+        expect(result[0].projectFileId).toBeNull();
+        expect(result[0].fileName).toBeNull();
+      });
     });
   });
 
@@ -898,6 +1060,48 @@ describe("LabelsService (Integration)", () => {
       });
 
       expect(result.routeKey).toBeNull();
+    });
+
+    it("should return fileName when updated label has a project file association", async () => {
+      // Create a project file
+      const projectFile: NewProjectFile = {
+        id: testUuid("13000005", 11),
+        projectId: ownedProject.id!,
+        filePath: "labels/scene_01.rpy",
+        fileType: "STORY",
+        content: 'label start:\n    "Hello"',
+        source: "ZIP",
+        contentHash: "abc123",
+      };
+
+      await db.insert(projectFiles).values(projectFile);
+
+      // Create a label associated with the file
+      const label: NewLabel = {
+        id: testUuid("13000002", 100),
+        projectId: ownedProject.id!,
+        title: "Original Title",
+        labelNumber: 1,
+        sequenceOrder: 0,
+        projectFileId: projectFile.id,
+        visibility: "EXCLUSIVE",
+        status: "DRAFT",
+        prerequisites: {},
+        effects: {},
+        createdBy: testUserId,
+        updatedBy: testUserId,
+      };
+
+      await db.insert(labels).values(label);
+
+      // Update the label title
+      const result = await updateLabel(label.id!, testUserId, {
+        title: "Updated Title",
+      });
+
+      expect(result.title).toBe("Updated Title");
+      expect(result.projectFileId).toBe(projectFile.id);
+      expect(result.fileName).toBe("scene_01.rpy");
     });
   });
 

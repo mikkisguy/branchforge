@@ -15,6 +15,8 @@ function createLabel(labelId: string, version: number, contentHash: string) {
     routeKey: null,
     status: "DRAFT",
     visibility: "EXCLUSIVE",
+    projectFileId: null,
+    fileName: null,
     version,
     contentHash,
     createdAt: "2024-01-01T00:00:00.000Z",
