@@ -9,6 +9,7 @@
  * - Character definitions
  */
 
+import { NotFoundError } from "../middleware/error-handler.middleware.js";
 import { sanitizeLabelName, RENPY_LABEL_REGEX } from "@branchforge/shared";
 
 // Parsed RPY data structures
@@ -1543,7 +1544,17 @@ export function addLabelToRPYContent(
   // If no afterLabelName, append at end
   if (!afterLabelName) {
     const indent = detectLabelIndentation(lines);
-    const separator = content.trim().length > 0 ? "\n\n" : "";
+
+    // Compute separator to ensure exactly one blank line between content and label
+    let separator: string;
+    if (content.endsWith("\n\n")) {
+      separator = "";
+    } else if (content.endsWith("\n")) {
+      separator = "\n";
+    } else {
+      separator = "\n\n";
+    }
+
     return `${content}${separator}label ${labelName}:\n${indent}return\n`;
   }
 
@@ -1579,6 +1590,7 @@ export function addLabelToRPYContent(
       }
 
       // If label's block runs to EOF, insert at end of file
+      // This is detected when the inner loop completes without finding an end marker
       if (insertAfterLine === i) {
         insertAfterLine = lines.length - 1;
       }
@@ -1588,7 +1600,9 @@ export function addLabelToRPYContent(
   }
 
   if (insertAfterLine === -1) {
-    throw new Error(`Label "${afterLabelName}" not found in RPY content`);
+    throw new NotFoundError(
+      `Label "${afterLabelName}" not found in RPY content`
+    );
   }
 
   // Insert the new label
@@ -1663,7 +1677,7 @@ export function reorderLabelsInRPYContent(
   // Validate all labels in newOrder exist
   for (const labelName of newOrder) {
     if (!allLabelMap.has(labelName)) {
-      throw new Error(`Label "${labelName}" not found in RPY content`);
+      throw new NotFoundError(`Label "${labelName}" not found in RPY content`);
     }
   }
 
@@ -1713,23 +1727,32 @@ export function reorderLabelsInRPYContent(
     let preambleLines = lines.slice(0, earliestLabel.startLine);
 
     // Remove any label blocks not in newOrder from the preamble
+    // Collect candidates first to avoid mutating preambleLines during iteration
     const newOrderSet = new Set(newOrder);
+    const labelsToRemove: Array<{ labelName: string; startLine: number }> = [];
     for (const [labelName, block] of allLabelMap) {
       if (
         !newOrderSet.has(labelName) &&
         block.startLine < earliestLabel.startLine
       ) {
-        // This label is not in newOrder but appears in the preamble
-        // Remove it from preambleLines
-        const blockEnd = labelContentEnd.get(labelName) ?? block.endLine;
-        if (blockEnd >= 0 && block.startLine < preambleLines.length) {
-          // Remove the label block (keep a trailing blank line if it exists)
-          const afterBlock = Math.min(blockEnd + 1, preambleLines.length);
-          preambleLines = [
-            ...preambleLines.slice(0, block.startLine),
-            ...preambleLines.slice(afterBlock),
-          ];
-        }
+        labelsToRemove.push({ labelName, startLine: block.startLine });
+      }
+    }
+
+    // Sort in descending order by startLine so removals don't affect indices
+    labelsToRemove.sort((a, b) => b.startLine - a.startLine);
+
+    // Perform removals iteratively
+    for (const { labelName } of labelsToRemove) {
+      const block = allLabelMap.get(labelName)!;
+      const blockEnd = labelContentEnd.get(labelName) ?? block.endLine;
+      if (blockEnd >= 0 && block.startLine < preambleLines.length) {
+        // Remove the label block (keep a trailing blank line if it exists)
+        const afterBlock = Math.min(blockEnd + 1, preambleLines.length);
+        preambleLines = [
+          ...preambleLines.slice(0, block.startLine),
+          ...preambleLines.slice(afterBlock),
+        ];
       }
     }
 
