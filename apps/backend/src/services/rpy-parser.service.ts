@@ -9,6 +9,7 @@
  * - Character definitions
  */
 
+import { NotFoundError } from "../middleware/error-handler.middleware.js";
 import { sanitizeLabelName, RENPY_LABEL_REGEX } from "@branchforge/shared";
 
 // Parsed RPY data structures
@@ -1438,6 +1439,342 @@ export function removeLabelFromRPYContent(
   }
 
   return result.join("\n");
+}
+
+export interface LabelBlock {
+  name: string;
+  startLine: number;
+  endLine: number;
+}
+
+/**
+ * Parse label boundaries in RPY content
+ * @param content - RPY file content
+ * @returns Array of label blocks with start/end positions
+ */
+export function parseLabelBoundaries(content: string): LabelBlock[] {
+  const lines = content.split("\n");
+  const labels: LabelBlock[] = [];
+  let currentLabel: LabelBlock | null = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Check for label definition
+    const labelMatch = line.match(RENPY_LABEL_REGEX);
+    if (labelMatch) {
+      // Save previous label if exists
+      if (currentLabel) {
+        // Remove trailing blank lines from the label block
+        while (
+          currentLabel.endLine > currentLabel.startLine &&
+          lines[currentLabel.endLine].trim().length === 0
+        ) {
+          currentLabel.endLine--;
+        }
+        labels.push(currentLabel);
+      }
+
+      // Start new label
+      currentLabel = {
+        name: labelMatch[1],
+        startLine: i,
+        endLine: i,
+      };
+      continue;
+    }
+
+    // Update end line if we're in a label block
+    if (currentLabel) {
+      const trimmed = line.trim();
+      const labelIndent = lines[currentLabel.startLine].search(/\S/);
+      const lineIndent = line.search(/\S/);
+
+      // Check if we've exited the label block
+      const nextLabelMatch = trimmed.match(RENPY_LABEL_REGEX);
+      if (nextLabelMatch || (trimmed.length > 0 && lineIndent <= labelIndent)) {
+        // Remove trailing blank lines before exiting
+        let actualEndLine = i - 1;
+        while (
+          actualEndLine > currentLabel.startLine &&
+          lines[actualEndLine].trim().length === 0
+        ) {
+          actualEndLine--;
+        }
+        currentLabel.endLine = actualEndLine;
+        labels.push(currentLabel);
+        currentLabel = null;
+      } else {
+        // Still in the label block
+        currentLabel.endLine = i;
+      }
+    }
+  }
+
+  // Don't forget the last label
+  if (currentLabel) {
+    // Remove trailing blank lines from the last label
+    while (
+      currentLabel.endLine > currentLabel.startLine &&
+      lines[currentLabel.endLine].trim().length === 0
+    ) {
+      currentLabel.endLine--;
+    }
+    labels.push(currentLabel);
+  }
+
+  return labels;
+}
+
+/**
+ * Insert a new label into RPY file content
+ * @param content - Original RPY file content
+ * @param labelName - Name of the new label (sanitized)
+ * @param afterLabelName - Optional: insert after this label (null = at end)
+ * @returns Updated RPY content with the new label inserted
+ * @throws Error if afterLabelName is specified but not found
+ */
+export function addLabelToRPYContent(
+  content: string,
+  labelName: string,
+  afterLabelName?: string | null
+): string {
+  const lines = content.split("\n");
+
+  // If no afterLabelName, append at end
+  if (!afterLabelName) {
+    const indent = detectLabelIndentation(lines);
+
+    // Compute separator to ensure exactly one blank line between content and label
+    let separator: string;
+    if (content.endsWith("\n\n")) {
+      separator = "";
+    } else if (content.endsWith("\n")) {
+      separator = "\n";
+    } else {
+      separator = "\n\n";
+    }
+
+    return `${content}${separator}label ${labelName}:\n${indent}return\n`;
+  }
+
+  // Find the label to insert after
+  let insertAfterLine = -1;
+  let labelIndent = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Check for label definition
+    const labelMatch = line.match(RENPY_LABEL_REGEX);
+    if (labelMatch && labelMatch[1] === afterLabelName) {
+      // Found the label - now find the end of its block
+      insertAfterLine = i;
+      labelIndent = line.search(/\S/);
+
+      // Scan forward to find end of label block
+      for (let j = i + 1; j < lines.length; j++) {
+        const nextLine = lines[j];
+        const nextTrimmed = nextLine.trim();
+        const nextIndent = nextLine.search(/\S/);
+
+        // End of block: next label or dedent to/above label level
+        const nextLabelMatch = nextLine.match(RENPY_LABEL_REGEX);
+        if (
+          nextLabelMatch ||
+          (nextTrimmed.length > 0 && nextIndent <= labelIndent)
+        ) {
+          insertAfterLine = j - 1;
+          break;
+        }
+      }
+
+      // If label's block runs to EOF, insert at end of file
+      // This is detected when the inner loop completes without finding an end marker
+      if (insertAfterLine === i) {
+        insertAfterLine = lines.length - 1;
+      }
+
+      break;
+    }
+  }
+
+  if (insertAfterLine === -1) {
+    throw new NotFoundError(
+      `Label "${afterLabelName}" not found in RPY content`
+    );
+  }
+
+  // Insert the new label
+  const indent = " ".repeat(labelIndent + 4);
+  const labelBlock = `label ${labelName}:\n${indent}return`;
+
+  const result = [
+    ...lines.slice(0, insertAfterLine + 1),
+    "",
+    labelBlock,
+    ...lines.slice(insertAfterLine + 1),
+  ];
+
+  return result.join("\n");
+}
+
+/**
+ * Detect standard indentation for labels in the file
+ * @param lines - RPY file lines
+ * @returns Detected indentation string (default: 4 spaces)
+ */
+function detectLabelIndentation(lines: string[]): string {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const labelMatch = line.match(RENPY_LABEL_REGEX);
+    if (labelMatch) {
+      // Check what's indented under this label
+      const labelIndent = line.search(/\S/);
+
+      for (let j = i + 1; j < lines.length; j++) {
+        const nextLine = lines[j];
+        if (nextLine.trim().length === 0) continue;
+
+        const nextIndent = nextLine.search(/\S/);
+        if (nextIndent > labelIndent) {
+          return nextLine.substring(0, nextIndent);
+        } else {
+          break;
+        }
+      }
+
+      break;
+    }
+  }
+
+  return "    "; // Default to 4 spaces
+}
+
+/**
+ * Reorder labels in RPY content while preserving non-label content
+ * Only labels specified in newOrder will be included in the result.
+ * Each label's associated content (comments, blank lines after it up to the next label) stays with the label.
+ *
+ * @param content - Original RPY file content
+ * @param newOrder - Array of label names in desired order (only these labels will be included)
+ * @returns Updated RPY content with labels reordered
+ * @throws Error if any label in newOrder is not found
+ */
+export function reorderLabelsInRPYContent(
+  content: string,
+  newOrder: string[]
+): string {
+  const lines = content.split("\n");
+  const allLabelBlocks = parseLabelBoundaries(content);
+
+  // Build a map for quick lookup of ALL labels
+  const allLabelMap = new Map<string, LabelBlock>();
+  for (const block of allLabelBlocks) {
+    allLabelMap.set(block.name, block);
+  }
+
+  // Validate all labels in newOrder exist
+  for (const labelName of newOrder) {
+    if (!allLabelMap.has(labelName)) {
+      throw new NotFoundError(`Label "${labelName}" not found in RPY content`);
+    }
+  }
+
+  // Sort all labels by their original position to find next labels
+  const sortedLabels = Array.from(allLabelMap.values()).sort(
+    (a, b) => a.startLine - b.startLine
+  );
+
+  // Build a map of each label to its content end (up to the next label or end of file)
+  // We need to include blank lines and comments that come after the label
+  const labelContentEnd = new Map<string, number>();
+  for (let i = 0; i < sortedLabels.length; i++) {
+    const currentLabel = sortedLabels[i];
+    if (i < sortedLabels.length - 1) {
+      // Content extends from the end of this label's block to the start of the next label
+      // Include everything between the labels (blank lines, comments, etc.)
+      const nextLabel = sortedLabels[i + 1];
+      let contentEnd = nextLabel.startLine - 1;
+      // Strip trailing blank lines so they don't accumulate at the end during reordering
+      while (
+        contentEnd > currentLabel.endLine &&
+        lines[contentEnd].trim().length === 0
+      ) {
+        contentEnd--;
+      }
+      labelContentEnd.set(currentLabel.name, contentEnd);
+    } else {
+      // Last label, content extends to end of file
+      labelContentEnd.set(currentLabel.name, lines.length - 1);
+    }
+  }
+
+  // Extract all lines as segments
+  const segments: string[] = [];
+
+  // Find the earliest label in newOrder to determine preamble
+  const earliestLabel =
+    newOrder.length > 0
+      ? newOrder
+          .map((name) => allLabelMap.get(name)!)
+          .sort((a, b) => a.startLine - b.startLine)[0]
+      : undefined;
+
+  // Preamble (content before the first label in newOrder)
+  // Exclude any labels not in newOrder from the preamble
+  if (earliestLabel && earliestLabel.startLine > 0) {
+    let preambleLines = lines.slice(0, earliestLabel.startLine);
+
+    // Remove any label blocks not in newOrder from the preamble
+    // Collect candidates first to avoid mutating preambleLines during iteration
+    const newOrderSet = new Set(newOrder);
+    const labelsToRemove: Array<{ labelName: string; startLine: number }> = [];
+    for (const [labelName, block] of allLabelMap) {
+      if (
+        !newOrderSet.has(labelName) &&
+        block.startLine < earliestLabel.startLine
+      ) {
+        labelsToRemove.push({ labelName, startLine: block.startLine });
+      }
+    }
+
+    // Sort in descending order by startLine so removals don't affect indices
+    labelsToRemove.sort((a, b) => b.startLine - a.startLine);
+
+    // Perform removals iteratively
+    for (const { labelName } of labelsToRemove) {
+      const block = allLabelMap.get(labelName)!;
+      const blockEnd = labelContentEnd.get(labelName) ?? block.endLine;
+      if (blockEnd >= 0 && block.startLine < preambleLines.length) {
+        // Remove the label block (keep a trailing blank line if it exists)
+        const afterBlock = Math.min(blockEnd + 1, preambleLines.length);
+        preambleLines = [
+          ...preambleLines.slice(0, block.startLine),
+          ...preambleLines.slice(afterBlock),
+        ];
+      }
+    }
+
+    segments.push(...preambleLines);
+  }
+
+  // Add labels in new order with their associated content
+  for (let i = 0; i < newOrder.length; i++) {
+    const labelName = newOrder[i];
+    const block = allLabelMap.get(labelName)!;
+    const contentEnd = labelContentEnd.get(labelName)!;
+
+    // Add label block and its associated content (including blank lines up to next label)
+    segments.push(...lines.slice(block.startLine, contentEnd + 1));
+
+    // Add blank line between labels (but not after the last label)
+    if (i < newOrder.length - 1) {
+      segments.push("");
+    }
+  }
+
+  return segments.join("\n");
 }
 
 /**
