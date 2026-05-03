@@ -16,19 +16,32 @@ import {
   routeConfigs,
   projectFiles,
 } from "../db/schema/index.js";
-import { eq, and, asc, or, isNull } from "drizzle-orm";
+import { eq, and, asc, or, isNull, inArray, sql } from "drizzle-orm";
 import type { Label, LabelLine } from "../db/schema/index.js";
 import type { PublicLabel } from "@branchforge/shared";
-import { LabelStatus } from "@branchforge/shared";
+import { LabelStatus, sanitizeLabelName } from "@branchforge/shared";
 import { createAuditFields, updateAuditFields } from "../lib/audit.js";
 import {
   NotFoundError,
   ForbiddenError,
+  ValidationError,
 } from "../middleware/error-handler.middleware.js";
 import { logWarn, LogEventType } from "../lib/logger.js";
+import {
+  addLabelToRPYContent,
+  reorderLabelsInRPYContent,
+} from "./rpy-parser.service.js";
+import { calculateContentHash } from "../lib/hash.js";
 
 // Re-export PublicLabel from shared for route handlers
 export type { PublicLabel };
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+// Maximum attempts to find a unique label name before falling back to timestamp/UUID
+const MAX_LABEL_ATTEMPTS = 1000;
 
 // ============================================================================
 // Derived Character Query
@@ -78,6 +91,56 @@ function extractFileName(filePath: string | null): string | null {
   if (!filePath) return null;
   const parts = filePath.split("/");
   return parts[parts.length - 1] || null;
+}
+
+/**
+ * Resync label positions for all labels in a file
+ * Ensures positions are sequential starting from 0
+ *
+ * @param tx - Database transaction or connection
+ * @param projectFileId - The project file ID
+ */
+async function resyncLabelPositions(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tx: any,
+  projectFileId: string
+): Promise<void> {
+  const fileLabels = await tx
+    .select()
+    .from(labels)
+    .where(
+      and(eq(labels.projectFileId, projectFileId), isNull(labels.deletedAt))
+    )
+    .orderBy(asc(labels.labelPosition));
+
+  // Sort labels: those with same position maintain their relative order
+  // but when multiple labels have position 0 (newly inserted at beginning),
+  // the newest one (most recent createdAt) should come first
+  fileLabels.sort((a: Label, b: Label) => {
+    if (a.labelPosition !== b.labelPosition) {
+      return (a.labelPosition ?? 0) - (b.labelPosition ?? 0);
+    }
+    // Same position: newer labels come first
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+
+  // Batch update all label positions in a single query using CASE statement
+  // This avoids N round-trips to the database
+  if (fileLabels.length > 0) {
+    const caseStatements = fileLabels
+      .map((label: Label, i: number) => `WHEN '${label.id}' THEN ${i}`)
+      .join("\n        ");
+
+    const labelIds = fileLabels.map((l: Label) => `'${l.id}'`).join(", ");
+
+    await tx.execute(
+      sql`UPDATE labels SET "label_position" = CASE id
+          ${sql.raw(caseStatements)}
+          ELSE "label_position"
+        END
+        WHERE id IN (${sql.raw(labelIds)})`
+    );
+  }
 }
 
 // ============================================================================
@@ -451,93 +514,215 @@ export async function createLabel(
     status?: LabelStatus | null;
     visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR" | null;
     projectFileId?: string | null;
+    afterLabelId?: string | null;
   }
 ): Promise<PublicLabel> {
   const db = getDb();
 
-  // Verify user has access to the project
-  const [project] = await db
-    .select({ userId: projects.userId })
-    .from(projects)
-    .where(eq(projects.id, data.projectId))
-    .limit(1);
-
-  if (!project) {
-    throw new NotFoundError("Project");
-  }
-
-  if (project.userId !== userId) {
-    throw new ForbiddenError("Insufficient permissions");
-  }
-
-  // Validate route exists in route_configs for this project
-  // If route is provided but doesn't exist, coerce to null
-  let validatedRoute = data.route ?? null;
-  if (validatedRoute !== null) {
-    const routeExists = await validateRouteExists(
-      data.projectId,
-      validatedRoute
-    );
-    if (!routeExists) {
-      // Coerce to null if route doesn't exist
-      logWarn(LogEventType.VALIDATION_WARNING, {
-        event: "invalid_route_configuration",
-        route: validatedRoute,
-        projectId: data.projectId,
-      });
-      validatedRoute = null;
-    }
-  }
-
-  // Validate projectFileId and fetch filePath in a single query to avoid extra round-trip
-  let filePath: string | null = null;
-  const validProjectFileId = data.projectFileId ?? null;
-  if (validProjectFileId !== null) {
-    const [projectFile] = await db
-      .select({
-        id: projectFiles.id,
-        filePath: projectFiles.filePath,
-        projectId: projectFiles.projectId,
-      })
-      .from(projectFiles)
-      .where(eq(projectFiles.id, validProjectFileId))
+  return await db.transaction(async (tx) => {
+    // Verify user has access to the project
+    const [project] = await tx
+      .select({ userId: projects.userId })
+      .from(projects)
+      .where(eq(projects.id, data.projectId))
       .limit(1);
 
-    if (!projectFile) {
-      throw new NotFoundError("ProjectFile");
+    if (!project) {
+      throw new NotFoundError("Project");
     }
 
-    if (projectFile.projectId !== data.projectId) {
-      throw new ForbiddenError(
-        "Project file does not belong to the specified project"
+    if (project.userId !== userId) {
+      throw new ForbiddenError("Insufficient permissions");
+    }
+
+    // Validate route exists in route_configs for this project
+    // If route is provided but doesn't exist, coerce to null
+    let validatedRoute = data.route ?? null;
+    if (validatedRoute !== null) {
+      const routeExists = await validateRouteExists(
+        data.projectId,
+        validatedRoute
       );
+      if (!routeExists) {
+        // Coerce to null if route doesn't exist
+        logWarn(LogEventType.VALIDATION_WARNING, {
+          event: "invalid_route_configuration",
+          route: validatedRoute,
+          projectId: data.projectId,
+        });
+        validatedRoute = null;
+      }
     }
 
-    filePath = projectFile.filePath;
-  }
+    // Validate projectFileId and fetch filePath in a single query to avoid extra round-trip
+    let filePath: string | null = null;
+    let rpyContent = "";
+    let afterLabelName = null;
+    let afterLabelPosition: number | null = null;
+    const validProjectFileId = data.projectFileId ?? null;
 
-  const auditFields = createAuditFields(userId);
+    if (validProjectFileId !== null) {
+      const [projectFile] = await tx
+        .select({
+          id: projectFiles.id,
+          filePath: projectFiles.filePath,
+          projectId: projectFiles.projectId,
+          content: projectFiles.content,
+        })
+        .from(projectFiles)
+        .where(eq(projectFiles.id, validProjectFileId))
+        .limit(1);
 
-  const [label] = await db
-    .insert(labels)
-    .values({
-      projectId: data.projectId,
-      title: data.title,
-      route: validatedRoute,
-      groupType: data.groupType ?? null,
-      groupValue: data.groupValue ?? null,
-      labelNumber: data.labelNumber,
-      sequenceOrder: data.sequenceOrder ?? 0,
-      status: data.status ?? "DRAFT",
-      visibility: data.visibility ?? "EXCLUSIVE",
-      projectFileId: data.projectFileId ?? null,
-      prerequisites: {},
-      effects: {},
-      ...auditFields,
-    })
-    .returning();
+      if (!projectFile) {
+        throw new NotFoundError("ProjectFile");
+      }
 
-  return mapToPublicLabel({ ...label, filePath });
+      if (projectFile.projectId !== data.projectId) {
+        throw new ForbiddenError(
+          "Project file does not belong to the specified project"
+        );
+      }
+
+      filePath = projectFile.filePath;
+      rpyContent = projectFile.content;
+
+      // Validate afterLabelId if provided
+      if (data.afterLabelId) {
+        const [afterLabel] = await tx
+          .select({
+            id: labels.id,
+            labelName: labels.labelName,
+            projectFileId: labels.projectFileId,
+            labelPosition: labels.labelPosition,
+          })
+          .from(labels)
+          .where(
+            and(eq(labels.id, data.afterLabelId), isNull(labels.deletedAt))
+          )
+          .limit(1);
+
+        if (!afterLabel) {
+          throw new NotFoundError("Label");
+        }
+
+        if (afterLabel.projectFileId !== validProjectFileId) {
+          throw new ValidationError("afterLabelId must be in the same file");
+        }
+
+        afterLabelName = afterLabel.labelName;
+        afterLabelPosition = afterLabel.labelPosition;
+      }
+    }
+
+    // Generate labelName
+    let labelName = sanitizeLabelName(data.title);
+    let finalTitle = data.title;
+
+    // Check for collisions in the same file
+    if (validProjectFileId) {
+      // Get all labels in the file that start with the sanitized base name
+      const existingLabels = await tx
+        .select()
+        .from(labels)
+        .where(
+          and(
+            eq(labels.projectFileId, validProjectFileId),
+            isNull(labels.deletedAt)
+          )
+        );
+
+      // Check for name collisions (with or without counter suffix)
+      const baseLabelName = labelName;
+      let counter = 2;
+      let hasCollision = existingLabels.some((l) => l.labelName === labelName);
+
+      let attempts = 0;
+      while (hasCollision) {
+        if (attempts >= MAX_LABEL_ATTEMPTS) {
+          // Fallback to timestamp-based unique suffix to avoid infinite loop
+          const timestampSuffix = Date.now().toString(36);
+          labelName = `${baseLabelName}_${timestampSuffix}`;
+          finalTitle = `${data.title}_${timestampSuffix}`;
+          logWarn(LogEventType.VALIDATION_WARNING, {
+            event: "max_label_name_attempts_exceeded",
+            baseLabelName,
+            attempts: MAX_LABEL_ATTEMPTS,
+            projectId: data.projectId,
+            projectFileId: validProjectFileId,
+          });
+          break;
+        }
+
+        const candidateName = `${baseLabelName}_${counter}`;
+        if (!existingLabels.some((l) => l.labelName === candidateName)) {
+          labelName = candidateName;
+          finalTitle = `${data.title}_${counter}`;
+          hasCollision = false;
+        }
+        counter++;
+        attempts++;
+      }
+    }
+
+    // Insert label block into RPY content
+    let updatedContent = rpyContent;
+    let insertPosition: number | null = null;
+
+    if (validProjectFileId) {
+      updatedContent = addLabelToRPYContent(
+        rpyContent,
+        labelName,
+        afterLabelName
+      );
+
+      // Determine insertion position
+      if (afterLabelName) {
+        insertPosition = (afterLabelPosition ?? 0) + 1;
+      } else {
+        // No afterLabelId provided, insert at beginning (position 0)
+        insertPosition = 0;
+      }
+    }
+
+    const auditFields = createAuditFields(userId);
+
+    const [label] = await tx
+      .insert(labels)
+      .values({
+        projectId: data.projectId,
+        title: finalTitle,
+        route: validatedRoute,
+        groupType: data.groupType ?? null,
+        groupValue: data.groupValue ?? null,
+        labelNumber: data.labelNumber,
+        sequenceOrder: data.sequenceOrder ?? 0,
+        status: data.status ?? "DRAFT",
+        visibility: data.visibility ?? "EXCLUSIVE",
+        projectFileId: validProjectFileId,
+        labelName,
+        labelPosition: insertPosition,
+        prerequisites: {},
+        effects: {},
+        ...auditFields,
+      })
+      .returning();
+
+    // Update project_files.content and contentHash
+    if (validProjectFileId) {
+      await tx
+        .update(projectFiles)
+        .set({
+          content: updatedContent,
+          contentHash: calculateContentHash(updatedContent),
+        })
+        .where(eq(projectFiles.id, validProjectFileId));
+
+      // Resync label positions
+      await resyncLabelPositions(tx, validProjectFileId);
+    }
+
+    return mapToPublicLabel({ ...label, filePath });
+  });
 }
 
 /**
@@ -705,6 +890,193 @@ export async function deleteLabel(
         })
         .where(eq(projectFiles.id, labelWithProject.projectFileId));
     }
+  });
+}
+
+/**
+ * Reorder labels within a specific file
+ * Updates both the RPY file content and label positions in the database
+ *
+ * @param userId - The ID of the user reordering the labels
+ * @param data - The reorder data
+ * @returns The updated labels
+ * @throws NotFoundError if project file not found
+ * @throws ForbiddenError if user lacks permission
+ * @throws ValidationError if labels belong to different files
+ */
+export async function reorderLabelsInFile(
+  userId: string,
+  data: {
+    projectFileId: string;
+    labelOrders: Array<{ labelId: string; newPosition: number }>;
+  }
+): Promise<PublicLabel[]> {
+  const db = getDb();
+
+  // Validate input
+  if (!data.labelOrders || data.labelOrders.length === 0) {
+    throw new ValidationError("At least one label must be reordered");
+  }
+
+  return await db.transaction(async (tx) => {
+    // Get the project file
+    const [projectFile] = await tx
+      .select({
+        id: projectFiles.id,
+        content: projectFiles.content,
+        projectId: projectFiles.projectId,
+        filePath: projectFiles.filePath,
+      })
+      .from(projectFiles)
+      .where(eq(projectFiles.id, data.projectFileId))
+      .limit(1);
+
+    if (!projectFile) {
+      throw new NotFoundError("ProjectFile");
+    }
+
+    // Verify user owns the project
+    const [project] = await tx
+      .select({ userId: projects.userId })
+      .from(projects)
+      .where(eq(projects.id, projectFile.projectId))
+      .limit(1);
+
+    if (!project || project.userId !== userId) {
+      throw new ForbiddenError("Insufficient permissions");
+    }
+
+    // Validate all labels exist and belong to the same file
+    const labelIds = data.labelOrders.map((l) => l.labelId);
+    const labelsToReorder = await tx
+      .select()
+      .from(labels)
+      .where(and(inArray(labels.id, labelIds), isNull(labels.deletedAt)));
+
+    if (labelsToReorder.length !== labelIds.length) {
+      throw new ValidationError("One or more labels not found");
+    }
+
+    for (const label of labelsToReorder) {
+      if (label.projectFileId !== data.projectFileId) {
+        throw new ValidationError("All labels must belong to the same file");
+      }
+    }
+
+    // Filter out labels without labelName (UI-only labels that aren't in RPY files)
+    const labelsWithoutName = labelsToReorder.filter((l) => !l.labelName);
+    const validLabelsToReorder = labelsToReorder.filter((l) => l.labelName);
+
+    if (labelsWithoutName.length > 0) {
+      const invalidNames = labelsWithoutName.map((l) => l.title).join(", ");
+      throw new ValidationError(
+        `Labels without file association cannot be reordered: ${invalidNames}`
+      );
+    }
+
+    if (validLabelsToReorder.length === 0) {
+      throw new ValidationError("At least one valid label must be reordered");
+    }
+
+    // Build array of label names in the new order
+    const validLabelIds = new Set(validLabelsToReorder.map((l) => l.id));
+    const labelMap = new Map(validLabelsToReorder.map((l) => [l.id, l]));
+    const newOrder: string[] = [];
+
+    // Only process labels that passed validation
+    const validOrders = data.labelOrders.filter((o) =>
+      validLabelIds.has(o.labelId)
+    );
+
+    const sortedOrders = [...validOrders].sort(
+      (a, b) => a.newPosition - b.newPosition
+    );
+
+    for (const order of sortedOrders) {
+      const label = labelMap.get(order.labelId);
+      // labelName is guaranteed to be non-null after validation
+      if (label?.labelName) {
+        newOrder.push(label.labelName);
+      }
+    }
+
+    // Reorder labels in RPY content
+    const updatedContent = reorderLabelsInRPYContent(
+      projectFile.content,
+      newOrder
+    );
+
+    // Update project_files.content and contentHash
+    await tx
+      .update(projectFiles)
+      .set({
+        content: updatedContent,
+        contentHash: calculateContentHash(updatedContent),
+      })
+      .where(eq(projectFiles.id, data.projectFileId));
+
+    // Update label positions for all labels in the file
+    const allFileLabels = await tx
+      .select()
+      .from(labels)
+      .where(
+        and(
+          eq(labels.projectFileId, data.projectFileId),
+          isNull(labels.deletedAt)
+        )
+      )
+      .orderBy(asc(labels.labelPosition));
+
+    const reorderedPositionMap = new Map(
+      validOrders.map((o) => [o.labelId, o.newPosition])
+    );
+
+    // Build new order array
+    const newLabelOrder = [...allFileLabels];
+    newLabelOrder.sort((a, b) => {
+      const aPos = reorderedPositionMap.get(a.id) ?? a.labelPosition ?? 0;
+      const bPos = reorderedPositionMap.get(b.id) ?? b.labelPosition ?? 0;
+      if (aPos !== bPos) {
+        return aPos - bPos;
+      }
+      // Tie-breaker: prioritize labels being explicitly reordered
+      const aIsReordered = reorderedPositionMap.has(a.id);
+      const bIsReordered = reorderedPositionMap.has(b.id);
+      if (aIsReordered && !bIsReordered) {
+        return -1; // a comes first
+      }
+      if (!aIsReordered && bIsReordered) {
+        return 1; // b comes first
+      }
+      // Both or neither reordered: use original position as tie-breaker
+      return (a.labelPosition ?? 0) - (b.labelPosition ?? 0);
+    });
+
+    // Update positions sequentially, skipping labels without labelName
+    // since they don't exist in RPY files and shouldn't have their positions changed
+    for (let i = 0; i < newLabelOrder.length; i++) {
+      const label = newLabelOrder[i];
+      if (label.labelName === null) {
+        continue; // Skip UI-only labels that aren't in RPY files
+      }
+      await tx
+        .update(labels)
+        .set({
+          labelPosition: i,
+          updatedBy: userId,
+        })
+        .where(eq(labels.id, label.id));
+    }
+
+    // Fetch and return updated labels
+    const updatedLabels = await tx
+      .select()
+      .from(labels)
+      .where(inArray(labels.id, Array.from(validLabelIds)));
+
+    return updatedLabels.map((l) =>
+      mapToPublicLabel({ ...l, filePath: projectFile.filePath })
+    );
   });
 }
 
