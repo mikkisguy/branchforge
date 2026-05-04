@@ -377,7 +377,16 @@ export const createLabelSchema = z
     projectFileId: uuidSchema.optional(),
     afterLabelId: uuidSchema.optional().nullable(),
   })
-  .strict();
+  .strict()
+  .superRefine((data, ctx) => {
+    if (data.afterLabelId && !data.projectFileId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["afterLabelId"],
+        message: "afterLabelId can only be used with projectFileId",
+      });
+    }
+  });
 
 /**
  * Update label request validation

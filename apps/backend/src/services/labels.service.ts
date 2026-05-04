@@ -144,9 +144,11 @@ async function resyncLabelPositions(
   // Batch update all label positions in a single query using parameterized VALUES
   // This avoids N round-trips to the database and prevents SQL injection
   if (fileLabels.length > 0) {
-    // Create a parameterized VALUES list
+    // Create a parameterized VALUES list with explicit type casting
     const valuesList = sql.join(
-      fileLabels.map((label: Label, i: number) => sql`(${label.id}, ${i})`),
+      fileLabels.map(
+        (label: Label, i: number) => sql`(${label.id}::uuid, ${i}::integer)`
+      ),
       sql`, `
     );
 
@@ -984,9 +986,13 @@ export async function reorderLabelsInFile(
 
     if (labelsWithoutName.length > 0) {
       const invalidNames = labelsWithoutName.map((l) => l.title).join(", ");
-      throw new ValidationError(
-        `Labels without file association cannot be reordered: ${invalidNames}`
-      );
+      logWarn(LogEventType.VALIDATION_WARNING, {
+        event: "label_reorder_failed_no_file_association",
+        invalidNames,
+        projectFileId: data.projectFileId,
+        labelIds: labelsWithoutName.map((l) => l.id),
+      });
+      throw new ValidationError("One or more labels cannot be reordered");
     }
 
     if (validLabelsToReorder.length === 0) {
@@ -1080,9 +1086,11 @@ export async function reorderLabelsInFile(
     }
 
     if (labelsToUpdate.length > 0) {
-      // Create a parameterized VALUES list
+      // Create a parameterized VALUES list with explicit type casting
       const valuesList = sql.join(
-        labelsToUpdate.map((item) => sql`(${item.id}, ${item.position})`),
+        labelsToUpdate.map(
+          (item) => sql`(${item.id}::uuid, ${item.position}::integer)`
+        ),
         sql`, `
       );
 
