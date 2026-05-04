@@ -16,8 +16,25 @@ import {
   routeConfigs,
   projectFiles,
 } from "../db/schema/index.js";
-import { eq, and, asc, or, isNull, inArray, sql } from "drizzle-orm";
+import {
+  eq,
+  and,
+  asc,
+  or,
+  isNull,
+  inArray,
+  sql,
+  type ExtractTablesWithRelations,
+} from "drizzle-orm";
 import type { Label, LabelLine } from "../db/schema/index.js";
+import type { NodePgTransaction } from "drizzle-orm/node-postgres";
+
+// Transaction type that matches what TypeScript infers from db.transaction()
+// The schema is inferred as Record<string, unknown> due to TypeScript's limitations
+type Transaction = NodePgTransaction<
+  Record<string, unknown>,
+  ExtractTablesWithRelations<Record<string, unknown>>
+>;
 import type { PublicLabel } from "@branchforge/shared";
 import { LabelStatus, sanitizeLabelName } from "@branchforge/shared";
 import { createAuditFields, updateAuditFields } from "../lib/audit.js";
@@ -29,6 +46,7 @@ import {
 import { logWarn, LogEventType } from "../lib/logger.js";
 import {
   addLabelToRPYContent,
+  removeLabelFromRPYContent,
   reorderLabelsInRPYContent,
 } from "./rpy-parser.service.js";
 import { calculateContentHash } from "../lib/hash.js";
@@ -101,8 +119,7 @@ function extractFileName(filePath: string | null): string | null {
  * @param projectFileId - The project file ID
  */
 async function resyncLabelPositions(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tx: any,
+  tx: Transaction,
   projectFileId: string
 ): Promise<void> {
   const fileLabels = await tx
@@ -124,21 +141,20 @@ async function resyncLabelPositions(
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
-  // Batch update all label positions in a single query using CASE statement
-  // This avoids N round-trips to the database
+  // Batch update all label positions in a single query using parameterized VALUES
+  // This avoids N round-trips to the database and prevents SQL injection
   if (fileLabels.length > 0) {
-    const caseStatements = fileLabels
-      .map((label: Label, i: number) => `WHEN '${label.id}' THEN ${i}`)
-      .join("\n        ");
-
-    const labelIds = fileLabels.map((l: Label) => `'${l.id}'`).join(", ");
+    // Create a parameterized VALUES list
+    const valuesList = sql.join(
+      fileLabels.map((label: Label, i: number) => sql`(${label.id}, ${i})`),
+      sql`, `
+    );
 
     await tx.execute(
-      sql`UPDATE labels SET "label_position" = CASE id
-          ${sql.raw(caseStatements)}
-          ELSE "label_position"
-        END
-        WHERE id IN (${sql.raw(labelIds)})`
+      sql`UPDATE labels
+          SET "label_position" = new_positions.position
+          FROM (VALUES ${valuesList}) AS new_positions(id, position)
+          WHERE labels.id = new_positions.id`
     );
   }
 }
@@ -571,6 +587,7 @@ export async function createLabel(
         })
         .from(projectFiles)
         .where(eq(projectFiles.id, validProjectFileId))
+        .for("update")
         .limit(1);
 
       if (!projectFile) {
@@ -823,9 +840,6 @@ export async function deleteLabel(
 ): Promise<void> {
   const db = getDb();
 
-  // Import the removeLabelFromRPYContent function dynamically
-  const { removeLabelFromRPYContent } = await import("./rpy-parser.service.js");
-
   // Get label with project owner info and projectFileId
   const [labelWithProject] = await db
     .select({
@@ -919,7 +933,7 @@ export async function reorderLabelsInFile(
   }
 
   return await db.transaction(async (tx) => {
-    // Get the project file
+    // Get the project file with row-level lock to prevent concurrent modifications
     const [projectFile] = await tx
       .select({
         id: projectFiles.id,
@@ -929,6 +943,7 @@ export async function reorderLabelsInFile(
       })
       .from(projectFiles)
       .where(eq(projectFiles.id, data.projectFileId))
+      .for("update")
       .limit(1);
 
     if (!projectFile) {
@@ -1052,20 +1067,33 @@ export async function reorderLabelsInFile(
       return (a.labelPosition ?? 0) - (b.labelPosition ?? 0);
     });
 
-    // Update positions sequentially, skipping labels without labelName
-    // since they don't exist in RPY files and shouldn't have their positions changed
+    // Update positions in a single batch query using parameterized VALUES
+    // Skip labels without labelName since they don't exist in RPY files
+    const labelsToUpdate: Array<{ id: string; position: number }> = [];
+
     for (let i = 0; i < newLabelOrder.length; i++) {
       const label = newLabelOrder[i];
       if (label.labelName === null) {
         continue; // Skip UI-only labels that aren't in RPY files
       }
-      await tx
-        .update(labels)
-        .set({
-          labelPosition: i,
-          updatedBy: userId,
-        })
-        .where(eq(labels.id, label.id));
+      labelsToUpdate.push({ id: label.id, position: i });
+    }
+
+    if (labelsToUpdate.length > 0) {
+      // Create a parameterized VALUES list
+      const valuesList = sql.join(
+        labelsToUpdate.map((item) => sql`(${item.id}, ${item.position})`),
+        sql`, `
+      );
+
+      await tx.execute(
+        sql`UPDATE labels
+            SET "label_position" = new_positions.position,
+                "updated_by" = ${userId},
+                "updated_at" = NOW()
+            FROM (VALUES ${valuesList}) AS new_positions(id, position)
+            WHERE labels.id = new_positions.id`
+      );
     }
 
     // Fetch and return updated labels

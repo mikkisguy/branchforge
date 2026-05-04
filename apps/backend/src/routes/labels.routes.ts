@@ -712,6 +712,10 @@ async function createLabelHandler(
       reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
       return;
     }
+    if (error instanceof ValidationError) {
+      reply.status(400).send({ error: "Bad request" } as ErrorResponse);
+      return;
+    }
 
     reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
   }
@@ -877,7 +881,10 @@ async function reorderLabelsInFileHandler(
       return;
     }
     if (error instanceof ValidationError) {
-      reply.status(400).send({ error: error.message } as ErrorResponse);
+      request.log.error(error);
+      reply
+        .status(400)
+        .send({ error: "Invalid request payload" } as ErrorResponse);
       return;
     }
 

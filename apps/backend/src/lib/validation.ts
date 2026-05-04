@@ -375,7 +375,7 @@ export const createLabelSchema = z
     visibility: labelVisibilitySchema.optional(),
     title: z.string().trim().min(1, "Title is required").max(255),
     projectFileId: uuidSchema.optional(),
-    afterLabelId: uuidSchema.optional(),
+    afterLabelId: uuidSchema.optional().nullable(),
   })
   .strict();
 
