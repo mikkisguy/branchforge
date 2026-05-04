@@ -374,8 +374,19 @@ export const createLabelSchema = z
     status: labelStatusSchema.optional(),
     visibility: labelVisibilitySchema.optional(),
     title: z.string().trim().min(1, "Title is required").max(255),
+    projectFileId: uuidSchema.optional(),
+    afterLabelId: uuidSchema.optional().nullable(),
   })
-  .strict();
+  .strict()
+  .superRefine((data, ctx) => {
+    if (data.afterLabelId && !data.projectFileId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["afterLabelId"],
+        message: "afterLabelId can only be used with projectFileId",
+      });
+    }
+  });
 
 /**
  * Update label request validation
@@ -407,6 +418,34 @@ export const updateLabelDialogueBodySchema = z
     expectedContentHash: expectedContentHashSchema,
   })
   .strict();
+
+/**
+ * Reorder labels in file request validation
+ */
+export const reorderLabelsInFileSchema = z
+  .object({
+    projectFileId: uuidSchema,
+    labelOrders: z
+      .array(
+        z.object({
+          labelId: uuidSchema,
+          newPosition: z.number().int().min(0),
+        })
+      )
+      .min(1, "At least one label must be reordered"),
+  })
+  .strict()
+  .refine(
+    (data) => {
+      const labelIds = data.labelOrders.map((lo) => lo.labelId);
+      const uniqueIds = new Set(labelIds);
+      return labelIds.length === uniqueIds.size;
+    },
+    {
+      message: "labelId values must be unique",
+      path: ["labelOrders"],
+    }
+  );
 
 // ============================================================================
 // Route Configuration Schemas
@@ -1021,6 +1060,9 @@ export type CreateLabelInput = z.infer<typeof createLabelSchema>;
 export type UpdateLabelInput = z.infer<typeof updateLabelSchema>;
 export type UpdateLabelDialogueInput = z.infer<
   typeof updateLabelDialogueBodySchema
+>;
+export type ReorderLabelsInFileInput = z.infer<
+  typeof reorderLabelsInFileSchema
 >;
 
 export type CreateCharacterInput = z.infer<typeof createCharacterSchema>;
