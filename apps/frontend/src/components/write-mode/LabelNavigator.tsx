@@ -2,18 +2,20 @@
  * LabelNavigator Component
  *
  * Left sidebar for navigating labels in WriteMode.
- * Matches app design system with theme colors and simple styling.
+ * Groups labels by source file name with visual status indicators.
  */
 
 import { useMemo } from "react";
 import type { PublicLabel, LabelStatus } from "@branchforge/shared";
-import { Sparkles, ChevronLeft } from "lucide-react";
+import { Sparkles, ChevronLeft, File, FolderOpen } from "lucide-react";
 
 const STATUS_COLORS: Record<LabelStatus, string> = {
   FINAL: "var(--theme-color)",
   REVIEW: "var(--theme-review-color)",
   DRAFT: "var(--theme-draft-color)",
 };
+
+const UNASSOCIATED_KEY = "Unassociated Labels";
 
 interface LabelNavigatorProps {
   labels: PublicLabel[];
@@ -36,11 +38,7 @@ export function LabelNavigator({
     const groups = new Map<string, PublicLabel[]>();
 
     for (const label of labels) {
-      const key =
-        label.groupType && label.groupValue
-          ? `${label.groupType}: ${label.groupValue}`
-          : "Uncategorized";
-
+      const key = label.fileName || UNASSOCIATED_KEY;
       if (!groups.has(key)) {
         groups.set(key, []);
       }
@@ -49,12 +47,8 @@ export function LabelNavigator({
 
     const sortedGroups = new Map<string, PublicLabel[]>();
     const groupKeys = Array.from(groups.keys()).sort((a, b) => {
-      if (a === "Uncategorized") {
-        return 1;
-      }
-      if (b === "Uncategorized") {
-        return -1;
-      }
+      if (a === UNASSOCIATED_KEY) return 1;
+      if (b === UNASSOCIATED_KEY) return -1;
       return a.localeCompare(b);
     });
     for (const key of groupKeys) {
@@ -102,20 +96,33 @@ export function LabelNavigator({
       {/* Label List */}
       <div className="p-3 space-y-2">
         {groupedLabels.size === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            No labels yet
-          </p>
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <FolderOpen className="w-10 h-10 text-muted-foreground mb-3" />
+            <p className="text-sm text-muted-foreground">No labels found</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Import a .rpy file or create labels to get started.
+            </p>
+          </div>
         ) : (
           <div className="space-y-3">
             {Array.from(groupedLabels.entries()).map(
-              ([groupName, groupLabels]) => (
-                <div key={groupName}>
-                  <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 px-2">
-                    {groupName}
+              ([fileName, fileLabels]) => (
+                <div key={fileName}>
+                  {/* File Header */}
+                  <div className="flex items-center gap-1.5 mb-1.5 px-2">
+                    <File className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
+                      {fileName}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground ml-auto shrink-0">
+                      {fileLabels.length}{" "}
+                      {fileLabels.length === 1 ? "label" : "labels"}
+                    </span>
                   </div>
 
+                  {/* Labels in this file */}
                   <div className="space-y-1.5">
-                    {groupLabels.map((label) => {
+                    {fileLabels.map((label) => {
                       const isActive = label.id === activeLabelId;
                       const statusColor =
                         STATUS_COLORS[label.status ?? "DRAFT"];
