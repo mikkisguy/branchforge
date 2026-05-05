@@ -103,6 +103,26 @@ describe("LabelsService (Integration)", () => {
     isShared: false,
   };
 
+  const defaultProjectFile: NewProjectFile = {
+    id: testUuid("13000001", 3),
+    projectId: ownedProject.id!,
+    source: "ZIP",
+    filePath: "labels/test.rpy",
+    fileType: "STORY",
+    content: 'label start:\n    "Hello"',
+    contentHash: calculateContentHash('label start:\n    "Hello"'),
+  };
+
+  const sharedProjectFile: NewProjectFile = {
+    id: testUuid("13000001", 4),
+    projectId: sharedProject.id!,
+    source: "ZIP",
+    filePath: "labels/shared.rpy",
+    fileType: "STORY",
+    content: 'label start:\n    "Shared"',
+    contentHash: calculateContentHash('label start:\n    "Shared"'),
+  };
+
   // Helper to clean up all test data in reverse dependency order
   async function cleanupTestData() {
     const testUserIds = [testUserId, otherUserId, thirdUserId];
@@ -147,6 +167,11 @@ describe("LabelsService (Integration)", () => {
 
     // Insert route configs
     await db.insert(routeConfigs).values([routeConfig1, routeConfig2]);
+
+    // Insert project files
+    await db
+      .insert(projectFiles)
+      .values([defaultProjectFile, sharedProjectFile]);
   }
 
   beforeEach(async () => {
@@ -168,6 +193,7 @@ describe("LabelsService (Integration)", () => {
       const testLabel: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "chapter1_label1",
         groupType: "act",
         groupValue: "I",
@@ -207,6 +233,7 @@ describe("LabelsService (Integration)", () => {
       const testLabel: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "secret_label",
         labelNumber: 1,
         sequenceOrder: 0,
@@ -229,6 +256,7 @@ describe("LabelsService (Integration)", () => {
       const label1: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "label_2",
         labelNumber: 2,
         sequenceOrder: 1,
@@ -243,6 +271,7 @@ describe("LabelsService (Integration)", () => {
       const label2: NewLabel = {
         id: testUuid("13000002", 2),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "label_1",
         labelNumber: 1,
         sequenceOrder: 0,
@@ -267,6 +296,7 @@ describe("LabelsService (Integration)", () => {
       const label1: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "common_label",
         route: "common",
         labelNumber: 1,
@@ -282,6 +312,7 @@ describe("LabelsService (Integration)", () => {
       const label2: NewLabel = {
         id: testUuid("13000002", 2),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "eileen_label",
         route: "eileen",
         labelNumber: 1,
@@ -308,6 +339,7 @@ describe("LabelsService (Integration)", () => {
       const label1: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "draft_label",
         labelNumber: 1,
         sequenceOrder: 0,
@@ -322,6 +354,7 @@ describe("LabelsService (Integration)", () => {
       const label2: NewLabel = {
         id: testUuid("13000002", 2),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "review_label",
         labelNumber: 2,
         sequenceOrder: 1,
@@ -347,6 +380,7 @@ describe("LabelsService (Integration)", () => {
       const label1: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "active_label",
         labelNumber: 1,
         sequenceOrder: 0,
@@ -361,6 +395,7 @@ describe("LabelsService (Integration)", () => {
       const label2: NewLabel = {
         id: testUuid("13000002", 2),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "deleted_label",
         labelNumber: 2,
         sequenceOrder: 1,
@@ -385,6 +420,7 @@ describe("LabelsService (Integration)", () => {
       const testLabel: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: sharedProject.id!,
+        projectFileId: sharedProjectFile.id!,
         title: "shared_label",
         labelNumber: 1,
         sequenceOrder: 0,
@@ -430,10 +466,10 @@ describe("LabelsService (Integration)", () => {
         const testLabel: NewLabel = {
           id: testUuid("13000002", 1),
           projectId: ownedProject.id!,
+          projectFileId: projectFile.id!,
           title: "act1_label1",
           labelNumber: 1,
           sequenceOrder: 0,
-          projectFileId: projectFile.id,
           visibility: "EXCLUSIVE",
           status: "DRAFT",
           prerequisites: {},
@@ -451,34 +487,6 @@ describe("LabelsService (Integration)", () => {
           id: testLabel.id,
           projectFileId: projectFile.id,
           fileName: "act_i.rpy",
-        });
-      });
-
-      it("should return null fileName for labels without file association", async () => {
-        // Create a label without projectFileId
-        const testLabel: NewLabel = {
-          id: testUuid("13000002", 1),
-          projectId: ownedProject.id!,
-          title: "unassociated_label",
-          labelNumber: 1,
-          sequenceOrder: 0,
-          visibility: "EXCLUSIVE",
-          status: "DRAFT",
-          prerequisites: {},
-          effects: {},
-          createdBy: testUserId,
-          updatedBy: testUserId,
-        };
-
-        await db.insert(labels).values(testLabel);
-
-        const result = await listLabels(ownedProject.id!, testUserId);
-
-        expect(result).toHaveLength(1);
-        expect(result[0]).toMatchObject({
-          id: testLabel.id,
-          projectFileId: null,
-          fileName: null,
         });
       });
 
@@ -500,10 +508,10 @@ describe("LabelsService (Integration)", () => {
         const testLabel: NewLabel = {
           id: testUuid("13000002", 1),
           projectId: ownedProject.id!,
+          projectFileId: projectFile.id!,
           title: "chapter1_scene1",
           labelNumber: 1,
           sequenceOrder: 0,
-          projectFileId: projectFile.id,
           visibility: "EXCLUSIVE",
           status: "DRAFT",
           prerequisites: {},
@@ -521,50 +529,6 @@ describe("LabelsService (Integration)", () => {
           projectFileId: projectFile.id,
           fileName: "scene_01.rpy",
         });
-      });
-
-      it("should handle labels with deleted project files", async () => {
-        // This tests the ON DELETE SET NULL behavior
-        // When a project file is deleted, the database sets labels.projectFileId to NULL
-        const testFile: NewProjectFile = {
-          id: testUuid("13000005", 1),
-          projectId: ownedProject.id!,
-          source: "ZIP",
-          filePath: "labels/deleted.rpy",
-          fileType: "STORY",
-          content: 'label start:\n    "Hello"',
-          contentHash: "abc123",
-        };
-
-        await db.insert(projectFiles).values(testFile);
-
-        // Create a label associated with the file
-        const testLabel: NewLabel = {
-          id: testUuid("13000002", 1),
-          projectId: ownedProject.id!,
-          title: "orphan_label",
-          labelNumber: 1,
-          sequenceOrder: 0,
-          visibility: "EXCLUSIVE",
-          status: "DRAFT",
-          projectFileId: testFile.id!,
-          prerequisites: {},
-          effects: {},
-          createdBy: testUserId,
-          updatedBy: testUserId,
-        };
-
-        await db.insert(labels).values(testLabel);
-
-        // Delete the file - this will trigger ON DELETE SET NULL
-        await db.delete(projectFiles).where(eq(projectFiles.id, testFile.id!));
-
-        const result = await listLabels(ownedProject.id!, testUserId);
-
-        // Label should still be returned, but with null projectFileId and fileName
-        expect(result).toHaveLength(1);
-        expect(result[0].projectFileId).toBeNull();
-        expect(result[0].fileName).toBeNull();
       });
     });
   });
@@ -587,6 +551,7 @@ describe("LabelsService (Integration)", () => {
       const label: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "test_label",
         labelNumber: 1,
         sequenceOrder: 0,
@@ -654,6 +619,7 @@ describe("LabelsService (Integration)", () => {
       const label: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "test_label",
         labelNumber: 1,
         sequenceOrder: 0,
@@ -732,6 +698,7 @@ describe("LabelsService (Integration)", () => {
       const label: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "private_label",
         labelNumber: 1,
         sequenceOrder: 0,
@@ -754,6 +721,7 @@ describe("LabelsService (Integration)", () => {
       const label: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "empty_label",
         labelNumber: 1,
         sequenceOrder: 0,
@@ -778,6 +746,7 @@ describe("LabelsService (Integration)", () => {
       const label: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "deleted_label",
         labelNumber: 1,
         sequenceOrder: 0,
@@ -811,6 +780,7 @@ describe("LabelsService (Integration)", () => {
       const label: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "test_label",
         labelNumber: 1,
         sequenceOrder: 0,
@@ -857,6 +827,7 @@ describe("LabelsService (Integration)", () => {
       const label: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "test_label",
         labelNumber: 1,
         sequenceOrder: 0,
@@ -907,6 +878,7 @@ describe("LabelsService (Integration)", () => {
       const label: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: testFile.id!,
         title: "test_label",
         labelNumber: 1,
         sequenceOrder: 0,
@@ -914,7 +886,6 @@ describe("LabelsService (Integration)", () => {
         status: "DRAFT",
         prerequisites: {},
         effects: {},
-        projectFileId: testFile.id!,
         createdBy: testUserId,
         updatedBy: testUserId,
       };
@@ -930,9 +901,26 @@ describe("LabelsService (Integration)", () => {
   });
 
   describe("createLabel", () => {
+    let createLabelFileId: string;
+
+    beforeEach(async () => {
+      const file: NewProjectFile = {
+        id: testUuid("13000099", 1),
+        projectId: ownedProject.id!,
+        source: "ZIP",
+        filePath: "labels/create_test.rpy",
+        fileType: "STORY",
+        content: 'label start:\n    "Hello"',
+        contentHash: "create-test-hash",
+      };
+      await db.insert(projectFiles).values(file);
+      createLabelFileId = file.id!;
+    });
+
     it("should create a label with valid data", async () => {
       const result = await createLabel(testUserId, {
         projectId: ownedProject.id!,
+        projectFileId: createLabelFileId,
         title: "New Label",
         route: "common",
         groupType: "act",
@@ -958,6 +946,7 @@ describe("LabelsService (Integration)", () => {
           projectId: testUuid("13000000", 999999),
           title: "Test Label",
           labelNumber: 1,
+          projectFileId: createLabelFileId,
         })
       ).rejects.toThrow("Project");
     });
@@ -966,6 +955,7 @@ describe("LabelsService (Integration)", () => {
       await expect(
         createLabel(thirdUserId, {
           projectId: ownedProject.id!,
+          projectFileId: createLabelFileId,
           title: "Test Label",
           labelNumber: 1,
         })
@@ -975,6 +965,7 @@ describe("LabelsService (Integration)", () => {
     it("should coerce route to null when route does not exist in route_configs", async () => {
       const result = await createLabel(testUserId, {
         projectId: ownedProject.id!,
+        projectFileId: createLabelFileId,
         title: "Test Label",
         route: "nonexistent_route",
         labelNumber: 1,
@@ -986,6 +977,7 @@ describe("LabelsService (Integration)", () => {
     it("should set default values for optional fields", async () => {
       const result = await createLabel(testUserId, {
         projectId: ownedProject.id!,
+        projectFileId: createLabelFileId,
         title: "Minimal Label",
         labelNumber: 1,
       });
@@ -1004,6 +996,7 @@ describe("LabelsService (Integration)", () => {
       const label: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "Old Title",
         labelNumber: 1,
         sequenceOrder: 0,
@@ -1028,6 +1021,7 @@ describe("LabelsService (Integration)", () => {
       const label: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "Test Label",
         labelNumber: 1,
         sequenceOrder: 0,
@@ -1060,6 +1054,7 @@ describe("LabelsService (Integration)", () => {
       const label: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "Test Label",
         labelNumber: 1,
         sequenceOrder: 0,
@@ -1082,6 +1077,7 @@ describe("LabelsService (Integration)", () => {
       const label: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "Test Label",
         labelNumber: 1,
         sequenceOrder: 0,
@@ -1120,10 +1116,10 @@ describe("LabelsService (Integration)", () => {
       const label: NewLabel = {
         id: testUuid("13000002", 100),
         projectId: ownedProject.id!,
+        projectFileId: projectFile.id!,
         title: "Original Title",
         labelNumber: 1,
         sequenceOrder: 0,
-        projectFileId: projectFile.id,
         visibility: "EXCLUSIVE",
         status: "DRAFT",
         prerequisites: {},
@@ -1150,6 +1146,7 @@ describe("LabelsService (Integration)", () => {
       const label: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "Test Label",
         labelNumber: 1,
         sequenceOrder: 0,
@@ -1179,6 +1176,7 @@ describe("LabelsService (Integration)", () => {
       const label: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "Test Label",
         labelNumber: 1,
         sequenceOrder: 0,
@@ -1225,6 +1223,7 @@ describe("LabelsService (Integration)", () => {
       const label: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "Test Label",
         labelNumber: 1,
         sequenceOrder: 0,
@@ -1247,6 +1246,7 @@ describe("LabelsService (Integration)", () => {
       const label: NewLabel = {
         id: testUuid("13000002", 1),
         projectId: ownedProject.id!,
+        projectFileId: defaultProjectFile.id!,
         title: "Test Label",
         labelNumber: 1,
         sequenceOrder: 0,

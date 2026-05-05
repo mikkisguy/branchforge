@@ -253,9 +253,7 @@ export function useWriteTabs({
         {
           id: label.id,
           title: label.title,
-          meta: label.fileName
-            ? label.fileName.replace(/\.[^.]+$/, "")
-            : undefined,
+          meta: label.fileName.replace(/\.[^.]+$/, ""),
           closeLabel: `Close ${label.title}`,
         },
       ];

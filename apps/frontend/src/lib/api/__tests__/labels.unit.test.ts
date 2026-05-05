@@ -9,7 +9,6 @@ import {
   it,
   expect,
   beforeEach,
-  afterEach,
   beforeAll,
   afterAll,
   vi,
@@ -42,8 +41,8 @@ describe("Labels API", () => {
     title: "Scene 1",
     status: "DRAFT",
     visibility: "EXCLUSIVE",
-    projectFileId: null,
-    fileName: null,
+    projectFileId: "file-1",
+    fileName: "scene_1.rpy",
     createdAt: "2024-01-01T00:00:00.000Z",
     updatedAt: "2024-01-01T00:00:00.000Z",
   };
@@ -55,10 +54,6 @@ describe("Labels API", () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
     mockFetch.mockReset();
   });
 

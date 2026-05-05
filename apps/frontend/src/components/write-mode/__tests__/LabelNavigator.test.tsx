@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import type { PublicLabel } from "@branchforge/shared";
 import { LabelNavigator } from "../LabelNavigator";
 
@@ -15,8 +15,8 @@ function makeLabel(overrides: Partial<PublicLabel> = {}): PublicLabel {
     routeKey: null,
     status: null,
     visibility: null,
-    projectFileId: null,
-    fileName: null,
+    projectFileId: "file-default",
+    fileName: "default.rpy",
     createdAt: "2024-01-01T00:00:00.000Z",
     updatedAt: "2024-01-01T00:00:00.000Z",
     ...overrides,
@@ -48,14 +48,6 @@ const labelsFromMultipleFiles: PublicLabel[] = [
     sequenceOrder: 0,
     labelNumber: 1,
   }),
-  makeLabel({
-    id: "4",
-    title: "Unassociated",
-    fileName: null,
-    projectFileId: null,
-    sequenceOrder: 3,
-    labelNumber: 1,
-  }),
 ];
 
 describe("LabelNavigator", () => {
@@ -73,18 +65,6 @@ describe("LabelNavigator", () => {
       expect(screen.getByText("act_ii.rpy")).toBeInTheDocument();
     });
 
-    it("shows 'Unassociated Labels' group for labels with null fileName", () => {
-      render(
-        <LabelNavigator
-          labels={labelsFromMultipleFiles}
-          activeLabelId={null}
-          onSelect={vi.fn()}
-        />
-      );
-
-      expect(screen.getByText("Unassociated Labels")).toBeInTheDocument();
-    });
-
     it("shows correct label counts per file", () => {
       render(
         <LabelNavigator
@@ -94,14 +74,15 @@ describe("LabelNavigator", () => {
         />
       );
 
-      expect(screen.getAllByText("2 labels").length).toBeGreaterThanOrEqual(1);
-      // act_ii.rpy and Unassociated Labels both have 1 label each
-      expect(screen.getAllByText("1 label").length).toBe(2);
+      const actIHeader = screen.getByText("act_i.rpy").parentElement!;
+      const actIiHeader = screen.getByText("act_ii.rpy").parentElement!;
+      expect(within(actIHeader).getByText("2 labels")).toBeInTheDocument();
+      expect(within(actIiHeader).getByText("1 label")).toBeInTheDocument();
     });
   });
 
   describe("sorting", () => {
-    it("sorts file groups alphabetically with 'Unassociated Labels' last", () => {
+    it("sorts file groups alphabetically", () => {
       render(
         <LabelNavigator
           labels={labelsFromMultipleFiles}
@@ -110,15 +91,11 @@ describe("LabelNavigator", () => {
         />
       );
 
-      const groups = screen
-        .getAllByText(/\.rpy|Unassociated Labels/)
-        .map((el) => el.textContent);
+      const groups = screen.getAllByText(/\.rpy/).map((el) => el.textContent);
       const actIIndex = groups.indexOf("act_i.rpy");
       const actIiIndex = groups.indexOf("act_ii.rpy");
-      const unassocIndex = groups.indexOf("Unassociated Labels");
 
       expect(actIIndex).toBeLessThan(actIiIndex);
-      expect(actIiIndex).toBeLessThan(unassocIndex);
     });
 
     it("sorts labels within each group by sequenceOrder", () => {
@@ -132,7 +109,7 @@ describe("LabelNavigator", () => {
 
       const buttons = screen
         .getAllByRole("button")
-        .filter((b) => b.textContent?.match(/Label|Unassociated/));
+        .filter((b) => b.textContent?.match(/Label/));
       const labelAIndex = buttons.findIndex((b) =>
         b.textContent?.includes("Label A")
       );
@@ -199,24 +176,6 @@ describe("LabelNavigator", () => {
       );
 
       expect(screen.getByText("story.rpy")).toBeInTheDocument();
-      expect(screen.getAllByText("2 labels").length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("renders with only unassociated labels", () => {
-      const unassocLabels = [
-        makeLabel({ id: "1", title: "A", fileName: null }),
-        makeLabel({ id: "2", title: "B", fileName: null }),
-      ];
-
-      render(
-        <LabelNavigator
-          labels={unassocLabels}
-          activeLabelId={null}
-          onSelect={vi.fn()}
-        />
-      );
-
-      expect(screen.getByText("Unassociated Labels")).toBeInTheDocument();
       expect(screen.getAllByText("2 labels").length).toBeGreaterThanOrEqual(1);
     });
   });

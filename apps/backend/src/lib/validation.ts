@@ -374,19 +374,10 @@ export const createLabelSchema = z
     status: labelStatusSchema.optional(),
     visibility: labelVisibilitySchema.optional(),
     title: z.string().trim().min(1, "Title is required").max(255),
-    projectFileId: uuidSchema.optional(),
+    projectFileId: uuidSchema,
     afterLabelId: uuidSchema.optional().nullable(),
   })
-  .strict()
-  .superRefine((data, ctx) => {
-    if (data.afterLabelId && !data.projectFileId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["afterLabelId"],
-        message: "afterLabelId can only be used with projectFileId",
-      });
-    }
-  });
+  .strict();
 
 /**
  * Update label request validation

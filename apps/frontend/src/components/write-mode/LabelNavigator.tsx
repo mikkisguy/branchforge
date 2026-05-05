@@ -15,8 +15,6 @@ const STATUS_COLORS: Record<LabelStatus, string> = {
   DRAFT: "var(--theme-draft-color)",
 };
 
-const UNASSOCIATED_KEY = "Unassociated Labels";
-
 interface LabelNavigatorProps {
   labels: PublicLabel[];
   activeLabelId: string | null;
@@ -38,7 +36,7 @@ export function LabelNavigator({
     const groups = new Map<string, PublicLabel[]>();
 
     for (const label of labels) {
-      const key = label.fileName || UNASSOCIATED_KEY;
+      const key = label.fileName;
       if (!groups.has(key)) {
         groups.set(key, []);
       }
@@ -46,11 +44,9 @@ export function LabelNavigator({
     }
 
     const sortedGroups = new Map<string, PublicLabel[]>();
-    const groupKeys = Array.from(groups.keys()).sort((a, b) => {
-      if (a === UNASSOCIATED_KEY) return 1;
-      if (b === UNASSOCIATED_KEY) return -1;
-      return a.localeCompare(b);
-    });
+    const groupKeys = Array.from(groups.keys()).sort((a, b) =>
+      a.localeCompare(b)
+    );
     for (const key of groupKeys) {
       const groupLabels = groups.get(key)!;
       groupLabels.sort((a, b) => a.sequenceOrder - b.sequenceOrder);

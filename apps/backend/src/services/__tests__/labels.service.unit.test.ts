@@ -101,6 +101,8 @@ describe("LabelsService", () => {
     crossRouteContext: null,
     readerNotes: null,
     duoPairId: null,
+    projectFileId: "file-123",
+    filePath: "labels/chapter1.rpy",
     createdAt: new Date("2024-01-01"),
     updatedAt: new Date("2024-01-01"),
   };
@@ -214,21 +216,14 @@ describe("LabelsService", () => {
       );
 
       const updateCalls: any[] = [];
-      const mockUpdate = vi
-        .fn()
-        .mockReturnValue({
+      const mockUpdate = vi.fn().mockImplementation(() => {
+        updateCalls.push("update");
+        return {
           set: vi.fn().mockReturnValue({
             where: vi.fn().mockResolvedValue(undefined),
           }),
-        })
-        .mockImplementation(() => {
-          updateCalls.push("update");
-          return {
-            set: vi.fn().mockReturnValue({
-              where: vi.fn().mockResolvedValue(undefined),
-            }),
-          };
-        });
+        };
+      });
       mockDb.update = mockUpdate;
 
       const mockTransaction = vi.fn().mockImplementation(async (callback) => {
@@ -249,58 +244,6 @@ describe("LabelsService", () => {
         mockContent,
         "chapter1_label1"
       );
-    });
-
-    it("should not update project_files when label has no projectFileId", async () => {
-      const mockLabelWithoutProjectFile = {
-        ...mockLabel,
-        labelName: "chapter1_label1",
-      };
-
-      mockSelect.mockImplementation(() =>
-        createMockChain([
-          {
-            label: mockLabelWithoutProjectFile,
-            projectOwnerId: userId,
-            projectFileId: null,
-            projectFileContent: null,
-          },
-        ])
-      );
-
-      const updateCalls: any[] = [];
-      const mockUpdate = vi
-        .fn()
-        .mockReturnValue({
-          set: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue(undefined),
-          }),
-        })
-        .mockImplementation(() => {
-          updateCalls.push("update");
-          return {
-            set: vi.fn().mockReturnValue({
-              where: vi.fn().mockResolvedValue(undefined),
-            }),
-          };
-        });
-      mockDb.update = mockUpdate;
-
-      const mockTransaction = vi.fn().mockImplementation(async (callback) => {
-        const tx = {
-          update: mockUpdate,
-        };
-        await callback(tx);
-      });
-      mockDb.transaction = mockTransaction;
-
-      await deleteLabel(labelId, userId);
-
-      // Should have called update only 2 times (label + label lines)
-      expect(updateCalls).toHaveLength(2);
-
-      // Verify the removeLabelFromRPYContent function was NOT called
-      expect(mockRemoveLabelFromRPYContent).not.toHaveBeenCalled();
     });
   });
 });
