@@ -8,7 +8,8 @@ import type { PublicLabel } from "@branchforge/shared";
 function createLabel(
   id: string,
   title: string,
-  labelNumber: number
+  labelNumber: number,
+  fileName: string | null = null
 ): PublicLabel {
   return {
     id,
@@ -22,7 +23,7 @@ function createLabel(
     status: "DRAFT",
     visibility: "EXCLUSIVE",
     projectFileId: null,
-    fileName: null,
+    fileName,
     createdAt: "2024-01-01T00:00:00.000Z",
     updatedAt: "2024-01-01T00:00:00.000Z",
   };
@@ -70,13 +71,13 @@ describe("useWriteTabs", () => {
       {
         id: "label-1",
         title: "Scene One",
-        meta: "01",
+        meta: undefined,
         closeLabel: "Close Scene One",
       },
       {
         id: "label-2",
         title: "Scene Two",
-        meta: "02",
+        meta: undefined,
         closeLabel: "Close Scene Two",
       },
     ]);
