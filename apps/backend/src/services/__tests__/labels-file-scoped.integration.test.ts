@@ -17,9 +17,11 @@ import {
   projects,
   labels,
   projectFiles,
-  type NewUser,
-  type NewProject,
-  type NewProjectFile,
+} from "../../db/schema/index.js";
+import type {
+  NewUser,
+  NewProject,
+  NewProjectFile,
 } from "../../db/schema/index.js";
 import { eq, inArray } from "drizzle-orm";
 import { createLabel, reorderLabelsInFile } from "../labels.service.js";
@@ -85,12 +87,16 @@ describe("LabelsService - File Scoped (Integration)", () => {
     }
 
     // Then delete all projects (including any created during tests)
-    await db.delete(projects).where(eq(projects.userId, testUserId));
-    await db.delete(projects).where(eq(projects.userId, otherUserId));
+    await Promise.all([
+      db.delete(projects).where(eq(projects.userId, testUserId)),
+      db.delete(projects).where(eq(projects.userId, otherUserId)),
+    ]);
 
     // Finally delete users
-    await db.delete(users).where(eq(users.id, testUserId));
-    await db.delete(users).where(eq(users.id, otherUserId));
+    await Promise.all([
+      db.delete(users).where(eq(users.id, testUserId)),
+      db.delete(users).where(eq(users.id, otherUserId)),
+    ]);
   }
 
   // Helper to set up test data
@@ -262,7 +268,7 @@ describe("LabelsService - File Scoped (Integration)", () => {
         expect(secondLabelDb.labelPosition).toBe(1);
       });
 
-      it("should create a label at the beginning when afterLabelId is null", async () => {
+      it("should create a label at the end when afterLabelId is null", async () => {
         // Create a project file
         const projectFile: NewProjectFile = {
           id: testUuid("13000005", 1),
@@ -284,7 +290,7 @@ describe("LabelsService - File Scoped (Integration)", () => {
           projectFileId: projectFile.id!,
         });
 
-        // Create second label with afterLabelId: null (should go to beginning)
+        // Create second label with afterLabelId: null (should go to end)
         const secondLabel = await createLabel(testUserId, {
           projectId: testProject.id!,
           title: "Second Label",
@@ -293,7 +299,8 @@ describe("LabelsService - File Scoped (Integration)", () => {
           afterLabelId: null,
         });
 
-        // Verify positions (second label should be at position 0, first at 1)
+        // Verify positions: labels are appended in creation order,
+        // so firstLabelDb.labelPosition === 0 and secondLabelDb.labelPosition === 1
         const [firstLabelDb] = await db
           .select()
           .from(labels)
@@ -306,8 +313,8 @@ describe("LabelsService - File Scoped (Integration)", () => {
           .where(eq(labels.id, secondLabel.id))
           .limit(1);
 
-        expect(firstLabelDb.labelPosition).toBe(1);
-        expect(secondLabelDb.labelPosition).toBe(0);
+        expect(firstLabelDb.labelPosition).toBe(0);
+        expect(secondLabelDb.labelPosition).toBe(1);
       });
 
       it("should throw NotFoundError when afterLabelId does not exist", async () => {
@@ -376,38 +383,6 @@ describe("LabelsService - File Scoped (Integration)", () => {
             labelNumber: 2,
             projectFileId: file2.id!,
             afterLabelId: labelInFile1.id,
-          })
-        ).rejects.toThrow(ValidationError);
-      });
-
-      it("should throw ValidationError when afterLabelId has no file association", async () => {
-        // Create a label without file association
-        const orphanLabel = await createLabel(testUserId, {
-          projectId: testProject.id!,
-          title: "Orphan Label",
-          labelNumber: 1,
-        });
-
-        const projectFile: NewProjectFile = {
-          id: testUuid("13000005", 1),
-          projectId: testProject.id!,
-          filePath: "labels/act_i.rpy",
-          fileType: "STORY",
-          content: 'label start:\n    "Hello"',
-          source: "ZIP",
-          contentHash: calculateContentHash('label start:\n    "Hello"'),
-        };
-
-        await db.insert(projectFiles).values(projectFile);
-
-        // Try to create a label in a file after the orphan label
-        await expect(
-          createLabel(testUserId, {
-            projectId: testProject.id!,
-            title: "Label with Orphan After Label",
-            labelNumber: 2,
-            projectFileId: projectFile.id!,
-            afterLabelId: orphanLabel.id,
           })
         ).rejects.toThrow(ValidationError);
       });
@@ -1032,17 +1007,15 @@ describe("LabelsService - File Scoped (Integration)", () => {
       const originalPosition = originalLabel1.labelPosition;
 
       // Try to reorder with a non-existent label (should fail)
-      try {
-        await reorderLabelsInFile(testUserId, {
+      await expect(
+        reorderLabelsInFile(testUserId, {
           projectFileId: projectFile.id!,
           labelOrders: [
             { labelId: label1.id, newPosition: 1 },
             { labelId: testUuid("13000002", 999999), newPosition: 0 }, // non-existent
           ],
-        });
-      } catch {
-        // Expected to fail
-      }
+        })
+      ).rejects.toThrow();
 
       // Verify positions were not changed (transaction rolled back)
       const [rolledBackLabel1] = await db

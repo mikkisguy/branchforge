@@ -274,7 +274,7 @@ async function getProjectFilesHandler(
       id: string;
       labelName: string | null;
       title: string;
-      projectFileId: string | null;
+      projectFileId: string;
     };
 
     // Public label type for API response - excludes internal projectFileId
@@ -299,11 +299,9 @@ async function getProjectFilesHandler(
     // Create a lookup keyed by projectFileId, storing only public label fields
     const labelsByFileId = new Map<string, PublicLabelSlim[]>();
     for (const label of allLabels) {
-      if (!label.projectFileId) continue;
       if (!labelsByFileId.has(label.projectFileId)) {
         labelsByFileId.set(label.projectFileId, []);
       }
-      // Store only public fields, excluding internal projectFileId
       const { projectFileId: _, ...publicLabel } = label;
       labelsByFileId.get(label.projectFileId)!.push(publicLabel);
     }

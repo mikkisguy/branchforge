@@ -239,6 +239,13 @@
       "when": 1777148383795,
       "tag": "0033_worthless_gertrude_yorkes",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1778001326790,
+      "tag": "0034_workable_king_bedlam",
+      "breakpoints": true
     }
   ]
 }

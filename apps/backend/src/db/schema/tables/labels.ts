@@ -66,9 +66,11 @@ export const labels = pgTable(
     readerNotes: text("reader_notes"), // Beta feedback
 
     // GitLab integration fields (references project_files table)
-    projectFileId: uuid("project_file_id").references(() => projectFiles.id, {
-      onDelete: "set null",
-    }),
+    projectFileId: uuid("project_file_id")
+      .notNull()
+      .references(() => projectFiles.id, {
+        onDelete: "cascade",
+      }),
     labelName: text("label_name"), // The actual label name in the RPY file
     labelPosition: integer("label_position"), // Position of this label within the file
 

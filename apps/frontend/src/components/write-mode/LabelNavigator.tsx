@@ -2,12 +2,12 @@
  * LabelNavigator Component
  *
  * Left sidebar for navigating labels in WriteMode.
- * Matches app design system with theme colors and simple styling.
+ * Groups labels by source file name with visual status indicators.
  */
 
 import { useMemo } from "react";
 import type { PublicLabel, LabelStatus } from "@branchforge/shared";
-import { Sparkles, ChevronLeft } from "lucide-react";
+import { Sparkles, ChevronLeft, File, FolderOpen } from "lucide-react";
 
 const STATUS_COLORS: Record<LabelStatus, string> = {
   FINAL: "var(--theme-color)",
@@ -36,11 +36,7 @@ export function LabelNavigator({
     const groups = new Map<string, PublicLabel[]>();
 
     for (const label of labels) {
-      const key =
-        label.groupType && label.groupValue
-          ? `${label.groupType}: ${label.groupValue}`
-          : "Uncategorized";
-
+      const key = label.projectFileId;
       if (!groups.has(key)) {
         groups.set(key, []);
       }
@@ -48,17 +44,13 @@ export function LabelNavigator({
     }
 
     const sortedGroups = new Map<string, PublicLabel[]>();
-    const groupKeys = Array.from(groups.keys()).sort((a, b) => {
-      if (a === "Uncategorized") {
-        return 1;
-      }
-      if (b === "Uncategorized") {
-        return -1;
-      }
-      return a.localeCompare(b);
+    const groupEntries = Array.from(groups.entries());
+    groupEntries.sort(([, aLabels], [, bLabels]) => {
+      const aName = aLabels[0]?.fileName ?? "";
+      const bName = bLabels[0]?.fileName ?? "";
+      return aName.localeCompare(bName);
     });
-    for (const key of groupKeys) {
-      const groupLabels = groups.get(key)!;
+    for (const [key, groupLabels] of groupEntries) {
       groupLabels.sort((a, b) => a.sequenceOrder - b.sequenceOrder);
       sortedGroups.set(key, groupLabels);
     }
@@ -102,72 +94,88 @@ export function LabelNavigator({
       {/* Label List */}
       <div className="p-3 space-y-2">
         {groupedLabels.size === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            No labels yet
-          </p>
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <FolderOpen className="w-10 h-10 text-muted-foreground mb-3" />
+            <p className="text-sm text-muted-foreground">No labels found</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Import a .rpy file or create labels to get started.
+            </p>
+          </div>
         ) : (
           <div className="space-y-3">
             {Array.from(groupedLabels.entries()).map(
-              ([groupName, groupLabels]) => (
-                <div key={groupName}>
-                  <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 px-2">
-                    {groupName}
-                  </div>
+              ([projectFileId, fileLabels]) => {
+                const fileName = fileLabels[0]?.fileName ?? "unknown";
+                return (
+                  <div key={projectFileId}>
+                    {/* File Header */}
+                    <div className="flex items-center gap-1.5 mb-1.5 px-2">
+                      <File className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
+                        {fileName}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground ml-auto shrink-0">
+                        {fileLabels.length}{" "}
+                        {fileLabels.length === 1 ? "label" : "labels"}
+                      </span>
+                    </div>
 
-                  <div className="space-y-1.5">
-                    {groupLabels.map((label) => {
-                      const isActive = label.id === activeLabelId;
-                      const statusColor =
-                        STATUS_COLORS[label.status ?? "DRAFT"];
+                    {/* Labels in this file */}
+                    <div className="space-y-1.5">
+                      {fileLabels.map((label) => {
+                        const isActive = label.id === activeLabelId;
+                        const statusColor =
+                          STATUS_COLORS[label.status ?? "DRAFT"];
 
-                      return (
-                        <button
-                          type="button"
-                          key={label.id}
-                          onClick={() => onSelect(label.id)}
-                          aria-pressed={isActive}
-                          className={`group relative py-2.5 px-3 rounded-lg border transition-all cursor-pointer w-full text-left ${
-                            isActive
-                              ? "bg-[var(--theme-color)]/10 border-[var(--theme-color)] shadow-md"
-                              : "bg-card/50 border-border hover:shadow-sm"
-                          }`}
-                        >
-                          {/* Status Indicator */}
-                          <div
-                            className="absolute left-0 top-2 bottom-2 w-1 rounded-r"
-                            style={{
-                              backgroundColor: statusColor,
-                              opacity: isActive ? 1 : 0.5,
-                            }}
-                          />
+                        return (
+                          <button
+                            type="button"
+                            key={label.id}
+                            onClick={() => onSelect(label.id)}
+                            aria-pressed={isActive}
+                            className={`group relative py-2.5 px-3 rounded-lg border transition-all cursor-pointer w-full text-left ${
+                              isActive
+                                ? "bg-[var(--theme-color)]/10 border-[var(--theme-color)] shadow-md"
+                                : "bg-card/50 border-border hover:shadow-sm"
+                            }`}
+                          >
+                            {/* Status Indicator */}
+                            <div
+                              className="absolute left-0 top-2 bottom-2 w-1 rounded-r"
+                              style={{
+                                backgroundColor: statusColor,
+                                opacity: isActive ? 1 : 0.5,
+                              }}
+                            />
 
-                          {/* Label Title */}
-                          <div className="ml-2.5" title={label.title}>
-                            <h3
-                              className={`text-sm font-medium truncate ${
-                                isActive
-                                  ? "text-foreground"
-                                  : "text-muted-foreground group-hover:text-foreground"
-                              }`}
-                            >
-                              <span
-                                className={`text-xs font-mono pr-2 ${
+                            {/* Label Title */}
+                            <div className="ml-2.5" title={label.title}>
+                              <h3
+                                className={`text-sm font-medium truncate ${
                                   isActive
-                                    ? "text-[var(--theme-color)]"
-                                    : "text-muted-foreground"
+                                    ? "text-foreground"
+                                    : "text-muted-foreground group-hover:text-foreground"
                                 }`}
                               >
-                                {String(label.labelNumber).padStart(2, "0")}
-                              </span>
-                              {label.title}
-                            </h3>
-                          </div>
-                        </button>
-                      );
-                    })}
+                                <span
+                                  className={`text-xs font-mono pr-2 ${
+                                    isActive
+                                      ? "text-[var(--theme-color)]"
+                                      : "text-muted-foreground"
+                                  }`}
+                                >
+                                  {String(label.labelNumber).padStart(2, "0")}
+                                </span>
+                                {label.title}
+                              </h3>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )
+                );
+              }
             )}
           </div>
         )}

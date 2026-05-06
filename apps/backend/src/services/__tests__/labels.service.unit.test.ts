@@ -9,7 +9,7 @@
  * - Project file sync integration (RPY parser)
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { RENPY_LABEL_REGEX } from "@branchforge/shared";
 
 // Now import the service after the mock is set up
@@ -101,6 +101,8 @@ describe("LabelsService", () => {
     crossRouteContext: null,
     readerNotes: null,
     duoPairId: null,
+    projectFileId: "file-123",
+    filePath: "labels/chapter1.rpy",
     createdAt: new Date("2024-01-01"),
     updatedAt: new Date("2024-01-01"),
   };
@@ -194,6 +196,11 @@ describe("LabelsService", () => {
       mockSelect.mockImplementation(createEmptyMockChain);
     });
 
+    afterEach(() => {
+      mockUpdate.mockReset();
+      mockTransaction.mockReset();
+    });
+
     it("should update project_files.content when label has a projectFileId", async () => {
       const mockContent =
         'label chapter1_label1:\n    "Test content"\n    return\nlabel chapter1_label2:\n    "Other content"\n    return';
@@ -214,30 +221,21 @@ describe("LabelsService", () => {
       );
 
       const updateCalls: any[] = [];
-      const mockUpdate = vi
-        .fn()
-        .mockReturnValue({
+      mockUpdate.mockImplementation(() => {
+        updateCalls.push("update");
+        return {
           set: vi.fn().mockReturnValue({
             where: vi.fn().mockResolvedValue(undefined),
           }),
-        })
-        .mockImplementation(() => {
-          updateCalls.push("update");
-          return {
-            set: vi.fn().mockReturnValue({
-              where: vi.fn().mockResolvedValue(undefined),
-            }),
-          };
-        });
-      mockDb.update = mockUpdate;
+        };
+      });
 
-      const mockTransaction = vi.fn().mockImplementation(async (callback) => {
+      mockTransaction.mockImplementation(async (callback) => {
         const tx = {
           update: mockUpdate,
         };
         await callback(tx);
       });
-      mockDb.transaction = mockTransaction;
 
       await deleteLabel(labelId, userId);
 
@@ -249,58 +247,6 @@ describe("LabelsService", () => {
         mockContent,
         "chapter1_label1"
       );
-    });
-
-    it("should not update project_files when label has no projectFileId", async () => {
-      const mockLabelWithoutProjectFile = {
-        ...mockLabel,
-        labelName: "chapter1_label1",
-      };
-
-      mockSelect.mockImplementation(() =>
-        createMockChain([
-          {
-            label: mockLabelWithoutProjectFile,
-            projectOwnerId: userId,
-            projectFileId: null,
-            projectFileContent: null,
-          },
-        ])
-      );
-
-      const updateCalls: any[] = [];
-      const mockUpdate = vi
-        .fn()
-        .mockReturnValue({
-          set: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue(undefined),
-          }),
-        })
-        .mockImplementation(() => {
-          updateCalls.push("update");
-          return {
-            set: vi.fn().mockReturnValue({
-              where: vi.fn().mockResolvedValue(undefined),
-            }),
-          };
-        });
-      mockDb.update = mockUpdate;
-
-      const mockTransaction = vi.fn().mockImplementation(async (callback) => {
-        const tx = {
-          update: mockUpdate,
-        };
-        await callback(tx);
-      });
-      mockDb.transaction = mockTransaction;
-
-      await deleteLabel(labelId, userId);
-
-      // Should have called update only 2 times (label + label lines)
-      expect(updateCalls).toHaveLength(2);
-
-      // Verify the removeLabelFromRPYContent function was NOT called
-      expect(mockRemoveLabelFromRPYContent).not.toHaveBeenCalled();
     });
   });
 });

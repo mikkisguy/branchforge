@@ -689,6 +689,7 @@ describe("Create Label Schema", () => {
     it("should accept valid minimal label payload", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
+        projectFileId: "550e8400-e29b-41d4-a716-446655440001",
         route: "eileen",
         labelNumber: 1,
         title: "Scene Title",
@@ -701,6 +702,7 @@ describe("Create Label Schema", () => {
     it("should accept valid full label payload with grouping", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
+        projectFileId: "550e8400-e29b-41d4-a716-446655440001",
         route: "lucas",
         groupType: "act",
         groupValue: "I",
@@ -717,6 +719,7 @@ describe("Create Label Schema", () => {
     it("should accept valid full label payload with chapter grouping", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
+        projectFileId: "550e8400-e29b-41d4-a716-446655440001",
         route: "female",
         groupType: "chapter",
         groupValue: "5",
@@ -733,6 +736,7 @@ describe("Create Label Schema", () => {
     it("should accept valid sequenceOrder for linear sequencing", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
+        projectFileId: "550e8400-e29b-41d4-a716-446655440001",
         route: "common",
         labelNumber: 1,
         sequenceOrder: 100,
@@ -745,6 +749,7 @@ describe("Create Label Schema", () => {
 
     it("should reject missing required field: projectId", () => {
       const invalidData = {
+        projectFileId: "550e8400-e29b-41d4-a716-446655440001",
         route: "eileen",
         labelNumber: 1,
         title: "Scene Title",
@@ -757,6 +762,7 @@ describe("Create Label Schema", () => {
     it("should accept label without route (optional field)", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
+        projectFileId: "550e8400-e29b-41d4-a716-446655440001",
         labelNumber: 1,
         title: "Scene Title",
       };
@@ -768,6 +774,32 @@ describe("Create Label Schema", () => {
     it("should reject invalid UUID for projectId", () => {
       const invalidData = {
         projectId: "not-a-uuid",
+        projectFileId: "550e8400-e29b-41d4-a716-446655440001",
+        route: "eileen",
+        labelNumber: 1,
+        title: "Scene Title",
+      };
+
+      const result = createLabelSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject invalid UUID for projectFileId", () => {
+      const invalidData = {
+        projectId: "550e8400-e29b-41d4-a716-446655440000",
+        projectFileId: "not-a-uuid",
+        route: "eileen",
+        labelNumber: 1,
+        title: "Scene Title",
+      };
+
+      const result = createLabelSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject missing required field: projectFileId", () => {
+      const invalidData = {
+        projectId: "550e8400-e29b-41d4-a716-446655440000",
         route: "eileen",
         labelNumber: 1,
         title: "Scene Title",
@@ -780,6 +812,7 @@ describe("Create Label Schema", () => {
     it("should accept any string value for route", () => {
       const validData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
+        projectFileId: "550e8400-e29b-41d4-a716-446655440001",
         route: "my_custom_route",
         labelNumber: 1,
         title: "Scene Title",
@@ -792,8 +825,10 @@ describe("Create Label Schema", () => {
     it("should reject invalid status enum value", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "eileen",
+        projectFileId: "550e8400-e29b-41d4-a716-446655440001",
+        route: "eileen",
         labelNumber: 1,
+        title: "Scene Title",
         status: "INVALID_STATUS",
       };
 
@@ -804,8 +839,10 @@ describe("Create Label Schema", () => {
     it("should reject invalid visibility enum value", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "eileen",
+        projectFileId: "550e8400-e29b-41d4-a716-446655440001",
+        route: "eileen",
         labelNumber: 1,
+        title: "Scene Title",
         visibility: "INVALID_VISIBILITY",
       };
 
@@ -816,8 +853,10 @@ describe("Create Label Schema", () => {
     it("should reject labelNumber value below minimum (1)", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "eileen",
+        projectFileId: "550e8400-e29b-41d4-a716-446655440001",
+        route: "eileen",
         labelNumber: 0,
+        title: "Scene Title",
       };
 
       const result = createLabelSchema.safeParse(invalidData);
@@ -827,8 +866,10 @@ describe("Create Label Schema", () => {
     it("should reject labelNumber value above maximum (999)", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "eileen",
+        projectFileId: "550e8400-e29b-41d4-a716-446655440001",
+        route: "eileen",
         labelNumber: 1000,
+        title: "Scene Title",
       };
 
       const result = createLabelSchema.safeParse(invalidData);
@@ -838,8 +879,10 @@ describe("Create Label Schema", () => {
     it("should reject non-integer labelNumber value", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "eileen",
+        projectFileId: "550e8400-e29b-41d4-a716-446655440001",
+        route: "eileen",
         labelNumber: 1.5,
+        title: "Scene Title",
       };
 
       const result = createLabelSchema.safeParse(invalidData);
@@ -849,8 +892,10 @@ describe("Create Label Schema", () => {
     it("should reject unknown 'scene' property", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "eileen",
+        projectFileId: "550e8400-e29b-41d4-a716-446655440001",
+        route: "eileen",
         labelNumber: 1,
+        title: "Scene Title",
         scene: 0, // Unknown property - not part of createLabelSchema
       };
 
@@ -861,8 +906,10 @@ describe("Create Label Schema", () => {
     it("should reject unknown 'chapter' property", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "female",
+        projectFileId: "550e8400-e29b-41d4-a716-446655440001",
+        route: "female",
         labelNumber: 1,
+        title: "Scene Title",
         chapter: 5, // Unknown property - not part of createLabelSchema
       };
 
@@ -870,12 +917,14 @@ describe("Create Label Schema", () => {
       expect(result.success).toBe(false);
     });
 
-    it("should reject sequenceOrder value below minimum (1)", () => {
+    it("should reject sequenceOrder value below minimum (0)", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "common",
+        projectFileId: "550e8400-e29b-41d4-a716-446655440001",
+        route: "common",
         labelNumber: 1,
-        sequenceOrder: 0,
+        title: "Scene Title",
+        sequenceOrder: -1,
       };
 
       const result = createLabelSchema.safeParse(invalidData);
@@ -885,8 +934,10 @@ describe("Create Label Schema", () => {
     it("should reject non-integer sequenceOrder value", () => {
       const invalidData = {
         projectId: "550e8400-e29b-41d4-a716-446655440000",
-        routeKey: "common",
+        projectFileId: "550e8400-e29b-41d4-a716-446655440001",
+        route: "common",
         labelNumber: 1,
+        title: "Scene Title",
         sequenceOrder: 1.5,
       };
 

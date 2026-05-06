@@ -1072,7 +1072,7 @@ async function getGitLabFilesHandler(
       id: string;
       labelName: string | null;
       title: string;
-      projectFileId: string | null;
+      projectFileId: string;
     };
 
     const allScenes: SceneWithFileId[] =
@@ -1091,10 +1091,6 @@ async function getGitLabFilesHandler(
     // Create a lookup keyed by projectFileId
     const scenesByFileId = new Map<string, SceneWithFileId[]>();
     for (const scene of allScenes) {
-      // Skip scenes without a projectFileId (defensive check)
-      if (!scene.projectFileId) {
-        continue;
-      }
       if (!scenesByFileId.has(scene.projectFileId)) {
         scenesByFileId.set(scene.projectFileId, []);
       }
