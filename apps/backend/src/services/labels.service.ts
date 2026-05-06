@@ -576,6 +576,14 @@ export async function createLabel(
     let afterLabelPosition: number | null = null;
     const validProjectFileId = data.projectFileId;
 
+    if (
+      !validProjectFileId ||
+      typeof validProjectFileId !== "string" ||
+      !validProjectFileId.trim()
+    ) {
+      throw new ValidationError("projectFileId is required");
+    }
+
     const [projectFile] = await tx
       .select({
         id: projectFiles.id,
@@ -620,6 +628,12 @@ export async function createLabel(
 
       if (afterLabel.projectFileId !== validProjectFileId) {
         throw new ValidationError("afterLabelId must be in the same file");
+      }
+
+      if (!afterLabel.labelName) {
+        throw new ValidationError(
+          "afterLabelId must refer to a label with a file-backed name"
+        );
       }
 
       afterLabelName = afterLabel.labelName;
@@ -680,8 +694,10 @@ export async function createLabel(
       afterLabelName
     );
 
-    // Determine insertion position
-    const insertPosition = afterLabelName ? (afterLabelPosition ?? 0) + 1 : 0;
+    // Determine insertion position: after specified label, or at end of file
+    const insertPosition = afterLabelName
+      ? (afterLabelPosition ?? 0) + 1
+      : existingLabels.length;
 
     const auditFields = createAuditFields(userId);
 

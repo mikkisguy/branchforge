@@ -262,7 +262,7 @@ describe("LabelsService - File Scoped (Integration)", () => {
         expect(secondLabelDb.labelPosition).toBe(1);
       });
 
-      it("should create a label at the beginning when afterLabelId is null", async () => {
+      it("should create a label at the end when afterLabelId is null", async () => {
         // Create a project file
         const projectFile: NewProjectFile = {
           id: testUuid("13000005", 1),
@@ -284,7 +284,7 @@ describe("LabelsService - File Scoped (Integration)", () => {
           projectFileId: projectFile.id!,
         });
 
-        // Create second label with afterLabelId: null (should go to beginning)
+        // Create second label with afterLabelId: null (should go to end)
         const secondLabel = await createLabel(testUserId, {
           projectId: testProject.id!,
           title: "Second Label",
@@ -306,8 +306,8 @@ describe("LabelsService - File Scoped (Integration)", () => {
           .where(eq(labels.id, secondLabel.id))
           .limit(1);
 
-        expect(firstLabelDb.labelPosition).toBe(1);
-        expect(secondLabelDb.labelPosition).toBe(0);
+        expect(firstLabelDb.labelPosition).toBe(0);
+        expect(secondLabelDb.labelPosition).toBe(1);
       });
 
       it("should throw NotFoundError when afterLabelId does not exist", async () => {
@@ -376,38 +376,6 @@ describe("LabelsService - File Scoped (Integration)", () => {
             labelNumber: 2,
             projectFileId: file2.id!,
             afterLabelId: labelInFile1.id,
-          })
-        ).rejects.toThrow(ValidationError);
-      });
-
-      it("should throw ValidationError when afterLabelId has no file association", async () => {
-        // Create a label without file association
-        const orphanLabel = await createLabel(testUserId, {
-          projectId: testProject.id!,
-          title: "Orphan Label",
-          labelNumber: 1,
-        });
-
-        const projectFile: NewProjectFile = {
-          id: testUuid("13000005", 1),
-          projectId: testProject.id!,
-          filePath: "labels/act_i.rpy",
-          fileType: "STORY",
-          content: 'label start:\n    "Hello"',
-          source: "ZIP",
-          contentHash: calculateContentHash('label start:\n    "Hello"'),
-        };
-
-        await db.insert(projectFiles).values(projectFile);
-
-        // Try to create a label in a file after the orphan label
-        await expect(
-          createLabel(testUserId, {
-            projectId: testProject.id!,
-            title: "Label with Orphan After Label",
-            labelNumber: 2,
-            projectFileId: projectFile.id!,
-            afterLabelId: orphanLabel.id,
           })
         ).rejects.toThrow(ValidationError);
       });

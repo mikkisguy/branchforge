@@ -962,6 +962,17 @@ describe("LabelsService (Integration)", () => {
       ).rejects.toThrow("Insufficient permissions");
     });
 
+    it("should throw ForbiddenError when projectFileId belongs to a different project", async () => {
+      await expect(
+        createLabel(testUserId, {
+          projectId: ownedProject.id!,
+          projectFileId: sharedProjectFile.id!,
+          title: "Cross-project Label",
+          labelNumber: 1,
+        })
+      ).rejects.toThrow("Project file does not belong");
+    });
+
     it("should coerce route to null when route does not exist in route_configs", async () => {
       const result = await createLabel(testUserId, {
         projectId: ownedProject.id!,

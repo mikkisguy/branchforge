@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import type { PublicLabel } from "@branchforge/shared";
-import { LabelNavigator } from "../LabelNavigator";
+import { LabelNavigator } from "@/components/write-mode/LabelNavigator.js";
 
 function makeLabel(overrides: Partial<PublicLabel> = {}): PublicLabel {
   return {

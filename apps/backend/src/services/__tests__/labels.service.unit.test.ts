@@ -9,7 +9,7 @@
  * - Project file sync integration (RPY parser)
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { RENPY_LABEL_REGEX } from "@branchforge/shared";
 
 // Now import the service after the mock is set up
@@ -196,6 +196,11 @@ describe("LabelsService", () => {
       mockSelect.mockImplementation(createEmptyMockChain);
     });
 
+    afterEach(() => {
+      mockUpdate.mockReset();
+      mockTransaction.mockReset();
+    });
+
     it("should update project_files.content when label has a projectFileId", async () => {
       const mockContent =
         'label chapter1_label1:\n    "Test content"\n    return\nlabel chapter1_label2:\n    "Other content"\n    return';
@@ -216,7 +221,7 @@ describe("LabelsService", () => {
       );
 
       const updateCalls: any[] = [];
-      const mockUpdate = vi.fn().mockImplementation(() => {
+      mockUpdate.mockImplementation(() => {
         updateCalls.push("update");
         return {
           set: vi.fn().mockReturnValue({
@@ -224,15 +229,13 @@ describe("LabelsService", () => {
           }),
         };
       });
-      mockDb.update = mockUpdate;
 
-      const mockTransaction = vi.fn().mockImplementation(async (callback) => {
+      mockTransaction.mockImplementation(async (callback) => {
         const tx = {
           update: mockUpdate,
         };
         await callback(tx);
       });
-      mockDb.transaction = mockTransaction;
 
       await deleteLabel(labelId, userId);
 
