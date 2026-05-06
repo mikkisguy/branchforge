@@ -6,7 +6,7 @@ BEGIN
     RAISE EXCEPTION 'Cannot set project_file_id NOT NULL: found labels with NULL project_file_id. Backfill these rows before re-running this migration.';
   END IF;
 END $$;
-
+--> statement-breakpoint
 ALTER TABLE "labels" DROP CONSTRAINT "labels_project_file_id_project_files_id_fk";
 --> statement-breakpoint
 ALTER TABLE "labels" ALTER COLUMN "project_file_id" SET NOT NULL;--> statement-breakpoint

@@ -293,7 +293,8 @@ describe("LabelsService - File Scoped (Integration)", () => {
           afterLabelId: null,
         });
 
-        // Verify positions (second label should be at position 0, first at 1)
+        // Verify positions: labels are appended in creation order,
+        // so firstLabelDb.labelPosition === 0 and secondLabelDb.labelPosition === 1
         const [firstLabelDb] = await db
           .select()
           .from(labels)
