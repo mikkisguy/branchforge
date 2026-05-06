@@ -17,9 +17,11 @@ import {
   projects,
   labels,
   projectFiles,
-  type NewUser,
-  type NewProject,
-  type NewProjectFile,
+} from "../../db/schema/index.js";
+import type {
+  NewUser,
+  NewProject,
+  NewProjectFile,
 } from "../../db/schema/index.js";
 import { eq, inArray } from "drizzle-orm";
 import { createLabel, reorderLabelsInFile } from "../labels.service.js";
@@ -85,12 +87,16 @@ describe("LabelsService - File Scoped (Integration)", () => {
     }
 
     // Then delete all projects (including any created during tests)
-    await db.delete(projects).where(eq(projects.userId, testUserId));
-    await db.delete(projects).where(eq(projects.userId, otherUserId));
+    await Promise.all([
+      db.delete(projects).where(eq(projects.userId, testUserId)),
+      db.delete(projects).where(eq(projects.userId, otherUserId)),
+    ]);
 
     // Finally delete users
-    await db.delete(users).where(eq(users.id, testUserId));
-    await db.delete(users).where(eq(users.id, otherUserId));
+    await Promise.all([
+      db.delete(users).where(eq(users.id, testUserId)),
+      db.delete(users).where(eq(users.id, otherUserId)),
+    ]);
   }
 
   // Helper to set up test data
@@ -1001,17 +1007,15 @@ describe("LabelsService - File Scoped (Integration)", () => {
       const originalPosition = originalLabel1.labelPosition;
 
       // Try to reorder with a non-existent label (should fail)
-      try {
-        await reorderLabelsInFile(testUserId, {
+      await expect(
+        reorderLabelsInFile(testUserId, {
           projectFileId: projectFile.id!,
           labelOrders: [
             { labelId: label1.id, newPosition: 1 },
             { labelId: testUuid("13000002", 999999), newPosition: 0 }, // non-existent
           ],
-        });
-      } catch {
-        // Expected to fail
-      }
+        })
+      ).rejects.toThrow();
 
       // Verify positions were not changed (transaction rolled back)
       const [rolledBackLabel1] = await db
