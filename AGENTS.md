@@ -148,3 +148,17 @@ NEVER create hand-written migration files. The only correct workflow:
 4. Apply with `pnpm --filter @branchforge/backend db:migrate`
 
 Bypassing this breaks migration tracking and causes deployment failures.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in the repo's GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Uses default triage labels (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: reads from `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
