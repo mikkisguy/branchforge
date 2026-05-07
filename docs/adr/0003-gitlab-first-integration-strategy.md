@@ -23,19 +23,25 @@ Implement **GitLab-first integration** using GitLab API directly, with project f
 ```typescript
 // GitLab-specific service using GitLab API
 export class GitLabService {
-  async getRepository projectId: string): Promise<GitlabRepository> { }
-  async getFileContent(projectId: string, filePath: string): Promise<string> { }
-  async createCommit(projectId: string, branch: string, files: FileChange[]): Promise<void> { }
+  async getRepository(projectId: string): Promise<GitlabRepository> {}
+  async getFileContent(projectId: string, filePath: string): Promise<string> {}
+  async createCommit(
+    projectId: string,
+    branch: string,
+    files: FileChange[]
+  ): Promise<void> {}
 }
+```
 
 // Project files abstraction (supports multiple sources)
 export const projectFiles = pgTable("project_files", {
-  source: fileSourceEnum("source").notNull(), // "GITLAB" or "ZIP"
-  path: text("path").notNull(),
-  originalFileName: text("original_file_name").notNull(),
-  // ...
+source: fileSourceEnum("source").notNull(), // "GITLAB" or "ZIP"
+path: text("path").notNull(),
+originalFileName: text("original_file_name").notNull(),
+// ...
 });
-```
+
+````
 
 ### Bi-directional sync flow
 
@@ -111,7 +117,7 @@ The `project_files.source` enum already supports this pattern:
 ```typescript
 export const fileSourceEnum = pgEnum("file_source", ["GITLAB", "ZIP"]);
 // Future: ["GITLAB", "GITHUB", "BITBUCKET", "GIT", "ZIP"]
-```
+````
 
 ## References
 

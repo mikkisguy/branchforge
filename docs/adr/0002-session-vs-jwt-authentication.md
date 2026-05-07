@@ -36,10 +36,10 @@ export async function authenticate(
   request: FastifyRequest,
   reply: FastifyReply
 ): Promise<void> {
-  if (!session?.user) {
+  if (!request.session?.user) {
     return reply.status(401).send({ error: "Unauthorized" });
   }
-  request.user = session.user;
+  request.user = request.session.user;
 }
 ```
 
