@@ -14,7 +14,6 @@ import {
   updateLabel,
   deleteLabel,
   getLabelCharacters,
-  reorderLabelsInFile,
   type PublicLabel,
   type LabelDetail,
   type ListLabelsFilters,
@@ -37,12 +36,10 @@ import {
   updateLabelDialogueBodySchema,
   createLabelSchema,
   updateLabelSchema,
-  reorderLabelsInFileSchema,
   type ListLabelsQuery,
   type UpdateLabelDialogueInput,
   type CreateLabelInput,
   type UpdateLabelInput,
-  type ReorderLabelsInFileInput,
 } from "../lib/validation.js";
 import { getDb } from "../db/index.js";
 import {
@@ -104,10 +101,6 @@ interface UpdateLabelDialogueResponse {
 
 interface LabelCharactersResponse {
   characters: LabelCharacterWithInfo[];
-}
-
-interface ReorderLabelsInFileResponse {
-  labels: PublicLabel[];
 }
 
 /**
@@ -850,48 +843,6 @@ async function getLabelCharactersHandler(
   }
 }
 
-/**
- * Reorder labels within a file
- *
- * POST /labels/reorder-file
- * Body: ReorderLabelsInFileInput
- * Requires authentication
- */
-async function reorderLabelsInFileHandler(
-  request: FastifyRequest<{ Body: ReorderLabelsInFileInput }>,
-  reply: FastifyReply
-): Promise<void> {
-  const user = request.user!;
-
-  try {
-    const labels = await reorderLabelsInFile(user.id, request.body);
-    reply.status(200).send({ labels } as ReorderLabelsInFileResponse);
-  } catch (error) {
-    request.log.error(error);
-
-    // Handle known error types
-    if (error instanceof NotFoundError) {
-      reply
-        .status(404)
-        .send({ error: "Project file not found" } as ErrorResponse);
-      return;
-    }
-    if (error instanceof ForbiddenError) {
-      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
-      return;
-    }
-    if (error instanceof ValidationError) {
-      request.log.error(error);
-      reply
-        .status(400)
-        .send({ error: "Invalid request payload" } as ErrorResponse);
-      return;
-    }
-
-    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
-  }
-}
-
 // ============================================================================
 // Routes Registration
 // ============================================================================
@@ -959,13 +910,5 @@ export async function labelsRoutes(fastify: FastifyInstance): Promise<void> {
       preValidation: validateParams(labelIdParamsSchema),
     },
     getLabelCharactersHandler
-  );
-  fastify.post<{ Body: ReorderLabelsInFileInput }>(
-    "/labels/reorder-file",
-    {
-      onRequest: authenticate,
-      preValidation: validateBody(reorderLabelsInFileSchema),
-    },
-    reorderLabelsInFileHandler
   );
 }

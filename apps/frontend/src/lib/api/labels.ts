@@ -5,17 +5,15 @@
  */
 
 import { request } from "./client";
-
-// ============================================================================
-// Types (imported from shared package)
-// ============================================================================
-
-// Import types from shared package - these match backend response types
 import type {
   PublicLabel,
   LabelDetail,
   LabelCharacter,
 } from "@branchforge/shared";
+
+// ============================================================================
+// Types (imported from shared package)
+// ============================================================================
 
 export interface ListLabelsParams {
   projectId: string;
@@ -50,6 +48,24 @@ export type UpdateDialogueResponse =
 
 export interface LabelCharactersResponse {
   characters: LabelCharacter[];
+}
+
+export interface CreateLabelInput {
+  projectId: string;
+  title: string;
+  projectFileId: string;
+  route?: string | null;
+  groupType?: string | null;
+  groupValue?: string | null;
+  labelNumber?: number;
+  sequenceOrder?: number;
+  status?: "DRAFT" | "REVIEW" | "FINAL" | null;
+  visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR" | null;
+  afterLabelId?: string | null;
+}
+
+export interface CreateLabelResponse {
+  label: PublicLabel;
 }
 
 // ============================================================================
@@ -116,5 +132,16 @@ export const labelsApi = {
       `/labels/${labelId}/characters`
     );
     return response.characters;
+  },
+
+  /**
+   * Create a new label
+   */
+  async createLabel(data: CreateLabelInput): Promise<PublicLabel> {
+    const response = await request<CreateLabelResponse>("/labels", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+    return response.label;
   },
 };

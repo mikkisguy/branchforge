@@ -19,6 +19,7 @@ vi.mock("@/lib/api/labels", () => ({
   labelsApi: {
     listLabels: vi.fn(),
     getLabel: vi.fn(),
+    createLabel: vi.fn(),
   },
 }));
 
@@ -286,6 +287,94 @@ describe("useLabels", () => {
       });
 
       expect(labelsApi.listLabels).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("Create Label", () => {
+    it("should create label and invalidate labels query", async () => {
+      const newLabel: PublicLabel = {
+        id: "label-new",
+        projectId: "project-1",
+        title: "New Scene",
+        groupType: null,
+        groupValue: null,
+        labelNumber: 2,
+        sequenceOrder: 2,
+        routeKey: null,
+        status: "DRAFT",
+        visibility: "EXCLUSIVE",
+        projectFileId: "file-1",
+        fileName: "act_i.rpy",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        updatedAt: "2024-01-01T00:00:00.000Z",
+      };
+
+      vi.mocked(labelsApi.listLabels)
+        .mockResolvedValueOnce(mockLabels)
+        .mockResolvedValueOnce([...mockLabels, newLabel]);
+      vi.mocked(labelsApi.createLabel).mockResolvedValue(newLabel);
+
+      const { result } = renderHook(() => useLabels(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.labels).toHaveLength(1);
+      });
+
+      await act(async () => {
+        await result.current.createLabel({
+          projectId: "project-1",
+          title: "New Scene",
+          projectFileId: "file-1",
+          labelNumber: 1,
+          sequenceOrder: 0,
+        });
+      });
+
+      expect(labelsApi.createLabel).toHaveBeenCalledWith({
+        projectId: "project-1",
+        title: "New Scene",
+        projectFileId: "file-1",
+        labelNumber: 1,
+        sequenceOrder: 0,
+      });
+
+      await waitFor(() => {
+        expect(result.current.labels).toHaveLength(2);
+      });
+    });
+
+    it("should show loading state during creation", async () => {
+      vi.mocked(labelsApi.listLabels).mockResolvedValue(mockLabels);
+      vi.mocked(labelsApi.createLabel).mockImplementation(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve(mockLabels[0]), 100)
+          )
+      );
+
+      const { result } = renderHook(() => useLabels(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.labels).toEqual(mockLabels);
+      });
+
+      act(() => {
+        result.current.createLabel({
+          projectId: "project-1",
+          title: "New Scene",
+          projectFileId: "file-1",
+          labelNumber: 1,
+          sequenceOrder: 0,
+        });
+      });
+
+      await waitFor(() => {
+        expect(result.current.isCreatingLabel).toBe(true);
+      });
+
+      await waitFor(() => {
+        expect(result.current.isCreatingLabel).toBe(false);
+      });
     });
   });
 });

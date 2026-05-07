@@ -62,6 +62,8 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
     isLoadingLabels,
     updateDialogue,
     isUpdatingDialogue,
+    createLabel,
+    isCreatingLabel,
   } = useLabels();
 
   const { characters } = useCharacters(currentProject?.id ?? "");
@@ -256,6 +258,15 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
               projectName={projectName || currentProject?.name}
               projectLabelCount={labels.length}
               onToggleCollapse={() => setIsLeftSidebarCollapsed(true)}
+              onCreateLabel={async (data) => {
+                await createLabel({
+                  projectId: currentProject!.id,
+                  ...data,
+                  labelNumber: 1, // Backend will auto-assign
+                  sequenceOrder: 0, // Backend will auto-assign
+                });
+              }}
+              isCreatingLabel={isCreatingLabel}
             />
           </div>
         </div>

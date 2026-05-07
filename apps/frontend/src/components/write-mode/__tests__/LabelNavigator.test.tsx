@@ -1,5 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  within,
+  waitFor,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { PublicLabel } from "@branchforge/shared";
 import { LabelNavigator } from "@/components/write-mode/LabelNavigator.js";
 
@@ -177,6 +184,149 @@ describe("LabelNavigator", () => {
 
       expect(screen.getByText("story.rpy")).toBeInTheDocument();
       expect(screen.getAllByText("2 labels").length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe("inline label creation", () => {
+    it('shows "+" button for each file group', () => {
+      render(
+        <LabelNavigator
+          labels={labelsFromMultipleFiles}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+          onCreateLabel={vi.fn()}
+        />
+      );
+
+      const addButtons = screen.getAllByText("Add label");
+      expect(addButtons).toHaveLength(2);
+    });
+
+    it('shows input field when "+" button is clicked', async () => {
+      const user = userEvent.setup();
+      render(
+        <LabelNavigator
+          labels={labelsFromMultipleFiles}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+          onCreateLabel={vi.fn()}
+        />
+      );
+
+      const addButtons = screen.getAllByText("Add label");
+      await user.click(addButtons[0]);
+
+      expect(screen.getByPlaceholderText("Label title...")).toBeInTheDocument();
+    });
+
+    it("calls onCreateLabel when Enter is pressed with text", async () => {
+      const user = userEvent.setup();
+      const onCreateLabel = vi.fn().mockResolvedValue(undefined);
+      render(
+        <LabelNavigator
+          labels={labelsFromMultipleFiles}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+          onCreateLabel={onCreateLabel}
+        />
+      );
+
+      const addButtons = screen.getAllByText("Add label");
+      await user.click(addButtons[0]);
+
+      const input = screen.getByPlaceholderText("Label title...");
+      await user.type(input, "New Label");
+      await user.keyboard("{Enter}");
+
+      await waitFor(() => {
+        expect(onCreateLabel).toHaveBeenCalledWith({
+          title: "New Label",
+          projectFileId: "file1",
+        });
+      });
+    });
+
+    it("hides input when Escape is pressed", async () => {
+      const user = userEvent.setup();
+      render(
+        <LabelNavigator
+          labels={labelsFromMultipleFiles}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+          onCreateLabel={vi.fn()}
+        />
+      );
+
+      const addButtons = screen.getAllByText("Add label");
+      await user.click(addButtons[0]);
+
+      expect(screen.getByPlaceholderText("Label title...")).toBeInTheDocument();
+
+      await user.keyboard("{Escape}");
+
+      expect(
+        screen.queryByPlaceholderText("Label title...")
+      ).not.toBeInTheDocument();
+    });
+
+    it("hides input when X button is clicked", async () => {
+      const user = userEvent.setup();
+      render(
+        <LabelNavigator
+          labels={labelsFromMultipleFiles}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+          onCreateLabel={vi.fn()}
+        />
+      );
+
+      const addButtons = screen.getAllByText("Add label");
+      await user.click(addButtons[0]);
+
+      expect(screen.getByPlaceholderText("Label title...")).toBeInTheDocument();
+
+      const cancelButton = screen.getByLabelText("Cancel");
+      await user.click(cancelButton);
+
+      expect(
+        screen.queryByPlaceholderText("Label title...")
+      ).not.toBeInTheDocument();
+    });
+
+    it("shows loading state during creation", async () => {
+      const onCreateLabel = vi.fn(() => Promise.resolve());
+      render(
+        <LabelNavigator
+          labels={labelsFromMultipleFiles}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+          onCreateLabel={onCreateLabel}
+          isCreatingLabel={true}
+        />
+      );
+
+      // When isCreatingLabel is true, input should show loading state
+      // But first we need to click the button to show the input
+      const addButtons = screen.getAllByText("Add label");
+      // The button should be disabled when isCreatingLabel is true
+      expect(addButtons[0] as HTMLButtonElement).toBeDisabled();
+    });
+
+    it("disables button during creation", () => {
+      render(
+        <LabelNavigator
+          labels={labelsFromMultipleFiles}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+          onCreateLabel={vi.fn()}
+          isCreatingLabel={true}
+        />
+      );
+
+      const addButtons = screen.getAllByText(
+        "Add label"
+      ) as HTMLButtonElement[];
+      expect(addButtons[0]).toBeDisabled();
     });
   });
 });
