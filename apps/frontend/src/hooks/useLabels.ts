@@ -8,7 +8,11 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { labelKeys, projectFilesKeys } from "@/lib/query-keys";
-import { labelsApi, type UpdateDialogueResponse } from "@/lib/api/labels";
+import {
+  labelsApi,
+  type UpdateDialogueResponse,
+  type CreateLabelInput,
+} from "@/lib/api/labels";
 import { useProject } from "@/hooks/useProject";
 import {
   getPrefixedStorageKey,
@@ -60,6 +64,10 @@ export interface UseLabelsReturn {
   ) => Promise<UpdateDialogueResponse>;
   isUpdatingDialogue: boolean;
   isUpdateError: boolean;
+
+  // Create
+  createLabel: (data: CreateLabelInput) => Promise<PublicLabel>;
+  isCreatingLabel: boolean;
 }
 
 // ============================================================================
@@ -162,6 +170,26 @@ export function useLabels(): UseLabelsReturn {
     },
   });
 
+  // Create label mutation
+  const createLabelMutation = useMutation({
+    mutationFn: async (data: CreateLabelInput) => {
+      return await labelsApi.createLabel(data);
+    },
+    onSuccess: async () => {
+      // Invalidate labels list to show new label
+      // Also invalidate project files since createLabel updates the RPY file content and its contentHash
+      if (currentProject) {
+        await queryClient.invalidateQueries({
+          queryKey: labelKeys.lists(currentProject.id),
+        });
+
+        await queryClient.refetchQueries({
+          queryKey: projectFilesKeys.lists(currentProject.id),
+        });
+      }
+    },
+  });
+
   // Memoized map for efficient lookups (like useProject pattern)
   const labelsMap = useMemo(
     () => new Map(labels.map((l) => [l.id, l])),
@@ -245,5 +273,7 @@ export function useLabels(): UseLabelsReturn {
     updateDialogue,
     isUpdatingDialogue: updateDialogueMutation.isPending,
     isUpdateError: updateDialogueMutation.isError,
+    createLabel: createLabelMutation.mutateAsync,
+    isCreatingLabel: createLabelMutation.isPending,
   };
 }

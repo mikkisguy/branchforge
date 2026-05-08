@@ -274,6 +274,7 @@ async function getProjectFilesHandler(
       id: string;
       labelName: string | null;
       title: string;
+      status: string | null;
       projectFileId: string;
     };
 
@@ -282,6 +283,7 @@ async function getProjectFilesHandler(
       id: string;
       labelName: string | null;
       title: string;
+      status: string | null;
     };
 
     const allLabels: LabelForGrouping[] = await db
@@ -289,6 +291,7 @@ async function getProjectFilesHandler(
         id: labels.id,
         labelName: labels.labelName,
         title: labels.title,
+        status: labels.status,
         projectFileId: labels.projectFileId,
       })
       .from(labels)

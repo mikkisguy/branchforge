@@ -22,7 +22,6 @@ import {
   asc,
   or,
   isNull,
-  inArray,
   sql,
   type ExtractTablesWithRelations,
 } from "drizzle-orm";
@@ -47,7 +46,6 @@ import { logWarn, LogEventType } from "../lib/logger.js";
 import {
   addLabelToRPYContent,
   removeLabelFromRPYContent,
-  reorderLabelsInRPYContent,
 } from "./rpy-parser.service.js";
 import { calculateContentHash } from "../lib/hash.js";
 
@@ -526,7 +524,7 @@ export async function createLabel(
     route?: string | null;
     groupType?: string | null;
     groupValue?: string | null;
-    labelNumber: number;
+    labelNumber?: number;
     sequenceOrder?: number;
     status?: LabelStatus | null;
     visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR" | null;
@@ -574,6 +572,7 @@ export async function createLabel(
     // Validate projectFileId and fetch filePath in a single query to avoid extra round-trip
     let afterLabelName = null;
     let afterLabelPosition: number | null = null;
+    let afterLabelSequenceOrder: number | null = null;
     const validProjectFileId = data.projectFileId;
 
     if (
@@ -617,6 +616,8 @@ export async function createLabel(
           labelName: labels.labelName,
           projectFileId: labels.projectFileId,
           labelPosition: labels.labelPosition,
+          sequenceOrder: labels.sequenceOrder,
+          labelNumber: labels.labelNumber,
         })
         .from(labels)
         .where(and(eq(labels.id, data.afterLabelId), isNull(labels.deletedAt)))
@@ -638,6 +639,7 @@ export async function createLabel(
 
       afterLabelName = afterLabel.labelName;
       afterLabelPosition = afterLabel.labelPosition;
+      afterLabelSequenceOrder = afterLabel.sequenceOrder;
     }
 
     // Generate labelName
@@ -699,6 +701,41 @@ export async function createLabel(
       ? (afterLabelPosition ?? 0) + 1
       : existingLabels.length;
 
+    // Compute sequenceOrder: use explicit value, place after specified label,
+    // or append to the end of the file's labels
+    let sequenceOrder: number;
+    if (data.sequenceOrder !== undefined) {
+      sequenceOrder = data.sequenceOrder;
+    } else if (afterLabelSequenceOrder !== null) {
+      sequenceOrder = afterLabelSequenceOrder + 1;
+    } else {
+      const maxSequenceOrder = existingLabels.reduce(
+        (max, l) => Math.max(max, l.sequenceOrder ?? 0),
+        -1
+      );
+      sequenceOrder = maxSequenceOrder + 1;
+    }
+
+    // Compute labelNumber: use explicit value, derive from afterLabelId,
+    // or append to the end
+    let labelNumber: number;
+    if (data.labelNumber !== undefined) {
+      labelNumber = data.labelNumber;
+    } else if (afterLabelSequenceOrder !== null) {
+      // When inserting after a specific label, find its labelNumber
+      // and add 1 to place it immediately after
+      const afterLabel = existingLabels.find(
+        (l) => l.sequenceOrder === afterLabelSequenceOrder
+      );
+      labelNumber = (afterLabel?.labelNumber ?? 0) + 1;
+    } else {
+      const maxLabelNumber = existingLabels.reduce(
+        (max, l) => Math.max(max, l.labelNumber ?? 0),
+        0
+      );
+      labelNumber = maxLabelNumber + 1;
+    }
+
     const auditFields = createAuditFields(userId);
 
     const [label] = await tx
@@ -709,8 +746,8 @@ export async function createLabel(
         route: validatedRoute,
         groupType: data.groupType ?? null,
         groupValue: data.groupValue ?? null,
-        labelNumber: data.labelNumber,
-        sequenceOrder: data.sequenceOrder ?? 0,
+        labelNumber,
+        sequenceOrder,
         status: data.status ?? "DRAFT",
         visibility: data.visibility ?? "EXCLUSIVE",
         projectFileId: validProjectFileId,
@@ -900,213 +937,6 @@ export async function deleteLabel(
         })
         .where(eq(projectFiles.id, labelWithProject.projectFileId));
     }
-  });
-}
-
-/**
- * Reorder labels within a specific file
- * Updates both the RPY file content and label positions in the database
- *
- * @param userId - The ID of the user reordering the labels
- * @param data - The reorder data
- * @returns The updated labels
- * @throws NotFoundError if project file not found
- * @throws ForbiddenError if user lacks permission
- * @throws ValidationError if labels belong to different files
- */
-export async function reorderLabelsInFile(
-  userId: string,
-  data: {
-    projectFileId: string;
-    labelOrders: Array<{ labelId: string; newPosition: number }>;
-  }
-): Promise<PublicLabel[]> {
-  const db = getDb();
-
-  // Validate input
-  if (!data.labelOrders || data.labelOrders.length === 0) {
-    throw new ValidationError("At least one label must be reordered");
-  }
-
-  return await db.transaction(async (tx) => {
-    // Get the project file with row-level lock to prevent concurrent modifications
-    const [projectFile] = await tx
-      .select({
-        id: projectFiles.id,
-        content: projectFiles.content,
-        projectId: projectFiles.projectId,
-        filePath: projectFiles.filePath,
-      })
-      .from(projectFiles)
-      .where(eq(projectFiles.id, data.projectFileId))
-      .for("update")
-      .limit(1);
-
-    if (!projectFile) {
-      throw new NotFoundError("ProjectFile");
-    }
-
-    // Verify user owns the project
-    const [project] = await tx
-      .select({ userId: projects.userId })
-      .from(projects)
-      .where(eq(projects.id, projectFile.projectId))
-      .limit(1);
-
-    if (!project || project.userId !== userId) {
-      throw new ForbiddenError("Insufficient permissions");
-    }
-
-    // Validate all labels exist and belong to the same file
-    const labelIds = data.labelOrders.map((l) => l.labelId);
-    const labelsToReorder = await tx
-      .select()
-      .from(labels)
-      .where(and(inArray(labels.id, labelIds), isNull(labels.deletedAt)));
-
-    if (labelsToReorder.length !== labelIds.length) {
-      throw new ValidationError("One or more labels not found");
-    }
-
-    for (const label of labelsToReorder) {
-      if (label.projectFileId !== data.projectFileId) {
-        throw new ValidationError("All labels must belong to the same file");
-      }
-    }
-
-    // Filter out labels without labelName (UI-only labels that aren't in RPY files)
-    const labelsWithoutName = labelsToReorder.filter((l) => !l.labelName);
-    const validLabelsToReorder = labelsToReorder.filter((l) => l.labelName);
-
-    if (labelsWithoutName.length > 0) {
-      const invalidNames = labelsWithoutName.map((l) => l.title).join(", ");
-      logWarn(LogEventType.VALIDATION_WARNING, {
-        event: "label_reorder_failed_no_file_association",
-        invalidNames,
-        projectFileId: data.projectFileId,
-        labelIds: labelsWithoutName.map((l) => l.id),
-      });
-      throw new ValidationError("One or more labels cannot be reordered");
-    }
-
-    if (validLabelsToReorder.length === 0) {
-      throw new ValidationError("At least one valid label must be reordered");
-    }
-
-    // Build array of label names in the new order
-    const validLabelIds = new Set(validLabelsToReorder.map((l) => l.id));
-    const labelMap = new Map(validLabelsToReorder.map((l) => [l.id, l]));
-    const newOrder: string[] = [];
-
-    // Only process labels that passed validation
-    const validOrders = data.labelOrders.filter((o) =>
-      validLabelIds.has(o.labelId)
-    );
-
-    const sortedOrders = [...validOrders].sort(
-      (a, b) => a.newPosition - b.newPosition
-    );
-
-    for (const order of sortedOrders) {
-      const label = labelMap.get(order.labelId);
-      // labelName is guaranteed to be non-null after validation
-      if (label?.labelName) {
-        newOrder.push(label.labelName);
-      }
-    }
-
-    // Reorder labels in RPY content
-    const updatedContent = reorderLabelsInRPYContent(
-      projectFile.content,
-      newOrder
-    );
-
-    // Update project_files.content and contentHash
-    await tx
-      .update(projectFiles)
-      .set({
-        content: updatedContent,
-        contentHash: calculateContentHash(updatedContent),
-      })
-      .where(eq(projectFiles.id, data.projectFileId));
-
-    // Update label positions for all labels in the file
-    const allFileLabels = await tx
-      .select()
-      .from(labels)
-      .where(
-        and(
-          eq(labels.projectFileId, data.projectFileId),
-          isNull(labels.deletedAt)
-        )
-      )
-      .orderBy(asc(labels.labelPosition));
-
-    const reorderedPositionMap = new Map(
-      validOrders.map((o) => [o.labelId, o.newPosition])
-    );
-
-    // Build new order array
-    const newLabelOrder = [...allFileLabels];
-    newLabelOrder.sort((a, b) => {
-      const aPos = reorderedPositionMap.get(a.id) ?? a.labelPosition ?? 0;
-      const bPos = reorderedPositionMap.get(b.id) ?? b.labelPosition ?? 0;
-      if (aPos !== bPos) {
-        return aPos - bPos;
-      }
-      // Tie-breaker: prioritize labels being explicitly reordered
-      const aIsReordered = reorderedPositionMap.has(a.id);
-      const bIsReordered = reorderedPositionMap.has(b.id);
-      if (aIsReordered && !bIsReordered) {
-        return -1; // a comes first
-      }
-      if (!aIsReordered && bIsReordered) {
-        return 1; // b comes first
-      }
-      // Both or neither reordered: use original position as tie-breaker
-      return (a.labelPosition ?? 0) - (b.labelPosition ?? 0);
-    });
-
-    // Update positions in a single batch query using parameterized VALUES
-    // Skip labels without labelName since they don't exist in RPY files
-    const labelsToUpdate: Array<{ id: string; position: number }> = [];
-
-    for (let i = 0; i < newLabelOrder.length; i++) {
-      const label = newLabelOrder[i];
-      if (label.labelName === null) {
-        continue; // Skip UI-only labels that aren't in RPY files
-      }
-      labelsToUpdate.push({ id: label.id, position: i });
-    }
-
-    if (labelsToUpdate.length > 0) {
-      // Create a parameterized VALUES list with explicit type casting
-      const valuesList = sql.join(
-        labelsToUpdate.map(
-          (item) => sql`(${item.id}::uuid, ${item.position}::integer)`
-        ),
-        sql`, `
-      );
-
-      await tx.execute(
-        sql`UPDATE labels
-            SET "label_position" = new_positions.position,
-                "updated_by" = ${userId},
-                "updated_at" = NOW()
-            FROM (VALUES ${valuesList}) AS new_positions(id, position)
-            WHERE labels.id = new_positions.id`
-      );
-    }
-
-    // Fetch and return updated labels
-    const updatedLabels = await tx
-      .select()
-      .from(labels)
-      .where(inArray(labels.id, Array.from(validLabelIds)));
-
-    return updatedLabels.map((l) =>
-      mapToPublicLabel({ ...l, filePath: projectFile.filePath })
-    );
   });
 }
 

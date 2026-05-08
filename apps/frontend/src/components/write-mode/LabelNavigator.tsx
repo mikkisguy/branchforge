@@ -3,17 +3,248 @@
  *
  * Left sidebar for navigating labels in WriteMode.
  * Groups labels by source file name with visual status indicators.
+ * Supports inline label creation.
  */
 
-import { useMemo } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import type { PublicLabel, LabelStatus } from "@branchforge/shared";
-import { Sparkles, ChevronLeft, File, FolderOpen } from "lucide-react";
+import {
+  Sparkles,
+  ChevronLeft,
+  File,
+  FolderOpen,
+  Plus,
+  Loader2,
+  X,
+} from "lucide-react";
 
 const STATUS_COLORS: Record<LabelStatus, string> = {
   FINAL: "var(--theme-color)",
   REVIEW: "var(--theme-review-color)",
   DRAFT: "var(--theme-draft-color)",
 };
+
+// ============================================================================
+// Label Item Component
+// ============================================================================
+
+interface LabelItemProps {
+  label: PublicLabel;
+  isActive: boolean;
+  onSelect: () => void;
+}
+
+function LabelItem({ label, isActive, onSelect }: LabelItemProps) {
+  const statusColor = STATUS_COLORS[label.status ?? "DRAFT"];
+  const statusLabel = label.status ?? "DRAFT";
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={isActive}
+      className={`
+        relative w-full flex items-center gap-3 px-3 py-2.5 rounded-md border transition-all
+        ${
+          isActive
+            ? "bg-[var(--theme-color)]/10 border-[var(--theme-color)] shadow-sm"
+            : "bg-card/50 border-border hover:bg-accent/50"
+        }
+      `}
+    >
+      {/* Status dot on the left */}
+      <div
+        className="w-2 h-2 rounded-full flex-shrink-0 ring-2 ring-background"
+        style={{
+          backgroundColor: statusColor,
+        }}
+        title={`Status: ${statusLabel}`}
+      />
+
+      {/* Label Title */}
+      <div className="flex-1 min-w-0 text-left" title={label.title}>
+        <h3
+          className={`text-sm font-medium truncate ${
+            isActive ? "text-foreground" : "text-muted-foreground"
+          }`}
+        >
+          {label.title}
+        </h3>
+      </div>
+    </button>
+  );
+}
+
+// ============================================================================
+// Inline Create Input Component
+// ============================================================================
+
+interface InlineCreateInputProps {
+  onCreate: (title: string) => Promise<void>;
+  onCancel: () => void;
+  isCreating: boolean;
+}
+
+const LABEL_INPUT_ID = "inline-label-title-input";
+
+function InlineCreateInput({
+  onCreate,
+  onCancel,
+  isCreating,
+}: InlineCreateInputProps) {
+  const [value, setValue] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const handleSubmit = async () => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setError("Label title is required");
+      return;
+    }
+
+    try {
+      setError(null);
+      await onCreate(trimmed);
+      setValue("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create label");
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSubmit();
+    } else if (e.key === "Escape") {
+      onCancel();
+    }
+  };
+
+  return (
+    <div className="px-2 py-2">
+      <label htmlFor={LABEL_INPUT_ID} className="sr-only">
+        Label title
+      </label>
+      <div className="flex items-center gap-2 min-w-0">
+        <input
+          id={LABEL_INPUT_ID}
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setError(null);
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder="Label title..."
+          className="flex-1 min-w-0 px-3 py-2 border rounded-md text-sm bg-background"
+          disabled={isCreating}
+        />
+        {isCreating ? (
+          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+        ) : (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="p-2 hover:bg-accent rounded"
+            aria-label="Cancel"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+      {error && <p className="text-xs text-destructive mt-1.5 px-1">{error}</p>}
+    </div>
+  );
+}
+
+// ============================================================================
+// File Group Component
+// ============================================================================
+
+interface FileGroupProps {
+  fileName: string;
+  projectFileId: string;
+  labels: PublicLabel[];
+  activeLabelId: string | null;
+  onLabelSelect: (labelId: string) => void;
+  onCreateLabel?: (data: {
+    title: string;
+    projectFileId: string;
+  }) => Promise<unknown>;
+  isCreatingLabel?: boolean;
+}
+
+function FileGroup({
+  fileName,
+  projectFileId: fileGroupId,
+  labels,
+  activeLabelId,
+  onLabelSelect,
+  onCreateLabel,
+  isCreatingLabel,
+}: FileGroupProps) {
+  const [showInput, setShowInput] = useState(false);
+
+  const handleCreate = async (title: string) => {
+    await onCreateLabel?.({
+      title,
+      projectFileId: fileGroupId,
+    });
+    setShowInput(false);
+  };
+
+  return (
+    <div className="mb-4">
+      {/* File Header */}
+      <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-muted/20">
+        <File className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
+          {fileName}
+        </span>
+        <span className="text-[10px] text-muted-foreground ml-auto shrink-0">
+          {labels.length}
+        </span>
+      </div>
+
+      {/* Label list */}
+      <div className="space-y-1">
+        {labels.map((label) => (
+          <LabelItem
+            key={label.id}
+            label={label}
+            isActive={activeLabelId === label.id}
+            onSelect={() => onLabelSelect(label.id)}
+          />
+        ))}
+      </div>
+
+      {/* Create button or input */}
+      {showInput ? (
+        <InlineCreateInput
+          onCreate={handleCreate}
+          onCancel={() => setShowInput(false)}
+          isCreating={isCreatingLabel ?? false}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setShowInput(true)}
+          className="flex items-center gap-2 mt-2 px-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          disabled={isCreatingLabel}
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Add label
+        </button>
+      )}
+    </div>
+  );
+}
 
 interface LabelNavigatorProps {
   labels: PublicLabel[];
@@ -22,6 +253,12 @@ interface LabelNavigatorProps {
   projectName?: string;
   projectLabelCount?: number;
   onToggleCollapse?: () => void;
+  // Create
+  onCreateLabel?: (data: {
+    title: string;
+    projectFileId: string;
+  }) => Promise<unknown>;
+  isCreatingLabel?: boolean;
 }
 
 export function LabelNavigator({
@@ -31,6 +268,8 @@ export function LabelNavigator({
   projectName,
   projectLabelCount,
   onToggleCollapse,
+  onCreateLabel,
+  isCreatingLabel,
 }: LabelNavigatorProps) {
   const groupedLabels = useMemo(() => {
     const groups = new Map<string, PublicLabel[]>();
@@ -107,73 +346,16 @@ export function LabelNavigator({
               ([projectFileId, fileLabels]) => {
                 const fileName = fileLabels[0]?.fileName ?? "unknown";
                 return (
-                  <div key={projectFileId}>
-                    {/* File Header */}
-                    <div className="flex items-center gap-1.5 mb-1.5 px-2">
-                      <File className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
-                        {fileName}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground ml-auto shrink-0">
-                        {fileLabels.length}{" "}
-                        {fileLabels.length === 1 ? "label" : "labels"}
-                      </span>
-                    </div>
-
-                    {/* Labels in this file */}
-                    <div className="space-y-1.5">
-                      {fileLabels.map((label) => {
-                        const isActive = label.id === activeLabelId;
-                        const statusColor =
-                          STATUS_COLORS[label.status ?? "DRAFT"];
-
-                        return (
-                          <button
-                            type="button"
-                            key={label.id}
-                            onClick={() => onSelect(label.id)}
-                            aria-pressed={isActive}
-                            className={`group relative py-2.5 px-3 rounded-lg border transition-all cursor-pointer w-full text-left ${
-                              isActive
-                                ? "bg-[var(--theme-color)]/10 border-[var(--theme-color)] shadow-md"
-                                : "bg-card/50 border-border hover:shadow-sm"
-                            }`}
-                          >
-                            {/* Status Indicator */}
-                            <div
-                              className="absolute left-0 top-2 bottom-2 w-1 rounded-r"
-                              style={{
-                                backgroundColor: statusColor,
-                                opacity: isActive ? 1 : 0.5,
-                              }}
-                            />
-
-                            {/* Label Title */}
-                            <div className="ml-2.5" title={label.title}>
-                              <h3
-                                className={`text-sm font-medium truncate ${
-                                  isActive
-                                    ? "text-foreground"
-                                    : "text-muted-foreground group-hover:text-foreground"
-                                }`}
-                              >
-                                <span
-                                  className={`text-xs font-mono pr-2 ${
-                                    isActive
-                                      ? "text-[var(--theme-color)]"
-                                      : "text-muted-foreground"
-                                  }`}
-                                >
-                                  {String(label.labelNumber).padStart(2, "0")}
-                                </span>
-                                {label.title}
-                              </h3>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <FileGroup
+                    key={projectFileId}
+                    fileName={fileName}
+                    projectFileId={projectFileId}
+                    labels={fileLabels}
+                    activeLabelId={activeLabelId}
+                    onLabelSelect={onSelect}
+                    onCreateLabel={onCreateLabel}
+                    isCreatingLabel={isCreatingLabel}
+                  />
                 );
               }
             )}

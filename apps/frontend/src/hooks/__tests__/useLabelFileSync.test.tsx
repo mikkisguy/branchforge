@@ -46,6 +46,7 @@ describe("useLabelFileSync", () => {
             id: "label-1",
             labelName: "chapter_one_intro",
             title: "Chapter One Intro",
+            status: "DRAFT",
           },
         ]
       ),
@@ -79,6 +80,7 @@ describe("useLabelFileSync", () => {
             id: "label-1",
             labelName: "chapter_one_intro",
             title: "Chapter One Intro",
+            status: "DRAFT",
           },
         ]
       ),
