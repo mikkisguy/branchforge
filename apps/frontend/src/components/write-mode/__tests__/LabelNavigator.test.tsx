@@ -83,8 +83,8 @@ describe("LabelNavigator", () => {
 
       const actIHeader = screen.getByText("act_i.rpy").parentElement!;
       const actIiHeader = screen.getByText("act_ii.rpy").parentElement!;
-      expect(within(actIHeader).getByText("2 labels")).toBeInTheDocument();
-      expect(within(actIiHeader).getByText("1 label")).toBeInTheDocument();
+      expect(within(actIHeader).getByText("2")).toBeInTheDocument();
+      expect(within(actIiHeader).getByText("1")).toBeInTheDocument();
     });
   });
 
@@ -293,26 +293,7 @@ describe("LabelNavigator", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("shows loading state during creation", async () => {
-      const onCreateLabel = vi.fn(() => Promise.resolve());
-      render(
-        <LabelNavigator
-          labels={labelsFromMultipleFiles}
-          activeLabelId={null}
-          onSelect={vi.fn()}
-          onCreateLabel={onCreateLabel}
-          isCreatingLabel={true}
-        />
-      );
-
-      // When isCreatingLabel is true, input should show loading state
-      // But first we need to click the button to show the input
-      const addButtons = screen.getAllByText("Add label");
-      // The button should be disabled when isCreatingLabel is true
-      expect(addButtons[0] as HTMLButtonElement).toBeDisabled();
-    });
-
-    it("disables button during creation", () => {
+    it("disables add button during creation", () => {
       render(
         <LabelNavigator
           labels={labelsFromMultipleFiles}

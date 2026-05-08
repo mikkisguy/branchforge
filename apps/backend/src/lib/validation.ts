@@ -369,7 +369,7 @@ export const createLabelSchema = z
     route: routeConfigKeySchema.optional(),
     groupType: optionalString(50),
     groupValue: optionalString(50),
-    labelNumber: z.number().int().min(1).max(999),
+    labelNumber: z.number().int().min(1).max(999).optional(),
     sequenceOrder: z.number().int().min(0).optional(),
     status: labelStatusSchema.optional(),
     visibility: labelVisibilitySchema.optional(),

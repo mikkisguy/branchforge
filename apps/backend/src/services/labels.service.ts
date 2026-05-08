@@ -524,7 +524,7 @@ export async function createLabel(
     route?: string | null;
     groupType?: string | null;
     groupValue?: string | null;
-    labelNumber: number;
+    labelNumber?: number;
     sequenceOrder?: number;
     status?: LabelStatus | null;
     visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR" | null;
@@ -697,6 +697,33 @@ export async function createLabel(
       ? (afterLabelPosition ?? 0) + 1
       : existingLabels.length;
 
+    // Compute sequenceOrder: use explicit value, place after specified label,
+    // or append to the end of the file's labels
+    let sequenceOrder: number;
+    if (data.sequenceOrder !== undefined && data.sequenceOrder !== null) {
+      sequenceOrder = data.sequenceOrder;
+    } else if (afterLabelPosition !== null) {
+      sequenceOrder = afterLabelPosition + 1;
+    } else {
+      const maxSequenceOrder = existingLabels.reduce(
+        (max, l) => Math.max(max, l.sequenceOrder ?? 0),
+        -1
+      );
+      sequenceOrder = maxSequenceOrder + 1;
+    }
+
+    // Compute labelNumber: use explicit value, or append to the end
+    let labelNumber: number;
+    if (data.labelNumber !== undefined && data.labelNumber !== null) {
+      labelNumber = data.labelNumber;
+    } else {
+      const maxLabelNumber = existingLabels.reduce(
+        (max, l) => Math.max(max, l.labelNumber ?? 0),
+        0
+      );
+      labelNumber = maxLabelNumber + 1;
+    }
+
     const auditFields = createAuditFields(userId);
 
     const [label] = await tx
@@ -707,8 +734,8 @@ export async function createLabel(
         route: validatedRoute,
         groupType: data.groupType ?? null,
         groupValue: data.groupValue ?? null,
-        labelNumber: data.labelNumber,
-        sequenceOrder: data.sequenceOrder ?? 0,
+        labelNumber,
+        sequenceOrder,
         status: data.status ?? "DRAFT",
         visibility: data.visibility ?? "EXCLUSIVE",
         projectFileId: validProjectFileId,

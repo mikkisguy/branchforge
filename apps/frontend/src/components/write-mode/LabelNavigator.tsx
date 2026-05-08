@@ -36,51 +36,42 @@ interface LabelItemProps {
 
 function LabelItem({ label, isActive, onSelect }: LabelItemProps) {
   const statusColor = STATUS_COLORS[label.status ?? "DRAFT"];
+  const statusLabel = label.status ?? "DRAFT";
 
   return (
-    <div
-      className={`relative rounded-lg border transition-all ${
-        isActive
-          ? "bg-[var(--theme-color)]/10 border-[var(--theme-color)] shadow-md"
-          : "bg-card/50 border-border hover:shadow-sm"
-      }`}
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={isActive}
+      className={`
+        relative w-full flex items-center gap-3 px-3 py-2.5 rounded-md border transition-all
+        ${
+          isActive
+            ? "bg-[var(--theme-color)]/10 border-[var(--theme-color)] shadow-sm"
+            : "bg-card/50 border-border hover:bg-accent/50"
+        }
+      `}
     >
-      <button
-        type="button"
-        onClick={onSelect}
-        aria-pressed={isActive}
-        className="w-full py-2.5 px-3 text-left"
-      >
-        {/* Status Indicator */}
-        <div
-          className="absolute left-3 top-2.5 bottom-2.5 w-1 rounded-r"
-          style={{
-            backgroundColor: statusColor,
-            opacity: isActive ? 1 : 0.5,
-          }}
-        />
+      {/* Status dot on the left */}
+      <div
+        className="w-2 h-2 rounded-full flex-shrink-0 ring-2 ring-background"
+        style={{
+          backgroundColor: statusColor,
+        }}
+        title={`Status: ${statusLabel}`}
+      />
 
-        {/* Label Title */}
-        <div className="ml-2.5" title={label.title}>
-          <h3
-            className={`text-sm font-medium truncate ${
-              isActive
-                ? "text-foreground"
-                : "text-muted-foreground group-hover:text-foreground"
-            }`}
-          >
-            <span
-              className={`text-xs font-mono pr-2 ${
-                isActive ? "text-[var(--theme-color)]" : "text-muted-foreground"
-              }`}
-            >
-              {String(label.labelNumber).padStart(2, "0")}
-            </span>
-            {label.title}
-          </h3>
-        </div>
-      </button>
-    </div>
+      {/* Label Title */}
+      <div className="flex-1 min-w-0 text-left" title={label.title}>
+        <h3
+          className={`text-sm font-medium truncate ${
+            isActive ? "text-foreground" : "text-muted-foreground"
+          }`}
+        >
+          {label.title}
+        </h3>
+      </div>
+    </button>
   );
 }
 
@@ -203,20 +194,20 @@ function FileGroup({
   };
 
   return (
-    <div className="mb-6 relative">
+    <div className="mb-4">
       {/* File Header */}
-      <div className="flex items-center gap-1.5 mb-1.5 px-2">
+      <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-muted/20">
         <File className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
           {fileName}
         </span>
         <span className="text-[10px] text-muted-foreground ml-auto shrink-0">
-          {labels.length} {labels.length === 1 ? "label" : "labels"}
+          {labels.length}
         </span>
       </div>
 
       {/* Label list */}
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         {labels.map((label) => (
           <LabelItem
             key={label.id}
@@ -238,10 +229,10 @@ function FileGroup({
         <button
           type="button"
           onClick={() => setShowInput(true)}
-          className="flex items-center gap-2 mt-2 px-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-2 mt-2 px-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
           disabled={isCreatingLabel}
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-3.5 h-3.5" />
           Add label
         </button>
       )}

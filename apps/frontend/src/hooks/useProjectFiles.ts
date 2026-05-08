@@ -19,6 +19,7 @@ export interface ProjectFileLabel {
   id: string;
   labelName: string | null;
   title: string;
+  status: string | null;
 }
 
 export interface ProjectFileNode extends ProjectFile {

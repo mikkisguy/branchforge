@@ -262,8 +262,6 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
                 await createLabel({
                   projectId: currentProject!.id,
                   ...data,
-                  labelNumber: 1, // Backend will auto-assign
-                  sequenceOrder: 0, // Backend will auto-assign
                 });
               }}
               isCreatingLabel={isCreatingLabel}

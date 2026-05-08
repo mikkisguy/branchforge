@@ -177,9 +177,14 @@ export function useLabels(): UseLabelsReturn {
     },
     onSuccess: async () => {
       // Invalidate labels list to show new label
+      // Also invalidate project files since createLabel updates the RPY file content and its contentHash
       if (currentProject) {
         await queryClient.invalidateQueries({
           queryKey: labelKeys.lists(currentProject.id),
+        });
+
+        await queryClient.refetchQueries({
+          queryKey: projectFilesKeys.lists(currentProject.id),
         });
       }
     },

@@ -19,6 +19,7 @@ export interface ProjectFileNode extends ProjectFile {
     id: string;
     labelName: string | null;
     title: string;
+    status: string | null;
   }>;
 }
 
