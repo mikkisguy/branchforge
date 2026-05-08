@@ -85,6 +85,8 @@ interface InlineCreateInputProps {
   isCreating: boolean;
 }
 
+const LABEL_INPUT_ID = "inline-label-title-input";
+
 function InlineCreateInput({
   onCreate,
   onCancel,
@@ -125,8 +127,12 @@ function InlineCreateInput({
 
   return (
     <div className="px-2 py-2">
+      <label htmlFor={LABEL_INPUT_ID} className="sr-only">
+        Label title
+      </label>
       <div className="flex items-center gap-2 min-w-0">
         <input
+          id={LABEL_INPUT_ID}
           ref={inputRef}
           type="text"
           value={value}

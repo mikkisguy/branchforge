@@ -169,11 +169,12 @@ export function ProjectFileTree({
                     file.labels.length > 0 && (
                       <div className="pl-7 space-y-0.5" role="group">
                         {file.labels.map((label) => {
-                          const statusColor =
-                            STATUS_COLORS[
-                              (label.status as LabelStatus) ?? "DRAFT"
-                            ];
-                          const statusLabel = label.status ?? "DRAFT";
+                          const safeStatus =
+                            typeof label.status === "string" &&
+                            label.status in STATUS_COLORS
+                              ? (label.status as LabelStatus)
+                              : "DRAFT";
+                          const statusColor = STATUS_COLORS[safeStatus];
 
                           return (
                             <button
@@ -188,11 +189,11 @@ export function ProjectFileTree({
                               }`}
                             >
                               <span
-                                className="w-1.5 h-1.5 rounded-full shrink-0 ring-1.5 ring-background"
+                                className="w-1.5 h-1.5 rounded-full shrink-0 ring-[1.5px] ring-background"
                                 style={{
                                   backgroundColor: statusColor,
                                 }}
-                                title={`Status: ${statusLabel}`}
+                                title={`Status: ${safeStatus}`}
                               />
                               <span className="truncate">
                                 {label.labelName || label.title}

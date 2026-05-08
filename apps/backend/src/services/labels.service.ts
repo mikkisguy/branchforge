@@ -572,6 +572,7 @@ export async function createLabel(
     // Validate projectFileId and fetch filePath in a single query to avoid extra round-trip
     let afterLabelName = null;
     let afterLabelPosition: number | null = null;
+    let afterLabelSequenceOrder: number | null = null;
     const validProjectFileId = data.projectFileId;
 
     if (
@@ -615,6 +616,8 @@ export async function createLabel(
           labelName: labels.labelName,
           projectFileId: labels.projectFileId,
           labelPosition: labels.labelPosition,
+          sequenceOrder: labels.sequenceOrder,
+          labelNumber: labels.labelNumber,
         })
         .from(labels)
         .where(and(eq(labels.id, data.afterLabelId), isNull(labels.deletedAt)))
@@ -636,6 +639,7 @@ export async function createLabel(
 
       afterLabelName = afterLabel.labelName;
       afterLabelPosition = afterLabel.labelPosition;
+      afterLabelSequenceOrder = afterLabel.sequenceOrder;
     }
 
     // Generate labelName
@@ -700,10 +704,10 @@ export async function createLabel(
     // Compute sequenceOrder: use explicit value, place after specified label,
     // or append to the end of the file's labels
     let sequenceOrder: number;
-    if (data.sequenceOrder !== undefined && data.sequenceOrder !== null) {
+    if (data.sequenceOrder !== undefined) {
       sequenceOrder = data.sequenceOrder;
-    } else if (afterLabelPosition !== null) {
-      sequenceOrder = afterLabelPosition + 1;
+    } else if (afterLabelSequenceOrder !== null) {
+      sequenceOrder = afterLabelSequenceOrder + 1;
     } else {
       const maxSequenceOrder = existingLabels.reduce(
         (max, l) => Math.max(max, l.sequenceOrder ?? 0),
@@ -712,10 +716,18 @@ export async function createLabel(
       sequenceOrder = maxSequenceOrder + 1;
     }
 
-    // Compute labelNumber: use explicit value, or append to the end
+    // Compute labelNumber: use explicit value, derive from afterLabelId,
+    // or append to the end
     let labelNumber: number;
-    if (data.labelNumber !== undefined && data.labelNumber !== null) {
+    if (data.labelNumber !== undefined) {
       labelNumber = data.labelNumber;
+    } else if (afterLabelSequenceOrder !== null) {
+      // When inserting after a specific label, find its labelNumber
+      // and add 1 to place it immediately after
+      const afterLabel = existingLabels.find(
+        (l) => l.sequenceOrder === afterLabelSequenceOrder
+      );
+      labelNumber = (afterLabel?.labelNumber ?? 0) + 1;
     } else {
       const maxLabelNumber = existingLabels.reduce(
         (max, l) => Math.max(max, l.labelNumber ?? 0),

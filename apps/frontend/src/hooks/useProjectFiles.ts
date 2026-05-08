@@ -8,23 +8,16 @@
 import { useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { projectFilesApi } from "@/lib/api/project-files";
+import type { ProjectFileNode } from "@/lib/api/project-files";
 import { projectFilesKeys } from "@/lib/query-keys";
-import type { ProjectFile, SourceOrigin } from "@branchforge/shared";
+import type { SourceOrigin } from "@branchforge/shared";
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export interface ProjectFileLabel {
-  id: string;
-  labelName: string | null;
-  title: string;
-  status: string | null;
-}
-
-export interface ProjectFileNode extends ProjectFile {
-  labels: ProjectFileLabel[];
-}
+// Re-export ProjectFileNode from API client for convenience
+export type { ProjectFileNode };
 
 export interface UseProjectFilesOptions {
   source?: SourceOrigin;
