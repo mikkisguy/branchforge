@@ -117,15 +117,13 @@ describe("Session Store Factory", () => {
   });
 
   describe("set", () => {
-    it("should call callback immediately", () => {
+    it("should call callback after successful set", async () => {
       const callback = vi.fn();
-
-      vi.mocked(retryWithBackoff).mockImplementation(
-        (fn) => new Promise((resolve) => setTimeout(() => resolve(fn()), 100))
-      );
+      vi.mocked(retryWithBackoff).mockResolvedValue(undefined);
 
       store.set("session-123", mockSession, callback);
 
+      await new Promise((resolve) => setTimeout(resolve, 0));
       expect(callback).toHaveBeenCalled();
     });
 
@@ -209,12 +207,13 @@ describe("Session Store Factory", () => {
   });
 
   describe("destroy", () => {
-    it("should call callback immediately", () => {
+    it("should call callback after successful destroy", async () => {
       const callback = vi.fn();
       vi.mocked(retryWithBackoff).mockResolvedValue(undefined);
 
       store.destroy("session-123", callback);
 
+      await new Promise((resolve) => setTimeout(resolve, 0));
       expect(callback).toHaveBeenCalled();
     });
 

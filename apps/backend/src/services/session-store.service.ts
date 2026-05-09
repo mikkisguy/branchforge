@@ -16,6 +16,11 @@
 
 import type { Session } from "fastify";
 import { logWarn, LogEventType, redactSensitiveKey } from "../lib/logger.js";
+import {
+  sessionDataSchema,
+  SessionData,
+  ALLOWED_SESSION_KEYS,
+} from "../lib/validation.js";
 
 // Re-exports from new modules
 export * from "./session-store/dead-letter-queue.js";
@@ -26,14 +31,6 @@ export * from "./session-store/session-store-factory.js";
 // Backward compatibility aliases
 export { createSessionStore as createDrizzleSessionStore } from "./session-store/session-store-factory.js";
 export type { SessionStore as DrizzleSessionStore } from "./session-store/session-store-factory.js";
-
-// Define allowed session data properties for validation
-const ALLOWED_SESSION_KEYS = new Set([
-  "user",
-  "csrfToken",
-  "flash",
-  "returnTo",
-]);
 
 // Retry configuration for session store operations
 export interface RetryOptions {
@@ -54,10 +51,11 @@ const DEFAULT_RETRY_OPTIONS: RetryOptions = {
 export function validateSessionData(
   data: Record<string, unknown>
 ): Record<string, unknown> {
-  const sanitized: Record<string, unknown> = {};
+  const allowedKeys = new Set<string>(ALLOWED_SESSION_KEYS);
+  const filtered: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(data)) {
-    if (!ALLOWED_SESSION_KEYS.has(key)) {
+    if (!allowedKeys.has(key)) {
       logWarn(LogEventType.SESSION_STORE_VALIDATION, {
         event: "session_validation_skipped",
         reason: "unknown_key",
@@ -65,74 +63,28 @@ export function validateSessionData(
       });
       continue;
     }
-
-    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-      const nestedObj = value as Record<string, unknown>;
-      const sanitizedNested: Record<string, unknown> = {};
-      let hasValidNested = false;
-
-      for (const [nestedKey, nestedValue] of Object.entries(nestedObj)) {
-        if (Object.keys(sanitizedNested).length >= 50) {
-          logWarn(LogEventType.SESSION_STORE_VALIDATION, {
-            event: "session_validation_skipped",
-            reason: "too_many_nested_keys",
-            key: redactSensitiveKey(key),
-            maxKeys: 50,
-          });
-          break;
-        }
-        if (nestedKey.length > 100) {
-          logWarn(LogEventType.SESSION_STORE_VALIDATION, {
-            event: "session_validation_skipped",
-            reason: "nested_key_too_long",
-            key: redactSensitiveKey(key),
-            nestedKey: redactSensitiveKey(nestedKey),
-            maxLength: 100,
-          });
-          continue;
-        }
-
-        if (
-          nestedValue === null ||
-          typeof nestedValue === "string" ||
-          typeof nestedValue === "number" ||
-          typeof nestedValue === "boolean"
-        ) {
-          sanitizedNested[nestedKey] = nestedValue;
-          hasValidNested = true;
-        }
-      }
-
-      if (hasValidNested) {
-        sanitized[key] = sanitizedNested;
-      }
-    } else if (
-      value === null ||
-      typeof value === "string" ||
-      typeof value === "number" ||
-      typeof value === "boolean"
-    ) {
-      sanitized[key] = value;
-    } else {
-      logWarn(LogEventType.SESSION_STORE_VALIDATION, {
-        event: "session_validation_skipped",
-        reason: "invalid_value_type",
-        key: redactSensitiveKey(key),
-      });
-    }
+    filtered[key] = value;
   }
 
-  return sanitized;
+  const result = sessionDataSchema.safeParse(filtered);
+
+  if (!result.success) {
+    for (const issue of result.error.issues) {
+      const key = (issue.path.length > 0 ? issue.path[0] : "unknown") as string;
+      logWarn(LogEventType.SESSION_STORE_VALIDATION, {
+        event: "session_validation_skipped",
+        reason: issue.code,
+        key: redactSensitiveKey(key),
+        ...(issue.path.length > 0 && { detail: issue.message }),
+      });
+    }
+    return {};
+  }
+
+  return result.data;
 }
 
-interface SessionRow {
-  id: string;
-  userId: string;
-  data: Record<string, unknown>;
-  expiresAt: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
+export type ValidatedSessionData = SessionData;
 
 /**
  * Convert Fastify session data to database format
@@ -163,9 +115,23 @@ export function sessionToDbData(session: Session): {
 /**
  * Convert database row to Fastify session data
  */
-export function dbDataToSession(row: SessionRow): Session {
+export function dbDataToSession(row: {
+  id: string;
+  userId: string;
+  data: unknown;
+  expiresAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}): Session {
+  const data = row.data ?? {};
+  const dataAsRecord =
+    typeof data === "object" && data !== null && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : data === null
+        ? {}
+        : {};
   const session: Partial<Session> = {
-    ...row.data,
+    ...dataAsRecord,
     cookie: {
       originalMaxAge: row.expiresAt.getTime() - Date.now(),
       expires: row.expiresAt,
@@ -181,6 +147,19 @@ export async function retryWithBackoff<T>(
   operation: () => Promise<T>,
   options: RetryOptions = DEFAULT_RETRY_OPTIONS
 ): Promise<T> {
+  if (options.maxRetries < 0) {
+    throw new Error("maxRetries must be >= 0");
+  }
+  if (options.baseDelayMs < 0) {
+    throw new Error("baseDelayMs must be >= 0");
+  }
+  if (options.maxDelayMs < 0) {
+    throw new Error("maxDelayMs must be >= 0");
+  }
+  if (options.maxDelayMs < options.baseDelayMs) {
+    throw new Error("maxDelayMs must be >= baseDelayMs");
+  }
+
   let lastError: Error | undefined;
   const { maxRetries, baseDelayMs, maxDelayMs } = options;
 

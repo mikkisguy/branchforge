@@ -1177,6 +1177,76 @@ export function validateData<T extends z.ZodTypeAny>(
   }
 }
 
+// ============================================================================
+// Session Schemas
+// ============================================================================
+
+/**
+ * Session data validation
+ * Sanitizes and validates session data with whitelisted keys and size limits
+ */
+export const ALLOWED_SESSION_KEYS = [
+  "user",
+  "csrfToken",
+  "flash",
+  "returnTo",
+] as const;
+
+/**
+ * Allowed primitive value types for session data
+ */
+const allowedPrimitiveSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+]);
+
+/**
+ * Nested session value schema
+ * Limits to 50 keys, each key max 100 chars, values must be primitives
+ */
+const nestedSessionValueSchema = z.record(
+  z.string().max(100, "Session key too long"),
+  allowedPrimitiveSchema
+);
+
+/**
+ * Session data schema
+ * Validates top-level keys against whitelist, applies size limits
+ * Whitelisted keys can have nested objects (with size limits) or primitive values
+ */
+export const sessionDataSchema = z
+  .record(
+    z.enum(ALLOWED_SESSION_KEYS),
+    z.union([nestedSessionValueSchema, allowedPrimitiveSchema])
+  )
+  .refine(
+    (data) => {
+      for (const value of Object.values(data)) {
+        if (
+          typeof value === "object" &&
+          value !== null &&
+          !Array.isArray(value)
+        ) {
+          const nested = value as Record<string, unknown>;
+          if (Object.keys(nested).length > 50) {
+            return false;
+          }
+          for (const nestedKey of Object.keys(nested)) {
+            if (nestedKey.length > 100) {
+              return false;
+            }
+          }
+        }
+      }
+      return true;
+    },
+    { message: "Session validation failed" }
+  );
+
+export type SessionData = z.infer<typeof sessionDataSchema>;
+
 /**
  * Safely validate data without throwing
  * Returns a result object with success status and data or error

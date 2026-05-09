@@ -4,15 +4,6 @@ import { userSessions } from "../../db/schema/index.js";
 import { eq, lt } from "drizzle-orm";
 import { sessionToDbData, dbDataToSession } from "../session-store.service.js";
 
-interface SessionRow {
-  id: string;
-  userId: string;
-  data: Record<string, unknown>;
-  expiresAt: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 /**
  * Set a session in the database
  */
@@ -23,6 +14,9 @@ export async function setSession(
   const db = getDb();
   const { userId, data: cleanData } = sessionToDbData(session);
 
+  // Async deferral ensures consistent behavior for sessions without userId
+  // This matches the original session store implementation's pattern
+  // and allows the caller to handle the async operation consistently
   if (!userId) {
     await new Promise((resolve) => setImmediate(resolve));
     return;
@@ -72,7 +66,7 @@ export async function getSession(sessionId: string): Promise<Session | null> {
     return null;
   }
 
-  return dbDataToSession(row as SessionRow);
+  return dbDataToSession(row);
 }
 
 /**

@@ -35,22 +35,45 @@ export function startCleanup(manager: CleanupManager): void {
     return;
   }
 
-  manager.interval = setInterval(async () => {
+  let isRunning = false;
+
+  const scheduleNext = () => {
+    if (isRunning) {
+      return;
+    }
+
+    isRunning = true;
     const startTime = Date.now();
-    const count = await manager.cleanupFn();
-    const duration = Date.now() - startTime;
 
-    if (count > 0) {
-      logInfo(LogEventType.SESSION_STORE_CLEANUP, {
-        sessionsCleaned: count,
-        durationMs: duration,
+    manager
+      .cleanupFn()
+      .then((count) => {
+        const duration = Date.now() - startTime;
+
+        if (count > 0) {
+          logInfo(LogEventType.SESSION_STORE_CLEANUP, {
+            sessionsCleaned: count,
+            durationMs: duration,
+          });
+        }
+
+        if (manager.onCleanup) {
+          manager.onCleanup(count, duration);
+        }
+      })
+      .finally(() => {
+        isRunning = false;
+        if (manager.interval) {
+          manager.interval = setTimeout(
+            scheduleNext,
+            manager.intervalMs
+          ) as unknown as NodeJS.Timeout;
+        }
       });
-    }
+  };
 
-    if (manager.onCleanup) {
-      manager.onCleanup(count, duration);
-    }
-  }, manager.intervalMs);
+  const timerId = setTimeout(scheduleNext, manager.intervalMs);
+  manager.interval = timerId as unknown as NodeJS.Timeout;
 
   if (manager.interval.unref) {
     manager.interval.unref();
@@ -62,7 +85,7 @@ export function startCleanup(manager: CleanupManager): void {
  */
 export function stopCleanup(manager: CleanupManager): void {
   if (manager.interval) {
-    clearInterval(manager.interval);
+    clearTimeout(manager.interval as NodeJS.Timeout);
     manager.interval = null;
   }
 }
@@ -72,5 +95,4 @@ export function stopCleanup(manager: CleanupManager): void {
  */
 export function destroyCleanupManager(manager: CleanupManager): void {
   stopCleanup(manager);
-  manager.interval = null;
 }
