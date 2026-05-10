@@ -1217,7 +1217,7 @@ const nestedSessionValueSchema = z.record(
  * Whitelisted keys can have nested objects (with size limits) or primitive values
  */
 export const sessionDataSchema = z
-  .record(
+  .partialRecord(
     z.enum(ALLOWED_SESSION_KEYS),
     z.union([nestedSessionValueSchema, allowedPrimitiveSchema])
   )

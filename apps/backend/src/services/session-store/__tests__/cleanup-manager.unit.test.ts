@@ -63,15 +63,60 @@ describe("Cleanup Manager", () => {
       stopCleanup(manager);
     });
 
-    it("should unref the interval if available", () => {
-      const manager = createCleanupManager(60000, mockCleanupFn, mockOnCleanup);
+    it("should call unref on the initial timer", () => {
+      const originalSetTimeout = global.setTimeout;
+      const unrefSpy = vi.fn();
 
-      startCleanup(manager);
+      global.setTimeout = vi.fn().mockReturnValue({ unref: unrefSpy });
 
-      expect(manager.interval).not.toBeNull();
-      expect(typeof manager.interval?.unref).toBe("function");
+      try {
+        const manager = createCleanupManager(
+          60000,
+          mockCleanupFn,
+          mockOnCleanup
+        );
 
-      stopCleanup(manager);
+        startCleanup(manager);
+
+        expect(unrefSpy).toHaveBeenCalled();
+        stopCleanup(manager);
+      } finally {
+        global.setTimeout = originalSetTimeout;
+      }
+    });
+
+    it("should call unref on the rescheduled timer", async () => {
+      const originalSetTimeout = global.setTimeout;
+      const unrefSpy = vi.fn();
+
+      // Mock setTimeout to call unref and execute callbacks via setImmediate
+      global.setTimeout = vi
+        .fn()
+        .mockImplementation((fn: () => void, _delay: number) => {
+          const timerId = { unref: unrefSpy };
+          // Execute callback after current call stack to trigger rescheduling
+          setImmediate(fn);
+          return timerId;
+        });
+
+      try {
+        const manager = createCleanupManager(
+          60000,
+          mockCleanupFn,
+          mockOnCleanup
+        );
+
+        startCleanup(manager);
+
+        // Wait for setImmediate callbacks to fire and create both timers
+        await new Promise((resolve) => setImmediate(resolve));
+
+        // unref should be called twice: once for initial timer, once for rescheduled
+        expect(unrefSpy).toHaveBeenCalledTimes(2);
+        stopCleanup(manager);
+      } finally {
+        global.setTimeout = originalSetTimeout;
+      }
     });
   });
 

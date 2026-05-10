@@ -2,13 +2,13 @@
  * Cleanup Manager for periodic session cleanup
  */
 
-import { logInfo, LogEventType } from "../../lib/logger.js";
+import { logInfo, logError, LogEventType } from "../../lib/logger.js";
 
 export interface CleanupManager {
   interval: NodeJS.Timeout | null;
   intervalMs: number;
   cleanupFn: () => Promise<number>;
-  onCleanup?: (count: number, duration: number) => void;
+  onCleanup?: (count: number, duration: number, error?: unknown) => void;
 }
 
 /**
@@ -17,7 +17,7 @@ export interface CleanupManager {
 export function createCleanupManager(
   intervalMs: number,
   cleanupFn: () => Promise<number>,
-  onCleanup?: (count: number, duration: number) => void
+  onCleanup?: (count: number, duration: number, error?: unknown) => void
 ): CleanupManager {
   return {
     interval: null,
@@ -61,6 +61,15 @@ export function startCleanup(manager: CleanupManager): void {
           manager.onCleanup(count, duration);
         }
       })
+      .catch((err) => {
+        logError(LogEventType.SESSION_STORE_CLEANUP, {
+          error: err,
+          message: "cleanup failed",
+        });
+        if (manager.onCleanup) {
+          manager.onCleanup(0, Date.now() - startTime, err);
+        }
+      })
       .finally(() => {
         isRunning = false;
         if (manager.interval) {
@@ -68,6 +77,9 @@ export function startCleanup(manager: CleanupManager): void {
             scheduleNext,
             manager.intervalMs
           ) as unknown as NodeJS.Timeout;
+          if (manager.interval.unref) {
+            manager.interval.unref();
+          }
         }
       });
   };

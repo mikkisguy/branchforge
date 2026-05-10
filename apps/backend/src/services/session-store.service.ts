@@ -18,8 +18,8 @@ import type { Session } from "fastify";
 import { logWarn, LogEventType, redactSensitiveKey } from "../lib/logger.js";
 import {
   sessionDataSchema,
-  SessionData,
   ALLOWED_SESSION_KEYS,
+  type SessionData,
 } from "../lib/validation.js";
 
 // Re-exports from new modules
