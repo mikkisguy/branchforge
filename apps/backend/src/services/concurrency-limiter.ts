@@ -15,12 +15,19 @@ class ConcurrencyLimiter {
     }
 
     this.running++;
+    let timerId: ReturnType<typeof setTimeout> | null = null;
     try {
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("Task timeout")), timeoutMs);
+        timerId = setTimeout(
+          () => reject(new Error("Task timeout")),
+          timeoutMs
+        );
       });
       return await Promise.race([fn(), timeoutPromise]);
     } finally {
+      if (timerId !== null) {
+        clearTimeout(timerId);
+      }
       this.running--;
       const next = this.queue.shift();
       if (next) next();

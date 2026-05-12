@@ -28,7 +28,7 @@ import { eq } from "drizzle-orm";
 import { detectConflicts } from "../conflict-detection.service.js";
 import { testUuid } from "../../utils/test-ids.js";
 
-describe("ConflictDetectionService (Unit)", () => {
+describe("ConflictDetectionService (Integration)", () => {
   let db: ReturnType<typeof getDb>;
 
   beforeAll(async () => {
@@ -67,7 +67,8 @@ describe("ConflictDetectionService (Unit)", () => {
       contentHash?: string;
     } = {}
   ) {
-    const id = overrides.id ?? testUuid("56000000", projectFileFixtureCounter);
+    const counter = projectFileFixtureCounter;
+    const id = overrides.id ?? testUuid("56000000", counter);
     // Only increment counter for auto-generated IDs
     if (!overrides.id) {
       projectFileFixtureCounter++;
@@ -76,11 +77,10 @@ describe("ConflictDetectionService (Unit)", () => {
       id,
       projectId: testProjectId,
       source: "GITLAB" as const,
-      filePath:
-        overrides.filePath ?? `game/script${projectFileFixtureCounter}.rpy`,
+      filePath: overrides.filePath ?? `game/script${counter}.rpy`,
       fileType: "STORY" as const,
       content: overrides.content ?? 'label start:\n    "Content"\n    return',
-      contentHash: overrides.contentHash ?? `hash${projectFileFixtureCounter}`,
+      contentHash: overrides.contentHash ?? `hash${counter}`,
     };
   }
 

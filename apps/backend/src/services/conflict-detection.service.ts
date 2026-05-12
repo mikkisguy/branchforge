@@ -18,6 +18,12 @@ import { parseRPYFileWithLabels } from "./rpy-parser.service.js";
 import { ConcurrencyLimiter } from "./concurrency-limiter.js";
 
 // ============================================================================
+// Shared Concurrency Limiter
+// ============================================================================
+
+const sharedLimiter = new ConcurrencyLimiter(5);
+
+// ============================================================================
 // Types
 // ============================================================================
 
@@ -95,7 +101,12 @@ export async function detectConflicts(
             })
             .from(labelLines)
             .leftJoin(characters, eq(labelLines.speakerId, characters.id))
-            .where(inArray(labelLines.labelId, Array.from(gitlabSceneIds)))
+            .where(
+              and(
+                inArray(labelLines.labelId, Array.from(gitlabSceneIds)),
+                isNull(labelLines.deletedAt)
+              )
+            )
             .orderBy(asc(labelLines.sequence));
 
     // Build a map of labelId -> lines for efficient lookup
@@ -124,7 +135,7 @@ export async function detectConflicts(
       );
 
     // Fetch file contents in parallel with concurrency limit
-    const limiter = new ConcurrencyLimiter(5); // Limit to 5 concurrent requests
+    const limiter = sharedLimiter;
     const fileFetchResults = await Promise.allSettled(
       files.map((projectFile) =>
         limiter.run(async () => {
