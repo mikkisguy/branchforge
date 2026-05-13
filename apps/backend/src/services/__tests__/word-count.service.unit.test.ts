@@ -47,6 +47,9 @@ const mockDb = {
 
 vi.mock("../../db/index.js", () => ({
   getDb: vi.fn(() => mockDb),
+}));
+
+vi.mock("../../db/schema/index.js", () => ({
   userSettings: {},
 }));
 

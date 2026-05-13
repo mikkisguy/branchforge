@@ -5,8 +5,10 @@
  * Provides functions for tracking word counts from label dialogue updates.
  */
 
-import type { Transaction } from "drizzle-orm";
-import { getDb, userSettings } from "../db/index.js";
+import type { NodePgTransaction } from "drizzle-orm/node-postgres";
+import type { ExtractTablesWithRelations } from "drizzle-orm";
+import { getDb } from "../db/index.js";
+import { userSettings } from "../db/schema/index.js";
 import { eq } from "drizzle-orm";
 import {
   getTodayDateKey,
@@ -17,6 +19,13 @@ import {
   parseDailyWordCounts,
 } from "../lib/date-utils.js";
 import type { Db } from "../db/index.js";
+
+// Transaction type that matches what TypeScript infers from db.transaction()
+// The schema is inferred as Record<string, unknown> due to TypeScript's limitations
+type Transaction = NodePgTransaction<
+  Record<string, unknown>,
+  ExtractTablesWithRelations<Record<string, unknown>>
+>;
 
 // ============================================================================
 // Types
@@ -41,7 +50,7 @@ export interface TrackWordsOptions {
   /** The dialogue content to count words from */
   dialogue: DialogueEntry[];
   /** Database connection or transaction (defaults to getDb()) */
-  db?: Db | ReturnType<typeof getDb> | Transaction;
+  db?: Db | Transaction;
 }
 
 /**
