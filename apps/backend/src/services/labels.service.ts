@@ -489,7 +489,8 @@ async function syncLabelsInTransaction(
   errors: Array<{ label: string; error: string }>;
   affectedLabelIds: string[];
 }> {
-  // Fetch existing labels for this source file (including soft-deleted to allow revival)
+  // Fetch existing labels for this source file (including soft-deleted)
+  // We need soft-deleted labels to check for name conflicts when creating new labels
   const existingLabels = await tx
     .select()
     .from(labels)
@@ -558,8 +559,52 @@ async function syncLabelsInTransaction(
       const existingLabel = existingLabelsByName.get(label.label);
 
       if (existingLabel) {
-        // Update existing label - revive soft-deleted labels
-        // Delete old lines
+        // If existing label is soft-deleted, create a new one instead of reviving
+        // This preserves the historical soft-deleted row for audit purposes
+        if (existingLabel.deletedAt !== null) {
+          // Create new scene
+          const labelLinesHash = calculateLinesHash(labelData.entries);
+
+          const [newScene] = await tx
+            .insert(labels)
+            .values({
+              projectId,
+              title: label.label,
+              projectFileId: sourceId,
+              labelName: label.label,
+              labelPosition: i,
+              sequenceOrder: i,
+              route: null,
+              labelNumber: i + 1,
+              status: "DRAFT",
+              prerequisites: {},
+              effects: {},
+              contentHash: labelLinesHash,
+              lastSyncedHash: labelLinesHash,
+              syncStatus: "SYNCED",
+            })
+            .returning();
+
+          affectedLabelIds.push(newScene.id);
+
+          // Insert lines in batch
+          if (labelData.entries.length > 0) {
+            const lineValues = buildLineValues(
+              newScene.id,
+              labelData.entries,
+              sourceId,
+              lookupMaps
+            );
+
+            await tx.insert(labelLines).values(lineValues);
+            linesProcessed += lineValues.length;
+          }
+
+          labelsCreated++;
+          continue;
+        }
+
+        // Update existing active label - Delete old lines
         await tx
           .delete(labelLines)
           .where(eq(labelLines.labelId, existingLabel.id));
