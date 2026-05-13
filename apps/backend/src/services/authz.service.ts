@@ -160,6 +160,37 @@ export async function getProjectRole(
   return null;
 }
 
+/**
+ * Require that a user is the owner of a project
+ * Throws NotFoundError if the project doesn't exist
+ * Throws ForbiddenError if the user is not the owner
+ *
+ * @param projectId - The project ID to check ownership for
+ * @param userId - The user ID to check
+ * @throws NotFoundError if project doesn't exist
+ * @throws ForbiddenError if user is not the owner
+ */
+export async function requireProjectOwnership(
+  projectId: string,
+  userId: string
+): Promise<void> {
+  const db = getDb();
+
+  const [project] = await db
+    .select({ userId: projects.userId })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+
+  if (!project) {
+    throw new NotFoundError("Project");
+  }
+
+  if (project.userId !== userId) {
+    throw new ForbiddenError("You do not have access to this project");
+  }
+}
+
 // ============================================================================
 // Label Authorization
 // ============================================================================
@@ -359,37 +390,6 @@ export async function hasProjectRole(
 
   // Use shared ROLE_HIERARCHY for permission checks
   return ROLE_HIERARCHY[role] >= ROLE_HIERARCHY[minimumRole];
-}
-
-/**
- * Require that a user is the owner of a project
- * Throws NotFoundError if the project doesn't exist
- * Throws ForbiddenError if the user is not the owner
- *
- * @param projectId - The project ID to check ownership for
- * @param userId - The user ID to check
- * @throws NotFoundError if project doesn't exist
- * @throws ForbiddenError if user is not the owner
- */
-export async function requireProjectOwnership(
-  projectId: string,
-  userId: string
-): Promise<void> {
-  const db = getDb();
-
-  const [project] = await db
-    .select({ userId: projects.userId })
-    .from(projects)
-    .where(eq(projects.id, projectId))
-    .limit(1);
-
-  if (!project) {
-    throw new NotFoundError("Project");
-  }
-
-  if (project.userId !== userId) {
-    throw new ForbiddenError("You do not have access to this project");
-  }
 }
 
 /**
