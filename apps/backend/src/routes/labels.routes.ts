@@ -55,14 +55,7 @@ import { reconstructRPYFile } from "../services/rpy-parser.service.js";
 import { calculateDialogueHash } from "../lib/hash.js";
 import { updateAuditFields } from "../lib/audit.js";
 import { calculateContentHash } from "../lib/hash.js";
-import {
-  getTodayDateKey,
-  updateTodayWordCount,
-  countWordsFromDialogue,
-  calculateNetNewWords,
-  parseLabelWordCounts,
-  parseDailyWordCounts,
-} from "../lib/date-utils.js";
+import { trackWordsForLabel } from "../services/word-count.service.js";
 
 // ============================================================================
 // Types
@@ -597,51 +590,11 @@ async function updateLabelDialogueHandler(
     // Track word counts for daily writing goals
     // This is non-critical: if tracking fails, the dialogue save is still successful
     try {
-      // Get user settings
-      const [settings] = await db
-        .select()
-        .from(userSettings)
-        .where(eq(userSettings.userId, user.id))
-        .limit(1);
-
-      // Only track if user has daily writing goal enabled
-      if (settings && settings.dailyWritingGoal !== null) {
-        const resetHour = settings.dailyWordResetHour ?? 0;
-        const timezone = settings.timezone ?? "UTC";
-        const todayDateKey = getTodayDateKey(resetHour, timezone);
-
-        // Count words from saved dialogue
-        const wordCount = countWordsFromDialogue(dialogue);
-
-        // Calculate net new words using per-label tracking
-        // This prevents double-counting when editing and re-saving the same content
-        // Validate and sanitize the JSON data before use
-        const labelWordCounts = parseLabelWordCounts(settings.labelWordCounts);
-
-        const { wordsToAdd, updatedTracking } = calculateNetNewWords(
-          labelWordCounts,
-          labelId,
-          todayDateKey,
-          wordCount
-        );
-
-        const dailyWordCounts = parseDailyWordCounts(settings.dailyWordCounts);
-        const updatedWordCounts = updateTodayWordCount(
-          dailyWordCounts,
-          todayDateKey,
-          wordsToAdd
-        );
-
-        // Save both daily word counts and per-label tracking
-        await db
-          .update(userSettings)
-          .set({
-            dailyWordCounts: updatedWordCounts,
-            labelWordCounts: updatedTracking,
-            updatedAt: new Date(),
-          })
-          .where(eq(userSettings.userId, user.id));
-      }
+      await trackWordsForLabel({
+        labelId,
+        userId: user.id,
+        dialogue,
+      });
     } catch (error) {
       // Log the error but don't fail the request - the dialogue was already saved successfully
       request.log.error(
