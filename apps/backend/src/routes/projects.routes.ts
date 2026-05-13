@@ -31,7 +31,7 @@ import {
 import { getDb } from "../db/index.js";
 import { projectFiles, labels, projects } from "../db/schema/index.js";
 import { eq, inArray, and, isNull } from "drizzle-orm";
-import { syncLabelsFromFile } from "../services/label-sync.service.js";
+import { syncLabelsFromFile } from "../services/labels.service.js";
 import { calculateContentHash } from "../lib/hash.js";
 import { parseRPYFileWithLabels } from "../services/rpy-parser.service.js";
 import {

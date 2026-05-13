@@ -48,7 +48,7 @@ import {
   isValidConflictResolution,
 } from "../lib/validation.js";
 import { createProject, deleteProject } from "../services/projects.service.js";
-import { syncLabelsFromGitLabFile } from "../services/gitlab-file-sync.service.js";
+import { syncLabelsFromGitLabFile } from "../services/labels.service.js";
 
 /**
  * Helper to get the authenticated user ID from a request.
@@ -1125,7 +1125,7 @@ async function getGitLabFilesHandler(
  * Updates file content (Script Mode editing)
  * Also re-parses the content to update associated scenes
  *
- * Uses gitlab-file-sync.service for reliable sync with:
+ * Uses syncLabelsFromGitLabFile from labels.service for reliable sync with:
  * - Atomic transactions
  * - Idempotency (same content skipped)
  * - Concurrent sync prevention

@@ -13,7 +13,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { calculateContentHash } from "../lib/hash.js";
 import { parseRPYFileWithLabels } from "./rpy-parser.service.js";
 import { logError, LogEventType } from "../lib/logger.js";
-import { syncLabelsFromFile } from "./label-sync.service.js";
+import { syncLabelsFromFile } from "./labels.service.js";
 
 // ============================================================================
 // Import Guardrails
