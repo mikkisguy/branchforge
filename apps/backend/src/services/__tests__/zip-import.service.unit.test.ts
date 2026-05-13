@@ -47,10 +47,10 @@ vi.mock("../rpy-parser.service.js", () => ({
   })),
 }));
 
-// Mock label-sync.service
-import { syncLabelsFromFile } from "../label-sync.service.js";
+// Mock labels.service
+import { syncLabelsFromFile } from "../labels.service.js";
 
-vi.mock("../label-sync.service.js", () => ({
+vi.mock("../labels.service.js", () => ({
   syncLabelsFromFile: vi.fn().mockResolvedValue({
     success: true,
     labelsCreated: 1,
