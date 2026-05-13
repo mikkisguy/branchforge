@@ -1125,7 +1125,7 @@ async function getGitLabFilesHandler(
  * Updates file content (Script Mode editing)
  * Also re-parses the content to update associated scenes
  *
- * Uses gitlab-file-sync.service for reliable sync with:
+ * Uses syncLabelsFromGitLabFile from labels.service for reliable sync with:
  * - Atomic transactions
  * - Idempotency (same content skipped)
  * - Concurrent sync prevention

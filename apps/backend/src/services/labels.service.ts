@@ -466,15 +466,6 @@ function buildLineValues(
  * Internal helper: Execute the label sync operations within a transaction.
  * This function is called either within a new transaction or with an external one.
  *
- * TRANSACTION TYPE NOTE: We use `any` for the tx parameter because Drizzle ORM's
- * transaction type is complex and not easily exportable. The transaction object has
- * the same API as the regular db instance (select, insert, update, delete, etc.),
- * but with additional transaction-specific methods (rollback, commit). Using `any`
- * here is a pragmatic choice since:
- * 1. The transaction API is identical to Db for our use case
- * 2. Drizzle doesn't export a portable transaction type that works across modules
- * 3. Attempting to extract the exact type results in unwieldy generics
- *
  * @param tx - The transaction context (same API as Db, passed from db.transaction())
  * @param projectId - The project ID
  * @param parsed - The parsed RPY file
@@ -484,8 +475,7 @@ function buildLineValues(
  * @returns Sync statistics
  */
 async function syncLabelsInTransaction(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tx: any,
+  tx: Transaction,
   projectId: string,
   parsed: ParsedRPYFileWithLabels,
   rpyContent: string,
@@ -499,11 +489,11 @@ async function syncLabelsInTransaction(
   errors: Array<{ label: string; error: string }>;
   affectedLabelIds: string[];
 }> {
-  // Fetch existing labels for this source file
+  // Fetch existing labels for this source file (including soft-deleted to allow revival)
   const existingLabels = await tx
     .select()
     .from(labels)
-    .where(and(eq(labels.projectFileId, sourceId), isNull(labels.deletedAt)));
+    .where(eq(labels.projectFileId, sourceId));
 
   // Build character lookup maps once for robust speaker linking during sync
   const projectCharacters = await tx
@@ -721,9 +711,6 @@ async function syncLabelsInTransaction(
  * This is essential when the caller needs the sync to be part of a larger transaction
  * (e.g., updating file content and syncing labels atomically).
  *
- * We use `any` for the tx type because Drizzle ORM's transaction type is complex and
- * not easily exportable as a portable type. The transaction has the same API as Db.
- *
  * @param projectId - The project ID to sync labels for
  * @param fileData - The file data containing content, path, and type
  * @param rpyContent - The RPY file content
@@ -737,8 +724,7 @@ export async function syncLabelsFromFile(
   rpyContent: string,
   sourceId: string,
   options?: SyncLabelsOptions & {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    tx?: any; // Drizzle transaction context (same API as Db)
+    tx?: Transaction;
   }
 ): Promise<SyncLabelsResult> {
   const db = options?.tx ?? getDb();
@@ -772,15 +758,14 @@ export async function syncLabelsFromFile(
     // The transaction callback parameter has the same API as Db for our operations.
     const syncResult = await (externalTx
       ? syncLabelsInTransaction(
-          db,
+          db as Transaction,
           projectId,
           parsed,
           rpyContent,
           sourceId,
           skipCleanup
         )
-      : // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        db.transaction((tx: any) =>
+      : db.transaction((tx) =>
           syncLabelsInTransaction(
             tx,
             projectId,

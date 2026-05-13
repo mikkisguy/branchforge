@@ -2,7 +2,6 @@
  * Labels Service Sync Integration Tests
  *
  * Tests for label sync functionality against a real database.
- * Consolidated from label-sync.service.ts and gitlab-file-sync.service.ts
  *
  * Prerequisites:
  * - DATABASE_URL_TEST environment variable must be set
