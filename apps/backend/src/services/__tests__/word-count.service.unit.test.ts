@@ -39,10 +39,19 @@ vi.mock("../../lib/date-utils.js", () => ({
 // Mock database
 const mockUpdate = vi.fn();
 const mockSelect = vi.fn();
+const mockTransaction = vi.fn((cb: (tx: unknown) => Promise<unknown>) => {
+  // Mock transaction: pass a mock tx to the callback
+  const mockTx = {
+    select: mockSelect,
+    update: mockUpdate,
+  };
+  return cb(mockTx);
+});
 
 const mockDb = {
   select: mockSelect,
   update: mockUpdate,
+  transaction: mockTransaction,
 };
 
 vi.mock("../../db/index.js", () => ({
@@ -65,16 +74,30 @@ describe("WordCountService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Set up mock select chain
+    // Set up mock select chain with support for .for("update")
     mockSelect.mockReturnValue({
       from: vi.fn(() => ({
         where: vi.fn(() => ({
-          limit: vi.fn(() => ({
-            then: vi.fn((cb: (value: unknown[]) => void) => {
-              cb([]);
-              return Promise.resolve([]);
+          for: vi.fn(() => ({
+            limit: vi.fn(() => {
+              // For simplicity, return a then-like object that resolves
+              return {
+                then: (cb: (value: unknown[]) => void) => {
+                  cb([]);
+                  return Promise.resolve([]);
+                },
+              };
             }),
           })),
+          limit: vi.fn(() => {
+            // Direct limit path (when not using .for())
+            return {
+              then: (cb: (value: unknown[]) => void) => {
+                cb([]);
+                return Promise.resolve([]);
+              },
+            };
+          }),
         })),
       })),
     });
@@ -98,11 +121,14 @@ describe("WordCountService", () => {
       mockSelect.mockReturnValueOnce({
         from: vi.fn(() => ({
           where: vi.fn(() => ({
-            limit: vi.fn(() =>
-              Promise.resolve([
-                // empty array - no settings
-              ])
-            ),
+            for: vi.fn(() => ({
+              limit: vi.fn(() => ({
+                then: (cb: (value: unknown[]) => void) => {
+                  cb([]);
+                  return Promise.resolve([]);
+                },
+              })),
+            })),
           })),
         })),
       });
@@ -137,7 +163,14 @@ describe("WordCountService", () => {
       mockSelect.mockReturnValueOnce({
         from: vi.fn(() => ({
           where: vi.fn(() => ({
-            limit: vi.fn(() => Promise.resolve(settingsWithNullGoal)),
+            for: vi.fn(() => ({
+              limit: vi.fn(() => ({
+                then: (cb: (value: unknown[]) => void) => {
+                  cb(settingsWithNullGoal);
+                  return Promise.resolve(settingsWithNullGoal);
+                },
+              })),
+            })),
           })),
         })),
       });
@@ -172,7 +205,14 @@ describe("WordCountService", () => {
       mockSelect.mockReturnValueOnce({
         from: vi.fn(() => ({
           where: vi.fn(() => ({
-            limit: vi.fn(() => Promise.resolve(settingsWithGoal)),
+            for: vi.fn(() => ({
+              limit: vi.fn(() => ({
+                then: (cb: (value: unknown[]) => void) => {
+                  cb(settingsWithGoal);
+                  return Promise.resolve(settingsWithGoal);
+                },
+              })),
+            })),
           })),
         })),
       });
@@ -231,7 +271,14 @@ describe("WordCountService", () => {
       mockSelect.mockReturnValueOnce({
         from: vi.fn(() => ({
           where: vi.fn(() => ({
-            limit: vi.fn(() => Promise.resolve(settingsWithGoal)),
+            for: vi.fn(() => ({
+              limit: vi.fn(() => ({
+                then: (cb: (value: unknown[]) => void) => {
+                  cb(settingsWithGoal);
+                  return Promise.resolve(settingsWithGoal);
+                },
+              })),
+            })),
           })),
         })),
       });
@@ -277,7 +324,14 @@ describe("WordCountService", () => {
       mockSelect.mockReturnValueOnce({
         from: vi.fn(() => ({
           where: vi.fn(() => ({
-            limit: vi.fn(() => Promise.resolve(settingsWithCustomSettings)),
+            for: vi.fn(() => ({
+              limit: vi.fn(() => ({
+                then: (cb: (value: unknown[]) => void) => {
+                  cb(settingsWithCustomSettings);
+                  return Promise.resolve(settingsWithCustomSettings);
+                },
+              })),
+            })),
           })),
         })),
       });
@@ -317,7 +371,14 @@ describe("WordCountService", () => {
         select: vi.fn().mockReturnValue({
           from: vi.fn(() => ({
             where: vi.fn(() => ({
-              limit: vi.fn(() => Promise.resolve(settingsWithGoal)),
+              for: vi.fn(() => ({
+                limit: vi.fn(() => ({
+                  then: (cb: (value: unknown[]) => void) => {
+                    cb(settingsWithGoal);
+                    return Promise.resolve(settingsWithGoal);
+                  },
+                })),
+              })),
             })),
           })),
         }),
@@ -331,6 +392,9 @@ describe("WordCountService", () => {
             })),
           })),
         }),
+        transaction: vi.fn((cb: (tx: unknown) => Promise<unknown>) =>
+          cb(customDb)
+        ),
       } as unknown as Db;
 
       mockCalculateNetNewWords.mockReturnValue({
@@ -369,7 +433,14 @@ describe("WordCountService", () => {
       mockSelect.mockReturnValueOnce({
         from: vi.fn(() => ({
           where: vi.fn(() => ({
-            limit: vi.fn(() => Promise.resolve(settingsWithGoal)),
+            for: vi.fn(() => ({
+              limit: vi.fn(() => ({
+                then: (cb: (value: unknown[]) => void) => {
+                  cb(settingsWithGoal);
+                  return Promise.resolve(settingsWithGoal);
+                },
+              })),
+            })),
           })),
         })),
       });

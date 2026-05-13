@@ -77,8 +77,8 @@ export interface TrackWordsResult {
  * 4. Updates daily word counts
  * 5. Saves both daily word counts and per-label tracking
  *
- * This is non-critical: if tracking fails, the calling operation
- * (e.g., dialogue save) is still successful.
+ * The caller should wrap this call in try/catch if tracking failures
+ * should not abort the calling operation (e.g., dialogue save).
  *
  * @param options - Options for tracking words
  * @returns Result indicating whether tracking occurred and words added
@@ -105,11 +105,30 @@ export async function trackWordsForLabel(
   const { labelId, userId, dialogue, db: providedDb } = options;
   const db = providedDb ?? getDb();
 
-  // Get user settings
-  const [settings] = await db
+  // Execute in a transaction to prevent race conditions on concurrent updates.
+  // Drizzle supports nested transactions via savepoints, so this is safe
+  // even if providedDb is already a transaction.
+  return db.transaction((tx) =>
+    trackWordsInternal(tx, labelId, userId, dialogue)
+  );
+}
+
+/**
+ * Internal helper: track words within a transaction context.
+ * Uses row locking (for update) to prevent concurrent writes.
+ */
+async function trackWordsInternal(
+  tx: Transaction,
+  labelId: string,
+  userId: string,
+  dialogue: DialogueEntry[]
+): Promise<TrackWordsResult> {
+  // Get user settings with row lock to prevent concurrent updates
+  const [settings] = await tx
     .select()
     .from(userSettings)
     .where(eq(userSettings.userId, userId))
+    .for("update")
     .limit(1);
 
   // Only track if user has daily writing goal enabled
@@ -144,7 +163,7 @@ export async function trackWordsForLabel(
   );
 
   // Save both daily word counts and per-label tracking
-  await db
+  await tx
     .update(userSettings)
     .set({
       dailyWordCounts: updatedWordCounts,
