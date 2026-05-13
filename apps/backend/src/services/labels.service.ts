@@ -94,18 +94,18 @@ export interface SyncLabelsOptions {
 
 /**
  * Validate RPY content before sync
- * @throws Error if validation fails
+ * @throws ValidationError if validation fails
  */
 export function validateRPYContent(
   content: string,
   parsed: ParsedRPYFileWithLabels
 ): void {
   if (!content || content.trim().length === 0) {
-    throw new Error("RPY content is empty");
+    throw new ValidationError("RPY content is empty");
   }
 
   if (parsed.labels.length === 0) {
-    throw new Error("No labels found in RPY content");
+    throw new ValidationError("No labels found in RPY content");
   }
 
   // Check for duplicate labels (case-insensitive)
@@ -120,16 +120,19 @@ export function validateRPYContent(
   }
 
   if (duplicateLabels.length > 0) {
-    throw new Error(`Duplicate labels found: ${duplicateLabels.join(", ")}`);
+    throw new ValidationError(
+      `Duplicate labels found: ${duplicateLabels.join(", ")}`
+    );
   }
 }
 
 /**
  * Validate that file type is STORY (only STORY files should sync to labels)
+ * @throws ValidationError if validation fails
  */
 export function validateFileType(fileType: string): void {
   if (fileType !== "STORY") {
-    throw new Error(
+    throw new ValidationError(
       `Invalid file type for label sync: ${fileType}. Only STORY files can sync to labels.`
     );
   }
@@ -772,7 +775,7 @@ export async function syncLabelsFromFile(
     tx?: Transaction;
   }
 ): Promise<SyncLabelsResult> {
-  const db = options?.tx ?? getDb();
+  const dbOrTx = options?.tx ?? getDb();
   const skipCleanup = options?.skipCleanup ?? false;
   const externalTx = !!options?.tx;
 
@@ -799,18 +802,16 @@ export async function syncLabelsFromFile(
 
     // Step 4: Execute sync in atomic transaction
     // If an external transaction is provided, use it directly; otherwise create a new one
-    // Note: We annotate tx as `any` because Drizzle's transaction type is complex.
-    // The transaction callback parameter has the same API as Db for our operations.
     const syncResult = await (externalTx
       ? syncLabelsInTransaction(
-          db as Transaction,
+          dbOrTx as Transaction,
           projectId,
           parsed,
           rpyContent,
           sourceId,
           skipCleanup
         )
-      : db.transaction((tx) =>
+      : dbOrTx.transaction((tx) =>
           syncLabelsInTransaction(
             tx,
             projectId,
