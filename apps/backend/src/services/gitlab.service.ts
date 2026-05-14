@@ -13,7 +13,7 @@ import {
   projectFiles,
   labels,
 } from "../db/schema/index.js";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, and } from "drizzle-orm";
 import {
   validateAndGetUsername,
   encryptPAT,
@@ -23,13 +23,14 @@ import {
 import {
   NotFoundError,
   ConflictError,
+  RepositoryNotLinkedError,
 } from "../middleware/error-handler.middleware.js";
 import { isPostgresError } from "../lib/db.js";
 import { createProject, deleteProject } from "./projects.service.js";
 import { importFromGitlab } from "./gitlab-sync.service.js";
 import { requireProjectOwnership } from "./authz.service.js";
 import { syncLabelsFromGitLabFile } from "./labels.service.js";
-import { logError, LogEventType } from "../lib/logger.js";
+import { logError, logWarn, LogEventType } from "../lib/logger.js";
 import type {
   ConflictResolution,
   SyncOperation,
@@ -326,14 +327,11 @@ export async function linkRepository(
   gitlabProjectId: number,
   repositoryName: string,
   defaultBranch: string = "main",
-  userId?: string
+  userId: string
 ): Promise<void> {
   const db = getDb();
 
-  // Check authorization if userId is provided
-  if (userId) {
-    await requireProjectOwnership(projectId, userId);
-  }
+  await requireProjectOwnership(projectId, userId);
 
   try {
     await db.transaction(async (tx) => {
@@ -399,14 +397,11 @@ export async function linkRepository(
  */
 export async function unlinkRepository(
   projectId: string,
-  userId?: string
+  userId: string
 ): Promise<void> {
   const db = getDb();
 
-  // Check authorization if userId is provided
-  if (userId) {
-    await requireProjectOwnership(projectId, userId);
-  }
+  await requireProjectOwnership(projectId, userId);
 
   await db
     .delete(gitlabRepositories)
@@ -468,13 +463,12 @@ export async function listBranches(
   userId: string,
   gitlabUrl?: string
 ): Promise<string[]> {
+  await requireProjectOwnership(projectId, userId);
+
   const repoLink = await getRepositoryLink(projectId);
   if (!repoLink) {
-    throw new NotFoundError("GitLab repository");
+    throw new RepositoryNotLinkedError();
   }
-
-  // Check authorization
-  await requireProjectOwnership(projectId, userId);
 
   const token = await getDecryptedToken(userId);
   const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
@@ -567,13 +561,12 @@ export async function listRpyFiles(
   userId: string,
   gitlabUrl?: string
 ): Promise<Array<{ name: string; path: string }>> {
+  await requireProjectOwnership(projectId, userId);
+
   const repoLink = await getRepositoryLink(projectId);
   if (!repoLink) {
-    throw new NotFoundError("GitLab repository");
+    throw new RepositoryNotLinkedError();
   }
-
-  // Check authorization
-  await requireProjectOwnership(projectId, userId);
 
   const token = await getDecryptedToken(userId);
   const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
@@ -879,7 +872,8 @@ export async function importProjectFromGitLab(
       newProject.id,
       gitlabProjectId,
       repositoryName,
-      branch
+      branch,
+      userId
     );
 
     // Import files
@@ -950,7 +944,12 @@ export async function getGitLabFilesWithScenes(
   const files = await db
     .select()
     .from(projectFiles)
-    .where(eq(projectFiles.projectId, projectId));
+    .where(
+      and(
+        eq(projectFiles.projectId, projectId),
+        eq(projectFiles.source, "GITLAB")
+      )
+    );
 
   // Batch fetch all scenes for all files at once to avoid N+1 queries
   const fileIds = files.map((f) => f.id);
@@ -1064,7 +1063,11 @@ export async function updateGitLabFileContent(
     }
 
     // Other sync errors - log but still return success for file update
-    console.warn("Scene sync had errors:", syncResult.errors);
+    logWarn("gitlab.scene_sync_errors", {
+      projectId: file.projectId,
+      fileId,
+      errors: syncResult.errors,
+    });
   }
 
   // Return success with sync details

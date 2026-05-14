@@ -777,7 +777,7 @@ export async function importFromGitlab(
  */
 export async function getSyncOperation(
   operationId: string,
-  userId?: string
+  userId: string
 ): Promise<SyncOperation | null> {
   const db = getDb();
 
@@ -791,9 +791,7 @@ export async function getSyncOperation(
     return null;
   }
 
-  if (userId) {
-    await requireProjectOwnership(operation.projectId, userId);
-  }
+  await requireProjectOwnership(operation.projectId, userId);
 
   return operation as SyncOperation;
 }

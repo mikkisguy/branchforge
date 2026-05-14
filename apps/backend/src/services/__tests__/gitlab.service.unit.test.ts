@@ -281,6 +281,9 @@ describe("GitLabService (HTTP Operations)", () => {
 
   describe("listBranches", () => {
     it("should list repository branches", async () => {
+      // Mock project ownership check (now runs before getRepositoryLink)
+      mockLimit.mockResolvedValueOnce([{ userId: testUserId }]);
+
       // Mock repository link
       mockLimit.mockResolvedValueOnce([
         {
@@ -293,9 +296,6 @@ describe("GitLabService (HTTP Operations)", () => {
           createdAt: new Date(),
         },
       ]);
-
-      // Mock project lookup
-      mockLimit.mockResolvedValueOnce([{ userId: testUserId }]);
 
       // Mock integration lookup
       mockLimit.mockResolvedValueOnce([
@@ -330,16 +330,22 @@ describe("GitLabService (HTTP Operations)", () => {
     });
 
     it("should throw when repository not linked", async () => {
-      mockLimit.mockResolvedValue([]);
+      // Project ownership passes
+      mockLimit.mockResolvedValueOnce([{ userId: testUserId }]);
+      // Repository link returns empty
+      mockLimit.mockResolvedValueOnce([]);
 
       await expect(
         listBranches(testProjectId, testUserId, testGitlabUrl)
-      ).rejects.toThrow("GitLab repository not found");
+      ).rejects.toThrow("GitLab repository not linked");
     });
   });
 
   describe("listRpyFiles", () => {
     it("should list .rpy files in repository", async () => {
+      // Mock project ownership check (now runs before getRepositoryLink)
+      mockLimit.mockResolvedValueOnce([{ userId: testUserId }]);
+
       // Mock repository link
       mockLimit.mockResolvedValueOnce([
         {
@@ -352,9 +358,6 @@ describe("GitLabService (HTTP Operations)", () => {
           createdAt: new Date(),
         },
       ]);
-
-      // Mock project lookup
-      mockLimit.mockResolvedValueOnce([{ userId: testUserId }]);
 
       // Mock integration lookup
       mockLimit.mockResolvedValueOnce([
@@ -402,6 +405,9 @@ describe("GitLabService (HTTP Operations)", () => {
     });
 
     it("should handle pagination for file listings", async () => {
+      // Mock project ownership check (now runs before getRepositoryLink)
+      mockLimit.mockResolvedValueOnce([{ userId: testUserId }]);
+
       // Mock repository link
       mockLimit.mockResolvedValueOnce([
         {
@@ -414,9 +420,6 @@ describe("GitLabService (HTTP Operations)", () => {
           createdAt: new Date(),
         },
       ]);
-
-      // Mock project lookup
-      mockLimit.mockResolvedValueOnce([{ userId: testUserId }]);
 
       // Mock integration lookup (will be called twice for pagination)
       mockLimit

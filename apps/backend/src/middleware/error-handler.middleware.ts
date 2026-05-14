@@ -95,6 +95,20 @@ export class ConflictError extends HttpError {
 }
 
 /**
+ * Repository Not Linked Error (404 Not Found)
+ * Use when a GitLab repository is not linked to a project.
+ * Distinct from general NotFoundError so handlers can return
+ * empty arrays instead of 404 errors for this specific case.
+ */
+export class RepositoryNotLinkedError extends NotFoundError {
+  constructor(message: string = "GitLab repository not linked") {
+    super("GitLab repository");
+    this.message = message;
+    this.name = "RepositoryNotLinkedError";
+  }
+}
+
+/**
  * Rate Limit Error (429 Too Many Requests)
  * Use when rate limit is exceeded
  */

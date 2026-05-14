@@ -717,7 +717,8 @@ describe("GitLab Routes (Integration)", () => {
 
   describe("Authorization - Sync Operation Access", () => {
     it("should return 404 when sync operation not found", async () => {
-      // Default mock returns undefined (operation not found) → null → 404
+      vi.spyOn(gitlabSyncService, "getSyncOperation").mockResolvedValue(null);
+
       const response = await fastify.inject({
         method: "GET",
         url: `/api/gitlab/operations/${testOperationId}`,

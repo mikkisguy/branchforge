@@ -13,6 +13,7 @@ import {
   ConflictError,
   ForbiddenError,
   ValidationError,
+  RepositoryNotLinkedError,
 } from "../middleware/error-handler.middleware.js";
 import { checkRateLimit } from "../services/rate-limiter.service.js";
 import {
@@ -489,10 +490,7 @@ async function listBranchesHandler(
     reply.send(branches);
   } catch (err) {
     // Return empty array if repository not linked (normal state, not an error)
-    if (
-      err instanceof NotFoundError &&
-      err.message === "GitLab repository not found"
-    ) {
+    if (err instanceof RepositoryNotLinkedError) {
       reply.send([]);
       return;
     }
@@ -553,10 +551,7 @@ async function listFilesHandler(
     reply.send(files);
   } catch (err) {
     // Return empty array if repository not linked (normal state, not an error)
-    if (
-      err instanceof NotFoundError &&
-      err.message === "GitLab repository not found"
-    ) {
+    if (err instanceof RepositoryNotLinkedError) {
       reply.send([]);
       return;
     }
