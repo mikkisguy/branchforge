@@ -42,9 +42,24 @@ import {
 } from "./rpy-parser.service.js";
 import { calculateContentHash, calculateLinesHash } from "../lib/hash.js";
 import { mapEntryToDbType, type ContentType } from "./label-line-mapper.js";
+import { reconstructRPYFile } from "./rpy-parser.service.js";
 
 // Re-export PublicLabel from shared for route handlers
 export type { PublicLabel };
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/**
+ * Generic type for database query operations shared by both db connections
+ * and transactions. This allows the same function to work with either context.
+ *
+ * Only includes the query methods actually used by reconstructFileForLabel.
+ */
+type QueryContext = {
+  select: ReturnType<typeof getDb>["select"];
+};
 
 // ============================================================================
 // Constants
@@ -1127,6 +1142,122 @@ type LabelForPublic = Pick<
 export interface ListLabelsFilters {
   routeKey?: string;
   status?: LabelStatus;
+}
+
+// ============================================================================
+// File Reconstruction Functions
+// ============================================================================
+
+/**
+ * Reconstruct file content for a project file by fetching all labels
+ * and their associated dialogue lines, then rebuilding the RPY file.
+ *
+ * @param projectFileId - The project file ID to reconstruct
+ * @param db - Optional database context (can be a transaction)
+ * @returns The reconstructed file content
+ */
+export async function reconstructFileForLabel(
+  projectFileId: string,
+  db: QueryContext = getDb()
+): Promise<string> {
+  // Get the project file
+  const [projectFile] = await db
+    .select()
+    .from(projectFiles)
+    .where(eq(projectFiles.id, projectFileId))
+    .limit(1);
+
+  if (!projectFile) {
+    throw new NotFoundError("ProjectFile");
+  }
+
+  // `content` is the single source of truth for the current file state.
+  // `originalContent` is import-time baseline only and must not be used here.
+  const reconstructionBaseContent = projectFile.content;
+
+  // Fetch all labels for the project file
+  const allLabels = await db
+    .select({
+      id: labels.id,
+      labelName: labels.labelName,
+      title: labels.title,
+    })
+    .from(labels)
+    .where(
+      and(eq(labels.projectFileId, projectFile.id), isNull(labels.deletedAt))
+    )
+    .orderBy(asc(labels.labelPosition));
+
+  // If there are no labels, return current file content as-is
+  if (allLabels.length === 0) {
+    return reconstructRPYFile({
+      originalContent: reconstructionBaseContent,
+      updatedDialogue: new Map(),
+    });
+  }
+
+  // Build dialogue map for reconstruction
+  const updatedDialogue = new Map<
+    string,
+    Array<{ speaker: string | null; text: string }>
+  >();
+
+  // Batch fetch all label lines for all labels with speaker information
+  // Join with characters to get Ren'Py tag from speakerId
+  const allLabelLines = await db
+    .select({
+      labelId: labelLines.labelId,
+      speakerId: labelLines.speakerId,
+      speakerTag: characters.renpyTag,
+      content: labelLines.content,
+      sequence: labelLines.sequence,
+    })
+    .from(labelLines)
+    .leftJoin(characters, eq(labelLines.speakerId, characters.id))
+    .where(
+      and(
+        inArray(
+          labelLines.labelId,
+          allLabels.map((l) => l.id)
+        ),
+        isNull(labelLines.deletedAt)
+      )
+    )
+    .orderBy(asc(labelLines.sequence));
+
+  // Group lines by labelId in-memory
+  const linesByLabelId = new Map<
+    string,
+    Array<{ speaker: string | null; content: string }>
+  >();
+  for (const line of allLabelLines) {
+    if (!linesByLabelId.has(line.labelId)) {
+      linesByLabelId.set(line.labelId, []);
+    }
+    linesByLabelId.get(line.labelId)!.push({
+      // Use Ren'Py speaker tag for script-safe reconstruction
+      speaker: line.speakerTag ?? null,
+      content: line.content,
+    });
+  }
+
+  // Build dialogue map from grouped lines
+  for (const l of allLabels) {
+    const labelName = l.labelName || l.title;
+    const labelLinesData = linesByLabelId.get(l.id) || [];
+
+    const labelDialogue = labelLinesData.map((line) => ({
+      speaker: line.speaker,
+      text: line.content,
+    }));
+    updatedDialogue.set(labelName, labelDialogue);
+  }
+
+  // Reconstruct and return file content using current file content as base
+  return reconstructRPYFile({
+    originalContent: reconstructionBaseContent,
+    updatedDialogue,
+  });
 }
 
 // ============================================================================
