@@ -11,6 +11,8 @@ import {
   getProject,
   updateProject,
   deleteProject,
+  getProjectFiles,
+  updateFileContent,
 } from "../services/projects.service.js";
 import type { SourceOrigin, PublicProject } from "@branchforge/shared";
 import { authenticate } from "../middleware/auth.middleware.js";
@@ -24,16 +26,9 @@ import {
   projectFilesQuerySchema,
   fileIdParamsSchema,
   updateFileContentSchema,
-  type FileIdParams,
   type UpdateFileContentInput,
   type UpdateProjectInput,
 } from "../lib/validation.js";
-import { getDb } from "../db/index.js";
-import { projectFiles, labels, projects } from "../db/schema/index.js";
-import { eq, inArray, and, isNull } from "drizzle-orm";
-import { syncLabelsFromFile } from "../services/labels.service.js";
-import { calculateContentHash } from "../lib/hash.js";
-import { parseRPYFileWithLabels } from "../services/rpy-parser.service.js";
 import {
   NotFoundError,
   ForbiddenError,
@@ -63,29 +58,6 @@ interface UpdateProjectResponse {
 interface ErrorResponse {
   error: string;
 }
-
-type UpdateFileContentParams = FileIdParams;
-
-type UpdateFileContentResponse =
-  | {
-      success: true;
-      contentHash: string;
-      updatedAt: string;
-      syncResult: {
-        labelsCreated: number;
-        labelsUpdated: number;
-        labelsDeleted: number;
-        linesProcessed: number;
-        errors: Array<{ label: string; error: string }>;
-      };
-    }
-  | {
-      success: false;
-      conflict: {
-        reason: "STALE_CONTENT_HASH";
-        currentContentHash: string;
-      };
-    };
 
 // ============================================================================
 // Route Handlers
@@ -239,95 +211,25 @@ async function getProjectFilesHandler(
   const { source } = request.query;
   const user = request.user!;
 
-  // Verify user owns the project
-  const project = await getProject(projectId, user.id);
-  if (!project) {
-    reply.status(404).send({ error: "Project not found" });
-    return;
-  }
-
   try {
-    const db = getDb();
-
-    // Build where conditions
-    const whereConditions = source
-      ? and(
-          eq(projectFiles.projectId, projectId),
-          eq(projectFiles.source, source)
-        )
-      : eq(projectFiles.projectId, projectId);
-
-    // Get all project files
-    const files = await db.select().from(projectFiles).where(whereConditions);
-
-    // If no files, return empty array
-    if (files.length === 0) {
-      reply.send({ files: [] });
+    const result = await getProjectFiles(projectId, user.id, source);
+    reply.send(result);
+  } catch (err) {
+    if (err instanceof NotFoundError) {
+      reply.status(404).send({ error: "Project not found" });
       return;
     }
-
-    // Get labels that are associated with these files
-    const fileIds = files.map((f) => f.id);
-
-    // Internal type for grouping - includes projectFileId for lookup
-    type LabelForGrouping = {
-      id: string;
-      labelName: string | null;
-      title: string;
-      status: string | null;
-      projectFileId: string;
-    };
-
-    // Public label type for API response - excludes internal projectFileId
-    type PublicLabelSlim = {
-      id: string;
-      labelName: string | null;
-      title: string;
-      status: string | null;
-    };
-
-    const allLabels: LabelForGrouping[] = await db
-      .select({
-        id: labels.id,
-        labelName: labels.labelName,
-        title: labels.title,
-        status: labels.status,
-        projectFileId: labels.projectFileId,
-      })
-      .from(labels)
-      .where(
-        and(inArray(labels.projectFileId, fileIds), isNull(labels.deletedAt))
-      );
-
-    // Create a lookup keyed by projectFileId, storing only public label fields
-    const labelsByFileId = new Map<string, PublicLabelSlim[]>();
-    for (const label of allLabels) {
-      if (!labelsByFileId.has(label.projectFileId)) {
-        labelsByFileId.set(label.projectFileId, []);
-      }
-      const { projectFileId: _, ...publicLabel } = label;
-      labelsByFileId.get(label.projectFileId)!.push(publicLabel);
+    if (err instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden" });
+      return;
     }
-
-    // Attach labels to each file and map database field names to API field names
-    const filesWithLabels = files.map((file) => {
-      const labels = labelsByFileId.get(file.id) ?? [];
-      return {
-        ...file,
-        labels,
-      };
-    });
-
-    reply.send({ files: filesWithLabels });
-  } catch (err) {
     request.log.error(
       { err, projectId },
-      "getProjectFilesHandler: Failed to get project files",
-      err instanceof Error ? err.message : "Unknown error"
+      `getProjectFilesHandler: Failed to get project files: ${
+        err instanceof Error ? err.message : "Unknown error"
+      }`
     );
-    reply.status(500).send({
-      error: "Failed to get project files",
-    });
+    reply.status(500).send({ error: "Failed to get project files" });
   }
 }
 
@@ -342,7 +244,7 @@ async function getProjectFilesHandler(
  */
 async function updateFileContentHandler(
   request: FastifyRequest<{
-    Params: UpdateFileContentParams;
+    Params: { fileId: string };
     Body: UpdateFileContentInput;
   }>,
   reply: FastifyReply
@@ -352,152 +254,37 @@ async function updateFileContentHandler(
   const user = request.user!;
 
   try {
-    const db = getDb();
+    const result = await updateFileContent(
+      fileId,
+      user.id,
+      content,
+      expectedContentHash
+    );
 
-    // Get the file with project information
-    const [fileWithProject] = await db
-      .select({
-        file: projectFiles,
-        projectOwnerId: projects.userId,
-      })
-      .from(projectFiles)
-      .innerJoin(projects, eq(projectFiles.projectId, projects.id))
-      .where(eq(projectFiles.id, fileId))
-      .limit(1);
-
-    if (!fileWithProject) {
-      reply.status(404).send({ error: "File not found" } as ErrorResponse);
+    if (!result.success) {
+      reply.status(409).send(result);
       return;
     }
 
-    // Verify user owns the project
-    if (fileWithProject.projectOwnerId !== user.id) {
-      throw new ForbiddenError("Insufficient permissions");
-    }
-
-    const { file } = fileWithProject;
-
-    // Re-evaluate file type from the latest content so files can transition
-    // from SETTINGS -> STORY when labels are added in Script Mode.
-    let parsed;
-    let nextFileType;
-    try {
-      parsed = parseRPYFileWithLabels(content, file.filePath);
-      nextFileType = parsed.fileType;
-    } catch (error) {
-      request.log.error(
-        { err: error, fileId },
-        `updateFileContentHandler: Failed to parse RPY file: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-      throw new ValidationError("Invalid RPY file content");
-    }
-
-    // Calculate new content hash
-    const newContentHash = calculateContentHash(content);
-
-    // Update file content and sync labels in a single transaction for atomicity
-    const syncResult = await db.transaction(async (tx) => {
-      const [lockedFile] = await tx
-        .select({
-          contentHash: projectFiles.contentHash,
-          updatedAt: projectFiles.updatedAt,
-        })
-        .from(projectFiles)
-        .where(eq(projectFiles.id, fileId))
-        .for("update")
-        .limit(1);
-
-      if (!lockedFile) {
-        throw new NotFoundError("File");
-      }
-
-      if (
-        expectedContentHash !== undefined &&
-        lockedFile.contentHash !== expectedContentHash
-      ) {
-        return {
-          conflictPayload: {
-            success: false,
-            conflict: {
-              reason: "STALE_CONTENT_HASH",
-              currentContentHash: lockedFile.contentHash,
-            },
-          } satisfies UpdateFileContentResponse,
-          syncResultForFile: undefined,
-        };
-      }
-
-      const fileUpdatedAt = new Date();
-
-      // Update the file content
-      await tx
-        .update(projectFiles)
-        .set({
-          content,
-          fileType: nextFileType,
-          contentHash: newContentHash,
-          updatedAt: fileUpdatedAt,
-        })
-        .where(eq(projectFiles.id, fileId));
-
-      // Sync labels from updated content (only for STORY files)
-      // Pass the transaction context to ensure atomicity
-      const syncResultForFile =
-        nextFileType === "STORY"
-          ? await syncLabelsFromFile(
-              file.projectId,
-              { filePath: file.filePath, fileType: nextFileType },
-              content,
-              fileId,
-              { skipCleanup: false, tx }
-            )
-          : undefined;
-
-      return {
-        conflictPayload: null,
-        syncResultForFile,
-        fileUpdatedAt,
-      };
-    });
-
-    if (syncResult.conflictPayload) {
-      reply.status(409).send(syncResult.conflictPayload);
-      return;
-    }
-
-    reply.status(200).send({
-      success: true,
-      contentHash: newContentHash,
-      updatedAt: syncResult.fileUpdatedAt.toISOString(),
-      syncResult: {
-        labelsCreated: syncResult.syncResultForFile?.labelsCreated ?? 0,
-        labelsUpdated: syncResult.syncResultForFile?.labelsUpdated ?? 0,
-        labelsDeleted: syncResult.syncResultForFile?.labelsDeleted ?? 0,
-        linesProcessed: syncResult.syncResultForFile?.linesProcessed ?? 0,
-        errors: syncResult.syncResultForFile?.errors ?? [],
-      },
-    } satisfies UpdateFileContentResponse);
-  } catch (error) {
+    reply.status(200).send(result);
+  } catch (err) {
     request.log.error(
-      { err: error, fileId },
+      { err, fileId },
       `updateFileContentHandler: Failed to update file content: ${
-        error instanceof Error ? error.message : "Unknown error"
+        err instanceof Error ? err.message : "Unknown error"
       }`
     );
 
-    // Handle known error types
-    if (error instanceof NotFoundError) {
+    if (err instanceof NotFoundError) {
       reply.status(404).send({ error: "Not found" } as ErrorResponse);
       return;
     }
-    if (error instanceof ForbiddenError) {
+    if (err instanceof ForbiddenError) {
       reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
       return;
     }
-    if (error instanceof ValidationError) {
-      reply.status(400).send({ error: error.userMessage } as ErrorResponse);
+    if (err instanceof ValidationError) {
+      reply.status(400).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
     reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
@@ -556,7 +343,7 @@ export async function projectsRoutes(fastify: FastifyInstance): Promise<void> {
 
   // Update file content (unified endpoint for both script mode and write mode)
   fastify.put<{
-    Params: UpdateFileContentParams;
+    Params: { fileId: string };
     Body: UpdateFileContentInput;
   }>(
     "/projects/files/:fileId",
