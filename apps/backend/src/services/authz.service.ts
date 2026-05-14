@@ -14,8 +14,7 @@
  */
 
 import { getDb, type Db } from "../db/index.js";
-import type { ExtractTablesWithRelations } from "drizzle-orm";
-import type { NodePgTransaction } from "drizzle-orm/node-postgres";
+import type { Transaction } from "../db/types.js";
 import { projects, projectUsers, labels } from "../db/schema/index.js";
 import { eq, and, or } from "drizzle-orm";
 import {
@@ -161,13 +160,6 @@ export async function getProjectRole(
 
   return null;
 }
-
-// Transaction type that matches what TypeScript infers from db.transaction()
-// The schema is inferred as Record<string, unknown> due to TypeScript's limitations
-type Transaction = NodePgTransaction<
-  Record<string, unknown>,
-  ExtractTablesWithRelations<Record<string, unknown>>
->;
 
 /**
  * Require that a user is the owner of a project

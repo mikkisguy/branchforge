@@ -279,8 +279,6 @@ describe("ProjectsService", () => {
         name: "New Name",
       };
 
-      mockSelect.mockImplementation(() => createMockChain([{ userId }]));
-
       updateChain.set.mockReturnValue({
         where: vi.fn(() => ({
           returning: vi.fn(() => Promise.resolve([updatedProject])),
@@ -297,8 +295,6 @@ describe("ProjectsService", () => {
         name: "Updated Project",
       };
 
-      mockSelect.mockImplementation(createEmptyMockChain);
-
       updateChain.set.mockReturnValue({
         where: vi.fn(() => ({
           returning: vi.fn(() => Promise.resolve([])),
@@ -310,13 +306,11 @@ describe("ProjectsService", () => {
       );
     });
 
-    it("should throw ForbiddenError when user is not the owner", async () => {
+    it("should throw NotFoundError when user is not the owner", async () => {
       const otherUserId = "other-user-456";
       const body: UpdateProjectBody = {
         name: "Updated Project",
       };
-
-      mockSelect.mockImplementation(() => createMockChain([{ userId }]));
 
       updateChain.set.mockReturnValue({
         where: vi.fn(() => ({
@@ -325,7 +319,7 @@ describe("ProjectsService", () => {
       });
 
       await expect(updateProject(otherUserId, projectId, body)).rejects.toThrow(
-        "You do not have access to this project"
+        "Project not found"
       );
     });
   });
@@ -342,8 +336,6 @@ describe("ProjectsService", () => {
     });
 
     it("should permanently delete project successfully", async () => {
-      mockSelect.mockImplementation(() => createMockChain([{ userId }]));
-
       deleteChain.where.mockReturnValue({
         returning: vi.fn(() => Promise.resolve([{ id: projectId }])),
       });
@@ -355,8 +347,6 @@ describe("ProjectsService", () => {
     });
 
     it("should throw NotFoundError when project does not exist", async () => {
-      mockSelect.mockImplementation(createEmptyMockChain);
-
       deleteChain.where.mockReturnValue({
         returning: vi.fn(() => Promise.resolve([])),
       });
@@ -366,30 +356,27 @@ describe("ProjectsService", () => {
       );
     });
 
-    it("should throw ForbiddenError when user is not the owner", async () => {
+    it("should throw NotFoundError when user is not the owner", async () => {
       const otherUserId = "other-user-456";
-
-      mockSelect.mockImplementation(() => createMockChain([{ userId }]));
 
       deleteChain.where.mockReturnValue({
         returning: vi.fn(() => Promise.resolve([])),
       });
 
       await expect(deleteProject(otherUserId, projectId)).rejects.toThrow(
-        "You do not have access to this project"
+        "Project not found"
       );
     });
 
     it("should throw NotFoundError on repeated delete", async () => {
-      mockSelect
-        .mockImplementationOnce(() => createMockChain([{ userId }]))
-        .mockImplementationOnce(createEmptyMockChain);
-
       deleteChain.where.mockReturnValue({
         returning: vi.fn(() => Promise.resolve([{ id: projectId }])),
       });
 
       await expect(deleteProject(userId, projectId)).resolves.not.toThrow();
+      deleteChain.where.mockReturnValue({
+        returning: vi.fn(() => Promise.resolve([])),
+      });
       await expect(deleteProject(userId, projectId)).rejects.toThrow(
         "Project not found"
       );

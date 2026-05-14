@@ -77,8 +77,8 @@ describe("Authorization Service", () => {
     describe("requireProjectOwnership", () => {
       it("should be a function that accepts projectId and userId", () => {
         expect(typeof requireProjectOwnership).toBe("function");
-        // Third parameter (tx) is optional, so length is still 2
-        expect(requireProjectOwnership.length).toBeLessThanOrEqual(3);
+        // Third parameter (tx) is optional but still counts in function.length
+        expect(requireProjectOwnership.length).toBe(3);
       });
 
       it("should throw NotFoundError when project does not exist", async () => {

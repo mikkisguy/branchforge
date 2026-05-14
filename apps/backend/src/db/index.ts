@@ -15,7 +15,7 @@ export type Db = ReturnType<typeof drizzle<typeof schema>>;
 
 const { Pool } = pg;
 
-let db: ReturnType<typeof drizzle> | null = null;
+let db: Db | null = null;
 let pool: pg.Pool | null = null;
 
 export function getDb() {

@@ -17,7 +17,6 @@ import {
   NotFoundError,
   ValidationError,
 } from "../middleware/error-handler.middleware.js";
-import { requireProjectOwnership } from "./authz.service.js";
 import { z } from "zod";
 import { createProjectSchema } from "../lib/validation.js";
 import { isValidSourceOrigin } from "@branchforge/shared";
@@ -277,12 +276,10 @@ export async function updateProject(
     updateData.description = body.description;
   }
 
-  await requireProjectOwnership(projectId, userId);
-
   const result = await db
     .update(projects)
     .set(updateData)
-    .where(eq(projects.id, projectId))
+    .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
     .returning();
 
   if (!result || result.length === 0 || !result[0]) {
@@ -308,11 +305,9 @@ export async function deleteProject(
 ): Promise<void> {
   const db = getDb();
 
-  await requireProjectOwnership(projectId, userId);
-
   const result = await db
     .delete(projects)
-    .where(eq(projects.id, projectId))
+    .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
     .returning({ id: projects.id });
 
   if (!result || result.length === 0 || !result[0]) {
