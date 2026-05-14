@@ -29,6 +29,7 @@ import { createProject, deleteProject } from "./projects.service.js";
 import { importFromGitlab } from "./gitlab-sync.service.js";
 import { requireProjectOwnership } from "./authz.service.js";
 import { syncLabelsFromGitLabFile } from "./labels.service.js";
+import { logError, LogEventType } from "../lib/logger.js";
 import type {
   ConflictResolution,
   SyncOperation,
@@ -844,8 +845,12 @@ export async function importProjectFromGitLab(
       await deleteProject(userId, projectId);
     } catch (deleteErr) {
       // Log but don't throw - cleanup is best-effort
-      console.error(
-        `Failed to cleanup partially created project ${projectId}:`,
+      logError(
+        LogEventType.SERVICE_ERROR,
+        {
+          projectId,
+          context: "cleanupPartialProject",
+        },
         deleteErr
       );
     }

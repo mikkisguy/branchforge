@@ -490,9 +490,8 @@ async function listBranchesHandler(
   } catch (err) {
     // Return empty array if repository not linked (normal state, not an error)
     if (
-      err instanceof Error &&
-      (err.message === "GitLab repository not linked" ||
-        err.message === "Project not found")
+      err instanceof NotFoundError &&
+      err.message === "GitLab repository not found"
     ) {
       reply.send([]);
       return;
@@ -555,9 +554,8 @@ async function listFilesHandler(
   } catch (err) {
     // Return empty array if repository not linked (normal state, not an error)
     if (
-      err instanceof Error &&
-      (err.message === "GitLab repository not linked" ||
-        err.message === "Project not found")
+      err instanceof NotFoundError &&
+      err.message === "GitLab repository not found"
     ) {
       reply.send([]);
       return;

@@ -63,12 +63,17 @@ vi.mock("../../services/gitlab.service.js", () => ({
   validateGitlabPAT: vi.fn(),
   storeGitlabIntegration: vi.fn(),
   deleteGitlabIntegration: vi.fn(),
+  getGitlabIntegration: vi.fn(),
   listGitlabRepositories: vi.fn(),
   getGitlabProject: vi.fn(),
   linkRepository: vi.fn(),
   unlinkRepository: vi.fn(),
+  listRepositoryLinks: vi.fn(),
   listBranches: vi.fn(),
   listRpyFiles: vi.fn(),
+  importProjectFromGitLab: vi.fn(),
+  getGitLabFilesWithScenes: vi.fn(),
+  updateGitLabFileContent: vi.fn(),
 }));
 
 vi.mock("../../services/gitlab-sync.service.js", () => ({
