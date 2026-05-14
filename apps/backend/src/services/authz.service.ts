@@ -13,7 +13,8 @@
  * Uses error classes from error-handler.middleware.ts for consistent error responses.
  */
 
-import { getDb } from "../db/index.js";
+import { getDb, type Db } from "../db/index.js";
+import type { Transaction } from "../db/types.js";
 import { projects, projectUsers, labels } from "../db/schema/index.js";
 import { eq, and, or } from "drizzle-orm";
 import {
@@ -158,6 +159,39 @@ export async function getProjectRole(
   }
 
   return null;
+}
+
+/**
+ * Require that a user is the owner of a project
+ * Throws NotFoundError if the project doesn't exist
+ * Throws ForbiddenError if the user is not the owner
+ *
+ * @param projectId - The project ID to check ownership for
+ * @param userId - The user ID to check
+ * @param tx - Optional transaction to use instead of getDb()
+ * @throws NotFoundError if project doesn't exist
+ * @throws ForbiddenError if user is not the owner
+ */
+export async function requireProjectOwnership(
+  projectId: string,
+  userId: string,
+  tx?: Db | Transaction
+): Promise<void> {
+  const db = tx ?? getDb();
+
+  const [project] = await db
+    .select({ userId: projects.userId })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+
+  if (!project) {
+    throw new NotFoundError("Project");
+  }
+
+  if (project.userId !== userId) {
+    throw new ForbiddenError("You do not have access to this project");
+  }
 }
 
 // ============================================================================

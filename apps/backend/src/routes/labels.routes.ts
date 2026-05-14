@@ -19,6 +19,7 @@ import {
   type ListLabelsFilters,
   type LabelCharacterWithInfo,
 } from "../services/labels.service.js";
+import { requireProjectOwnership } from "../services/authz.service.js";
 import { authenticate } from "../middleware/auth.middleware.js";
 import {
   validateQuery,
@@ -43,7 +44,6 @@ import {
 } from "../lib/validation.js";
 import { getDb } from "../db/index.js";
 import {
-  projects,
   labels,
   labelLines,
   projectFiles,
@@ -217,28 +217,6 @@ async function reconstructFileForLabel(
   });
 }
 
-// Helper function to authorize project access
-async function authorizeProjectAccess(
-  projectId: string,
-  userId: string
-): Promise<void> {
-  const db = getDb();
-
-  const [project] = await db
-    .select({ userId: projects.userId })
-    .from(projects)
-    .where(eq(projects.id, projectId))
-    .limit(1);
-
-  if (!project) {
-    throw new NotFoundError("Project not found");
-  }
-
-  if (project.userId !== userId) {
-    throw new ForbiddenError("Forbidden");
-  }
-}
-
 // ============================================================================
 // Route Handlers
 // ============================================================================
@@ -360,7 +338,7 @@ async function updateLabelDialogueHandler(
     }
 
     // Verify user owns the project
-    await authorizeProjectAccess(label.projectId, user.id);
+    await requireProjectOwnership(label.projectId, user.id);
 
     // Validate that all speakerIds exist in the characters table for this project
     const speakerIdsInDialogue = dialogue

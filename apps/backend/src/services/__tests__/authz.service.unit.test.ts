@@ -11,6 +11,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   hasProjectAccess,
   requireProjectAccess,
+  requireProjectOwnership,
   getProjectRole,
   hasLabelAccess,
   requireLabelAccess,
@@ -70,6 +71,83 @@ describe("Authorization Service", () => {
         await expect(
           requireProjectAccess("nonexistent-project", "user-id")
         ).rejects.toThrow();
+      });
+    });
+
+    describe("requireProjectOwnership", () => {
+      it("should be a function that accepts projectId and userId", () => {
+        expect(typeof requireProjectOwnership).toBe("function");
+        // Third parameter (tx) is optional but still counts in function.length
+        expect(requireProjectOwnership.length).toBe(3);
+      });
+
+      it("should throw NotFoundError when project does not exist", async () => {
+        const mockDb = {
+          select: vi.fn(() => ({
+            from: vi.fn(() => ({
+              where: vi.fn(() => ({
+                limit: vi.fn().mockResolvedValue([]),
+              })),
+            })),
+          })),
+        };
+        const getDbSpy = vi
+          .spyOn(dbModule, "getDb")
+          .mockReturnValue(mockDb as never);
+
+        try {
+          await expect(
+            requireProjectOwnership("nonexistent-project", "user-id")
+          ).rejects.toThrow(NotFoundError);
+        } finally {
+          getDbSpy.mockRestore();
+        }
+      });
+
+      it("should throw ForbiddenError when user is not the owner", async () => {
+        const mockDb = {
+          select: vi.fn(() => ({
+            from: vi.fn(() => ({
+              where: vi.fn(() => ({
+                limit: vi.fn().mockResolvedValue([{ userId: "owner-id" }]),
+              })),
+            })),
+          })),
+        };
+        const getDbSpy = vi
+          .spyOn(dbModule, "getDb")
+          .mockReturnValue(mockDb as never);
+
+        try {
+          await expect(
+            requireProjectOwnership("project-id", "other-user-id")
+          ).rejects.toThrow(ForbiddenError);
+        } finally {
+          getDbSpy.mockRestore();
+        }
+      });
+
+      it("should not throw when user is the owner", async () => {
+        const mockDb = {
+          select: vi.fn(() => ({
+            from: vi.fn(() => ({
+              where: vi.fn(() => ({
+                limit: vi.fn().mockResolvedValue([{ userId: "owner-id" }]),
+              })),
+            })),
+          })),
+        };
+        const getDbSpy = vi
+          .spyOn(dbModule, "getDb")
+          .mockReturnValue(mockDb as never);
+
+        try {
+          await expect(
+            requireProjectOwnership("project-id", "owner-id")
+          ).resolves.not.toThrow();
+        } finally {
+          getDbSpy.mockRestore();
+        }
       });
     });
 

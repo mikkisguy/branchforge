@@ -11,11 +11,12 @@ import { validateBody } from "../middleware/validation.middleware.js";
 import {
   NotFoundError,
   ConflictError,
+  ForbiddenError,
 } from "../middleware/error-handler.middleware.js";
+import { requireProjectOwnership } from "../services/authz.service.js";
 import { checkRateLimit } from "../services/rate-limiter.service.js";
 import { getDb } from "../db/index.js";
 import {
-  projects,
   gitlabSyncOperations,
   projectFiles,
   labels,
@@ -88,6 +89,42 @@ function getClientIp(request: FastifyRequest): string {
   return request.ip;
 }
 
+/**
+ * Assert that the authenticated user owns the specified project.
+ *
+ * Sends an appropriate HTTP error response and returns false if the user
+ * does not own the project or the project does not exist.
+ *
+ * @param projectId - The project ID to verify
+ * @param userId - The authenticated user's ID
+ * @param reply - Fastify reply object for sending error responses
+ * @returns true if authorized, false if an error response was sent
+ */
+async function assertProjectOwnership(
+  projectId: string,
+  userId: string,
+  reply: FastifyReply
+): Promise<boolean> {
+  try {
+    await requireProjectOwnership(projectId, userId);
+    return true;
+  } catch (err) {
+    if (err instanceof NotFoundError) {
+      reply
+        .status(404)
+        .send({ error: "Not Found", message: "Project not found" });
+    } else if (err instanceof ForbiddenError) {
+      reply.status(403).send({
+        error: "Forbidden",
+        message: "You do not have access to this project",
+      });
+    } else {
+      throw err;
+    }
+    return false;
+  }
+}
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -136,98 +173,6 @@ interface UpdateFileContentBody {
 // ============================================================================
 // Route Handlers
 // ============================================================================
-
-/**
- * Authorization error response
- */
-interface AuthzError {
-  error: string;
-  message: string;
-}
-
-/**
- * Verify that the authenticated user owns the specified project.
- *
- * This function checks that:
- * 1. The project exists
- * 2. The authenticated user is the owner (projects.userId matches)
- *
- * @param projectId - The project ID to verify
- * @param userId - The authenticated user's ID
- * @param reply - Fastify reply object for sending error responses
- * @returns true if authorized, false if an error response was sent
- */
-async function authorizeProjectAccess(
-  projectId: string,
-  userId: string,
-  reply: FastifyReply
-): Promise<boolean> {
-  const db = getDb();
-
-  const [project] = await db
-    .select({ userId: projects.userId })
-    .from(projects)
-    .where(eq(projects.id, projectId))
-    .limit(1);
-
-  if (!project) {
-    const error: AuthzError = {
-      error: "Not Found",
-      message: "Project not found",
-    };
-    reply.status(404).send(error);
-    return false;
-  }
-
-  if (project.userId !== userId) {
-    const error: AuthzError = {
-      error: "Forbidden",
-      message: "You do not have access to this project",
-    };
-    reply.status(403).send(error);
-    return false;
-  }
-
-  return true;
-}
-
-/**
- * Verify that the authenticated user owns the project associated with a sync operation.
- *
- * This function checks that:
- * 1. The sync operation exists
- * 2. The project associated with the operation exists
- * 3. The authenticated user is the owner of the project
- *
- * @param operationId - The sync operation ID to verify
- * @param userId - The authenticated user's ID
- * @param reply - Fastify reply object for sending error responses
- * @returns true if authorized, false if an error response was sent
- */
-async function authorizeSyncOperationAccess(
-  operationId: string,
-  userId: string,
-  reply: FastifyReply
-): Promise<boolean> {
-  const db = getDb();
-
-  const [operation] = await db
-    .select({ projectId: gitlabSyncOperations.projectId })
-    .from(gitlabSyncOperations)
-    .where(eq(gitlabSyncOperations.id, operationId))
-    .limit(1);
-
-  if (!operation) {
-    const error: AuthzError = {
-      error: "Not Found",
-      message: "Sync operation not found",
-    };
-    reply.status(404).send(error);
-    return false;
-  }
-
-  return authorizeProjectAccess(operation.projectId, userId, reply);
-}
 
 /**
  * Validate GitLab PAT
@@ -457,8 +402,7 @@ async function linkRepositoryHandler(
     return;
   }
 
-  // Verify user owns the project
-  if (!(await authorizeProjectAccess(projectId, userId, reply))) {
+  if (!(await assertProjectOwnership(projectId, userId, reply))) {
     return;
   }
 
@@ -507,8 +451,7 @@ async function unlinkRepositoryHandler(
   const userId = getAuthenticatedUserId(request);
   const { projectId } = request.params;
 
-  // Verify user owns the project
-  if (!(await authorizeProjectAccess(projectId, userId, reply))) {
+  if (!(await assertProjectOwnership(projectId, userId, reply))) {
     return;
   }
 
@@ -579,8 +522,7 @@ async function listBranchesHandler(
   const userId = getAuthenticatedUserId(request);
   const { projectId } = request.params;
 
-  // Verify user owns the project
-  if (!(await authorizeProjectAccess(projectId, userId, reply))) {
+  if (!(await assertProjectOwnership(projectId, userId, reply))) {
     return;
   }
 
@@ -642,8 +584,7 @@ async function listFilesHandler(
     return;
   }
 
-  // Verify user owns the project
-  if (!(await authorizeProjectAccess(projectId, userId, reply))) {
+  if (!(await assertProjectOwnership(projectId, userId, reply))) {
     return;
   }
 
@@ -701,8 +642,7 @@ async function exportHandler(
     return;
   }
 
-  // Verify user owns the project
-  if (!(await authorizeProjectAccess(projectId, userId, reply))) {
+  if (!(await assertProjectOwnership(projectId, userId, reply))) {
     return;
   }
 
@@ -746,8 +686,7 @@ async function importHandler(
     return;
   }
 
-  // Verify user owns the project
-  if (!(await authorizeProjectAccess(projectId, userId, reply))) {
+  if (!(await assertProjectOwnership(projectId, userId, reply))) {
     return;
   }
 
@@ -934,7 +873,22 @@ async function getOperationHandler(
   const { operationId } = request.params;
 
   // Verify user owns the project associated with this operation
-  if (!(await authorizeSyncOperationAccess(operationId, userId, reply))) {
+  const db = getDb();
+  const [operation] = await db
+    .select({ projectId: gitlabSyncOperations.projectId })
+    .from(gitlabSyncOperations)
+    .where(eq(gitlabSyncOperations.id, operationId))
+    .limit(1);
+
+  if (!operation) {
+    reply.status(404).send({
+      error: "Not Found",
+      message: "Sync operation not found",
+    });
+    return;
+  }
+
+  if (!(await assertProjectOwnership(operation.projectId, userId, reply))) {
     return;
   }
 
@@ -975,8 +929,7 @@ async function listOperationsHandler(
   const userId = getAuthenticatedUserId(request);
   const { projectId } = request.params;
 
-  // Verify user owns the project
-  if (!(await authorizeProjectAccess(projectId, userId, reply))) {
+  if (!(await assertProjectOwnership(projectId, userId, reply))) {
     return;
   }
 
@@ -1015,8 +968,7 @@ async function detectConflictsHandler(
     return;
   }
 
-  // Verify user owns the project
-  if (!(await authorizeProjectAccess(projectId, userId, reply))) {
+  if (!(await assertProjectOwnership(projectId, userId, reply))) {
     return;
   }
 
@@ -1050,8 +1002,7 @@ async function getGitLabFilesHandler(
   const userId = getAuthenticatedUserId(request);
   const { projectId } = request.params;
 
-  // Verify user owns the project
-  if (!(await authorizeProjectAccess(projectId, userId, reply))) {
+  if (!(await assertProjectOwnership(projectId, userId, reply))) {
     return;
   }
 
@@ -1163,7 +1114,7 @@ async function updateGitLabFileHandler(
     }
 
     // Verify user owns the project
-    if (!(await authorizeProjectAccess(file.projectId, userId, reply))) {
+    if (!(await assertProjectOwnership(file.projectId, userId, reply))) {
       return;
     }
 

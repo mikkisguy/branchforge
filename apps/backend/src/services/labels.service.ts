@@ -20,26 +20,9 @@ import {
   projectFiles,
   projectFileSyncState,
 } from "../db/schema/index.js";
-import {
-  eq,
-  and,
-  asc,
-  or,
-  isNull,
-  sql,
-  desc,
-  inArray,
-  type ExtractTablesWithRelations,
-} from "drizzle-orm";
+import { eq, and, asc, or, isNull, sql, desc, inArray } from "drizzle-orm";
 import type { Label, LabelLine } from "../db/schema/index.js";
-import type { NodePgTransaction } from "drizzle-orm/node-postgres";
-
-// Transaction type that matches what TypeScript infers from db.transaction()
-// The schema is inferred as Record<string, unknown> due to TypeScript's limitations
-type Transaction = NodePgTransaction<
-  Record<string, unknown>,
-  ExtractTablesWithRelations<Record<string, unknown>>
->;
+import type { Transaction } from "../db/types.js";
 import type { PublicLabel } from "@branchforge/shared";
 import { LabelStatus, sanitizeLabelName } from "@branchforge/shared";
 import { createAuditFields, updateAuditFields } from "../lib/audit.js";
@@ -49,6 +32,7 @@ import {
   ValidationError,
 } from "../middleware/error-handler.middleware.js";
 import { logError, logWarn, LogEventType } from "../lib/logger.js";
+import { requireProjectOwnership } from "../services/authz.service.js";
 import {
   addLabelToRPYContent,
   removeLabelFromRPYContent,
@@ -811,7 +795,7 @@ export async function syncLabelsFromFile(
           sourceId,
           skipCleanup
         )
-      : dbOrTx.transaction((tx) =>
+      : dbOrTx.transaction((tx: Transaction) =>
           syncLabelsInTransaction(
             tx,
             projectId,
@@ -1428,19 +1412,7 @@ export async function createLabel(
 
   return await db.transaction(async (tx) => {
     // Verify user has access to the project
-    const [project] = await tx
-      .select({ userId: projects.userId })
-      .from(projects)
-      .where(eq(projects.id, data.projectId))
-      .limit(1);
-
-    if (!project) {
-      throw new NotFoundError("Project");
-    }
-
-    if (project.userId !== userId) {
-      throw new ForbiddenError("Insufficient permissions");
-    }
+    await requireProjectOwnership(data.projectId, userId, tx);
 
     // Validate route exists in route_configs for this project
     // If route is provided but doesn't exist, coerce to null

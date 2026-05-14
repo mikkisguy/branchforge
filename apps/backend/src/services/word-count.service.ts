@@ -5,9 +5,8 @@
  * Provides functions for tracking word counts from label dialogue updates.
  */
 
-import type { NodePgTransaction } from "drizzle-orm/node-postgres";
-import type { ExtractTablesWithRelations } from "drizzle-orm";
-import { getDb } from "../db/index.js";
+import { getDb, type Db } from "../db/index.js";
+import type { Transaction } from "../db/types.js";
 import { userSettings } from "../db/schema/index.js";
 import { eq } from "drizzle-orm";
 import {
@@ -18,14 +17,6 @@ import {
   parseLabelWordCounts,
   parseDailyWordCounts,
 } from "../lib/date-utils.js";
-import type { Db } from "../db/index.js";
-
-// Transaction type that matches what TypeScript infers from db.transaction()
-// The schema is inferred as Record<string, unknown> due to TypeScript's limitations
-type Transaction = NodePgTransaction<
-  Record<string, unknown>,
-  ExtractTablesWithRelations<Record<string, unknown>>
->;
 
 // ============================================================================
 // Types
@@ -108,7 +99,7 @@ export async function trackWordsForLabel(
   // Execute in a transaction to prevent race conditions on concurrent updates.
   // Drizzle supports nested transactions via savepoints, so this is safe
   // even if providedDb is already a transaction.
-  return db.transaction((tx) =>
+  return db.transaction((tx: Transaction) =>
     trackWordsInternal(tx, labelId, userId, dialogue)
   );
 }

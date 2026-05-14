@@ -959,7 +959,7 @@ describe("LabelsService (Integration)", () => {
           title: "Test Label",
           labelNumber: 1,
         })
-      ).rejects.toThrow("Insufficient permissions");
+      ).rejects.toThrow("You do not have access to this project");
     });
 
     it("should throw ForbiddenError when projectFileId belongs to a different project", async () => {

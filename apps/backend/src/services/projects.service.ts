@@ -15,7 +15,6 @@ import type {
 } from "@branchforge/shared";
 import {
   NotFoundError,
-  ForbiddenError,
   ValidationError,
 } from "../middleware/error-handler.middleware.js";
 import { z } from "zod";
@@ -277,20 +276,6 @@ export async function updateProject(
     updateData.description = body.description;
   }
 
-  const project = await db
-    .select({ userId: projects.userId })
-    .from(projects)
-    .where(eq(projects.id, projectId))
-    .limit(1);
-
-  if (!project || project.length === 0) {
-    throw new NotFoundError("Project");
-  }
-
-  if (project[0]!.userId !== userId) {
-    throw new ForbiddenError("Only project owners can update projects");
-  }
-
   const result = await db
     .update(projects)
     .set(updateData)
@@ -319,20 +304,6 @@ export async function deleteProject(
   projectId: string
 ): Promise<void> {
   const db = getDb();
-
-  const project = await db
-    .select({ userId: projects.userId })
-    .from(projects)
-    .where(eq(projects.id, projectId))
-    .limit(1);
-
-  if (!project || project.length === 0) {
-    throw new NotFoundError("Project");
-  }
-
-  if (project[0]!.userId !== userId) {
-    throw new ForbiddenError("Only project owners can delete projects");
-  }
 
   const result = await db
     .delete(projects)
