@@ -15,9 +15,9 @@ import type {
 } from "@branchforge/shared";
 import {
   NotFoundError,
-  ForbiddenError,
   ValidationError,
 } from "../middleware/error-handler.middleware.js";
+import { requireProjectOwnership } from "./authz.service.js";
 import { z } from "zod";
 import { createProjectSchema } from "../lib/validation.js";
 import { isValidSourceOrigin } from "@branchforge/shared";
@@ -277,24 +277,12 @@ export async function updateProject(
     updateData.description = body.description;
   }
 
-  const project = await db
-    .select({ userId: projects.userId })
-    .from(projects)
-    .where(eq(projects.id, projectId))
-    .limit(1);
-
-  if (!project || project.length === 0) {
-    throw new NotFoundError("Project");
-  }
-
-  if (project[0]!.userId !== userId) {
-    throw new ForbiddenError("Only project owners can update projects");
-  }
+  await requireProjectOwnership(projectId, userId);
 
   const result = await db
     .update(projects)
     .set(updateData)
-    .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
+    .where(eq(projects.id, projectId))
     .returning();
 
   if (!result || result.length === 0 || !result[0]) {
@@ -320,23 +308,11 @@ export async function deleteProject(
 ): Promise<void> {
   const db = getDb();
 
-  const project = await db
-    .select({ userId: projects.userId })
-    .from(projects)
-    .where(eq(projects.id, projectId))
-    .limit(1);
-
-  if (!project || project.length === 0) {
-    throw new NotFoundError("Project");
-  }
-
-  if (project[0]!.userId !== userId) {
-    throw new ForbiddenError("Only project owners can delete projects");
-  }
+  await requireProjectOwnership(projectId, userId);
 
   const result = await db
     .delete(projects)
-    .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
+    .where(eq(projects.id, projectId))
     .returning({ id: projects.id });
 
   if (!result || result.length === 0 || !result[0]) {

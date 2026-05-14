@@ -325,7 +325,7 @@ describe("ProjectsService", () => {
       });
 
       await expect(updateProject(otherUserId, projectId, body)).rejects.toThrow(
-        "Only project owners can update projects"
+        "You do not have access to this project"
       );
     });
   });
@@ -376,7 +376,7 @@ describe("ProjectsService", () => {
       });
 
       await expect(deleteProject(otherUserId, projectId)).rejects.toThrow(
-        "Only project owners can delete projects"
+        "You do not have access to this project"
       );
     });
 

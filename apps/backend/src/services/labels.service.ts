@@ -49,6 +49,7 @@ import {
   ValidationError,
 } from "../middleware/error-handler.middleware.js";
 import { logError, logWarn, LogEventType } from "../lib/logger.js";
+import { requireProjectOwnership } from "../services/authz.service.js";
 import {
   addLabelToRPYContent,
   removeLabelFromRPYContent,
@@ -1428,19 +1429,7 @@ export async function createLabel(
 
   return await db.transaction(async (tx) => {
     // Verify user has access to the project
-    const [project] = await tx
-      .select({ userId: projects.userId })
-      .from(projects)
-      .where(eq(projects.id, data.projectId))
-      .limit(1);
-
-    if (!project) {
-      throw new NotFoundError("Project");
-    }
-
-    if (project.userId !== userId) {
-      throw new ForbiddenError("Insufficient permissions");
-    }
+    await requireProjectOwnership(data.projectId, userId, tx);
 
     // Validate route exists in route_configs for this project
     // If route is provided but doesn't exist, coerce to null
