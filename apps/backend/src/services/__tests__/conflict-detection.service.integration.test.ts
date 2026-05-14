@@ -176,7 +176,11 @@ describe("ConflictDetectionService (Integration)", () => {
         fileType: "STORY",
       });
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result).toMatchObject({
         hasConflicts: false,
@@ -219,7 +223,11 @@ describe("ConflictDetectionService (Integration)", () => {
         fileType: "STORY",
       });
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result.hasConflicts).toBe(true);
       expect(result.conflicts).toHaveLength(1);
@@ -261,7 +269,11 @@ describe("ConflictDetectionService (Integration)", () => {
         fileType: "STORY",
       });
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result.hasConflicts).toBe(true);
       expect(result.conflicts).toHaveLength(1);
@@ -284,7 +296,7 @@ describe("ConflictDetectionService (Integration)", () => {
 
       // Mock GitLab API to return a file with different labels
       vi.spyOn(gitlabService, "getFileContent").mockImplementation(
-        async (_projectId, filePath) => {
+        async (_projectId, _userId, filePath) => {
           if (filePath === "game/script.rpy") {
             return 'label other:\n    "Other content"\n    return';
           }
@@ -306,7 +318,11 @@ describe("ConflictDetectionService (Integration)", () => {
         fileType: "STORY",
       });
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result.hasConflicts).toBe(true);
       // We expect 2 conflicts: "other" is a new remote label, and "start" was deleted remotely
@@ -361,7 +377,11 @@ describe("ConflictDetectionService (Integration)", () => {
         fileType: "STORY",
       });
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result.hasConflicts).toBe(true);
       expect(result.conflicts).toHaveLength(1);
@@ -408,7 +428,11 @@ describe("ConflictDetectionService (Integration)", () => {
         fileType: "STORY",
       });
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result).toMatchObject({
         hasConflicts: false,
@@ -438,7 +462,7 @@ describe("ConflictDetectionService (Integration)", () => {
 
       // Mock GitLab API to return different content based on file path (order-independent)
       vi.spyOn(gitlabService, "getFileContent").mockImplementation(
-        async (_projectId, filePath) => {
+        async (_projectId, _userId, filePath) => {
           if (filePath === "game/script.rpy") {
             return 'label start:\n    "Remote change"\n    return';
           } else if (filePath === "game/chapter2.rpy") {
@@ -487,7 +511,11 @@ describe("ConflictDetectionService (Integration)", () => {
         }
       );
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result.hasConflicts).toBe(true);
       expect(result.conflicts.length).toBeGreaterThanOrEqual(2);
@@ -515,7 +543,11 @@ describe("ConflictDetectionService (Integration)", () => {
         new Error("API Error")
       );
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result).toMatchObject({
         hasConflicts: false,
@@ -581,7 +613,7 @@ describe("ConflictDetectionService (Integration)", () => {
 
       // Mock GitLab API to return matching content based on file path (order-independent)
       vi.spyOn(gitlabService, "getFileContent").mockImplementation(
-        async (_projectId, filePath) => {
+        async (_projectId, _userId, filePath) => {
           if (filePath === "game/script.rpy") {
             return 'label start:\n    "Line 1"\n    "Line 2"\n    return';
           } else if (filePath === "game/chapter1.rpy") {
@@ -632,7 +664,11 @@ describe("ConflictDetectionService (Integration)", () => {
         }
       );
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result).toMatchObject({
         hasConflicts: false,

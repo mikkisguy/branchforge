@@ -212,7 +212,11 @@ describe("GitLabSyncService (Integration)", () => {
         fileType: "STORY",
       });
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result).toMatchObject({
         hasConflicts: false,
@@ -255,7 +259,11 @@ describe("GitLabSyncService (Integration)", () => {
         fileType: "STORY",
       });
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result.hasConflicts).toBe(true);
       expect(result.conflicts).toHaveLength(1);
@@ -297,7 +305,11 @@ describe("GitLabSyncService (Integration)", () => {
         fileType: "STORY",
       });
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result.hasConflicts).toBe(true);
       expect(result.conflicts).toHaveLength(1);
@@ -346,7 +358,11 @@ describe("GitLabSyncService (Integration)", () => {
         fileType: "STORY",
       });
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result.hasConflicts).toBe(true);
       // We expect 2 conflicts: "other" is a new remote label, and "start" was deleted remotely
@@ -401,7 +417,11 @@ describe("GitLabSyncService (Integration)", () => {
         fileType: "STORY",
       });
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result.hasConflicts).toBe(true);
       expect(result.conflicts).toHaveLength(1);
@@ -448,7 +468,11 @@ describe("GitLabSyncService (Integration)", () => {
         fileType: "STORY",
       });
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result).toMatchObject({
         hasConflicts: false,
@@ -478,7 +502,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       // Mock GitLab API to return different content based on file path (order-independent)
       vi.spyOn(gitlabService, "getFileContent").mockImplementation(
-        async (_projectId, filePath) => {
+        async (_projectId, _userId, filePath) => {
           if (filePath === "game/script.rpy") {
             return 'label start:\n    "Remote change"\n    return';
           } else if (filePath === "game/chapter2.rpy") {
@@ -527,7 +551,11 @@ describe("GitLabSyncService (Integration)", () => {
         }
       );
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result.hasConflicts).toBe(true);
       expect(result.conflicts.length).toBeGreaterThanOrEqual(2);
@@ -555,7 +583,11 @@ describe("GitLabSyncService (Integration)", () => {
         new Error("API Error")
       );
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result).toMatchObject({
         hasConflicts: false,
@@ -621,7 +653,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       // Mock GitLab API to return matching content based on file path (order-independent)
       vi.spyOn(gitlabService, "getFileContent").mockImplementation(
-        async (_projectId, filePath) => {
+        async (_projectId, _userId, filePath) => {
           if (filePath === "game/script.rpy") {
             return 'label start:\n    "Line 1"\n    "Line 2"\n    return';
           } else if (filePath === "game/chapter1.rpy") {
@@ -672,7 +704,11 @@ describe("GitLabSyncService (Integration)", () => {
         }
       );
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result).toMatchObject({
         hasConflicts: false,
@@ -698,6 +734,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       const result = await exportToGitlab(
         testProjectId,
+        testUserId,
         testBranch,
         "Test export"
       );
@@ -711,6 +748,7 @@ describe("GitLabSyncService (Integration)", () => {
       });
       expect(gitlabService.createOrUpdateFile).toHaveBeenCalledWith(
         testProjectId,
+        testUserId,
         testBranch,
         testGitlabFile.filePath,
         testGitlabFile.content,
@@ -734,6 +772,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       const result = await exportToGitlab(
         testProjectId,
+        testUserId,
         testBranch,
         "Test export"
       );
@@ -756,6 +795,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       const result = await exportToGitlab(
         testProjectId,
+        testUserId,
         testBranch,
         "Test export"
       );
@@ -774,14 +814,14 @@ describe("GitLabSyncService (Integration)", () => {
         branch: testBranch,
       } as any);
 
-      await exportToGitlab(testProjectId, testBranch);
+      await exportToGitlab(testProjectId, testUserId, testBranch);
 
       expect(gitlabService.createOrUpdateFile).toHaveBeenCalled();
       const calls = (gitlabService.createOrUpdateFile as any).mock.calls;
-      // createOrUpdateFile(projectId, branch, filePath, content, commitMessage)
-      // The commit message is at index 4
+      // createOrUpdateFile(projectId, userId, branch, filePath, content, commitMessage)
+      // The commit message is at index 5
       expect(calls.length).toBeGreaterThan(0);
-      const commitMessage = calls[0][4];
+      const commitMessage = calls[0][5];
       expect(commitMessage).toMatch(/Export from BranchForge -/);
     });
 
@@ -806,6 +846,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       const result = await exportToGitlab(
         testProjectId,
+        testUserId,
         testBranch,
         "Test export"
       );
@@ -856,6 +897,7 @@ describe("GitLabSyncService (Integration)", () => {
       // Perform export
       const result = await exportToGitlab(
         testProjectId,
+        testUserId,
         testBranch,
         "Test export"
       );
@@ -918,6 +960,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       const result = await importFromGitlab(
         testProjectId,
+        testUserId,
         testBranch,
         "branchforge_wins" as ConflictResolution
       );
@@ -967,6 +1010,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       const result = await importFromGitlab(
         testProjectId,
+        testUserId,
         testBranch,
         "branchforge_wins" as ConflictResolution
       );
@@ -1010,6 +1054,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       const result = await importFromGitlab(
         testProjectId,
+        testUserId,
         testBranch,
         "gitlab_wins" as ConflictResolution
       );
@@ -1051,6 +1096,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       const result = await importFromGitlab(
         testProjectId,
+        testUserId,
         testBranch,
         "manual_review" as ConflictResolution
       );
@@ -1069,6 +1115,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       const result = await importFromGitlab(
         testProjectId,
+        testUserId,
         testBranch,
         "branchforge_wins" as ConflictResolution
       );
@@ -1100,6 +1147,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       const result = await importFromGitlab(
         testProjectId,
+        testUserId,
         testBranch,
         "branchforge_wins" as ConflictResolution
       );

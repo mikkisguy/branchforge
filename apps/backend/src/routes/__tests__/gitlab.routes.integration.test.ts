@@ -31,6 +31,10 @@ import * as gitlabService from "../../services/gitlab.service.js";
 import * as gitlabSyncService from "../../services/gitlab-sync.service.js";
 import * as rateLimiter from "../../services/rate-limiter.service.js";
 import * as db from "../../db/index.js";
+import {
+  NotFoundError,
+  ForbiddenError,
+} from "../../middleware/error-handler.middleware.js";
 
 // Mock drizzle-orm's eq function
 vi.mock("drizzle-orm", () => ({
@@ -59,12 +63,17 @@ vi.mock("../../services/gitlab.service.js", () => ({
   validateGitlabPAT: vi.fn(),
   storeGitlabIntegration: vi.fn(),
   deleteGitlabIntegration: vi.fn(),
+  getGitlabIntegration: vi.fn(),
   listGitlabRepositories: vi.fn(),
   getGitlabProject: vi.fn(),
   linkRepository: vi.fn(),
   unlinkRepository: vi.fn(),
+  listRepositoryLinks: vi.fn(),
   listBranches: vi.fn(),
   listRpyFiles: vi.fn(),
+  importProjectFromGitLab: vi.fn(),
+  getGitLabFilesWithScenes: vi.fn(),
+  updateGitLabFileContent: vi.fn(),
 }));
 
 vi.mock("../../services/gitlab-sync.service.js", () => ({
@@ -650,10 +659,10 @@ describe("GitLab Routes (Integration)", () => {
 
   describe("Authorization - Project Access", () => {
     it("should return 404 when project not found (link repository)", async () => {
-      const mockLimit = (fastify as any).mockDb.mockLimit;
-
-      // Override to return empty array (project not found)
-      mockLimit.mockResolvedValueOnce([]);
+      // Mock linkRepository to simulate project not found (authz check in service)
+      vi.mocked(gitlabService.linkRepository).mockRejectedValueOnce(
+        new NotFoundError("Project")
+      );
 
       const response = await fastify.inject({
         method: "POST",
@@ -668,15 +677,14 @@ describe("GitLab Routes (Integration)", () => {
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({
         error: "Not Found",
-        message: "Project not found",
       });
     });
 
     it("should return 403 when user does not own project (unlink repository)", async () => {
-      const mockLimit = (fastify as any).mockDb.mockLimit;
-
-      // Override to return different userId (user does not own project)
-      mockLimit.mockResolvedValueOnce([{ userId: "other-user-id" }]);
+      // Mock unlinkRepository to simulate forbidden access (authz check in service)
+      vi.mocked(gitlabService.unlinkRepository).mockRejectedValueOnce(
+        new ForbiddenError("You do not have access to this project")
+      );
 
       const response = await fastify.inject({
         method: "DELETE",
@@ -686,15 +694,14 @@ describe("GitLab Routes (Integration)", () => {
       expect(response.statusCode).toBe(403);
       expect(response.json()).toMatchObject({
         error: "Forbidden",
-        message: "You do not have access to this project",
       });
     });
 
     it("should return 404 when project not found (list operations)", async () => {
-      const mockLimit = (fastify as any).mockDb.mockLimit;
-
-      // Override to return empty array (project not found)
-      mockLimit.mockResolvedValueOnce([]);
+      // Mock listSyncOperations to simulate project not found (authz check in service)
+      vi.mocked(gitlabSyncService.listSyncOperations).mockRejectedValueOnce(
+        new NotFoundError("Project")
+      );
 
       const response = await fastify.inject({
         method: "GET",
@@ -704,17 +711,13 @@ describe("GitLab Routes (Integration)", () => {
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({
         error: "Not Found",
-        message: "Project not found",
       });
     });
   });
 
   describe("Authorization - Sync Operation Access", () => {
     it("should return 404 when sync operation not found", async () => {
-      const mockLimit = (fastify as any).mockDb.mockLimit;
-
-      // First call: gitlabSyncOperations query returns empty (operation not found)
-      mockLimit.mockResolvedValueOnce([]);
+      vi.spyOn(gitlabSyncService, "getSyncOperation").mockResolvedValue(null);
 
       const response = await fastify.inject({
         method: "GET",
@@ -729,12 +732,10 @@ describe("GitLab Routes (Integration)", () => {
     });
 
     it("should return 404 when operation exists but project not found", async () => {
-      const mockLimit = (fastify as any).mockDb.mockLimit;
-
-      // First call: gitlabSyncOperations query - return operation with projectId
-      mockLimit.mockResolvedValueOnce([{ projectId: testProjectId }]);
-      // Second call: projects query - return empty (project not found)
-      mockLimit.mockResolvedValueOnce([]);
+      // Mock getSyncOperation to simulate project not found (authz check in service)
+      vi.mocked(gitlabSyncService.getSyncOperation).mockRejectedValueOnce(
+        new NotFoundError("Project")
+      );
 
       const response = await fastify.inject({
         method: "GET",
@@ -744,17 +745,14 @@ describe("GitLab Routes (Integration)", () => {
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({
         error: "Not Found",
-        message: "Project not found",
       });
     });
 
     it("should return 403 when operation exists but user does not own project", async () => {
-      const mockLimit = (fastify as any).mockDb.mockLimit;
-
-      // First call: gitlabSyncOperations query - return operation with projectId
-      mockLimit.mockResolvedValueOnce([{ projectId: testProjectId }]);
-      // Second call: projects query - return different userId (user does not own project)
-      mockLimit.mockResolvedValueOnce([{ userId: "other-user-id" }]);
+      // Mock getSyncOperation to simulate forbidden access (authz check in service)
+      vi.mocked(gitlabSyncService.getSyncOperation).mockRejectedValueOnce(
+        new ForbiddenError("You do not have access to this project")
+      );
 
       const response = await fastify.inject({
         method: "GET",
@@ -764,7 +762,6 @@ describe("GitLab Routes (Integration)", () => {
       expect(response.statusCode).toBe(403);
       expect(response.json()).toMatchObject({
         error: "Forbidden",
-        message: "You do not have access to this project",
       });
     });
   });

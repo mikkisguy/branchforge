@@ -16,9 +16,15 @@ vi.mock("../../db/index.js", () => ({
   getDb: vi.fn(),
 }));
 
+// Mock authz service - unit tests focus on query logic, not authorization
+vi.mock("../authz.service.js", () => ({
+  requireProjectOwnership: vi.fn(),
+}));
+
 import { getDb } from "../../db/index.js";
 
 // Test fixtures
+const testUserId = "user-123";
 const testProjectId = "project-123";
 const testOperationId = "operation-123";
 const testBranch = "main";
@@ -68,7 +74,7 @@ describe("GitLabSyncService", () => {
         })),
       })) as any;
 
-      const result = await getSyncOperation(testOperationId);
+      const result = await getSyncOperation(testOperationId, testUserId);
 
       expect(result).toEqual(mockOperation);
     });
@@ -84,7 +90,7 @@ describe("GitLabSyncService", () => {
         })),
       })) as any;
 
-      const result = await getSyncOperation("non-existent-id");
+      const result = await getSyncOperation("non-existent-id", testUserId);
 
       expect(result).toBeNull();
     });
@@ -124,8 +130,7 @@ describe("GitLabSyncService", () => {
         })),
       })) as any;
 
-      const result = await listSyncOperations(testProjectId);
-
+      const result = await listSyncOperations(testProjectId, testUserId);
       expect(result).toEqual(mockOperations);
     });
 
@@ -141,8 +146,7 @@ describe("GitLabSyncService", () => {
         })),
       })) as any;
 
-      const result = await listSyncOperations(testProjectId);
-
+      const result = await listSyncOperations(testProjectId, testUserId);
       expect(result).toEqual([]);
     });
 
@@ -174,7 +178,7 @@ describe("GitLabSyncService", () => {
         })),
       })) as any;
 
-      const result = await listSyncOperations(testProjectId, 10);
+      const result = await listSyncOperations(testProjectId, testUserId, 10);
 
       expect(result).toEqual(mockOperations);
     });

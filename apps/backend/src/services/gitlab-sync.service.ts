@@ -6,6 +6,7 @@
  */
 
 import { getDb, type Db } from "../db/index.js";
+import { requireProjectOwnership } from "./authz.service.js";
 import {
   gitlabSyncOperations,
   projectFiles,
@@ -145,9 +146,12 @@ async function updateSyncOperation(
  */
 export async function exportToGitlab(
   projectId: string,
+  userId: string,
   branch?: string,
   commitMessage?: string
 ): Promise<SyncOperation> {
+  await requireProjectOwnership(projectId, userId);
+
   const db = getDb();
   const targetBranch = branch || "main";
   const message =
@@ -210,6 +214,7 @@ export async function exportToGitlab(
 
         await createOrUpdateFile(
           projectId,
+          userId,
           targetBranch,
           file.filePath,
           contentToExport,
@@ -234,6 +239,7 @@ export async function exportToGitlab(
       );
       await createOrUpdateFile(
         projectId,
+        userId,
         targetBranch,
         "state_variables.rpy",
         stateVariablesContent,
@@ -259,6 +265,7 @@ export async function exportToGitlab(
       );
       await createOrUpdateFile(
         projectId,
+        userId,
         targetBranch,
         "definitions.rpy",
         definitionsContent,
@@ -346,9 +353,12 @@ export async function exportToGitlab(
  */
 export async function importFromGitlab(
   projectId: string,
+  userId: string,
   branch: string,
   conflictResolution: ConflictResolution
 ): Promise<SyncOperation> {
+  await requireProjectOwnership(projectId, userId);
+
   const db = getDb();
 
   // Create sync operation
@@ -356,10 +366,10 @@ export async function importFromGitlab(
 
   try {
     // Get the commit SHA for this branch at import time
-    const importCommitSha = await getBranchCommitSha(projectId, branch);
+    const importCommitSha = await getBranchCommitSha(projectId, userId, branch);
 
     // List RPY files in the repository
-    const rpyFiles = await listRpyFiles(projectId, branch);
+    const rpyFiles = await listRpyFiles(projectId, branch, userId);
 
     if (rpyFiles.length === 0) {
       // No files to import - mark as completed
@@ -394,7 +404,12 @@ export async function importFromGitlab(
     const fileFetchResults = await Promise.allSettled(
       rpyFiles.map((file) =>
         limiter.run(async () => {
-          const content = await getFileContent(projectId, file.path, branch);
+          const content = await getFileContent(
+            projectId,
+            userId,
+            file.path,
+            branch
+          );
           return { file, content };
         })
       )
@@ -769,7 +784,8 @@ export async function importFromGitlab(
  * Get a sync operation by ID
  */
 export async function getSyncOperation(
-  operationId: string
+  operationId: string,
+  userId: string
 ): Promise<SyncOperation | null> {
   const db = getDb();
 
@@ -779,7 +795,13 @@ export async function getSyncOperation(
     .where(eq(gitlabSyncOperations.id, operationId))
     .limit(1);
 
-  return (operation as SyncOperation) || null;
+  if (!operation) {
+    return null;
+  }
+
+  await requireProjectOwnership(operation.projectId, userId);
+
+  return operation as SyncOperation;
 }
 
 /**
@@ -787,8 +809,11 @@ export async function getSyncOperation(
  */
 export async function listSyncOperations(
   projectId: string,
+  userId: string,
   limit?: number
 ): Promise<SyncOperation[]> {
+  await requireProjectOwnership(projectId, userId);
+
   const db = getDb();
 
   const query = db

@@ -25,6 +25,11 @@ import * as encryptionService from "../encryption.service.js";
 // Use the same value as encryption.service.unit.test.ts for consistency
 const testToken = "glpat-123456789abcdefghijklmn";
 
+// Mock authz service — unit tests focus on HTTP operations, not authorization
+vi.mock("../authz.service.js", () => ({
+  requireProjectOwnership: vi.fn(),
+}));
+
 // Mock encryption service
 vi.mock("../encryption.service.js", () => ({
   validateAndGetUsername: vi.fn(),
@@ -294,9 +299,6 @@ describe("GitLabService (HTTP Operations)", () => {
         },
       ]);
 
-      // Mock project lookup
-      mockLimit.mockResolvedValueOnce([{ userId: testUserId }]);
-
       // Mock integration lookup
       mockLimit.mockResolvedValueOnce([
         {
@@ -320,17 +322,22 @@ describe("GitLabService (HTTP Operations)", () => {
         .matchHeader("private-token", testToken)
         .reply(200, mockBranches);
 
-      const result = await listBranches(testProjectId, testGitlabUrl);
+      const result = await listBranches(
+        testProjectId,
+        testUserId,
+        testGitlabUrl
+      );
 
       expect(result).toEqual(["main", "develop"]);
     });
 
     it("should throw when repository not linked", async () => {
-      mockLimit.mockResolvedValue([]);
+      // Repository link returns empty
+      mockLimit.mockResolvedValueOnce([]);
 
-      await expect(listBranches(testProjectId, testGitlabUrl)).rejects.toThrow(
-        "GitLab repository not linked"
-      );
+      await expect(
+        listBranches(testProjectId, testUserId, testGitlabUrl)
+      ).rejects.toThrow("GitLab repository not linked");
     });
   });
 
@@ -348,9 +355,6 @@ describe("GitLabService (HTTP Operations)", () => {
           createdAt: new Date(),
         },
       ]);
-
-      // Mock project lookup
-      mockLimit.mockResolvedValueOnce([{ userId: testUserId }]);
 
       // Mock integration lookup
       mockLimit.mockResolvedValueOnce([
@@ -387,6 +391,7 @@ describe("GitLabService (HTTP Operations)", () => {
       const result = await listRpyFiles(
         testProjectId,
         testBranch,
+        testUserId,
         testGitlabUrl
       );
 
@@ -410,33 +415,18 @@ describe("GitLabService (HTTP Operations)", () => {
         },
       ]);
 
-      // Mock project lookup
-      mockLimit.mockResolvedValueOnce([{ userId: testUserId }]);
-
-      // Mock integration lookup (will be called twice for pagination)
-      mockLimit
-        .mockResolvedValueOnce([
-          {
-            id: "integration-123",
-            userId: testUserId,
-            encryptedToken: "encrypted_token",
-            gitlabUrl: testGitlabUrl,
-            username: "testuser",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        ])
-        .mockResolvedValueOnce([
-          {
-            id: "integration-123",
-            userId: testUserId,
-            encryptedToken: "encrypted_token",
-            gitlabUrl: testGitlabUrl,
-            username: "testuser",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        ]);
+      // Mock integration lookup
+      mockLimit.mockResolvedValueOnce([
+        {
+          id: "integration-123",
+          userId: testUserId,
+          encryptedToken: "encrypted_token",
+          gitlabUrl: testGitlabUrl,
+          username: "testuser",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ]);
 
       const page1Files = [
         { name: "script.rpy", path: "game/script.rpy", type: "blob" },
@@ -475,6 +465,7 @@ describe("GitLabService (HTTP Operations)", () => {
       const result = await listRpyFiles(
         testProjectId,
         testBranch,
+        testUserId,
         testGitlabUrl
       );
 
@@ -499,9 +490,6 @@ describe("GitLabService (HTTP Operations)", () => {
           createdAt: new Date(),
         },
       ]);
-
-      // Mock project lookup
-      mockLimit.mockResolvedValueOnce([{ userId: testUserId }]);
 
       // Mock integration lookup
       mockLimit.mockResolvedValueOnce([
@@ -534,6 +522,7 @@ describe("GitLabService (HTTP Operations)", () => {
 
       const result = await getFileContent(
         testProjectId,
+        testUserId,
         "game/script.rpy",
         testBranch,
         testGitlabUrl
@@ -555,9 +544,6 @@ describe("GitLabService (HTTP Operations)", () => {
           createdAt: new Date(),
         },
       ]);
-
-      // Mock project lookup
-      mockLimit.mockResolvedValueOnce([{ userId: testUserId }]);
 
       // Mock integration lookup
       mockLimit.mockResolvedValueOnce([
@@ -582,6 +568,7 @@ describe("GitLabService (HTTP Operations)", () => {
 
       const result = await getFileContent(
         testProjectId,
+        testUserId,
         "game/missing.rpy",
         testBranch,
         testGitlabUrl
@@ -605,9 +592,6 @@ describe("GitLabService (HTTP Operations)", () => {
           createdAt: new Date(),
         },
       ]);
-
-      // Mock project lookup
-      mockLimit.mockResolvedValueOnce([{ userId: testUserId }]);
 
       // Mock integration lookup
       mockLimit.mockResolvedValueOnce([
@@ -637,6 +621,7 @@ describe("GitLabService (HTTP Operations)", () => {
 
       const result = await createOrUpdateFile(
         testProjectId,
+        testUserId,
         testBranch,
         "game/new.rpy",
         content,
@@ -663,9 +648,6 @@ describe("GitLabService (HTTP Operations)", () => {
           createdAt: new Date(),
         },
       ]);
-
-      // Mock project lookup
-      mockLimit.mockResolvedValueOnce([{ userId: testUserId }]);
 
       // Mock integration lookup
       mockLimit.mockResolvedValueOnce([
@@ -695,6 +677,7 @@ describe("GitLabService (HTTP Operations)", () => {
 
       const result = await createOrUpdateFile(
         testProjectId,
+        testUserId,
         testBranch,
         "game/script.rpy",
         content,
@@ -722,9 +705,6 @@ describe("GitLabService (HTTP Operations)", () => {
         },
       ]);
 
-      // Mock project lookup
-      mockLimit.mockResolvedValueOnce([{ userId: testUserId }]);
-
       // Mock integration lookup
       mockLimit.mockResolvedValueOnce([
         {
@@ -748,6 +728,7 @@ describe("GitLabService (HTTP Operations)", () => {
       await expect(
         createOrUpdateFile(
           testProjectId,
+          testUserId,
           testBranch,
           "game/script.rpy",
           "content",
