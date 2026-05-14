@@ -100,9 +100,9 @@ export class ConflictError extends HttpError {
  * Distinct from general NotFoundError so handlers can return
  * empty arrays instead of 404 errors for this specific case.
  */
-export class RepositoryNotLinkedError extends NotFoundError {
+export class RepositoryNotLinkedError extends HttpError {
   constructor(message: string = "GitLab repository not linked") {
-    super(message);
+    super(404, message, message);
     this.name = "RepositoryNotLinkedError";
   }
 }
