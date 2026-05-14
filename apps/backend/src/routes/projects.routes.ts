@@ -276,7 +276,7 @@ async function updateFileContentHandler(
     );
 
     if (err instanceof NotFoundError) {
-      reply.status(404).send({ error: "Not found" } as ErrorResponse);
+      reply.status(404).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
     if (err instanceof ForbiddenError) {

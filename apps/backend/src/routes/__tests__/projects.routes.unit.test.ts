@@ -503,7 +503,7 @@ describe("ProjectsRoutes", () => {
       });
 
       expect(response.statusCode).toBe(404);
-      expect(response.json()).toEqual({ error: "Not found" });
+      expect(response.json()).toEqual({ error: "File not found" });
     });
 
     it("should return 403 when access denied", async () => {

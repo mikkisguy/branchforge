@@ -33,7 +33,6 @@ import { syncLabelsFromFile } from "./labels.service.js";
 import type { SyncLabelsResult } from "./labels.service.js";
 import { calculateContentHash } from "../lib/hash.js";
 import { parseRPYFileWithLabels } from "./rpy-parser.service.js";
-import type { Transaction } from "../db/types.js";
 
 /**
  * Project row type from database queries (with optional role for shared projects)
@@ -532,8 +531,8 @@ export async function updateFileContent(
   try {
     const parsed = parseRPYFileWithLabels(content, file.filePath);
     nextFileType = parsed.fileType;
-  } catch {
-    throw new ValidationError("Invalid RPY file content");
+  } catch (err) {
+    throw new ValidationError("Invalid RPY file content", err);
   }
 
   // Calculate new content hash
@@ -593,7 +592,7 @@ export async function updateFileContent(
             { filePath: file.filePath, fileType: nextFileType },
             content,
             fileId,
-            { skipCleanup: false, tx: tx as Transaction }
+            { skipCleanup: false, tx }
           )
         : undefined;
 
