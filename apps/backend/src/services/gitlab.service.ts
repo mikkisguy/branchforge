@@ -31,6 +31,7 @@ import { importFromGitlab } from "./gitlab-sync.service.js";
 import { requireProjectOwnership } from "./authz.service.js";
 import { syncLabelsFromGitLabFile } from "./labels.service.js";
 import { logError, logWarn, LogEventType } from "../lib/logger.js";
+import { calculateContentHash } from "../lib/hash.js";
 import type {
   ConflictResolution,
   SyncOperation,
@@ -831,20 +832,20 @@ export async function importProjectFromGitLab(
   let newProject: Awaited<ReturnType<typeof createProject>> | null = null;
 
   try {
-    // Create the project
-    newProject = await createProject(userId, {
-      name: projectName,
-      description: projectDescription,
-      source: "GITLAB",
-    });
-
-    // Fetch GitLab project details to get the authoritative repository name
+    // Validate remote GitLab project exists before creating local project
     const gitlabProject = await getGitlabProject(userId, gitlabProjectId);
     if (!gitlabProject) {
       throw new NotFoundError("GitLab project");
     }
 
     const repositoryName = gitlabProject.path_with_namespace;
+
+    // Create the project
+    newProject = await createProject(userId, {
+      name: projectName,
+      description: projectDescription,
+      source: "GITLAB",
+    });
 
     // Link the repository
     await linkRepository(
@@ -868,7 +869,7 @@ export async function importProjectFromGitLab(
       operation,
     };
   } catch (err) {
-    // Clean up partially created project on error
+    // Clean up partially created project on subsequent errors
     if (newProject?.id) {
       await cleanupPartialProject(newProject.id);
     }
@@ -1018,17 +1019,13 @@ export async function updateGitLabFileContent(
     throw new NotFoundError("File");
   }
 
+  // Guard: only GitLab-sourced files can be updated via this helper
+  if (file.source !== "GITLAB") {
+    throw new NotFoundError("File");
+  }
+
   // Verify user owns the project
   await requireProjectOwnership(file.projectId, userId);
-
-  // Update file content directly (Script Mode)
-  await db
-    .update(projectFiles)
-    .set({
-      content,
-      updatedAt: new Date(),
-    })
-    .where(eq(projectFiles.id, fileId));
 
   const syncResult = await syncLabelsFromGitLabFile(fileId, content);
 
@@ -1049,6 +1046,16 @@ export async function updateGitLabFileContent(
       errors: syncResult.errors,
     });
   }
+
+  // Update file content and hash after sync succeeds (or after non-concurrent errors are logged)
+  await db
+    .update(projectFiles)
+    .set({
+      content,
+      contentHash: calculateContentHash(content),
+      updatedAt: new Date(),
+    })
+    .where(eq(projectFiles.id, fileId));
 
   // Return success with sync details
   return {
