@@ -38,11 +38,11 @@ import {
   removeLabelFromRPYContent,
   parseRPYFileWithLabels,
   convertToBranchForgeFormatFromLabels,
+  reconstructRPYFile,
   type ParsedRPYFileWithLabels,
 } from "./rpy-parser.service.js";
 import { calculateContentHash, calculateLinesHash } from "../lib/hash.js";
 import { mapEntryToDbType, type ContentType } from "./label-line-mapper.js";
-import { reconstructRPYFile } from "./rpy-parser.service.js";
 
 // Re-export PublicLabel from shared for route handlers
 export type { PublicLabel };
@@ -57,9 +57,9 @@ export type { PublicLabel };
  *
  * Only includes the query methods actually used by reconstructFileForLabel.
  */
-type QueryContext = {
-  select: ReturnType<typeof getDb>["select"];
-};
+type QueryContext =
+  | Pick<ReturnType<typeof getDb>, "select">
+  | Pick<Transaction, "select">;
 
 // ============================================================================
 // Constants
@@ -1243,14 +1243,18 @@ export async function reconstructFileForLabel(
 
   // Build dialogue map from grouped lines
   for (const l of allLabels) {
-    const labelName = l.labelName || l.title;
+    // Skip labels without a labelName (UI-created labels that don't exist in RPY files)
+    if (l.labelName === null) {
+      continue;
+    }
+
     const labelLinesData = linesByLabelId.get(l.id) || [];
 
     const labelDialogue = labelLinesData.map((line) => ({
       speaker: line.speaker,
       text: line.content,
     }));
-    updatedDialogue.set(labelName, labelDialogue);
+    updatedDialogue.set(l.labelName, labelDialogue);
   }
 
   // Reconstruct and return file content using current file content as base
