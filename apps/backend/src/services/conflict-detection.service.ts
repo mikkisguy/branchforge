@@ -6,6 +6,7 @@
  */
 
 import { getDb } from "../db/index.js";
+import { requireProjectOwnership } from "./authz.service.js";
 import {
   labels,
   labelLines,
@@ -54,8 +55,11 @@ export interface ConflictDetectionResult {
  */
 export async function detectConflicts(
   projectId: string,
+  userId: string,
   branch: string
 ): Promise<ConflictDetectionResult> {
+  await requireProjectOwnership(projectId, userId);
+
   const conflicts: ConflictInfo[] = [];
 
   try {

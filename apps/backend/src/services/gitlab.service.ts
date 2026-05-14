@@ -10,8 +10,10 @@ import {
   gitlabIntegrations,
   gitlabRepositories,
   projects,
+  projectFiles,
+  labels,
 } from "../db/schema/index.js";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import {
   validateAndGetUsername,
   encryptPAT,
@@ -23,6 +25,14 @@ import {
   ConflictError,
 } from "../middleware/error-handler.middleware.js";
 import { isPostgresError } from "../lib/db.js";
+import { createProject, deleteProject } from "./projects.service.js";
+import { importFromGitlab } from "./gitlab-sync.service.js";
+import { requireProjectOwnership } from "./authz.service.js";
+import { syncLabelsFromGitLabFile } from "./labels.service.js";
+import type {
+  ConflictResolution,
+  SyncOperation,
+} from "./gitlab-sync.service.js";
 
 const DEFAULT_TIMEOUT_MS = 30000;
 
@@ -305,15 +315,24 @@ export async function getGitlabProject(
  * @param gitlabProjectId - The GitLab project ID
  * @param repositoryName - The repository name
  * @param defaultBranch - The default branch (default: main)
+ * @param userId - The user ID making the request (for authorization)
+ * @throws NotFoundError if project not found
+ * @throws ForbiddenError if user lacks permission
  * @throws ConflictError if the GitLab repository is already linked to a different project
  */
 export async function linkRepository(
   projectId: string,
   gitlabProjectId: number,
   repositoryName: string,
-  defaultBranch: string = "main"
+  defaultBranch: string = "main",
+  userId?: string
 ): Promise<void> {
   const db = getDb();
+
+  // Check authorization if userId is provided
+  if (userId) {
+    await requireProjectOwnership(projectId, userId);
+  }
 
   try {
     await db.transaction(async (tx) => {
@@ -373,9 +392,21 @@ export async function linkRepository(
 /**
  * Unlink a GitLab repository from a BranchForge project
  * @param projectId - The BranchForge project ID
+ * @param userId - The user ID making the request (for authorization)
+ * @throws NotFoundError if project not found
+ * @throws ForbiddenError if user lacks permission
  */
-export async function unlinkRepository(projectId: string): Promise<void> {
+export async function unlinkRepository(
+  projectId: string,
+  userId?: string
+): Promise<void> {
   const db = getDb();
+
+  // Check authorization if userId is provided
+  if (userId) {
+    await requireProjectOwnership(projectId, userId);
+  }
+
   await db
     .delete(gitlabRepositories)
     .where(eq(gitlabRepositories.projectId, projectId));
@@ -425,31 +456,26 @@ export async function listRepositoryLinks(userId: string) {
 /**
  * List branches in a GitLab repository
  * @param projectId - The BranchForge project ID
+ * @param userId - The user ID making the request (for authorization)
  * @param gitlabUrl - Optional GitLab URL override
  * @returns Array of branch names
+ * @throws NotFoundError if project not found or repository not linked
+ * @throws ForbiddenError if user lacks permission
  */
 export async function listBranches(
   projectId: string,
+  userId: string,
   gitlabUrl?: string
 ): Promise<string[]> {
   const repoLink = await getRepositoryLink(projectId);
   if (!repoLink) {
-    throw new Error("GitLab repository not linked");
+    throw new NotFoundError("GitLab repository");
   }
 
-  // Get user ID from project to fetch integration
-  const db = getDb();
-  const projectResult = await db
-    .select({ userId: projects.userId })
-    .from(projects)
-    .where(eq(projects.id, projectId))
-    .limit(1);
+  // Check authorization
+  await requireProjectOwnership(projectId, userId);
 
-  if (projectResult.length === 0) {
-    throw new Error("Project not found");
-  }
-
-  const token = await getDecryptedToken(projectResult[0].userId);
+  const token = await getDecryptedToken(userId);
   const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
 
   const apiUrl = new URL(
@@ -528,32 +554,27 @@ export async function getBranchCommitSha(
  * List .rpy files in a GitLab repository
  * @param projectId - The BranchForge project ID
  * @param branch - The branch to search
+ * @param userId - The user ID making the request (for authorization)
  * @param gitlabUrl - Optional GitLab URL override
  * @returns Array of .rpy file info
+ * @throws NotFoundError if project not found or repository not linked
+ * @throws ForbiddenError if user lacks permission
  */
 export async function listRpyFiles(
   projectId: string,
   branch: string,
+  userId: string,
   gitlabUrl?: string
 ): Promise<Array<{ name: string; path: string }>> {
   const repoLink = await getRepositoryLink(projectId);
   if (!repoLink) {
-    throw new Error("GitLab repository not linked");
+    throw new NotFoundError("GitLab repository");
   }
 
-  // Get user ID from project
-  const db = getDb();
-  const projectResult = await db
-    .select({ userId: projects.userId })
-    .from(projects)
-    .where(eq(projects.id, projectId))
-    .limit(1);
+  // Check authorization
+  await requireProjectOwnership(projectId, userId);
 
-  if (projectResult.length === 0) {
-    throw new Error("Project not found");
-  }
-
-  const token = await getDecryptedToken(projectResult[0].userId);
+  const token = await getDecryptedToken(userId);
   const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
 
   const rpyFiles: Array<{ name: string; path: string }> = [];
@@ -776,4 +797,281 @@ export async function createOrUpdateFile(
   }
 
   return (await response.json()) as { file_path: string; branch: string };
+}
+
+// ============================================================================
+// Project Import Coordination
+// ============================================================================
+
+/**
+ * Import a project from GitLab
+ *
+ * Creates a new project, links it to a GitLab repository, and imports files.
+ * Handles cleanup of partially created projects on errors.
+ *
+ * @param userId - The user ID creating the project
+ * @param data - Import data including project name, GitLab project ID, branch, etc.
+ * @returns The created project and sync operation
+ * @throws NotFoundError if GitLab project not found
+ * @throws ConflictError if repository already linked
+ */
+export async function importProjectFromGitLab(
+  userId: string,
+  data: {
+    projectName: string;
+    projectDescription?: string;
+    gitlabProjectId: number;
+    branch: string;
+    conflictResolution: ConflictResolution;
+  }
+): Promise<{
+  project: Awaited<ReturnType<typeof createProject>>;
+  operation: SyncOperation;
+}> {
+  const {
+    projectName,
+    projectDescription,
+    gitlabProjectId,
+    branch,
+    conflictResolution,
+  } = data;
+
+  /**
+   * Cleanup helper for partially created projects
+   */
+  async function cleanupPartialProject(projectId: string): Promise<void> {
+    try {
+      await deleteProject(userId, projectId);
+    } catch (deleteErr) {
+      // Log but don't throw - cleanup is best-effort
+      console.error(
+        `Failed to cleanup partially created project ${projectId}:`,
+        deleteErr
+      );
+    }
+  }
+
+  let newProject: Awaited<ReturnType<typeof createProject>> | null = null;
+
+  try {
+    // Create the project
+    newProject = await createProject(userId, {
+      name: projectName,
+      description: projectDescription,
+      source: "GITLAB",
+    });
+
+    // Fetch GitLab project details to get the authoritative repository name
+    const gitlabProject = await getGitlabProject(userId, gitlabProjectId);
+    if (!gitlabProject) {
+      throw new NotFoundError("GitLab project");
+    }
+
+    const repositoryName = gitlabProject.path_with_namespace;
+
+    // Link the repository
+    await linkRepository(
+      newProject.id,
+      gitlabProjectId,
+      repositoryName,
+      branch
+    );
+
+    // Import files
+    const operation = await importFromGitlab(
+      newProject.id,
+      userId,
+      branch,
+      conflictResolution
+    );
+
+    return {
+      project: newProject,
+      operation,
+    };
+  } catch (err) {
+    // Clean up partially created project on error
+    if (newProject?.id) {
+      await cleanupPartialProject(newProject.id);
+    }
+
+    // Re-throw the error for the route handler to convert to HTTP response
+    throw err;
+  }
+}
+
+// ============================================================================
+// GitLab Files with Scenes
+// ============================================================================
+
+/**
+ * Get GitLab files for a project with their associated scenes
+ *
+ * Returns all GitLab files for the project with their associated scenes (labels).
+ * Uses batch fetching to avoid N+1 queries.
+ *
+ * @param projectId - The project ID
+ * @returns Array of files with their scenes
+ */
+export async function getGitLabFilesWithScenes(
+  projectId: string,
+  userId: string
+): Promise<
+  Array<{
+    id: string;
+    projectId: string;
+    source: string;
+    filePath: string;
+    fileType: string | null;
+    content: string | null;
+    contentHash: string | null;
+    lastSyncedAt: Date | null;
+    lastCommitSha: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    scenes: Array<{
+      id: string;
+      labelName: string | null;
+      title: string;
+      projectFileId: string;
+    }>;
+  }>
+> {
+  const db = getDb();
+
+  await requireProjectOwnership(projectId, userId);
+
+  // Get all GitLab files for the project
+  const files = await db
+    .select()
+    .from(projectFiles)
+    .where(eq(projectFiles.projectId, projectId));
+
+  // Batch fetch all scenes for all files at once to avoid N+1 queries
+  const fileIds = files.map((f) => f.id);
+
+  type SceneWithFileId = {
+    id: string;
+    labelName: string | null;
+    title: string;
+    projectFileId: string;
+  };
+
+  const allScenes: SceneWithFileId[] =
+    fileIds.length > 0
+      ? await db
+          .select({
+            id: labels.id,
+            labelName: labels.labelName,
+            title: labels.title,
+            projectFileId: labels.projectFileId,
+          })
+          .from(labels)
+          .where(inArray(labels.projectFileId, fileIds))
+      : [];
+
+  // Create a lookup keyed by projectFileId
+  const scenesByFileId = new Map<string, SceneWithFileId[]>();
+  for (const scene of allScenes) {
+    if (!scenesByFileId.has(scene.projectFileId)) {
+      scenesByFileId.set(scene.projectFileId, []);
+    }
+    scenesByFileId.get(scene.projectFileId)!.push(scene);
+  }
+
+  // Attach scenes to each file using the lookup
+  const filesWithScenes = files.map((file) => ({
+    ...file,
+    scenes: scenesByFileId.get(file.id) ?? [],
+  }));
+
+  return filesWithScenes;
+}
+
+// ============================================================================
+// GitLab File Content Update
+// ============================================================================
+
+/**
+ * Update GitLab file content and sync labels
+ *
+ * Updates file content (Script Mode editing) and re-parses the content to
+ * update associated scenes using syncLabelsFromGitLabFile.
+ *
+ * @param fileId - The file ID to update
+ * @param content - The new file content
+ * @param userId - The user ID making the update
+ * @returns Update result with sync statistics
+ * @throws NotFoundError if file not found
+ * @throws ForbiddenError if user lacks access
+ * @throws ConflictError if sync is already in progress
+ */
+export async function updateGitLabFileContent(
+  fileId: string,
+  content: string,
+  userId: string
+): Promise<{
+  success: boolean;
+  sync: {
+    skipped: boolean;
+    scenesCreated: number;
+    scenesUpdated: number;
+    scenesDeleted: number;
+    linesProcessed: number;
+    errors: Array<{ label: string; error: string }>;
+  };
+}> {
+  const db = getDb();
+
+  // Get file to check project access
+  const [file] = await db
+    .select()
+    .from(projectFiles)
+    .where(eq(projectFiles.id, fileId))
+    .limit(1);
+
+  if (!file) {
+    throw new NotFoundError("File");
+  }
+
+  // Verify user owns the project
+  await requireProjectOwnership(file.projectId, userId);
+
+  // Update file content directly (Script Mode)
+  await db
+    .update(projectFiles)
+    .set({
+      content,
+      updatedAt: new Date(),
+    })
+    .where(eq(projectFiles.id, fileId));
+
+  const syncResult = await syncLabelsFromGitLabFile(fileId, content);
+
+  if (!syncResult.success && syncResult.errors.length > 0) {
+    // Check if it's a concurrent sync error
+    const concurrentError = syncResult.errors.find((e) =>
+      e.error.includes("already in progress")
+    );
+
+    if (concurrentError) {
+      throw new ConflictError(concurrentError.error);
+    }
+
+    // Other sync errors - log but still return success for file update
+    console.warn("Scene sync had errors:", syncResult.errors);
+  }
+
+  // Return success with sync details
+  return {
+    success: true,
+    sync: {
+      skipped: syncResult.skipped,
+      scenesCreated: syncResult.labelsCreated,
+      scenesUpdated: syncResult.labelsUpdated,
+      scenesDeleted: syncResult.labelsDeleted,
+      linesProcessed: syncResult.linesProcessed,
+      errors: syncResult.errors,
+    },
+  };
 }

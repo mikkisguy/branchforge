@@ -320,7 +320,11 @@ describe("GitLabService (HTTP Operations)", () => {
         .matchHeader("private-token", testToken)
         .reply(200, mockBranches);
 
-      const result = await listBranches(testProjectId, testGitlabUrl);
+      const result = await listBranches(
+        testProjectId,
+        testUserId,
+        testGitlabUrl
+      );
 
       expect(result).toEqual(["main", "develop"]);
     });
@@ -328,9 +332,9 @@ describe("GitLabService (HTTP Operations)", () => {
     it("should throw when repository not linked", async () => {
       mockLimit.mockResolvedValue([]);
 
-      await expect(listBranches(testProjectId, testGitlabUrl)).rejects.toThrow(
-        "GitLab repository not linked"
-      );
+      await expect(
+        listBranches(testProjectId, testUserId, testGitlabUrl)
+      ).rejects.toThrow("GitLab repository not found");
     });
   });
 
@@ -387,6 +391,7 @@ describe("GitLabService (HTTP Operations)", () => {
       const result = await listRpyFiles(
         testProjectId,
         testBranch,
+        testUserId,
         testGitlabUrl
       );
 
@@ -475,6 +480,7 @@ describe("GitLabService (HTTP Operations)", () => {
       const result = await listRpyFiles(
         testProjectId,
         testBranch,
+        testUserId,
         testGitlabUrl
       );
 

@@ -176,7 +176,11 @@ describe("ConflictDetectionService (Integration)", () => {
         fileType: "STORY",
       });
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result).toMatchObject({
         hasConflicts: false,
@@ -219,7 +223,11 @@ describe("ConflictDetectionService (Integration)", () => {
         fileType: "STORY",
       });
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result.hasConflicts).toBe(true);
       expect(result.conflicts).toHaveLength(1);
@@ -261,7 +269,11 @@ describe("ConflictDetectionService (Integration)", () => {
         fileType: "STORY",
       });
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result.hasConflicts).toBe(true);
       expect(result.conflicts).toHaveLength(1);
@@ -306,7 +318,11 @@ describe("ConflictDetectionService (Integration)", () => {
         fileType: "STORY",
       });
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result.hasConflicts).toBe(true);
       // We expect 2 conflicts: "other" is a new remote label, and "start" was deleted remotely
@@ -361,7 +377,11 @@ describe("ConflictDetectionService (Integration)", () => {
         fileType: "STORY",
       });
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result.hasConflicts).toBe(true);
       expect(result.conflicts).toHaveLength(1);
@@ -408,7 +428,11 @@ describe("ConflictDetectionService (Integration)", () => {
         fileType: "STORY",
       });
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result).toMatchObject({
         hasConflicts: false,
@@ -487,7 +511,11 @@ describe("ConflictDetectionService (Integration)", () => {
         }
       );
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result.hasConflicts).toBe(true);
       expect(result.conflicts.length).toBeGreaterThanOrEqual(2);
@@ -515,7 +543,11 @@ describe("ConflictDetectionService (Integration)", () => {
         new Error("API Error")
       );
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result).toMatchObject({
         hasConflicts: false,
@@ -632,7 +664,11 @@ describe("ConflictDetectionService (Integration)", () => {
         }
       );
 
-      const result = await detectConflicts(testProjectId, testBranch);
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
 
       expect(result).toMatchObject({
         hasConflicts: false,

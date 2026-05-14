@@ -12,16 +12,9 @@ import {
   NotFoundError,
   ConflictError,
   ForbiddenError,
+  ValidationError,
 } from "../middleware/error-handler.middleware.js";
-import { requireProjectOwnership } from "../services/authz.service.js";
 import { checkRateLimit } from "../services/rate-limiter.service.js";
-import { getDb } from "../db/index.js";
-import {
-  gitlabSyncOperations,
-  projectFiles,
-  labels,
-} from "../db/schema/index.js";
-import { eq, inArray } from "drizzle-orm";
 import {
   validateGitlabPAT,
   storeGitlabIntegration,
@@ -34,6 +27,9 @@ import {
   listRpyFiles,
   getGitlabIntegration,
   listRepositoryLinks,
+  importProjectFromGitLab,
+  getGitLabFilesWithScenes,
+  updateGitLabFileContent,
 } from "../services/gitlab.service.js";
 import {
   exportToGitlab,
@@ -48,8 +44,6 @@ import {
   type ImportProjectInput,
   isValidConflictResolution,
 } from "../lib/validation.js";
-import { createProject, deleteProject } from "../services/projects.service.js";
-import { syncLabelsFromGitLabFile } from "../services/labels.service.js";
 
 /**
  * Helper to get the authenticated user ID from a request.
@@ -87,42 +81,6 @@ function getClientIp(request: FastifyRequest): string {
 
   // Fall back to socket address
   return request.ip;
-}
-
-/**
- * Assert that the authenticated user owns the specified project.
- *
- * Sends an appropriate HTTP error response and returns false if the user
- * does not own the project or the project does not exist.
- *
- * @param projectId - The project ID to verify
- * @param userId - The authenticated user's ID
- * @param reply - Fastify reply object for sending error responses
- * @returns true if authorized, false if an error response was sent
- */
-async function assertProjectOwnership(
-  projectId: string,
-  userId: string,
-  reply: FastifyReply
-): Promise<boolean> {
-  try {
-    await requireProjectOwnership(projectId, userId);
-    return true;
-  } catch (err) {
-    if (err instanceof NotFoundError) {
-      reply
-        .status(404)
-        .send({ error: "Not Found", message: "Project not found" });
-    } else if (err instanceof ForbiddenError) {
-      reply.status(403).send({
-        error: "Forbidden",
-        message: "You do not have access to this project",
-      });
-    } else {
-      throw err;
-    }
-    return false;
-  }
 }
 
 // ============================================================================
@@ -402,10 +360,6 @@ async function linkRepositoryHandler(
     return;
   }
 
-  if (!(await assertProjectOwnership(projectId, userId, reply))) {
-    return;
-  }
-
   try {
     // Fetch GitLab project details to get the repository name
     const gitlabProject = await getGitlabProject(userId, gitlabProjectId);
@@ -417,7 +371,13 @@ async function linkRepositoryHandler(
     // Use path_with_namespace as the repository name (more descriptive)
     const repositoryName = gitlabProject.path_with_namespace;
 
-    await linkRepository(projectId, gitlabProjectId, repositoryName, branch);
+    await linkRepository(
+      projectId,
+      gitlabProjectId,
+      repositoryName,
+      branch,
+      userId
+    );
     reply.status(201).send();
   } catch (err) {
     request.log.error(
@@ -451,22 +411,24 @@ async function unlinkRepositoryHandler(
   const userId = getAuthenticatedUserId(request);
   const { projectId } = request.params;
 
-  if (!(await assertProjectOwnership(projectId, userId, reply))) {
-    return;
-  }
-
   try {
-    await unlinkRepository(projectId);
+    await unlinkRepository(projectId, userId);
     reply.status(204).send();
   } catch (err) {
-    request.log.error(
-      { err, projectId },
-      "unlinkRepositoryHandler: Failed to unlink repository"
-    );
-    reply.status(500).send({
-      error: "Failed to unlink repository",
-      message: "An internal error occurred",
-    });
+    if (err instanceof NotFoundError) {
+      reply.status(404).send({ error: "Not Found", message: err.message });
+    } else if (err instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden", message: err.message });
+    } else {
+      request.log.error(
+        { err, projectId },
+        "unlinkRepositoryHandler: Failed to unlink repository"
+      );
+      reply.status(500).send({
+        error: "Failed to unlink repository",
+        message: "An internal error occurred",
+      });
+    }
   }
 }
 
@@ -522,12 +484,8 @@ async function listBranchesHandler(
   const userId = getAuthenticatedUserId(request);
   const { projectId } = request.params;
 
-  if (!(await assertProjectOwnership(projectId, userId, reply))) {
-    return;
-  }
-
   try {
-    const branches = await listBranches(projectId);
+    const branches = await listBranches(projectId, userId);
     reply.send(branches);
   } catch (err) {
     // Return empty array if repository not linked (normal state, not an error)
@@ -545,7 +503,14 @@ async function listBranchesHandler(
       "listBranchesHandler: Failed to list branches"
     );
 
-    if (err instanceof Error && err.message.startsWith("GitLab API error:")) {
+    if (err instanceof NotFoundError) {
+      reply.status(404).send({ error: "Not Found", message: err.message });
+    } else if (err instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden", message: err.message });
+    } else if (
+      err instanceof Error &&
+      err.message.startsWith("GitLab API error:")
+    ) {
       reply.status(502).send({
         error: "Failed to fetch branches from GitLab",
         message: "Unable to communicate with GitLab. Please try again later.",
@@ -584,12 +549,8 @@ async function listFilesHandler(
     return;
   }
 
-  if (!(await assertProjectOwnership(projectId, userId, reply))) {
-    return;
-  }
-
   try {
-    const files = await listRpyFiles(projectId, branch);
+    const files = await listRpyFiles(projectId, branch, userId);
     reply.send(files);
   } catch (err) {
     // Return empty array if repository not linked (normal state, not an error)
@@ -607,7 +568,14 @@ async function listFilesHandler(
       "listFilesHandler: Failed to list RPY files"
     );
 
-    if (err instanceof Error && err.message.startsWith("GitLab API error:")) {
+    if (err instanceof NotFoundError) {
+      reply.status(404).send({ error: "Not Found", message: err.message });
+    } else if (err instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden", message: err.message });
+    } else if (
+      err instanceof Error &&
+      err.message.startsWith("GitLab API error:")
+    ) {
       reply.status(502).send({
         error: "Failed to fetch files from GitLab",
         message: "Unable to communicate with GitLab. Please try again later.",
@@ -642,22 +610,29 @@ async function exportHandler(
     return;
   }
 
-  if (!(await assertProjectOwnership(projectId, userId, reply))) {
-    return;
-  }
-
   try {
-    const operation = await exportToGitlab(projectId, branch, commitMessage);
+    const operation = await exportToGitlab(
+      projectId,
+      userId,
+      branch,
+      commitMessage
+    );
     reply.status(202).send(operation);
   } catch (err) {
-    request.log.error(
-      { err, projectId },
-      "exportHandler: Failed to export to GitLab"
-    );
-    reply.status(500).send({
-      error: "Failed to export to GitLab",
-      message: "An internal error occurred",
-    });
+    if (err instanceof NotFoundError) {
+      reply.status(404).send({ error: "Not Found", message: err.message });
+    } else if (err instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden", message: err.message });
+    } else {
+      request.log.error(
+        { err, projectId },
+        "exportHandler: Failed to export to GitLab"
+      );
+      reply.status(500).send({
+        error: "Failed to export to GitLab",
+        message: "An internal error occurred",
+      });
+    }
   }
 }
 
@@ -686,26 +661,29 @@ async function importHandler(
     return;
   }
 
-  if (!(await assertProjectOwnership(projectId, userId, reply))) {
-    return;
-  }
-
   try {
     const operation = await importFromGitlab(
       projectId,
+      userId,
       branch,
       conflictResolution
     );
     reply.status(202).send(operation);
   } catch (err) {
-    request.log.error(
-      { err, projectId },
-      "importHandler: Failed to import from GitLab"
-    );
-    reply.status(500).send({
-      error: "Failed to import from GitLab",
-      message: "An internal error occurred",
-    });
+    if (err instanceof NotFoundError) {
+      reply.status(404).send({ error: "Not Found", message: err.message });
+    } else if (err instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden", message: err.message });
+    } else {
+      request.log.error(
+        { err, projectId },
+        "importHandler: Failed to import from GitLab"
+      );
+      reply.status(500).send({
+        error: "Failed to import from GitLab",
+        message: "An internal error occurred",
+      });
+    }
   }
 }
 
@@ -746,115 +724,37 @@ async function importProjectHandler(
     conflictResolution,
   } = request.body;
 
-  /**
-   * Cleanup helper for partially created projects
-   *
-   * Attempts to delete a partially created project and logs the result.
-   * Used throughout importProjectHandler to clean up on errors.
-   *
-   * @param projectId - The ID of the project to delete
-   * @param context - Context string for logging (e.g., error type)
-   */
-  async function cleanupPartialProject(
-    projectId: string,
-    context: string
-  ): Promise<void> {
-    try {
-      await deleteProject(userId, projectId);
-      request.log.info(
-        { projectId },
-        `importProjectHandler: Cleaned up partially created project ${context}`
-      );
-    } catch (deleteErr) {
-      request.log.error(
-        { err: deleteErr, projectId },
-        "importProjectHandler: Failed to cleanup partially created project"
-      );
-    }
-  }
-
-  let newProject: Awaited<ReturnType<typeof createProject>> | null = null;
-
   try {
-    newProject = await createProject(userId, {
-      name: projectName,
-      description: projectDescription,
-      source: "GITLAB",
-    });
-
-    // Fetch GitLab project details to get the authoritative repository name
-    const gitlabProject = await getGitlabProject(userId, gitlabProjectId);
-    if (!gitlabProject) {
-      reply.status(404).send({ error: "GitLab project not found" });
-      if (newProject?.id) {
-        await cleanupPartialProject(
-          newProject.id,
-          "after GitLab project not found"
-        );
-      }
-      return;
-    }
-
-    const repositoryName = gitlabProject.path_with_namespace;
-
-    await linkRepository(
-      newProject.id,
+    const result = await importProjectFromGitLab(userId, {
+      projectName,
+      projectDescription,
       gitlabProjectId,
-      repositoryName,
-      branch
-    );
-
-    const operation = await importFromGitlab(
-      newProject.id,
       branch,
-      conflictResolution
-    );
-
-    reply.status(202).send({
-      project: newProject,
-      operation,
+      conflictResolution,
     });
+    reply.status(202).send(result);
   } catch (err) {
-    request.log.error(
-      { err },
-      "importProjectHandler: Failed to import project from GitLab"
-    );
-
-    // Check for conflict error from linkRepository (repository already linked)
     if (err instanceof ConflictError) {
-      // Delete the partially created project before sending response
-      if (newProject?.id) {
-        await cleanupPartialProject(
-          newProject.id,
-          "after duplicate-link error"
-        );
-      }
-
       reply.status(409).send({
         error: "Repository already linked",
         message: "This repository is already linked to your project.",
       });
-      return;
+    } else if (err instanceof NotFoundError) {
+      reply.status(404).send({ error: "Not Found", message: err.message });
+    } else if (err instanceof ValidationError) {
+      reply
+        .status(400)
+        .send({ error: "Validation Error", message: err.message });
+    } else {
+      request.log.error(
+        { err },
+        "importProjectHandler: Failed to import project from GitLab"
+      );
+      reply.status(500).send({
+        error: "Failed to import project from GitLab",
+        message: "An internal error occurred",
+      });
     }
-
-    // Check for NotFoundError and rethrow after cleanup
-    if (err instanceof NotFoundError) {
-      // Delete the partially created project before rethrowing
-      if (newProject?.id) {
-        await cleanupPartialProject(newProject.id, "after NotFoundError");
-      }
-      // Rethrow NotFoundError so global error handler returns 404
-      throw err;
-    }
-
-    if (newProject?.id) {
-      await cleanupPartialProject(newProject.id, "");
-    }
-
-    reply.status(500).send({
-      error: "Failed to import project from GitLab",
-      message: "An internal error occurred",
-    });
   }
 }
 
@@ -872,28 +772,8 @@ async function getOperationHandler(
   const userId = getAuthenticatedUserId(request);
   const { operationId } = request.params;
 
-  // Verify user owns the project associated with this operation
-  const db = getDb();
-  const [operation] = await db
-    .select({ projectId: gitlabSyncOperations.projectId })
-    .from(gitlabSyncOperations)
-    .where(eq(gitlabSyncOperations.id, operationId))
-    .limit(1);
-
-  if (!operation) {
-    reply.status(404).send({
-      error: "Not Found",
-      message: "Sync operation not found",
-    });
-    return;
-  }
-
-  if (!(await assertProjectOwnership(operation.projectId, userId, reply))) {
-    return;
-  }
-
   try {
-    const operation = await getSyncOperation(operationId);
+    const operation = await getSyncOperation(operationId, userId);
 
     if (!operation) {
       reply
@@ -904,14 +784,20 @@ async function getOperationHandler(
 
     reply.send(operation);
   } catch (err) {
-    request.log.error(
-      { err, operationId },
-      "getOperationHandler: Failed to get sync operation"
-    );
-    reply.status(500).send({
-      error: "Failed to get sync operation",
-      message: "An internal error occurred",
-    });
+    if (err instanceof NotFoundError) {
+      reply.status(404).send({ error: "Not Found", message: err.message });
+    } else if (err instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden", message: err.message });
+    } else {
+      request.log.error(
+        { err, operationId },
+        "getOperationHandler: Failed to get sync operation"
+      );
+      reply.status(500).send({
+        error: "Failed to get sync operation",
+        message: "An internal error occurred",
+      });
+    }
   }
 }
 
@@ -929,22 +815,24 @@ async function listOperationsHandler(
   const userId = getAuthenticatedUserId(request);
   const { projectId } = request.params;
 
-  if (!(await assertProjectOwnership(projectId, userId, reply))) {
-    return;
-  }
-
   try {
-    const operations = await listSyncOperations(projectId);
+    const operations = await listSyncOperations(projectId, userId);
     reply.send(operations);
   } catch (err) {
-    request.log.error(
-      { err, projectId },
-      "listOperationsHandler: Failed to list sync operations"
-    );
-    reply.status(500).send({
-      error: "Failed to list sync operations",
-      message: "An internal error occurred",
-    });
+    if (err instanceof NotFoundError) {
+      reply.status(404).send({ error: "Not Found", message: err.message });
+    } else if (err instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden", message: err.message });
+    } else {
+      request.log.error(
+        { err, projectId },
+        "listOperationsHandler: Failed to list sync operations"
+      );
+      reply.status(500).send({
+        error: "Failed to list sync operations",
+        message: "An internal error occurred",
+      });
+    }
   }
 }
 
@@ -968,22 +856,24 @@ async function detectConflictsHandler(
     return;
   }
 
-  if (!(await assertProjectOwnership(projectId, userId, reply))) {
-    return;
-  }
-
   try {
-    const result = await detectConflicts(projectId, branch);
+    const result = await detectConflicts(projectId, userId, branch);
     reply.send(result);
   } catch (err) {
-    request.log.error(
-      { err, projectId, branch },
-      "detectConflictsHandler: Failed to detect conflicts"
-    );
-    reply.status(500).send({
-      error: "Failed to detect conflicts",
-      message: "An internal error occurred",
-    });
+    if (err instanceof NotFoundError) {
+      reply.status(404).send({ error: "Not Found", message: err.message });
+    } else if (err instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden", message: err.message });
+    } else {
+      request.log.error(
+        { err, projectId, branch },
+        "detectConflictsHandler: Failed to detect conflicts"
+      );
+      reply.status(500).send({
+        error: "Failed to detect conflicts",
+        message: "An internal error occurred",
+      });
+    }
   }
 }
 
@@ -1002,68 +892,24 @@ async function getGitLabFilesHandler(
   const userId = getAuthenticatedUserId(request);
   const { projectId } = request.params;
 
-  if (!(await assertProjectOwnership(projectId, userId, reply))) {
-    return;
-  }
-
   try {
-    const db = getDb();
-
-    // Get all GitLab files for the project
-    const files = await db
-      .select()
-      .from(projectFiles)
-      .where(eq(projectFiles.projectId, projectId));
-
-    // Batch fetch all scenes for all files at once to avoid N+1 queries
-    const fileIds = files.map((f) => f.id);
-
-    // Define the scene type for the lookup
-    type SceneWithFileId = {
-      id: string;
-      labelName: string | null;
-      title: string;
-      projectFileId: string;
-    };
-
-    const allScenes: SceneWithFileId[] =
-      fileIds.length > 0
-        ? await db
-            .select({
-              id: labels.id,
-              labelName: labels.labelName,
-              title: labels.title,
-              projectFileId: labels.projectFileId,
-            })
-            .from(labels)
-            .where(inArray(labels.projectFileId, fileIds))
-        : [];
-
-    // Create a lookup keyed by projectFileId
-    const scenesByFileId = new Map<string, SceneWithFileId[]>();
-    for (const scene of allScenes) {
-      if (!scenesByFileId.has(scene.projectFileId)) {
-        scenesByFileId.set(scene.projectFileId, []);
-      }
-      scenesByFileId.get(scene.projectFileId)!.push(scene);
-    }
-
-    // Attach scenes to each file using the lookup
-    const filesWithScenes = files.map((file) => ({
-      ...file,
-      scenes: scenesByFileId.get(file.id) ?? [],
-    }));
-
-    reply.send(filesWithScenes);
+    const files = await getGitLabFilesWithScenes(projectId, userId);
+    reply.send(files);
   } catch (err) {
-    request.log.error(
-      { err, projectId },
-      "getGitLabFilesHandler: Failed to get GitLab files"
-    );
-    reply.status(500).send({
-      error: "Failed to get GitLab files",
-      message: "An internal error occurred",
-    });
+    if (err instanceof NotFoundError) {
+      reply.status(404).send({ error: "Not Found", message: err.message });
+    } else if (err instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden", message: err.message });
+    } else {
+      request.log.error(
+        { err, projectId },
+        "getGitLabFilesHandler: Failed to get GitLab files"
+      );
+      reply.status(500).send({
+        error: "Failed to get GitLab files",
+        message: "An internal error occurred",
+      });
+    }
   }
 }
 
@@ -1075,12 +921,6 @@ async function getGitLabFilesHandler(
  *
  * Updates file content (Script Mode editing)
  * Also re-parses the content to update associated scenes
- *
- * Uses syncLabelsFromGitLabFile from labels.service for reliable sync with:
- * - Atomic transactions
- * - Idempotency (same content skipped)
- * - Concurrent sync prevention
- * - Validation
  */
 async function updateGitLabFileHandler(
   request: FastifyRequest<{
@@ -1099,79 +939,28 @@ async function updateGitLabFileHandler(
   }
 
   try {
-    const db = getDb();
-
-    // Get file to check project access
-    const [file] = await db
-      .select()
-      .from(projectFiles)
-      .where(eq(projectFiles.id, fileId))
-      .limit(1);
-
-    if (!file) {
-      reply.status(404).send({ error: "File not found" });
-      return;
-    }
-
-    // Verify user owns the project
-    if (!(await assertProjectOwnership(file.projectId, userId, reply))) {
-      return;
-    }
-
-    // Update file content directly (Script Mode)
-    await db
-      .update(projectFiles)
-      .set({
-        content,
-        updatedAt: new Date(),
-      })
-      .where(eq(projectFiles.id, fileId));
-
-    const syncResult = await syncLabelsFromGitLabFile(fileId, content);
-
-    if (!syncResult.success && syncResult.errors.length > 0) {
-      // Check if it's a concurrent sync error
-      const concurrentError = syncResult.errors.find((e) =>
-        e.error.includes("already in progress")
-      );
-
-      if (concurrentError) {
-        reply.status(409).send({
-          error: "Sync already in progress",
-          message: concurrentError.error,
-        });
-        return;
-      }
-
-      // Other sync errors - still return success for file update
-      // but include sync errors in response
-      request.log.warn(
-        { errors: syncResult.errors },
-        "updateGitLabFileHandler: Scene sync had errors"
-      );
-    }
-
-    // Return success with sync details
-    reply.send({
-      success: true,
-      sync: {
-        skipped: syncResult.skipped,
-        scenesCreated: syncResult.labelsCreated,
-        scenesUpdated: syncResult.labelsUpdated,
-        scenesDeleted: syncResult.labelsDeleted,
-        linesProcessed: syncResult.linesProcessed,
-        errors: syncResult.errors,
-      },
-    });
+    const result = await updateGitLabFileContent(fileId, content, userId);
+    reply.send(result);
   } catch (err) {
-    request.log.error(
-      { err, fileId },
-      "updateGitLabFileHandler: Failed to update GitLab file"
-    );
-    reply.status(500).send({
-      error: "Failed to update GitLab file",
-      message: "An internal error occurred",
-    });
+    if (err instanceof NotFoundError) {
+      reply.status(404).send({ error: "Not Found", message: err.message });
+    } else if (err instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden", message: err.message });
+    } else if (err instanceof ConflictError) {
+      reply.status(409).send({
+        error: "Sync already in progress",
+        message: err.message,
+      });
+    } else {
+      request.log.error(
+        { err, fileId },
+        "updateGitLabFileHandler: Failed to update GitLab file"
+      );
+      reply.status(500).send({
+        error: "Failed to update GitLab file",
+        message: "An internal error occurred",
+      });
+    }
   }
 }
 
