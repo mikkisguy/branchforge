@@ -316,8 +316,8 @@ export async function getGitlabProject(
  * @param projectId - The BranchForge project ID
  * @param gitlabProjectId - The GitLab project ID
  * @param repositoryName - The repository name
- * @param defaultBranch - The default branch (default: main)
  * @param userId - The user ID making the request (for authorization)
+ * @param defaultBranch - The default branch (default: main)
  * @throws NotFoundError if project not found
  * @throws ForbiddenError if user lacks permission
  * @throws ConflictError if the GitLab repository is already linked to a different project
@@ -326,8 +326,8 @@ export async function linkRepository(
   projectId: string,
   gitlabProjectId: number,
   repositoryName: string,
-  defaultBranch: string = "main",
-  userId: string
+  userId: string,
+  defaultBranch: string = "main"
 ): Promise<void> {
   const db = getDb();
 
@@ -495,33 +495,26 @@ export async function listBranches(
 /**
  * Get the HEAD commit SHA for a branch
  * @param projectId - The BranchForge project ID
+ * @param userId - The user ID making the request (for authorization/token lookup)
  * @param branch - The branch name
  * @param gitlabUrl - Optional GitLab URL override
  * @returns The commit SHA
+ * @throws NotFoundError if project not found or repository not linked
  */
 export async function getBranchCommitSha(
   projectId: string,
+  userId: string,
   branch: string,
   gitlabUrl?: string
 ): Promise<string> {
+  await requireProjectOwnership(projectId, userId);
+
   const repoLink = await getRepositoryLink(projectId);
   if (!repoLink) {
-    throw new Error("GitLab repository not linked");
+    throw new RepositoryNotLinkedError();
   }
 
-  // Get user ID from project
-  const db = getDb();
-  const projectResult = await db
-    .select({ userId: projects.userId })
-    .from(projects)
-    .where(eq(projects.id, projectId))
-    .limit(1);
-
-  if (projectResult.length === 0) {
-    throw new Error("Project not found");
-  }
-
-  const token = await getDecryptedToken(projectResult[0].userId);
+  const token = await getDecryptedToken(userId);
   const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
 
   const apiUrl = new URL(
@@ -619,35 +612,28 @@ export async function listRpyFiles(
 /**
  * Get file content from a GitLab repository
  * @param projectId - The BranchForge project ID
+ * @param userId - The user ID making the request (for authorization/token lookup)
  * @param filePath - The file path in the repository
  * @param branch - The branch
  * @param gitlabUrl - Optional GitLab URL override
  * @returns The file content or null if not found
+ * @throws NotFoundError if project not found or repository not linked
  */
 export async function getFileContent(
   projectId: string,
+  userId: string,
   filePath: string,
   branch: string,
   gitlabUrl?: string
 ): Promise<string | null> {
+  await requireProjectOwnership(projectId, userId);
+
   const repoLink = await getRepositoryLink(projectId);
   if (!repoLink) {
-    throw new Error("GitLab repository not linked");
+    throw new RepositoryNotLinkedError();
   }
 
-  // Get user ID from project
-  const db = getDb();
-  const projectResult = await db
-    .select({ userId: projects.userId })
-    .from(projects)
-    .where(eq(projects.id, projectId))
-    .limit(1);
-
-  if (projectResult.length === 0) {
-    throw new Error("Project not found");
-  }
-
-  const token = await getDecryptedToken(projectResult[0].userId);
+  const token = await getDecryptedToken(userId);
   const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
 
   const apiUrl = new URL(
@@ -681,39 +667,32 @@ export async function getFileContent(
 /**
  * Create or update a file in a GitLab repository
  * @param projectId - The BranchForge project ID
+ * @param userId - The user ID making the request (for authorization/token lookup)
  * @param branch - The branch
  * @param filePath - The file path
  * @param content - The file content
  * @param commitMessage - The commit message
  * @param gitlabUrl - Optional GitLab URL override
  * @returns The API response
+ * @throws NotFoundError if project not found or repository not linked
  */
 export async function createOrUpdateFile(
   projectId: string,
+  userId: string,
   branch: string,
   filePath: string,
   content: string,
   commitMessage: string,
   gitlabUrl?: string
 ): Promise<{ file_path: string; branch: string }> {
+  await requireProjectOwnership(projectId, userId);
+
   const repoLink = await getRepositoryLink(projectId);
   if (!repoLink) {
-    throw new Error("GitLab repository not linked");
+    throw new RepositoryNotLinkedError();
   }
 
-  // Get user ID from project
-  const db = getDb();
-  const projectResult = await db
-    .select({ userId: projects.userId })
-    .from(projects)
-    .where(eq(projects.id, projectId))
-    .limit(1);
-
-  if (projectResult.length === 0) {
-    throw new Error("Project not found");
-  }
-
-  const token = await getDecryptedToken(projectResult[0].userId);
+  const token = await getDecryptedToken(userId);
   const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
 
   const apiUrl = new URL(
@@ -872,8 +851,8 @@ export async function importProjectFromGitLab(
       newProject.id,
       gitlabProjectId,
       repositoryName,
-      branch,
-      userId
+      userId,
+      branch
     );
 
     // Import files
@@ -941,6 +920,7 @@ export async function getGitLabFilesWithScenes(
   await requireProjectOwnership(projectId, userId);
 
   // Get all GitLab files for the project
+  // Filter by source: "GITLAB" since only files imported from GitLab are relevant here
   const files = await db
     .select()
     .from(projectFiles)

@@ -145,6 +145,7 @@ export async function detectConflicts(
         limiter.run(async () => {
           const content = await getFileContent(
             projectId,
+            userId,
             projectFile.filePath,
             branch
           );

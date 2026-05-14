@@ -502,7 +502,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       // Mock GitLab API to return different content based on file path (order-independent)
       vi.spyOn(gitlabService, "getFileContent").mockImplementation(
-        async (_projectId, filePath) => {
+        async (_projectId, _userId, filePath) => {
           if (filePath === "game/script.rpy") {
             return 'label start:\n    "Remote change"\n    return';
           } else if (filePath === "game/chapter2.rpy") {
@@ -653,7 +653,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       // Mock GitLab API to return matching content based on file path (order-independent)
       vi.spyOn(gitlabService, "getFileContent").mockImplementation(
-        async (_projectId, filePath) => {
+        async (_projectId, _userId, filePath) => {
           if (filePath === "game/script.rpy") {
             return 'label start:\n    "Line 1"\n    "Line 2"\n    return';
           } else if (filePath === "game/chapter1.rpy") {
@@ -748,6 +748,7 @@ describe("GitLabSyncService (Integration)", () => {
       });
       expect(gitlabService.createOrUpdateFile).toHaveBeenCalledWith(
         testProjectId,
+        testUserId,
         testBranch,
         testGitlabFile.filePath,
         testGitlabFile.content,
@@ -817,10 +818,10 @@ describe("GitLabSyncService (Integration)", () => {
 
       expect(gitlabService.createOrUpdateFile).toHaveBeenCalled();
       const calls = (gitlabService.createOrUpdateFile as any).mock.calls;
-      // createOrUpdateFile(projectId, branch, filePath, content, commitMessage)
-      // The commit message is at index 4
+      // createOrUpdateFile(projectId, userId, branch, filePath, content, commitMessage)
+      // The commit message is at index 5
       expect(calls.length).toBeGreaterThan(0);
-      const commitMessage = calls[0][4];
+      const commitMessage = calls[0][5];
       expect(commitMessage).toMatch(/Export from BranchForge -/);
     });
 

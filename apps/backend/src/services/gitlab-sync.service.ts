@@ -214,6 +214,7 @@ export async function exportToGitlab(
 
         await createOrUpdateFile(
           projectId,
+          userId,
           targetBranch,
           file.filePath,
           contentToExport,
@@ -238,6 +239,7 @@ export async function exportToGitlab(
       );
       await createOrUpdateFile(
         projectId,
+        userId,
         targetBranch,
         "state_variables.rpy",
         stateVariablesContent,
@@ -263,6 +265,7 @@ export async function exportToGitlab(
       );
       await createOrUpdateFile(
         projectId,
+        userId,
         targetBranch,
         "definitions.rpy",
         definitionsContent,
@@ -363,7 +366,7 @@ export async function importFromGitlab(
 
   try {
     // Get the commit SHA for this branch at import time
-    const importCommitSha = await getBranchCommitSha(projectId, branch);
+    const importCommitSha = await getBranchCommitSha(projectId, userId, branch);
 
     // List RPY files in the repository
     const rpyFiles = await listRpyFiles(projectId, branch, userId);
@@ -401,7 +404,12 @@ export async function importFromGitlab(
     const fileFetchResults = await Promise.allSettled(
       rpyFiles.map((file) =>
         limiter.run(async () => {
-          const content = await getFileContent(projectId, file.path, branch);
+          const content = await getFileContent(
+            projectId,
+            userId,
+            file.path,
+            branch
+          );
           return { file, content };
         })
       )

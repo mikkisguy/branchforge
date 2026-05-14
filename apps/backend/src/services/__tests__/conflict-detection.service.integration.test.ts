@@ -296,7 +296,7 @@ describe("ConflictDetectionService (Integration)", () => {
 
       // Mock GitLab API to return a file with different labels
       vi.spyOn(gitlabService, "getFileContent").mockImplementation(
-        async (_projectId, filePath) => {
+        async (_projectId, _userId, filePath) => {
           if (filePath === "game/script.rpy") {
             return 'label other:\n    "Other content"\n    return';
           }
@@ -462,7 +462,7 @@ describe("ConflictDetectionService (Integration)", () => {
 
       // Mock GitLab API to return different content based on file path (order-independent)
       vi.spyOn(gitlabService, "getFileContent").mockImplementation(
-        async (_projectId, filePath) => {
+        async (_projectId, _userId, filePath) => {
           if (filePath === "game/script.rpy") {
             return 'label start:\n    "Remote change"\n    return';
           } else if (filePath === "game/chapter2.rpy") {
@@ -613,7 +613,7 @@ describe("ConflictDetectionService (Integration)", () => {
 
       // Mock GitLab API to return matching content based on file path (order-independent)
       vi.spyOn(gitlabService, "getFileContent").mockImplementation(
-        async (_projectId, filePath) => {
+        async (_projectId, _userId, filePath) => {
           if (filePath === "game/script.rpy") {
             return 'label start:\n    "Line 1"\n    "Line 2"\n    return';
           } else if (filePath === "game/chapter1.rpy") {

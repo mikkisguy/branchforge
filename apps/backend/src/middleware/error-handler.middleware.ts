@@ -102,8 +102,7 @@ export class ConflictError extends HttpError {
  */
 export class RepositoryNotLinkedError extends NotFoundError {
   constructor(message: string = "GitLab repository not linked") {
-    super("GitLab repository");
-    this.message = message;
+    super(message);
     this.name = "RepositoryNotLinkedError";
   }
 }

@@ -376,25 +376,27 @@ async function linkRepositoryHandler(
       projectId,
       gitlabProjectId,
       repositoryName,
-      branch,
-      userId
+      userId,
+      branch
     );
     reply.status(201).send();
   } catch (err) {
-    request.log.error(
-      { err },
-      "linkRepositoryHandler: Failed to link repository"
-    );
-
-    // Rethrow NotFoundError and ConflictError to let global error handler return appropriate status
-    if (err instanceof NotFoundError || err instanceof ConflictError) {
-      throw err;
+    if (err instanceof NotFoundError) {
+      reply.status(404).send({ error: "Not Found", message: err.message });
+    } else if (err instanceof ConflictError) {
+      reply.status(409).send({ error: "Conflict", message: err.message });
+    } else if (err instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden", message: err.message });
+    } else {
+      request.log.error(
+        { err },
+        "linkRepositoryHandler: Failed to link repository"
+      );
+      reply.status(500).send({
+        error: "Failed to link repository",
+        message: "An internal error occurred",
+      });
     }
-
-    reply.status(500).send({
-      error: "Failed to link repository",
-      message: "An internal error occurred",
-    });
   }
 }
 
