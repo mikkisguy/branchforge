@@ -628,7 +628,10 @@ export class CharactersService {
         await fs.copyFile(previousAvatarPath, previousAvatarBackupPath);
       } catch (accessError) {
         if ((accessError as NodeJS.ErrnoException).code !== "ENOENT") {
-          throw accessError;
+          throw new Error(
+            `Failed to backup existing avatar file: ${(accessError as Error).message}`,
+            { cause: accessError }
+          );
         }
         // File doesn't exist — proceed without backup
       }
