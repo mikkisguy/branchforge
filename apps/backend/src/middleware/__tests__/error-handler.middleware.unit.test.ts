@@ -262,6 +262,39 @@ describe("Global Error Handler", () => {
     });
   });
 
+  it("should handle ConflictError without metadata", () => {
+    const request = createMockRequest();
+    const reply = createMockReply();
+    const error = new ConflictError();
+
+    globalErrorHandler(error as any, request, reply);
+
+    expect(reply.status).toHaveBeenCalledWith(409);
+    expect(reply.send).toHaveBeenCalledWith({
+      error: "ConflictError",
+      message: "Resource conflict",
+    });
+  });
+
+  it("should include metadata for ConflictError with hash and reason", () => {
+    const request = createMockRequest();
+    const reply = createMockReply();
+    const error = new ConflictError("Hash mismatch", {
+      reason: "STALE_CONTENT_HASH",
+      currentContentHash: "abc123",
+    });
+
+    globalErrorHandler(error as any, request, reply);
+
+    expect(reply.status).toHaveBeenCalledWith(409);
+    expect(reply.send).toHaveBeenCalledWith({
+      error: "ConflictError",
+      message: "Resource conflict",
+      currentContentHash: "abc123",
+      reason: "STALE_CONTENT_HASH",
+    });
+  });
+
   it("should handle Zod validation errors", () => {
     const request = createMockRequest();
     const reply = createMockReply();

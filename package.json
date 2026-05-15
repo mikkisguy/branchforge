@@ -10,7 +10,7 @@
     "bump:version": "changeset version && node -e \"const v=require('./apps/backend/package.json').version;const p=require('./package.json');p.version=v;require('fs').writeFileSync('./package.json',JSON.stringify(p,null,2))\" && node scripts/consolidate-changelog.js && pnpm install --lockfile-only",
     "release": "pnpm build && changeset publish",
     "install:all": "pnpm install",
-    "test": "pnpm -r --filter './packages/*' --filter './apps/*' test",
+    "test": "pnpm run test:unit && pnpm run test:integration",
     "test:unit": "pnpm -r --filter './packages/*' --filter './apps/*' test:unit",
     "test:integration": "pnpm -r --filter './apps/*' test:integration",
     "test:e2e": "echo \"E2E tests not yet implemented\"",

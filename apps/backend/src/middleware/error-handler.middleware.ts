@@ -158,6 +158,14 @@ export interface RateLimitResponse extends ErrorResponse {
   retryAfter?: number;
 }
 
+/**
+ * Conflict error response format
+ */
+export interface ConflictErrorResponse extends ErrorResponse {
+  currentContentHash?: string;
+  reason?: string;
+}
+
 // ============================================================================
 // Logging Functions
 // ============================================================================
@@ -249,6 +257,19 @@ export function globalErrorHandler(
       const retryAfter = (error as RateLimitError).retryAfter!;
       (response as RateLimitResponse).retryAfter = retryAfter;
       reply.header("Retry-After", retryAfter.toString());
+    }
+
+    // Include metadata for conflict errors
+    if (
+      error instanceof ConflictError &&
+      ((error as ConflictError).currentContentHash ||
+        (error as ConflictError).reason)
+    ) {
+      const conflictResponse = response as ConflictErrorResponse;
+      conflictResponse.currentContentHash = (
+        error as ConflictError
+      ).currentContentHash;
+      conflictResponse.reason = (error as ConflictError).reason;
     }
 
     reply.status(error.statusCode).send(response);
