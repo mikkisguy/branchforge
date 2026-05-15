@@ -33,6 +33,7 @@ import {
   NotFoundError,
   ForbiddenError,
   ValidationError,
+  ConflictError,
 } from "../middleware/error-handler.middleware.js";
 
 // ============================================================================
@@ -261,11 +262,6 @@ async function updateFileContentHandler(
       expectedContentHash
     );
 
-    if (!result.success) {
-      reply.status(409).send(result);
-      return;
-    }
-
     reply.status(200).send(result);
   } catch (err) {
     request.log.error(
@@ -280,11 +276,15 @@ async function updateFileContentHandler(
       return;
     }
     if (err instanceof ForbiddenError) {
-      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      reply.status(403).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
     if (err instanceof ValidationError) {
       reply.status(400).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    if (err instanceof ConflictError) {
+      reply.status(409).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
     reply.status(500).send({ error: "Internal server error" } as ErrorResponse);

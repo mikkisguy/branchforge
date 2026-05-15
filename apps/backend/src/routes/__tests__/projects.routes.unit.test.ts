@@ -11,6 +11,8 @@ import * as projectsService from "../../services/projects.service.js";
 import {
   NotFoundError,
   ForbiddenError,
+  ValidationError,
+  ConflictError,
 } from "../../middleware/error-handler.middleware.js";
 
 const PROJECT_ID = "550e8400-e29b-41d4-a716-446655440000";
@@ -466,16 +468,8 @@ describe("ProjectsRoutes", () => {
     });
 
     it("should return 409 on content hash conflict", async () => {
-      const mockResult = {
-        success: false as const,
-        conflict: {
-          reason: "STALE_CONTENT_HASH" as const,
-          currentContentHash: "serverhash",
-        },
-      };
-
-      vi.mocked(projectsService.updateFileContent).mockResolvedValue(
-        mockResult
+      vi.mocked(projectsService.updateFileContent).mockRejectedValue(
+        new ConflictError("Content hash mismatch. Current hash: serverhash")
       );
 
       const response = await fastify.inject({
@@ -485,10 +479,9 @@ describe("ProjectsRoutes", () => {
       });
 
       expect(response.statusCode).toBe(409);
-      const json = response.json();
-      expect(json.success).toBe(false);
-      expect(json.conflict.reason).toBe("STALE_CONTENT_HASH");
-      expect(json.conflict.currentContentHash).toBe("serverhash");
+      expect(response.json()).toEqual({
+        error: "Resource conflict",
+      });
     });
 
     it("should return 404 when file not found", async () => {
@@ -506,6 +499,21 @@ describe("ProjectsRoutes", () => {
       expect(response.json()).toEqual({ error: "File not found" });
     });
 
+    it("should return 400 when content invalid", async () => {
+      vi.mocked(projectsService.updateFileContent).mockRejectedValue(
+        new ValidationError("Invalid RPY file content")
+      );
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/files/${FILE_ID}`,
+        payload: { content: "..." },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toHaveProperty("error");
+    });
+
     it("should return 403 when access denied", async () => {
       vi.mocked(projectsService.updateFileContent).mockRejectedValue(
         new ForbiddenError("Insufficient permissions")
@@ -518,7 +526,7 @@ describe("ProjectsRoutes", () => {
       });
 
       expect(response.statusCode).toBe(403);
-      expect(response.json()).toEqual({ error: "Forbidden" });
+      expect(response.json()).toEqual({ error: "Insufficient permissions" });
     });
   });
 });

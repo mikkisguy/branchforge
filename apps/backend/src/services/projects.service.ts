@@ -10,6 +10,7 @@ import {
   projectUsers,
   projectFiles,
   labels,
+  labelLines,
 } from "../db/schema/index.js";
 import { eq, and, inArray, isNull } from "drizzle-orm";
 import type { NewProject } from "../db/schema/tables/projects.js";
@@ -21,6 +22,7 @@ import type {
 import {
   NotFoundError,
   ValidationError,
+  ConflictError,
 } from "../middleware/error-handler.middleware.js";
 import { z } from "zod";
 import { createProjectSchema } from "../lib/validation.js";
@@ -125,30 +127,21 @@ export interface GetProjectFilesResult {
 
 /**
  * Result of the updateFileContent service call.
- * Uses a discriminated union: success (content was saved) or conflict (stale hash).
- * Errors (not found, forbidden, validation) are thrown, not returned.
+ * Errors (not found, forbidden, validation, conflict) are thrown, not returned.
  */
-export type UpdateFileContentResult =
-  | {
-      success: true;
-      contentHash: string;
-      updatedAt: string;
-      syncResult: Pick<
-        SyncLabelsResult,
-        | "labelsCreated"
-        | "labelsUpdated"
-        | "labelsDeleted"
-        | "linesProcessed"
-        | "errors"
-      >;
-    }
-  | {
-      success: false;
-      conflict: {
-        reason: "STALE_CONTENT_HASH";
-        currentContentHash: string;
-      };
-    };
+export type UpdateFileContentResult = {
+  success: true;
+  contentHash: string;
+  updatedAt: string;
+  syncResult: Pick<
+    SyncLabelsResult,
+    | "labelsCreated"
+    | "labelsUpdated"
+    | "labelsDeleted"
+    | "linesProcessed"
+    | "errors"
+  >;
+};
 
 /**
  * List all projects for a user
@@ -558,17 +551,9 @@ export async function updateFileContent(
       expectedContentHash !== undefined &&
       lockedFile.contentHash !== expectedContentHash
     ) {
-      return {
-        conflictPayload: {
-          success: false as const,
-          conflict: {
-            reason: "STALE_CONTENT_HASH" as const,
-            currentContentHash: lockedFile.contentHash,
-          },
-        } satisfies UpdateFileContentResult,
-        syncResultForFile: undefined,
-        fileUpdatedAt: undefined,
-      };
+      throw new ConflictError(
+        `Content hash mismatch. Current hash: ${lockedFile.contentHash}`
+      );
     }
 
     const fileUpdatedAt = new Date();
@@ -596,21 +581,44 @@ export async function updateFileContent(
           )
         : undefined;
 
+    // When file type transitions away from STORY, soft-delete existing labels
+    if (nextFileType !== "STORY") {
+      // Find all non-deleted label IDs for this file
+      const fileLabelIds = await tx
+        .select({ id: labels.id })
+        .from(labels)
+        .where(and(eq(labels.projectFileId, fileId), isNull(labels.deletedAt)));
+
+      if (fileLabelIds.length > 0) {
+        const ids = fileLabelIds.map((l) => l.id);
+        const deletedAt = new Date();
+
+        // Soft delete label lines
+        await tx
+          .update(labelLines)
+          .set({ deletedAt })
+          .where(
+            and(inArray(labelLines.labelId, ids), isNull(labelLines.deletedAt))
+          );
+
+        // Soft delete labels
+        await tx
+          .update(labels)
+          .set({ deletedAt })
+          .where(and(inArray(labels.id, ids), isNull(labels.deletedAt)));
+      }
+    }
+
     return {
-      conflictPayload: null,
       syncResultForFile,
       fileUpdatedAt,
     };
   });
 
-  if (syncResult.conflictPayload) {
-    return syncResult.conflictPayload;
-  }
-
   return {
     success: true,
     contentHash: newContentHash,
-    updatedAt: syncResult.fileUpdatedAt!.toISOString(),
+    updatedAt: syncResult.fileUpdatedAt.toISOString(),
     syncResult: {
       labelsCreated: syncResult.syncResultForFile?.labelsCreated ?? 0,
       labelsUpdated: syncResult.syncResultForFile?.labelsUpdated ?? 0,
