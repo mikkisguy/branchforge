@@ -88,9 +88,19 @@ export class UnauthorizedError extends HttpError {
  * Use when a request conflicts with existing data
  */
 export class ConflictError extends HttpError {
-  constructor(message: string = "Resource already exists") {
+  public currentContentHash?: string;
+  public reason?: string;
+
+  constructor(
+    message: string = "Resource already exists",
+    details?: { currentContentHash?: string; reason?: string }
+  ) {
     super(409, message, "Resource conflict");
     this.name = "ConflictError";
+    if (details) {
+      this.currentContentHash = details.currentContentHash;
+      this.reason = details.reason;
+    }
   }
 }
 

@@ -392,6 +392,18 @@ describe("ProjectsRoutes", () => {
         error: "Failed to get project files",
       });
     });
+
+    it("should return 400 for invalid source query", async () => {
+      const response = await fastify.inject({
+        method: "GET",
+        url: `/projects/${PROJECT_ID}/files?source=INVALID_VALUE`,
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        message: "Invalid query parameters",
+      });
+    });
   });
 
   describe("PUT /projects/files/:fileId", () => {
@@ -484,6 +496,30 @@ describe("ProjectsRoutes", () => {
       });
     });
 
+    it("should return structured 409 on stale content hash conflict", async () => {
+      vi.mocked(projectsService.updateFileContent).mockRejectedValue(
+        new ConflictError("Content hash mismatch. Current hash: serverhash", {
+          reason: "STALE_CONTENT_HASH",
+          currentContentHash: "serverhash",
+        })
+      );
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/files/${FILE_ID}`,
+        payload: { content: "updated content", expectedContentHash: "oldhash" },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toEqual({
+        success: false,
+        conflict: {
+          reason: "STALE_CONTENT_HASH",
+          currentContentHash: "serverhash",
+        },
+      });
+    });
+
     it("should return 404 when file not found", async () => {
       vi.mocked(projectsService.updateFileContent).mockRejectedValue(
         new NotFoundError("File")
@@ -527,6 +563,32 @@ describe("ProjectsRoutes", () => {
 
       expect(response.statusCode).toBe(403);
       expect(response.json()).toEqual({ error: "Insufficient permissions" });
+    });
+
+    it("should return 400 when content is missing", async () => {
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/files/${FILE_ID}`,
+        payload: {},
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        message: "Invalid request body",
+      });
+    });
+
+    it("should return 400 when content has invalid type", async () => {
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/files/${FILE_ID}`,
+        payload: { content: 123 },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        message: "Invalid request body",
+      });
     });
   });
 });

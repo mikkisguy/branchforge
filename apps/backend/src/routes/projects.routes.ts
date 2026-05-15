@@ -284,6 +284,16 @@ async function updateFileContentHandler(
       return;
     }
     if (err instanceof ConflictError) {
+      if (err.reason && err.currentContentHash) {
+        reply.status(409).send({
+          success: false,
+          conflict: {
+            reason: err.reason,
+            currentContentHash: err.currentContentHash,
+          },
+        });
+        return;
+      }
       reply.status(409).send({ error: err.userMessage } as ErrorResponse);
       return;
     }

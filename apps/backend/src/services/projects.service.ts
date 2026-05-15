@@ -14,6 +14,7 @@ import {
 } from "../db/schema/index.js";
 import { eq, and, inArray, isNull } from "drizzle-orm";
 import type { NewProject } from "../db/schema/tables/projects.js";
+import type { ProjectFile } from "../db/schema/tables/project-files.js";
 import type {
   UserRole,
   SourceOrigin,
@@ -105,18 +106,7 @@ export interface PublicLabelSlim {
 /**
  * A project file with its attached labels.
  */
-export interface FileWithLabels {
-  id: string;
-  projectId: string;
-  source: string;
-  filePath: string;
-  fileType: string;
-  content: string;
-  contentHash: string;
-  createdAt: Date;
-  updatedAt: Date;
-  labels: PublicLabelSlim[];
-}
+export type FileWithLabels = ProjectFile & { labels: PublicLabelSlim[] };
 
 /**
  * Result of the getProjectFiles service call.
@@ -552,7 +542,11 @@ export async function updateFileContent(
       lockedFile.contentHash !== expectedContentHash
     ) {
       throw new ConflictError(
-        `Content hash mismatch. Current hash: ${lockedFile.contentHash}`
+        `Content hash mismatch. Current hash: ${lockedFile.contentHash}`,
+        {
+          reason: "STALE_CONTENT_HASH",
+          currentContentHash: lockedFile.contentHash,
+        }
       );
     }
 
@@ -582,6 +576,8 @@ export async function updateFileContent(
         : undefined;
 
     // When file type transitions away from STORY, soft-delete existing labels
+    let deletedCount = 0;
+
     if (nextFileType !== "STORY") {
       // Find all non-deleted label IDs for this file
       const fileLabelIds = await tx
@@ -589,7 +585,9 @@ export async function updateFileContent(
         .from(labels)
         .where(and(eq(labels.projectFileId, fileId), isNull(labels.deletedAt)));
 
-      if (fileLabelIds.length > 0) {
+      deletedCount = fileLabelIds.length;
+
+      if (deletedCount > 0) {
         const ids = fileLabelIds.map((l) => l.id);
         const deletedAt = new Date();
 
@@ -612,6 +610,7 @@ export async function updateFileContent(
     return {
       syncResultForFile,
       fileUpdatedAt,
+      deletedCount,
     };
   });
 
@@ -622,7 +621,9 @@ export async function updateFileContent(
     syncResult: {
       labelsCreated: syncResult.syncResultForFile?.labelsCreated ?? 0,
       labelsUpdated: syncResult.syncResultForFile?.labelsUpdated ?? 0,
-      labelsDeleted: syncResult.syncResultForFile?.labelsDeleted ?? 0,
+      labelsDeleted:
+        (syncResult.syncResultForFile?.labelsDeleted ?? 0) +
+        syncResult.deletedCount,
       linesProcessed: syncResult.syncResultForFile?.linesProcessed ?? 0,
       errors: syncResult.syncResultForFile?.errors ?? [],
     },
