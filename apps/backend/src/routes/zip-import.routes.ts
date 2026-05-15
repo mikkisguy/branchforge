@@ -7,9 +7,6 @@
 
 import type { FastifyInstance } from "fastify";
 import type { FastifyRequest, FastifyReply } from "fastify";
-import { getDb } from "../db/index.js";
-import { projects } from "../db/schema/index.js";
-import { eq } from "drizzle-orm";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { validateParams } from "../middleware/validation.middleware.js";
 import {
@@ -20,14 +17,13 @@ import {
 import {
   importZipFile,
   type ImportZipResult,
+  importProjectFromZip,
 } from "../services/zip-import.service.js";
-import { createProject, deleteProject } from "../services/projects.service.js";
+import { requireProjectAccess } from "../services/authz.service.js";
 import type { MultipartFile } from "@fastify/multipart";
 import {
   HttpError,
   ValidationError,
-  NotFoundError,
-  ForbiddenError,
 } from "../middleware/error-handler.middleware.js";
 import {
   ZIP_IMPORT_MAX_SIZE,
@@ -109,22 +105,8 @@ async function importZipHandler(
   const user = request.user!;
 
   try {
-    const db = getDb();
-
     // Verify project access
-    const [project] = await db
-      .select({ userId: projects.userId })
-      .from(projects)
-      .where(eq(projects.id, projectId))
-      .limit(1);
-
-    if (!project) {
-      throw new NotFoundError("Project");
-    }
-
-    if (project.userId !== user.id) {
-      throw new ForbiddenError("You do not have access to this project");
-    }
+    await requireProjectAccess(projectId, user.id);
 
     // Parse multipart form data with fileSize limit enforced at stream creation
     let data;
@@ -268,115 +250,68 @@ async function importProjectHandler(
       ? projectDescriptionField.value
       : undefined;
 
+  // Validate project data against schema (handles trimming and max length)
+  const validatedProjectData = validateData(
+    {
+      name: projectName,
+      description: projectDescription,
+      source: "ZIP",
+    },
+    createProjectSchema,
+    "Invalid project data"
+  );
+
+  let buffer: Buffer;
   try {
-    // Validate project data against schema (handles trimming and max length)
-    const validatedProjectData = validateData(
-      {
-        name: projectName,
-        description: projectDescription,
-        source: "ZIP",
-      },
-      createProjectSchema,
-      "Invalid project data"
-    );
-    let buffer: Buffer;
-    try {
-      buffer = await file.toBuffer();
-    } catch (err: unknown) {
-      if (isMultipartFileTooLargeError(err)) {
-        throw new ValidationError(
-          `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`
-        );
-      }
-      throw err;
-    }
-
-    if (file.file.truncated) {
+    buffer = await file.toBuffer();
+  } catch (err: unknown) {
+    if (isMultipartFileTooLargeError(err)) {
       throw new ValidationError(
         `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`
       );
     }
-
-    if (buffer.length > ZIP_IMPORT_MAX_SIZE) {
-      throw new ValidationError(
-        `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`
-      );
-    }
-
-    // Only create project after file validations pass
-    const newProject = await createProject(userId, validatedProjectData);
-
-    let result: ImportZipResult;
-    try {
-      result = await importZipFile(newProject.id, buffer);
-    } catch (importErr) {
-      // Clean up orphaned project if importZipFile throws
-      try {
-        await deleteProject(userId, newProject.id);
-        request.log.info(
-          { projectId: newProject.id },
-          "Cleaned up partially created project after importZipFile threw"
-        );
-      } catch (deleteErr) {
-        request.log.error(
-          { err: deleteErr, projectId: newProject.id },
-          "Failed to cleanup partially created project after importZipFile threw"
-        );
-      }
-      // Re-throw to be handled by outer catch or global error handler
-      throw importErr;
-    }
-
-    if (!result.success) {
-      try {
-        await deleteProject(userId, newProject.id);
-        request.log.info(
-          { projectId: newProject.id },
-          "Cleaned up partially created project due to failed zip import"
-        );
-      } catch (deleteErr) {
-        request.log.error(
-          { err: deleteErr, projectId: newProject.id },
-          "Failed to cleanup partially created project"
-        );
-      }
-
-      const failureResponse: ImportProjectFailure = {
-        success: false,
-        error: result.error || "Failed to import zip file",
-      };
-      reply.status(400).send(failureResponse);
-      return;
-    }
-
-    const successResponse: ImportProjectSuccess = {
-      success: true,
-      project: {
-        ...newProject,
-        source: "ZIP",
-      },
-      filesImported: result.filesImported,
-      filesUpdated: result.filesUpdated,
-      filesSkipped: result.filesSkipped,
-      labelsCreated: result.labelsCreated,
-    };
-    reply.status(201).send(successResponse);
-  } catch (err) {
-    // Re-throw HttpError instances (e.g., ValidationError) so the global error handler can use their status code
-    if (err instanceof HttpError) {
-      throw err;
-    }
-    request.log.error(
-      { err },
-      "importProjectHandler: Failed to import project from ZIP"
-    );
-    const errorResponse: ImportProjectFailure = {
-      success: false,
-      error:
-        "Failed to import project from ZIP file. Please check the file format and try again.",
-    };
-    reply.status(500).send(errorResponse);
+    throw err;
   }
+
+  if (file.file.truncated) {
+    throw new ValidationError(
+      `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`
+    );
+  }
+
+  if (buffer.length > ZIP_IMPORT_MAX_SIZE) {
+    throw new ValidationError(
+      `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`
+    );
+  }
+
+  const result = await importProjectFromZip(
+    userId,
+    validatedProjectData,
+    buffer
+  );
+
+  if (!result.success) {
+    const failureResponse: ImportProjectFailure = {
+      success: false,
+      error: result.error || "Failed to import zip file",
+    };
+    reply.status(400).send(failureResponse);
+    return;
+  }
+
+  const successResponse: ImportProjectSuccess = {
+    success: true,
+    project: {
+      ...result.project!,
+      source: "ZIP",
+    },
+    filesImported: result.filesImported!,
+    filesUpdated: result.filesUpdated!,
+    filesSkipped: result.filesSkipped!,
+    labelsCreated: result.labelsCreated!,
+  };
+  reply.status(201).send(successResponse);
 }
 
 // ============================================================================

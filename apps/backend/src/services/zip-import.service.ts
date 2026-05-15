@@ -14,6 +14,7 @@ import { calculateContentHash } from "../lib/hash.js";
 import { parseRPYFileWithLabels } from "./rpy-parser.service.js";
 import { logError, LogEventType } from "../lib/logger.js";
 import { syncLabelsFromFile } from "./labels.service.js";
+import { createProject, deleteProject } from "./projects.service.js";
 
 // ============================================================================
 // Import Guardrails
@@ -390,4 +391,83 @@ export async function importZipFile(
     };
     return failure;
   }
+}
+
+// ============================================================================
+// Project Creation + Import (Combined)
+// ============================================================================
+
+export interface ImportProjectFromZipResult {
+  success: boolean;
+  project?: {
+    id: string;
+    name: string;
+    description?: string;
+    source: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+  filesImported?: number;
+  filesUpdated?: number;
+  filesSkipped?: number;
+  labelsCreated?: number;
+  error?: string;
+}
+
+/**
+ * Create a new project from a zip file. Handles the full lifecycle:
+ * creates the project, imports the zip, and cleans up on failure.
+ *
+ * @param userId - The user ID owning the new project
+ * @param projectData - Validated project creation data
+ * @param zipBuffer - The zip file buffer
+ * @returns Result with project info and import statistics
+ */
+export async function importProjectFromZip(
+  userId: string,
+  projectData: { name: string; description?: string },
+  zipBuffer: Buffer
+): Promise<ImportProjectFromZipResult> {
+  const newProject = await createProject(userId, {
+    ...projectData,
+    source: "ZIP",
+  });
+
+  let result: ImportZipResult;
+  try {
+    result = await importZipFile(newProject.id, zipBuffer);
+  } catch (err) {
+    // Clean up orphaned project on import failure
+    try {
+      await deleteProject(userId, newProject.id);
+    } catch {
+      // Log but don't throw - cleanup is best-effort
+    }
+    throw err;
+  }
+
+  if (!result.success) {
+    // Clean up on failed import
+    try {
+      await deleteProject(userId, newProject.id);
+    } catch {
+      // Log but don't throw - cleanup is best-effort
+    }
+    return {
+      success: false,
+      error: result.error || "Failed to import zip file",
+    };
+  }
+
+  return {
+    success: true,
+    project: {
+      ...newProject,
+      source: "ZIP",
+    },
+    filesImported: result.filesImported,
+    filesUpdated: result.filesUpdated,
+    filesSkipped: result.filesSkipped,
+    labelsCreated: result.labelsCreated,
+  };
 }

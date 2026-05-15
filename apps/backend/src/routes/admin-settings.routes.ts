@@ -10,10 +10,9 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { authenticate, requireRole } from "../middleware/auth.middleware.js";
 import {
   getAdminSetting,
+  getAllAdminSettings,
   setAdminSetting,
 } from "../services/admin-settings.service.js";
-import { adminSettings } from "../db/schema/index.js";
-import { getDb } from "../db/index.js";
 
 // ============================================================================
 // Types
@@ -72,13 +71,8 @@ async function getAllSettingsHandler(
   request: FastifyRequest,
   reply: FastifyReply
 ): Promise<void> {
-  const db = getDb();
-  const settings = await db.select().from(adminSettings);
-  const record = settings.reduce((acc: Record<string, unknown>, s) => {
-    acc[s.key] = s.value;
-    return acc;
-  }, {});
-  reply.send({ settings: record } as AllSettingsResponse);
+  const settings = await getAllAdminSettings();
+  reply.send({ settings } as AllSettingsResponse);
 }
 
 /**

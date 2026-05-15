@@ -28,8 +28,12 @@ import session from "@fastify/session";
 import multipart from "@fastify/multipart";
 import { zipImportRoutes } from "../zip-import.routes.js";
 import * as zipImportService from "../../services/zip-import.service.js";
-import * as projectsService from "../../services/projects.service.js";
+import * as authzService from "../../services/authz.service.js";
 import * as db from "../../db/index.js";
+import {
+  ForbiddenError,
+  NotFoundError,
+} from "../../middleware/error-handler.middleware.js";
 
 // Mock drizzle-orm's eq function
 vi.mock("drizzle-orm", () => ({
@@ -52,11 +56,16 @@ vi.mock("../../db/schema/index.js", () => ({
 // Mock the services
 vi.mock("../../services/zip-import.service.js", () => ({
   importZipFile: vi.fn(),
+  importProjectFromZip: vi.fn(),
 }));
 
 vi.mock("../../services/projects.service.js", () => ({
   createProject: vi.fn(),
   deleteProject: vi.fn(),
+}));
+
+vi.mock("../../services/authz.service.js", () => ({
+  requireProjectAccess: vi.fn(async () => {}),
 }));
 
 // Mock the authenticate middleware
@@ -146,16 +155,14 @@ describe("ZIP Import Routes (Integration)", () => {
 
       const mockImportResult = {
         success: true,
+        project: mockProject,
         filesImported: 5,
         filesUpdated: 0,
         filesSkipped: 0,
         labelsCreated: 3,
       };
 
-      vi.spyOn(projectsService, "createProject").mockResolvedValue(
-        mockProject as any
-      );
-      vi.spyOn(zipImportService, "importZipFile").mockResolvedValue(
+      vi.spyOn(zipImportService, "importProjectFromZip").mockResolvedValue(
         mockImportResult as any
       );
 
@@ -183,34 +190,14 @@ describe("ZIP Import Routes (Integration)", () => {
       });
 
       expect(response.statusCode).toBe(201);
-      expect(projectsService.createProject).toHaveBeenCalled();
-      expect(zipImportService.importZipFile).toHaveBeenCalled();
+      expect(zipImportService.importProjectFromZip).toHaveBeenCalled();
     });
 
     it("should handle ZIP parsing errors", async () => {
-      const mockProject = {
-        id: "new-project-id",
-        userId: testUserId,
-        name: "ZIP Project",
-        description: "Imported from ZIP",
-        source: "ZIP",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      vi.spyOn(projectsService, "createProject").mockResolvedValue(
-        mockProject as any
-      );
-      vi.spyOn(zipImportService, "importZipFile").mockResolvedValue({
+      vi.spyOn(zipImportService, "importProjectFromZip").mockResolvedValue({
         success: false,
-        filesImported: 0,
-        filesUpdated: 0,
-        filesSkipped: 0,
-        labelsCreated: 0,
         error: "Invalid ZIP file",
       } as any);
-
-      vi.spyOn(projectsService, "deleteProject").mockResolvedValue(undefined);
 
       const mockZipBuffer = Buffer.from("PK\x03\x04...mock zip content");
       const boundary = "----formdata-test-boundary";
@@ -236,32 +223,28 @@ describe("ZIP Import Routes (Integration)", () => {
       });
 
       expect(response.statusCode).toBe(400);
-      expect(projectsService.deleteProject).toHaveBeenCalled();
+      expect(zipImportService.importProjectFromZip).toHaveBeenCalled();
     });
 
     it("should import RPY files correctly", async () => {
-      const mockProject = {
-        id: "new-project-id",
-        userId: testUserId,
-        name: "ZIP Project",
-        description: "Imported from ZIP",
-        source: "ZIP",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
       const mockImportResult = {
         success: true,
+        project: {
+          id: "new-project-id",
+          userId: testUserId,
+          name: "ZIP Project",
+          description: "Imported from ZIP",
+          source: "ZIP",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
         filesImported: 10,
         filesUpdated: 2,
         filesSkipped: 1,
         labelsCreated: 5,
       };
 
-      vi.spyOn(projectsService, "createProject").mockResolvedValue(
-        mockProject as any
-      );
-      vi.spyOn(zipImportService, "importZipFile").mockResolvedValue(
+      vi.spyOn(zipImportService, "importProjectFromZip").mockResolvedValue(
         mockImportResult as any
       );
 
@@ -295,7 +278,7 @@ describe("ZIP Import Routes (Integration)", () => {
 
       expect(response.statusCode).toBe(201);
       // Verify the import service was called
-      expect(zipImportService.importZipFile).toHaveBeenCalled();
+      expect(zipImportService.importProjectFromZip).toHaveBeenCalled();
     });
   });
 
@@ -344,10 +327,9 @@ describe("ZIP Import Routes (Integration)", () => {
     });
 
     it("should verify user owns project", async () => {
-      const mockLimit = (fastify as any).mockDb.mockLimit;
-
-      // Override to return different userId (user does not own project)
-      mockLimit.mockResolvedValueOnce([{ userId: "other-user-id" }]);
+      vi.spyOn(authzService, "requireProjectAccess").mockRejectedValue(
+        new ForbiddenError("You do not have access to this project")
+      );
 
       // Create a mock ZIP file buffer
       const mockZipBuffer = Buffer.from("PK\x03\x04...mock zip content");
@@ -378,10 +360,9 @@ describe("ZIP Import Routes (Integration)", () => {
     });
 
     it("should return 404 when project not found", async () => {
-      const mockLimit = (fastify as any).mockDb.mockLimit;
-
-      // Override to return empty array (project not found)
-      mockLimit.mockResolvedValueOnce([]);
+      vi.spyOn(authzService, "requireProjectAccess").mockRejectedValue(
+        new NotFoundError("Project")
+      );
 
       // Create a mock ZIP file buffer
       const mockZipBuffer = Buffer.from("PK\x03\x04...mock zip content");
