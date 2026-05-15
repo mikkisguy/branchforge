@@ -607,7 +607,7 @@ describe("Character Avatar Routes (Integration)", () => {
         // Should return 500 due to backup failure
         expect(secondResponse.statusCode).toBe(500);
         const body = secondResponse.json();
-        expect(body.error).toBe("Failed to backup existing avatar file");
+        expect(body.error).toBe("Internal Server Error");
 
         // Verify the original avatar is still in place
         const [character] = await db

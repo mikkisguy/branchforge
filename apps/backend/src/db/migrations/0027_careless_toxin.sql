@@ -1,1 +1,1 @@
-ALTER TABLE "meters" ADD CONSTRAINT "min_value_lte_max_value" CHECK ("meters"."min_value" <= "meters"."max_value");
+ALTER TABLE "meters" ADD CONSTRAINT "min_value_lte_max_value" CHECK ("meters"."min_value" <= "meters"."max_value");--> statement-breakpoint

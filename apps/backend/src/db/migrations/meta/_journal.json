@@ -246,6 +246,20 @@
       "when": 1778001326790,
       "tag": "0034_workable_king_bedlam",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1778865198780,
+      "tag": "0035_omniscient_timeslip",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1778872356323,
+      "tag": "0036_greedy_pixie",
+      "breakpoints": true
     }
   ]
 }

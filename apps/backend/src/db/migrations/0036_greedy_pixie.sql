@@ -1,0 +1,1 @@
+DROP INDEX "characters_project_renpytag_idx";

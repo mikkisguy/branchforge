@@ -1,1 +1,1 @@
-CREATE INDEX "project_files_project_id_idx" ON "project_files" USING btree ("project_id");
+CREATE INDEX "project_files_project_id_idx" ON "project_files" USING btree ("project_id");--> statement-breakpoint

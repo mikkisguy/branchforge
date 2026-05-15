@@ -11,6 +11,7 @@ import {
   timestamp,
   boolean,
   index,
+  unique,
 } from "drizzle-orm/pg-core";
 import { projects } from "./projects.js";
 
@@ -38,7 +39,7 @@ export const characters = pgTable(
   },
   (table) => [
     index("characters_project_id_idx").on(table.projectId),
-    index("characters_project_renpytag_idx").on(
+    unique("characters_project_renpy_tag_unique").on(
       table.projectId,
       table.renpyTag
     ),

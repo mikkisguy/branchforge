@@ -28,6 +28,7 @@ import session from "@fastify/session";
 import { charactersRoutes } from "../characters.routes.js";
 import { getDb, closeDb } from "../../db/index.js";
 import { SESSION_COOKIE_NAME } from "../../lib/session.js";
+import { globalErrorHandler } from "../../middleware/error-handler.middleware.js";
 import { testEmail, testUuid } from "../../utils/test-ids.js";
 import {
   users,
@@ -214,6 +215,9 @@ describe("CharactersRoutes (Integration)", () => {
     // Register the routes
     await charactersRoutes(fastify);
 
+    // Register global error handler to handle errors from service layer
+    fastify.setErrorHandler(globalErrorHandler);
+
     // Add a test-only route to set the session user
     fastify.post(
       "/test-login",
@@ -281,7 +285,10 @@ describe("CharactersRoutes (Integration)", () => {
       });
 
       expect(response.statusCode).toBe(403);
-      expect(response.json()).toEqual({ error: "Forbidden" });
+      expect(response.json()).toEqual({
+        error: "ForbiddenError",
+        message: "Insufficient permissions",
+      });
     });
 
     it("should return empty array when no characters", async () => {
@@ -359,7 +366,10 @@ describe("CharactersRoutes (Integration)", () => {
       });
 
       expect(response.statusCode).toBe(404);
-      expect(response.json()).toEqual({ error: "Character not found" });
+      expect(response.json()).toEqual({
+        error: "NotFoundError",
+        message: "Character not found",
+      });
     });
 
     it("should return 403 when user does not own the project", async () => {
@@ -379,7 +389,10 @@ describe("CharactersRoutes (Integration)", () => {
       });
 
       expect(response.statusCode).toBe(403);
-      expect(response.json()).toEqual({ error: "Forbidden" });
+      expect(response.json()).toEqual({
+        error: "ForbiddenError",
+        message: "Insufficient permissions",
+      });
     });
 
     it("should return character data for valid ID", async () => {
@@ -450,7 +463,10 @@ describe("CharactersRoutes (Integration)", () => {
       });
 
       expect(response.statusCode).toBe(403);
-      expect(response.json()).toEqual({ error: "Forbidden" });
+      expect(response.json()).toEqual({
+        error: "ForbiddenError",
+        message: "Insufficient permissions",
+      });
     });
 
     it("should create character with valid data", async () => {
@@ -526,7 +542,8 @@ describe("CharactersRoutes (Integration)", () => {
 
       expect(response.statusCode).toBe(409);
       expect(response.json()).toMatchObject({
-        error: "Character with this tag already exists",
+        error: "ConflictError",
+        message: "Resource conflict",
       });
     });
 
@@ -615,7 +632,10 @@ describe("CharactersRoutes (Integration)", () => {
       });
 
       expect(response.statusCode).toBe(404);
-      expect(response.json()).toEqual({ error: "Character not found" });
+      expect(response.json()).toEqual({
+        error: "NotFoundError",
+        message: "Character not found",
+      });
     });
 
     it("should return 403 when user does not own the project", async () => {
@@ -636,7 +656,10 @@ describe("CharactersRoutes (Integration)", () => {
       });
 
       expect(response.statusCode).toBe(403);
-      expect(response.json()).toEqual({ error: "Forbidden" });
+      expect(response.json()).toEqual({
+        error: "ForbiddenError",
+        message: "Insufficient permissions",
+      });
     });
 
     it("should update character with valid data", async () => {
@@ -734,7 +757,10 @@ describe("CharactersRoutes (Integration)", () => {
       });
 
       expect(response.statusCode).toBe(404);
-      expect(response.json()).toEqual({ error: "Character not found" });
+      expect(response.json()).toEqual({
+        error: "NotFoundError",
+        message: "Character not found",
+      });
     });
 
     it("should return 403 when user does not own the project", async () => {
@@ -754,7 +780,10 @@ describe("CharactersRoutes (Integration)", () => {
       });
 
       expect(response.statusCode).toBe(403);
-      expect(response.json()).toEqual({ error: "Forbidden" });
+      expect(response.json()).toEqual({
+        error: "ForbiddenError",
+        message: "Insufficient permissions",
+      });
     });
 
     it("should delete character successfully", async () => {
