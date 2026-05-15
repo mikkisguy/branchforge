@@ -254,7 +254,7 @@ async function uploadCharacterAvatarHandler(
   const { characterId } = request.params;
 
   // Parse multipart form data with fileSize limit enforced at stream creation
-  let data;
+  let data: MultipartFile | undefined;
   try {
     data = await request.file({
       limits: { fileSize: AVATAR_MAX_SIZE },
@@ -268,15 +268,12 @@ async function uploadCharacterAvatarHandler(
     throw error;
   }
   if (!data) {
-    reply.status(400).send({ error: "No file uploaded" });
-    return;
+    throw new ValidationError("No file uploaded");
   }
-
-  const file = data as MultipartFile;
 
   let buffer: Buffer;
   try {
-    buffer = await file.toBuffer();
+    buffer = await data.toBuffer();
   } catch (err: unknown) {
     if (isMultipartFileTooLargeError(err)) {
       throw new ValidationError(
@@ -287,7 +284,7 @@ async function uploadCharacterAvatarHandler(
   }
 
   // Check if file was truncated due to size limit after buffering
-  if (file.file.truncated) {
+  if (data.file.truncated) {
     throw new ValidationError(
       `File must be smaller than ${AVATAR_MAX_SIZE_MB}MB`
     );
@@ -304,7 +301,7 @@ async function uploadCharacterAvatarHandler(
     characterId,
     request.user!.id,
     buffer,
-    file.mimetype
+    data.mimetype
   );
 
   reply.status(200).send(result);

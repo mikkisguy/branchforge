@@ -1,1 +1,1 @@
-DROP TABLE "label_characters" CASCADE;
+DROP TABLE "label_characters" CASCADE;--> statement-breakpoint

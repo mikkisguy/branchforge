@@ -1,0 +1,1 @@
+ALTER TABLE "characters" ADD CONSTRAINT "characters_project_renpy_tag_unique" UNIQUE("project_id","renpy_tag");--> statement-breakpoint

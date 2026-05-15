@@ -13,7 +13,7 @@ import {
   labels,
   projectFiles,
 } from "../db/schema/index.js";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import {
   NotFoundError,
   ConflictError,
@@ -257,15 +257,13 @@ export class CharactersService {
     const settings = await this.getProjectSettings(projectId, userId);
     const excludedTags = new Set(settings.excludedCharacterTags ?? []);
 
-    const existingCharacters = await db
-      .select()
-      .from(characters)
-      .where(eq(characters.projectId, projectId));
-
-    const allProjectFiles = await db
-      .select()
-      .from(projectFiles)
-      .where(eq(projectFiles.projectId, projectId));
+    const [existingCharacters, allProjectFiles] = await Promise.all([
+      db.select().from(characters).where(eq(characters.projectId, projectId)),
+      db
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.projectId, projectId)),
+    ]);
 
     const allDetected: DetectedCharacter[] = [];
     for (const file of allProjectFiles) {
@@ -354,37 +352,32 @@ export class CharactersService {
       existingCharacters.map((c) => [c.renpyTag, c])
     );
 
-    const createdCharacters: Array<{
-      id: string;
-      tag: string;
-      name: string;
-      displayName: string;
-    }> = [];
+    const createdCharacters = await Promise.all(
+      charactersToImport.map(async (charData) => {
+        const existing = existingByTag.get(charData.tag);
 
-    for (const charData of charactersToImport) {
-      const existing = existingByTag.get(charData.tag);
+        if (existing) {
+          // Update existing character
+          await db
+            .update(characters)
+            .set({
+              name: charData.name ?? charData.tag,
+              displayName: charData.displayName,
+              color: charData.color,
+              routeAffiliation: charData.routeAffiliation,
+              isLoveInterest: charData.isLoveInterest ?? false,
+              updatedAt: new Date(),
+            })
+            .where(eq(characters.id, existing.id));
 
-      if (existing) {
-        // Update existing character
-        await db
-          .update(characters)
-          .set({
+          return {
+            id: existing.id,
+            tag: existing.renpyTag,
             name: charData.name ?? charData.tag,
             displayName: charData.displayName,
-            color: charData.color,
-            routeAffiliation: charData.routeAffiliation,
-            isLoveInterest: charData.isLoveInterest ?? false,
-            updatedAt: new Date(),
-          })
-          .where(eq(characters.id, existing.id));
+          };
+        }
 
-        createdCharacters.push({
-          id: existing.id,
-          tag: existing.renpyTag,
-          name: charData.name ?? charData.tag,
-          displayName: charData.displayName,
-        });
-      } else {
         // Create new character
         const [newChar] = await db
           .insert(characters)
@@ -399,14 +392,14 @@ export class CharactersService {
           })
           .returning();
 
-        createdCharacters.push({
+        return {
           id: newChar.id,
           tag: newChar.renpyTag,
           name: newChar.name,
           displayName: newChar.displayName,
-        });
-      }
-    }
+        };
+      })
+    );
 
     let linked = 0;
     let unmatched: string[] = [];
@@ -498,22 +491,6 @@ export class CharactersService {
 
     const db = getDb();
 
-    // Prevent duplicate tags within the same project
-    const [existing] = await db
-      .select()
-      .from(characters)
-      .where(
-        and(
-          eq(characters.projectId, projectId),
-          eq(characters.renpyTag, input.renpyTag)
-        )
-      )
-      .limit(1);
-
-    if (existing) {
-      throw new ConflictError("Character with this tag already exists");
-    }
-
     const [newCharacter] = await db
       .insert(characters)
       .values({
@@ -527,7 +504,14 @@ export class CharactersService {
         dialogueStyle: input.dialogueStyle,
         conditionalPrefix: input.conditionalPrefix,
       })
+      .onConflictDoNothing({
+        target: [characters.projectId, characters.renpyTag],
+      })
       .returning();
+
+    if (!newCharacter) {
+      throw new ConflictError("Character with this tag already exists");
+    }
 
     return {
       id: newCharacter.id,
@@ -688,6 +672,14 @@ export class CharactersService {
         } catch {
           logWarn(LogEventType.SERVICE_ERROR, {
             message: `Failed to restore previous avatar: ${character.avatarUrl}`,
+            characterId,
+          });
+        }
+        try {
+          await deleteAvatarFile(previousAvatarBackupPath);
+        } catch {
+          logWarn(LogEventType.SERVICE_ERROR, {
+            message: `Failed to delete avatar backup: ${previousAvatarBackupPath}`,
             characterId,
           });
         }

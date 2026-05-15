@@ -1,1 +1,1 @@
-ALTER TABLE "project_files" ADD COLUMN "original_content" text;
+ALTER TABLE "project_files" ADD COLUMN "original_content" text;--> statement-breakpoint
