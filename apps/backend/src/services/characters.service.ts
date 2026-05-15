@@ -1,0 +1,734 @@
+/**
+ * Characters Service
+ *
+ * Handles all character management business logic including detection,
+ * import, CRUD operations, avatar management, and project settings.
+ * Authorization is enforced via requireProjectOwnership from authz.service.
+ */
+
+import { getDb } from "../db/index.js";
+import {
+  characters,
+  projectSettings,
+  labels,
+  projectFiles,
+} from "../db/schema/index.js";
+import { eq, and } from "drizzle-orm";
+import {
+  NotFoundError,
+  ConflictError,
+} from "../middleware/error-handler.middleware.js";
+import {
+  characterParserService,
+  type DetectedCharacter,
+  type CharacterConflict,
+} from "./character-parser.service.js";
+import { characterLinkerService } from "./character-linker.service.js";
+import { requireProjectOwnership } from "./authz.service.js";
+import {
+  validateAndProcessAvatar,
+  deleteAvatar as deleteAvatarFile,
+} from "./image-processing.service.js";
+import {
+  ensureAvatarDir,
+  getAvatarPath,
+  getAvatarFullPath,
+} from "../lib/storage.js";
+import { getBasePath } from "../lib/config.js";
+import { promises as fs } from "node:fs";
+import { logWarn, LogEventType } from "../lib/logger.js";
+import type { Character, ProjectSettings } from "../db/schema/index.js";
+import type {
+  CreateCharacterInput,
+  UpdateCharacterInput,
+  ImportCharactersInput,
+  ProjectSettingsInput,
+} from "../lib/validation.js";
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/** Character summary returned in list views */
+export interface CharacterSummary {
+  id: string;
+  name: string;
+  displayName: string;
+  renpyTag: string;
+  color: string;
+  routeAffiliation: string | null;
+  isLoveInterest: boolean;
+  avatarUrl: string | null;
+}
+
+/** Full character detail returned for single-character operations */
+export interface CharacterDetail {
+  id: string;
+  name: string;
+  displayName: string;
+  renpyTag: string;
+  color: string;
+  routeAffiliation: string | null;
+  isLoveInterest: boolean;
+  dialogueStyle: string | null;
+  conditionalPrefix: string | null;
+  avatarUrl: string | null;
+}
+
+/** Result of character detection */
+export interface DetectCharactersResult {
+  characters: DetectedCharacter[];
+  excludedTags: string[];
+  existingTags: string[];
+  conflicts: CharacterConflict[];
+}
+
+/** Result of character import */
+export interface ImportCharactersResult {
+  characters: Array<{
+    id: string;
+    tag: string;
+    name: string;
+    displayName: string;
+  }>;
+  linked: number;
+  unmatched: string[];
+}
+
+/** Project character settings subset */
+export interface CharacterSettingsResult {
+  excludedCharacterTags: string[];
+  autoLinkSpeakers: boolean;
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/** Build avatar URL from stored filename */
+function buildAvatarUrl(filename: string | null): string | null {
+  if (!filename) return null;
+  return getAvatarPath(filename, getBasePath());
+}
+
+// ============================================================================
+// CharactersService
+// ============================================================================
+
+export class CharactersService {
+  // --------------------------------------------------------------------------
+  // Project settings
+  // --------------------------------------------------------------------------
+
+  /**
+   * Get or create project settings, enforcing ownership.
+   */
+  async getProjectSettings(
+    projectId: string,
+    userId: string
+  ): Promise<ProjectSettings> {
+    await requireProjectOwnership(projectId, userId);
+
+    const db = getDb();
+
+    let [settings] = await db
+      .select()
+      .from(projectSettings)
+      .where(eq(projectSettings.projectId, projectId))
+      .limit(1);
+
+    if (!settings) {
+      [settings] = await db
+        .insert(projectSettings)
+        .values({
+          projectId,
+          excludedCharacterTags: ["n", "u", "narrator", "extend"],
+          autoLinkSpeakers: true,
+          updatedAt: new Date(),
+        })
+        .returning();
+    }
+
+    return settings;
+  }
+
+  /**
+   * Upsert project character settings.
+   */
+  async updateCharacterSettings(
+    projectId: string,
+    userId: string,
+    input: ProjectSettingsInput
+  ): Promise<CharacterSettingsResult> {
+    await requireProjectOwnership(projectId, userId);
+
+    const db = getDb();
+
+    const [updatedSettings] = await db
+      .insert(projectSettings)
+      .values({
+        projectId,
+        excludedCharacterTags: input.excludedCharacterTags ?? [
+          "n",
+          "u",
+          "narrator",
+          "extend",
+        ],
+        autoLinkSpeakers: input.autoLinkSpeakers ?? true,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [projectSettings.projectId],
+        set: {
+          ...(input.excludedCharacterTags && {
+            excludedCharacterTags: input.excludedCharacterTags,
+          }),
+          ...(input.autoLinkSpeakers !== undefined && {
+            autoLinkSpeakers: input.autoLinkSpeakers,
+          }),
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+
+    return {
+      excludedCharacterTags: updatedSettings.excludedCharacterTags ?? [],
+      autoLinkSpeakers: updatedSettings.autoLinkSpeakers,
+    };
+  }
+
+  /**
+   * Get project character settings subset (no ownership enforcement: reads
+   * only).
+   */
+  async getCharacterSettings(
+    projectId: string,
+    userId: string
+  ): Promise<CharacterSettingsResult> {
+    // getProjectSettings enforces ownership
+    const settings = await this.getProjectSettings(projectId, userId);
+    return {
+      excludedCharacterTags: settings.excludedCharacterTags ?? [],
+      autoLinkSpeakers: settings.autoLinkSpeakers,
+    };
+  }
+
+  // --------------------------------------------------------------------------
+  // Authorization helper
+  // --------------------------------------------------------------------------
+
+  /**
+   * Fetch a character by ID and verify the caller's project ownership.
+   * Throws NotFoundError if the character (or its project) doesn't exist,
+   * and ForbiddenError if the caller lacks access.
+   */
+  async requireCharacterAccess(
+    characterId: string,
+    userId: string
+  ): Promise<Character> {
+    const db = getDb();
+
+    const [character] = await db
+      .select()
+      .from(characters)
+      .where(eq(characters.id, characterId))
+      .limit(1);
+
+    if (!character) {
+      throw new NotFoundError("Character");
+    }
+
+    await requireProjectOwnership(character.projectId, userId);
+
+    return character;
+  }
+
+  // --------------------------------------------------------------------------
+  // Detection
+  // --------------------------------------------------------------------------
+
+  /**
+   * Detect characters from all project RPY files, deduplicate by tag, and
+   * detect conflicts with already-imported characters.
+   */
+  async detectCharacters(
+    projectId: string,
+    userId: string
+  ): Promise<DetectCharactersResult> {
+    // getProjectSettings enforces ownership
+    const db = getDb();
+
+    const settings = await this.getProjectSettings(projectId, userId);
+    const excludedTags = new Set(settings.excludedCharacterTags ?? []);
+
+    const existingCharacters = await db
+      .select()
+      .from(characters)
+      .where(eq(characters.projectId, projectId));
+
+    const allProjectFiles = await db
+      .select()
+      .from(projectFiles)
+      .where(eq(projectFiles.projectId, projectId));
+
+    const allDetected: DetectedCharacter[] = [];
+    for (const file of allProjectFiles) {
+      if (file.content) {
+        const fileCharacters = characterParserService.parseWithExclusions(
+          file.content,
+          file.filePath,
+          excludedTags
+        );
+        allDetected.push(...fileCharacters);
+      }
+    }
+
+    // Deduplicate by tag
+    const seenTags = new Set<string>();
+    const uniqueCharacters: DetectedCharacter[] = [];
+    for (const char of allDetected) {
+      if (!seenTags.has(char.tag)) {
+        seenTags.add(char.tag);
+        uniqueCharacters.push(char);
+      }
+    }
+
+    const conflicts = characterParserService.detectConflicts(
+      uniqueCharacters,
+      existingCharacters.map((c) => ({
+        renpyTag: c.renpyTag,
+        name: c.name,
+        displayName: c.displayName,
+        color: c.color,
+      }))
+    );
+
+    const existingTags = existingCharacters.map((c) => c.renpyTag);
+
+    return {
+      characters: uniqueCharacters,
+      excludedTags: Array.from(excludedTags),
+      existingTags,
+      conflicts,
+    };
+  }
+
+  // --------------------------------------------------------------------------
+  // Import
+  // --------------------------------------------------------------------------
+
+  /**
+   * Import characters (create or update) and optionally link speakers to
+   * lines.
+   */
+  async importCharacters(
+    projectId: string,
+    userId: string,
+    input: ImportCharactersInput
+  ): Promise<ImportCharactersResult> {
+    await requireProjectOwnership(projectId, userId);
+
+    const db = getDb();
+    const { characters: charactersToImport, excludedTags, linkToLines } = input;
+
+    // Update project settings
+    await db
+      .insert(projectSettings)
+      .values({
+        projectId,
+        excludedCharacterTags: excludedTags,
+        autoLinkSpeakers: linkToLines,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [projectSettings.projectId],
+        set: {
+          excludedCharacterTags: excludedTags,
+          autoLinkSpeakers: linkToLines,
+          updatedAt: new Date(),
+        },
+      });
+
+    const existingCharacters = await db
+      .select()
+      .from(characters)
+      .where(eq(characters.projectId, projectId));
+
+    const existingByTag = new Map(
+      existingCharacters.map((c) => [c.renpyTag, c])
+    );
+
+    const createdCharacters: Array<{
+      id: string;
+      tag: string;
+      name: string;
+      displayName: string;
+    }> = [];
+
+    for (const charData of charactersToImport) {
+      const existing = existingByTag.get(charData.tag);
+
+      if (existing) {
+        // Update existing character
+        await db
+          .update(characters)
+          .set({
+            name: charData.name ?? charData.tag,
+            displayName: charData.displayName,
+            color: charData.color,
+            routeAffiliation: charData.routeAffiliation,
+            isLoveInterest: charData.isLoveInterest ?? false,
+            updatedAt: new Date(),
+          })
+          .where(eq(characters.id, existing.id));
+
+        createdCharacters.push({
+          id: existing.id,
+          tag: existing.renpyTag,
+          name: charData.name ?? charData.tag,
+          displayName: charData.displayName,
+        });
+      } else {
+        // Create new character
+        const [newChar] = await db
+          .insert(characters)
+          .values({
+            projectId,
+            name: charData.name ?? charData.tag,
+            displayName: charData.displayName,
+            renpyTag: charData.tag,
+            color: charData.color,
+            routeAffiliation: charData.routeAffiliation,
+            isLoveInterest: charData.isLoveInterest ?? false,
+          })
+          .returning();
+
+        createdCharacters.push({
+          id: newChar.id,
+          tag: newChar.renpyTag,
+          name: newChar.name,
+          displayName: newChar.displayName,
+        });
+      }
+    }
+
+    let linked = 0;
+    let unmatched: string[] = [];
+
+    if (linkToLines) {
+      const projectLabels = await db
+        .select({ id: labels.id })
+        .from(labels)
+        .where(eq(labels.projectId, projectId));
+
+      const labelIds = projectLabels.map((l) => l.id);
+
+      if (labelIds.length > 0) {
+        const result = await characterLinkerService.linkSpeakersToLines(
+          projectId,
+          labelIds,
+          new Set(excludedTags)
+        );
+        linked = result.linked;
+        unmatched = result.unmatched;
+      }
+    }
+
+    return { characters: createdCharacters, linked, unmatched };
+  }
+
+  // --------------------------------------------------------------------------
+  // CRUD
+  // --------------------------------------------------------------------------
+
+  /** List all characters for a project, ordered by renpyTag. */
+  async listCharacters(
+    projectId: string,
+    userId: string
+  ): Promise<CharacterSummary[]> {
+    await requireProjectOwnership(projectId, userId);
+
+    const db = getDb();
+
+    const rows = await db
+      .select({
+        id: characters.id,
+        name: characters.name,
+        displayName: characters.displayName,
+        renpyTag: characters.renpyTag,
+        color: characters.color,
+        routeAffiliation: characters.routeAffiliation,
+        isLoveInterest: characters.isLoveInterest,
+        avatarUrl: characters.avatarUrl,
+      })
+      .from(characters)
+      .where(eq(characters.projectId, projectId))
+      .orderBy(characters.renpyTag);
+
+    return rows.map((c) => ({
+      ...c,
+      avatarUrl: buildAvatarUrl(c.avatarUrl),
+    }));
+  }
+
+  /** Get a single character by ID with full detail. */
+  async getCharacter(
+    characterId: string,
+    userId: string
+  ): Promise<CharacterDetail> {
+    const character = await this.requireCharacterAccess(characterId, userId);
+
+    return {
+      id: character.id,
+      name: character.name,
+      displayName: character.displayName,
+      renpyTag: character.renpyTag,
+      color: character.color,
+      routeAffiliation: character.routeAffiliation,
+      isLoveInterest: character.isLoveInterest,
+      dialogueStyle: character.dialogueStyle,
+      conditionalPrefix: character.conditionalPrefix,
+      avatarUrl: buildAvatarUrl(character.avatarUrl),
+    };
+  }
+
+  /** Create a new character. */
+  async createCharacter(
+    projectId: string,
+    userId: string,
+    input: CreateCharacterInput
+  ): Promise<CharacterDetail> {
+    await requireProjectOwnership(projectId, userId);
+
+    const db = getDb();
+
+    // Prevent duplicate tags within the same project
+    const [existing] = await db
+      .select()
+      .from(characters)
+      .where(
+        and(
+          eq(characters.projectId, projectId),
+          eq(characters.renpyTag, input.renpyTag)
+        )
+      )
+      .limit(1);
+
+    if (existing) {
+      throw new ConflictError("Character with this tag already exists");
+    }
+
+    const [newCharacter] = await db
+      .insert(characters)
+      .values({
+        projectId,
+        name: input.name,
+        displayName: input.displayName,
+        renpyTag: input.renpyTag,
+        color: input.color,
+        routeAffiliation: input.routeAffiliation,
+        isLoveInterest: input.isLoveInterest,
+        dialogueStyle: input.dialogueStyle,
+        conditionalPrefix: input.conditionalPrefix,
+      })
+      .returning();
+
+    return {
+      id: newCharacter.id,
+      name: newCharacter.name,
+      displayName: newCharacter.displayName,
+      renpyTag: newCharacter.renpyTag,
+      color: newCharacter.color,
+      routeAffiliation: newCharacter.routeAffiliation,
+      isLoveInterest: newCharacter.isLoveInterest,
+      dialogueStyle: newCharacter.dialogueStyle,
+      conditionalPrefix: newCharacter.conditionalPrefix,
+      avatarUrl: buildAvatarUrl(newCharacter.avatarUrl),
+    };
+  }
+
+  /** Update a character. */
+  async updateCharacter(
+    characterId: string,
+    userId: string,
+    input: UpdateCharacterInput
+  ): Promise<CharacterDetail> {
+    await this.requireCharacterAccess(characterId, userId);
+
+    const db = getDb();
+
+    const [updated] = await db
+      .update(characters)
+      .set({ ...input, updatedAt: new Date() })
+      .where(eq(characters.id, characterId))
+      .returning();
+
+    return {
+      id: updated.id,
+      name: updated.name,
+      displayName: updated.displayName,
+      renpyTag: updated.renpyTag,
+      color: updated.color,
+      routeAffiliation: updated.routeAffiliation,
+      isLoveInterest: updated.isLoveInterest,
+      dialogueStyle: updated.dialogueStyle,
+      conditionalPrefix: updated.conditionalPrefix,
+      avatarUrl: buildAvatarUrl(updated.avatarUrl),
+    };
+  }
+
+  /** Delete a character and its avatar file. */
+  async deleteCharacter(characterId: string, userId: string): Promise<void> {
+    const character = await this.requireCharacterAccess(characterId, userId);
+
+    const db = getDb();
+
+    await db.delete(characters).where(eq(characters.id, characterId));
+
+    if (character.avatarUrl) {
+      try {
+        await deleteAvatarFile(getAvatarFullPath(character.avatarUrl));
+      } catch {
+        logWarn(LogEventType.SERVICE_ERROR, {
+          message: `Failed to delete avatar file: ${character.avatarUrl}`,
+          characterId,
+        });
+      }
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // Avatar management
+  // --------------------------------------------------------------------------
+
+  /**
+   * Upload an avatar for a character. Handles image processing, file I/O,
+   * database updates, backup/restore on failure, and cleanup.
+   */
+  async uploadAvatar(
+    characterId: string,
+    userId: string,
+    buffer: Buffer,
+    mimetype: string
+  ): Promise<{ avatarUrl: string }> {
+    const character = await this.requireCharacterAccess(characterId, userId);
+    const db = getDb();
+
+    // Process image
+    const result = await validateAndProcessAvatar(buffer, mimetype);
+
+    // Ensure upload directory exists
+    await ensureAvatarDir();
+
+    // Backup existing avatar file
+    let previousAvatarBackupPath: string | undefined;
+    if (character.avatarUrl) {
+      const previousAvatarPath = getAvatarFullPath(character.avatarUrl);
+      try {
+        await fs.access(previousAvatarPath);
+        previousAvatarBackupPath = `${previousAvatarPath}.backup-${Date.now()}-${
+          process.pid
+        }`;
+        await fs.copyFile(previousAvatarPath, previousAvatarBackupPath);
+      } catch (accessError) {
+        if ((accessError as NodeJS.ErrnoException).code !== "ENOENT") {
+          throw accessError;
+        }
+        // File doesn't exist — proceed without backup
+      }
+    }
+
+    // Write new file
+    const filePath = getAvatarFullPath(result.filename);
+    await fs.writeFile(filePath, result.buffer);
+
+    // Remove old avatar file
+    if (character.avatarUrl) {
+      try {
+        await deleteAvatarFile(getAvatarFullPath(character.avatarUrl));
+      } catch {
+        logWarn(LogEventType.SERVICE_ERROR, {
+          message: `Failed to delete old avatar (backup preserved): ${character.avatarUrl}`,
+          characterId,
+        });
+      }
+    }
+
+    // Update DB
+    try {
+      const [updatedCharacter] = await db
+        .update(characters)
+        .set({ avatarUrl: result.filename, updatedAt: new Date() })
+        .where(eq(characters.id, characterId))
+        .returning();
+
+      // Clean up backup on success
+      if (previousAvatarBackupPath) {
+        try {
+          await deleteAvatarFile(previousAvatarBackupPath);
+        } catch {
+          logWarn(LogEventType.SERVICE_ERROR, {
+            message: `Failed to delete avatar backup: ${previousAvatarBackupPath}`,
+            characterId,
+          });
+        }
+      }
+
+      const avatarUrl = buildAvatarUrl(updatedCharacter.avatarUrl);
+      if (!avatarUrl) {
+        throw new Error("avatarUrl unexpectedly null after successful upload");
+      }
+
+      return { avatarUrl };
+    } catch (error) {
+      // DB update failed — restore backup and clean up new file
+      if (previousAvatarBackupPath) {
+        const previousAvatarPath = getAvatarFullPath(character.avatarUrl!);
+        try {
+          await fs.copyFile(previousAvatarBackupPath, previousAvatarPath);
+        } catch {
+          logWarn(LogEventType.SERVICE_ERROR, {
+            message: `Failed to restore previous avatar: ${character.avatarUrl}`,
+            characterId,
+          });
+        }
+      }
+
+      try {
+        await deleteAvatarFile(filePath);
+      } catch {
+        logWarn(LogEventType.SERVICE_ERROR, {
+          message: `Failed to delete new avatar file after DB failure: ${result.filename}`,
+          characterId,
+        });
+      }
+
+      throw error;
+    }
+  }
+
+  /** Delete a character's avatar (file + DB). */
+  async deleteAvatar(characterId: string, userId: string): Promise<void> {
+    const character = await this.requireCharacterAccess(characterId, userId);
+
+    const db = getDb();
+
+    await db
+      .update(characters)
+      .set({ avatarUrl: null, updatedAt: new Date() })
+      .where(eq(characters.id, characterId));
+
+    if (character.avatarUrl) {
+      try {
+        await deleteAvatarFile(getAvatarFullPath(character.avatarUrl));
+      } catch {
+        logWarn(LogEventType.SERVICE_ERROR, {
+          message: `Failed to delete avatar file: ${character.avatarUrl}`,
+          characterId,
+        });
+      }
+    }
+  }
+}
+
+export const charactersService = new CharactersService();
