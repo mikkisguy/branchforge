@@ -11,6 +11,8 @@ import * as projectsService from "../../services/projects.service.js";
 import {
   NotFoundError,
   ForbiddenError,
+  ValidationError,
+  ConflictError,
 } from "../../middleware/error-handler.middleware.js";
 
 const PROJECT_ID = "550e8400-e29b-41d4-a716-446655440000";
@@ -21,6 +23,8 @@ vi.mock("../../services/projects.service.js", () => ({
   getProject: vi.fn(),
   updateProject: vi.fn(),
   deleteProject: vi.fn(),
+  getProjectFiles: vi.fn(),
+  updateFileContent: vi.fn(),
 }));
 
 // Mock the authenticate middleware to attach a test user
@@ -279,6 +283,312 @@ describe("ProjectsRoutes", () => {
 
       expect(response.statusCode).toBe(403);
       expect(response.json()).toEqual({ error: "Forbidden" });
+    });
+  });
+
+  describe("GET /projects/:projectId/files", () => {
+    it("should return files with labels", async () => {
+      const mockResult = {
+        files: [
+          {
+            id: "file-1",
+            projectId: PROJECT_ID,
+            source: "GITLAB",
+            filePath: "labels/ch1.rpy",
+            fileType: "STORY",
+            content: "label start:",
+            contentHash: "abc123",
+            createdAt: new Date("2024-01-01"),
+            updatedAt: new Date("2024-01-02"),
+            labels: [
+              {
+                id: "lbl-1",
+                labelName: "start",
+                title: "Start",
+                status: "DRAFT",
+              },
+            ],
+          },
+        ],
+      };
+
+      vi.mocked(projectsService.getProjectFiles).mockResolvedValue(mockResult);
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: `/projects/${PROJECT_ID}/files`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      const json = response.json();
+      expect(json.files).toHaveLength(1);
+      expect(json.files[0].id).toBe("file-1");
+      expect(json.files[0].labels).toHaveLength(1);
+      expect(projectsService.getProjectFiles).toHaveBeenCalledWith(
+        PROJECT_ID,
+        "user-123",
+        undefined
+      );
+    });
+
+    it("should pass source filter to service", async () => {
+      vi.mocked(projectsService.getProjectFiles).mockResolvedValue({
+        files: [],
+      });
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: `/projects/${PROJECT_ID}/files?source=GITLAB`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(projectsService.getProjectFiles).toHaveBeenCalledWith(
+        PROJECT_ID,
+        "user-123",
+        "GITLAB"
+      );
+    });
+
+    it("should return 404 when project not found", async () => {
+      vi.mocked(projectsService.getProjectFiles).mockRejectedValue(
+        new NotFoundError("Project")
+      );
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: `/projects/${PROJECT_ID}/files`,
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({ error: "Project not found" });
+    });
+
+    it("should return 403 when access denied", async () => {
+      vi.mocked(projectsService.getProjectFiles).mockRejectedValue(
+        new ForbiddenError("You do not have access to this project")
+      );
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: `/projects/${PROJECT_ID}/files`,
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({ error: "Forbidden" });
+    });
+
+    it("should return 500 on unexpected errors", async () => {
+      vi.mocked(projectsService.getProjectFiles).mockRejectedValue(
+        new Error("DB connection failed")
+      );
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: `/projects/${PROJECT_ID}/files`,
+      });
+
+      expect(response.statusCode).toBe(500);
+      expect(response.json()).toEqual({
+        error: "Failed to get project files",
+      });
+    });
+
+    it("should return 400 for invalid source query", async () => {
+      const response = await fastify.inject({
+        method: "GET",
+        url: `/projects/${PROJECT_ID}/files?source=INVALID_VALUE`,
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        message: "Invalid query parameters",
+      });
+    });
+  });
+
+  describe("PUT /projects/files/:fileId", () => {
+    const FILE_ID = "660e8400-e29b-41d4-a716-446655440001";
+
+    it("should update file content successfully", async () => {
+      const mockResult = {
+        success: true as const,
+        contentHash: "newhash123",
+        updatedAt: new Date("2024-01-02").toISOString(),
+        syncResult: {
+          labelsCreated: 2,
+          labelsUpdated: 1,
+          labelsDeleted: 0,
+          linesProcessed: 50,
+          errors: [],
+        },
+      };
+
+      vi.mocked(projectsService.updateFileContent).mockResolvedValue(
+        mockResult
+      );
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/files/${FILE_ID}`,
+        payload: { content: "label start:\n  'Hello'\n" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const json = response.json();
+      expect(json.success).toBe(true);
+      expect(json.contentHash).toBe("newhash123");
+      expect(json.syncResult.labelsCreated).toBe(2);
+      expect(projectsService.updateFileContent).toHaveBeenCalledWith(
+        FILE_ID,
+        "user-123",
+        "label start:\n  'Hello'\n",
+        undefined
+      );
+    });
+
+    it("should pass expectedContentHash for optimistic concurrency", async () => {
+      const mockResult = {
+        success: true as const,
+        contentHash: "newhash123",
+        updatedAt: new Date("2024-01-02").toISOString(),
+        syncResult: {
+          labelsCreated: 0,
+          labelsUpdated: 0,
+          labelsDeleted: 0,
+          linesProcessed: 0,
+          errors: [],
+        },
+      };
+
+      vi.mocked(projectsService.updateFileContent).mockResolvedValue(
+        mockResult
+      );
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/files/${FILE_ID}`,
+        payload: { content: "updated content", expectedContentHash: "oldhash" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(projectsService.updateFileContent).toHaveBeenCalledWith(
+        FILE_ID,
+        "user-123",
+        "updated content",
+        "oldhash"
+      );
+    });
+
+    it("should return 409 on content hash conflict", async () => {
+      vi.mocked(projectsService.updateFileContent).mockRejectedValue(
+        new ConflictError("Content hash mismatch. Current hash: serverhash")
+      );
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/files/${FILE_ID}`,
+        payload: { content: "updated content", expectedContentHash: "oldhash" },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toEqual({
+        error: "Resource conflict",
+      });
+    });
+
+    it("should return structured 409 on stale content hash conflict", async () => {
+      vi.mocked(projectsService.updateFileContent).mockRejectedValue(
+        new ConflictError("Content hash mismatch. Current hash: serverhash", {
+          reason: "STALE_CONTENT_HASH",
+          currentContentHash: "serverhash",
+        })
+      );
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/files/${FILE_ID}`,
+        payload: { content: "updated content", expectedContentHash: "oldhash" },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toEqual({
+        success: false,
+        conflict: {
+          reason: "STALE_CONTENT_HASH",
+          currentContentHash: "serverhash",
+        },
+      });
+    });
+
+    it("should return 404 when file not found", async () => {
+      vi.mocked(projectsService.updateFileContent).mockRejectedValue(
+        new NotFoundError("File")
+      );
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/files/${FILE_ID}`,
+        payload: { content: "content" },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({ error: "File not found" });
+    });
+
+    it("should return 400 when content invalid", async () => {
+      vi.mocked(projectsService.updateFileContent).mockRejectedValue(
+        new ValidationError("Invalid RPY file content")
+      );
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/files/${FILE_ID}`,
+        payload: { content: "..." },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toHaveProperty("error");
+    });
+
+    it("should return 403 when access denied", async () => {
+      vi.mocked(projectsService.updateFileContent).mockRejectedValue(
+        new ForbiddenError("Insufficient permissions")
+      );
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/files/${FILE_ID}`,
+        payload: { content: "content" },
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({ error: "Insufficient permissions" });
+    });
+
+    it("should return 400 when content is missing", async () => {
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/files/${FILE_ID}`,
+        payload: {},
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        message: "Invalid request body",
+      });
+    });
+
+    it("should return 400 when content has invalid type", async () => {
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/files/${FILE_ID}`,
+        payload: { content: 123 },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        message: "Invalid request body",
+      });
     });
   });
 });

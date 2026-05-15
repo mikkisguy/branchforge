@@ -5,9 +5,16 @@
  */
 
 import { getDb } from "../db/index.js";
-import { projects, projectUsers } from "../db/schema/index.js";
-import { eq, and } from "drizzle-orm";
+import {
+  projects,
+  projectUsers,
+  projectFiles,
+  labels,
+  labelLines,
+} from "../db/schema/index.js";
+import { eq, and, inArray, isNull } from "drizzle-orm";
 import type { NewProject } from "../db/schema/tables/projects.js";
+import type { ProjectFile } from "../db/schema/tables/project-files.js";
 import type {
   UserRole,
   SourceOrigin,
@@ -16,10 +23,19 @@ import type {
 import {
   NotFoundError,
   ValidationError,
+  ConflictError,
 } from "../middleware/error-handler.middleware.js";
 import { z } from "zod";
 import { createProjectSchema } from "../lib/validation.js";
 import { isValidSourceOrigin } from "@branchforge/shared";
+import {
+  requireProjectAccess,
+  requireProjectOwnership,
+} from "./authz.service.js";
+import { syncLabelsFromFile } from "./labels.service.js";
+import type { SyncLabelsResult } from "./labels.service.js";
+import { calculateContentHash } from "../lib/hash.js";
+import { parseRPYFileWithLabels } from "./rpy-parser.service.js";
 
 /**
  * Project row type from database queries (with optional role for shared projects)
@@ -71,6 +87,51 @@ export interface UpdateProjectBody {
   name?: string;
   description?: string;
 }
+
+// ============================================================================
+// File-related Types
+// ============================================================================
+
+/**
+ * Slim public label representation for file listings.
+ * Excludes internal fields like projectFileId.
+ */
+export interface PublicLabelSlim {
+  id: string;
+  labelName: string | null;
+  title: string;
+  status: string | null;
+}
+
+/**
+ * A project file with its attached labels.
+ */
+export type FileWithLabels = ProjectFile & { labels: PublicLabelSlim[] };
+
+/**
+ * Result of the getProjectFiles service call.
+ */
+export interface GetProjectFilesResult {
+  files: FileWithLabels[];
+}
+
+/**
+ * Result of the updateFileContent service call.
+ * Errors (not found, forbidden, validation, conflict) are thrown, not returned.
+ */
+export type UpdateFileContentResult = {
+  success: true;
+  contentHash: string;
+  updatedAt: string;
+  syncResult: Pick<
+    SyncLabelsResult,
+    | "labelsCreated"
+    | "labelsUpdated"
+    | "labelsDeleted"
+    | "linesProcessed"
+    | "errors"
+  >;
+};
 
 /**
  * List all projects for a user
@@ -313,4 +374,258 @@ export async function deleteProject(
   if (!result || result.length === 0 || !result[0]) {
     throw new NotFoundError("Project");
   }
+}
+
+// ============================================================================
+// Project Files
+// ============================================================================
+
+/**
+ * Get all project files with their labels.
+ *
+ * Verifies the user has access to the project via authz.service,
+ * then fetches all project files (optionally filtered by source) and
+ * attaches their non-deleted labels.
+ *
+ * @param projectId - The project ID to fetch files for
+ * @param userId - The user ID making the request (for authorization)
+ * @param source - Optional source filter (e.g., "GITLAB", "ZIP")
+ * @returns Files with their attached labels
+ * @throws NotFoundError if the project doesn't exist
+ * @throws ForbiddenError if the user lacks access
+ */
+export async function getProjectFiles(
+  projectId: string,
+  userId: string,
+  source?: SourceOrigin
+): Promise<GetProjectFilesResult> {
+  // Verify user has access to the project (throws NotFoundError / ForbiddenError)
+  await requireProjectAccess(projectId, userId);
+
+  const db = getDb();
+
+  // Build where conditions
+  const whereConditions = source
+    ? and(
+        eq(projectFiles.projectId, projectId),
+        eq(projectFiles.source, source)
+      )
+    : eq(projectFiles.projectId, projectId);
+
+  // Get all project files
+  const files = await db.select().from(projectFiles).where(whereConditions);
+
+  // If no files, return empty array
+  if (files.length === 0) {
+    return { files: [] };
+  }
+
+  // Get labels that are associated with these files
+  const fileIds = files.map((f) => f.id);
+
+  // Internal type for grouping - includes projectFileId for lookup
+  type LabelForGrouping = {
+    id: string;
+    labelName: string | null;
+    title: string;
+    status: string | null;
+    projectFileId: string;
+  };
+
+  const allLabels: LabelForGrouping[] = await db
+    .select({
+      id: labels.id,
+      labelName: labels.labelName,
+      title: labels.title,
+      status: labels.status,
+      projectFileId: labels.projectFileId,
+    })
+    .from(labels)
+    .where(
+      and(inArray(labels.projectFileId, fileIds), isNull(labels.deletedAt))
+    );
+
+  // Create a lookup keyed by projectFileId, storing only public label fields
+  const labelsByFileId = new Map<string, PublicLabelSlim[]>();
+  for (const label of allLabels) {
+    if (!labelsByFileId.has(label.projectFileId)) {
+      labelsByFileId.set(label.projectFileId, []);
+    }
+    const { projectFileId: _, ...publicLabel } = label;
+    labelsByFileId.get(label.projectFileId)!.push(publicLabel);
+  }
+
+  // Attach labels to each file
+  const filesWithLabels: FileWithLabels[] = files.map((file) => ({
+    ...file,
+    labels: labelsByFileId.get(file.id) ?? [],
+  }));
+
+  return { files: filesWithLabels };
+}
+
+/**
+ * Update file content and sync labels from the updated content.
+ *
+ * This is the unified service for both Script Mode and Write Mode editing.
+ * It verifies project ownership, parses the RPY content, updates the file
+ * in a transaction, and syncs labels.
+ *
+ * @param fileId - The file ID to update
+ * @param userId - The user ID making the request (for authorization)
+ * @param content - The new file content
+ * @param expectedContentHash - Optional hash for optimistic concurrency control
+ * @returns A discriminated union: success with contentHash/updatedAt/syncResult, or conflict
+ * @throws NotFoundError if the file or project doesn't exist
+ * @throws ForbiddenError if the user lacks project ownership
+ * @throws ValidationError if the RPY content is invalid
+ */
+export async function updateFileContent(
+  fileId: string,
+  userId: string,
+  content: string,
+  expectedContentHash?: string
+): Promise<UpdateFileContentResult> {
+  const db = getDb();
+
+  // Get the file with project information for ownership verification
+  const [fileWithProject] = await db
+    .select({
+      file: projectFiles,
+      projectId: projects.id,
+    })
+    .from(projectFiles)
+    .innerJoin(projects, eq(projectFiles.projectId, projects.id))
+    .where(eq(projectFiles.id, fileId))
+    .limit(1);
+
+  if (!fileWithProject) {
+    throw new NotFoundError("File");
+  }
+
+  // Verify user owns the project
+  await requireProjectOwnership(fileWithProject.projectId, userId);
+
+  const { file } = fileWithProject;
+
+  // Re-evaluate file type from the latest content so files can transition
+  // from SETTINGS -> STORY when labels are added in Script Mode.
+  let nextFileType: typeof file.fileType;
+  try {
+    const parsed = parseRPYFileWithLabels(content, file.filePath);
+    nextFileType = parsed.fileType;
+  } catch (err) {
+    throw new ValidationError("Invalid RPY file content", err);
+  }
+
+  // Calculate new content hash
+  const newContentHash = calculateContentHash(content);
+
+  // Update file content and sync labels in a single transaction for atomicity
+  const syncResult = await db.transaction(async (tx) => {
+    const [lockedFile] = await tx
+      .select({
+        contentHash: projectFiles.contentHash,
+        updatedAt: projectFiles.updatedAt,
+      })
+      .from(projectFiles)
+      .where(eq(projectFiles.id, fileId))
+      .for("update")
+      .limit(1);
+
+    if (!lockedFile) {
+      throw new NotFoundError("File");
+    }
+
+    if (
+      expectedContentHash !== undefined &&
+      lockedFile.contentHash !== expectedContentHash
+    ) {
+      throw new ConflictError(
+        `Content hash mismatch. Current hash: ${lockedFile.contentHash}`,
+        {
+          reason: "STALE_CONTENT_HASH",
+          currentContentHash: lockedFile.contentHash,
+        }
+      );
+    }
+
+    const fileUpdatedAt = new Date();
+
+    // Update the file content
+    await tx
+      .update(projectFiles)
+      .set({
+        content,
+        fileType: nextFileType,
+        contentHash: newContentHash,
+        updatedAt: fileUpdatedAt,
+      })
+      .where(eq(projectFiles.id, fileId));
+
+    // Sync labels from updated content (only for STORY files)
+    const syncResultForFile =
+      nextFileType === "STORY"
+        ? await syncLabelsFromFile(
+            file.projectId,
+            { filePath: file.filePath, fileType: nextFileType },
+            content,
+            fileId,
+            { skipCleanup: false, tx }
+          )
+        : undefined;
+
+    // When file type transitions away from STORY, soft-delete existing labels
+    let deletedCount = 0;
+
+    if (nextFileType !== "STORY") {
+      // Find all non-deleted label IDs for this file
+      const fileLabelIds = await tx
+        .select({ id: labels.id })
+        .from(labels)
+        .where(and(eq(labels.projectFileId, fileId), isNull(labels.deletedAt)));
+
+      deletedCount = fileLabelIds.length;
+
+      if (deletedCount > 0) {
+        const ids = fileLabelIds.map((l) => l.id);
+        const deletedAt = new Date();
+
+        // Soft delete label lines
+        await tx
+          .update(labelLines)
+          .set({ deletedAt })
+          .where(
+            and(inArray(labelLines.labelId, ids), isNull(labelLines.deletedAt))
+          );
+
+        // Soft delete labels
+        await tx
+          .update(labels)
+          .set({ deletedAt })
+          .where(and(inArray(labels.id, ids), isNull(labels.deletedAt)));
+      }
+    }
+
+    return {
+      syncResultForFile,
+      fileUpdatedAt,
+      deletedCount,
+    };
+  });
+
+  return {
+    success: true,
+    contentHash: newContentHash,
+    updatedAt: syncResult.fileUpdatedAt.toISOString(),
+    syncResult: {
+      labelsCreated: syncResult.syncResultForFile?.labelsCreated ?? 0,
+      labelsUpdated: syncResult.syncResultForFile?.labelsUpdated ?? 0,
+      labelsDeleted:
+        (syncResult.syncResultForFile?.labelsDeleted ?? 0) +
+        syncResult.deletedCount,
+      linesProcessed: syncResult.syncResultForFile?.linesProcessed ?? 0,
+      errors: syncResult.syncResultForFile?.errors ?? [],
+    },
+  };
 }

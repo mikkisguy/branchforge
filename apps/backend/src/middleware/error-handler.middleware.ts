@@ -88,9 +88,19 @@ export class UnauthorizedError extends HttpError {
  * Use when a request conflicts with existing data
  */
 export class ConflictError extends HttpError {
-  constructor(message: string = "Resource already exists") {
+  public currentContentHash?: string;
+  public reason?: string;
+
+  constructor(
+    message: string = "Resource already exists",
+    details?: { currentContentHash?: string; reason?: string }
+  ) {
     super(409, message, "Resource conflict");
     this.name = "ConflictError";
+    if (details) {
+      this.currentContentHash = details.currentContentHash;
+      this.reason = details.reason;
+    }
   }
 }
 
@@ -146,6 +156,14 @@ export interface ValidationErrorResponse extends ErrorResponse {
  */
 export interface RateLimitResponse extends ErrorResponse {
   retryAfter?: number;
+}
+
+/**
+ * Conflict error response format
+ */
+export interface ConflictErrorResponse extends ErrorResponse {
+  currentContentHash?: string;
+  reason?: string;
 }
 
 // ============================================================================
@@ -239,6 +257,19 @@ export function globalErrorHandler(
       const retryAfter = (error as RateLimitError).retryAfter!;
       (response as RateLimitResponse).retryAfter = retryAfter;
       reply.header("Retry-After", retryAfter.toString());
+    }
+
+    // Include metadata for conflict errors
+    if (
+      error instanceof ConflictError &&
+      ((error as ConflictError).currentContentHash ||
+        (error as ConflictError).reason)
+    ) {
+      const conflictResponse = response as ConflictErrorResponse;
+      conflictResponse.currentContentHash = (
+        error as ConflictError
+      ).currentContentHash;
+      conflictResponse.reason = (error as ConflictError).reason;
     }
 
     reply.status(error.statusCode).send(response);
