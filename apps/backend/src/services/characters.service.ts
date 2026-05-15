@@ -131,23 +131,22 @@ export class CharactersService {
 
     const db = getDb();
 
-    let [settings] = await db
+    // Try insert first, then select to handle race condition
+    await db
+      .insert(projectSettings)
+      .values({
+        projectId,
+        excludedCharacterTags: ["n", "u", "narrator", "extend"],
+        autoLinkSpeakers: true,
+        updatedAt: new Date(),
+      })
+      .onConflictDoNothing();
+
+    const [settings] = await db
       .select()
       .from(projectSettings)
       .where(eq(projectSettings.projectId, projectId))
       .limit(1);
-
-    if (!settings) {
-      [settings] = await db
-        .insert(projectSettings)
-        .values({
-          projectId,
-          excludedCharacterTags: ["n", "u", "narrator", "extend"],
-          autoLinkSpeakers: true,
-          updatedAt: new Date(),
-        })
-        .returning();
-    }
 
     return settings;
   }
@@ -197,10 +196,7 @@ export class CharactersService {
     };
   }
 
-  /**
-   * Get project character settings subset (no ownership enforcement: reads
-   * only).
-   */
+  /** Get project character settings subset. Ownership enforced by getProjectSettings. */
   async getCharacterSettings(
     projectId: string,
     userId: string
