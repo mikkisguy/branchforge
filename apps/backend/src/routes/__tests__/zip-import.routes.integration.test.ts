@@ -13,7 +13,7 @@
  * - Uses real Fastify request/response lifecycle (inject() method)
  *
  * What is mocked:
- * - Database authorization lookups (projects table)
+ * - Authorization service (requireProjectAccess)
  * - ZIP import service operations (file parsing, label creation)
  * - Project service operations (create, delete)
  *
@@ -29,29 +29,10 @@ import multipart from "@fastify/multipart";
 import { zipImportRoutes } from "../zip-import.routes.js";
 import * as zipImportService from "../../services/zip-import.service.js";
 import * as authzService from "../../services/authz.service.js";
-import * as db from "../../db/index.js";
 import {
   ForbiddenError,
   NotFoundError,
 } from "../../middleware/error-handler.middleware.js";
-
-// Mock drizzle-orm's eq function
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn(),
-}));
-
-// Mock the database
-vi.mock("../../db/index.js", () => ({
-  getDb: vi.fn(),
-}));
-
-// Mock the database schema - only mock what's used by authorization helpers
-vi.mock("../../db/schema/index.js", () => ({
-  projects: {
-    userId: "userId",
-    id: "id",
-  },
-}));
 
 // Mock the services
 vi.mock("../../services/zip-import.service.js", () => ({
@@ -109,27 +90,6 @@ describe("ZIP Import Routes (Integration)", () => {
         fileSize: 50 * 1024 * 1024, // 50MB
       },
     });
-
-    // Set up database mock for authorization helpers
-    const mockSelect = vi.fn(() => ({ from: mockFrom }));
-    const mockFrom = vi.fn(() => ({ where: mockWhere }));
-    const mockWhere = vi.fn(() => ({ limit: mockLimit }));
-    const mockLimit = vi.fn(() => {
-      // Default: project belongs to user
-      return Promise.resolve([{ userId: testUserId }]);
-    });
-    const mockDb = {
-      select: mockSelect,
-    };
-    vi.mocked(db.getDb).mockReturnValue(mockDb as any);
-
-    // Store mock references for test customization
-    (fastify as any).mockDb = {
-      mockSelect,
-      mockFrom,
-      mockWhere,
-      mockLimit,
-    };
 
     // Register ZIP import routes with real multipart plugin
     await fastify.register(zipImportRoutes);

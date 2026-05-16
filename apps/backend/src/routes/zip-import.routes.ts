@@ -207,111 +207,129 @@ async function importProjectHandler(
 ): Promise<void> {
   const userId = request.user!.id;
 
-  let data;
   try {
-    data = await request.file({
-      limits: {
-        fileSize: ZIP_IMPORT_MAX_SIZE,
-      },
-    });
-  } catch (error) {
-    if (isMultipartFileTooLargeError(error)) {
-      throw new ValidationError(
-        `File size exceeds ${ZIP_IMPORT_MAX_SIZE_MB}MB limit`
-      );
+    let data;
+    try {
+      data = await request.file({
+        limits: {
+          fileSize: ZIP_IMPORT_MAX_SIZE,
+        },
+      });
+    } catch (error) {
+      if (isMultipartFileTooLargeError(error)) {
+        throw new ValidationError(
+          `File size exceeds ${ZIP_IMPORT_MAX_SIZE_MB}MB limit`
+        );
+      }
+      throw error;
     }
-    throw error;
-  }
 
-  if (!data) {
-    throw new ValidationError("No file provided");
-  }
+    if (!data) {
+      throw new ValidationError("No file provided");
+    }
 
-  const file = data as MultipartFile;
+    const file = data as MultipartFile;
 
-  if (!isZipFile(file.filename)) {
-    throw new ValidationError("File must be a .zip file");
-  }
+    if (!isZipFile(file.filename)) {
+      throw new ValidationError("File must be a .zip file");
+    }
 
-  if (file.mimetype && !isValidZipMimeType(file.mimetype)) {
-    throw new ValidationError("File must be a valid zip file");
-  }
+    if (file.mimetype && !isValidZipMimeType(file.mimetype)) {
+      throw new ValidationError("File must be a valid zip file");
+    }
 
-  const projectNameField = data.fields.projectName ?? data.fields.name;
-  const projectDescriptionField =
-    data.fields.projectDescription ?? data.fields.description;
+    const projectNameField = data.fields.projectName ?? data.fields.name;
+    const projectDescriptionField =
+      data.fields.projectDescription ?? data.fields.description;
 
-  const projectName =
-    projectNameField && "value" in projectNameField
-      ? projectNameField.value
-      : undefined;
-  const projectDescription =
-    projectDescriptionField && "value" in projectDescriptionField
-      ? projectDescriptionField.value
-      : undefined;
+    const projectName =
+      projectNameField && "value" in projectNameField
+        ? projectNameField.value
+        : undefined;
+    const projectDescription =
+      projectDescriptionField && "value" in projectDescriptionField
+        ? projectDescriptionField.value
+        : undefined;
 
-  // Validate project data against schema (handles trimming and max length)
-  const validatedProjectData = validateData(
-    {
-      name: projectName,
-      description: projectDescription,
-      source: "ZIP",
-    },
-    createProjectSchema,
-    "Invalid project data"
-  );
+    // Validate project data against schema (handles trimming and max length)
+    const validatedProjectData = validateData(
+      {
+        name: projectName,
+        description: projectDescription,
+        source: "ZIP",
+      },
+      createProjectSchema,
+      "Invalid project data"
+    );
 
-  let buffer: Buffer;
-  try {
-    buffer = await file.toBuffer();
-  } catch (err: unknown) {
-    if (isMultipartFileTooLargeError(err)) {
+    let buffer: Buffer;
+    try {
+      buffer = await file.toBuffer();
+    } catch (err: unknown) {
+      if (isMultipartFileTooLargeError(err)) {
+        throw new ValidationError(
+          `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`
+        );
+      }
+      throw err;
+    }
+
+    if (file.file.truncated) {
       throw new ValidationError(
         `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`
       );
     }
-    throw err;
-  }
 
-  if (file.file.truncated) {
-    throw new ValidationError(
-      `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`
+    if (buffer.length > ZIP_IMPORT_MAX_SIZE) {
+      throw new ValidationError(
+        `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`
+      );
+    }
+
+    const result = await importProjectFromZip(
+      userId,
+      validatedProjectData,
+      buffer
     );
-  }
 
-  if (buffer.length > ZIP_IMPORT_MAX_SIZE) {
-    throw new ValidationError(
-      `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`
-    );
-  }
+    if (!result.success) {
+      const failureResponse: ImportProjectFailure = {
+        success: false,
+        error: result.error || "Failed to import zip file",
+      };
+      reply.status(400).send(failureResponse);
+      return;
+    }
 
-  const result = await importProjectFromZip(
-    userId,
-    validatedProjectData,
-    buffer
-  );
-
-  if (!result.success) {
-    const failureResponse: ImportProjectFailure = {
-      success: false,
-      error: result.error || "Failed to import zip file",
+    const successResponse: ImportProjectSuccess = {
+      success: true,
+      project: {
+        ...result.project!,
+        source: "ZIP",
+      },
+      filesImported: result.filesImported!,
+      filesUpdated: result.filesUpdated!,
+      filesSkipped: result.filesSkipped!,
+      labelsCreated: result.labelsCreated!,
     };
-    reply.status(400).send(failureResponse);
-    return;
+    reply.status(201).send(successResponse);
+  } catch (error) {
+    // Re-throw HttpError instances (e.g., ValidationError) so the global error handler can use their status code
+    if (error instanceof HttpError) {
+      throw error;
+    }
+    // Handle multipart file size limit errors (from busboy)
+    if (isMultipartFileTooLargeError(error)) {
+      throw new ValidationError(
+        `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`
+      );
+    }
+    request.log.error(error);
+    reply.status(500).send({
+      error:
+        "Failed to import project from ZIP file. Please check the file format and try again.",
+    } as ErrorResponse);
   }
-
-  const successResponse: ImportProjectSuccess = {
-    success: true,
-    project: {
-      ...result.project!,
-      source: "ZIP",
-    },
-    filesImported: result.filesImported!,
-    filesUpdated: result.filesUpdated!,
-    filesSkipped: result.filesSkipped!,
-    labelsCreated: result.labelsCreated!,
-  };
-  reply.status(201).send(successResponse);
 }
 
 // ============================================================================

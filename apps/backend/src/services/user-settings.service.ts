@@ -69,19 +69,29 @@ async function ensureSettingsExist(
 
   if (existing) return existing;
 
-  await db.insert(userSettings).values({
-    userId,
-    ...DEFAULT_USER_SETTINGS,
-  });
+  // INSERT ... ON CONFLICT DO NOTHING prevents duplicate-key errors when
+  // two concurrent requests race to create the settings row for the same user.
+  await db
+    .insert(userSettings)
+    .values({
+      userId,
+      ...DEFAULT_USER_SETTINGS,
+    })
+    .onConflictDoNothing();
 
-  // Re-fetch to get the inserted row with server-generated values
+  // Re-fetch to get the row (either newly inserted or inserted by a concurrent request)
   const [inserted] = await db
     .select()
     .from(userSettings)
     .where(eq(userSettings.userId, userId))
     .limit(1);
 
-  return inserted!;
+  if (!inserted) {
+    throw new Error(
+      `Failed to create or retrieve user settings for user ${userId}`
+    );
+  }
+  return inserted;
 }
 
 // ============================================================================
@@ -141,7 +151,12 @@ export async function updateUserSettings(
     .where(eq(userSettings.userId, userId))
     .limit(1);
 
-  return toPublic(updated!);
+  if (!updated) {
+    throw new Error(
+      `Failed to retrieve updated user settings for user ${userId}`
+    );
+  }
+  return toPublic(updated);
 }
 
 /**
