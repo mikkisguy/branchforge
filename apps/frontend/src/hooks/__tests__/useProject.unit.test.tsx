@@ -73,4 +73,41 @@ describe("useProject", () => {
       "project-1"
     );
   });
+
+  it("sets currentProject to null when projects API returns an empty list", async () => {
+    vi.spyOn(projectsApi, "listProjects").mockResolvedValue([]);
+    localStorage.setItem("branchforge:project:current", "project-1");
+
+    const queryClient = createTestQueryClient();
+
+    const { result } = renderHook(() => useProject(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoadingProjects).toBe(false);
+    });
+
+    expect(result.current.currentProject).toBeNull();
+    expect(localStorage.getItem("branchforge:project:current")).toBeNull();
+  });
+
+  it("surfaces error state when projects query fails", async () => {
+    vi.spyOn(projectsApi, "listProjects").mockRejectedValue(
+      new Error("Network error")
+    );
+
+    const queryClient = createTestQueryClient();
+
+    const { result } = renderHook(() => useProject(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(result.current.projectsError).toBeTruthy();
+    });
+
+    expect(result.current.projectsError?.message).toBe("Network error");
+    expect(result.current.currentProject).toBeNull();
+  });
 });

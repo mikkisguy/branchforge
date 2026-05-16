@@ -95,7 +95,7 @@ describe("Auth API", () => {
     it("should reject email too long (>254 characters)", async () => {
       const invalidCredentials = {
         ...validCredentials,
-        email: "a".repeat(250) + "@example.com", // 250 + 11 = 261 characters
+        email: "a".repeat(250) + "@example.com", // 250 + 12 = 262 characters
       };
 
       await expect(authApi.login(invalidCredentials)).rejects.toThrow(
