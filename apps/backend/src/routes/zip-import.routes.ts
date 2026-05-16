@@ -183,13 +183,7 @@ async function importZipHandler(
     if (error instanceof HttpError) {
       throw error;
     }
-    // Handle multipart file size limit errors (from busboy)
-    if (isMultipartFileTooLargeError(error)) {
-      throw new ValidationError(
-        `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`
-      );
-    }
-    request.log.error(error);
+    request.log.error({ err: error }, "importZipHandler: Failed to import zip");
     reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
   }
 }
@@ -318,13 +312,10 @@ async function importProjectHandler(
     if (error instanceof HttpError) {
       throw error;
     }
-    // Handle multipart file size limit errors (from busboy)
-    if (isMultipartFileTooLargeError(error)) {
-      throw new ValidationError(
-        `File must be smaller than ${ZIP_IMPORT_MAX_SIZE_MB}MB`
-      );
-    }
-    request.log.error(error);
+    request.log.error(
+      { err: error },
+      "importProjectHandler: Failed to import project from ZIP"
+    );
     reply.status(500).send({
       error:
         "Failed to import project from ZIP file. Please check the file format and try again.",

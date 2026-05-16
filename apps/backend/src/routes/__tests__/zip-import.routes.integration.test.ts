@@ -351,5 +351,42 @@ describe("ZIP Import Routes (Integration)", () => {
         error: "Not Found",
       });
     });
+
+    it("should return 500 when service throws a non-HttpError", async () => {
+      // Ensure requireProjectAccess resolves (previous tests may have left it rejecting)
+      vi.spyOn(authzService, "requireProjectAccess").mockResolvedValue(
+        undefined
+      );
+
+      // Simulate an unexpected internal error (not HttpError)
+      // This exercises the catch block's structured-log + reply.status(500) path
+      vi.spyOn(zipImportService, "importZipFile").mockRejectedValueOnce(
+        new Error("Unexpected database failure")
+      );
+
+      const mockZipBuffer = Buffer.from("PK\x03\x04...mock zip content");
+      const boundary = "----formdata-test-boundary";
+      const header = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="test.zip"\r\nContent-Type: application/zip\r\n\r\n`;
+      const footer = `\r\n--${boundary}--\r\n`;
+      const multipartBody = Buffer.concat([
+        Buffer.from(header),
+        mockZipBuffer,
+        Buffer.from(footer),
+      ]);
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: `/projects/${testProjectId}/import/zip`,
+        payload: multipartBody,
+        headers: {
+          "content-type": `multipart/form-data; boundary=${boundary}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(500);
+      expect(response.json()).toEqual({
+        error: "Internal server error",
+      });
+    });
   });
 });

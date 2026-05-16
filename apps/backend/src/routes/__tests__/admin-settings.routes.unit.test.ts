@@ -5,10 +5,44 @@ import session from "@fastify/session";
 import { adminSettingsRoutes } from "../admin-settings.routes.js";
 import * as adminSettingsService from "../../services/admin-settings.service.js";
 
+// Shared auth state for controlling mock behavior across tests
+const { authState } = vi.hoisted(() => ({
+  authState: { authenticated: false, user: null as any },
+}));
+
+const testOwnerUser = {
+  id: "123e4567-e89b-12d3-a456-426614174000",
+  email: "admin@test.com",
+  role: "OWNER" as const,
+};
+
 // Mock the admin settings service
 vi.mock("../../services/admin-settings.service.js", () => ({
   getAdminSetting: vi.fn(),
   setAdminSetting: vi.fn(),
+  getAllAdminSettings: vi.fn(),
+}));
+
+// Mock auth middleware with shared state control
+vi.mock("../../middleware/auth.middleware.js", () => ({
+  authenticate: vi.fn(async (request: any, reply: any) => {
+    if (authState.authenticated) {
+      request.user = authState.user;
+    } else {
+      reply
+        .status(401)
+        .send({ error: "Unauthorized", message: "Authentication required" });
+    }
+  }),
+  requireRole: vi.fn(() => async (request: any, reply: any) => {
+    if (authState.authenticated) {
+      request.user = authState.user;
+    } else {
+      reply
+        .status(401)
+        .send({ error: "Unauthorized", message: "Authentication required" });
+    }
+  }),
 }));
 
 // Mock console.error to avoid noise in tests
@@ -20,6 +54,8 @@ beforeEach(() => {
 afterEach(() => {
   console.error = originalConsoleError;
   vi.clearAllMocks();
+  authState.authenticated = false;
+  authState.user = null;
 });
 
 describe("Admin Settings Routes (Unit)", () => {
@@ -139,8 +175,45 @@ describe("Admin Settings Routes (Unit)", () => {
       });
     });
 
-    // Note: Testing authenticated endpoints requires integration-level setup
-    // These tests are better suited for integration tests with real auth
+    it("should return all settings when authenticated as OWNER", async () => {
+      authState.authenticated = true;
+      authState.user = testOwnerUser;
+
+      vi.mocked(adminSettingsService.getAllAdminSettings).mockResolvedValueOnce(
+        {
+          sign_ups_enabled: true,
+          max_projects: 10,
+        }
+      );
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: "/admin/settings",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.payload)).toEqual({
+        settings: { sign_ups_enabled: true, max_projects: 10 },
+      });
+      expect(adminSettingsService.getAllAdminSettings).toHaveBeenCalledOnce();
+    });
+
+    it("should return empty settings object when no settings exist", async () => {
+      authState.authenticated = true;
+      authState.user = testOwnerUser;
+
+      vi.mocked(adminSettingsService.getAllAdminSettings).mockResolvedValueOnce(
+        {}
+      );
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: "/admin/settings",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.payload)).toEqual({ settings: {} });
+    });
   });
 
   describe("PUT /admin/settings/:key", () => {
