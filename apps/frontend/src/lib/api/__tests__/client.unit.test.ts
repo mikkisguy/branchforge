@@ -457,7 +457,8 @@ describe("API Client", () => {
 
       try {
         vi.resetModules();
-        const { request: requestWithStubbedEnv } = await import("../client");
+        const { request: requestWithStubbedEnv, API_BASE } =
+          await import("../client");
 
         mockFetch.mockResolvedValueOnce({
           ok: true,
@@ -467,9 +468,7 @@ describe("API Client", () => {
         await requestWithStubbedEnv("/endpoint");
 
         const [url] = mockFetch.mock.calls[0];
-        expect(url).toBe(
-          `${import.meta.env.VITE_API_BASE_URL ?? "/api"}/endpoint`
-        );
+        expect(url).toBe(`${API_BASE}/endpoint`);
       } finally {
         vi.unstubAllEnvs();
         vi.resetModules();

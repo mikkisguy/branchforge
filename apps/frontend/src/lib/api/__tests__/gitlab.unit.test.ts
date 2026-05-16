@@ -5,7 +5,7 @@
  * Tests are written before implementation (TDD approach).
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { gitlabApi } from "../gitlab.js";
 
 // Mock fetch
@@ -13,12 +13,9 @@ const mockFetch = vi.fn();
 global.fetch = mockFetch as unknown as typeof fetch;
 
 describe("GitLab API Client", () => {
-  beforeEach(() => {
-    mockFetch.mockClear();
-  });
-
   afterEach(() => {
     mockFetch.mockReset();
+    vi.useRealTimers();
   });
 
   describe("validateToken", () => {
@@ -71,18 +68,6 @@ describe("GitLab API Client", () => {
       await expect(gitlabApi.validateToken("glpat-invalid")).rejects.toThrow(
         "Invalid GitLab token"
       );
-    });
-
-    it("should validate token format before sending request", async () => {
-      // Token starting with 'glpat-' is valid
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ valid: true, username: "testuser" }),
-      } as Response);
-
-      await gitlabApi.validateToken("glpat-validtoken123");
-
-      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
     it("should reject invalid token format", async () => {
@@ -175,11 +160,10 @@ describe("GitLab API Client", () => {
       const result = await gitlabApi.getRepositories();
 
       expect(result).toEqual(mockRepositories);
-      // Verify the call was made with GET method
-      expect(mockFetch).toHaveBeenCalled();
-      const callArgs = mockFetch.mock.calls[0];
-      expect(callArgs[0]).toMatch(/gitlab\/repositories$/);
-      expect(callArgs[1]?.method).toBe("GET");
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining("gitlab/repositories"),
+        expect.objectContaining({ method: "GET" })
+      );
     });
   });
 
@@ -258,6 +242,10 @@ describe("GitLab API Client", () => {
       const result = await gitlabApi.getBranches("project-123");
 
       expect(result).toEqual(mockBranches);
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining("/gitlab/branches/project-123"),
+        expect.objectContaining({ credentials: "include" })
+      );
     });
   });
 
@@ -276,6 +264,10 @@ describe("GitLab API Client", () => {
       const result = await gitlabApi.getRpyFiles("project-123", "main");
 
       expect(result).toEqual(mockFiles);
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining("/gitlab/files/project-123"),
+        expect.objectContaining({ credentials: "include" })
+      );
     });
   });
 
@@ -343,12 +335,13 @@ describe("GitLab API Client", () => {
       expect(result).toEqual(mockOperation);
     });
 
-    it("should support all conflict resolution options", async () => {
-      const resolutions: Array<
-        "branchforge_wins" | "gitlab_wins" | "manual_review"
-      > = ["branchforge_wins", "gitlab_wins", "manual_review"];
-
-      for (const resolution of resolutions) {
+    it.each([
+      ["branchforge_wins"],
+      ["gitlab_wins"],
+      ["manual_review"],
+    ] as const)(
+      "should support conflict resolution: %s",
+      async (resolution) => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
           json: async () => ({
@@ -369,7 +362,7 @@ describe("GitLab API Client", () => {
           })
         );
       }
-    });
+    );
   });
 
   describe("getOperationStatus", () => {
@@ -502,6 +495,8 @@ describe("GitLab API Client", () => {
     });
 
     it("should handle timeout", async () => {
+      vi.useFakeTimers();
+
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({
@@ -512,16 +507,23 @@ describe("GitLab API Client", () => {
 
       const onUpdate = vi.fn();
 
-      // Should timeout after 50ms
-      await expect(
-        gitlabApi.pollOperation("op-123", onUpdate, {
-          interval: 20,
-          timeout: 50,
-        })
-      ).rejects.toThrow("Operation polling timed out");
+      const pollPromise = gitlabApi.pollOperation("op-123", onUpdate, {
+        interval: 20,
+        timeout: 50,
+      });
 
-      // Should have called update at least once before timeout
+      // Attach rejection handler before advancing timers to prevent
+      // unhandled rejection warning
+      const assertion = expect(pollPromise).rejects.toThrow(
+        "Operation polling timed out"
+      );
+
+      await vi.runAllTimersAsync();
+      await assertion;
+
       expect(onUpdate).toHaveBeenCalled();
+
+      vi.useRealTimers();
     });
   });
 });

@@ -281,7 +281,7 @@ describe("Settings API", () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
-        json: async () => Promise.reject(new Error("JSON parse error")),
+        json: () => Promise.reject(new Error("JSON parse error")),
       });
 
       await expect(settingsApi.getAllSettings()).rejects.toThrow(

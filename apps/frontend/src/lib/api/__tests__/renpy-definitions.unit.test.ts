@@ -4,15 +4,7 @@
  * Tests for Ren'Py definition management API methods.
  */
 
-import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  afterAll,
-  vi,
-} from "vitest";
+import { describe, it, expect, afterEach, afterAll, vi } from "vitest";
 import { renpyDefinitionsApi } from "../renpy-definitions";
 import type {
   CreateRenpyDefinitionBody,
@@ -44,10 +36,6 @@ describe("Ren'Py Definitions API", () => {
     createdAt: "2024-01-01T00:00:00.000Z",
     updatedAt: "2024-01-01T00:00:00.000Z",
   };
-
-  beforeEach(() => {
-    mockFetch.mockClear();
-  });
 
   afterEach(() => {
     vi.clearAllMocks();
@@ -255,15 +243,9 @@ describe("Ren'Py Definitions API", () => {
       ).rejects.toThrow("Invalid Ren'Py definition data");
     });
 
-    it("should handle all categories", async () => {
-      const categories: RenpyDefinitionCategory[] = [
-        "CHARACTER",
-        "TRANSFORM",
-        "IMAGE",
-        "INIT",
-      ];
-
-      for (const category of categories) {
+    it.each(["CHARACTER", "TRANSFORM", "IMAGE", "INIT"] as const)(
+      "should handle category: %s",
+      async (category) => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
           json: async () => ({
@@ -284,7 +266,7 @@ describe("Ren'Py Definitions API", () => {
 
         expect(result.category).toBe(category);
       }
-    });
+    );
   });
 
   describe("Update Ren'Py Definition", () => {
@@ -504,6 +486,14 @@ describe("Ren'Py Definitions API", () => {
       await expect(
         renpyDefinitionsApi.getRenpyDefinition("def-1")
       ).rejects.toThrow("Request failed with status 503");
+    });
+
+    it("should propagate fetch rejection (network failure)", async () => {
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+      await expect(
+        renpyDefinitionsApi.listRenpyDefinitions("proj-1")
+      ).rejects.toThrow("Network error");
     });
   });
 });
