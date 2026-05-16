@@ -8,6 +8,7 @@
 import { getDb } from "../db/index.js";
 import { userSettings } from "../db/schema/index.js";
 import { eq } from "drizzle-orm";
+import { ConflictError } from "../middleware/error-handler.middleware.js";
 
 // ============================================================================
 // Types
@@ -87,9 +88,7 @@ async function ensureSettingsExist(
     .limit(1);
 
   if (!inserted) {
-    throw new Error(
-      `Failed to create or retrieve user settings for user ${userId}`
-    );
+    throw new ConflictError("Failed to create or retrieve user settings");
   }
   return inserted;
 }
@@ -152,9 +151,7 @@ export async function updateUserSettings(
     .limit(1);
 
   if (!updated) {
-    throw new Error(
-      `Failed to retrieve updated user settings for user ${userId}`
-    );
+    throw new ConflictError("Failed to retrieve updated user settings");
   }
   return toPublic(updated);
 }

@@ -397,9 +397,9 @@ export async function importZipFile(
 // Project Creation + Import (Combined)
 // ============================================================================
 
-export interface ImportProjectFromZipResult {
-  success: boolean;
-  project?: {
+export interface ImportProjectFromZipSuccess {
+  success: true;
+  project: {
     id: string;
     name: string;
     description?: string;
@@ -407,12 +407,20 @@ export interface ImportProjectFromZipResult {
     createdAt: string;
     updatedAt: string;
   };
-  filesImported?: number;
-  filesUpdated?: number;
-  filesSkipped?: number;
-  labelsCreated?: number;
-  error?: string;
+  filesImported: number;
+  filesUpdated: number;
+  filesSkipped: number;
+  labelsCreated: number;
 }
+
+export interface ImportProjectFromZipFailure {
+  success: false;
+  error: string;
+}
+
+export type ImportProjectFromZipResult =
+  | ImportProjectFromZipSuccess
+  | ImportProjectFromZipFailure;
 
 /**
  * Create a new project from a zip file. Handles the full lifecycle:
@@ -440,8 +448,16 @@ export async function importProjectFromZip(
     // Clean up orphaned project on import failure
     try {
       await deleteProject(userId, newProject.id);
-    } catch {
-      // Log but don't throw - cleanup is best-effort
+    } catch (cleanupErr) {
+      logError(LogEventType.SERVICE_ERROR, {
+        event: "zip_import_cleanup_failed",
+        userId,
+        projectId: newProject.id,
+        error:
+          cleanupErr instanceof Error
+            ? cleanupErr.message
+            : "Unknown cleanup error",
+      });
     }
     throw err;
   }
@@ -450,8 +466,16 @@ export async function importProjectFromZip(
     // Clean up on failed import
     try {
       await deleteProject(userId, newProject.id);
-    } catch {
-      // Log but don't throw - cleanup is best-effort
+    } catch (cleanupErr) {
+      logError(LogEventType.SERVICE_ERROR, {
+        event: "zip_import_cleanup_failed",
+        userId,
+        projectId: newProject.id,
+        error:
+          cleanupErr instanceof Error
+            ? cleanupErr.message
+            : "Unknown cleanup error",
+      });
     }
     return {
       success: false,

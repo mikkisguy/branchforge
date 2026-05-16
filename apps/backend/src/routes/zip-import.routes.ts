@@ -304,13 +304,13 @@ async function importProjectHandler(
     const successResponse: ImportProjectSuccess = {
       success: true,
       project: {
-        ...result.project!,
+        ...result.project,
         source: "ZIP",
       },
-      filesImported: result.filesImported!,
-      filesUpdated: result.filesUpdated!,
-      filesSkipped: result.filesSkipped!,
-      labelsCreated: result.labelsCreated!,
+      filesImported: result.filesImported,
+      filesUpdated: result.filesUpdated,
+      filesSkipped: result.filesSkipped,
+      labelsCreated: result.labelsCreated,
     };
     reply.status(201).send(successResponse);
   } catch (error) {

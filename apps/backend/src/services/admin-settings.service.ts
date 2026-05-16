@@ -56,7 +56,7 @@ export async function setAdminSetting(
 export async function getAllAdminSettings(): Promise<Record<string, unknown>> {
   const db = getDb();
   const settings = await db.select().from(adminSettings);
-  const record: Record<string, unknown> = {};
+  const record: Record<string, unknown> = Object.create(null);
   for (const s of settings) {
     record[s.key] = s.value;
   }
