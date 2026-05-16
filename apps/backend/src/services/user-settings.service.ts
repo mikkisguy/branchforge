@@ -124,7 +124,9 @@ export async function updateUserSettings(
   await ensureSettingsExist(userId);
 
   // Build update object with only provided fields
-  const updateData: Record<string, unknown> & { updatedAt: Date } = {
+  const updateData: Partial<typeof userSettings.$inferInsert> & {
+    updatedAt: Date;
+  } = {
     updatedAt: new Date(),
   };
 

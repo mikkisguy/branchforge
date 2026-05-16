@@ -51,11 +51,10 @@ async function getUserSettingsHandler(
  * to disable the daily writing goal feature.
  */
 async function updateUserSettingsHandler(
-  request: FastifyRequest,
+  request: FastifyRequest<{ Body: UpdateWritingGoalInput }>,
   reply: FastifyReply
 ): Promise<void> {
-  const { dailyWritingGoal, dailyWordResetHour, timezone } =
-    request.body as UpdateWritingGoalInput;
+  const { dailyWritingGoal, dailyWordResetHour, timezone } = request.body;
   const settings = await updateUserSettings(request.user!.id, {
     dailyWritingGoal,
     dailyWordResetHour,
