@@ -12,45 +12,11 @@ import {
   updateWritingGoalSchema,
   type UpdateWritingGoalInput,
 } from "../lib/validation.js";
-import { getDb } from "../db/index.js";
-import { userSettings } from "../db/schema/index.js";
-import { eq } from "drizzle-orm";
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-const DEFAULT_USER_SETTINGS: Omit<
-  typeof userSettings.$inferInsert,
-  "userId" | "id" | "createdAt" | "updatedAt"
-> = {
-  dailyWritingGoal: null,
-  dailyWordResetHour: 0,
-  dailyWordCounts: [],
-  timezone: "UTC",
-};
-
-// ============================================================================
-// Types
-// ============================================================================
-
-interface DailyWordCount {
-  date: string;
-  count: number;
-}
-
-interface UserSettingsResponse {
-  dailyWritingGoal: number | null;
-  dailyWordResetHour: number;
-  dailyWordCounts: DailyWordCount[];
-  timezone: string;
-}
-
-type UpdateWritingGoalResponse = UserSettingsResponse;
-
-interface ResetWritingStatsResponse {
-  success: boolean;
-}
+import {
+  getUserSettings,
+  updateUserSettings,
+  resetWritingStats,
+} from "../services/user-settings.service.js";
 
 // ============================================================================
 // Route Handlers
@@ -69,32 +35,8 @@ async function getUserSettingsHandler(
   request: FastifyRequest,
   reply: FastifyReply
 ): Promise<void> {
-  const user = request.user!;
-  const db = getDb();
-
-  const [settings] = await db
-    .select()
-    .from(userSettings)
-    .where(eq(userSettings.userId, user.id))
-    .limit(1);
-
-  if (!settings) {
-    // Create default settings if they don't exist
-    await db.insert(userSettings).values({
-      userId: user.id,
-      ...DEFAULT_USER_SETTINGS,
-    });
-
-    reply.send(DEFAULT_USER_SETTINGS as UserSettingsResponse);
-    return;
-  }
-
-  reply.send({
-    dailyWritingGoal: settings.dailyWritingGoal ?? null,
-    dailyWordResetHour: settings.dailyWordResetHour ?? 0,
-    dailyWordCounts: (settings.dailyWordCounts as DailyWordCount[]) ?? [],
-    timezone: settings.timezone ?? "UTC",
-  } as UserSettingsResponse);
+  const settings = await getUserSettings(request.user!.id);
+  reply.send(settings);
 }
 
 /**
@@ -112,62 +54,13 @@ async function updateUserSettingsHandler(
   request: FastifyRequest<{ Body: UpdateWritingGoalInput }>,
   reply: FastifyReply
 ): Promise<void> {
-  const user = request.user!;
   const { dailyWritingGoal, dailyWordResetHour, timezone } = request.body;
-  const db = getDb();
-
-  // Check if settings exist
-  const [existingSettings] = await db
-    .select()
-    .from(userSettings)
-    .where(eq(userSettings.userId, user.id))
-    .limit(1);
-
-  if (!existingSettings) {
-    // Create default settings if they don't exist (matching GET handler behavior)
-    await db.insert(userSettings).values({
-      userId: user.id,
-      ...DEFAULT_USER_SETTINGS,
-    });
-  }
-
-  // Build update object with only provided fields
-  const updateData: Partial<typeof userSettings.$inferInsert> & {
-    updatedAt: Date;
-  } = {
-    updatedAt: new Date(),
-  };
-
-  if (dailyWritingGoal !== undefined) {
-    updateData.dailyWritingGoal = dailyWritingGoal;
-  }
-  if (dailyWordResetHour !== undefined) {
-    updateData.dailyWordResetHour = dailyWordResetHour;
-  }
-  if (timezone !== undefined) {
-    updateData.timezone = timezone;
-  }
-
-  // Update settings
-  await db
-    .update(userSettings)
-    .set(updateData)
-    .where(eq(userSettings.userId, user.id));
-
-  // Fetch updated settings
-  const [updatedSettings] = await db
-    .select()
-    .from(userSettings)
-    .where(eq(userSettings.userId, user.id))
-    .limit(1);
-
-  reply.send({
-    dailyWritingGoal: updatedSettings.dailyWritingGoal ?? null,
-    dailyWordResetHour: updatedSettings.dailyWordResetHour ?? 0,
-    dailyWordCounts:
-      (updatedSettings.dailyWordCounts as DailyWordCount[]) ?? [],
-    timezone: updatedSettings.timezone ?? "UTC",
-  } as UpdateWritingGoalResponse);
+  const settings = await updateUserSettings(request.user!.id, {
+    dailyWritingGoal,
+    dailyWordResetHour,
+    timezone,
+  });
+  reply.send(settings);
 }
 
 /**
@@ -184,35 +77,8 @@ async function resetWritingStatsHandler(
   request: FastifyRequest,
   reply: FastifyReply
 ): Promise<void> {
-  const user = request.user!;
-  const db = getDb();
-
-  // Check if settings exist
-  const [existingSettings] = await db
-    .select()
-    .from(userSettings)
-    .where(eq(userSettings.userId, user.id))
-    .limit(1);
-
-  if (!existingSettings) {
-    // Create default settings if they don't exist (matching GET handler behavior)
-    await db.insert(userSettings).values({
-      userId: user.id,
-      ...DEFAULT_USER_SETTINGS,
-    });
-  }
-
-  // Reset word counts to empty
-  await db
-    .update(userSettings)
-    .set({
-      dailyWordCounts: [],
-      labelWordCounts: {},
-      updatedAt: new Date(),
-    })
-    .where(eq(userSettings.userId, user.id));
-
-  reply.send({ success: true } as ResetWritingStatsResponse);
+  await resetWritingStats(request.user!.id);
+  reply.send({ success: true });
 }
 
 // ============================================================================

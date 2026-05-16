@@ -13,7 +13,7 @@
  * - Uses real Fastify request/response lifecycle (inject() method)
  *
  * What is mocked:
- * - Database authorization lookups (projects table)
+ * - Authorization service (requireProjectAccess)
  * - ZIP import service operations (file parsing, label creation)
  * - Project service operations (create, delete)
  *
@@ -28,35 +28,25 @@ import session from "@fastify/session";
 import multipart from "@fastify/multipart";
 import { zipImportRoutes } from "../zip-import.routes.js";
 import * as zipImportService from "../../services/zip-import.service.js";
-import * as projectsService from "../../services/projects.service.js";
-import * as db from "../../db/index.js";
-
-// Mock drizzle-orm's eq function
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn(),
-}));
-
-// Mock the database
-vi.mock("../../db/index.js", () => ({
-  getDb: vi.fn(),
-}));
-
-// Mock the database schema - only mock what's used by authorization helpers
-vi.mock("../../db/schema/index.js", () => ({
-  projects: {
-    userId: "userId",
-    id: "id",
-  },
-}));
+import * as authzService from "../../services/authz.service.js";
+import {
+  ForbiddenError,
+  NotFoundError,
+} from "../../middleware/error-handler.middleware.js";
 
 // Mock the services
 vi.mock("../../services/zip-import.service.js", () => ({
   importZipFile: vi.fn(),
+  importProjectFromZip: vi.fn(),
 }));
 
 vi.mock("../../services/projects.service.js", () => ({
   createProject: vi.fn(),
   deleteProject: vi.fn(),
+}));
+
+vi.mock("../../services/authz.service.js", () => ({
+  requireProjectAccess: vi.fn(async () => {}),
 }));
 
 // Mock the authenticate middleware
@@ -101,27 +91,6 @@ describe("ZIP Import Routes (Integration)", () => {
       },
     });
 
-    // Set up database mock for authorization helpers
-    const mockSelect = vi.fn(() => ({ from: mockFrom }));
-    const mockFrom = vi.fn(() => ({ where: mockWhere }));
-    const mockWhere = vi.fn(() => ({ limit: mockLimit }));
-    const mockLimit = vi.fn(() => {
-      // Default: project belongs to user
-      return Promise.resolve([{ userId: testUserId }]);
-    });
-    const mockDb = {
-      select: mockSelect,
-    };
-    vi.mocked(db.getDb).mockReturnValue(mockDb as any);
-
-    // Store mock references for test customization
-    (fastify as any).mockDb = {
-      mockSelect,
-      mockFrom,
-      mockWhere,
-      mockLimit,
-    };
-
     // Register ZIP import routes with real multipart plugin
     await fastify.register(zipImportRoutes);
     await fastify.ready();
@@ -146,16 +115,14 @@ describe("ZIP Import Routes (Integration)", () => {
 
       const mockImportResult = {
         success: true,
+        project: mockProject,
         filesImported: 5,
         filesUpdated: 0,
         filesSkipped: 0,
         labelsCreated: 3,
       };
 
-      vi.spyOn(projectsService, "createProject").mockResolvedValue(
-        mockProject as any
-      );
-      vi.spyOn(zipImportService, "importZipFile").mockResolvedValue(
+      vi.spyOn(zipImportService, "importProjectFromZip").mockResolvedValue(
         mockImportResult as any
       );
 
@@ -183,34 +150,14 @@ describe("ZIP Import Routes (Integration)", () => {
       });
 
       expect(response.statusCode).toBe(201);
-      expect(projectsService.createProject).toHaveBeenCalled();
-      expect(zipImportService.importZipFile).toHaveBeenCalled();
+      expect(zipImportService.importProjectFromZip).toHaveBeenCalled();
     });
 
     it("should handle ZIP parsing errors", async () => {
-      const mockProject = {
-        id: "new-project-id",
-        userId: testUserId,
-        name: "ZIP Project",
-        description: "Imported from ZIP",
-        source: "ZIP",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      vi.spyOn(projectsService, "createProject").mockResolvedValue(
-        mockProject as any
-      );
-      vi.spyOn(zipImportService, "importZipFile").mockResolvedValue({
+      vi.spyOn(zipImportService, "importProjectFromZip").mockResolvedValue({
         success: false,
-        filesImported: 0,
-        filesUpdated: 0,
-        filesSkipped: 0,
-        labelsCreated: 0,
         error: "Invalid ZIP file",
       } as any);
-
-      vi.spyOn(projectsService, "deleteProject").mockResolvedValue(undefined);
 
       const mockZipBuffer = Buffer.from("PK\x03\x04...mock zip content");
       const boundary = "----formdata-test-boundary";
@@ -236,32 +183,28 @@ describe("ZIP Import Routes (Integration)", () => {
       });
 
       expect(response.statusCode).toBe(400);
-      expect(projectsService.deleteProject).toHaveBeenCalled();
+      expect(zipImportService.importProjectFromZip).toHaveBeenCalled();
     });
 
     it("should import RPY files correctly", async () => {
-      const mockProject = {
-        id: "new-project-id",
-        userId: testUserId,
-        name: "ZIP Project",
-        description: "Imported from ZIP",
-        source: "ZIP",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
       const mockImportResult = {
         success: true,
+        project: {
+          id: "new-project-id",
+          userId: testUserId,
+          name: "ZIP Project",
+          description: "Imported from ZIP",
+          source: "ZIP",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
         filesImported: 10,
         filesUpdated: 2,
         filesSkipped: 1,
         labelsCreated: 5,
       };
 
-      vi.spyOn(projectsService, "createProject").mockResolvedValue(
-        mockProject as any
-      );
-      vi.spyOn(zipImportService, "importZipFile").mockResolvedValue(
+      vi.spyOn(zipImportService, "importProjectFromZip").mockResolvedValue(
         mockImportResult as any
       );
 
@@ -295,7 +238,7 @@ describe("ZIP Import Routes (Integration)", () => {
 
       expect(response.statusCode).toBe(201);
       // Verify the import service was called
-      expect(zipImportService.importZipFile).toHaveBeenCalled();
+      expect(zipImportService.importProjectFromZip).toHaveBeenCalled();
     });
   });
 
@@ -344,10 +287,9 @@ describe("ZIP Import Routes (Integration)", () => {
     });
 
     it("should verify user owns project", async () => {
-      const mockLimit = (fastify as any).mockDb.mockLimit;
-
-      // Override to return different userId (user does not own project)
-      mockLimit.mockResolvedValueOnce([{ userId: "other-user-id" }]);
+      vi.spyOn(authzService, "requireProjectAccess").mockRejectedValue(
+        new ForbiddenError("You do not have access to this project")
+      );
 
       // Create a mock ZIP file buffer
       const mockZipBuffer = Buffer.from("PK\x03\x04...mock zip content");
@@ -378,10 +320,9 @@ describe("ZIP Import Routes (Integration)", () => {
     });
 
     it("should return 404 when project not found", async () => {
-      const mockLimit = (fastify as any).mockDb.mockLimit;
-
-      // Override to return empty array (project not found)
-      mockLimit.mockResolvedValueOnce([]);
+      vi.spyOn(authzService, "requireProjectAccess").mockRejectedValue(
+        new NotFoundError("Project")
+      );
 
       // Create a mock ZIP file buffer
       const mockZipBuffer = Buffer.from("PK\x03\x04...mock zip content");
@@ -408,6 +349,43 @@ describe("ZIP Import Routes (Integration)", () => {
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({
         error: "Not Found",
+      });
+    });
+
+    it("should return 500 when service throws a non-HttpError", async () => {
+      // Ensure requireProjectAccess resolves (previous tests may have left it rejecting)
+      vi.spyOn(authzService, "requireProjectAccess").mockResolvedValue(
+        undefined
+      );
+
+      // Simulate an unexpected internal error (not HttpError)
+      // This exercises the catch block's structured-log + reply.status(500) path
+      vi.spyOn(zipImportService, "importZipFile").mockRejectedValueOnce(
+        new Error("Unexpected database failure")
+      );
+
+      const mockZipBuffer = Buffer.from("PK\x03\x04...mock zip content");
+      const boundary = "----formdata-test-boundary";
+      const header = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="test.zip"\r\nContent-Type: application/zip\r\n\r\n`;
+      const footer = `\r\n--${boundary}--\r\n`;
+      const multipartBody = Buffer.concat([
+        Buffer.from(header),
+        mockZipBuffer,
+        Buffer.from(footer),
+      ]);
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: `/projects/${testProjectId}/import/zip`,
+        payload: multipartBody,
+        headers: {
+          "content-type": `multipart/form-data; boundary=${boundary}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(500);
+      expect(response.json()).toEqual({
+        error: "Internal server error",
       });
     });
   });

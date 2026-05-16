@@ -50,6 +50,20 @@ export async function setAdminSetting(
 }
 
 /**
+ * Get all admin settings as a key-value record
+ * @returns Record of all settings keyed by setting key
+ */
+export async function getAllAdminSettings(): Promise<Record<string, unknown>> {
+  const db = getDb();
+  const settings = await db.select().from(adminSettings);
+  const record: Record<string, unknown> = Object.create(null);
+  for (const s of settings) {
+    record[s.key] = s.value;
+  }
+  return record;
+}
+
+/**
  * Check if new user signups are currently enabled
  * @returns true if signups are enabled, false otherwise (defaults to true)
  */
