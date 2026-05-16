@@ -22,6 +22,7 @@ import cookie from "@fastify/cookie";
 import session from "@fastify/session";
 import { userSettingsRoutes } from "../user-settings.routes.js";
 import * as userSettingsService from "../../services/user-settings.service.js";
+import type { PublicUserSettings } from "../../services/user-settings.service.js";
 import { authenticate } from "../../middleware/auth.middleware.js";
 import { globalErrorHandler } from "../../middleware/error-handler.middleware.js";
 
@@ -37,7 +38,7 @@ const testUser = {
   role: "OWNER" as const,
 };
 
-const defaultSettings = {
+const defaultSettings: PublicUserSettings = {
   dailyWritingGoal: null,
   dailyWordResetHour: 0,
   dailyWordCounts: [],
@@ -119,7 +120,7 @@ describe("User Settings Routes (Integration)", () => {
       };
 
       vi.mocked(userSettingsService.getUserSettings).mockResolvedValueOnce(
-        mockSettings as any
+        mockSettings satisfies PublicUserSettings
       );
 
       const response = await fastify.inject({
@@ -136,7 +137,7 @@ describe("User Settings Routes (Integration)", () => {
 
     it("should return default settings shape", async () => {
       vi.mocked(userSettingsService.getUserSettings).mockResolvedValueOnce(
-        defaultSettings as any
+        defaultSettings
       );
 
       const response = await fastify.inject({
@@ -195,7 +196,7 @@ describe("User Settings Routes (Integration)", () => {
       };
 
       vi.mocked(userSettingsService.updateUserSettings).mockResolvedValueOnce(
-        updatedSettings as any
+        updatedSettings satisfies PublicUserSettings
       );
 
       const response = await fastify.inject({
@@ -216,7 +217,7 @@ describe("User Settings Routes (Integration)", () => {
 
     it("should pass partial update fields to service", async () => {
       vi.mocked(userSettingsService.updateUserSettings).mockResolvedValueOnce(
-        defaultSettings as any
+        defaultSettings
       );
 
       await fastify.inject({
@@ -283,7 +284,7 @@ describe("User Settings Routes (Integration)", () => {
 
     it("should allow setting dailyWritingGoal to null", async () => {
       vi.mocked(userSettingsService.updateUserSettings).mockResolvedValueOnce(
-        defaultSettings as any
+        defaultSettings
       );
 
       const response = await fastify.inject({

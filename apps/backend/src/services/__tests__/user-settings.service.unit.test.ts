@@ -17,6 +17,8 @@ import {
   resetWritingStats,
 } from "../user-settings.service.js";
 import { getDb } from "../../db/index.js";
+import type { Db } from "../../db/index.js";
+import { ConflictError } from "../../middleware/error-handler.middleware.js";
 
 // Mock database module
 vi.mock("../../db/index.js", () => ({
@@ -56,6 +58,14 @@ function createMockDb() {
     _insertChain: insertChain,
     _updateChain: updateChain,
   };
+}
+
+/**
+ * Assert that a partial mock database satisfies the Db interface.
+ * Centralizes the type assertion needed for mocking getDb().
+ */
+function asDb(mock: ReturnType<typeof createMockDb>): Db {
+  return mock as unknown as Db;
 }
 
 // ============================================================================
@@ -106,7 +116,7 @@ describe("User Settings Service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDb = createMockDb();
-    vi.mocked(getDb).mockReturnValue(mockDb as any);
+    vi.mocked(getDb).mockReturnValue(asDb(mockDb));
   });
 
   // --------------------------------------------------------------------------
@@ -325,7 +335,10 @@ describe("User Settings Service", () => {
         .mockResolvedValueOnce([]) // First select: no row
         .mockResolvedValueOnce([]); // Re-fetch: still nothing (shouldn't happen but handled)
 
-      await expect(getUserSettings(testUserId)).rejects.toThrow(
+      const error = await getUserSettings(testUserId).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ConflictError);
+      expect(error).toHaveProperty(
+        "message",
         "Failed to create or retrieve user settings"
       );
     });

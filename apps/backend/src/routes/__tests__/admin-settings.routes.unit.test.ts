@@ -224,6 +224,8 @@ describe("Admin Settings Routes (Unit)", () => {
         error: "Forbidden",
         message: "Requires OWNER role",
       });
+      // Authorization short-circuits — service must not be invoked
+      expect(adminSettingsService.getAllAdminSettings).not.toHaveBeenCalled();
     });
 
     it("should return empty settings object when no settings exist", async () => {
