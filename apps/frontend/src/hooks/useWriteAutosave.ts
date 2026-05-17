@@ -185,6 +185,12 @@ export function useWriteAutosave({
           }
 
           const payload = dialogueToPayload(draftToSave.entries);
+
+          // Skip saving if all entries are empty — backend requires at least 1 entry
+          if (payload.length === 0) {
+            return;
+          }
+
           const expectedVersion = lastKnownVersionByLabelRef.current.get(
             draftToSave.labelId
           );

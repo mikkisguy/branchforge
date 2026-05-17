@@ -71,12 +71,14 @@ export const DialogueLine = memo(function DialogueLine({
   const dropdownId = useId();
   const textOnChangeRef = useRef(onChange);
   const previousTextRef = useRef(entry.text);
+  const measureRef = useRef<HTMLSpanElement>(null);
 
   const resizeTextarea = useCallback(() => {
     const textarea = internalTextareaRef.current;
     if (!textarea) return;
     textarea.style.height = "auto";
-    textarea.style.height = `${textarea.scrollHeight}px`;
+    const targetHeight = textarea.scrollHeight;
+    textarea.style.height = `${targetHeight}px`;
   }, []);
 
   // Keep track of the latest onChange function
@@ -117,6 +119,17 @@ export const DialogueLine = memo(function DialogueLine({
   useEffect(() => {
     window.addEventListener("resize", resizeTextarea);
     return () => window.removeEventListener("resize", resizeTextarea);
+  }, [resizeTextarea]);
+
+  // Re-measure when font settings change via CSS custom properties
+  useEffect(() => {
+    const measure = measureRef.current;
+    if (!measure) return;
+    const observer = new ResizeObserver(() => {
+      resizeTextarea();
+    });
+    observer.observe(measure);
+    return () => observer.disconnect();
   }, [resizeTextarea]);
 
   useEffect(() => {
@@ -533,8 +546,8 @@ export const DialogueLine = memo(function DialogueLine({
         onChange={handleTextChange}
         onKeyDown={handleKeyDown}
         placeholder={entry.speakerId ? "Dialogue..." : "Narration..."}
-        className={`min-h-[52px] p-0 resize-none overflow-hidden bg-transparent border-0 outline-none focus-visible:outline-none focus-visible:ring-0 font-light tracking-normal leading-8 placeholder:text-muted-foreground/50 ${
-          isStacked ? "w-full pr-7" : "flex-1"
+        className={`relative min-h-[52px] p-0 pr-7 resize-none overflow-hidden bg-transparent border-0 outline-none focus-visible:outline-none focus-visible:ring-0 font-light tracking-normal leading-8 placeholder:text-muted-foreground/50 ${
+          isStacked ? "w-full" : "flex-1"
         }`}
         style={{
           fontSize: "var(--prose-editor-font-size, 16px)",
@@ -548,14 +561,25 @@ export const DialogueLine = memo(function DialogueLine({
       {(isHovered || entry.text === "") && totalEntries > 1 && (
         <button
           onClick={onDelete}
-          className={`p-1 rounded text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-            isStacked ? "absolute right-0 top-2" : "shrink-0"
-          }`}
+          className="z-10 absolute right-0 top-0.5 p-1 rounded text-muted-foreground/70 hover:text-destructive bg-background/90 hover:bg-destructive/10 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           title="Delete line (Backspace)"
         >
           <X className="w-3.5 h-3.5" />
         </button>
       )}
+
+      {/* Hidden measuring span — detects font size/family changes via ResizeObserver */}
+      <span
+        ref={measureRef}
+        aria-hidden="true"
+        className="absolute invisible pointer-events-none whitespace-pre"
+        style={{
+          fontSize: "var(--prose-editor-font-size, 16px)",
+          fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
+        }}
+      >
+        M
+      </span>
     </div>
   );
 }, areDialogueLinePropsEqual);
