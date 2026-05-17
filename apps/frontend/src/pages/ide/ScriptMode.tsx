@@ -24,14 +24,12 @@ import { useTextUndo } from "@/hooks/useTextUndo";
 interface ScriptModeProps {
   projectId?: string;
   projectName?: string;
-  gitlabBranch?: string;
   onOpenSettings?: () => void;
 }
 
 export function ScriptMode({
   projectId,
   projectName,
-  gitlabBranch,
   onOpenSettings,
 }: ScriptModeProps) {
   const { error: showErrorToast } = useToast();
@@ -403,7 +401,7 @@ export function ScriptMode({
         language="Ren'Py"
         projectId={projectId}
         projectName={projectName}
-        gitlabBranch={gitlabBranch}
+        gitlabBranch={linkedRepo?.defaultBranch}
         fileSourceType={primaryFileSourceType}
         isFocusMode={isFocusMode}
         onOpenZipImportDialog={() => setShowZipImportDialog(true)}

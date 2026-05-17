@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useTheme } from "@/contexts/useTheme";
 import { useAuth } from "@/hooks/useAuth";
 import { useProject } from "@/hooks/useProject";
-import { useGitLab } from "@/hooks/useGitLab";
 import { useLabels } from "@/hooks/useLabels";
 import { themePalettes, BASE_URL } from "@/lib/constants";
 import { FloatingParticles, LeftSidebar } from "@/components/ide-shared";
@@ -57,9 +56,6 @@ export function HomePageIDE() {
     deleteProject,
     refreshProjects,
   } = useProject();
-
-  // GitLab context for getting linked repository info
-  const { getLinkedRepository } = useGitLab();
 
   // Labels context - clear active label when project changes
   const { setActiveLabelId } = useLabels();
@@ -201,12 +197,6 @@ export function HomePageIDE() {
     };
   }, []);
 
-  // Get GitLab branch for current project (if linked)
-  const gitlabRepo = currentProject
-    ? getLinkedRepository(currentProject.id)
-    : null;
-  const gitlabBranch = gitlabRepo?.defaultBranch;
-
   return (
     <div className="h-screen relative overflow-hidden">
       <FloatingParticles />
@@ -279,7 +269,6 @@ export function HomePageIDE() {
               <ScriptMode
                 projectId={currentProject?.id}
                 projectName={currentProject?.name}
-                gitlabBranch={gitlabBranch}
                 onOpenSettings={handleOpenSettings}
               />
             </Suspense>

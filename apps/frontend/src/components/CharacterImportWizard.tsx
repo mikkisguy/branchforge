@@ -383,10 +383,10 @@ export function CharacterImportWizard({
                       placeholder="e.g., s, narrator, protagonist"
                       value={newCharacter.tag}
                       onChange={(e) =>
-                        setNewCharacter({
-                          ...newCharacter,
+                        setNewCharacter((prev) => ({
+                          ...prev,
                           tag: e.target.value,
-                        })
+                        }))
                       }
                       disabled={isImporting}
                       className="h-8 text-sm"
@@ -398,10 +398,10 @@ export function CharacterImportWizard({
                       placeholder="e.g., Sarah, Narrator"
                       value={newCharacter.displayName}
                       onChange={(e) =>
-                        setNewCharacter({
-                          ...newCharacter,
+                        setNewCharacter((prev) => ({
+                          ...prev,
                           displayName: e.target.value,
-                        })
+                        }))
                       }
                       disabled={isImporting}
                       className="h-8 text-sm"
@@ -414,10 +414,10 @@ export function CharacterImportWizard({
                         type="color"
                         value={newCharacter.color}
                         onChange={(e) =>
-                          setNewCharacter({
-                            ...newCharacter,
+                          setNewCharacter((prev) => ({
+                            ...prev,
                             color: e.target.value,
-                          })
+                          }))
                         }
                         disabled={isImporting}
                         className="h-8 p-1"
@@ -476,10 +476,10 @@ export function CharacterImportWizard({
                       placeholder="e.g., s, narrator"
                       value={newCharacter.tag}
                       onChange={(e) =>
-                        setNewCharacter({
-                          ...newCharacter,
+                        setNewCharacter((prev) => ({
+                          ...prev,
                           tag: e.target.value,
-                        })
+                        }))
                       }
                       disabled={isImporting}
                       className="h-7 text-sm"
@@ -493,10 +493,10 @@ export function CharacterImportWizard({
                       placeholder="e.g., Sarah"
                       value={newCharacter.displayName}
                       onChange={(e) =>
-                        setNewCharacter({
-                          ...newCharacter,
+                        setNewCharacter((prev) => ({
+                          ...prev,
                           displayName: e.target.value,
-                        })
+                        }))
                       }
                       disabled={isImporting}
                       className="h-7 text-sm"
@@ -512,10 +512,10 @@ export function CharacterImportWizard({
                       type="color"
                       value={newCharacter.color}
                       onChange={(e) =>
-                        setNewCharacter({
-                          ...newCharacter,
+                        setNewCharacter((prev) => ({
+                          ...prev,
                           color: e.target.value,
-                        })
+                        }))
                       }
                       disabled={isImporting}
                       className="h-7 w-16 p-1"
