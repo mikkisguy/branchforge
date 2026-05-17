@@ -223,6 +223,8 @@ export const ProseEditor = forwardRef<ProseEditorRef, ProseEditorProps>(
       (nextEntries: DialogueEntry[]) => {
         isExternalUpdateRef.current = true;
         setEntries(nextEntries);
+        // Propagate undo/redo to parent so autosave picks up the change
+        onChangeRef.current(nextEntries);
       },
       []
     );
