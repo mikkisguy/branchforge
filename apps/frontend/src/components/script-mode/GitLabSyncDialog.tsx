@@ -79,8 +79,9 @@ export function GitLabSyncDialog({
   // Check if this is a first sync (no local labels)
   const isFirstSync = !isLoadingLabels && labels.length === 0;
 
-  // Form state
-  const [branch, setBranch] = useState(defaultBranch);
+  // Form state — derive branch from prop, track user overrides separately
+  const [userBranch, setUserBranch] = useState<string | null>(null);
+  const branch = userBranch ?? defaultBranch;
   const [commitMessage, setCommitMessage] = useState(
     `Sync ${operationType} from BranchForge`
   );
@@ -359,7 +360,7 @@ export function GitLabSyncDialog({
                   type="text"
                   placeholder={defaultBranch}
                   value={branch}
-                  onChange={(e) => setBranch(e.target.value)}
+                  onChange={(e) => setUserBranch(e.target.value)}
                   disabled={state.isProcessing}
                 />
                 <p className="text-xs text-muted-foreground">

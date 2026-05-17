@@ -8,7 +8,6 @@ import {
   forwardRef,
   useImperativeHandle,
 } from "react";
-import type { Extension } from "@codemirror/state";
 import { EditorView, Decoration, DecorationSet } from "@codemirror/view";
 import { StateField, StateEffect } from "@codemirror/state";
 import { highlightSelectionMatches, search } from "@codemirror/search";
@@ -27,6 +26,7 @@ import {
 import { LineWrapSwitcher } from "./LineWrapSwitcher";
 import { SaveIndicator } from "../write-mode";
 import type { SaveStatus } from "@/hooks/useAutosave";
+import { useLocalStorageBoolean } from "@/hooks/useLocalStorage";
 
 export interface ScriptEditorRef {
   focus: () => void;
@@ -96,9 +96,14 @@ export const ScriptEditor = forwardRef<ScriptEditorRef, ScriptEditorProps>(
     }: ScriptEditorProps,
     ref
   ) {
-    const [lineWrapExtension, setLineWrapExtension] = useState<
-      Extension | readonly Extension[]
-    >([]);
+    const [lineWrap, setLineWrap] = useLocalStorageBoolean(
+      "script:line-wrap",
+      false
+    );
+    const lineWrapExtension = useMemo(
+      () => (lineWrap ? EditorView.lineWrapping : []),
+      [lineWrap]
+    );
     const [isHovered, setIsHovered] = useState(false);
     const cleanContent = useMemo(() => stripBOM(content), [content]);
 
@@ -306,11 +311,9 @@ export const ScriptEditor = forwardRef<ScriptEditorRef, ScriptEditorProps>(
     const { cursorPosition, selectionInfo, totalLines, updateListener } =
       useEditorCursor({ initialContent: cleanContent });
 
-    const handleLineWrapChange = useCallback(
-      (extension: Extension | readonly Extension[]) => {
-        setLineWrapExtension(extension);
-      },
-      []
+    const toggleLineWrap = useCallback(
+      () => setLineWrap((prev) => !prev),
+      [setLineWrap]
     );
 
     const extensions = useMemo(
@@ -365,7 +368,7 @@ export const ScriptEditor = forwardRef<ScriptEditorRef, ScriptEditorProps>(
         >
           <div className="flex items-center gap-2">
             <FontSizeSwitcher mode="script" direction="up" />
-            <LineWrapSwitcher onChange={handleLineWrapChange} />
+            <LineWrapSwitcher lineWrap={lineWrap} onToggle={toggleLineWrap} />
             <PaletteSwitcher />
           </div>
           <div className="flex items-center gap-3">

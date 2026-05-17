@@ -346,15 +346,13 @@ export function useAutosave<T>({
       }
     }
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, hashFn, debounceMs, performSave, clearSaveTimeout, saveStatus]);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
     return () => {
       clearSaveTimeout();
+      // Reset so the next effect run knows it may need to reschedule
+      pendingHashRef.current = null;
     };
-  }, [clearSaveTimeout]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, hashFn, debounceMs, performSave, clearSaveTimeout, saveStatus]);
 
   return {
     saveStatus,

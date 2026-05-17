@@ -26,7 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/contexts/ToastContext";
 import { useGitLab } from "@/hooks/useGitLab";
 import { gitlabApi } from "@/lib/api/gitlab";
-import { projectKeys } from "@/lib/query-keys";
+import { projectKeys, gitlabKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
 import type { GitLabRepository } from "@/lib/api/gitlab";
 import { CharacterImportWizard } from "@/components/CharacterImportWizard";
@@ -213,8 +213,11 @@ export function GitLabImportDialog({
         message: `Successfully imported ${result.project.name}`,
       });
 
-      // Invalidate projects cache
+      // Invalidate projects and GitLab linked repos cache
       await queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+      await queryClient.invalidateQueries({
+        queryKey: gitlabKeys.repositories(),
+      });
 
       // Detect characters from imported RPY files
       try {
