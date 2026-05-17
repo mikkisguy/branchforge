@@ -5,7 +5,7 @@
  * Includes enable/disable toggle, daily goal input, and reset time selection.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useWritingGoals } from "@/hooks/useWritingGoals";
@@ -21,7 +21,6 @@ export function WritingGoalSettings() {
   const { settings, isLoading, isSaving, updateGoal, resetStats } =
     useWritingGoals();
   const { error: toastError } = useToast();
-  const [detectedTimezone, setDetectedTimezone] = useState<string | null>(null);
   const [showResetConfirmDialog, setShowResetConfirmDialog] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   // Explicit state: null = use server value, string = user is editing
@@ -30,11 +29,11 @@ export function WritingGoalSettings() {
 
   const isDisabled = isLoading || isSaving || isResetting;
 
-  // Auto-detect timezone on mount
-  useEffect(() => {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    setDetectedTimezone(tz);
-  }, []);
+  // Detect timezone during render instead of effect chain
+  const detectedTimezone = useMemo(
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+    []
+  );
 
   // Save detected timezone if user has none set
   useEffect(() => {

@@ -349,12 +349,21 @@ export function useGitLabSync(): UseGitLabSyncReturn {
       });
     },
     onSuccess: (op) => {
+      const projectId = activeProjectIdRef.current;
+
       if (isTerminalStatus(op.status)) {
         finalizeOperation(op);
         return;
       }
 
       const startedAt = Date.now();
+
+      // Invalidate caches when mutation starts to ensure fresh data
+      // once the operation completes (finalizeOperation also invalidates
+      // on terminal status, but this covers edge cases like polling errors).
+      if (projectId) {
+        invalidateProjectCaches(projectId);
+      }
 
       updateActiveOperationId(op.id);
       setPollStartTime(startedAt);
@@ -395,12 +404,21 @@ export function useGitLabSync(): UseGitLabSyncReturn {
       });
     },
     onSuccess: (op) => {
+      const projectId = activeProjectIdRef.current;
+
       if (isTerminalStatus(op.status)) {
         finalizeOperation(op);
         return;
       }
 
       const startedAt = Date.now();
+
+      // Invalidate caches when mutation starts to ensure fresh data
+      // once the operation completes (finalizeOperation also invalidates
+      // on terminal status, but this covers edge cases like polling errors).
+      if (projectId) {
+        invalidateProjectCaches(projectId);
+      }
 
       updateActiveOperationId(op.id);
       setPollStartTime(startedAt);

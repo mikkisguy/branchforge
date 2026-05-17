@@ -21,9 +21,9 @@ export function FileTree({ files, activeFile, onSelectFile }: FileTreeProps) {
         Contents
       </div>
       <div className="space-y-0.5">
-        {files.map((file, i) => (
+        {files.map((file) => (
           <button
-            key={i}
+            key={file.name}
             onClick={() => file.type === "file" && onSelectFile(file.name)}
             disabled={file.type === "folder"}
             className={`w-full flex items-center gap-2 py-2 px-2 rounded-md text-sm transition-all ${
