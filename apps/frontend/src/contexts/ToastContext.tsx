@@ -1,10 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  ReactNode,
-} from "react";
+import { createContext, use, useState, useCallback, ReactNode } from "react";
 
 type ToastVariant = "default" | "success" | "destructive";
 
@@ -25,7 +19,7 @@ interface ToastContextType {
 const ToastContext = createContext<ToastContextType | null>(null);
 
 export function useToast() {
-  const context = useContext(ToastContext);
+  const context = use(ToastContext);
   if (!context) {
     throw new Error("useToast must be used within ToastProvider");
   }

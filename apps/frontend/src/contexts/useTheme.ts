@@ -1,4 +1,4 @@
-import { createContext, useContext } from "react";
+import { createContext, use } from "react";
 
 export type ThemePalette =
   | "forest"
@@ -22,7 +22,7 @@ export const ThemeContext = createContext<ThemeContextType | undefined>(
 );
 
 export function useTheme(): ThemeContextType {
-  const context = useContext(ThemeContext);
+  const context = use(ThemeContext);
   if (!context) {
     throw new Error("useTheme must be used within ThemeProvider");
   }
