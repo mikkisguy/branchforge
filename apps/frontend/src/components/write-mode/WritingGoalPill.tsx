@@ -48,8 +48,8 @@ export const WritingGoalPill = memo(function WritingGoalPill({
       }
     >
       {/* Circular progress */}
-      <div className="relative h-6 w-6 shrink-0">
-        <svg className="h-6 w-6 -rotate-90" viewBox="0 0 24 24" aria-hidden>
+      <div className="relative size-6 shrink-0">
+        <svg className="size-6 -rotate-90" viewBox="0 0 24 24" aria-hidden>
           <circle
             cx="12"
             cy="12"

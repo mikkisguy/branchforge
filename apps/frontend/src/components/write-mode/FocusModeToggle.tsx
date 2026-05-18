@@ -43,13 +43,13 @@ export const FocusModeToggle = memo(function FocusModeToggle({
     >
       {isFocusMode ? (
         <>
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--theme-color)]/15 text-[var(--theme-color)]">
-            <Minimize2 className="h-3.5 w-3.5" />
+          <span className="flex size-6 items-center justify-center rounded-full bg-[var(--theme-color)]/15 text-[var(--theme-color)]">
+            <Minimize2 className="size-3.5" />
           </span>
           <span className="font-semibold">Exit Focus</span>
         </>
       ) : (
-        <Maximize2 className="h-4 w-4" />
+        <Maximize2 className="size-4" />
       )}
     </button>
   );

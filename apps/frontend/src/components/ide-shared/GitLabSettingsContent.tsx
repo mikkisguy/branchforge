@@ -235,7 +235,7 @@ export function GitLabSettingsContent() {
                     variant="ghost"
                     size="icon"
                     onClick={() => setShowToken(!showToken)}
-                    className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    className="absolute right-1 top-1/2 size-8 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
                     {showToken ? (
                       <EyeOff className="size-4" />

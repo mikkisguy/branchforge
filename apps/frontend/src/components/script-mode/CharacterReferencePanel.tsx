@@ -111,7 +111,7 @@ export function CharacterReferencePanel({
                     return (
                       <div
                         key={sceneCharacter.id}
-                        className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-muted transition-colors group"
+                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors group"
                       >
                         <div
                           className="size-10 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0 shadow-sm"
