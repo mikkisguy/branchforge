@@ -1,4 +1,5 @@
-export { ScriptEditor } from "./ScriptEditor";
+export { ScriptEditor } from "./ScriptEditor.lazy";
+export type { ScriptEditorRef } from "./ScriptEditor.lazy";
 export { FileTree } from "./FileTree";
 export { BookmarkTab } from "./BookmarkTab";
 export { StatusBar } from "./StatusBar";

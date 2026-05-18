@@ -95,18 +95,24 @@ function formatDateKey(year: number, month: number, day: number): string {
   )}`;
 }
 
+const dateTimeFormatCache = new Map<string, Intl.DateTimeFormat>();
+
 function getDatePartsInTimezone(
   date: Date,
   timezone: string
 ): TimezoneDateParts {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    hourCycle: "h23",
-  });
+  let formatter = dateTimeFormatCache.get(timezone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      hourCycle: "h23",
+    });
+    dateTimeFormatCache.set(timezone, formatter);
+  }
 
   const parts = formatter.formatToParts(date);
 

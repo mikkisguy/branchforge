@@ -64,6 +64,8 @@ function groupCharacters(
 ): CharacterGroup {
   const conflictTags = new Set(conflicts.map((c) => c.tag));
   const specialTags = new Set(["n", "u", "narrator", "extend"]);
+  const excludedTagSet = new Set(excludedTags);
+  const conflictMap = new Map(conflicts.map((c) => [c.tag, c]));
 
   const result: CharacterGroup = {
     new: [],
@@ -77,14 +79,14 @@ function groupCharacters(
 
     const editable: EditableCharacter = {
       ...char,
-      excluded: excludedTags.includes(char.tag) || (isSpecial && !isConflict),
+      excluded: excludedTagSet.has(char.tag) || (isSpecial && !isConflict),
       isLoveInterest: false,
       routeAffiliation: undefined,
     };
 
     if (isConflict) {
       // Find the conflict info
-      const conflict = conflicts.find((c) => c.tag === char.tag);
+      const conflict = conflictMap.get(char.tag);
       if (conflict) {
         result.existing.push(conflict);
       }

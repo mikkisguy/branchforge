@@ -7,7 +7,11 @@
 
 import { useCallback, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { labelKeys, projectFilesKeys } from "@/lib/query-keys";
+import {
+  labelKeys,
+  projectFilesKeys,
+  writingGoalsKeys,
+} from "@/lib/query-keys";
 import {
   labelsApi,
   type UpdateDialogueResponse,
@@ -153,20 +157,22 @@ export function useLabels(): UseLabelsReturn {
       // Invalidate project files (file content is reconstructed after dialogue update)
       // Don't invalidate labels list - metadata hasn't changed
       if (currentProject && variables.labelId) {
-        await queryClient.invalidateQueries({
-          queryKey: labelKeys.detail(currentProject.id, variables.labelId),
-        });
-
-        await queryClient.invalidateQueries({
-          queryKey: labelKeys.versions(variables.labelId),
-        });
-
-        // Invalidate project files for this project and force refetch
-        await queryClient.refetchQueries({
-          queryKey: projectFilesKeys.lists(currentProject.id),
-        });
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: labelKeys.detail(currentProject.id, variables.labelId),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: labelKeys.versions(variables.labelId),
+          }),
+          // Invalidate project files for this project and force refetch
+          queryClient.refetchQueries({
+            queryKey: projectFilesKeys.lists(currentProject.id),
+          }),
+          queryClient.invalidateQueries({ queryKey: writingGoalsKeys.all }),
+        ]);
+      } else {
+        await queryClient.invalidateQueries({ queryKey: writingGoalsKeys.all });
       }
-      await queryClient.invalidateQueries({ queryKey: ["writingGoals"] });
     },
   });
 
@@ -179,13 +185,14 @@ export function useLabels(): UseLabelsReturn {
       // Invalidate labels list to show new label
       // Also invalidate project files since createLabel updates the RPY file content and its contentHash
       if (currentProject) {
-        await queryClient.invalidateQueries({
-          queryKey: labelKeys.lists(currentProject.id),
-        });
-
-        await queryClient.refetchQueries({
-          queryKey: projectFilesKeys.lists(currentProject.id),
-        });
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: labelKeys.lists(currentProject.id),
+          }),
+          queryClient.refetchQueries({
+            queryKey: projectFilesKeys.lists(currentProject.id),
+          }),
+        ]);
       }
     },
   });
@@ -222,22 +229,24 @@ export function useLabels(): UseLabelsReturn {
   const invalidateLabels = useCallback(async () => {
     if (currentProject) {
       // Refetch list queries to ensure immediate data refresh after import
-      await queryClient.refetchQueries({
-        queryKey: labelKeys.lists(currentProject.id),
-      });
       // Also invalidate all detail queries for this project
       // This ensures Write Mode gets fresh label data after import
-      await queryClient.invalidateQueries({
-        predicate: (query) => {
-          const key = query.queryKey as unknown[];
-          return (
-            Array.isArray(key) &&
-            key[0] === "labels" &&
-            key[1] === currentProject.id &&
-            key[2] === "detail"
-          );
-        },
-      });
+      await Promise.all([
+        queryClient.refetchQueries({
+          queryKey: labelKeys.lists(currentProject.id),
+        }),
+        queryClient.invalidateQueries({
+          predicate: (query) => {
+            const key = query.queryKey as unknown[];
+            return (
+              Array.isArray(key) &&
+              key[0] === "labels" &&
+              key[1] === currentProject.id &&
+              key[2] === "detail"
+            );
+          },
+        }),
+      ]);
     }
   }, [currentProject, queryClient]);
 
