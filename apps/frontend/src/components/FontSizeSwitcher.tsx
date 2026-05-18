@@ -237,13 +237,13 @@ export function FontSizeSwitcher({
     <div
       className="relative flex items-center gap-2"
       onBlur={closeOnFocusLeave}
-      onMouseDown={handleMouseDown}
     >
       <button
         ref={buttonRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         onKeyDown={handleKeyDown}
+        onMouseDown={handleMouseDown}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
         aria-labelledby="font-size-label"
@@ -296,6 +296,7 @@ export function FontSizeSwitcher({
         <>
           <div
             className="fixed inset-0 z-40"
+            aria-hidden="true"
             onClick={() => {
               closeReasonRef.current = "mouse";
               setIsOpen(false);

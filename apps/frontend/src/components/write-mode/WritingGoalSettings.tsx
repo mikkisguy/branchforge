@@ -128,13 +128,19 @@ export function WritingGoalSettings() {
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
-              <label className="text-sm font-medium">Daily Writing Goal</label>
+              <label
+                htmlFor="writing-goal-toggle"
+                className="text-sm font-medium"
+              >
+                Daily Writing Goal
+              </label>
             </div>
             <p className="text-xs text-muted-foreground">
               Track your daily word count to build a consistent writing habit
             </p>
           </div>
           <Switch
+            id="writing-goal-toggle"
             checked={isEnabled}
             onCheckedChange={handleToggleEnabled}
             disabled={isDisabled}

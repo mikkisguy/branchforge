@@ -158,6 +158,7 @@ export function ConfirmDialog({
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/50"
+        aria-hidden="true"
         onClick={handleBackdropClick}
       />
       {/* Content */}

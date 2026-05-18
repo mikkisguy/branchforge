@@ -97,6 +97,7 @@ export function Dialog({
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/30 backdrop-blur-sm"
+        aria-hidden="true"
         onClick={closeOnBackdropClick ? () => onOpenChange?.(false) : undefined}
       />
       {/* Content */}

@@ -162,11 +162,15 @@ export function useAutosave<T>({
       const priorSavedHash = savedHashRef.current;
       pendingHashRef.current = localPendingHash;
       pendingDataRef.current = localPendingData;
-      await (savePromiseRef.current || Promise.resolve(true));
+      // Only await when a save is actually in-flight; skip unnecessary
+      // microtask when the ref is null (defensive edge-case).
+      if (savePromiseRef.current) {
+        await savePromiseRef.current;
+      }
       if (savedHashRef.current !== priorSavedHash) {
         pendingHashRef.current = localPendingHash;
         pendingDataRef.current = localPendingData;
-        return await triggerSave();
+        return triggerSave();
       }
       return true;
     }

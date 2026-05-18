@@ -94,7 +94,11 @@ export function PaletteSwitcher({
 
       {isOpen && (
         <>
-          <div className="fixed inset-0" onClick={() => setIsOpen(false)} />
+          <div
+            className="fixed inset-0"
+            aria-hidden="true"
+            onClick={() => setIsOpen(false)}
+          />
           <div
             className={`absolute ${dropdownPositionClasses} bg-card border border-border rounded-md shadow-lg overflow-hidden min-w-[200px]`}
           >
