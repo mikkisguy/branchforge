@@ -77,7 +77,7 @@ export function ZipImportProjectDialog({
     null
   );
   // Track if import succeeded so we notify parent when wizard closes
-  const [importSucceeded, setImportSucceeded] = useState(false);
+  const importSucceededRef = useRef(false);
   // Guard to prevent calling onSuccess twice (synchronous check)
   const didCallOnSuccessRef = useRef(false);
 
@@ -98,7 +98,7 @@ export function ZipImportProjectDialog({
       setShowCharacterWizard(false);
       setDetectedCharacters(null);
       setCreatedProject(null);
-      setImportSucceeded(false);
+      importSucceededRef.current = false;
       didCallOnSuccessRef.current = false;
     }
   }, [open]);
@@ -191,7 +191,7 @@ export function ZipImportProjectDialog({
       });
 
       // Mark import as succeeded so we notify parent when wizard closes
-      setImportSucceeded(true);
+      importSucceededRef.current = true;
       didCallOnSuccessRef.current = false;
 
       // Store the created project for switching after character import
@@ -481,7 +481,7 @@ export function ZipImportProjectDialog({
             setShowCharacterWizard(open);
             if (!open) {
               // Notify parent of successful import when wizard closes
-              if (importSucceeded && !didCallOnSuccessRef.current) {
+              if (importSucceededRef.current && !didCallOnSuccessRef.current) {
                 didCallOnSuccessRef.current = true;
                 if (createdProject) {
                   onSuccess?.(createdProject);
@@ -497,7 +497,7 @@ export function ZipImportProjectDialog({
           excludedTags={detectedCharacters.excludedTags}
           onComplete={() => {
             setShowCharacterWizard(false);
-            if (importSucceeded && !didCallOnSuccessRef.current) {
+            if (importSucceededRef.current && !didCallOnSuccessRef.current) {
               didCallOnSuccessRef.current = true;
               // Switch to the created project after character import completes
               if (createdProject) {

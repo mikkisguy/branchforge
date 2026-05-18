@@ -494,7 +494,7 @@ export function ZipImportFilesDialog({
             </>
           )}
           {importState.status === "success" && (
-            <Button onClick={handleClose}>Done</Button>
+            <Button onClick={handleClose}>Close</Button>
           )}
         </div>
       </DialogContent>

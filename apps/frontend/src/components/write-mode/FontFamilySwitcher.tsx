@@ -200,7 +200,7 @@ export function FontFamilySwitcher({
     updateDropdownState({ isKeyboardNav: false });
   };
 
-  const handleBlur = (e: React.FocusEvent) => {
+  const closeOnFocusLeave = (e: React.FocusEvent) => {
     if (!e.currentTarget.contains(e.relatedTarget)) {
       updateDropdownState({
         isOpen: false,
@@ -220,7 +220,7 @@ export function FontFamilySwitcher({
   return (
     <div
       className={`relative flex items-center gap-2 ${className}`}
-      onBlur={handleBlur}
+      onBlur={closeOnFocusLeave}
       onMouseDown={handleMouseDown}
     >
       <button

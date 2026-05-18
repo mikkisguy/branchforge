@@ -110,7 +110,7 @@ export function Tooltip({
     setIsVisible(false);
   };
 
-  const handleFocus = () => {
+  const showTooltip = () => {
     setIsVisible(true);
   };
 
@@ -151,7 +151,7 @@ export function Tooltip({
       ),
       onFocus: mergeHandlers(
         child.props.onFocus as ((e: React.FocusEvent) => unknown) | undefined,
-        handleFocus
+        showTooltip
       ),
       onBlur: mergeHandlers(
         child.props.onBlur as ((e: React.FocusEvent) => unknown) | undefined,
@@ -208,7 +208,7 @@ export function Tooltip({
       tabIndex={0}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      onFocus={handleFocus}
+      onFocus={showTooltip}
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
       className={cn("inline-block", triggerClassName)}

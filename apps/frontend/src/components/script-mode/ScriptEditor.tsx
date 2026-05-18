@@ -24,7 +24,7 @@ import {
   EDITOR_FONT_SIZE_CHANGED,
 } from "../FontSizeSwitcher";
 import { LineWrapSwitcher } from "./LineWrapSwitcher";
-import { SaveIndicator } from "../write-mode";
+import { SaveIndicator } from "../write-mode/SaveIndicator";
 import type { SaveStatus } from "@/hooks/useAutosave";
 import { useLocalStorageBoolean } from "@/hooks/useLocalStorage";
 

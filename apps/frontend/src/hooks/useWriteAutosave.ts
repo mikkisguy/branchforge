@@ -112,17 +112,20 @@ export function getPersistedDialogueFromLabel(
     return [];
   }
 
-  return activeLabel.lines
-    .filter(
-      (line) =>
-        (line.contentType === "DIALOGUE" || line.contentType === "NARRATION") &&
-        line.content.trim().length > 0
-    )
-    .map((line) => ({
-      id: line.id,
-      speakerId: line.speakerId,
-      text: line.content,
-    }));
+  const result: DialogueEntry[] = [];
+  for (const line of activeLabel.lines) {
+    if (
+      (line.contentType === "DIALOGUE" || line.contentType === "NARRATION") &&
+      line.content.trim().length > 0
+    ) {
+      result.push({
+        id: line.id,
+        speakerId: line.speakerId,
+        text: line.content,
+      });
+    }
+  }
+  return result;
 }
 
 export function useWriteAutosave({

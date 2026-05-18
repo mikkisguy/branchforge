@@ -52,9 +52,14 @@ export function CharacterReferencePanel({
   }, [characters, labelCharacterIds]);
 
   const resolvedLabelChars = useMemo(() => {
-    return labelCharacters
-      .map((labelCharacter) => characterById.get(labelCharacter.id))
-      .filter((c): c is Character => c !== undefined);
+    const result: Character[] = [];
+    for (const labelCharacter of labelCharacters) {
+      const c = characterById.get(labelCharacter.id);
+      if (c !== undefined) {
+        result.push(c);
+      }
+    }
+    return result;
   }, [labelCharacters, characterById]);
 
   return (
