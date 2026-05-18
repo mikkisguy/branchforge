@@ -49,7 +49,7 @@ export function Toast({
           onClick={onClose}
           className="text-muted-foreground hover:text-foreground transition-colors"
         >
-          <X className="w-4 h-4" />
+          <X className="size-4" />
         </button>
       )}
     </div>
@@ -64,11 +64,11 @@ export function ToastIcon({ variant = "default" }: ToastIconProps) {
   switch (variant) {
     case "success":
       return (
-        <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+        <CheckCircle2 className="size-5 text-green-600 dark:text-green-400" />
       );
     case "destructive":
-      return <AlertCircle className="w-5 h-5 text-destructive" />;
+      return <AlertCircle className="size-5 text-destructive" />;
     default:
-      return <Info className="w-5 h-5 text-muted-foreground" />;
+      return <Info className="size-5 text-muted-foreground" />;
   }
 }

@@ -251,7 +251,7 @@ export function FontSizeSwitcher({
         title="Change font size"
       >
         <svg
-          className="w-3 h-3"
+          className="size-3"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -269,7 +269,7 @@ export function FontSizeSwitcher({
         </span>
         <span aria-hidden="true">{currentOption.label}</span>
         <svg
-          className={`w-3 h-3 transition-transform ${
+          className={`size-3 transition-transform ${
             isOpen
               ? direction === "up"
                 ? ""

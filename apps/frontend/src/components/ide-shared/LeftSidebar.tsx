@@ -208,21 +208,21 @@ export function LeftSidebar(props: LeftSidebarProps) {
             <button
               onClick={() => setMode("write")}
               className={`flex ${
-                isCollapsed ? "w-full px-2.5 py-2.5" : "flex-1 px-2 py-1.5"
-              } items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-sm font-medium transition-all ${
+                isCollapsed ? "w-full p-2.5" : "flex-1 px-2 py-1.5"
+              } items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-all ${
                 mode === "write"
                   ? "text-white bg-[var(--theme-color)]"
                   : "text-muted-foreground hover:text-foreground"
               }`}
               title="Write Mode"
             >
-              <BookOpen className="w-4 h-4 flex-shrink-0" />
+              <BookOpen className="size-4 flex-shrink-0" />
               {showLabel && <span>Write</span>}
             </button>
             <button
               onClick={() => setMode("script")}
               className={`flex ${
-                isCollapsed ? "w-full px-2.5 py-2.5" : "flex-1 px-2 py-1.5"
+                isCollapsed ? "w-full p-2.5" : "flex-1 px-2 py-1.5"
               } items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-all ${
                 mode === "script"
                   ? "text-white bg-[var(--theme-color)]"
@@ -230,7 +230,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
               }`}
               title="Script Mode"
             >
-              <SquarePen className="w-4 h-4 flex-shrink-0" />
+              <SquarePen className="size-4 flex-shrink-0" />
               {showLabel && <span>Script</span>}
             </button>
           </div>
@@ -243,14 +243,14 @@ export function LeftSidebar(props: LeftSidebarProps) {
                 <button
                   onClick={() => setIsProjectPopoverOpen(!isProjectPopoverOpen)}
                   disabled={isLoadingProjects}
-                  className={`flex items-center justify-center px-2.5 py-2.5 rounded-md text-sm font-medium transition-colors ${
+                  className={`flex items-center justify-center p-2.5 rounded-md text-sm font-medium transition-colors ${
                     isProjectPopoverOpen
                       ? "text-foreground bg-muted/50"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   }`}
                   title="Select Project"
                 >
-                  <FolderOpen className="w-4 h-4 flex-shrink-0" />
+                  <FolderOpen className="size-4 flex-shrink-0" />
                 </button>
 
                 {isProjectPopoverOpen && (
@@ -329,7 +329,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
               onClick={() => setIsRoutesOpen(true)}
               disabled={!projectId}
               className={`flex items-center ${
-                isCollapsed ? "justify-center px-2.5 py-2.5" : "gap-3 px-2 py-2"
+                isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
               } rounded-md text-sm font-medium transition-colors ${
                 !projectId
                   ? "text-muted-foreground/50 cursor-not-allowed"
@@ -337,7 +337,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
               }`}
               title="Routes"
             >
-              <Route className="w-4 h-4 flex-shrink-0" />
+              <Route className="size-4 flex-shrink-0" />
               {showLabel && <span>Routes</span>}
             </button>
 
@@ -346,7 +346,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
               onClick={() => setIsStateVarsOpen(true)}
               disabled={!projectId}
               className={`flex items-center ${
-                isCollapsed ? "justify-center px-2.5 py-2.5" : "gap-3 px-2 py-2"
+                isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
               } rounded-md text-sm font-medium transition-colors ${
                 !projectId
                   ? "text-muted-foreground/50 cursor-not-allowed"
@@ -354,7 +354,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
               }`}
               title="State Variables"
             >
-              <Database className="w-4 h-4 flex-shrink-0" />
+              <Database className="size-4 flex-shrink-0" />
               {showLabel && <span>State Variables</span>}
             </button>
 
@@ -363,7 +363,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
               onClick={() => setIsCharactersOpen(true)}
               disabled={!projectId}
               className={`flex items-center ${
-                isCollapsed ? "justify-center px-2.5 py-2.5" : "gap-3 px-2 py-2"
+                isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
               } rounded-md text-sm font-medium transition-colors ${
                 !projectId
                   ? "text-muted-foreground/50 cursor-not-allowed"
@@ -371,7 +371,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
               }`}
               title="Characters"
             >
-              <Users className="w-4 h-4 flex-shrink-0" />
+              <Users className="size-4 flex-shrink-0" />
               {showLabel && <span>Characters</span>}
             </button>
           </nav>
@@ -383,15 +383,15 @@ export function LeftSidebar(props: LeftSidebarProps) {
           <button
             onClick={handleToggleCollapse}
             className={`flex items-center ${
-              isCollapsed ? "justify-center px-2.5 py-2.5" : "gap-3 px-2 py-2"
+              isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
             } rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors`}
             title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {isCollapsed ? (
-              <ChevronsRight className="w-4 h-4 flex-shrink-0" />
+              <ChevronsRight className="size-4 flex-shrink-0" />
             ) : (
               <>
-                <ChevronsLeft className="w-4 h-4 flex-shrink-0" />
+                <ChevronsLeft className="size-4 flex-shrink-0" />
                 {showLabel && <span>Collapse</span>}
               </>
             )}
@@ -404,14 +404,14 @@ export function LeftSidebar(props: LeftSidebarProps) {
                 {/* Collapsed: Icon button with popover */}
                 <button
                   onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
-                  className={`flex items-center justify-center px-2.5 py-2.5 rounded-md text-sm font-medium transition-colors ${
+                  className={`flex items-center justify-center p-2.5 rounded-md text-sm font-medium transition-colors ${
                     isThemeDropdownOpen
                       ? "text-foreground bg-muted/50"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   }`}
                   title="Theme"
                 >
-                  <Palette className="w-4 h-4 flex-shrink-0" />
+                  <Palette className="size-4 flex-shrink-0" />
                 </button>
 
                 {isThemeDropdownOpen && (
@@ -424,7 +424,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
                             setTheme(palette.key);
                             setIsThemeDropdownOpen(false);
                           }}
-                          className={`w-7 h-7 rounded transition-all ${
+                          className={`size-7 rounded transition-all ${
                             theme === palette.key
                               ? "scale-110 ring-2 ring-white ring-offset-2 ring-offset-card"
                               : "opacity-60 hover:opacity-100 hover:scale-105"
@@ -440,7 +440,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
             ) : (
               <>
                 {/* Expanded: Inline theme colors (no icon) */}
-                <div className="flex items-center px-2 py-2">
+                <div className="flex items-center p-2">
                   <div className="flex gap-1.5 flex-1">
                     {themePalettes.map((palette) => (
                       <button
@@ -465,11 +465,11 @@ export function LeftSidebar(props: LeftSidebarProps) {
           <button
             onClick={() => setSettingsOpen(true)}
             className={`flex items-center ${
-              isCollapsed ? "justify-center px-2.5 py-2.5" : "gap-3 px-2 py-2"
+              isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
             } rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors`}
             title="Settings"
           >
-            <Settings className="w-4 h-4 flex-shrink-0" />
+            <Settings className="size-4 flex-shrink-0" />
             {showLabel && <span>Settings</span>}
           </button>
 
@@ -477,11 +477,11 @@ export function LeftSidebar(props: LeftSidebarProps) {
           <button
             onClick={onLogout}
             className={`flex items-center ${
-              isCollapsed ? "justify-center px-2.5 py-2.5" : "gap-3 px-2 py-2"
+              isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
             } rounded-md text-sm font-medium text-muted-foreground hover:text-destructive-muted hover:bg-destructive/10 transition-colors`}
             title="Logout"
           >
-            <LogOut className="w-4 h-4 flex-shrink-0" />
+            <LogOut className="size-4 flex-shrink-0" />
             {showLabel && <span>Logout</span>}
           </button>
         </div>

@@ -122,7 +122,7 @@ export function SettingsModal({
             onClick={() => onOpenChange(false)}
             aria-label="Close settings"
           >
-            <X className="w-5 h-5" />
+            <X className="size-5" />
           </Button>
         </DialogHeader>
 

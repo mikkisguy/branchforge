@@ -59,9 +59,9 @@ export const SaveIndicator = memo(function SaveIndicator({
         title="Edit conflict detected"
       >
         <span
-          className={`flex items-center justify-center w-3 h-3 rounded-full text-white ${ERROR_DOT_COLOR}`}
+          className={`flex items-center justify-center size-3 rounded-full text-white ${ERROR_DOT_COLOR}`}
         >
-          <AlertCircle className="w-3 h-3" />
+          <AlertCircle className="size-3" />
         </span>
         {displayMode === "verbose" && <span>Conflict detected</span>}
       </div>
@@ -74,11 +74,11 @@ export const SaveIndicator = memo(function SaveIndicator({
   const icon = (() => {
     switch (saveStatus) {
       case "error":
-        return <AlertCircle className="w-3 h-3" />;
+        return <AlertCircle className="size-3" />;
       case "saving":
-        return <Loader2 className="w-3 h-3 animate-spin" />;
+        return <Loader2 className="size-3 animate-spin" />;
       case "saved":
-        return <Check className="w-3 h-3" />;
+        return <Check className="size-3" />;
     }
   })();
 
@@ -123,7 +123,7 @@ export const SaveIndicator = memo(function SaveIndicator({
       {/* Status icon with background for error state */}
       {saveStatus === "error" && (
         <span
-          className={`flex items-center justify-center w-3 h-3 rounded-full text-white ${ERROR_DOT_COLOR}`}
+          className={`flex items-center justify-center size-3 rounded-full text-white ${ERROR_DOT_COLOR}`}
         >
           {icon}
         </span>

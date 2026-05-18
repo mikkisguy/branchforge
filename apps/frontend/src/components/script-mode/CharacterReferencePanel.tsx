@@ -72,7 +72,7 @@ export function CharacterReferencePanel({
                 aria-label="Collapse character reference sidebar"
                 title="Collapse character reference sidebar"
               >
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                <ChevronRight className="size-4 text-muted-foreground" />
               </button>
             )}
             <h2 className="text-sm font-semibold tracking-wide">Characters</h2>
@@ -89,7 +89,7 @@ export function CharacterReferencePanel({
 
               {sceneCharacters.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-2">
+                  <div className="size-12 rounded-full bg-muted/50 flex items-center justify-center mb-2">
                     <span className="text-2xl opacity-40">👥</span>
                   </div>
                   <p className="text-sm text-muted-foreground">
@@ -114,7 +114,7 @@ export function CharacterReferencePanel({
                         className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-muted transition-colors group"
                       >
                         <div
-                          className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0 shadow-sm"
+                          className="size-10 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0 shadow-sm"
                           style={{ backgroundColor: avatarColor }}
                         >
                           {displayName[0] || "?"}
@@ -130,7 +130,7 @@ export function CharacterReferencePanel({
                           )}
                         </div>
                         {resolvedCharacter?.isLoveInterest && (
-                          <Heart className="w-4 h-4 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
+                          <Heart className="size-4 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
                         )}
                       </div>
                     );
@@ -152,7 +152,7 @@ export function CharacterReferencePanel({
                       className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted transition-colors group"
                     >
                       <div
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs shrink-0 shadow-sm"
+                        className="size-6 rounded-full flex items-center justify-center text-white text-xs shrink-0 shadow-sm"
                         style={{ backgroundColor: character.color }}
                       >
                         {character.displayName[0] || "?"}
@@ -161,7 +161,7 @@ export function CharacterReferencePanel({
                         {character.displayName}
                       </span>
                       {character.isLoveInterest && (
-                        <Heart className="w-3.5 h-3.5 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
+                        <Heart className="size-3.5 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
                       )}
                     </div>
                   ))}
@@ -177,20 +177,20 @@ export function CharacterReferencePanel({
               <div className="space-y-2 text-sm px-2">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <span
-                    className="w-2 h-2 rounded-full"
+                    className="size-2 rounded-full"
                     style={{ backgroundColor: statusColor }}
                   />
                   <span>Status: {activeLabel?.status ?? "Unknown"}</span>
                 </div>
                 {activeLabel?.routeKey && (
                   <div className="flex items-center gap-2 text-muted-foreground">
-                    <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
+                    <span className="size-2 rounded-full bg-muted-foreground/50" />
                     <span>Route: {activeLabel.routeKey}</span>
                   </div>
                 )}
                 {activeLabel?.groupType && activeLabel?.groupValue && (
                   <div className="flex items-center gap-2 text-muted-foreground">
-                    <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
+                    <span className="size-2 rounded-full bg-muted-foreground/50" />
                     <span>
                       {activeLabel.groupType}: {activeLabel.groupValue}
                     </span>
@@ -211,7 +211,7 @@ export function CharacterReferencePanel({
             aria-label="Expand character reference sidebar"
             title="Expand character reference sidebar"
           >
-            <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+            <ChevronLeft className="size-4 text-muted-foreground" />
           </button>
         </div>
       )}

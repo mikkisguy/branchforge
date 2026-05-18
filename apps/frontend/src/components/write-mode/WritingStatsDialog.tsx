@@ -94,7 +94,7 @@ export function WritingStatsDialog({
             className="text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Close dialog"
           >
-            <X className="w-5 h-5" />
+            <X className="size-5" />
           </button>
         </DialogHeader>
 

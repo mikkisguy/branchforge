@@ -594,8 +594,8 @@ export const ProseEditor = forwardRef<ProseEditorRef, ProseEditorProps>(
     if (!activeLabel) {
       return (
         <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-          <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-            <BookOpen className="w-8 h-8 opacity-40" />
+          <div className="size-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+            <BookOpen className="size-8 opacity-40" />
           </div>
           <p className="text-lg">Select a scene to start writing</p>
         </div>
@@ -605,8 +605,8 @@ export const ProseEditor = forwardRef<ProseEditorRef, ProseEditorProps>(
     if (entries.length === 0) {
       return (
         <div className="bg-card border border-border rounded-lg h-full flex flex-col items-center justify-center gap-6 text-muted-foreground">
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[var(--theme-color)]/10 to-[var(--theme-color)]/5 flex items-center justify-center">
-            <PenLine className="w-10 h-10 text-[var(--theme-color)]/60" />
+          <div className="size-20 rounded-full bg-gradient-to-br from-[var(--theme-color)]/10 to-[var(--theme-color)]/5 flex items-center justify-center">
+            <PenLine className="size-10 text-[var(--theme-color)]/60" />
           </div>
           <div className="text-center space-y-1">
             <p className="text-lg font-medium text-foreground">
@@ -629,7 +629,7 @@ export const ProseEditor = forwardRef<ProseEditorRef, ProseEditorProps>(
             className="group px-6 py-3 rounded-lg bg-[var(--theme-color)] text-white hover:bg-[var(--theme-color-hover)] transition-all duration-200 hover:shadow-lg hover:shadow-[var(--theme-color)]/20 focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)] focus:ring-offset-2 focus:ring-offset-background"
           >
             <span className="flex items-center gap-2">
-              <PenLine className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+              <PenLine className="size-4 group-hover:scale-110 transition-transform duration-200" />
               Add your first line
             </span>
           </button>
@@ -676,7 +676,7 @@ export const ProseEditor = forwardRef<ProseEditorRef, ProseEditorProps>(
         {/* Editor Content */}
         <div
           data-prose-editor-scroll="true"
-          className={`flex-1 overflow-y-auto px-4 sm:px-6 py-6 bg-background scroll-pb-24 ${
+          className={`flex-1 overflow-y-auto px-4 sm:p-6 bg-background scroll-pb-24 ${
             isFocusMode ? "border-t border-border" : ""
           }`}
         >

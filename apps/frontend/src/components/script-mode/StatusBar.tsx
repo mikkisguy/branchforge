@@ -100,7 +100,7 @@ export function StatusBar({
           </div>
           {isGitLabAvailable && (
             <div className="flex items-center gap-1.5 text-muted-foreground border-r border-border/30 pr-4">
-              <GitBranch className="w-3 h-3" />
+              <GitBranch className="size-3" />
               <span>{gitlabBranch ?? "Unknown"}</span>
             </div>
           )}
@@ -118,7 +118,7 @@ export function StatusBar({
                   )}
                   title="Import from GitLab"
                 >
-                  <Download className="w-3.5 h-3.5" />
+                  <Download className="size-3.5" />
                   <span>Import</span>
                 </button>
               </div>
@@ -131,7 +131,7 @@ export function StatusBar({
                   )}
                   title="Export to GitLab"
                 >
-                  <Upload className="w-3.5 h-3.5" />
+                  <Upload className="size-3.5" />
                   <span>Export</span>
                 </button>
               </div>
@@ -149,7 +149,7 @@ export function StatusBar({
                 )}
                 title="Import from Zip"
               >
-                <Package className="w-3.5 h-3.5" />
+                <Package className="size-3.5" />
                 <span>Import Zip</span>
               </button>
             </div>

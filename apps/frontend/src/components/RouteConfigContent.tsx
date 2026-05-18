@@ -291,7 +291,7 @@ export function RouteConfigContent({ projectId }: RouteConfigContentProps) {
 
       {isLoadingRouteConfigs ? (
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
         </div>
       ) : routeConfigsError ? (
         <InlineMessage variant="error">
@@ -305,7 +305,7 @@ export function RouteConfigContent({ projectId }: RouteConfigContentProps) {
                 No routes configured yet. Add your first route to get started.
               </p>
               <Button type="button" variant="outline" onClick={addRoute}>
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="size-4 mr-2" />
                 Add Route
               </Button>
             </div>
@@ -318,7 +318,7 @@ export function RouteConfigContent({ projectId }: RouteConfigContentProps) {
                 >
                   {/* Route Header */}
                   <div className="flex items-center gap-2">
-                    <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
+                    <GripVertical className="size-4 text-muted-foreground cursor-grab" />
                     <Label className="text-sm font-medium">
                       Route {index + 1}
                     </Label>
@@ -330,7 +330,7 @@ export function RouteConfigContent({ projectId }: RouteConfigContentProps) {
                         onClick={() => removeRoute(index)}
                         className="ml-auto text-destructive hover:text-destructive"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="size-4" />
                       </Button>
                     )}
                   </div>
@@ -436,7 +436,7 @@ export function RouteConfigContent({ projectId }: RouteConfigContentProps) {
                 disabled={isSaving}
                 className="w-full"
               >
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="size-4 mr-2" />
                 Add Another Route
               </Button>
 
@@ -446,9 +446,7 @@ export function RouteConfigContent({ projectId }: RouteConfigContentProps) {
                   onClick={handleSave}
                   disabled={!isValid || isSaving || isLoadingRouteConfigs}
                 >
-                  {isSaving && (
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  )}
+                  {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
                   Save Routes
                 </Button>
               </div>

@@ -102,11 +102,11 @@ export function ProjectFileTree({
               className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/20 hover:bg-muted/30 transition-colors"
             >
               {expandedFolders.has(folder) ? (
-                <ChevronDown className="w-3 h-3" />
+                <ChevronDown className="size-3" />
               ) : (
-                <ChevronRight className="w-3 h-3" />
+                <ChevronRight className="size-3" />
               )}
-              <Folder className="w-3 h-3 shrink-0" />
+              <Folder className="size-3 shrink-0" />
               <span className="truncate">{folder}</span>
             </button>
           )}
@@ -140,9 +140,9 @@ export function ProjectFileTree({
                         tabIndex={-1}
                       >
                         {expandedFiles.has(file.id) ? (
-                          <ChevronDown className="w-3 h-3" />
+                          <ChevronDown className="size-3" />
                         ) : (
-                          <ChevronRight className="w-3 h-3" />
+                          <ChevronRight className="size-3" />
                         )}
                       </button>
                     ) : (
@@ -189,7 +189,7 @@ export function ProjectFileTree({
                               }`}
                             >
                               <span
-                                className="w-1.5 h-1.5 rounded-full shrink-0 ring-[1.5px] ring-background"
+                                className="size-1.5 rounded-full shrink-0 ring-[1.5px] ring-background"
                                 style={{
                                   backgroundColor: statusColor,
                                 }}

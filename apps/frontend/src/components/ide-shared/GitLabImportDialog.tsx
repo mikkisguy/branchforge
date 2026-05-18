@@ -302,7 +302,7 @@ export function GitLabImportDialog({
       <DialogContent className="w-[700px] max-w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <GitFork className="w-5 h-5" />
+            <GitFork className="size-5" />
             Import from GitLab
           </DialogTitle>
         </DialogHeader>
@@ -312,7 +312,7 @@ export function GitLabImportDialog({
           {importState.status === "idle" && !hasIntegration && (
             <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-4">
               <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="size-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <h4 className="font-medium text-amber-600 dark:text-amber-400 mb-1">
                     GitLab Integration Not Configured
@@ -345,7 +345,7 @@ export function GitLabImportDialog({
           {/* Loading integration status */}
           {checkingIntegration && (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin" />
+              <Loader2 className="size-6 animate-spin" />
               <span className="ml-2 text-sm text-muted-foreground">
                 Checking GitLab integration...
               </span>
@@ -396,7 +396,7 @@ export function GitLabImportDialog({
 
               {isLoadingRepos ? (
                 <div className="flex items-center justify-center py-4">
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <Loader2 className="size-5 animate-spin" />
                   <span className="ml-2 text-sm text-muted-foreground">
                     Loading repositories...
                   </span>
@@ -464,7 +464,7 @@ export function GitLabImportDialog({
 
               {/* Info */}
               <div className="flex items-start gap-2 text-xs text-muted-foreground">
-                <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <Info className="size-4 mt-0.5 flex-shrink-0" />
                 <p>
                   This will create a new project and import all .rpy files from
                   the selected GitLab repository. Existing local changes will
@@ -477,7 +477,7 @@ export function GitLabImportDialog({
           {/* Importing state */}
           {importState.status === "importing" && (
             <div className="flex flex-col items-center justify-center py-8">
-              <Loader2 className="w-8 h-8 animate-spin mb-4" />
+              <Loader2 className="size-8 animate-spin mb-4" />
               <p className="text-sm text-muted-foreground">
                 {importState.message}
               </p>
@@ -487,7 +487,7 @@ export function GitLabImportDialog({
           {/* Success state */}
           {importState.status === "success" && (
             <div className="flex flex-col items-center justify-center py-8">
-              <CheckCircle2 className="w-12 h-12 text-green-500 mb-4" />
+              <CheckCircle2 className="size-12 text-green-500 mb-4" />
               <p className="text-sm text-foreground">{importState.message}</p>
             </div>
           )}
@@ -496,7 +496,7 @@ export function GitLabImportDialog({
           {importState.status === "error" && (
             <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4">
               <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                <AlertCircle className="size-5 text-destructive flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <h4 className="font-medium text-destructive mb-1">
                     Import Failed

@@ -225,7 +225,7 @@ export function WritingGoalSettings() {
             className="w-full"
             disabled={isDisabled}
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="size-4" />
             <span>Clear recent word count history</span>
           </Button>
         )}

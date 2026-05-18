@@ -275,7 +275,7 @@ export function ConflictReviewDialog({
             className="text-muted-foreground hover:text-foreground transition-colors"
             disabled={isLoading}
           >
-            <X className="w-5 h-5" />
+            <X className="size-5" />
           </button>
         </div>
 
@@ -308,7 +308,7 @@ export function ConflictReviewDialog({
           ) : conflicts.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
-                <CheckCircle2 className="w-12 h-12 mx-auto text-green-500 mb-4" />
+                <CheckCircle2 className="size-12 mx-auto text-green-500 mb-4" />
                 <h3 className="text-lg font-medium">No Conflicts Detected</h3>
                 <p className="text-sm text-muted-foreground mt-1">
                   Your BranchForge and GitLab versions are in sync.
@@ -333,7 +333,7 @@ export function ConflictReviewDialog({
                     disabled={currentIndex === 0 || isLoading}
                     className="p-1 hover:bg-muted rounded transition-colors disabled:opacity-50"
                   >
-                    <ChevronLeft className="w-5 h-5" />
+                    <ChevronLeft className="size-5" />
                   </button>
                   <span>
                     {currentIndex + 1} / {totalCount}
@@ -343,7 +343,7 @@ export function ConflictReviewDialog({
                     disabled={currentIndex === totalCount - 1 || isLoading}
                     className="p-1 hover:bg-muted rounded transition-colors disabled:opacity-50"
                   >
-                    <ChevronRight className="w-5 h-5" />
+                    <ChevronRight className="size-5" />
                   </button>
                 </div>
               </div>
@@ -351,7 +351,7 @@ export function ConflictReviewDialog({
               {/* Resolution Status */}
               {currentResolution && (
                 <div className="p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200 rounded-md text-sm flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4" />
+                  <CheckCircle2 className="size-4" />
                   <span>
                     Will use:{" "}
                     {currentResolution === "local"
@@ -428,7 +428,7 @@ export function ConflictReviewDialog({
             </div>
           ) : (
             <div className="text-center py-12">
-              <CheckCircle2 className="w-12 h-12 mx-auto text-green-500 mb-4" />
+              <CheckCircle2 className="size-12 mx-auto text-green-500 mb-4" />
               <h3 className="text-lg font-medium">All Conflicts Resolved</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 You can now apply your resolutions to complete the sync.

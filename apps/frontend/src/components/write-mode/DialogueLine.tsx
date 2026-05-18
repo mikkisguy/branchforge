@@ -462,7 +462,7 @@ export const DialogueLine = memo(function DialogueLine({
             {character?.displayName || "Narration"}
           </span>
           <ChevronDown
-            className={`w-3 h-3 transition-transform duration-200 flex-shrink-0 ${
+            className={`size-3 transition-transform duration-200 flex-shrink-0 ${
               isDropdownOpen ? "rotate-180" : ""
             }`}
             style={{ opacity: isSpeakerInteractive ? 0.5 : 0 }}
@@ -526,7 +526,7 @@ export const DialogueLine = memo(function DialogueLine({
                 }}
               >
                 <span
-                  className="w-2 h-2 rounded-full shrink-0"
+                  className="size-2 rounded-full shrink-0"
                   style={{ backgroundColor: char.color }}
                 />
                 <span>{char.displayName}</span>
@@ -564,7 +564,7 @@ export const DialogueLine = memo(function DialogueLine({
           className="z-10 absolute right-0 top-0.5 p-1 rounded text-muted-foreground/70 hover:text-destructive bg-background/90 hover:bg-destructive/10 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           title="Delete line (Backspace)"
         >
-          <X className="w-3.5 h-3.5" />
+          <X className="size-3.5" />
         </button>
       )}
 

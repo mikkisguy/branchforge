@@ -129,7 +129,7 @@ export function ProjectEditDialog({
             onClick={() => onOpenChange(false)}
             aria-label="Close"
           >
-            <X className="w-5 h-5" />
+            <X className="size-5" />
           </Button>
         </DialogHeader>
 

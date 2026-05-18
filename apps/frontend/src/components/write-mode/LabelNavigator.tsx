@@ -54,7 +54,7 @@ function LabelItem({ label, isActive, onSelect }: LabelItemProps) {
     >
       {/* Status dot on the left */}
       <div
-        className="w-2 h-2 rounded-full flex-shrink-0 ring-2 ring-background"
+        className="size-2 rounded-full flex-shrink-0 ring-2 ring-background"
         style={{
           backgroundColor: statusColor,
         }}
@@ -126,7 +126,7 @@ function InlineCreateInput({
   };
 
   return (
-    <div className="px-2 py-2">
+    <div className="p-2">
       <label htmlFor={LABEL_INPUT_ID} className="sr-only">
         Label title
       </label>
@@ -146,7 +146,7 @@ function InlineCreateInput({
           disabled={isCreating}
         />
         {isCreating ? (
-          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+          <Loader2 className="size-4 animate-spin text-muted-foreground" />
         ) : (
           <button
             type="button"
@@ -154,7 +154,7 @@ function InlineCreateInput({
             className="p-2 hover:bg-accent rounded"
             aria-label="Cancel"
           >
-            <X className="w-4 h-4" />
+            <X className="size-4" />
           </button>
         )}
       </div>
@@ -203,7 +203,7 @@ function FileGroup({
     <div className="mb-4">
       {/* File Header */}
       <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-muted/20">
-        <File className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+        <File className="size-3.5 text-muted-foreground shrink-0" />
         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
           {fileName}
         </span>
@@ -238,7 +238,7 @@ function FileGroup({
           className="flex items-center gap-2 mt-2 px-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
           disabled={isCreatingLabel}
         >
-          <Plus className="w-3.5 h-3.5" />
+          <Plus className="size-3.5" />
           Add label
         </button>
       )}
@@ -311,12 +311,12 @@ export function LabelNavigator({
             aria-label="Collapse label navigator sidebar"
             title="Collapse label navigator sidebar"
           >
-            <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+            <ChevronLeft className="size-4 text-muted-foreground" />
           </button>
         )}
         <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded bg-[var(--theme-color)] flex items-center justify-center shadow-sm shrink-0">
-            <Sparkles className="w-4 h-4 text-white" />
+          <div className="size-7 rounded bg-[var(--theme-color)] flex items-center justify-center shadow-sm shrink-0">
+            <Sparkles className="size-4 text-white" />
           </div>
           <div className="min-w-0">
             <span className="text-sm font-medium block truncate">
@@ -334,7 +334,7 @@ export function LabelNavigator({
       <div className="p-3 space-y-2">
         {groupedLabels.size === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <FolderOpen className="w-10 h-10 text-muted-foreground mb-3" />
+            <FolderOpen className="size-10 text-muted-foreground mb-3" />
             <p className="text-sm text-muted-foreground">No labels found</p>
             <p className="text-xs text-muted-foreground mt-1">
               Import a .rpy file or create labels to get started.

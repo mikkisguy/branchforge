@@ -295,7 +295,7 @@ export function StateVariablesContent({
 
       {isLoadingStateVariables ? (
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
         </div>
       ) : stateVariablesError ? (
         <InlineMessage variant="error">
@@ -314,7 +314,7 @@ export function StateVariablesContent({
                 variant="outline"
                 onClick={addStateVariable}
               >
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="size-4 mr-2" />
                 Add State Variable
               </Button>
             </div>
@@ -366,7 +366,7 @@ export function StateVariablesContent({
                                     onClick={() => setEditingIndex(index)}
                                     disabled={isSaving}
                                   >
-                                    <Pencil className="w-4 h-4" />
+                                    <Pencil className="size-4" />
                                   </Button>
                                   <Button
                                     type="button"
@@ -376,7 +376,7 @@ export function StateVariablesContent({
                                     disabled={isSaving}
                                     className="text-destructive hover:text-destructive"
                                   >
-                                    <Trash2 className="w-4 h-4" />
+                                    <Trash2 className="size-4" />
                                   </Button>
                                 </div>
                               </div>
@@ -486,7 +486,7 @@ export function StateVariablesContent({
                                     }
                                   >
                                     {isSaving && (
-                                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                      <Loader2 className="size-4 animate-spin mr-2" />
                                     )}
                                     Save
                                   </Button>
@@ -509,7 +509,7 @@ export function StateVariablesContent({
                 disabled={isSaving}
                 className="w-full"
               >
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="size-4 mr-2" />
                 Add Another State Variable
               </Button>
             </div>
