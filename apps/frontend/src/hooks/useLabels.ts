@@ -7,7 +7,11 @@
 
 import { useCallback, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { labelKeys, projectFilesKeys } from "@/lib/query-keys";
+import {
+  labelKeys,
+  projectFilesKeys,
+  writingGoalsKeys,
+} from "@/lib/query-keys";
 import {
   labelsApi,
   type UpdateDialogueResponse,
@@ -164,10 +168,10 @@ export function useLabels(): UseLabelsReturn {
           queryClient.refetchQueries({
             queryKey: projectFilesKeys.lists(currentProject.id),
           }),
-          queryClient.invalidateQueries({ queryKey: ["writingGoals"] }),
+          queryClient.invalidateQueries({ queryKey: writingGoalsKeys.all }),
         ]);
       } else {
-        await queryClient.invalidateQueries({ queryKey: ["writingGoals"] });
+        await queryClient.invalidateQueries({ queryKey: writingGoalsKeys.all });
       }
     },
   });
