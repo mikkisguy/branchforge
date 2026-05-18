@@ -286,7 +286,7 @@ export function ConflictReviewDialog({
               <div className="text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
                 <p className="text-sm text-muted-foreground">
-                  Detecting conflicts...
+                  Detecting conflicts…
                 </p>
               </div>
             </div>
@@ -453,7 +453,7 @@ export function ConflictReviewDialog({
               </span>
             )}
             <Button onClick={handleApply} disabled={isLoading || hasUnresolved}>
-              {isLoading ? <>Applying...</> : <>Apply Resolutions</>}
+              {isLoading ? <>Applying…</> : <>Apply Resolutions</>}
             </Button>
           </div>
         </div>

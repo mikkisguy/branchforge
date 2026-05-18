@@ -1,4 +1,5 @@
-import { lazy, Suspense, forwardRef } from "react";
+import { lazy, Suspense } from "react";
+import type React from "react";
 import type { ScriptEditorRef } from "./ScriptEditor";
 
 /**
@@ -28,16 +29,15 @@ interface ScriptEditorProps {
   saveStatus?: import("@/hooks/useAutosave").SaveStatus;
   saveConflict?: boolean;
   onSaveRequest?: () => void;
+  ref?: React.Ref<ScriptEditorRef>;
 }
 
-export const ScriptEditor = forwardRef<ScriptEditorRef, ScriptEditorProps>(
-  function LazyScriptEditorWrapper(props, ref) {
-    return (
-      <Suspense fallback={<ScriptEditorFallback />}>
-        <LazyScriptEditor {...props} ref={ref} />
-      </Suspense>
-    );
-  }
-);
+export function ScriptEditor(props: ScriptEditorProps) {
+  return (
+    <Suspense fallback={<ScriptEditorFallback />}>
+      <LazyScriptEditor {...props} />
+    </Suspense>
+  );
+}
 
 export type { ScriptEditorRef };

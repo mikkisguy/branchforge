@@ -5,9 +5,9 @@ import {
   useCallback,
   useEffect,
   useRef,
-  forwardRef,
   useImperativeHandle,
 } from "react";
+import type React from "react";
 import { EditorView, Decoration, DecorationSet } from "@codemirror/view";
 import { StateField, StateEffect } from "@codemirror/state";
 import { highlightSelectionMatches, search } from "@codemirror/search";
@@ -82,329 +82,325 @@ const createHighlightExtension = () => {
   return { highlightStateField, setHighlightEffect };
 };
 
-export const ScriptEditor = forwardRef<ScriptEditorRef, ScriptEditorProps>(
-  function ScriptEditor(
-    {
-      content,
-      onChange,
-      scrollToLine,
-      readOnly = false,
-      isFocusMode = false,
-      saveStatus,
-      saveConflict,
-      onSaveRequest,
-    }: ScriptEditorProps,
-    ref
-  ) {
-    const [lineWrap, setLineWrap] = useLocalStorageBoolean(
-      "script:line-wrap",
-      false
-    );
-    const lineWrapExtension = useMemo(
-      () => (lineWrap ? EditorView.lineWrapping : []),
-      [lineWrap]
-    );
-    const [isHovered, setIsHovered] = useState(false);
-    const cleanContent = useMemo(() => stripBOM(content), [content]);
+export const ScriptEditor = function ScriptEditor({
+  content,
+  onChange,
+  scrollToLine,
+  readOnly = false,
+  isFocusMode = false,
+  saveStatus,
+  saveConflict,
+  onSaveRequest,
+  ref,
+}: ScriptEditorProps & { ref?: React.Ref<ScriptEditorRef> }) {
+  const [lineWrap, setLineWrap] = useLocalStorageBoolean(
+    "script:line-wrap",
+    false
+  );
+  const lineWrapExtension = useMemo(
+    () => (lineWrap ? EditorView.lineWrapping : []),
+    [lineWrap]
+  );
+  const [isHovered, setIsHovered] = useState(false);
+  const cleanContent = useMemo(() => stripBOM(content), [content]);
 
-    // Track if we've scrolled to avoid re-scrolling on every render
-    const hasScrolled = useRef(false);
-    // Keep a reference to the EditorView for dynamic scroll operations
-    const editorViewRef = useRef<EditorView | null>(null);
+  // Track if we've scrolled to avoid re-scrolling on every render
+  const hasScrolled = useRef(false);
+  // Keep a reference to the EditorView for dynamic scroll operations
+  const editorViewRef = useRef<EditorView | null>(null);
 
-    // Expose focus method to parent via ref
-    useImperativeHandle(
-      ref,
-      () => ({
-        focus: () => {
-          editorViewRef.current?.focus();
-        },
-      }),
-      []
-    );
-    // Track the timeout for removing the highlight
-    const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-      null
-    );
-    // Track queued animation frames used to start highlight after scrolling/layout
-    const highlightRafRef = useRef<number | null>(null);
-    const highlightRafNestedRef = useRef<number | null>(null);
-    // Prevent back-to-back re-triggers from restarting the animation mid-flight.
-    const lastHighlightedLineRef = useRef<number | null>(null);
-    const lastHighlightAtRef = useRef(0);
-
-    // Create the highlight extension (only once)
-    const { highlightStateField, setHighlightEffect } = useMemo(
-      () => createHighlightExtension(),
-      []
-    );
-
-    // Helper to highlight a specific line using the StateEffect
-    const highlightLineElement = useCallback(
-      (view: EditorView, line: number) => {
-        const now = performance.now();
-        if (
-          lastHighlightedLineRef.current === line &&
-          now - lastHighlightAtRef.current <
-            TARGET_LINE_HIGHLIGHT_DEDUPE_WINDOW_MS
-        ) {
-          return;
-        }
-        lastHighlightedLineRef.current = line;
-        lastHighlightAtRef.current = now;
-
-        // Clear any existing timeout
-        if (highlightTimeoutRef.current) {
-          clearTimeout(highlightTimeoutRef.current);
-        }
-
-        // Apply the highlight effect
-        view.dispatch({
-          effects: [setHighlightEffect.of(line)],
-        });
-
-        // Remove the highlight after the pulse fully fades out
-        highlightTimeoutRef.current = setTimeout(() => {
-          view.dispatch({
-            effects: [setHighlightEffect.of(null)],
-          });
-        }, TARGET_LINE_HIGHLIGHT_MS + TARGET_LINE_HIGHLIGHT_CLEANUP_BUFFER_MS);
+  // Expose focus method to parent via ref
+  useImperativeHandle(
+    ref,
+    () => ({
+      focus: () => {
+        editorViewRef.current?.focus();
       },
-      [setHighlightEffect]
-    );
+    }),
+    []
+  );
+  // Track the timeout for removing the highlight
+  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  // Track queued animation frames used to start highlight after scrolling/layout
+  const highlightRafRef = useRef<number | null>(null);
+  const highlightRafNestedRef = useRef<number | null>(null);
+  // Prevent back-to-back re-triggers from restarting the animation mid-flight.
+  const lastHighlightedLineRef = useRef<number | null>(null);
+  const lastHighlightAtRef = useRef(0);
 
-    // Schedule highlight on the next paint frames so scroll settles first.
-    const scheduleLineHighlight = useCallback(
-      (view: EditorView, line: number) => {
-        if (highlightRafRef.current !== null) {
-          cancelAnimationFrame(highlightRafRef.current);
-          highlightRafRef.current = null;
-        }
-        if (highlightRafNestedRef.current !== null) {
-          cancelAnimationFrame(highlightRafNestedRef.current);
-          highlightRafNestedRef.current = null;
-        }
+  // Create the highlight extension (only once)
+  const { highlightStateField, setHighlightEffect } = useMemo(
+    () => createHighlightExtension(),
+    []
+  );
 
-        highlightRafRef.current = requestAnimationFrame(() => {
-          highlightRafNestedRef.current = requestAnimationFrame(() => {
-            highlightLineElement(view, line);
-            highlightRafRef.current = null;
-            highlightRafNestedRef.current = null;
-          });
-        });
-      },
-      [highlightLineElement]
-    );
-
-    // Helper to scroll to a specific line with validation
-    const scrollToLineIfValid = useCallback(
-      (view: EditorView, line: number | null | undefined) => {
-        if (!line) return;
-
-        const docLines = view.state.doc.lines;
-        if (Number.isFinite(line) && line >= 1 && line <= docLines) {
-          const pos = view.state.doc.line(line).from;
-          view.dispatch({
-            effects: [
-              EditorView.scrollIntoView(pos, { y: "start", yMargin: 50 }),
-            ],
-          });
-        }
-        // Mark as scrolled even if out of bounds to avoid repeated attempts
-        hasScrolled.current = true;
-      },
-      []
-    );
-
-    const applyEditorFontSize = useCallback((view: EditorView) => {
-      const fontSize = getComputedStyle(document.documentElement)
-        .getPropertyValue("--editor-font-size")
-        .trim();
-      if (!fontSize) {
+  // Helper to highlight a specific line using the StateEffect
+  const highlightLineElement = useCallback(
+    (view: EditorView, line: number) => {
+      const now = performance.now();
+      if (
+        lastHighlightedLineRef.current === line &&
+        now - lastHighlightAtRef.current <
+          TARGET_LINE_HIGHLIGHT_DEDUPE_WINDOW_MS
+      ) {
         return;
       }
+      lastHighlightedLineRef.current = line;
+      lastHighlightAtRef.current = now;
 
-      view.dom.style.fontSize = fontSize;
-      view.requestMeasure();
-    }, []);
-
-    // Add a handler for editor creation to store the view and handle initial scroll
-    const handleCreateEditor = useCallback(
-      (view: EditorView) => {
-        editorViewRef.current = view;
-        if (!hasScrolled.current) {
-          scrollToLineIfValid(view, scrollToLine);
-          // Trigger the highlight effect
-          if (scrollToLine) {
-            scheduleLineHighlight(view, scrollToLine);
-          }
-        }
-        // Apply initial font size
-        applyEditorFontSize(view);
-      },
-      [
-        scrollToLine,
-        scrollToLineIfValid,
-        scheduleLineHighlight,
-        applyEditorFontSize,
-      ]
-    );
-
-    // Track previous scrollToLine to detect changes
-    const prevScrollToLineRef = useRef<number | null | undefined>(scrollToLine);
-
-    // Handle dynamic scrollToLine changes after the editor is created
-    useEffect(() => {
-      // Reset hasScrolled when scrollToLine changes
-      if (prevScrollToLineRef.current !== scrollToLine) {
-        hasScrolled.current = false;
-        prevScrollToLineRef.current = scrollToLine;
+      // Clear any existing timeout
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
       }
 
-      const view = editorViewRef.current;
-      if (scrollToLine && !hasScrolled.current && view) {
+      // Apply the highlight effect
+      view.dispatch({
+        effects: [setHighlightEffect.of(line)],
+      });
+
+      // Remove the highlight after the pulse fully fades out
+      highlightTimeoutRef.current = setTimeout(() => {
+        view.dispatch({
+          effects: [setHighlightEffect.of(null)],
+        });
+      }, TARGET_LINE_HIGHLIGHT_MS + TARGET_LINE_HIGHLIGHT_CLEANUP_BUFFER_MS);
+    },
+    [setHighlightEffect]
+  );
+
+  // Schedule highlight on the next paint frames so scroll settles first.
+  const scheduleLineHighlight = useCallback(
+    (view: EditorView, line: number) => {
+      if (highlightRafRef.current !== null) {
+        cancelAnimationFrame(highlightRafRef.current);
+        highlightRafRef.current = null;
+      }
+      if (highlightRafNestedRef.current !== null) {
+        cancelAnimationFrame(highlightRafNestedRef.current);
+        highlightRafNestedRef.current = null;
+      }
+
+      highlightRafRef.current = requestAnimationFrame(() => {
+        highlightRafNestedRef.current = requestAnimationFrame(() => {
+          highlightLineElement(view, line);
+          highlightRafRef.current = null;
+          highlightRafNestedRef.current = null;
+        });
+      });
+    },
+    [highlightLineElement]
+  );
+
+  // Helper to scroll to a specific line with validation
+  const scrollToLineIfValid = useCallback(
+    (view: EditorView, line: number | null | undefined) => {
+      if (!line) return;
+
+      const docLines = view.state.doc.lines;
+      if (Number.isFinite(line) && line >= 1 && line <= docLines) {
+        const pos = view.state.doc.line(line).from;
+        view.dispatch({
+          effects: [
+            EditorView.scrollIntoView(pos, { y: "start", yMargin: 50 }),
+          ],
+        });
+      }
+      // Mark as scrolled even if out of bounds to avoid repeated attempts
+      hasScrolled.current = true;
+    },
+    []
+  );
+
+  const applyEditorFontSize = useCallback((view: EditorView) => {
+    const fontSize = getComputedStyle(document.documentElement)
+      .getPropertyValue("--editor-font-size")
+      .trim();
+    if (!fontSize) {
+      return;
+    }
+
+    view.dom.style.fontSize = fontSize;
+    view.requestMeasure();
+  }, []);
+
+  // Add a handler for editor creation to store the view and handle initial scroll
+  const handleCreateEditor = useCallback(
+    (view: EditorView) => {
+      editorViewRef.current = view;
+      if (!hasScrolled.current) {
         scrollToLineIfValid(view, scrollToLine);
-        scheduleLineHighlight(view, scrollToLine);
+        // Trigger the highlight effect
+        if (scrollToLine) {
+          scheduleLineHighlight(view, scrollToLine);
+        }
       }
-    }, [scrollToLine, scrollToLineIfValid, scheduleLineHighlight]);
+      // Apply initial font size
+      applyEditorFontSize(view);
+    },
+    [
+      scrollToLine,
+      scrollToLineIfValid,
+      scheduleLineHighlight,
+      applyEditorFontSize,
+    ]
+  );
 
-    // Cleanup highlight timeout on unmount
-    useEffect(() => {
-      return () => {
-        if (highlightTimeoutRef.current) {
-          clearTimeout(highlightTimeoutRef.current);
-        }
-        if (highlightRafRef.current !== null) {
-          cancelAnimationFrame(highlightRafRef.current);
-        }
-        if (highlightRafNestedRef.current !== null) {
-          cancelAnimationFrame(highlightRafNestedRef.current);
-        }
-      };
-    }, []);
+  // Track previous scrollToLine to detect changes
+  const prevScrollToLineRef = useRef<number | null | undefined>(scrollToLine);
 
-    // Listen for font size changes and update CodeMirror DOM
-    useEffect(() => {
-      const handleFontSizeChange = (event: Event) => {
-        const fontSize = (event as CustomEvent<{ fontSize: number }>).detail
-          .fontSize;
-        if (
-          editorViewRef.current &&
-          typeof fontSize === "number" &&
-          Number.isFinite(fontSize)
-        ) {
-          editorViewRef.current.dom.style.fontSize = `${fontSize}px`;
-          editorViewRef.current.requestMeasure();
-        }
-      };
+  // Handle dynamic scrollToLine changes after the editor is created
+  useEffect(() => {
+    // Reset hasScrolled when scrollToLine changes
+    if (prevScrollToLineRef.current !== scrollToLine) {
+      hasScrolled.current = false;
+      prevScrollToLineRef.current = scrollToLine;
+    }
 
-      window.addEventListener(EDITOR_FONT_SIZE_CHANGED, handleFontSizeChange);
+    const view = editorViewRef.current;
+    if (scrollToLine && !hasScrolled.current && view) {
+      scrollToLineIfValid(view, scrollToLine);
+      scheduleLineHighlight(view, scrollToLine);
+    }
+  }, [scrollToLine, scrollToLineIfValid, scheduleLineHighlight]);
 
-      return () => {
-        window.removeEventListener(
-          EDITOR_FONT_SIZE_CHANGED,
-          handleFontSizeChange
-        );
-      };
-    }, []);
+  // Cleanup highlight timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
+      }
+      if (highlightRafRef.current !== null) {
+        cancelAnimationFrame(highlightRafRef.current);
+      }
+      if (highlightRafNestedRef.current !== null) {
+        cancelAnimationFrame(highlightRafNestedRef.current);
+      }
+    };
+  }, []);
 
-    const { cursorPosition, selectionInfo, totalLines, updateListener } =
-      useEditorCursor({ initialContent: cleanContent });
+  // Listen for font size changes and update CodeMirror DOM
+  useEffect(() => {
+    const handleFontSizeChange = (event: Event) => {
+      const fontSize = (event as CustomEvent<{ fontSize: number }>).detail
+        .fontSize;
+      if (
+        editorViewRef.current &&
+        typeof fontSize === "number" &&
+        Number.isFinite(fontSize)
+      ) {
+        editorViewRef.current.dom.style.fontSize = `${fontSize}px`;
+        editorViewRef.current.requestMeasure();
+      }
+    };
 
-    const toggleLineWrap = useCallback(
-      () => setLineWrap((prev) => !prev),
-      [setLineWrap]
-    );
+    window.addEventListener(EDITOR_FONT_SIZE_CHANGED, handleFontSizeChange);
 
-    const extensions = useMemo(
-      () =>
-        [
-          renPy,
-          renPyBaseTheme,
-          renPySyntaxHighlighting,
-          lineWrapExtension,
-          updateListener,
-          highlightStateField,
-          // Explicitly add search extension with default configuration
-          search({}),
-          // Highlight matches of the current selection
-          highlightSelectionMatches(),
-        ].flat(),
-      [lineWrapExtension, updateListener, highlightStateField]
-    );
+    return () => {
+      window.removeEventListener(
+        EDITOR_FONT_SIZE_CHANGED,
+        handleFontSizeChange
+      );
+    };
+  }, []);
 
-    return (
-      <div className="h-full w-full overflow-hidden min-h-0 min-w-0 flex flex-col">
-        <div className="flex-1 min-h-0">
-          <CodeMirror
-            value={cleanContent}
-            height="100%"
-            className="h-full w-full min-w-0"
-            editable={!readOnly}
-            extensions={extensions}
-            onChange={onChange}
-            onCreateEditor={handleCreateEditor}
-            basicSetup={{
-              lineNumbers: true,
-              highlightActiveLine: true,
-              drawSelection: true,
-              tabSize: 4,
-              bracketMatching: true,
-              closeBrackets: true,
-              autocompletion: false,
-              // searchKeymap is removed since we add search extension explicitly
-            }}
-          />
-        </div>
-        <div
-          className="flex items-center justify-between px-2 py-1 border-t border-border bg-muted/20 font-code text-xs text-muted-foreground transition-opacity duration-300 ease-out"
-          style={{
-            opacity: isFocusMode ? (isHovered ? 1 : 0.4) : 1,
+  const { cursorPosition, selectionInfo, totalLines, updateListener } =
+    useEditorCursor({ initialContent: cleanContent });
+
+  const toggleLineWrap = useCallback(
+    () => setLineWrap((prev) => !prev),
+    [setLineWrap]
+  );
+
+  const extensions = useMemo(
+    () =>
+      [
+        renPy,
+        renPyBaseTheme,
+        renPySyntaxHighlighting,
+        lineWrapExtension,
+        updateListener,
+        highlightStateField,
+        // Explicitly add search extension with default configuration
+        search({}),
+        // Highlight matches of the current selection
+        highlightSelectionMatches(),
+      ].flat(),
+    [lineWrapExtension, updateListener, highlightStateField]
+  );
+
+  return (
+    <div className="h-full w-full overflow-hidden min-h-0 min-w-0 flex flex-col">
+      <div className="flex-1 min-h-0">
+        <CodeMirror
+          value={cleanContent}
+          height="100%"
+          className="h-full w-full min-w-0"
+          editable={!readOnly}
+          extensions={extensions}
+          onChange={onChange}
+          onCreateEditor={handleCreateEditor}
+          basicSetup={{
+            lineNumbers: true,
+            highlightActiveLine: true,
+            drawSelection: true,
+            tabSize: 4,
+            bracketMatching: true,
+            closeBrackets: true,
+            autocompletion: false,
+            // searchKeymap is removed since we add search extension explicitly
           }}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-          onFocusCapture={() => setIsHovered(true)}
-          onBlurCapture={() => setIsHovered(false)}
-        >
-          <div className="flex items-center gap-2">
-            <FontSizeSwitcher mode="script" direction="up" />
-            <LineWrapSwitcher lineWrap={lineWrap} onToggle={toggleLineWrap} />
-            <PaletteSwitcher />
-          </div>
-          <div className="flex items-center gap-3">
-            {saveStatus && (
-              <>
-                <SaveIndicator
-                  saveStatus={saveStatus}
-                  displayMode="compact"
-                  saveConflict={saveConflict}
-                  onRetry={onSaveRequest}
-                />
-                <span className="w-px h-3 bg-border" aria-hidden="true" />
-              </>
-            )}
-            <span>Ren'Py</span>
-            <span className="w-px h-3 bg-border" aria-hidden="true" />
-            <span>UTF-8</span>
-            <span className="w-px h-3 bg-border" aria-hidden="true" />
-            <span>4 spaces</span>
-            <span className="w-px h-3 bg-border" aria-hidden="true" />
-            <span>
-              Ln {cursorPosition.line}, Col {cursorPosition.col}
-            </span>
-            <span className="w-px h-3 bg-border" aria-hidden="true" />
-            <span>
-              {totalLines} {totalLines === 1 ? "line" : "lines"}
-            </span>
-            {selectionInfo && (
-              <>
-                <span className="w-px h-3 bg-border" aria-hidden="true" />
-                <span className="text-foreground">{selectionInfo}</span>
-              </>
-            )}
-          </div>
+        />
+      </div>
+      <div
+        className="flex items-center justify-between px-2 py-1 border-t border-border bg-muted/20 font-code text-xs text-muted-foreground transition-opacity duration-300 ease-out"
+        style={{
+          opacity: isFocusMode ? (isHovered ? 1 : 0.4) : 1,
+        }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onFocusCapture={() => setIsHovered(true)}
+        onBlurCapture={() => setIsHovered(false)}
+      >
+        <div className="flex items-center gap-2">
+          <FontSizeSwitcher mode="script" direction="up" />
+          <LineWrapSwitcher lineWrap={lineWrap} onToggle={toggleLineWrap} />
+          <PaletteSwitcher />
+        </div>
+        <div className="flex items-center gap-3">
+          {saveStatus && (
+            <>
+              <SaveIndicator
+                saveStatus={saveStatus}
+                displayMode="compact"
+                saveConflict={saveConflict}
+                onRetry={onSaveRequest}
+              />
+              <span className="w-px h-3 bg-border" aria-hidden="true" />
+            </>
+          )}
+          <span>Ren'Py</span>
+          <span className="w-px h-3 bg-border" aria-hidden="true" />
+          <span>UTF-8</span>
+          <span className="w-px h-3 bg-border" aria-hidden="true" />
+          <span>4 spaces</span>
+          <span className="w-px h-3 bg-border" aria-hidden="true" />
+          <span>
+            Ln {cursorPosition.line}, Col {cursorPosition.col}
+          </span>
+          <span className="w-px h-3 bg-border" aria-hidden="true" />
+          <span>
+            {totalLines} {totalLines === 1 ? "line" : "lines"}
+          </span>
+          {selectionInfo && (
+            <>
+              <span className="w-px h-3 bg-border" aria-hidden="true" />
+              <span className="text-foreground">{selectionInfo}</span>
+            </>
+          )}
         </div>
       </div>
-    );
-  }
-);
+    </div>
+  );
+};

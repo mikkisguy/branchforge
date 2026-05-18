@@ -134,7 +134,7 @@ describe("RegisterPage", () => {
 
       render(<RegisterPage />, { wrapper });
 
-      expect(screen.getByText("Loading...")).toBeInTheDocument();
+      expect(screen.getByText("Loading…")).toBeInTheDocument();
     });
 
     it("should not show form while loading", () => {
@@ -249,7 +249,7 @@ describe("RegisterPage", () => {
 
       // Should show loading state
       await waitFor(() => {
-        expect(submitButton).toHaveTextContent("Creating account...");
+        expect(submitButton).toHaveTextContent("Creating account…");
       });
 
       // Button and inputs should be disabled

@@ -5,7 +5,7 @@
  * Features customizable title, description, button labels, and loading state.
  */
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
@@ -84,6 +84,8 @@ export function ConfirmDialog({
     }
   }, [isLoading, onConfirm, onError]);
 
+  const handleClose = useEffectEvent(() => onOpenChange(false));
+
   // Focus trap and restore
   useEffect(() => {
     if (!open || !dialogRef.current) return;
@@ -114,7 +116,7 @@ export function ConfirmDialog({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         if (isLoadingRef.current) return;
-        onOpenChange(false);
+        handleClose();
         return;
       }
 
@@ -147,7 +149,7 @@ export function ConfirmDialog({
         previouslyFocusedElementRef.current.focus();
       }
     };
-  }, [open, onOpenChange]);
+  }, [open]);
 
   if (!open) return null;
 

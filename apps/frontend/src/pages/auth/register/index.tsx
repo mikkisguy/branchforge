@@ -41,7 +41,7 @@ export function RegisterPage() {
               <CardTitle>Create Account</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">Loading...</p>
+              <p className="text-sm text-muted-foreground">Loading…</p>
             </CardContent>
           </Card>
         </div>
@@ -165,7 +165,7 @@ export function RegisterPage() {
             </CardContent>
             <CardFooter className="flex flex-col gap-2">
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Creating account..." : "Create Account"}
+                {isLoading ? "Creating account…" : "Create Account"}
               </Button>
               <p className="text-sm text-muted-foreground">
                 Already have an account?{" "}
