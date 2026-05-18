@@ -96,15 +96,8 @@ export function PaletteSwitcher({
         <>
           <div
             className="fixed inset-0"
-            role="button"
-            tabIndex={-1}
+            aria-hidden="true"
             onClick={() => setIsOpen(false)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                setIsOpen(false);
-              }
-            }}
           />
           <div
             className={`absolute ${dropdownPositionClasses} bg-card border border-border rounded-md shadow-lg overflow-hidden min-w-[200px]`}

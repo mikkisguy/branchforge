@@ -282,22 +282,12 @@ export function FontFamilySwitcher({
         <>
           <div
             className="fixed inset-0 z-40"
-            role="button"
-            tabIndex={-1}
+            aria-hidden="true"
             onClick={() => {
               updateDropdownState({
                 isOpen: false,
                 closeReason: "mouse",
               });
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                updateDropdownState({
-                  isOpen: false,
-                  closeReason: "mouse",
-                });
-              }
             }}
           />
           <div

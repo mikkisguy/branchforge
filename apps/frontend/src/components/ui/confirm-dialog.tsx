@@ -158,15 +158,8 @@ export function ConfirmDialog({
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/50"
-        role="button"
-        tabIndex={-1}
+        aria-hidden="true"
         onClick={handleBackdropClick}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            handleBackdropClick();
-          }
-        }}
       />
       {/* Content */}
       <div

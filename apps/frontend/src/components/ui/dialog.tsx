@@ -97,19 +97,8 @@ export function Dialog({
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/30 backdrop-blur-sm"
-        role={closeOnBackdropClick ? "button" : undefined}
-        tabIndex={closeOnBackdropClick ? -1 : undefined}
+        aria-hidden="true"
         onClick={closeOnBackdropClick ? () => onOpenChange?.(false) : undefined}
-        onKeyDown={
-          closeOnBackdropClick
-            ? (e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onOpenChange?.(false);
-                }
-              }
-            : undefined
-        }
       />
       {/* Content */}
       <div ref={dialogRef} role="dialog" aria-modal="true">
