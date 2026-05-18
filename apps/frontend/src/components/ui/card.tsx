@@ -34,7 +34,7 @@ function CardHeader({ className, ref, ...props }: CardHeaderProps) {
 }
 
 interface CardTitleProps extends React.HTMLAttributes<HTMLHeadingElement> {
-  ref?: React.Ref<HTMLParagraphElement>;
+  ref?: React.Ref<HTMLHeadingElement>;
 }
 
 function CardTitle({ className, ref, ...props }: CardTitleProps) {
