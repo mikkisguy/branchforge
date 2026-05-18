@@ -12,12 +12,18 @@ import {
   useRef,
   useMemo,
   useImperativeHandle,
+  lazy,
+  Suspense,
 } from "react";
 import type React from "react";
 import { DialogueLine } from "./DialogueLine";
 import { areDialogueEntriesEqual } from "@/lib/prose-converter";
 import { WritingGoalPill } from "./WritingGoalPill";
-import { WritingStatsDialog } from "./WritingStatsDialog";
+const WritingStatsDialog = lazy(() =>
+  import("./WritingStatsDialog").then((m) => ({
+    default: m.WritingStatsDialog,
+  }))
+);
 import { SaveIndicator } from "./SaveIndicator";
 import { FontSizeSwitcher } from "../FontSizeSwitcher";
 import { FontFamilySwitcher } from "./FontFamilySwitcher";
@@ -769,12 +775,14 @@ export const ProseEditor = function ProseEditor({
       </div>
 
       {/* Writing Stats Dialog */}
-      <WritingStatsDialog
-        open={statsDialogOpen}
-        onOpenChange={setStatsDialogOpen}
-        dailyGoal={writingGoalSettings?.dailyWritingGoal ?? 500}
-        dailyWordCounts={writingGoalSettings?.dailyWordCounts ?? []}
-      />
+      <Suspense fallback={null}>
+        <WritingStatsDialog
+          open={statsDialogOpen}
+          onOpenChange={setStatsDialogOpen}
+          dailyGoal={writingGoalSettings?.dailyWritingGoal ?? 500}
+          dailyWordCounts={writingGoalSettings?.dailyWordCounts ?? []}
+        />
+      </Suspense>
     </div>
   );
 };
