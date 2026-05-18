@@ -146,26 +146,24 @@ export function useFileTabs({
     [activeFileId, onNoTabsRemaining, openTabs, selectFileTab]
   );
 
-  const tabItems = useMemo<EditorTabBarItem[]>(
-    () =>
-      openTabs
-        .map((tabId) =>
-          projectFiles.find((projectFile) => projectFile.id === tabId)
-        )
-        .filter((file): file is NonNullable<typeof file> => file !== undefined)
-        .map((file) => {
-          const fileName = file.filePath.split("/").pop() || file.filePath;
-          const fileKind = file.fileType === "SETTINGS" ? "Settings" : "Story";
+  const tabItems = useMemo<EditorTabBarItem[]>(() => {
+    const items: EditorTabBarItem[] = [];
+    for (const tabId of openTabs) {
+      const file = projectFiles.find((projectFile) => projectFile.id === tabId);
+      if (file !== undefined) {
+        const fileName = file.filePath.split("/").pop() || file.filePath;
+        const fileKind = file.fileType === "SETTINGS" ? "Settings" : "Story";
 
-          return {
-            id: file.id,
-            title: fileName,
-            meta: fileKind,
-            closeLabel: `Close ${fileName}`,
-          };
-        }),
-    [openTabs, projectFiles]
-  );
+        items.push({
+          id: file.id,
+          title: fileName,
+          meta: fileKind,
+          closeLabel: `Close ${fileName}`,
+        });
+      }
+    }
+    return items;
+  }, [openTabs, projectFiles]);
 
   useEffect(() => {
     if (tabsStorageKey && hydratedTabsProjectId === projectId) {

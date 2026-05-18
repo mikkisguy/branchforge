@@ -32,10 +32,14 @@ function toReadableField(path: unknown): string {
     return "Field";
   }
 
-  const joined = path
-    .map((segment) => String(segment).trim())
-    .filter((segment) => segment.length > 0)
-    .join(".");
+  const segments: string[] = [];
+  for (const segment of path) {
+    const trimmed = String(segment).trim();
+    if (trimmed.length > 0) {
+      segments.push(trimmed);
+    }
+  }
+  const joined = segments.join(".");
 
   if (joined.length === 0) {
     return "Field";

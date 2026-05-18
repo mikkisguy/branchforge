@@ -180,9 +180,16 @@ export function RouteConfigContent({ projectId }: RouteConfigContentProps) {
       );
 
       // Check for failed deletions
-      const failedDeletes = deleteResults
-        .map((result, index) => ({ result, route: routesToDelete[index] }))
-        .filter(({ result }) => result.status === "rejected");
+      const failedDeletes: Array<{
+        result: PromiseSettledResult<void>;
+        route: (typeof routesToDelete)[number];
+      }> = [];
+
+      for (const [index, result] of deleteResults.entries()) {
+        if (result.status === "rejected") {
+          failedDeletes.push({ result, route: routesToDelete[index] });
+        }
+      }
 
       if (failedDeletes.length > 0) {
         const deleteErrorMessages = failedDeletes.map(
@@ -226,9 +233,16 @@ export function RouteConfigContent({ projectId }: RouteConfigContentProps) {
       const mutationResults = await Promise.allSettled(routeMutations);
 
       // Check for failed mutations
-      const failedMutations = mutationResults
-        .map((result, index) => ({ result, route: routes[index] }))
-        .filter(({ result }) => result.status === "rejected");
+      const failedMutations: Array<{
+        result: PromiseSettledResult<RouteConfigForm>;
+        route: (typeof routes)[number];
+      }> = [];
+
+      for (const [index, result] of mutationResults.entries()) {
+        if (result.status === "rejected") {
+          failedMutations.push({ result, route: routes[index] });
+        }
+      }
 
       if (failedMutations.length > 0) {
         const mutationErrorMessages = failedMutations.map(

@@ -7,8 +7,10 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const allowedHosts = (env.VITE_ALLOWED_HOSTS ?? ".localhost")
     .split(",")
-    .map((host) => host.trim())
-    .filter(Boolean);
+    .flatMap((host) => {
+      const trimmed = host.trim();
+      return trimmed ? [trimmed] : [];
+    });
 
   return {
     base: env.VITE_FRONTEND_BASE_URL ?? "/",

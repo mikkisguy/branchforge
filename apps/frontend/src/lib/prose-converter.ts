@@ -66,10 +66,17 @@ export function dialogueToPayload(entries: DialogueEntry[]): Array<{
   speakerId: string | null;
   text: string;
 }> {
-  return entries
-    .filter((entry) => entry.text.trim().length > 0)
-    .map((entry) => ({
-      speakerId: entry.speakerId,
-      text: entry.text,
-    }));
+  const result: Array<{
+    speakerId: string | null;
+    text: string;
+  }> = [];
+  for (const entry of entries) {
+    if (entry.text.trim().length > 0) {
+      result.push({
+        speakerId: entry.speakerId,
+        text: entry.text,
+      });
+    }
+  }
+  return result;
 }

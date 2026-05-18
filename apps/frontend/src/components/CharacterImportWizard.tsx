@@ -188,11 +188,11 @@ export function CharacterImportWizard({
 
     try {
       // Collect all non-excluded characters
-      const charactersToImport = [
-        ...groups.new.filter((c) => !c.excluded),
-        ...groups.existing
-          .filter((c) => !excludedTags.includes(c.tag))
-          .map((c) => ({
+      const charactersToImport = [...groups.new.filter((c) => !c.excluded)];
+
+      for (const c of groups.existing) {
+        if (!excludedTags.includes(c.tag)) {
+          charactersToImport.push({
             tag: c.tag,
             name: c.detectedName,
             displayName: c.detectedName || c.tag,
@@ -202,9 +202,12 @@ export function CharacterImportWizard({
             confidence: 1,
             isLoveInterest: false,
             routeAffiliation: undefined,
-          })),
-        ...groups.special.filter((c) => !c.excluded),
-      ];
+            excluded: false,
+          });
+        }
+      }
+
+      charactersToImport.push(...groups.special.filter((c) => !c.excluded));
 
       // Map to import format
       const importData: ImportCharacter[] = charactersToImport.map((c) => ({
@@ -216,11 +219,19 @@ export function CharacterImportWizard({
         routeAffiliation: c.routeAffiliation,
       }));
 
-      const newExcludedTags = [
-        ...excludedTags,
-        ...groups.new.filter((c) => c.excluded).map((c) => c.tag),
-        ...groups.special.filter((c) => c.excluded).map((c) => c.tag),
-      ];
+      const newExcludedTags = [...excludedTags];
+
+      for (const c of groups.new) {
+        if (c.excluded) {
+          newExcludedTags.push(c.tag);
+        }
+      }
+
+      for (const c of groups.special) {
+        if (c.excluded) {
+          newExcludedTags.push(c.tag);
+        }
+      }
 
       const result = await charactersApi.importCharacters(projectId, {
         characters: importData,

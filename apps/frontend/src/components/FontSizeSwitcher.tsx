@@ -213,7 +213,7 @@ export function FontSizeSwitcher({
     setIsKeyboardNav(false);
   };
 
-  const handleBlur = (e: React.FocusEvent) => {
+  const closeOnFocusLeave = (e: React.FocusEvent) => {
     // Close if focus moves outside the dropdown
     if (!e.currentTarget.contains(e.relatedTarget)) {
       closeReasonRef.current = "mouse";
@@ -236,7 +236,7 @@ export function FontSizeSwitcher({
   return (
     <div
       className="relative flex items-center gap-2"
-      onBlur={handleBlur}
+      onBlur={closeOnFocusLeave}
       onMouseDown={handleMouseDown}
     >
       <button

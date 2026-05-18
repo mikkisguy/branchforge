@@ -456,7 +456,7 @@ export function GitLabSyncDialog({
               </Button>
             )}
           {state.operation?.status === "COMPLETED" && (
-            <Button onClick={handleClose}>Done</Button>
+            <Button onClick={handleClose}>Close</Button>
           )}
         </div>
       </DialogContent>

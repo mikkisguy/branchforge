@@ -62,16 +62,17 @@ function convertLabelLinesToEntries(
   activeLabel: LabelDetail | undefined
 ): DialogueEntry[] {
   if (!activeLabel?.lines) return [];
-  return activeLabel.lines
-    .filter(
-      (line) =>
-        line.contentType === "DIALOGUE" || line.contentType === "NARRATION"
-    )
-    .map((line) => ({
-      id: line.id,
-      speakerId: line.speakerId,
-      text: line.content,
-    }));
+  const result: DialogueEntry[] = [];
+  for (const line of activeLabel.lines) {
+    if (line.contentType === "DIALOGUE" || line.contentType === "NARRATION") {
+      result.push({
+        id: line.id,
+        speakerId: line.speakerId,
+        text: line.content,
+      });
+    }
+  }
+  return result;
 }
 
 function cloneEntries(entries: DialogueEntry[]): DialogueEntry[] {
