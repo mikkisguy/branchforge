@@ -23,7 +23,7 @@ import { GitLabImportDialog } from "./GitLabImportDialog";
 import { ZipImportProjectDialog } from "./ZipImportProjectDialog";
 import { Logo } from "@/components/ui/logo";
 
-export interface ThemePaletteOption {
+interface ThemePaletteOption {
   name: string;
   key: ThemePalette;
   color: string;

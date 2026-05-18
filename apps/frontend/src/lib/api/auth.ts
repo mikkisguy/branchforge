@@ -18,7 +18,7 @@ export interface RegisterCredentials {
   password: string;
 }
 
-export interface ApiError {
+interface ApiError {
   error: string;
 }
 

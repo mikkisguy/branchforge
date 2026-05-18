@@ -15,13 +15,13 @@ import type { StateVariable } from "@branchforge/shared";
 // Types
 // ============================================================================
 
-export interface CreateStateVariableInput {
+interface CreateStateVariableInput {
   key: string;
   description?: string;
   category?: string;
 }
 
-export interface UpdateStateVariableInput {
+interface UpdateStateVariableInput {
   key?: string;
   description?: string;
   category?: string;

@@ -5,10 +5,6 @@
  */
 
 export { ProseEditor } from "./ProseEditor";
-export { DialogueLine } from "./DialogueLine";
 export { LabelNavigator } from "./LabelNavigator";
 export { CharacterReferencePanel } from "./CharacterReferencePanel";
-export { FocusModeToggle } from "./FocusModeToggle";
 export { SaveIndicator } from "./SaveIndicator";
-export type { SaveIndicatorDisplayMode } from "./SaveIndicator";
-export { WritingGoalPill } from "./WritingGoalPill";

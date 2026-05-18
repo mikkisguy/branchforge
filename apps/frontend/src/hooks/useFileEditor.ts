@@ -15,7 +15,7 @@ interface UseFileEditorProps {
   skipSaveRef?: RefObject<boolean>;
 }
 
-export interface SwitchFileTarget {
+interface SwitchFileTarget {
   id: string;
   content: string;
   contentHash?: string | null;

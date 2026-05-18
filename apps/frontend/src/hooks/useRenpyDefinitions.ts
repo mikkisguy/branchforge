@@ -18,7 +18,7 @@ import type {
 // Types
 // ============================================================================
 
-export interface CreateRenpyDefinitionInput {
+interface CreateRenpyDefinitionInput {
   category: RenpyDefinitionCategory;
   tag: string;
   displayName: string;
@@ -27,7 +27,7 @@ export interface CreateRenpyDefinitionInput {
   sortOrder?: number;
 }
 
-export interface UpdateRenpyDefinitionInput {
+interface UpdateRenpyDefinitionInput {
   category?: RenpyDefinitionCategory;
   tag?: string;
   displayName?: string;

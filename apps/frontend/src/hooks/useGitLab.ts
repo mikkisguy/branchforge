@@ -14,14 +14,14 @@ import { gitlabKeys } from "@/lib/query-keys";
 // Types
 // ============================================================================
 
-export interface GitLabIntegration {
+interface GitLabIntegration {
   id: string;
   username?: string;
   gitlabUrl?: string;
   createdAt: string;
 }
 
-export interface LinkedRepository {
+interface LinkedRepository {
   id: string;
   projectId: string;
   gitlabProjectId: number;

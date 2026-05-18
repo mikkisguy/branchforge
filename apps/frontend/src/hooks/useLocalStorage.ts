@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export const STORAGE_PREFIX = "branchforge:";
+const STORAGE_PREFIX = "branchforge:";
 
 type SetStateAction<T> = T | ((prev: T) => T);
 

@@ -6,7 +6,7 @@ import {
   ReactNode,
 } from "react";
 
-export type ToastVariant = "default" | "success" | "destructive";
+type ToastVariant = "default" | "success" | "destructive";
 
 interface Toast {
   id: string;

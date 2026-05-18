@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useLocalStorageBoolean } from "@/hooks/useLocalStorage";
 
-export interface FocusModeSidebarStates {
+interface FocusModeSidebarStates {
   leftCollapsed: boolean;
   rightCollapsed: boolean;
 }

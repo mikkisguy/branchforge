@@ -15,7 +15,7 @@ import { Check, AlertCircle, Loader2 } from "lucide-react";
 import { memo } from "react";
 import type { SaveStatus } from "@/hooks/useAutosave";
 
-export type SaveIndicatorDisplayMode = "compact" | "verbose";
+type SaveIndicatorDisplayMode = "compact" | "verbose";
 
 interface SaveIndicatorProps {
   saveStatus: SaveStatus;

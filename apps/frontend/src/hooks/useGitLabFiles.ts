@@ -15,7 +15,7 @@ import type { GitLabFile } from "@branchforge/shared";
 // Types
 // ============================================================================
 
-export interface GitLabFileScene {
+interface GitLabFileScene {
   id: string;
   labelName: string | null;
   title: string;

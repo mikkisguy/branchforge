@@ -17,9 +17,3 @@ export interface DialogueEntry {
   speakerId: string | null; // Character UUID (null = narration)
   text: string; // Content text
 }
-
-/**
- * Backend payload format for dialogue updates
- * Used when sending updates to the backend
- */
-export type DialoguePayload = Omit<DialogueEntry, "id">;
