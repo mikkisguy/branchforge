@@ -249,7 +249,7 @@ describe("RegisterPage", () => {
 
       // Should show loading state
       await waitFor(() => {
-        expect(submitButton).toHaveTextContent("Creating account...");
+        expect(submitButton).toHaveTextContent("Creating account…");
       });
 
       // Button and inputs should be disabled
