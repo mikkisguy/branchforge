@@ -221,7 +221,6 @@ export function FontFamilySwitcher({
     <div
       className={`relative flex items-center gap-2 ${className}`}
       onBlur={closeOnFocusLeave}
-      onMouseDown={handleMouseDown}
     >
       <button
         ref={buttonRef}
@@ -230,6 +229,7 @@ export function FontFamilySwitcher({
           setDropdownState((prev) => ({ ...prev, isOpen: !prev.isOpen }))
         }
         onKeyDown={handleKeyDown}
+        onMouseDown={handleMouseDown}
         aria-expanded={dropdownState.isOpen}
         aria-haspopup="listbox"
         aria-labelledby="font-family-label"
@@ -282,11 +282,22 @@ export function FontFamilySwitcher({
         <>
           <div
             className="fixed inset-0 z-40"
+            role="button"
+            tabIndex={-1}
             onClick={() => {
               updateDropdownState({
                 isOpen: false,
                 closeReason: "mouse",
               });
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                updateDropdownState({
+                  isOpen: false,
+                  closeReason: "mouse",
+                });
+              }
             }}
           />
           <div
