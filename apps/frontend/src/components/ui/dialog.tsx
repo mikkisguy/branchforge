@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useEffectEvent, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 interface DialogProps {
@@ -17,6 +17,8 @@ export function Dialog({
 }: DialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+
+  const handleOpenChange = useEffectEvent(() => onOpenChange?.(false));
 
   useEffect(() => {
     if (!open || !dialogRef.current) return;
@@ -49,7 +51,7 @@ export function Dialog({
     // Handle Escape key and Tab/Shift+Tab for focus trap
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onOpenChange?.(false);
+        handleOpenChange();
         return;
       }
 
@@ -86,7 +88,7 @@ export function Dialog({
         previouslyFocusedElementRef.current.focus();
       }
     };
-  }, [open, onOpenChange]);
+  }, [open]);
 
   if (!open) return null;
 
