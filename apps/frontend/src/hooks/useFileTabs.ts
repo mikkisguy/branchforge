@@ -196,6 +196,12 @@ export function useFileTabs({
     let cancelled = false;
 
     const hydrateTabs = async () => {
+      // Sync early-return: if a reset is already flagged, skip the
+      // microtask yield and bail out immediately.
+      if (isResettingRef?.current) {
+        return;
+      }
+
       // Intentionally yield to next microtask to allow state to settle
       await Promise.resolve();
 

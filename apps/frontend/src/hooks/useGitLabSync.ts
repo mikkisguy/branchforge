@@ -178,6 +178,12 @@ export function useGitLabSync(): UseGitLabSyncReturn {
         queryKey: gitlabKeys.repositories(),
       });
 
+      // Invalidate the operations list so the sync history panel refreshes
+      // after starting or completing an export/import.
+      queryClient.invalidateQueries({
+        queryKey: gitlabKeys.operations(projectId),
+      });
+
       // Invalidate characters after sync completion.
       // New imports can create/update characters and stale cached character
       // lists make Write Mode speaker labels render as Narration until reload.

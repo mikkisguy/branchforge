@@ -39,6 +39,12 @@ export function useProjectReset({
     let cancelled = false;
 
     void (async () => {
+      // Sync early-return: if a newer reset already superseded this one
+      // (incremented the ref between the effect body and this IIFE), bail.
+      if (resetId !== currentResetIdRef.current) {
+        return;
+      }
+
       await Promise.resolve();
       if (cancelled) {
         return;
