@@ -260,7 +260,7 @@ export function EditorTabBar({
                   title="Close tab"
                   tabIndex={0}
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="size-3.5" />
                 </button>
               </div>
             );
@@ -273,7 +273,7 @@ export function EditorTabBar({
             aria-hidden="true"
           >
             <div className="flex items-center gap-1 rounded-full border border-border/80 bg-background/92 px-1.5 py-1 shadow-[0_2px_10px_rgba(0,0,0,0.35)]">
-              <ChevronsLeft className="h-4 w-4 text-foreground/80" />
+              <ChevronsLeft className="size-4 text-foreground/80" />
               <div className="h-4 w-px rounded-full bg-border/85" />
             </div>
           </div>
@@ -286,7 +286,7 @@ export function EditorTabBar({
           >
             <div className="flex items-center gap-1 rounded-full border border-border/80 bg-background/92 px-1.5 py-1 shadow-[0_2px_10px_rgba(0,0,0,0.35)]">
               <div className="h-4 w-px rounded-full bg-border/85" />
-              <ChevronsRight className="h-4 w-4 text-foreground/80" />
+              <ChevronsRight className="size-4 text-foreground/80" />
             </div>
           </div>
         ) : null}

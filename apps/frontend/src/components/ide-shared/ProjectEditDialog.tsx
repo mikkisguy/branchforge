@@ -120,7 +120,7 @@ export function ProjectEditDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[500px] max-w-[95vw]">
-        <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <DialogHeader className="flex flex-row items-center justify-between gap-y-0 pb-4">
           <DialogTitle>Edit Project</DialogTitle>
           <Button
             type="button"
@@ -184,7 +184,7 @@ export function ProjectEditDialog({
               <Button type="submit" disabled={isSaving || !hasChanges}>
                 {isSaving ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 size-4 animate-spin" />
                     Saving…
                   </>
                 ) : (
