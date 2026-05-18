@@ -9,7 +9,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { cva } from "class-variance-authority";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 
-export type FontFamilyOption = {
+type FontFamilyOption = {
   label: string;
   value: string;
   family: string;

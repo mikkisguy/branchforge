@@ -4,7 +4,6 @@
  * Converts between LabelLine (backend format) and DialogueEntry (editor format).
  */
 
-import type { LabelLine } from "@branchforge/shared";
 import type { DialogueEntry } from "./prose-types";
 
 // ============================================================================
@@ -16,7 +15,7 @@ import type { DialogueEntry } from "./prose-types";
  * Uses JSON.stringify for unambiguous encoding that won't collide
  * even if speakerId or text contain delimiter characters
  */
-export function hashDialogueEntry(entry: DialogueEntry): string {
+function hashDialogueEntry(entry: DialogueEntry): string {
   return JSON.stringify([entry.speakerId, entry.text]);
 }
 
@@ -54,26 +53,6 @@ export function areDialogueEntriesEqual(
 // ============================================================================
 // Conversion Functions
 // ============================================================================
-
-/**
- * Converts LabelLine[] to DialogueEntry[]
- * This converts backend label lines to the format used by the prose editor
- *
- * @param lines - Label lines from the backend
- * @returns Dialogue entries for the prose editor
- */
-export function labelLinesToDialogue(lines: LabelLine[]): DialogueEntry[] {
-  return lines
-    .filter(
-      (line) =>
-        line.contentType === "DIALOGUE" || line.contentType === "NARRATION"
-    )
-    .map((line) => ({
-      id: line.id,
-      speakerId: line.speakerId,
-      text: line.content,
-    }));
-}
 
 /**
  * Converts DialogueEntry[] to backend dialogue payload format

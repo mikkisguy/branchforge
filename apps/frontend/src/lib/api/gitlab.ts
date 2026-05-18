@@ -76,7 +76,7 @@ export interface RpyFile {
   path: string;
 }
 
-export interface ApiErrorPayload {
+interface ApiErrorPayload {
   error: string;
 }
 
@@ -107,7 +107,7 @@ export interface ImportProjectResponse {
   operation: SyncOperation;
 }
 
-export class ApiError extends Error {
+class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,

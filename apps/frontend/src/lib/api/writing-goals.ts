@@ -10,7 +10,7 @@ import { request } from "./client";
 // Types
 // ============================================================================
 
-export interface DailyWordCount {
+interface DailyWordCount {
   date: string; // ISO date YYYY-MM-DD
   count: number;
 }

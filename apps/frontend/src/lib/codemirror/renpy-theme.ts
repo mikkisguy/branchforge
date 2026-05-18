@@ -7,7 +7,7 @@ import { configKeywordTag, audioKeywordTag } from "./renpy";
  * Ren'Py syntax highlighting styles using the site's color scheme
  * Uses HighlightStyle from @codemirror/language for proper type safety
  */
-export const renPyHighlightStyle = HighlightStyle.define([
+const renPyHighlightStyle = HighlightStyle.define([
   { tag: tags.keyword, color: "var(--keyword)" },
   { tag: configKeywordTag, color: "var(--config-keyword)" },
   { tag: audioKeywordTag, color: "var(--audio-keyword)" },

@@ -5,15 +5,10 @@
  */
 
 import { request } from "./client";
-import type {
-  Character,
-  DetectedCharacter,
-  CharacterConflict,
-  DetectCharactersResponse,
-} from "@branchforge/shared";
+import type { Character, DetectCharactersResponse } from "@branchforge/shared";
 
 // Re-export types for convenience
-export type { DetectedCharacter, CharacterConflict, DetectCharactersResponse };
+export type { DetectCharactersResponse };
 
 export interface ImportCharacter {
   tag: string;

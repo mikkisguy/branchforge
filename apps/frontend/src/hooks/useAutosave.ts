@@ -57,70 +57,6 @@ export interface UseAutosaveReturn<T> {
 }
 
 // ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Simple hash function for strings and objects.
- * Uses a simple FNV-1a-like algorithm for performance.
- *
- * CAVEATS:
- * - Non-deterministic key order: Equivalent objects with different key order may hash differently
- * - Circular references: Will fall back to a safe representation instead of throwing
- * - Undefined values: Object properties with undefined values are omitted (matches JSON.stringify behavior)
- *
- * RECOMMENDED USAGE:
- * - Best for simple data structures (primitives, arrays, plain objects)
- * - Avoid with objects containing circular references
- * - For consistent hashing of complex objects, use a deterministic serializer like fast-json-stable-stringify
- */
-function simpleHash(value: unknown): string {
-  let str: string;
-
-  if (typeof value === "string") {
-    str = value;
-  } else {
-    try {
-      str = JSON.stringify(value);
-    } catch {
-      try {
-        str = JSON.stringify(value, (_key, val) => {
-          if (typeof val === "bigint") {
-            return val.toString();
-          }
-          if (val === undefined) {
-            return "[undefined]";
-          }
-          if (typeof val === "symbol") {
-            return val.toString();
-          }
-          if (typeof val === "function") {
-            return "[function]";
-          }
-          return val;
-        });
-      } catch {
-        str = String(value);
-      }
-    }
-  }
-
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < str.length; i++) {
-    hash ^= str.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(36);
-}
-
-/**
- * Default hash function if none provided
- */
-function defaultHash<T>(data: T): string {
-  return simpleHash(data);
-}
-
-// ============================================================================
 // Hook Implementation
 // ============================================================================
 
@@ -363,6 +299,3 @@ export function useAutosave<T>({
     resetSavedHash,
   };
 }
-
-// Re-export default hash function for external use
-export { defaultHash };

@@ -15,7 +15,7 @@ import type { RouteConfig } from "@branchforge/shared";
 // Types
 // ============================================================================
 
-export interface CreateRouteConfigInput {
+interface CreateRouteConfigInput {
   routeKey: string;
   routeName: string;
   jumpPrefix: string;
@@ -23,7 +23,7 @@ export interface CreateRouteConfigInput {
   isShared?: boolean;
 }
 
-export interface UpdateRouteConfigInput {
+interface UpdateRouteConfigInput {
   routeKey?: string;
   routeName?: string;
   jumpPrefix?: string;

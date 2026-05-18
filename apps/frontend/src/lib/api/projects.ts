@@ -1,7 +1,6 @@
 import type {
   SourceOrigin,
   UserRole,
-  ImportZipResponse,
   ImportProjectResponse,
 } from "@branchforge/shared";
 import {
@@ -43,8 +42,8 @@ export interface ImportZipBody {
   projectDescription?: string;
 }
 
-// Re-export ImportZipResponse and ImportProjectResponse from shared package for convenience
-export type { ImportZipResponse, ImportProjectResponse };
+// Re-export ImportProjectResponse from shared package for convenience
+export type { ImportProjectResponse };
 
 export interface ListProjectsResponse {
   projects: Project[];

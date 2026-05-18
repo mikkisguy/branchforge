@@ -20,7 +20,7 @@ import {
 // Types
 // ============================================================================
 
-export interface CreateCharacterInput {
+interface CreateCharacterInput {
   name: string;
   displayName: string;
   renpyTag: string;
@@ -31,7 +31,7 @@ export interface CreateCharacterInput {
   conditionalPrefix?: string;
 }
 
-export interface UpdateCharacterInput {
+interface UpdateCharacterInput {
   name?: string;
   displayName?: string;
   color?: string;
