@@ -209,7 +209,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
               onClick={() => setMode("write")}
               className={`flex ${
                 isCollapsed ? "w-full p-2.5" : "flex-1 px-2 py-1.5"
-              } items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-sm font-medium transition-all ${
+              } items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-all ${
                 mode === "write"
                   ? "text-white bg-[var(--theme-color)]"
                   : "text-muted-foreground hover:text-foreground"
