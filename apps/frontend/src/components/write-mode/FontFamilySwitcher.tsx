@@ -237,7 +237,7 @@ export function FontFamilySwitcher({
         title="Change font family"
       >
         <svg
-          className="w-3.5 h-3.5"
+          className="size-3.5"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -255,7 +255,7 @@ export function FontFamilySwitcher({
         </span>
         <span aria-hidden="true">{currentOption.label}</span>
         <svg
-          className={`w-3 h-3 transition-transform ${
+          className={`size-3 transition-transform ${
             dropdownState.isOpen
               ? direction === "up"
                 ? ""
@@ -326,7 +326,7 @@ export function FontFamilySwitcher({
                 <span>{option.label}</span>
                 {option.value === fontFamily && (
                   <svg
-                    className="w-4 h-4 text-[var(--theme-color)]"
+                    className="size-4 text-[var(--theme-color)]"
                     fill="currentColor"
                     viewBox="0 0 20 20"
                     aria-hidden="true"

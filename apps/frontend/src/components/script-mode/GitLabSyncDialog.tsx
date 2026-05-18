@@ -256,7 +256,7 @@ export function GitLabSyncDialog({
         <div className="p-6 border-b border-border/30 flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-muted rounded-md">
-              <SyncIcon className="w-5 h-5" />
+              <SyncIcon className="size-5" />
             </div>
             <div>
               <h2 className="text-lg font-medium">
@@ -278,7 +278,7 @@ export function GitLabSyncDialog({
             type="button"
             aria-label="Close sync dialog"
           >
-            <X className="w-5 h-5" />
+            <X className="size-5" />
           </button>
         </div>
 
@@ -300,7 +300,7 @@ export function GitLabSyncDialog({
                 >
                   {state.operation.status === "COMPLETED" && (
                     <div className="flex items-center gap-2 text-sm">
-                      <CheckCircle2 className="w-4 h-4" />
+                      <CheckCircle2 className="size-4" />
                       <span>
                         {operationType === "export" ? "Export" : "Import"}{" "}
                         completed
@@ -309,7 +309,7 @@ export function GitLabSyncDialog({
                   )}
                   {state.operation.status === "FAILED" && (
                     <div className="flex items-center gap-2 text-sm">
-                      <AlertCircle className="w-4 h-4" />
+                      <AlertCircle className="size-4" />
                       <span>{state.error || "Operation failed"}</span>
                     </div>
                   )}

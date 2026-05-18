@@ -527,7 +527,7 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
       {isLoadingCharacters ? (
         <div className="flex items-center justify-center py-8">
           <Loader2
-            className="w-6 h-6 animate-spin text-muted-foreground"
+            className="size-6 animate-spin text-muted-foreground"
             role="status"
           />
         </div>
@@ -542,7 +542,7 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
                 started.
               </p>
               <Button type="button" variant="outline" onClick={addCharacter}>
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="size-4 mr-2" />
                 Add Character
               </Button>
             </div>
@@ -567,13 +567,13 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
                               src={character.avatarUrl}
                               alt={`${character.displayName} avatar`}
                               data-testid={`character-avatar-${index}`}
-                              className="w-8 h-8 rounded-full object-cover border-2 shadow-sm"
+                              className="size-8 rounded-full object-cover border-2 shadow-sm"
                               style={{ borderColor: character.color }}
                             />
                           ) : (
                             <div
                               data-testid={`character-color-${index}`}
-                              className="w-8 h-8 rounded-full border-2 border-background shadow-sm"
+                              className="size-8 rounded-full border-2 border-background shadow-sm"
                               style={{ backgroundColor: character.color }}
                             />
                           )}
@@ -586,7 +586,7 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
                               </span>
                               {character.isLoveInterest && (
                                 <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300">
-                                  <Heart className="w-3 h-3" />
+                                  <Heart className="size-3" />
                                   Love Interest
                                 </span>
                               )}
@@ -619,7 +619,7 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
                             onClick={() => setEditingIndex(index)}
                             disabled={isSaving}
                           >
-                            <Pencil className="w-4 h-4" />
+                            <Pencil className="size-4" />
                           </Button>
                           <Button
                             type="button"
@@ -629,7 +629,7 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
                             disabled={isSaving}
                             className="text-destructive hover:text-destructive"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="size-4" />
                           </Button>
                         </div>
                       </div>
@@ -760,7 +760,7 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
                           </Label>
                           <div className="flex items-center gap-4">
                             {/* Preview */}
-                            <div className="relative w-20 h-20 flex-shrink-0">
+                            <div className="relative size-20 flex-shrink-0">
                               {character.avatarPreview ||
                               character.avatarUrl ? (
                                 <img
@@ -777,7 +777,7 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
                                   className="w-full h-full rounded-full border-4 border-dashed flex items-center justify-center"
                                   style={{ borderColor: character.color }}
                                 >
-                                  <Upload className="w-6 h-6 text-muted-foreground" />
+                                  <Upload className="size-6 text-muted-foreground" />
                                 </div>
                               )}
                             </div>
@@ -901,7 +901,7 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
                                 )
                               }
                               disabled={isSaving}
-                              className="w-4 h-4"
+                              className="size-4"
                             />
                             <Label
                               htmlFor={`character-love-${index}`}
@@ -935,7 +935,7 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
                             disabled={!isCharacterValid(index) || isSaving}
                           >
                             {isSaving && (
-                              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                              <Loader2 className="size-4 animate-spin mr-2" />
                             )}
                             Save
                           </Button>
@@ -954,7 +954,7 @@ export function CharacterContent({ projectId }: CharacterContentProps) {
                 disabled={isSaving}
                 className="w-full"
               >
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="size-4 mr-2" />
                 Add Another Character
               </Button>
             </div>

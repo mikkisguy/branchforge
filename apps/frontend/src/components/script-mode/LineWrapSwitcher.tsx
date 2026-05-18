@@ -27,9 +27,9 @@ export function LineWrapSwitcher({
       title={lineWrap ? "Disable line wrapping" : "Enable line wrapping"}
     >
       {lineWrap ? (
-        <WrapText className="w-3 h-3" />
+        <WrapText className="size-3" />
       ) : (
-        <AlignJustify className="w-3 h-3" />
+        <AlignJustify className="size-3" />
       )}
       <span>Wrap: {lineWrap ? "On" : "Off"}</span>
     </button>

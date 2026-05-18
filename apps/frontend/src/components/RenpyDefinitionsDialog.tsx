@@ -351,7 +351,7 @@ export function RenpyDefinitionsDialog({
             onClick={closeDialog}
             className="text-muted-foreground hover:text-foreground transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="size-5" />
           </button>
         </div>
 
@@ -388,7 +388,7 @@ export function RenpyDefinitionsDialog({
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {isLoadingRenpyDefinitions ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              <Loader2 className="size-6 animate-spin text-muted-foreground" />
             </div>
           ) : renpyDefinitionsError ? (
             <InlineMessage variant="error">
@@ -398,7 +398,7 @@ export function RenpyDefinitionsDialog({
             <>
               {filteredDefinitionsWithIndices.length === 0 ? (
                 <div className="p-8 border border-dashed border-border/30 rounded-md text-center">
-                  <Code className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <Code className="size-12 mx-auto text-muted-foreground mb-4" />
                   <p className="text-sm text-muted-foreground mb-4">
                     {selectedCategory === "ALL"
                       ? "No Ren'Py definitions configured yet. Add your first definition to get started."
@@ -411,7 +411,7 @@ export function RenpyDefinitionsDialog({
                     variant="outline"
                     onClick={addDefinition}
                   >
-                    <Plus className="w-4 h-4 mr-2" />
+                    <Plus className="size-4 mr-2" />
                     Add Definition
                   </Button>
                 </div>
@@ -457,7 +457,7 @@ export function RenpyDefinitionsDialog({
                                   onClick={() => setEditingIndex(originalIndex)}
                                   disabled={isSaving}
                                 >
-                                  <Pencil className="w-4 h-4" />
+                                  <Pencil className="size-4" />
                                 </Button>
                                 <Button
                                   type="button"
@@ -469,7 +469,7 @@ export function RenpyDefinitionsDialog({
                                   disabled={isSaving}
                                   className="text-destructive hover:text-destructive"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  <Trash2 className="size-4" />
                                 </Button>
                               </div>
                             </div>
@@ -659,7 +659,7 @@ export function RenpyDefinitionsDialog({
                                   }
                                 >
                                   {isSaving && (
-                                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                    <Loader2 className="size-4 animate-spin mr-2" />
                                   )}
                                   Save
                                 </Button>
@@ -682,7 +682,7 @@ export function RenpyDefinitionsDialog({
                   disabled={isSaving}
                   className="w-full"
                 >
-                  <Plus className="w-4 h-4 mr-2" />
+                  <Plus className="size-4 mr-2" />
                   Add Another Definition
                 </Button>
               )}

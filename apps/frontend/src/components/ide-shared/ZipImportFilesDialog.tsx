@@ -289,7 +289,7 @@ export function ZipImportFilesDialog({
         <div className="p-6 border-b border-border/30 flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-muted rounded-md">
-              <Package className="w-5 h-5" />
+              <Package className="size-5" />
             </div>
             <div>
               <h2 className="text-lg font-medium">Import Zip File</h2>
@@ -308,7 +308,7 @@ export function ZipImportFilesDialog({
             disabled={importState.status === "uploading" || showCharacterWizard}
             aria-label="Close dialog"
           >
-            <X className="w-5 h-5" />
+            <X className="size-5" />
           </Button>
         </div>
 
@@ -331,7 +331,7 @@ export function ZipImportFilesDialog({
               >
                 {selectedFile ? (
                   <div className="space-y-2">
-                    <FileArchive className="w-12 h-12 mx-auto text-primary" />
+                    <FileArchive className="size-12 mx-auto text-primary" />
                     <p className="font-medium">{selectedFile.name}</p>
                     <p className="text-sm text-muted-foreground">
                       {formatFileSize(selectedFile.size)}
@@ -349,7 +349,7 @@ export function ZipImportFilesDialog({
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    <Upload className="w-12 h-12 mx-auto text-muted-foreground" />
+                    <Upload className="size-12 mx-auto text-muted-foreground" />
                     <div>
                       <p className="font-medium">Drop zip file here</p>
                       <p className="text-sm text-muted-foreground">or</p>
@@ -409,7 +409,7 @@ export function ZipImportFilesDialog({
           {importState.status === "success" && importState.result && (
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                <CheckCircle2 className="w-5 h-5" />
+                <CheckCircle2 className="size-5" />
                 <span className="font-medium">
                   Import completed successfully!
                 </span>
@@ -445,7 +445,7 @@ export function ZipImportFilesDialog({
           {importState.status === "error" && (
             <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-md">
               <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="size-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <p className="font-medium text-red-800 dark:text-red-200">
                     Import Failed

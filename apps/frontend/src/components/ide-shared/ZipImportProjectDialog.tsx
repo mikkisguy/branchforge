@@ -269,7 +269,7 @@ export function ZipImportProjectDialog({
               <div className="flex items-center justify-between border-b border-border/30 pb-4 mb-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-muted rounded-md">
-                    <Package className="w-5 h-5" />
+                    <Package className="size-5" />
                   </div>
                   <div>
                     <h2 className="text-lg font-medium">Import ZIP File</h2>
@@ -285,7 +285,7 @@ export function ZipImportProjectDialog({
                   disabled={isImporting}
                   aria-label="Close dialog"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="size-5" />
                 </Button>
               </div>
             )}
@@ -338,7 +338,7 @@ export function ZipImportProjectDialog({
                 >
                   {selectedFile ? (
                     <div className="space-y-3">
-                      <FileArchive className="w-12 h-12 mx-auto text-primary" />
+                      <FileArchive className="size-12 mx-auto text-primary" />
                       <p className="font-medium">{selectedFile.name}</p>
                       <p className="text-sm text-muted-foreground">
                         {formatFileSize(selectedFile.size)}
@@ -360,7 +360,7 @@ export function ZipImportProjectDialog({
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      <Upload className="w-12 h-12 mx-auto text-muted-foreground" />
+                      <Upload className="size-12 mx-auto text-muted-foreground" />
                       <div>
                         <p className="font-medium">Drop zip file here</p>
                         <p className="text-sm text-muted-foreground">or</p>
@@ -411,7 +411,7 @@ export function ZipImportProjectDialog({
             {/* Uploading state */}
             {importState.status === "uploading" && (
               <div className="flex flex-col items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin mb-4" />
+                <Loader2 className="size-8 animate-spin mb-4" />
                 <p className="text-sm text-muted-foreground">
                   {importState.message}
                 </p>
@@ -421,7 +421,7 @@ export function ZipImportProjectDialog({
             {/* Success state */}
             {importState.status === "success" && (
               <div className="flex flex-col items-center justify-center py-12">
-                <CheckCircle2 className="w-12 h-12 text-green-500 mb-4" />
+                <CheckCircle2 className="size-12 text-green-500 mb-4" />
                 <h3 className="text-lg font-medium mb-2">Import Successful!</h3>
                 <p className="text-sm text-muted-foreground text-center mb-4">
                   {importState.result?.filesImported} files imported,{" "}
@@ -446,7 +446,7 @@ export function ZipImportProjectDialog({
             {/* Error state */}
             {importState.status === "error" && (
               <div className="flex flex-col items-center justify-center py-12">
-                <AlertCircle className="w-12 h-12 text-destructive mb-4" />
+                <AlertCircle className="size-12 text-destructive mb-4" />
                 <h3 className="text-lg font-medium mb-2">Import Failed</h3>
                 <p className="text-sm text-muted-foreground text-center mb-4">
                   {importState.error}

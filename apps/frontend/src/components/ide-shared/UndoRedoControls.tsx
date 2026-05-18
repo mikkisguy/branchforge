@@ -81,7 +81,7 @@ export function UndoRedoControls({
         title="Undo (Ctrl+Z / Cmd+Z)"
         aria-label="Undo"
       >
-        <Undo2 className="w-4 h-4" />
+        <Undo2 className="size-4" />
       </button>
       <button
         onClick={onRedo}
@@ -95,7 +95,7 @@ export function UndoRedoControls({
         title="Redo (Ctrl+Y / Cmd+Shift+Z)"
         aria-label="Redo"
       >
-        <Redo2 className="w-4 h-4" />
+        <Redo2 className="size-4" />
       </button>
     </div>
   );

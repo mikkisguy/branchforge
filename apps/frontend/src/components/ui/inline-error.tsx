@@ -26,9 +26,9 @@ export function InlineMessage({
     >
       {icon &&
         (variant === "error" ? (
-          <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <AlertCircle className="size-4 mt-0.5 flex-shrink-0" />
         ) : (
-          <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <CheckCircle2 className="size-4 mt-0.5 flex-shrink-0" />
         ))}
       <span>{children}</span>
     </div>

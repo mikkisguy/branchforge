@@ -232,7 +232,7 @@ export function GitLabRepositoryLinkingDialog({
               onClick={closeDialog}
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
-              <X className="w-5 h-5" />
+              <X className="size-5" />
             </button>
           </div>
 
@@ -248,7 +248,7 @@ export function GitLabRepositoryLinkingDialog({
                   aria-busy="true"
                 >
                   <Loader2
-                    className="w-5 h-5 animate-spin text-muted-foreground"
+                    className="size-5 animate-spin text-muted-foreground"
                     aria-hidden="true"
                   />
                   <span className="sr-only">Loading projects...</span>
@@ -296,7 +296,7 @@ export function GitLabRepositoryLinkingDialog({
                   disabled={isLoadingGitlab || isLinking}
                 />
                 {isLoadingGitlab && (
-                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 size-4 animate-spin text-muted-foreground" />
                 )}
               </div>
 
@@ -304,7 +304,7 @@ export function GitLabRepositoryLinkingDialog({
               <div className="border border-border/30 rounded-md max-h-48 overflow-y-auto">
                 {isLoadingGitlab ? (
                   <div className="p-4 flex items-center justify-center">
-                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                    <Loader2 className="size-5 animate-spin text-muted-foreground" />
                   </div>
                 ) : gitlabLoadError ? (
                   <div className="p-4 flex flex-col items-center gap-3 text-center">
@@ -319,7 +319,7 @@ export function GitLabRepositoryLinkingDialog({
                       disabled={isLoadingGitlab}
                     >
                       {isLoadingGitlab ? (
-                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        <Loader2 className="size-4 animate-spin mr-2" />
                       ) : null}
                       Retry
                     </Button>
@@ -390,7 +390,7 @@ export function GitLabRepositoryLinkingDialog({
                 isLinking
               }
             >
-              {isLinking && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              {isLinking && <Loader2 className="size-4 animate-spin mr-2" />}
               Link Repository
             </Button>
           </div>

@@ -202,7 +202,7 @@ export function ConfirmDialog({
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  <Loader2 className="size-4 animate-spin mr-2" />
                   {loadingLabel}
                 </>
               ) : (

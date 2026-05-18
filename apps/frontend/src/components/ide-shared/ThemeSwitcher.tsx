@@ -29,7 +29,7 @@ export function ThemeSwitcher({
           <button
             key={palette.key}
             onClick={() => setTheme(palette.key)}
-            className={`w-7 h-7 rounded transition-all ${
+            className={`size-7 rounded transition-all ${
               theme === palette.key
                 ? "scale-110 ring-2 ring-white ring-offset-2 ring-offset-card"
                 : "opacity-60 hover:opacity-100 hover:scale-105"

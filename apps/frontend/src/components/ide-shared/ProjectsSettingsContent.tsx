@@ -79,8 +79,8 @@ export function ProjectsSettingsContent({
   if (projects.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-4">
-        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-          <FileArchive className="w-8 h-8 text-muted-foreground" />
+        <div className="size-16 rounded-full bg-muted flex items-center justify-center mb-4">
+          <FileArchive className="size-8 text-muted-foreground" />
         </div>
         <h3 className="text-lg font-medium mb-2">No projects yet</h3>
         <p className="text-sm text-muted-foreground text-center max-w-md mb-6">
@@ -99,14 +99,14 @@ export function ProjectsSettingsContent({
             )}
             {onImportZip && (
               <Button variant="outline" onClick={onImportZip}>
-                <FileArchive className="w-4 h-4 mr-2" />
+                <FileArchive className="size-4 mr-2" />
                 Import ZIP
               </Button>
             )}
           </div>
           {!hasIntegration && !isLoadingIntegration && onImportFromGitLab && (
             <div className="flex items-start gap-2 max-w-md text-sm text-muted-foreground mt-2">
-              <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <Info className="size-4 mt-0.5 flex-shrink-0" />
               <p>
                 GitLab import requires{" "}
                 <span className="font-medium">GitLab integration</span> to be
@@ -142,14 +142,14 @@ export function ProjectsSettingsContent({
             )}
             {onImportZip && (
               <Button size="sm" variant="outline" onClick={onImportZip}>
-                <FileArchive className="w-4 h-4 mr-2" />
+                <FileArchive className="size-4 mr-2" />
                 Import ZIP
               </Button>
             )}
           </div>
           {!hasIntegration && !isLoadingIntegration && onImportFromGitLab && (
             <div className="flex items-start gap-2 text-xs text-muted-foreground max-w-[300px]">
-              <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+              <Info className="size-3 mt-0.5 flex-shrink-0" />
               <p>
                 Configure GitLab integration in{" "}
                 <span className="font-medium">Integrations</span> tab first
@@ -193,7 +193,7 @@ export function ProjectsSettingsContent({
                             {project.name}
                           </span>
                           <Info
-                            className="w-3.5 h-3.5 text-muted-foreground/70 flex-shrink-0"
+                            className="size-3.5 text-muted-foreground/70 flex-shrink-0"
                             aria-hidden="true"
                           />
                           <span className="sr-only">{project.description}</span>
@@ -226,7 +226,7 @@ export function ProjectsSettingsContent({
                         onClick={() => handleEditClick(project)}
                         aria-label={`Edit ${project.name}`}
                       >
-                        <Edit className="w-4 h-4" />
+                        <Edit className="size-4" />
                       </Button>
                     )}
                     {isProjectOwner(project) && onDeleteProject && (
@@ -237,7 +237,7 @@ export function ProjectsSettingsContent({
                         onClick={() => handleDeleteClick(project)}
                         aria-label={`Delete ${project.name}`}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="size-4" />
                       </Button>
                     )}
                   </div>

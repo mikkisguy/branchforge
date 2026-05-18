@@ -150,11 +150,11 @@ export function ScriptModeEditorLayout({
                 aria-label="Collapse project files sidebar"
                 title="Collapse project files sidebar"
               >
-                <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+                <ChevronLeft className="size-4 text-muted-foreground" />
               </button>
               <div className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded bg-[var(--theme-color)] flex items-center justify-center shadow-sm shrink-0">
-                  <Sparkles className="w-4 h-4 text-white" />
+                <div className="size-7 rounded bg-[var(--theme-color)] flex items-center justify-center shadow-sm shrink-0">
+                  <Sparkles className="size-4 text-white" />
                 </div>
                 <div className="min-w-0">
                   <span className="text-sm font-medium block truncate">
@@ -199,7 +199,7 @@ export function ScriptModeEditorLayout({
               aria-label="Expand project files sidebar"
               title="Expand project files sidebar"
             >
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              <ChevronRight className="size-4 text-muted-foreground" />
             </button>
           </div>
         )}

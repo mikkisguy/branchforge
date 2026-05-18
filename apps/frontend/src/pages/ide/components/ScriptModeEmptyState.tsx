@@ -29,8 +29,8 @@ export function ScriptModeEmptyState({
   if (!projectId) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center">
-        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-4">
-          <FileCode className="w-10 h-10 text-muted-foreground/60" />
+        <div className="size-20 rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-4">
+          <FileCode className="size-10 text-muted-foreground/60" />
         </div>
         <p className="text-foreground font-medium">No project selected</p>
         <p className="text-sm text-muted-foreground/70 mt-1 text-center max-w-md px-4">
@@ -47,8 +47,8 @@ export function ScriptModeEmptyState({
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center">
-      <div className="w-20 h-20 rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-4">
-        <FileCode className="w-10 h-10 text-muted-foreground/60" />
+      <div className="size-20 rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-4">
+        <FileCode className="size-10 text-muted-foreground/60" />
       </div>
       <p className="text-foreground font-medium">No files imported yet</p>
       <p className="text-sm text-muted-foreground/70 mt-1 text-center max-w-md px-4">
@@ -64,12 +64,12 @@ export function ScriptModeEmptyState({
             onClick={() => onShowSyncDialogChange(true)}
             type="button"
           >
-            <Download className="w-4 h-4 mr-2" />
+            <Download className="size-4 mr-2" />
             Import from GitLab
           </Button>
         )}
         <Button type="button" onClick={() => onShowZipImportDialogChange(true)}>
-          <FileCode className="w-4 h-4 mr-2" />
+          <FileCode className="size-4 mr-2" />
           Import from Zip
         </Button>
       </div>

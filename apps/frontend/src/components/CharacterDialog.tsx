@@ -44,7 +44,7 @@ export function CharacterDialog({
             onClick={closeDialog}
             className="text-muted-foreground hover:text-foreground transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="size-5" />
           </button>
         </div>
 

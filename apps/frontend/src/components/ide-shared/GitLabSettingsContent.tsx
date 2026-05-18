@@ -167,7 +167,7 @@ export function GitLabSettingsContent() {
     <div className="space-y-4">
       {isLoadingIntegration ? (
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
         </div>
       ) : hasIntegration ? (
         // Has integration - show status and remove option
@@ -187,9 +187,9 @@ export function GitLabSettingsContent() {
                 disabled={isRemoving}
               >
                 {isRemoving ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="size-4 animate-spin" />
                 ) : (
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="size-4" />
                 )}
                 <span className="ml-2">Remove</span>
               </Button>
@@ -238,9 +238,9 @@ export function GitLabSettingsContent() {
                     className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
                     {showToken ? (
-                      <EyeOff className="w-4 h-4" />
+                      <EyeOff className="size-4" />
                     ) : (
-                      <Eye className="w-4 h-4" />
+                      <Eye className="size-4" />
                     )}
                   </Button>
                 </div>
@@ -285,7 +285,7 @@ export function GitLabSettingsContent() {
                   className="flex-1"
                 >
                   {isValidating ? (
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    <Loader2 className="size-4 animate-spin mr-2" />
                   ) : null}
                   Validate
                 </Button>
@@ -300,7 +300,7 @@ export function GitLabSettingsContent() {
                   className="flex-1"
                 >
                   {isStoring ? (
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    <Loader2 className="size-4 animate-spin mr-2" />
                   ) : null}
                   Save Integration
                 </Button>

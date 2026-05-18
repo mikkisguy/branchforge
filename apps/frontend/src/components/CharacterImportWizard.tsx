@@ -332,7 +332,7 @@ export function CharacterImportWizard({
         <div className="p-6 border-b border-border/30 flex items-start justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-md">
-              <User className="w-5 h-5 text-primary" />
+              <User className="size-5 text-primary" />
             </div>
             <div>
               <h2 className="text-lg font-medium">Import Characters</h2>
@@ -350,7 +350,7 @@ export function CharacterImportWizard({
             className="text-muted-foreground hover:text-foreground transition-colors"
             disabled={isImporting}
           >
-            <X className="w-5 h-5" />
+            <X className="size-5" />
           </button>
         </div>
 
@@ -374,7 +374,7 @@ export function CharacterImportWizard({
                   onClick={() => setShowAddForm(true)}
                   disabled={isImporting}
                 >
-                  <Plus className="w-4 h-4 mr-2" />
+                  <Plus className="size-4 mr-2" />
                   Add Character
                 </Button>
               ) : (
@@ -460,7 +460,7 @@ export function CharacterImportWizard({
               disabled={isImporting}
               className="w-full"
             >
-              <Plus className="w-4 h-4 mr-2" />
+              <Plus className="size-4 mr-2" />
               {showAddForm ? "Cancel" : "Add Another Character"}
             </Button>
           )}
@@ -553,16 +553,16 @@ export function CharacterImportWizard({
                 type="button"
               >
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-green-600" />
+                  <CheckCircle2 className="size-4 text-green-600" />
                   <span className="text-sm font-medium">New Characters</span>
                   <span className="text-xs text-muted-foreground">
                     ({newCount})
                   </span>
                 </div>
                 {expandedGroups.has("new") ? (
-                  <ChevronUp className="w-4 h-4" />
+                  <ChevronUp className="size-4" />
                 ) : (
-                  <ChevronDown className="w-4 h-4" />
+                  <ChevronDown className="size-4" />
                 )}
               </button>
 
@@ -583,7 +583,7 @@ export function CharacterImportWizard({
                                 excluded: !e.target.checked,
                               })
                             }
-                            className="w-4 h-4 rounded"
+                            className="size-4 rounded"
                             disabled={isImporting}
                           />
                           <span className="font-mono text-sm font-medium">
@@ -592,12 +592,12 @@ export function CharacterImportWizard({
                         </div>
                         <div className="flex items-center gap-2">
                           <div
-                            className="w-6 h-6 rounded border border-border/30"
+                            className="size-6 rounded border border-border/30"
                             style={{ backgroundColor: char.color }}
                             title={char.color}
                           />
                           {char.excluded && (
-                            <Ban className="w-4 h-4 text-muted-foreground" />
+                            <Ban className="size-4 text-muted-foreground" />
                           )}
                         </div>
                       </div>
@@ -653,16 +653,16 @@ export function CharacterImportWizard({
                 type="button"
               >
                 <div className="flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-amber-600" />
+                  <AlertCircle className="size-4 text-amber-600" />
                   <span className="text-sm font-medium">Conflicts</span>
                   <span className="text-xs text-muted-foreground">
                     ({existingCount})
                   </span>
                 </div>
                 {expandedGroups.has("existing") ? (
-                  <ChevronUp className="w-4 h-4" />
+                  <ChevronUp className="size-4" />
                 ) : (
-                  <ChevronDown className="w-4 h-4" />
+                  <ChevronDown className="size-4" />
                 )}
               </button>
 
@@ -682,7 +682,7 @@ export function CharacterImportWizard({
                             Current:
                           </span>
                           <div
-                            className="w-4 h-4 rounded border border-border/30"
+                            className="size-4 rounded border border-border/30"
                             style={{ backgroundColor: conflict.existingColor }}
                           />
                         </div>
@@ -716,7 +716,7 @@ export function CharacterImportWizard({
                 type="button"
               >
                 <div className="flex items-center gap-2">
-                  <Ban className="w-4 h-4 text-muted-foreground" />
+                  <Ban className="size-4 text-muted-foreground" />
                   <span className="text-sm font-medium">
                     Special Characters
                   </span>
@@ -725,9 +725,9 @@ export function CharacterImportWizard({
                   </span>
                 </div>
                 {expandedGroups.has("special") ? (
-                  <ChevronUp className="w-4 h-4" />
+                  <ChevronUp className="size-4" />
                 ) : (
-                  <ChevronDown className="w-4 h-4" />
+                  <ChevronDown className="size-4" />
                 )}
               </button>
 
@@ -751,7 +751,7 @@ export function CharacterImportWizard({
                               excluded: !e.target.checked,
                             })
                           }
-                          className="w-4 h-4 rounded"
+                          className="size-4 rounded"
                           disabled={isImporting}
                         />
                         <span className="font-mono text-sm">{char.tag}</span>
@@ -760,7 +760,7 @@ export function CharacterImportWizard({
                         </span>
                       </div>
                       <div
-                        className="w-4 h-4 rounded border border-border/30"
+                        className="size-4 rounded border border-border/30"
                         style={{ backgroundColor: char.color }}
                       />
                     </div>
@@ -773,7 +773,7 @@ export function CharacterImportWizard({
           <div className="p-3 bg-muted/50 rounded-md space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Settings className="w-4 h-4 text-muted-foreground" />
+                <Settings className="size-4 text-muted-foreground" />
                 <label
                   htmlFor={linkToLinesId}
                   className="text-sm font-medium cursor-pointer"
@@ -786,7 +786,7 @@ export function CharacterImportWizard({
                 type="checkbox"
                 checked={linkToLines}
                 onChange={(e) => setLinkToLines(e.target.checked)}
-                className="w-4 h-4 rounded"
+                className="size-4 rounded"
                 disabled={isImporting}
               />
             </div>

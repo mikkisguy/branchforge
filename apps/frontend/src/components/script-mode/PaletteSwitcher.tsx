@@ -65,12 +65,12 @@ export function PaletteSwitcher({
         title="Change syntax colors"
       >
         <span
-          className="w-2 h-2 rounded-full"
+          className="size-2 rounded-full"
           style={{ backgroundColor: PALETTES[selectedIndex].indicator }}
         />
         <span>{PALETTES[selectedIndex].name}</span>
         <svg
-          className={`w-3 h-3 transition-transform ${
+          className={`size-3 transition-transform ${
             isOpen
               ? direction === "up"
                 ? ""
@@ -114,7 +114,7 @@ export function PaletteSwitcher({
                     }`}
                   >
                     <span
-                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      className="size-3 rounded-full flex-shrink-0"
                       style={{ backgroundColor: palette.indicator }}
                     />
                     <span className="truncate">{palette.name}</span>
