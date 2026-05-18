@@ -211,7 +211,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
           </div>
           <div className="absolute inset-0 size-16 rounded-full bg-[var(--theme-color)]/5 animate-ping" />
         </div>
-        <p className="text-muted-foreground mt-4">Loading labels...</p>
+        <p className="text-muted-foreground mt-4">Loading labels…</p>
       </div>
     );
   }

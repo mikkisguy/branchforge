@@ -347,7 +347,7 @@ export function GitLabImportDialog({
             <div className="flex items-center justify-center py-8">
               <Loader2 className="size-6 animate-spin" />
               <span className="ml-2 text-sm text-muted-foreground">
-                Checking GitLab integration...
+                Checking GitLab integration…
               </span>
             </div>
           )}
@@ -398,7 +398,7 @@ export function GitLabImportDialog({
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="size-5 animate-spin" />
                   <span className="ml-2 text-sm text-muted-foreground">
-                    Loading repositories...
+                    Loading repositories…
                   </span>
                 </div>
               ) : filteredRepositories.length === 0 ? (

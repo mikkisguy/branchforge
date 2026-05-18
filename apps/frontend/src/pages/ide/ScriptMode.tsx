@@ -334,7 +334,7 @@ export function ScriptMode({
       <div className="h-screen flex flex-col overflow-hidden">
         <div className="flex-1 flex flex-col pt-16">
           <div className="flex-1 flex items-center justify-center">
-            <p className="text-muted-foreground">Loading project...</p>
+            <p className="text-muted-foreground">Loading project…</p>
           </div>
         </div>
       </div>

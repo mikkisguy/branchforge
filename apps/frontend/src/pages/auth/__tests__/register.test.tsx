@@ -134,7 +134,7 @@ describe("RegisterPage", () => {
 
       render(<RegisterPage />, { wrapper });
 
-      expect(screen.getByText("Loading...")).toBeInTheDocument();
+      expect(screen.getByText("Loading…")).toBeInTheDocument();
     });
 
     it("should not show form while loading", () => {

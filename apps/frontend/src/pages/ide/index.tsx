@@ -262,7 +262,7 @@ export function HomePageIDE() {
             <Suspense
               fallback={
                 <div className="flex items-center justify-center h-full text-slate-400">
-                  Loading editor...
+                  Loading editor…
                 </div>
               }
             >

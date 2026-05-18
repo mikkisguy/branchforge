@@ -30,7 +30,7 @@ function App() {
             <Suspense
               fallback={
                 <div className="flex items-center justify-center h-screen text-slate-400">
-                  Loading...
+                  Loading…
                 </div>
               }
             >

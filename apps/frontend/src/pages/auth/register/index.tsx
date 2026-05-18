@@ -41,7 +41,7 @@ export function RegisterPage() {
               <CardTitle>Create Account</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">Loading...</p>
+              <p className="text-sm text-muted-foreground">Loading…</p>
             </CardContent>
           </Card>
         </div>

@@ -474,7 +474,7 @@ export function ZipImportFilesDialog({
           {(importState.status === "uploading" ||
             importState.status === "processing") && (
             <Button variant="outline" disabled>
-              Importing...
+              Importing…
             </Button>
           )}
           {importState.status === "error" && (

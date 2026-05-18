@@ -258,7 +258,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
                     <div className="p-2 max-h-[400px] overflow-y-auto">
                       {isLoadingProjects ? (
                         <div className="px-3 py-2 text-sm text-muted-foreground">
-                          Loading...
+                          Loading…
                         </div>
                       ) : projects.length === 0 ? (
                         <div className="px-3 py-2 text-sm text-muted-foreground">
@@ -304,7 +304,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
                   style={{ borderColor: "var(--theme-border-subtle)" }}
                 >
                   {isLoadingProjects ? (
-                    <option>Loading...</option>
+                    <option>Loading…</option>
                   ) : projects.length === 0 ? (
                     <option>No projects</option>
                   ) : (
