@@ -4,7 +4,7 @@
  * Client for label management operations.
  */
 
-import { request } from "./client";
+import { request, requestVoid } from "./client";
 import type {
   PublicLabel,
   LabelDetail,
@@ -65,6 +65,17 @@ export interface CreateLabelInput {
 }
 
 export interface CreateLabelResponse {
+  label: PublicLabel;
+}
+
+export interface UpdateLabelInput {
+  title?: string;
+  route?: string | null;
+  status?: "DRAFT" | "REVIEW" | "FINAL";
+  visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
+}
+
+export interface UpdateLabelResponse {
   label: PublicLabel;
 }
 
@@ -143,5 +154,28 @@ export const labelsApi = {
       body: JSON.stringify(data),
     });
     return response.label;
+  },
+
+  /**
+   * Update label metadata (title, route, status, visibility)
+   */
+  async updateLabel(
+    labelId: string,
+    data: UpdateLabelInput
+  ): Promise<PublicLabel> {
+    const response = await request<UpdateLabelResponse>(`/labels/${labelId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+    return response.label;
+  },
+
+  /**
+   * Soft delete a label (sets deleted_at timestamp)
+   */
+  async deleteLabel(labelId: string): Promise<void> {
+    await requestVoid(`/labels/${labelId}`, {
+      method: "DELETE",
+    });
   },
 };

@@ -16,6 +16,7 @@ import {
   labelsApi,
   type UpdateDialogueResponse,
   type CreateLabelInput,
+  type UpdateLabelInput,
 } from "@/lib/api/labels";
 import { useProject } from "@/hooks/useProject";
 import {
@@ -72,6 +73,17 @@ export interface UseLabelsReturn {
   // Create
   createLabel: (data: CreateLabelInput) => Promise<PublicLabel>;
   isCreatingLabel: boolean;
+
+  // Update metadata
+  updateLabel: (
+    labelId: string,
+    data: UpdateLabelInput
+  ) => Promise<PublicLabel>;
+  isUpdatingLabel: boolean;
+
+  // Delete
+  deleteLabel: (labelId: string) => Promise<void>;
+  isDeletingLabel: boolean;
 }
 
 // ============================================================================
@@ -197,6 +209,65 @@ export function useLabels(): UseLabelsReturn {
     },
   });
 
+  // Update label metadata mutation
+  const updateLabelMutation = useMutation({
+    mutationFn: async ({
+      labelId,
+      data,
+    }: {
+      labelId: string;
+      data: UpdateLabelInput;
+    }) => {
+      return await labelsApi.updateLabel(labelId, data);
+    },
+    onSuccess: async (_data, variables) => {
+      if (currentProject) {
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: labelKeys.lists(currentProject.id),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: labelKeys.detail(currentProject.id, variables.labelId),
+          }),
+          queryClient.refetchQueries({
+            queryKey: projectFilesKeys.lists(currentProject.id),
+          }),
+        ]);
+      }
+    },
+  });
+
+  // Delete label mutation
+  const deleteLabelMutation = useMutation({
+    mutationFn: async (labelId: string) => {
+      await labelsApi.deleteLabel(labelId);
+    },
+    onSuccess: async (_data, labelId) => {
+      if (currentProject) {
+        // If deleted label was active, navigate to adjacent label
+        if (activeLabelId === labelId) {
+          const labelIds = labels.map((l) => l.id);
+          const deletedIndex = labelIds.indexOf(labelId);
+          const nextLabelId =
+            labelIds[deletedIndex + 1] ?? labelIds[deletedIndex - 1] ?? null;
+          setActiveLabelId(nextLabelId);
+        }
+
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: labelKeys.lists(currentProject.id),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: labelKeys.detail(currentProject.id, labelId),
+          }),
+          queryClient.refetchQueries({
+            queryKey: projectFilesKeys.lists(currentProject.id),
+          }),
+        ]);
+      }
+    },
+  });
+
   // Memoized map for efficient lookups (like useProject pattern)
   const labelsMap = useMemo(
     () => new Map(labels.map((l) => [l.id, l])),
@@ -284,5 +355,10 @@ export function useLabels(): UseLabelsReturn {
     isUpdateError: updateDialogueMutation.isError,
     createLabel: createLabelMutation.mutateAsync,
     isCreatingLabel: createLabelMutation.isPending,
+    updateLabel: (labelId: string, data: UpdateLabelInput) =>
+      updateLabelMutation.mutateAsync({ labelId, data }),
+    isUpdatingLabel: updateLabelMutation.isPending,
+    deleteLabel: deleteLabelMutation.mutateAsync,
+    isDeletingLabel: deleteLabelMutation.isPending,
   };
 }
