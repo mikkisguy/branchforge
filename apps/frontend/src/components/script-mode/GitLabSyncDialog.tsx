@@ -80,10 +80,11 @@ type SyncFormAction =
       type: "SET_CHARACTER_WIZARD";
       show: boolean;
       characters: DetectCharactersResponse | null;
-    }
-  | { type: "RESET" };
+    };
 
-function createInitialSyncFormState(operationType: string): SyncFormState {
+function createInitialSyncFormState(
+  operationType: SyncOperationType
+): SyncFormState {
   return {
     userBranch: null,
     commitMessage: `Sync ${operationType} from BranchForge`,
@@ -110,8 +111,6 @@ function syncFormReducer(
         showCharacterWizard: action.show,
         detectedCharacters: action.characters,
       };
-    case "RESET":
-      return createInitialSyncFormState("");
     default:
       return state;
   }
@@ -537,13 +536,7 @@ export function GitLabSyncDialog({
         <CharacterImportWizard
           open={formState.showCharacterWizard}
           onOpenChange={(open) => {
-            dispatch({
-              type: "SET_CHARACTER_WIZARD",
-              show: open,
-              characters: formState.detectedCharacters,
-            });
             if (!open) {
-              // Close the sync dialog after character wizard is closed
               handleClose();
             }
           }}

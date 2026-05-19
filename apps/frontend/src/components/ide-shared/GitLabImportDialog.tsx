@@ -153,6 +153,7 @@ export function GitLabImportDialog({
   const hasLoadedReposRef = useRef(false);
   const hasSetSelectingState = useRef(false);
   const loadReposRequestIdRef = useRef(0);
+  const importIdRef = useRef(0);
 
   const { success, error } = useToast();
   const {
@@ -170,8 +171,9 @@ export function GitLabImportDialog({
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
-      // Increment request ID to ignore stale listRepositories responses
+      // Increment request IDs to ignore stale responses
       loadReposRequestIdRef.current += 1;
+      importIdRef.current += 1;
       dispatch({ type: "RESET" });
       didCallOnSuccessRef.current = false;
       hasLoadedReposRef.current = false;
@@ -266,13 +268,8 @@ export function GitLabImportDialog({
         conflictResolution: "branchforge_wins",
       });
 
-      dispatch({
-        type: "SET_IMPORT_STATE",
-        payload: {
-          status: "success",
-          message: `Successfully imported ${result.project.name}`,
-        },
-      });
+      // Store imported project immediately so all success paths can access it
+      dispatch({ type: "SET_IMPORTED_PROJECT", payload: result.project });
 
       // Invalidate projects and GitLab linked repos cache
       await queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
@@ -280,11 +277,15 @@ export function GitLabImportDialog({
         queryKey: gitlabKeys.repositories(),
       });
 
+      const currentImportId = importIdRef.current;
+
       // Detect characters from imported RPY files
       try {
         const detectionResult = await charactersApi.detectCharacters(
           result.project.id
         );
+
+        if (currentImportId !== importIdRef.current) return;
 
         // Filter out characters that already exist in the database
         // For a newly created project, existingTags will be empty
@@ -294,7 +295,6 @@ export function GitLabImportDialog({
         );
 
         if (newCharacters.length > 0) {
-          dispatch({ type: "SET_IMPORTED_PROJECT", payload: result.project });
           dispatch({
             type: "SET_DETECTED_CHARACTERS",
             payload: {
@@ -307,6 +307,7 @@ export function GitLabImportDialog({
         }
       } catch (err) {
         console.error("Failed to detect characters:", err);
+        if (currentImportId !== importIdRef.current) return;
         // Non-blocking: notify user but don't fail the import
         error(
           "Project imported, but character detection failed. You can import characters manually later.",
@@ -314,7 +315,15 @@ export function GitLabImportDialog({
         );
       }
 
-      // Only show success and close if no characters detected
+      // Dispatch success only after character detection completes
+      dispatch({
+        type: "SET_IMPORT_STATE",
+        payload: {
+          status: "success",
+          message: `Successfully imported ${result.project.name}`,
+        },
+      });
+
       success("Project imported successfully");
       // Clear any existing timeout before scheduling a new one
       if (timeoutRef.current) {
@@ -357,7 +366,7 @@ export function GitLabImportDialog({
           !didCallOnSuccessRef.current
         ) {
           didCallOnSuccessRef.current = true;
-          onSuccess?.();
+          onSuccess?.(state.importedProject ?? undefined);
         }
       }
       onOpenChange(nextOpen);

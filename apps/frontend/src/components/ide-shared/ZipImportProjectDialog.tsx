@@ -129,11 +129,13 @@ export function ZipImportProjectDialog({
 
   const { success, error } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importIdRef = useRef(0);
   const importMutation = useImportZipProject();
 
   // Reset state when dialog closes
   useEffect(() => {
     if (!open) {
+      importIdRef.current += 1;
       dispatch({ type: "RESET" });
       importSucceededRef.current = false;
       didCallOnSuccessRef.current = false;
@@ -221,27 +223,27 @@ export function ZipImportProjectDialog({
         throw new Error(data.error || "Failed to import project");
       }
 
+      // Store created project immediately so all success paths can access it
       dispatch({
-        type: "SET_IMPORT_STATE",
-        importState: {
-          status: "success",
-          message: "Import completed successfully",
-          result: {
-            filesImported: data.filesImported || 0,
-            labelsCreated: data.labelsCreated || 0,
-          },
-        },
+        type: "SET_CHARACTER_WIZARD",
+        show: false,
+        characters: null,
+        project: data.project,
       });
 
       // Mark import as succeeded so we notify parent when wizard closes
       importSucceededRef.current = true;
       didCallOnSuccessRef.current = false;
 
+      const currentImportId = importIdRef.current;
+
       // Detect characters from imported RPY files
       try {
         const detectionResult = await charactersApi.detectCharacters(
           data.project.id
         );
+
+        if (currentImportId !== importIdRef.current) return;
 
         // Filter out characters that already exist in the database
         // For a newly created project, existingTags will be empty
@@ -261,9 +263,22 @@ export function ZipImportProjectDialog({
         }
       } catch (err) {
         console.error("Failed to detect characters:", err);
+        if (currentImportId !== importIdRef.current) return;
       }
 
-      // Only show success if no characters detected
+      // Dispatch success only after character detection completes
+      dispatch({
+        type: "SET_IMPORT_STATE",
+        importState: {
+          status: "success",
+          message: "Import completed successfully",
+          result: {
+            filesImported: data.filesImported || 0,
+            labelsCreated: data.labelsCreated || 0,
+          },
+        },
+      });
+
       success("Project imported successfully");
     } catch (err) {
       const message =

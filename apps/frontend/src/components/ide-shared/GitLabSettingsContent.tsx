@@ -68,9 +68,9 @@ function settingsReducer(
 ): SettingsState {
   switch (action.type) {
     case "SET_TOKEN":
-      return { ...state, token: action.value };
+      return { ...state, token: action.value, validationResult: null };
     case "SET_GITLAB_URL":
-      return { ...state, gitlabUrl: action.value };
+      return { ...state, gitlabUrl: action.value, validationResult: null };
     case "TOGGLE_SHOW_TOKEN":
       return { ...state, showToken: !state.showToken };
     case "SET_VALIDATING":
@@ -285,7 +285,7 @@ export function GitLabSettingsContent() {
                   <Input
                     id="token"
                     type={state.showToken ? "text" : "password"}
-                    placeholder="glpat-example-token-replace-with-real-one"
+                    placeholder="paste-your-token-here"
                     value={state.token}
                     onChange={(e) =>
                       dispatch({ type: "SET_TOKEN", value: e.target.value })

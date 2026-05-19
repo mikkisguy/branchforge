@@ -364,14 +364,25 @@ export function CharacterImportWizard({
    * Add a new character manually
    */
   const addCharacter = useCallback(() => {
-    if (!state.newCharacter.tag.trim()) {
+    const tag = state.newCharacter.tag.trim();
+    if (!tag) {
+      return;
+    }
+
+    // Check for duplicates across all character groups (case-insensitive)
+    const allTags = [
+      ...state.groups.new.map((c) => c.tag.toLowerCase()),
+      ...state.groups.existing.map((c) => c.tag.toLowerCase()),
+      ...state.groups.special.map((c) => c.tag.toLowerCase()),
+    ];
+    if (allTags.includes(tag.toLowerCase())) {
       return;
     }
 
     const character: EditableCharacter = {
-      tag: state.newCharacter.tag.trim(),
-      name: state.newCharacter.displayName || state.newCharacter.tag,
-      displayName: state.newCharacter.displayName || state.newCharacter.tag,
+      tag,
+      name: state.newCharacter.displayName || tag,
+      displayName: state.newCharacter.displayName || tag,
       color: state.newCharacter.color,
       isSpecial: false,
       sourceFile: "manual",
@@ -380,7 +391,7 @@ export function CharacterImportWizard({
     };
 
     dispatch({ type: "ADD_CHARACTER", character });
-  }, [state.newCharacter]);
+  }, [state.newCharacter, state.groups]);
 
   // Count totals
   const newCount = state.groups.new.length;
@@ -388,6 +399,7 @@ export function CharacterImportWizard({
   const specialCount = state.groups.special.length;
   const selectedCount =
     state.groups.new.filter((c) => !c.excluded).length +
+    state.groups.existing.filter((c) => !excludedTags.includes(c.tag)).length +
     state.groups.special.filter((c) => !c.excluded).length;
 
   // ============================================================================
@@ -395,7 +407,12 @@ export function CharacterImportWizard({
   // ============================================================================
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) handleClose();
+      }}
+    >
       <DialogContent className="max-w-2xl w-full p-0 gap-0 max-h-[80vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-border/30 flex items-start justify-between shrink-0">

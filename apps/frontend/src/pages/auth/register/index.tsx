@@ -121,7 +121,7 @@ export function RegisterPage() {
     );
   }
 
-  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     dispatch({ type: "SET_ERROR", value: "" });
 

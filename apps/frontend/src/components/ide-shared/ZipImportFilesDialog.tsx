@@ -146,9 +146,11 @@ export function ZipImportFilesDialog({
 
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importIdRef = useRef(0);
   // Reset state when dialog closes
   useEffect(() => {
     if (!open) {
+      importIdRef.current += 1;
       dispatch({ type: "RESET" });
     }
   }, [open]);
@@ -227,20 +229,7 @@ export function ZipImportFilesDialog({
       });
 
       if (result.success) {
-        dispatch({
-          type: "SET_IMPORT_STATE",
-          importState: {
-            status: "success",
-            progress: 100,
-            message: "Import completed successfully",
-            result: {
-              filesImported: result.filesImported,
-              filesUpdated: result.filesUpdated,
-              filesSkipped: result.filesSkipped,
-              labelsCreated: result.labelsCreated,
-            },
-          },
-        });
+        const currentImportId = importIdRef.current;
 
         // Invalidate and refetch queries to get fresh data before detecting characters
         try {
@@ -260,19 +249,19 @@ export function ZipImportFilesDialog({
             }),
           ]);
         } catch (cacheError) {
-          // Log cache refresh error but don't fail the import
           console.error("Failed to refresh cache after import:", cacheError);
-          // Non-blocking: import succeeded even if cache refresh failed
         }
+
+        if (currentImportId !== importIdRef.current) return;
 
         // Detect characters from imported RPY files
         try {
           const detectionResult =
             await charactersApi.detectCharacters(projectId);
 
+          if (currentImportId !== importIdRef.current) return;
+
           // Filter out characters that already exist in the database
-          // The backend now provides existingTags which includes ALL existing
-          // character tags, not just conflicts
           const existingTagsSet = new Set(detectionResult.existingTags);
           const newCharacters = detectionResult.characters.filter(
             (char) => !existingTagsSet.has(char.tag)
@@ -284,7 +273,7 @@ export function ZipImportFilesDialog({
               characters: {
                 characters: newCharacters,
                 excludedTags: detectionResult.excludedTags,
-                conflicts: [], // No conflicts since we filtered them out
+                conflicts: [],
                 existingTags: detectionResult.existingTags,
               },
             });
@@ -292,9 +281,25 @@ export function ZipImportFilesDialog({
           }
         } catch (err) {
           console.error("Failed to detect characters:", err);
+          if (currentImportId !== importIdRef.current) return;
         }
 
-        // Only show success if no NEW characters detected
+        // Dispatch success only after character detection completes
+        dispatch({
+          type: "SET_IMPORT_STATE",
+          importState: {
+            status: "success",
+            progress: 100,
+            message: "Import completed successfully",
+            result: {
+              filesImported: result.filesImported,
+              filesUpdated: result.filesUpdated,
+              filesSkipped: result.filesSkipped,
+              labelsCreated: result.labelsCreated,
+            },
+          },
+        });
+
         success(
           `Imported ${result.filesImported} files, ${result.labelsCreated} labels`
         );
@@ -413,6 +418,9 @@ export function ZipImportFilesDialog({
                       onClick={(e) => {
                         e.stopPropagation();
                         dispatch({ type: "SET_SELECTED_FILE", file: null });
+                        if (fileInputRef.current) {
+                          fileInputRef.current.value = "";
+                        }
                       }}
                     >
                       Remove
@@ -554,6 +562,9 @@ export function ZipImportFilesDialog({
                 variant="outline"
                 onClick={() => {
                   dispatch({ type: "RESET_FILE_AND_IMPORT" });
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = "";
+                  }
                 }}
               >
                 Try Again
