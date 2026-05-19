@@ -257,16 +257,10 @@ export function useAutosave<T>({
         savePromiseRef.current = null;
         setSaveStatus("saved");
         setIsDirty(false);
-        return;
-      }
-
-      if (isSavingRef.current) {
+      } else if (isSavingRef.current) {
         // Keep the latest unsaved payload available for a manual flush while
         // a debounced save is in-flight.
-        return;
-      }
-
-      if (currentHash !== pendingHashRef.current) {
+      } else if (currentHash !== pendingHashRef.current) {
         pendingHashRef.current = currentHash;
 
         clearSaveTimeout();
@@ -287,7 +281,11 @@ export function useAutosave<T>({
     }
 
     return () => {
-      clearSaveTimeout();
+      // Inline clearTimeout so lint rules can see the cleanup directly.
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = undefined;
+      }
       // Reset so the next effect run knows it may need to reschedule
       pendingHashRef.current = null;
     };

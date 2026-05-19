@@ -5,7 +5,7 @@
  * Shows progress and allows configuration of branch and commit message.
  */
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useReducer, useCallback, useRef, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { X, Download, Upload, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -61,6 +61,62 @@ const CONFLICT_RESOLUTIONS: Array<{
 ];
 
 // ============================================================================
+// Types and Reducer
+// ============================================================================
+
+interface SyncFormState {
+  userBranch: string | null;
+  commitMessage: string;
+  conflictResolution: ConflictResolution;
+  showCharacterWizard: boolean;
+  detectedCharacters: DetectCharactersResponse | null;
+}
+
+type SyncFormAction =
+  | { type: "SET_USER_BRANCH"; value: string | null }
+  | { type: "SET_COMMIT_MESSAGE"; value: string }
+  | { type: "SET_CONFLICT_RESOLUTION"; value: ConflictResolution }
+  | {
+      type: "SET_CHARACTER_WIZARD";
+      show: boolean;
+      characters: DetectCharactersResponse | null;
+    };
+
+function createInitialSyncFormState(
+  operationType: SyncOperationType
+): SyncFormState {
+  return {
+    userBranch: null,
+    commitMessage: `Sync ${operationType} from BranchForge`,
+    conflictResolution: "branchforge_wins",
+    showCharacterWizard: false,
+    detectedCharacters: null,
+  };
+}
+
+function syncFormReducer(
+  state: SyncFormState,
+  action: SyncFormAction
+): SyncFormState {
+  switch (action.type) {
+    case "SET_USER_BRANCH":
+      return { ...state, userBranch: action.value };
+    case "SET_COMMIT_MESSAGE":
+      return { ...state, commitMessage: action.value };
+    case "SET_CONFLICT_RESOLUTION":
+      return { ...state, conflictResolution: action.value };
+    case "SET_CHARACTER_WIZARD":
+      return {
+        ...state,
+        showCharacterWizard: action.show,
+        detectedCharacters: action.characters,
+      };
+    default:
+      return state;
+  }
+}
+
+// ============================================================================
 // Component
 // ============================================================================
 
@@ -80,18 +136,12 @@ export function GitLabSyncDialog({
   const isFirstSync = !isLoadingLabels && labels.length === 0;
 
   // Form state — derive branch from prop, track user overrides separately
-  const [userBranch, setUserBranch] = useState<string | null>(null);
-  const branch = userBranch ?? defaultBranch;
-  const [commitMessage, setCommitMessage] = useState(
-    `Sync ${operationType} from BranchForge`
+  const [formState, dispatch] = useReducer(
+    syncFormReducer,
+    operationType,
+    createInitialSyncFormState
   );
-  const [conflictResolution, setConflictResolution] =
-    useState<ConflictResolution>("branchforge_wins");
-
-  // Character wizard state
-  const [showCharacterWizard, setShowCharacterWizard] = useState(false);
-  const [detectedCharacters, setDetectedCharacters] =
-    useState<DetectCharactersResponse | null>(null);
+  const branch = formState.userBranch ?? defaultBranch;
 
   // Ref to track the timeout so we can clear it on unmount
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(
@@ -123,7 +173,9 @@ export function GitLabSyncDialog({
 
     // For first sync, use gitlab_wins as the conflict resolution
     // (there's no local data to preserve anyway)
-    const resolution = isFirstSync ? "gitlab_wins" : conflictResolution;
+    const resolution = isFirstSync
+      ? "gitlab_wins"
+      : formState.conflictResolution;
 
     // Capture the operation result directly rather than relying on state.operation
     // which may be stale due to React's asynchronous state updates
@@ -132,7 +184,7 @@ export function GitLabSyncDialog({
         ? await exportToGitlab(
             projectId,
             branch.trim(),
-            commitMessage.trim() || undefined
+            formState.commitMessage.trim() || undefined
           )
         : await importFromGitlab(projectId, branch.trim(), resolution);
 
@@ -168,13 +220,16 @@ export function GitLabSyncDialog({
           );
 
           if (newCharacters.length > 0) {
-            setDetectedCharacters({
-              characters: newCharacters,
-              conflicts: detectionResult.conflicts,
-              excludedTags: detectionResult.excludedTags,
-              existingTags: detectionResult.existingTags,
+            dispatch({
+              type: "SET_CHARACTER_WIZARD",
+              show: true,
+              characters: {
+                characters: newCharacters,
+                conflicts: detectionResult.conflicts,
+                excludedTags: detectionResult.excludedTags,
+                existingTags: detectionResult.existingTags,
+              },
             });
-            setShowCharacterWizard(true);
             return;
           }
         } catch (err) {
@@ -197,8 +252,8 @@ export function GitLabSyncDialog({
     }
   }, [
     branch,
-    commitMessage,
-    conflictResolution,
+    formState.commitMessage,
+    formState.conflictResolution,
     operationType,
     projectId,
     exportToGitlab,
@@ -218,8 +273,11 @@ export function GitLabSyncDialog({
    */
   const handleClose = useCallback(() => {
     clearAutoCloseTimeout();
-    setShowCharacterWizard(false);
-    setDetectedCharacters(null);
+    dispatch({
+      type: "SET_CHARACTER_WIZARD",
+      show: false,
+      characters: null,
+    });
     reset();
     onOpenChange(false);
   }, [clearAutoCloseTimeout, reset, onOpenChange]);
@@ -360,7 +418,9 @@ export function GitLabSyncDialog({
                   type="text"
                   placeholder={defaultBranch}
                   value={branch}
-                  onChange={(e) => setUserBranch(e.target.value)}
+                  onChange={(e) =>
+                    dispatch({ type: "SET_USER_BRANCH", value: e.target.value })
+                  }
                   disabled={state.isProcessing}
                 />
                 <p className="text-xs text-muted-foreground">
@@ -377,8 +437,13 @@ export function GitLabSyncDialog({
                     id="commit-message"
                     type="text"
                     placeholder="Update scenes from BranchForge"
-                    value={commitMessage}
-                    onChange={(e) => setCommitMessage(e.target.value)}
+                    value={formState.commitMessage}
+                    onChange={(e) =>
+                      dispatch({
+                        type: "SET_COMMIT_MESSAGE",
+                        value: e.target.value,
+                      })
+                    }
                     disabled={state.isProcessing}
                   />
                 </div>
@@ -403,9 +468,14 @@ export function GitLabSyncDialog({
                           <button
                             key={cr.value}
                             type="button"
-                            onClick={() => setConflictResolution(cr.value)}
+                            onClick={() =>
+                              dispatch({
+                                type: "SET_CONFLICT_RESOLUTION",
+                                value: cr.value,
+                              })
+                            }
                             className={`w-full p-3 text-left rounded-md border transition-colors ${
-                              conflictResolution === cr.value
+                              formState.conflictResolution === cr.value
                                 ? "border-primary bg-primary/10"
                                 : "border-border/30 hover:bg-muted/50"
                             }`}
@@ -462,20 +532,18 @@ export function GitLabSyncDialog({
       </DialogContent>
 
       {/* Character Import Wizard */}
-      {detectedCharacters && (
+      {formState.detectedCharacters && (
         <CharacterImportWizard
-          open={showCharacterWizard}
+          open={formState.showCharacterWizard}
           onOpenChange={(open) => {
-            setShowCharacterWizard(open);
             if (!open) {
-              // Close the sync dialog after character wizard is closed
               handleClose();
             }
           }}
           projectId={projectId}
-          detectedCharacters={detectedCharacters.characters}
-          conflicts={detectedCharacters.conflicts}
-          excludedTags={detectedCharacters.excludedTags}
+          detectedCharacters={formState.detectedCharacters.characters}
+          conflicts={formState.detectedCharacters.conflicts}
+          excludedTags={formState.detectedCharacters.excludedTags}
           onComplete={() => {
             // Refresh labels and characters after character import/linking
             void invalidateLabels();

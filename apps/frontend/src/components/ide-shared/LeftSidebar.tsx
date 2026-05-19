@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useReducer, useEffect, useRef, useCallback } from "react";
 import {
   BookOpen,
   SquarePen,
@@ -66,6 +66,56 @@ export type LeftSidebarProps =
   | ControlledSettingsProps
   | UncontrolledSettingsProps;
 
+type ModalKey =
+  | "themeDropdown"
+  | "settings"
+  | "routes"
+  | "stateVars"
+  | "characters"
+  | "projectPopover"
+  | "gitLabImport"
+  | "zipImport";
+
+interface ModalState {
+  themeDropdown: boolean;
+  settings: boolean;
+  routes: boolean;
+  stateVars: boolean;
+  characters: boolean;
+  projectPopover: boolean;
+  gitLabImport: boolean;
+  zipImport: boolean;
+}
+
+type ModalAction =
+  | { type: "OPEN"; key: ModalKey }
+  | { type: "CLOSE"; key: ModalKey }
+  | { type: "TOGGLE"; key: ModalKey };
+
+const initialModalState: ModalState = {
+  themeDropdown: false,
+  settings: false,
+  routes: false,
+  stateVars: false,
+  characters: false,
+  projectPopover: false,
+  gitLabImport: false,
+  zipImport: false,
+};
+
+function modalReducer(state: ModalState, action: ModalAction): ModalState {
+  switch (action.type) {
+    case "OPEN":
+      return { ...state, [action.key]: true };
+    case "CLOSE":
+      return { ...state, [action.key]: false };
+    case "TOGGLE":
+      return { ...state, [action.key]: !state[action.key] };
+    default:
+      return state;
+  }
+}
+
 export function LeftSidebar(props: LeftSidebarProps) {
   const {
     mode,
@@ -88,28 +138,21 @@ export function LeftSidebar(props: LeftSidebarProps) {
 
   const isSettingsOpenExternally = props.isSettingsOpenExternally;
   const onSettingsOpenChangeExternally = props.onSettingsOpenChangeExternally;
-  const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
-  const [isSettingsOpenInternal, setIsSettingsOpenInternal] = useState(false);
-  const [isRoutesOpen, setIsRoutesOpen] = useState(false);
-  const [isStateVarsOpen, setIsStateVarsOpen] = useState(false);
-  const [isCharactersOpen, setIsCharactersOpen] = useState(false);
-  const [isProjectPopoverOpen, setIsProjectPopoverOpen] = useState(false);
-  const [showGitLabImportDialog, setShowGitLabImportDialog] = useState(false);
-  const [showZipImportDialog, setShowZipImportDialog] = useState(false);
+  const [modals, dispatchModal] = useReducer(modalReducer, initialModalState);
   const themeDropdownRef = useRef<HTMLDivElement>(null);
   const projectPopoverRef = useRef<HTMLDivElement>(null);
   const projectsRef = useRef(projects);
 
-  const isSettingsOpen = isSettingsOpenExternally ?? isSettingsOpenInternal;
+  const isSettingsOpen = isSettingsOpenExternally ?? modals.settings;
   const setSettingsOpen = useCallback(
     (value: boolean) => {
       if (onSettingsOpenChangeExternally) {
         onSettingsOpenChangeExternally(value);
       } else {
-        setIsSettingsOpenInternal(value);
+        dispatchModal({ type: value ? "OPEN" : "CLOSE", key: "settings" });
       }
     },
-    [onSettingsOpenChangeExternally, setIsSettingsOpenInternal]
+    [onSettingsOpenChangeExternally]
   );
 
   const handleToggleCollapse = () => {
@@ -129,24 +172,24 @@ export function LeftSidebar(props: LeftSidebarProps) {
         themeDropdownRef.current &&
         !themeDropdownRef.current.contains(event.target as Node)
       ) {
-        setIsThemeDropdownOpen(false);
+        dispatchModal({ type: "CLOSE", key: "themeDropdown" });
       }
       if (
         projectPopoverRef.current &&
         !projectPopoverRef.current.contains(event.target as Node)
       ) {
-        setIsProjectPopoverOpen(false);
+        dispatchModal({ type: "CLOSE", key: "projectPopover" });
       }
     }
 
-    if (isThemeDropdownOpen || isProjectPopoverOpen) {
+    if (modals.themeDropdown || modals.projectPopover) {
       document.addEventListener("mousedown", handleClickOutside);
     }
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isThemeDropdownOpen, isProjectPopoverOpen]);
+  }, [modals.themeDropdown, modals.projectPopover]);
 
   const width = isCollapsed ? "w-14" : "w-56";
   const showLabel = !isCollapsed;
@@ -241,10 +284,12 @@ export function LeftSidebar(props: LeftSidebarProps) {
               <>
                 {/* Collapsed: Icon button with popover */}
                 <button
-                  onClick={() => setIsProjectPopoverOpen(!isProjectPopoverOpen)}
+                  onClick={() =>
+                    dispatchModal({ type: "TOGGLE", key: "projectPopover" })
+                  }
                   disabled={isLoadingProjects}
                   className={`flex items-center justify-center p-2.5 rounded-md text-sm font-medium transition-colors ${
-                    isProjectPopoverOpen
+                    modals.projectPopover
                       ? "text-foreground bg-muted/50"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   }`}
@@ -253,7 +298,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
                   <FolderOpen className="size-4 flex-shrink-0" />
                 </button>
 
-                {isProjectPopoverOpen && (
+                {modals.projectPopover && (
                   <div className="absolute left-full top-0 ml-2 bg-card border border-border/30 rounded-lg shadow-xl min-w-[300px] max-w-[400px] z-50">
                     <div className="p-2 max-h-[400px] overflow-y-auto">
                       {isLoadingProjects ? (
@@ -272,7 +317,10 @@ export function LeftSidebar(props: LeftSidebarProps) {
                             key={project.id}
                             onClick={() => {
                               setCurrentProject(project);
-                              setIsProjectPopoverOpen(false);
+                              dispatchModal({
+                                type: "CLOSE",
+                                key: "projectPopover",
+                              });
                             }}
                             className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-left transition-colors ${
                               projectId === project.id
@@ -326,7 +374,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
           <nav className="flex flex-col gap-1">
             {/* Routes */}
             <button
-              onClick={() => setIsRoutesOpen(true)}
+              onClick={() => dispatchModal({ type: "OPEN", key: "routes" })}
               disabled={!projectId}
               className={`flex items-center ${
                 isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
@@ -343,7 +391,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
 
             {/* State Variables */}
             <button
-              onClick={() => setIsStateVarsOpen(true)}
+              onClick={() => dispatchModal({ type: "OPEN", key: "stateVars" })}
               disabled={!projectId}
               className={`flex items-center ${
                 isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
@@ -360,7 +408,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
 
             {/* Characters */}
             <button
-              onClick={() => setIsCharactersOpen(true)}
+              onClick={() => dispatchModal({ type: "OPEN", key: "characters" })}
               disabled={!projectId}
               className={`flex items-center ${
                 isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
@@ -403,9 +451,11 @@ export function LeftSidebar(props: LeftSidebarProps) {
               <>
                 {/* Collapsed: Icon button with popover */}
                 <button
-                  onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
+                  onClick={() =>
+                    dispatchModal({ type: "TOGGLE", key: "themeDropdown" })
+                  }
                   className={`flex items-center justify-center p-2.5 rounded-md text-sm font-medium transition-colors ${
-                    isThemeDropdownOpen
+                    modals.themeDropdown
                       ? "text-foreground bg-muted/50"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   }`}
@@ -414,7 +464,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
                   <Palette className="size-4 flex-shrink-0" />
                 </button>
 
-                {isThemeDropdownOpen && (
+                {modals.themeDropdown && (
                   <div className="absolute left-full top-0 ml-2 bg-card border border-border/30 rounded-lg p-3 shadow-xl z-50">
                     <div className="flex gap-2">
                       {themePalettes.map((palette) => (
@@ -422,7 +472,10 @@ export function LeftSidebar(props: LeftSidebarProps) {
                           key={palette.key}
                           onClick={() => {
                             setTheme(palette.key);
-                            setIsThemeDropdownOpen(false);
+                            dispatchModal({
+                              type: "CLOSE",
+                              key: "themeDropdown",
+                            });
                           }}
                           className={`size-7 rounded transition-all ${
                             theme === palette.key
@@ -496,29 +549,38 @@ export function LeftSidebar(props: LeftSidebarProps) {
         onDeleteProject={deleteProject}
         onImportFromGitLab={() => {
           setSettingsOpen(false);
-          setShowGitLabImportDialog(true);
+          dispatchModal({ type: "OPEN", key: "gitLabImport" });
         }}
         onImportZip={() => {
           setSettingsOpen(false);
-          setShowZipImportDialog(true);
+          dispatchModal({ type: "OPEN", key: "zipImport" });
         }}
         initialTab={initialSettingsTab}
       />
       {projectId && (
         <>
           <RouteSettingsModal
-            open={isRoutesOpen}
-            onOpenChange={setIsRoutesOpen}
+            open={modals.routes}
+            onOpenChange={(open) =>
+              dispatchModal({ type: open ? "OPEN" : "CLOSE", key: "routes" })
+            }
             projectId={projectId}
           />
           <StateVariablesModal
-            open={isStateVarsOpen}
-            onOpenChange={setIsStateVarsOpen}
+            open={modals.stateVars}
+            onOpenChange={(open) =>
+              dispatchModal({ type: open ? "OPEN" : "CLOSE", key: "stateVars" })
+            }
             projectId={projectId}
           />
           <CharactersModal
-            open={isCharactersOpen}
-            onOpenChange={setIsCharactersOpen}
+            open={modals.characters}
+            onOpenChange={(open) =>
+              dispatchModal({
+                type: open ? "OPEN" : "CLOSE",
+                key: "characters",
+              })
+            }
             projectId={projectId}
           />
         </>
@@ -526,15 +588,19 @@ export function LeftSidebar(props: LeftSidebarProps) {
 
       {/* GitLab Import Dialog */}
       <GitLabImportDialog
-        open={showGitLabImportDialog}
-        onOpenChange={setShowGitLabImportDialog}
+        open={modals.gitLabImport}
+        onOpenChange={(open: boolean) =>
+          dispatchModal({ type: open ? "OPEN" : "CLOSE", key: "gitLabImport" })
+        }
         onSuccess={handleImportSuccess}
       />
 
       {/* ZIP Import Dialog */}
       <ZipImportProjectDialog
-        open={showZipImportDialog}
-        onOpenChange={setShowZipImportDialog}
+        open={modals.zipImport}
+        onOpenChange={(open: boolean) =>
+          dispatchModal({ type: open ? "OPEN" : "CLOSE", key: "zipImport" })
+        }
         onSuccess={handleImportSuccess}
       />
     </>

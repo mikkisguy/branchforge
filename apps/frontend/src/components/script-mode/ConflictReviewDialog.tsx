@@ -5,7 +5,7 @@
  * Shows side-by-side comparison and allows user to choose which version to keep.
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useReducer, useCallback, useEffect } from "react";
 import { X, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -98,6 +98,94 @@ function getConflictTypeLabel(type: ConflictInfo["type"]): string {
   }
 }
 
+interface ConflictState {
+  currentIndex: number;
+  resolutions: Map<string, "local" | "remote" | "skip">;
+  isLoading: boolean;
+  conflicts: ConflictInfo[];
+  fetchError: string | null;
+}
+
+type ConflictAction =
+  | { type: "DECREMENT_INDEX" }
+  | { type: "INCREMENT_INDEX" }
+  | {
+      type: "SET_RESOLUTION";
+      label: string;
+      choice: "local" | "remote" | "skip";
+    }
+  | { type: "SET_LOADING"; isLoading: boolean }
+  | { type: "SET_CONFLICTS"; conflicts: ConflictInfo[] }
+  | { type: "SET_FETCH_ERROR"; error: string | null }
+  | { type: "RESET_FOR_NEW_FETCH" }
+  | { type: "FETCH_SUCCESS"; conflicts: ConflictInfo[] }
+  | { type: "FETCH_ERROR"; error: string }
+  | { type: "LOAD_MOCK"; conflicts: ConflictInfo[] };
+
+const initialConflictState: ConflictState = {
+  currentIndex: 0,
+  resolutions: new Map(),
+  isLoading: false,
+  conflicts: [],
+  fetchError: null,
+};
+
+function conflictReducer(
+  state: ConflictState,
+  action: ConflictAction
+): ConflictState {
+  switch (action.type) {
+    case "DECREMENT_INDEX":
+      return { ...state, currentIndex: Math.max(0, state.currentIndex - 1) };
+    case "INCREMENT_INDEX":
+      return {
+        ...state,
+        currentIndex: Math.min(
+          state.conflicts.length - 1,
+          state.currentIndex + 1
+        ),
+      };
+    case "SET_RESOLUTION": {
+      const next = new Map(state.resolutions);
+      next.set(action.label, action.choice);
+      return { ...state, resolutions: next };
+    }
+    case "SET_LOADING":
+      return { ...state, isLoading: action.isLoading };
+    case "SET_CONFLICTS":
+      return { ...state, conflicts: action.conflicts };
+    case "SET_FETCH_ERROR":
+      return { ...state, fetchError: action.error };
+    case "RESET_FOR_NEW_FETCH":
+      return { ...state, isLoading: true, fetchError: null };
+    case "FETCH_SUCCESS":
+      return {
+        ...state,
+        isLoading: false,
+        conflicts: action.conflicts,
+        currentIndex: 0,
+        resolutions: new Map(),
+      };
+    case "FETCH_ERROR":
+      return {
+        ...state,
+        isLoading: false,
+        fetchError: action.error,
+        conflicts: [],
+      };
+    case "LOAD_MOCK":
+      return {
+        ...state,
+        conflicts: action.conflicts,
+        currentIndex: 0,
+        resolutions: new Map(),
+        fetchError: null,
+      };
+    default:
+      return state;
+  }
+}
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -113,13 +201,7 @@ export function ConflictReviewDialog({
   const { success, error } = useToast();
 
   // State
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [resolutions, setResolutions] = useState<
-    Map<string, "local" | "remote" | "skip">
-  >(new Map());
-  const [isLoading, setIsLoading] = useState(false);
-  const [conflicts, setConflicts] = useState<ConflictInfo[]>([]);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [state, dispatch] = useReducer(conflictReducer, initialConflictState);
 
   /**
    * Fetch conflicts when dialog opens
@@ -132,27 +214,19 @@ export function ConflictReviewDialog({
     const abortController = new AbortController();
     const { signal } = abortController;
 
-    setIsLoading(true);
-    setFetchError(null);
+    dispatch({ type: "RESET_FOR_NEW_FETCH" });
 
     gitlabApi
       .detectConflicts(projectId, branch, signal)
       .then((result: ConflictDetectionResult) => {
         if (signal.aborted) return;
-        setConflicts(result.conflicts);
-        setCurrentIndex(0);
-        setResolutions(new Map());
+        dispatch({ type: "FETCH_SUCCESS", conflicts: result.conflicts });
       })
       .catch((err: Error) => {
         if (signal.aborted) return;
         const message = err.message || "Failed to fetch conflicts";
-        setFetchError(message);
+        dispatch({ type: "FETCH_ERROR", error: message });
         error(message);
-        setConflicts([]);
-      })
-      .finally(() => {
-        if (signal.aborted) return;
-        setIsLoading(false);
       });
 
     return () => {
@@ -160,8 +234,8 @@ export function ConflictReviewDialog({
     };
   }, [open, projectId, branch, error]);
 
-  const currentConflict = conflicts[currentIndex];
-  const currentResolution = resolutions.get(currentConflict?.label || "");
+  const currentConflict = state.conflicts[state.currentIndex];
+  const currentResolution = state.resolutions.get(currentConflict?.label || "");
 
   /**
    * Set resolution for current conflict
@@ -169,9 +243,11 @@ export function ConflictReviewDialog({
   const setResolution = useCallback(
     (choice: "local" | "remote" | "skip") => {
       if (!currentConflict) return;
-      setResolutions((prev) =>
-        new Map(prev).set(currentConflict.label, choice)
-      );
+      dispatch({
+        type: "SET_RESOLUTION",
+        label: currentConflict.label,
+        choice,
+      });
     },
     [currentConflict]
   );
@@ -180,26 +256,26 @@ export function ConflictReviewDialog({
    * Navigate to previous conflict
    */
   const goPrevious = useCallback(() => {
-    setCurrentIndex((prev) => Math.max(0, prev - 1));
+    dispatch({ type: "DECREMENT_INDEX" });
   }, []);
 
   /**
    * Navigate to next conflict
    */
   const goNext = useCallback(() => {
-    setCurrentIndex((prev) => Math.min(conflicts.length - 1, prev + 1));
-  }, [conflicts.length]);
+    dispatch({ type: "INCREMENT_INDEX" });
+  }, []);
 
   /**
    * Apply all resolutions
    */
   const handleApply = useCallback(async () => {
-    setIsLoading(true);
+    dispatch({ type: "SET_LOADING", isLoading: true });
 
     try {
       // Convert resolutions to array
       const resolutionArray: ConflictResolution[] = Array.from(
-        resolutions.entries()
+        state.resolutions.entries()
       ).map(([label, choice]) => ({
         label,
         choice,
@@ -223,23 +299,20 @@ export function ConflictReviewDialog({
         err instanceof Error ? err.message : "Failed to apply resolutions";
       error(message);
     } finally {
-      setIsLoading(false);
+      dispatch({ type: "SET_LOADING", isLoading: false });
     }
-  }, [resolutions, onApplyResolutions, onOpenChange, success, error]);
+  }, [state.resolutions, onApplyResolutions, onOpenChange, success, error]);
 
   /**
    * Load mock conflicts (owner only)
    */
   const loadMockConflicts = useCallback(() => {
-    setConflicts(MOCK_CONFLICTS);
-    setCurrentIndex(0);
-    setResolutions(new Map());
-    setFetchError(null);
+    dispatch({ type: "LOAD_MOCK", conflicts: MOCK_CONFLICTS });
   }, []);
 
   // Calculate progress
-  const resolvedCount = resolutions.size;
-  const totalCount = conflicts.length;
+  const resolvedCount = state.resolutions.size;
+  const totalCount = state.conflicts.length;
   const hasUnresolved = totalCount > resolvedCount;
 
   // ============================================================================
@@ -259,7 +332,7 @@ export function ConflictReviewDialog({
                   size="sm"
                   variant="ghost"
                   onClick={loadMockConflicts}
-                  disabled={isLoading}
+                  disabled={state.isLoading}
                   className="text-xs"
                 >
                   Load Mock Data
@@ -273,7 +346,7 @@ export function ConflictReviewDialog({
           <button
             onClick={() => onOpenChange(false)}
             className="text-muted-foreground hover:text-foreground transition-colors"
-            disabled={isLoading}
+            disabled={state.isLoading}
           >
             <X className="size-5" />
           </button>
@@ -281,7 +354,7 @@ export function ConflictReviewDialog({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          {isLoading && conflicts.length === 0 ? (
+          {state.isLoading && state.conflicts.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <div className="animate-spin rounded-full size-8 border-b-2 border-primary mx-auto mb-4" />
@@ -290,10 +363,12 @@ export function ConflictReviewDialog({
                 </p>
               </div>
             </div>
-          ) : fetchError && conflicts.length === 0 ? (
+          ) : state.fetchError && state.conflicts.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
-                <p className="text-sm text-destructive mb-2">{fetchError}</p>
+                <p className="text-sm text-destructive mb-2">
+                  {state.fetchError}
+                </p>
                 {userRole === "OWNER" && (
                   <Button
                     size="sm"
@@ -305,7 +380,7 @@ export function ConflictReviewDialog({
                 )}
               </div>
             </div>
-          ) : conflicts.length === 0 ? (
+          ) : state.conflicts.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <CheckCircle2 className="size-12 mx-auto text-green-500 mb-4" />
@@ -330,17 +405,19 @@ export function ConflictReviewDialog({
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <button
                     onClick={goPrevious}
-                    disabled={currentIndex === 0 || isLoading}
+                    disabled={state.currentIndex === 0 || state.isLoading}
                     className="p-1 hover:bg-muted rounded transition-colors disabled:opacity-50"
                   >
                     <ChevronLeft className="size-5" />
                   </button>
                   <span>
-                    {currentIndex + 1} / {totalCount}
+                    {state.currentIndex + 1} / {totalCount}
                   </span>
                   <button
                     onClick={goNext}
-                    disabled={currentIndex === totalCount - 1 || isLoading}
+                    disabled={
+                      state.currentIndex === totalCount - 1 || state.isLoading
+                    }
                     className="p-1 hover:bg-muted rounded transition-colors disabled:opacity-50"
                   >
                     <ChevronRight className="size-5" />
@@ -376,7 +453,7 @@ export function ConflictReviewDialog({
                         currentResolution === "local" ? "default" : "outline"
                       }
                       onClick={() => setResolution("local")}
-                      disabled={isLoading}
+                      disabled={state.isLoading}
                     >
                       {currentResolution === "local" ? "Selected" : "Use This"}
                     </Button>
@@ -398,7 +475,7 @@ export function ConflictReviewDialog({
                         currentResolution === "remote" ? "default" : "outline"
                       }
                       onClick={() => setResolution("remote")}
-                      disabled={isLoading}
+                      disabled={state.isLoading}
                     >
                       {currentResolution === "remote" ? "Selected" : "Use This"}
                     </Button>
@@ -417,7 +494,7 @@ export function ConflictReviewDialog({
                   variant="ghost"
                   size="sm"
                   onClick={() => setResolution("skip")}
-                  disabled={isLoading}
+                  disabled={state.isLoading}
                   className={
                     currentResolution === "skip" ? "text-muted-foreground" : ""
                   }
@@ -442,7 +519,7 @@ export function ConflictReviewDialog({
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            disabled={isLoading}
+            disabled={state.isLoading}
           >
             Cancel
           </Button>
@@ -452,8 +529,11 @@ export function ConflictReviewDialog({
                 Resolve all conflicts first
               </span>
             )}
-            <Button onClick={handleApply} disabled={isLoading || hasUnresolved}>
-              {isLoading ? <>Applying…</> : <>Apply Resolutions</>}
+            <Button
+              onClick={handleApply}
+              disabled={state.isLoading || hasUnresolved}
+            >
+              {state.isLoading ? <>Applying…</> : <>Apply Resolutions</>}
             </Button>
           </div>
         </div>
