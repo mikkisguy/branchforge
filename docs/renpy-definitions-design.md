@@ -130,14 +130,14 @@ interface RenpySnippet {
 
 ## Implementation Status
 
-### Phase 1: `renpy_definitions` (Current Plan)
+### Phase 1: `renpy_definitions` — ✅ COMPLETE
 
-- [ ] Backend routes, service, validation
-- [ ] Frontend API client, hooks, UI
-- [ ] Export to `definitions.rpy`
-- [ ] Import/detection from existing files (future)
+- [x] Backend routes, service, validation
+- [x] Frontend API client, hooks, UI
+- [x] Export to `definitions.rpy`
+- [ ] Import/detection from existing files → **Tracked in GitHub Issue #135**
 
-### Phase 2: `renpy_snippets` (Future)
+### Phase 2: `renpy_snippets` — Tracked in GitHub Issue #134
 
 - [ ] Schema design
 - [ ] Backend CRUD
