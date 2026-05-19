@@ -43,6 +43,7 @@ describe("Labels API", () => {
     visibility: "EXCLUSIVE",
     projectFileId: "file-1",
     fileName: "scene_1.rpy",
+    labelName: null,
     createdAt: "2024-01-01T00:00:00.000Z",
     updatedAt: "2024-01-01T00:00:00.000Z",
   };

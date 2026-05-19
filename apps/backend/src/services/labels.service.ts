@@ -1119,6 +1119,7 @@ type LabelForPublic = Pick<
   | "id"
   | "projectId"
   | "title"
+  | "labelName"
   | "groupType" // was: act
   | "groupValue" // was: chapter
   | "labelNumber"
@@ -1325,6 +1326,7 @@ export async function listLabels(
       id: labels.id,
       projectId: labels.projectId,
       title: labels.title,
+      labelName: labels.labelName,
       groupType: labels.groupType,
       groupValue: labels.groupValue,
       labelNumber: labels.labelNumber,
@@ -1475,6 +1477,7 @@ function mapToPublicLabel(label: LabelForPublic): PublicLabel {
     id: label.id,
     projectId: label.projectId,
     title: label.title,
+    labelName: label.labelName ?? null,
     groupType: label.groupType ?? null,
     groupValue: label.groupValue ?? null,
     labelNumber: label.labelNumber,

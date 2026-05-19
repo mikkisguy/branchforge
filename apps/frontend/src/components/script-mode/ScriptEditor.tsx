@@ -18,6 +18,11 @@ import {
 } from "../../lib/codemirror/renpy-theme";
 import { stripBOM } from "../../lib/codemirror/utils";
 import { useEditorCursor } from "../../lib/codemirror/useEditorCursor";
+import {
+  labelTitleExtension,
+  setLabelTitlesEffect,
+  type LabelTitleMap,
+} from "../../lib/codemirror/label-title-decoration";
 import { PaletteSwitcher } from "./PaletteSwitcher";
 import {
   FontSizeSwitcher,
@@ -25,6 +30,7 @@ import {
 } from "../FontSizeSwitcher";
 import { LineWrapSwitcher } from "./LineWrapSwitcher";
 import { SaveIndicator } from "../write-mode/SaveIndicator";
+import { Eye, EyeOff } from "lucide-react";
 import type { SaveStatus } from "@/hooks/useAutosave";
 import { useLocalStorageBoolean } from "@/hooks/useLocalStorage";
 
@@ -41,6 +47,7 @@ interface ScriptEditorProps {
   saveStatus?: SaveStatus;
   saveConflict?: boolean;
   onSaveRequest?: () => void;
+  labelTitles?: LabelTitleMap;
 }
 
 const TARGET_LINE_HIGHLIGHT_MS = 920;
@@ -91,6 +98,7 @@ export const ScriptEditor = function ScriptEditor({
   saveStatus,
   saveConflict,
   onSaveRequest,
+  labelTitles,
   ref,
 }: ScriptEditorProps & { ref?: React.Ref<ScriptEditorRef> }) {
   const [lineWrap, setLineWrap] = useLocalStorageBoolean(
@@ -108,6 +116,23 @@ export const ScriptEditor = function ScriptEditor({
   const hasScrolled = useRef(false);
   // Keep a reference to the EditorView for dynamic scroll operations
   const editorViewRef = useRef<EditorView | null>(null);
+
+  // Keep latest labelTitles in a ref so handleCreateEditor can dispatch
+  // without re-creating the callback (which would re-mount CodeMirror)
+  const labelTitlesRef = useRef<LabelTitleMap | undefined>(labelTitles);
+  useEffect(() => {
+    labelTitlesRef.current = labelTitles;
+  });
+
+  // Toggle for showing/hiding label title pills
+  const [showLabelTitles, setShowLabelTitles] = useLocalStorageBoolean(
+    "script:show-label-titles",
+    true
+  );
+  const showLabelTitlesRef = useRef(showLabelTitles);
+  useEffect(() => {
+    showLabelTitlesRef.current = showLabelTitles;
+  });
 
   // Expose focus method to parent via ref
   useImperativeHandle(
@@ -238,6 +263,19 @@ export const ScriptEditor = function ScriptEditor({
       }
       // Apply initial font size
       applyEditorFontSize(view);
+
+      // Dispatch label titles on initial mount (effect fires while
+      // lazy-loaded fallback is still showing, so ref wasn't set yet)
+      const currentTitles = labelTitlesRef.current;
+      if (
+        currentTitles &&
+        currentTitles.size > 0 &&
+        showLabelTitlesRef.current
+      ) {
+        view.dispatch({
+          effects: [setLabelTitlesEffect.of(currentTitles)],
+        });
+      }
     },
     [
       scrollToLine,
@@ -322,6 +360,7 @@ export const ScriptEditor = function ScriptEditor({
         lineWrapExtension,
         updateListener,
         highlightStateField,
+        labelTitleExtension,
         // Explicitly add search extension with default configuration
         search({}),
         // Highlight matches of the current selection
@@ -329,6 +368,18 @@ export const ScriptEditor = function ScriptEditor({
       ].flat(),
     [lineWrapExtension, updateListener, highlightStateField]
   );
+
+  // Dispatch label title updates when the map changes or visibility toggles
+  useEffect(() => {
+    const view = editorViewRef.current;
+    if (view && labelTitles) {
+      view.dispatch({
+        effects: [
+          setLabelTitlesEffect.of(showLabelTitles ? labelTitles : new Map()),
+        ],
+      });
+    }
+  }, [labelTitles, showLabelTitles]);
 
   return (
     <div className="h-full w-full overflow-hidden min-h-0 min-w-0 flex flex-col">
@@ -367,6 +418,23 @@ export const ScriptEditor = function ScriptEditor({
           <FontSizeSwitcher mode="script" direction="up" />
           <LineWrapSwitcher lineWrap={lineWrap} onToggle={toggleLineWrap} />
           <PaletteSwitcher />
+          <button
+            type="button"
+            onClick={() => setShowLabelTitles((v) => !v)}
+            className={`px-3 py-1.5 text-xs font-code border rounded flex items-center gap-2 transition-colors ${
+              showLabelTitles
+                ? "bg-accent/50 hover:bg-accent border-border"
+                : "bg-muted/50 hover:bg-muted border-border"
+            }`}
+            title={showLabelTitles ? "Hide label titles" : "Show label titles"}
+          >
+            {showLabelTitles ? (
+              <Eye className="size-3" />
+            ) : (
+              <EyeOff className="size-3" />
+            )}
+            <span>Titles: {showLabelTitles ? "On" : "Off"}</span>
+          </button>
         </div>
         <div className="flex items-center gap-3">
           {saveStatus && (

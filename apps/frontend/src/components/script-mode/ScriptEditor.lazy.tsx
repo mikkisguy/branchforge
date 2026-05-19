@@ -29,6 +29,7 @@ interface ScriptEditorProps {
   saveStatus?: import("@/hooks/useAutosave").SaveStatus;
   saveConflict?: boolean;
   onSaveRequest?: () => void;
+  labelTitles?: import("@/lib/codemirror/label-title-decoration").LabelTitleMap;
   ref?: React.Ref<ScriptEditorRef>;
 }
 

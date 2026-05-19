@@ -19,6 +19,7 @@ import type { ScriptEditorRef } from "@/components/script-mode/ScriptEditor";
 import type { FocusModeState } from "@/hooks/useFocusModeState";
 import type { ProjectFileNode } from "@/hooks/useProjectFiles";
 import type { SaveStatus } from "@/hooks/useAutosave";
+import type { LabelTitleMap } from "@/lib/codemirror/label-title-decoration";
 import type {
   Dispatch,
   KeyboardEvent,
@@ -77,6 +78,7 @@ interface ScriptModeEditorLayoutProps {
   saveStatus?: SaveStatus;
   saveConflict?: boolean;
   onSaveRequest?: () => void;
+  labelTitles?: LabelTitleMap;
 }
 
 export function ScriptModeEditorLayout({
@@ -114,6 +116,7 @@ export function ScriptModeEditorLayout({
   saveStatus = "saved",
   saveConflict = false,
   onSaveRequest,
+  labelTitles,
 }: ScriptModeEditorLayoutProps) {
   const { isFocusMode, focusToggleRef } = focusModeState;
 
@@ -247,6 +250,7 @@ export function ScriptModeEditorLayout({
                   saveStatus={saveStatus}
                   saveConflict={saveConflict}
                   onSaveRequest={onSaveRequest}
+                  labelTitles={labelTitles}
                 />
               ) : activeLabel ? (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">

@@ -19,6 +19,7 @@ function createLabel(labelId: string, version: number, contentHash: string) {
     fileName: "scene.rpy",
     version,
     contentHash,
+    labelName: null,
     createdAt: "2024-01-01T00:00:00.000Z",
     updatedAt: "2024-01-01T00:00:00.000Z",
   };

@@ -24,10 +24,10 @@ function createProjectFile(
 }
 
 describe("useLabelFileSync", () => {
-  it("finds label line numbers from label titles", () => {
+  it("finds label line numbers by label name", () => {
     const line = findLabelLineNumber(
       ["# intro", "label chapter_one_intro:", '    e "hi"'].join("\n"),
-      "Chapter One Intro"
+      "chapter_one_intro"
     );
 
     expect(line).toBe(2);
