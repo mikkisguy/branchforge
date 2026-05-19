@@ -5,7 +5,7 @@
  * Checks integration status, allows repository selection, and creates projects.
  */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useReducer } from "react";
 import {
   Loader2,
   GitFork,
@@ -56,6 +56,81 @@ interface ImportState {
 }
 
 // ============================================================================
+// Reducer State & Actions
+// ============================================================================
+
+interface DialogState {
+  projectName: string;
+  projectDescription: string;
+  selectedRepository: GitLabRepository | null;
+  branch: string;
+  searchQuery: string;
+  importState: ImportState;
+  repositories: GitLabRepository[];
+  showCharacterWizard: boolean;
+  detectedCharacters: DetectCharactersResponse | null;
+  importedProject: { id: string } | null;
+}
+
+type DialogAction =
+  | { type: "SET_PROJECT_NAME"; payload: string }
+  | { type: "SET_PROJECT_DESCRIPTION"; payload: string }
+  | { type: "SET_SELECTED_REPOSITORY"; payload: GitLabRepository | null }
+  | { type: "SET_BRANCH"; payload: string }
+  | { type: "SET_SEARCH_QUERY"; payload: string }
+  | { type: "SET_IMPORT_STATE"; payload: ImportState }
+  | { type: "SET_REPOSITORIES"; payload: GitLabRepository[] }
+  | { type: "SET_SHOW_CHARACTER_WIZARD"; payload: boolean }
+  | {
+      type: "SET_DETECTED_CHARACTERS";
+      payload: DetectCharactersResponse | null;
+    }
+  | { type: "SET_IMPORTED_PROJECT"; payload: { id: string } | null }
+  | { type: "RESET" };
+
+const initialDialogState: DialogState = {
+  projectName: "",
+  projectDescription: "",
+  selectedRepository: null,
+  branch: "main",
+  searchQuery: "",
+  importState: { status: "idle", message: "" },
+  repositories: [],
+  showCharacterWizard: false,
+  detectedCharacters: null,
+  importedProject: null,
+};
+
+function dialogReducer(state: DialogState, action: DialogAction): DialogState {
+  switch (action.type) {
+    case "SET_PROJECT_NAME":
+      return { ...state, projectName: action.payload };
+    case "SET_PROJECT_DESCRIPTION":
+      return { ...state, projectDescription: action.payload };
+    case "SET_SELECTED_REPOSITORY":
+      return { ...state, selectedRepository: action.payload };
+    case "SET_BRANCH":
+      return { ...state, branch: action.payload };
+    case "SET_SEARCH_QUERY":
+      return { ...state, searchQuery: action.payload };
+    case "SET_IMPORT_STATE":
+      return { ...state, importState: action.payload };
+    case "SET_REPOSITORIES":
+      return { ...state, repositories: action.payload };
+    case "SET_SHOW_CHARACTER_WIZARD":
+      return { ...state, showCharacterWizard: action.payload };
+    case "SET_DETECTED_CHARACTERS":
+      return { ...state, detectedCharacters: action.payload };
+    case "SET_IMPORTED_PROJECT":
+      return { ...state, importedProject: action.payload };
+    case "RESET":
+      return initialDialogState;
+    default:
+      return state;
+  }
+}
+
+// ============================================================================
 // Component
 // ============================================================================
 
@@ -64,31 +139,14 @@ export function GitLabImportDialog({
   onOpenChange,
   onSuccess,
 }: GitLabImportDialogProps) {
-  // Form state
-  const [projectName, setProjectName] = useState("");
-  const [projectDescription, setProjectDescription] = useState("");
-  const [selectedRepository, setSelectedRepository] =
-    useState<GitLabRepository | null>(null);
-  const [branch, setBranch] = useState("main");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [importState, setImportState] = useState<ImportState>({
-    status: "idle",
-    message: "",
-  });
+  // Combined dialog state managed by reducer
+  const [state, dispatch] = useReducer(dialogReducer, initialDialogState);
 
-  // Character wizard state
-  const [showCharacterWizard, setShowCharacterWizard] = useState(false);
-  const [detectedCharacters, setDetectedCharacters] =
-    useState<DetectCharactersResponse | null>(null);
-  const [importedProject, setImportedProject] = useState<{ id: string } | null>(
-    null
-  );
+  // Separate loading state (different lifecycle)
+  const [isLoadingRepos, setIsLoadingRepos] = useState(false);
+
   // Guard to prevent calling onSuccess/onOpenChange(false) twice
   const didCallOnSuccessRef = useRef(false);
-
-  // Repositories state
-  const [repositories, setRepositories] = useState<GitLabRepository[]>([]);
-  const [isLoadingRepos, setIsLoadingRepos] = useState(false);
 
   // Timeout cleanup and loading tracking
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -114,16 +172,7 @@ export function GitLabImportDialog({
       }
       // Increment request ID to ignore stale listRepositories responses
       loadReposRequestIdRef.current += 1;
-      setProjectName("");
-      setProjectDescription("");
-      setSelectedRepository(null);
-      setBranch("main");
-      setSearchQuery("");
-      setImportState({ status: "idle", message: "" });
-      setRepositories([]);
-      setShowCharacterWizard(false);
-      setDetectedCharacters(null);
-      setImportedProject(null);
+      dispatch({ type: "RESET" });
       didCallOnSuccessRef.current = false;
       hasLoadedReposRef.current = false;
       hasSetSelectingState.current = false;
@@ -136,7 +185,10 @@ export function GitLabImportDialog({
       if (hasIntegration) {
         // Only set state if we haven't already
         if (!hasSetSelectingState.current) {
-          setImportState({ status: "selecting", message: "" });
+          dispatch({
+            type: "SET_IMPORT_STATE",
+            payload: { status: "selecting", message: "" },
+          });
           hasSetSelectingState.current = true;
         }
         // Load repositories (only once per dialog session)
@@ -147,7 +199,7 @@ export function GitLabImportDialog({
             .then((repos) => {
               // Only update if this is still the current request and dialog is open
               if (requestId === loadReposRequestIdRef.current && open) {
-                setRepositories(repos);
+                dispatch({ type: "SET_REPOSITORIES", payload: repos });
                 hasLoadedReposRef.current = true;
               }
             })
@@ -172,9 +224,12 @@ export function GitLabImportDialog({
             });
         }
       } else {
-        setImportState({
-          status: "idle",
-          message: "GitLab integration not configured",
+        dispatch({
+          type: "SET_IMPORT_STATE",
+          payload: {
+            status: "idle",
+            message: "GitLab integration not configured",
+          },
         });
       }
     }
@@ -191,26 +246,32 @@ export function GitLabImportDialog({
   }, []);
 
   const handleImport = async () => {
-    if (!selectedRepository || !projectName.trim()) {
+    if (!state.selectedRepository || !state.projectName.trim()) {
       error("Please select a repository and enter a project name");
       return;
     }
 
-    setImportState({ status: "importing", message: "Importing project..." });
+    dispatch({
+      type: "SET_IMPORT_STATE",
+      payload: { status: "importing", message: "Importing project..." },
+    });
 
     try {
       const result = await gitlabApi.importProject({
-        projectName: projectName.trim(),
-        projectDescription: projectDescription.trim() || undefined,
-        gitlabProjectId: selectedRepository.id,
-        gitlabProjectName: selectedRepository.name,
-        branch: branch.trim() || "main",
+        projectName: state.projectName.trim(),
+        projectDescription: state.projectDescription.trim() || undefined,
+        gitlabProjectId: state.selectedRepository.id,
+        gitlabProjectName: state.selectedRepository.name,
+        branch: state.branch.trim() || "main",
         conflictResolution: "branchforge_wins",
       });
 
-      setImportState({
-        status: "success",
-        message: `Successfully imported ${result.project.name}`,
+      dispatch({
+        type: "SET_IMPORT_STATE",
+        payload: {
+          status: "success",
+          message: `Successfully imported ${result.project.name}`,
+        },
       });
 
       // Invalidate projects and GitLab linked repos cache
@@ -233,12 +294,15 @@ export function GitLabImportDialog({
         );
 
         if (newCharacters.length > 0) {
-          setImportedProject(result.project);
-          setDetectedCharacters({
-            ...detectionResult,
-            characters: newCharacters,
+          dispatch({ type: "SET_IMPORTED_PROJECT", payload: result.project });
+          dispatch({
+            type: "SET_DETECTED_CHARACTERS",
+            payload: {
+              ...detectionResult,
+              characters: newCharacters,
+            },
           });
-          setShowCharacterWizard(true);
+          dispatch({ type: "SET_SHOW_CHARACTER_WIZARD", payload: true });
           return;
         }
       } catch (err) {
@@ -267,15 +331,20 @@ export function GitLabImportDialog({
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to import project";
-      setImportState({ status: "error", message });
+      dispatch({
+        type: "SET_IMPORT_STATE",
+        payload: { status: "error", message },
+      });
       error(message, "Import failed");
     }
   };
 
-  const filteredRepositories = repositories.filter(
+  const filteredRepositories = state.repositories.filter(
     (repo) =>
-      repo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      repo.path_with_namespace.toLowerCase().includes(searchQuery.toLowerCase())
+      repo.name.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
+      repo.path_with_namespace
+        .toLowerCase()
+        .includes(state.searchQuery.toLowerCase())
   );
 
   // Guarded close handler that ensures onSuccess is called if import completed
@@ -283,14 +352,17 @@ export function GitLabImportDialog({
     (nextOpen: boolean) => {
       if (!nextOpen) {
         // Check if import succeeded but timeout hasn't fired yet
-        if (importState.status === "success" && !didCallOnSuccessRef.current) {
+        if (
+          state.importState.status === "success" &&
+          !didCallOnSuccessRef.current
+        ) {
           didCallOnSuccessRef.current = true;
           onSuccess?.();
         }
       }
       onOpenChange(nextOpen);
     },
-    [importState.status, onSuccess, onOpenChange]
+    [state.importState.status, onSuccess, onOpenChange]
   );
 
   // ============================================================================
@@ -309,7 +381,7 @@ export function GitLabImportDialog({
 
         <div className="space-y-6 py-4">
           {/* Integration not configured */}
-          {importState.status === "idle" && !hasIntegration && (
+          {state.importState.status === "idle" && !hasIntegration && (
             <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-4">
               <div className="flex items-start gap-3">
                 <AlertCircle className="size-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
@@ -353,7 +425,7 @@ export function GitLabImportDialog({
           )}
 
           {/* Repository selection */}
-          {importState.status === "selecting" && (
+          {state.importState.status === "selecting" && (
             <div className="space-y-4">
               {/* Project details */}
               <div className="space-y-3">
@@ -361,8 +433,13 @@ export function GitLabImportDialog({
                   <Label htmlFor="gitlab-project-name">Project name *</Label>
                   <Input
                     id="gitlab-project-name"
-                    value={projectName}
-                    onChange={(e) => setProjectName(e.target.value)}
+                    value={state.projectName}
+                    onChange={(e) =>
+                      dispatch({
+                        type: "SET_PROJECT_NAME",
+                        payload: e.target.value,
+                      })
+                    }
                     placeholder="My Visual Novel"
                     maxLength={200}
                   />
@@ -374,8 +451,13 @@ export function GitLabImportDialog({
                   </Label>
                   <Textarea
                     id="gitlab-project-description"
-                    value={projectDescription}
-                    onChange={(e) => setProjectDescription(e.target.value)}
+                    value={state.projectDescription}
+                    onChange={(e) =>
+                      dispatch({
+                        type: "SET_PROJECT_DESCRIPTION",
+                        payload: e.target.value,
+                      })
+                    }
                     placeholder="Optional description"
                     maxLength={2000}
                     rows={2}
@@ -389,8 +471,13 @@ export function GitLabImportDialog({
                 <Label>GitLab repository *</Label>
                 <Input
                   placeholder="Search repositories..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={state.searchQuery}
+                  onChange={(e) =>
+                    dispatch({
+                      type: "SET_SEARCH_QUERY",
+                      payload: e.target.value,
+                    })
+                  }
                 />
               </div>
 
@@ -403,7 +490,7 @@ export function GitLabImportDialog({
                 </div>
               ) : filteredRepositories.length === 0 ? (
                 <div className="text-center py-8 text-sm text-muted-foreground">
-                  {searchQuery
+                  {state.searchQuery
                     ? "No repositories match your search"
                     : "No repositories found"}
                 </div>
@@ -417,13 +504,18 @@ export function GitLabImportDialog({
                       key={repo.id}
                       type="button"
                       role="option"
-                      aria-selected={selectedRepository?.id === repo.id}
-                      onClick={() => setSelectedRepository(repo)}
+                      aria-selected={state.selectedRepository?.id === repo.id}
+                      onClick={() =>
+                        dispatch({
+                          type: "SET_SELECTED_REPOSITORY",
+                          payload: repo,
+                        })
+                      }
                       className={`
                         w-full text-left px-4 py-3 border-b last:border-b-0
                         hover:bg-muted/50 transition-colors
                         ${
-                          selectedRepository?.id === repo.id
+                          state.selectedRepository?.id === repo.id
                             ? "bg-accent text-accent-foreground"
                             : ""
                         }
@@ -443,8 +535,10 @@ export function GitLabImportDialog({
                 <Label htmlFor="gitlab-branch">Branch</Label>
                 <Input
                   id="gitlab-branch"
-                  value={branch}
-                  onChange={(e) => setBranch(e.target.value)}
+                  value={state.branch}
+                  onChange={(e) =>
+                    dispatch({ type: "SET_BRANCH", payload: e.target.value })
+                  }
                   placeholder="main"
                 />
                 <p className="text-xs text-muted-foreground">
@@ -455,7 +549,9 @@ export function GitLabImportDialog({
               {/* Import button */}
               <Button
                 onClick={handleImport}
-                disabled={!selectedRepository || !projectName.trim()}
+                disabled={
+                  !state.selectedRepository || !state.projectName.trim()
+                }
                 className="w-full"
               >
                 <GitFork className="mr-2 size-4" />
@@ -475,25 +571,27 @@ export function GitLabImportDialog({
           )}
 
           {/* Importing state */}
-          {importState.status === "importing" && (
+          {state.importState.status === "importing" && (
             <div className="flex flex-col items-center justify-center py-8">
               <Loader2 className="size-8 animate-spin mb-4" />
               <p className="text-sm text-muted-foreground">
-                {importState.message}
+                {state.importState.message}
               </p>
             </div>
           )}
 
           {/* Success state */}
-          {importState.status === "success" && (
+          {state.importState.status === "success" && (
             <div className="flex flex-col items-center justify-center py-8">
               <CheckCircle2 className="size-12 text-green-500 mb-4" />
-              <p className="text-sm text-foreground">{importState.message}</p>
+              <p className="text-sm text-foreground">
+                {state.importState.message}
+              </p>
             </div>
           )}
 
           {/* Error state */}
-          {importState.status === "error" && (
+          {state.importState.status === "error" && (
             <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4">
               <div className="flex items-start gap-3">
                 <AlertCircle className="size-5 text-destructive flex-shrink-0 mt-0.5" />
@@ -502,13 +600,16 @@ export function GitLabImportDialog({
                     Import Failed
                   </h4>
                   <p className="text-sm text-destructive/90">
-                    {importState.message}
+                    {state.importState.message}
                   </p>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() =>
-                      setImportState({ status: "selecting", message: "" })
+                      dispatch({
+                        type: "SET_IMPORT_STATE",
+                        payload: { status: "selecting", message: "" },
+                      })
                     }
                     className="mt-3"
                   >
@@ -522,31 +623,33 @@ export function GitLabImportDialog({
       </DialogContent>
 
       {/* Character Import Wizard */}
-      {showCharacterWizard && detectedCharacters && importedProject && (
-        <CharacterImportWizard
-          open={showCharacterWizard}
-          onOpenChange={(open) => {
-            setShowCharacterWizard(open);
-            if (!open) {
+      {state.showCharacterWizard &&
+        state.detectedCharacters &&
+        state.importedProject && (
+          <CharacterImportWizard
+            open={state.showCharacterWizard}
+            onOpenChange={(open) => {
+              dispatch({ type: "SET_SHOW_CHARACTER_WIZARD", payload: open });
+              if (!open) {
+                // Set flag to prevent duplicate onSuccess calls
+                didCallOnSuccessRef.current = true;
+                // Close the import dialog after character wizard is closed
+                handleOpenChange(false);
+              }
+            }}
+            projectId={state.importedProject.id}
+            detectedCharacters={state.detectedCharacters.characters}
+            conflicts={state.detectedCharacters.conflicts}
+            excludedTags={state.detectedCharacters.excludedTags}
+            onComplete={() => {
+              dispatch({ type: "SET_SHOW_CHARACTER_WIZARD", payload: false });
               // Set flag to prevent duplicate onSuccess calls
               didCallOnSuccessRef.current = true;
-              // Close the import dialog after character wizard is closed
-              handleOpenChange(false);
-            }
-          }}
-          projectId={importedProject.id}
-          detectedCharacters={detectedCharacters.characters}
-          conflicts={detectedCharacters.conflicts}
-          excludedTags={detectedCharacters.excludedTags}
-          onComplete={() => {
-            setShowCharacterWizard(false);
-            // Set flag to prevent duplicate onSuccess calls
-            didCallOnSuccessRef.current = true;
-            // Switch to the imported project after character import completes
-            onSuccess?.(importedProject);
-          }}
-        />
-      )}
+              // Switch to the imported project after character import completes
+              onSuccess?.(state.importedProject!);
+            }}
+          />
+        )}
     </Dialog>
   );
 }

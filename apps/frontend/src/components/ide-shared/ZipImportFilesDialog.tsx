@@ -5,7 +5,7 @@
  * Shows file selection, upload progress, and import results.
  */
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useReducer, useCallback, useRef, useEffect } from "react";
 import {
   X,
   Upload,
@@ -53,6 +53,79 @@ interface ImportState {
 }
 
 // ============================================================================
+// Reducer
+// ============================================================================
+
+interface ZipImportState {
+  selectedFile: File | null;
+  importState: ImportState;
+  showCharacterWizard: boolean;
+  detectedCharacters: DetectCharactersResponse | null;
+}
+
+type ZipImportAction =
+  | { type: "RESET" }
+  | { type: "SET_SELECTED_FILE"; file: File | null }
+  | { type: "SET_IMPORT_STATE"; importState: ImportState }
+  | { type: "UPDATE_UPLOAD_PROGRESS"; progress: number; message: string }
+  | { type: "SET_SHOW_CHARACTER_WIZARD"; show: boolean }
+  | {
+      type: "SET_DETECTED_CHARACTERS";
+      characters: DetectCharactersResponse | null;
+    }
+  | { type: "CHARACTERS_DETECTED"; characters: DetectCharactersResponse }
+  | { type: "RESET_FILE_AND_IMPORT" };
+
+const initialZipImportState: ZipImportState = {
+  selectedFile: null,
+  importState: { status: "idle", progress: 0, message: "" },
+  showCharacterWizard: false,
+  detectedCharacters: null,
+};
+
+function zipImportReducer(
+  state: ZipImportState,
+  action: ZipImportAction
+): ZipImportState {
+  switch (action.type) {
+    case "RESET":
+      return initialZipImportState;
+    case "SET_SELECTED_FILE":
+      return { ...state, selectedFile: action.file };
+    case "SET_IMPORT_STATE":
+      return { ...state, importState: action.importState };
+    case "UPDATE_UPLOAD_PROGRESS":
+      return {
+        ...state,
+        importState: {
+          ...state.importState,
+          status: "uploading",
+          progress: action.progress,
+          message: action.message,
+        },
+      };
+    case "SET_SHOW_CHARACTER_WIZARD":
+      return { ...state, showCharacterWizard: action.show };
+    case "SET_DETECTED_CHARACTERS":
+      return { ...state, detectedCharacters: action.characters };
+    case "CHARACTERS_DETECTED":
+      return {
+        ...state,
+        detectedCharacters: action.characters,
+        showCharacterWizard: true,
+      };
+    case "RESET_FILE_AND_IMPORT":
+      return {
+        ...state,
+        selectedFile: null,
+        importState: { status: "idle", progress: 0, message: "" },
+      };
+    default:
+      return state;
+  }
+}
+
+// ============================================================================
 // Component
 // ============================================================================
 
@@ -67,31 +140,16 @@ export function ZipImportFilesDialog({
   const queryClient = useQueryClient();
 
   // State
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [importState, setImportState] = useState<ImportState>({
-    status: "idle",
-    progress: 0,
-    message: "",
-  });
-
-  // Character wizard state
-  const [showCharacterWizard, setShowCharacterWizard] = useState(false);
-  const [detectedCharacters, setDetectedCharacters] =
-    useState<DetectCharactersResponse | null>(null);
+  const [state, dispatch] = useReducer(zipImportReducer, initialZipImportState);
+  const { selectedFile, importState, showCharacterWizard, detectedCharacters } =
+    state;
 
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // Reset state when dialog opens/closes
+  // Reset state when dialog closes
   useEffect(() => {
     if (!open) {
-      setSelectedFile(null);
-      setImportState({
-        status: "idle",
-        progress: 0,
-        message: "",
-      });
-      setShowCharacterWizard(false);
-      setDetectedCharacters(null);
+      dispatch({ type: "RESET" });
     }
   }, [open]);
 
@@ -109,7 +167,7 @@ export function ZipImportFilesDialog({
         return;
       }
 
-      setSelectedFile(validationResult);
+      dispatch({ type: "SET_SELECTED_FILE", file: validationResult });
     },
     [error]
   );
@@ -129,7 +187,7 @@ export function ZipImportFilesDialog({
         return;
       }
 
-      setSelectedFile(validationResult);
+      dispatch({ type: "SET_SELECTED_FILE", file: validationResult });
     },
     [error]
   );
@@ -147,35 +205,40 @@ export function ZipImportFilesDialog({
       return;
     }
 
-    setImportState({
-      status: "uploading",
-      progress: 0,
-      message: "Uploading file...",
+    dispatch({
+      type: "SET_IMPORT_STATE",
+      importState: {
+        status: "uploading",
+        progress: 0,
+        message: "Uploading file...",
+      },
     });
 
     try {
       const result = await projectFilesApi.importZip(projectId, selectedFile, {
         onProgress: (loaded, total) => {
           const progress = total > 0 ? Math.round((loaded / total) * 100) : 0;
-          setImportState((prev) => ({
-            ...prev,
-            status: "uploading",
+          dispatch({
+            type: "UPDATE_UPLOAD_PROGRESS",
             progress,
             message: `Uploading... ${progress}%`,
-          }));
+          });
         },
       });
 
       if (result.success) {
-        setImportState({
-          status: "success",
-          progress: 100,
-          message: "Import completed successfully",
-          result: {
-            filesImported: result.filesImported,
-            filesUpdated: result.filesUpdated,
-            filesSkipped: result.filesSkipped,
-            labelsCreated: result.labelsCreated,
+        dispatch({
+          type: "SET_IMPORT_STATE",
+          importState: {
+            status: "success",
+            progress: 100,
+            message: "Import completed successfully",
+            result: {
+              filesImported: result.filesImported,
+              filesUpdated: result.filesUpdated,
+              filesSkipped: result.filesSkipped,
+              labelsCreated: result.labelsCreated,
+            },
           },
         });
 
@@ -216,13 +279,15 @@ export function ZipImportFilesDialog({
           );
 
           if (newCharacters.length > 0) {
-            setDetectedCharacters({
-              characters: newCharacters,
-              excludedTags: detectionResult.excludedTags,
-              conflicts: [], // No conflicts since we filtered them out
-              existingTags: detectionResult.existingTags,
+            dispatch({
+              type: "CHARACTERS_DETECTED",
+              characters: {
+                characters: newCharacters,
+                excludedTags: detectionResult.excludedTags,
+                conflicts: [], // No conflicts since we filtered them out
+                existingTags: detectionResult.existingTags,
+              },
             });
-            setShowCharacterWizard(true);
             return;
           }
         } catch (err) {
@@ -234,21 +299,27 @@ export function ZipImportFilesDialog({
           `Imported ${result.filesImported} files, ${result.labelsCreated} labels`
         );
       } else {
-        setImportState({
-          status: "error",
-          progress: 0,
-          message: "Import failed",
-          error: result.error || "Unknown error",
+        dispatch({
+          type: "SET_IMPORT_STATE",
+          importState: {
+            status: "error",
+            progress: 0,
+            message: "Import failed",
+            error: result.error || "Unknown error",
+          },
         });
         error(result.error || "Import failed");
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Import failed";
-      setImportState({
-        status: "error",
-        progress: 0,
-        message: "Import failed",
-        error: errorMessage,
+      dispatch({
+        type: "SET_IMPORT_STATE",
+        importState: {
+          status: "error",
+          progress: 0,
+          message: "Import failed",
+          error: errorMessage,
+        },
       });
       error(errorMessage);
     }
@@ -341,7 +412,7 @@ export function ZipImportFilesDialog({
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedFile(null);
+                        dispatch({ type: "SET_SELECTED_FILE", file: null });
                       }}
                     >
                       Remove
@@ -482,8 +553,7 @@ export function ZipImportFilesDialog({
               <Button
                 variant="outline"
                 onClick={() => {
-                  setSelectedFile(null);
-                  setImportState({ status: "idle", progress: 0, message: "" });
+                  dispatch({ type: "RESET_FILE_AND_IMPORT" });
                 }}
               >
                 Try Again
@@ -504,7 +574,7 @@ export function ZipImportFilesDialog({
         <CharacterImportWizard
           open={showCharacterWizard}
           onOpenChange={(open) => {
-            setShowCharacterWizard(open);
+            dispatch({ type: "SET_SHOW_CHARACTER_WIZARD", show: open });
             if (!open) {
               // Close the import dialog after character wizard is closed
               onOpenChange(false);

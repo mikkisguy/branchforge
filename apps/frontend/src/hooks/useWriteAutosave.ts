@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef } from "react";
 import type { RefObject } from "react";
 import type { PublicLabel, LabelDetail } from "@branchforge/shared";
 import { useAutosave, type SaveStatus } from "@/hooks/useAutosave";
@@ -47,6 +47,102 @@ class WriteConflictError extends Error {
   constructor() {
     super("Write conflict detected");
     this.name = "WriteConflictError";
+  }
+}
+
+// Reducer state interface
+interface AutosaveState {
+  lastKnownVersionByLabel: Map<string, number>;
+  conflictByLabel: Map<string, boolean>;
+  lastSaved: Date | null;
+}
+
+// Reducer action types
+type AutosaveAction =
+  | { type: "CLEAR_STATE" }
+  | { type: "PRUNE_LABELS"; validLabelIds: Set<string> }
+  | {
+      type: "SET_VERSION";
+      labelId: string;
+      version: number;
+    }
+  | { type: "CLEAR_CONFLICT"; labelId: string }
+  | { type: "SET_CONFLICT"; labelId: string }
+  | { type: "SET_LAST_SAVED"; timestamp: Date }
+  | { type: "CLEAR_LAST_SAVED" };
+
+// Reducer function
+function autosaveReducer(
+  state: AutosaveState,
+  action: AutosaveAction
+): AutosaveState {
+  switch (action.type) {
+    case "CLEAR_STATE":
+      return {
+        lastKnownVersionByLabel: new Map(),
+        conflictByLabel: new Map(),
+        lastSaved: null,
+      };
+
+    case "PRUNE_LABELS": {
+      return {
+        lastKnownVersionByLabel: pruneStateMap(
+          state.lastKnownVersionByLabel,
+          action.validLabelIds
+        ),
+        conflictByLabel: pruneStateMap(
+          state.conflictByLabel,
+          action.validLabelIds
+        ),
+        lastSaved: state.lastSaved,
+      };
+    }
+
+    case "SET_VERSION": {
+      return {
+        ...state,
+        lastKnownVersionByLabel: setMapValue(
+          state.lastKnownVersionByLabel,
+          action.labelId,
+          action.version
+        ),
+      };
+    }
+
+    case "CLEAR_CONFLICT": {
+      return {
+        ...state,
+        conflictByLabel: deleteMapKey(state.conflictByLabel, action.labelId),
+      };
+    }
+
+    case "SET_CONFLICT": {
+      return {
+        ...state,
+        conflictByLabel: setMapValue(
+          state.conflictByLabel,
+          action.labelId,
+          true
+        ),
+      };
+    }
+
+    case "SET_LAST_SAVED": {
+      return {
+        ...state,
+        lastSaved: action.timestamp,
+      };
+    }
+
+    case "CLEAR_LAST_SAVED": {
+      return {
+        ...state,
+        lastSaved: null,
+      };
+    }
+
+    default:
+      return state;
   }
 }
 
@@ -138,13 +234,15 @@ export function useWriteAutosave({
   onUpdateDialogue,
   showErrorToast,
 }: UseWriteAutosaveProps): UseWriteAutosaveReturn {
-  const [lastKnownVersionByLabel, setLastKnownVersionByLabel] = useState<
-    Map<string, number>
-  >(new Map());
-  const [conflictByLabel, setConflictByLabel] = useState<Map<string, boolean>>(
-    new Map()
-  );
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const initialState: AutosaveState = {
+    lastKnownVersionByLabel: new Map(),
+    conflictByLabel: new Map(),
+    lastSaved: null,
+  };
+
+  const [state, dispatch] = useReducer(autosaveReducer, initialState);
+
+  const { lastKnownVersionByLabel, conflictByLabel, lastSaved } = state;
 
   const lastKnownVersionByLabelRef = useRef(lastKnownVersionByLabel);
   const savedHashesRef = useRef<Map<string, string>>(new Map());
@@ -152,6 +250,7 @@ export function useWriteAutosave({
   const triggerSaveRef = useRef<() => Promise<boolean>>(async () => true);
   const isDirtyRef = useRef(false);
   const prevProjectIdRef = useRef<string | undefined>(undefined);
+  const prevLabelIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     lastKnownVersionByLabelRef.current = lastKnownVersionByLabel;
@@ -164,9 +263,7 @@ export function useWriteAutosave({
     ) {
       const clearedVersions = new Map<string, number>();
       lastKnownVersionByLabelRef.current = clearedVersions;
-      setLastKnownVersionByLabel(clearedVersions);
-      setConflictByLabel(new Map());
-      setLastSaved(null);
+      dispatch({ type: "CLEAR_STATE" });
       savedHashesRef.current.clear();
       serverContentHashesRef.current.clear();
     }
@@ -211,36 +308,34 @@ export function useWriteAutosave({
               draftToSave.labelId,
               hashDialogueEntries(draftToSave.entries)
             );
-            setLastKnownVersionByLabel((prev) => {
-              const next = setMapValue(
-                prev,
-                draftToSave.labelId!,
-                result.version
-              );
-              lastKnownVersionByLabelRef.current = next;
-              return next;
+            dispatch({
+              type: "SET_VERSION",
+              labelId: draftToSave.labelId!,
+              version: result.version,
             });
+            lastKnownVersionByLabelRef.current.set(
+              draftToSave.labelId!,
+              result.version
+            );
             serverContentHashesRef.current.set(
               draftToSave.labelId,
               result.contentHash
             );
-            setConflictByLabel((prev) =>
-              deleteMapKey(prev, draftToSave.labelId!)
-            );
-            setLastSaved(new Date());
+            dispatch({ type: "CLEAR_CONFLICT", labelId: draftToSave.labelId! });
+            dispatch({ type: "SET_LAST_SAVED", timestamp: new Date() });
             return;
           }
 
           if (typeof result.conflict.currentVersion === "number") {
-            setLastKnownVersionByLabel((prev) => {
-              const next = setMapValue(
-                prev,
-                draftToSave.labelId!,
-                result.conflict.currentVersion
-              );
-              lastKnownVersionByLabelRef.current = next;
-              return next;
+            dispatch({
+              type: "SET_VERSION",
+              labelId: draftToSave.labelId!,
+              version: result.conflict.currentVersion,
             });
+            lastKnownVersionByLabelRef.current.set(
+              draftToSave.labelId!,
+              result.conflict.currentVersion
+            );
           }
 
           if (typeof result.conflict.currentContentHash === "string") {
@@ -252,9 +347,7 @@ export function useWriteAutosave({
             serverContentHashesRef.current.delete(draftToSave.labelId);
           }
 
-          setConflictByLabel((prev) =>
-            setMapValue(prev, draftToSave.labelId!, true)
-          );
+          dispatch({ type: "SET_CONFLICT", labelId: draftToSave.labelId! });
 
           showErrorToast(
             "This scene changed elsewhere. Reloaded data is needed before saving again.",
@@ -320,25 +413,39 @@ export function useWriteAutosave({
     }
 
     if (typeof activeLabelVersion === "number") {
-      setLastKnownVersionByLabel((prev) => {
-        const next = setMapValue(prev, activeLabel.id, activeLabelVersion);
-        lastKnownVersionByLabelRef.current = next;
-        return next;
+      dispatch({
+        type: "SET_VERSION",
+        labelId: activeLabel.id,
+        version: activeLabelVersion,
       });
+      lastKnownVersionByLabelRef.current.set(
+        activeLabel.id,
+        activeLabelVersion
+      );
     }
 
-    setConflictByLabel((prev) => deleteMapKey(prev, activeLabel.id));
+    dispatch({ type: "CLEAR_CONFLICT", labelId: activeLabel.id });
   }, [activeLabel, isUpdatingDialogue]);
 
   useEffect(() => {
     const validLabelIds = new Set(labels.map((label) => label.id));
 
-    setLastKnownVersionByLabel((prev) => {
-      const next = pruneStateMap(prev, validLabelIds);
-      lastKnownVersionByLabelRef.current = next;
-      return next;
-    });
-    setConflictByLabel((prev) => pruneStateMap(prev, validLabelIds));
+    // Avoid dispatching if label IDs haven't changed — prevents infinite
+    // re-render loop when labels array has a new identity but same contents
+    const prevIds = prevLabelIdsRef.current;
+    if (
+      prevIds.size === validLabelIds.size &&
+      [...validLabelIds].every((id) => prevIds.has(id))
+    ) {
+      return;
+    }
+    prevLabelIdsRef.current = validLabelIds;
+
+    dispatch({ type: "PRUNE_LABELS", validLabelIds });
+    lastKnownVersionByLabelRef.current = pruneStateMap(
+      lastKnownVersionByLabelRef.current,
+      validLabelIds
+    );
     pruneRefMap(savedHashesRef.current, validLabelIds);
     pruneRefMap(serverContentHashesRef.current, validLabelIds);
   }, [labels]);

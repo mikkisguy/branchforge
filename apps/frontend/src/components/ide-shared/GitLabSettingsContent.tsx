@@ -6,7 +6,7 @@
  * Repository linking is now handled in the import flow, not here.
  */
 
-import { useState, useCallback } from "react";
+import { useReducer, useCallback } from "react";
 import { Eye, EyeOff, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,79 @@ import {
 import { SettingsSection } from "@/components/ide-shared/SettingsLayout";
 import { useGitLab } from "@/hooks/useGitLab";
 import { useToast } from "@/contexts/ToastContext";
+
+// ============================================================================
+// Types and Reducer
+// ============================================================================
+
+interface SettingsState {
+  token: string;
+  gitlabUrl: string;
+  showToken: boolean;
+  isValidating: boolean;
+  isStoring: boolean;
+  isRemoving: boolean;
+  validationResult: { valid: boolean; username?: string } | null;
+  showRemoveConfirmDialog: boolean;
+}
+
+type SettingsAction =
+  | { type: "SET_TOKEN"; value: string }
+  | { type: "SET_GITLAB_URL"; value: string }
+  | { type: "TOGGLE_SHOW_TOKEN" }
+  | { type: "SET_VALIDATING"; value: boolean }
+  | { type: "SET_STORING"; value: boolean }
+  | { type: "SET_REMOVING"; value: boolean }
+  | {
+      type: "SET_VALIDATION_RESULT";
+      result: { valid: boolean; username?: string } | null;
+    }
+  | { type: "SET_REMOVE_CONFIRM_DIALOG"; value: boolean }
+  | { type: "RESET_FORM" };
+
+const initialSettingsState: SettingsState = {
+  token: "",
+  gitlabUrl: "https://gitlab.com",
+  showToken: false,
+  isValidating: false,
+  isStoring: false,
+  isRemoving: false,
+  validationResult: null,
+  showRemoveConfirmDialog: false,
+};
+
+function settingsReducer(
+  state: SettingsState,
+  action: SettingsAction
+): SettingsState {
+  switch (action.type) {
+    case "SET_TOKEN":
+      return { ...state, token: action.value };
+    case "SET_GITLAB_URL":
+      return { ...state, gitlabUrl: action.value };
+    case "TOGGLE_SHOW_TOKEN":
+      return { ...state, showToken: !state.showToken };
+    case "SET_VALIDATING":
+      return { ...state, isValidating: action.value };
+    case "SET_STORING":
+      return { ...state, isStoring: action.value };
+    case "SET_REMOVING":
+      return { ...state, isRemoving: action.value };
+    case "SET_VALIDATION_RESULT":
+      return { ...state, validationResult: action.result };
+    case "SET_REMOVE_CONFIRM_DIALOG":
+      return { ...state, showRemoveConfirmDialog: action.value };
+    case "RESET_FORM":
+      return {
+        ...state,
+        token: "",
+        gitlabUrl: "https://gitlab.com",
+        validationResult: null,
+      };
+    default:
+      return state;
+  }
+}
 
 // ============================================================================
 // Component
@@ -40,35 +113,23 @@ export function GitLabSettingsContent() {
   const { success, error } = useToast();
 
   // Form state
-  const [token, setToken] = useState("");
-  const [gitlabUrl, setGitlabUrl] = useState("https://gitlab.com");
-  const [showToken, setShowToken] = useState(false);
-  const [isValidating, setIsValidating] = useState(false);
-  const [isStoring, setIsStoring] = useState(false);
-  const [isRemoving, setIsRemoving] = useState(false);
-  const [validationResult, setValidationResult] = useState<{
-    valid: boolean;
-    username?: string;
-  } | null>(null);
-
-  // Dialog state
-  const [showRemoveConfirmDialog, setShowRemoveConfirmDialog] = useState(false);
+  const [state, dispatch] = useReducer(settingsReducer, initialSettingsState);
 
   /**
    * Validate token
    */
   const handleValidate = useCallback(async () => {
-    if (!token.trim()) {
+    if (!state.token.trim()) {
       error("Token is required");
       return;
     }
 
-    setIsValidating(true);
-    setValidationResult(null);
+    dispatch({ type: "SET_VALIDATING", value: true });
+    dispatch({ type: "SET_VALIDATION_RESULT", result: null });
 
     try {
-      const result = await validateToken(token, gitlabUrl);
-      setValidationResult(result);
+      const result = await validateToken(state.token, state.gitlabUrl);
+      dispatch({ type: "SET_VALIDATION_RESULT", result: result });
       if (result.valid) {
         success(
           `Token validated successfully for ${result.username || "user"}`
@@ -79,46 +140,44 @@ export function GitLabSettingsContent() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Validation failed";
       error(message);
-      setValidationResult({ valid: false });
+      dispatch({ type: "SET_VALIDATION_RESULT", result: { valid: false } });
     } finally {
-      setIsValidating(false);
+      dispatch({ type: "SET_VALIDATING", value: false });
     }
-  }, [token, gitlabUrl, validateToken, success, error]);
+  }, [state.token, state.gitlabUrl, validateToken, success, error]);
 
   /**
    * Store token
    */
   const handleStore = useCallback(async () => {
-    if (!token.trim()) {
+    if (!state.token.trim()) {
       error("Token is required");
       return;
     }
 
-    if (validationResult?.valid !== true) {
+    if (state.validationResult?.valid !== true) {
       error("Please validate the token first");
       return;
     }
 
-    setIsStoring(true);
+    dispatch({ type: "SET_STORING", value: true });
 
     try {
-      await storeToken(token, gitlabUrl);
+      await storeToken(state.token, state.gitlabUrl);
       success("GitLab integration saved successfully");
-      setToken("");
-      setGitlabUrl("https://gitlab.com");
-      setValidationResult(null);
+      dispatch({ type: "RESET_FORM" });
       await refreshIntegration();
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to store token";
       error(message);
     } finally {
-      setIsStoring(false);
+      dispatch({ type: "SET_STORING", value: false });
     }
   }, [
-    token,
-    gitlabUrl,
-    validationResult,
+    state.token,
+    state.gitlabUrl,
+    state.validationResult,
     storeToken,
     refreshIntegration,
     success,
@@ -129,15 +188,15 @@ export function GitLabSettingsContent() {
    * Show remove confirmation dialog
    */
   const handleRemoveClick = useCallback(() => {
-    setShowRemoveConfirmDialog(true);
+    dispatch({ type: "SET_REMOVE_CONFIRM_DIALOG", value: true });
   }, []);
 
   /**
    * Remove integration (called after user confirms)
    */
   const handleRemoveConfirmed = useCallback(async () => {
-    setShowRemoveConfirmDialog(false);
-    setIsRemoving(true);
+    dispatch({ type: "SET_REMOVE_CONFIRM_DIALOG", value: false });
+    dispatch({ type: "SET_REMOVING", value: true });
 
     try {
       await removeIntegration();
@@ -148,7 +207,7 @@ export function GitLabSettingsContent() {
         err instanceof Error ? err.message : "Failed to remove integration";
       error(message);
     } finally {
-      setIsRemoving(false);
+      dispatch({ type: "SET_REMOVING", value: false });
     }
   }, [removeIntegration, refreshIntegration, success, error]);
 
@@ -156,7 +215,7 @@ export function GitLabSettingsContent() {
    * Cancel removal
    */
   const handleRemoveCancelled = useCallback(() => {
-    setShowRemoveConfirmDialog(false);
+    dispatch({ type: "SET_REMOVE_CONFIRM_DIALOG", value: false });
   }, []);
 
   // ============================================================================
@@ -184,9 +243,9 @@ export function GitLabSettingsContent() {
                 variant="destructive"
                 size="sm"
                 onClick={handleRemoveClick}
-                disabled={isRemoving}
+                disabled={state.isRemoving}
               >
-                {isRemoving ? (
+                {state.isRemoving ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
                   <Trash2 className="size-4" />
@@ -206,9 +265,11 @@ export function GitLabSettingsContent() {
                 id="gitlab-url"
                 type="url"
                 placeholder="https://gitlab.com"
-                value={gitlabUrl}
-                onChange={(e) => setGitlabUrl(e.target.value)}
-                disabled={isStoring}
+                value={state.gitlabUrl}
+                onChange={(e) =>
+                  dispatch({ type: "SET_GITLAB_URL", value: e.target.value })
+                }
+                disabled={state.isStoring}
               />
               <p className="text-xs text-muted-foreground">
                 Leave default for gitlab.com or provide your self-hosted URL.
@@ -223,21 +284,23 @@ export function GitLabSettingsContent() {
                 <div className="relative">
                   <Input
                     id="token"
-                    type={showToken ? "text" : "password"}
+                    type={state.showToken ? "text" : "password"}
                     placeholder="glpat-example-token-replace-with-real-one"
-                    value={token}
-                    onChange={(e) => setToken(e.target.value)}
-                    disabled={isStoring}
+                    value={state.token}
+                    onChange={(e) =>
+                      dispatch({ type: "SET_TOKEN", value: e.target.value })
+                    }
+                    disabled={state.isStoring}
                     className="pr-10"
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    onClick={() => setShowToken(!showToken)}
+                    onClick={() => dispatch({ type: "TOGGLE_SHOW_TOKEN" })}
                     className="absolute right-1 top-1/2 size-8 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
-                    {showToken ? (
+                    {state.showToken ? (
                       <EyeOff className="size-4" />
                     ) : (
                       <Eye className="size-4" />
@@ -259,12 +322,12 @@ export function GitLabSettingsContent() {
                 </p>
               </div>
 
-              {validationResult && (
+              {state.validationResult && (
                 <InlineMessage
-                  variant={validationResult.valid ? "success" : "error"}
+                  variant={state.validationResult.valid ? "success" : "error"}
                 >
-                  {validationResult.valid
-                    ? `Validated for ${validationResult.username || "user"}`
+                  {state.validationResult.valid
+                    ? `Validated for ${state.validationResult.username || "user"}`
                     : "Invalid token"}
                 </InlineMessage>
               )}
@@ -281,10 +344,12 @@ export function GitLabSettingsContent() {
                 <Button
                   variant="outline"
                   onClick={handleValidate}
-                  disabled={!token.trim() || isValidating || isStoring}
+                  disabled={
+                    !state.token.trim() || state.isValidating || state.isStoring
+                  }
                   className="flex-1"
                 >
-                  {isValidating ? (
+                  {state.isValidating ? (
                     <Loader2 className="size-4 animate-spin mr-2" />
                   ) : null}
                   Validate
@@ -292,14 +357,14 @@ export function GitLabSettingsContent() {
                 <Button
                   onClick={handleStore}
                   disabled={
-                    !token.trim() ||
-                    validationResult?.valid !== true ||
-                    isStoring ||
-                    isValidating
+                    !state.token.trim() ||
+                    state.validationResult?.valid !== true ||
+                    state.isStoring ||
+                    state.isValidating
                   }
                   className="flex-1"
                 >
-                  {isStoring ? (
+                  {state.isStoring ? (
                     <Loader2 className="size-4 animate-spin mr-2" />
                   ) : null}
                   Save Integration
@@ -312,8 +377,10 @@ export function GitLabSettingsContent() {
 
       {/* Remove Confirmation Dialog */}
       <Dialog
-        open={showRemoveConfirmDialog}
-        onOpenChange={setShowRemoveConfirmDialog}
+        open={state.showRemoveConfirmDialog}
+        onOpenChange={(open) =>
+          dispatch({ type: "SET_REMOVE_CONFIRM_DIALOG", value: open })
+        }
       >
         <DialogContent className="max-w-md w-full p-0 gap-0">
           {/* Header */}

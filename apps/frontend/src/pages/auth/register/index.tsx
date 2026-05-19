@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useReducer } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useSettings } from "@/hooks/useSettings";
@@ -18,15 +18,54 @@ import { InlineMessage } from "@/components/ui/inline-error";
 import { BASE_URL } from "@/lib/constants";
 import { APP_NAME } from "../../../lib/version";
 
+interface FormState {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  error: string;
+  isLoading: boolean;
+}
+
+type FormAction =
+  | { type: "SET_EMAIL"; value: string }
+  | { type: "SET_PASSWORD"; value: string }
+  | { type: "SET_CONFIRM_PASSWORD"; value: string }
+  | { type: "SET_ERROR"; value: string }
+  | { type: "SET_LOADING"; value: boolean }
+  | { type: "RESET" };
+
+const initialFormState: FormState = {
+  email: "",
+  password: "",
+  confirmPassword: "",
+  error: "",
+  isLoading: false,
+};
+
+function formReducer(state: FormState, action: FormAction): FormState {
+  switch (action.type) {
+    case "SET_EMAIL":
+      return { ...state, email: action.value };
+    case "SET_PASSWORD":
+      return { ...state, password: action.value };
+    case "SET_CONFIRM_PASSWORD":
+      return { ...state, confirmPassword: action.value };
+    case "SET_ERROR":
+      return { ...state, error: action.value };
+    case "SET_LOADING":
+      return { ...state, isLoading: action.value };
+    case "RESET":
+      return { ...state, error: "", isLoading: false };
+    default:
+      return state;
+  }
+}
+
 export function RegisterPage() {
   const navigate = useNavigate();
   const { register } = useAuth();
   const { signUpsEnabled, isLoading: settingsLoading } = useSettings();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [state, dispatch] = useReducer(formReducer, initialFormState);
 
   // Show loading state while checking settings
   if (settingsLoading) {
@@ -84,27 +123,33 @@ export function RegisterPage() {
 
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError("");
+    dispatch({ type: "SET_ERROR", value: "" });
 
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters");
+    if (state.password.length < 8) {
+      dispatch({
+        type: "SET_ERROR",
+        value: "Password must be at least 8 characters",
+      });
       return;
     }
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
+    if (state.password !== state.confirmPassword) {
+      dispatch({ type: "SET_ERROR", value: "Passwords do not match" });
       return;
     }
 
-    setIsLoading(true);
+    dispatch({ type: "SET_LOADING", value: true });
 
     try {
-      await register(email, password);
+      await register(state.email, state.password);
       navigate(`${BASE_URL}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed");
+      dispatch({
+        type: "SET_ERROR",
+        value: err instanceof Error ? err.message : "Registration failed",
+      });
     } finally {
-      setIsLoading(false);
+      dispatch({ type: "SET_LOADING", value: false });
     }
   };
 
@@ -123,17 +168,21 @@ export function RegisterPage() {
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
-              {error && <InlineMessage variant="error">{error}</InlineMessage>}
+              {state.error && (
+                <InlineMessage variant="error">{state.error}</InlineMessage>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={state.email}
+                  onChange={(e) =>
+                    dispatch({ type: "SET_EMAIL", value: e.target.value })
+                  }
                   required
-                  disabled={isLoading}
+                  disabled={state.isLoading}
                 />
               </div>
               <div className="space-y-2">
@@ -142,10 +191,12 @@ export function RegisterPage() {
                   id="password"
                   type="password"
                   placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={state.password}
+                  onChange={(e) =>
+                    dispatch({ type: "SET_PASSWORD", value: e.target.value })
+                  }
                   required
-                  disabled={isLoading}
+                  disabled={state.isLoading}
                   minLength={8}
                 />
               </div>
@@ -155,17 +206,26 @@ export function RegisterPage() {
                   id="confirmPassword"
                   type="password"
                   placeholder="••••••••"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  value={state.confirmPassword}
+                  onChange={(e) =>
+                    dispatch({
+                      type: "SET_CONFIRM_PASSWORD",
+                      value: e.target.value,
+                    })
+                  }
                   required
-                  disabled={isLoading}
+                  disabled={state.isLoading}
                   minLength={8}
                 />
               </div>
             </CardContent>
             <CardFooter className="flex flex-col gap-2">
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Creating account…" : "Create Account"}
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={state.isLoading}
+              >
+                {state.isLoading ? "Creating account…" : "Create Account"}
               </Button>
               <p className="text-sm text-muted-foreground">
                 Already have an account?{" "}

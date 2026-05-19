@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import type { KeyboardEvent, MouseEvent } from "react";
 import type { PublicLabel } from "@branchforge/shared";
 import type { EditorTabBarItem } from "@/components/ide-shared";
@@ -8,6 +8,86 @@ import {
   removeLocalStorageItem,
   writeLocalStorageItem,
 } from "@/hooks/useLocalStorage";
+
+interface WriteTabsState {
+  openTabs: string[];
+  hydratedTabsProjectId: string | undefined;
+  nextActiveLabelId: string | null | undefined;
+}
+
+type WriteTabsAction =
+  | {
+      type: "SET_TABS_AND_HYDRATION";
+      openTabs: string[];
+      hydratedTabsProjectId: string;
+    }
+  | { type: "CLEAR_TABS_AND_HYDRATION" }
+  | { type: "CLOSE_TAB"; labelId: string; isActiveTab: boolean }
+  | { type: "ADD_TAB"; labelId: string }
+  | { type: "PROJECT_CHANGE" }
+  | { type: "CLEAR_NEXT_ACTIVE" }
+  | { type: "PRUNE_TABS"; openTabs: string[] };
+
+function writeTabsReducer(
+  state: WriteTabsState,
+  action: WriteTabsAction
+): WriteTabsState {
+  switch (action.type) {
+    case "SET_TABS_AND_HYDRATION":
+      return {
+        openTabs: action.openTabs,
+        hydratedTabsProjectId: action.hydratedTabsProjectId,
+        nextActiveLabelId: undefined,
+      };
+
+    case "CLEAR_TABS_AND_HYDRATION":
+      return {
+        openTabs: [],
+        hydratedTabsProjectId: undefined,
+        nextActiveLabelId: undefined,
+      };
+
+    case "CLOSE_TAB": {
+      const nextTabs = state.openTabs.filter(
+        (tabId) => tabId !== action.labelId
+      );
+      let nextActiveLabelId: string | null | undefined = undefined;
+
+      if (nextTabs.length === 0) {
+        nextActiveLabelId = null;
+      } else if (action.isActiveTab) {
+        const tabIndex = state.openTabs.indexOf(action.labelId);
+        nextActiveLabelId = state.openTabs[tabIndex - 1] ?? nextTabs[0] ?? null;
+      }
+
+      return { ...state, openTabs: nextTabs, nextActiveLabelId };
+    }
+
+    case "ADD_TAB":
+      return {
+        ...state,
+        openTabs: state.openTabs.includes(action.labelId)
+          ? state.openTabs
+          : [...state.openTabs, action.labelId],
+      };
+
+    case "PROJECT_CHANGE":
+      return {
+        openTabs: [],
+        hydratedTabsProjectId: undefined,
+        nextActiveLabelId: undefined,
+      };
+
+    case "CLEAR_NEXT_ACTIVE":
+      return { ...state, nextActiveLabelId: undefined };
+
+    case "PRUNE_TABS":
+      return { ...state, openTabs: action.openTabs };
+
+    default:
+      return state;
+  }
+}
 
 interface UseWriteTabsProps {
   projectId: string | undefined;
@@ -31,17 +111,13 @@ export function useWriteTabs({
   setActiveLabelId,
   isLoadingLabels,
 }: UseWriteTabsProps): UseWriteTabsReturn {
-  const [openTabs, setOpenTabs] = useState<string[]>(() => {
-    if (activeLabelId) {
-      return [activeLabelId];
-    }
-
-    return [];
+  const [tabsState, dispatch] = useReducer(writeTabsReducer, {
+    openTabs: activeLabelId ? [activeLabelId] : [],
+    hydratedTabsProjectId: undefined,
+    nextActiveLabelId: undefined,
   });
 
-  const [hydratedTabsProjectId, setHydratedTabsProjectId] = useState<
-    string | undefined
-  >(undefined);
+  const { openTabs, hydratedTabsProjectId } = tabsState;
 
   const prevProjectIdRef = useRef<string | undefined>(undefined);
   const activeLabelIdRef = useRef<string | null>(null);
@@ -69,8 +145,7 @@ export function useWriteTabs({
       prevProjectIdRef.current !== undefined &&
       prevProjectIdRef.current !== projectId
     ) {
-      setOpenTabs([]);
-      setHydratedTabsProjectId(undefined);
+      dispatch({ type: "PROJECT_CHANGE" });
     }
 
     prevProjectIdRef.current = projectId;
@@ -80,16 +155,16 @@ export function useWriteTabs({
     activeLabelIdRef.current = activeLabelId;
   }, [activeLabelId]);
 
+  useEffect(() => {
+    if (tabsState.nextActiveLabelId !== undefined) {
+      setActiveLabelId(tabsState.nextActiveLabelId);
+      dispatch({ type: "CLEAR_NEXT_ACTIVE" });
+    }
+  }, [tabsState.nextActiveLabelId, setActiveLabelId]);
+
   const selectLabelTab = useCallback(
     (labelId: string) => {
-      setOpenTabs((prev) => {
-        if (prev.includes(labelId)) {
-          return prev;
-        }
-
-        return [...prev, labelId];
-      });
-
+      dispatch({ type: "ADD_TAB", labelId });
       setActiveLabelId(labelId);
     },
     [setActiveLabelId]
@@ -98,26 +173,10 @@ export function useWriteTabs({
   const handleCloseTab = useCallback(
     (event: MouseEvent | KeyboardEvent, labelId: string) => {
       event.stopPropagation();
-
-      setOpenTabs((prev) => {
-        const tabIndex = prev.indexOf(labelId);
-        const nextTabs = prev.filter((tabId) => tabId !== labelId);
-
-        if (nextTabs.length === 0) {
-          setActiveLabelId(null);
-          return nextTabs;
-        }
-
-        const currentActiveId = activeLabelIdRef.current;
-        if (labelId === currentActiveId) {
-          const fallbackTab = prev[tabIndex - 1] ?? nextTabs[0] ?? null;
-          setActiveLabelId(fallbackTab);
-        }
-
-        return nextTabs;
-      });
+      const isActiveTab = labelId === activeLabelIdRef.current;
+      dispatch({ type: "CLOSE_TAB", labelId, isActiveTab });
     },
-    [setActiveLabelId]
+    []
   );
 
   useEffect(() => {
@@ -195,13 +254,15 @@ export function useWriteTabs({
       nextOpenTabs = [...nextOpenTabs, nextActiveLabelId];
     }
 
-    setOpenTabs(nextOpenTabs);
+    dispatch({
+      type: "SET_TABS_AND_HYDRATION",
+      openTabs: nextOpenTabs,
+      hydratedTabsProjectId: projectId,
+    });
 
     if (nextActiveLabelId !== activeLabelId) {
       setActiveLabelId(nextActiveLabelId);
     }
-
-    setHydratedTabsProjectId(projectId);
   }, [
     activeLabelId,
     activeTabStorageKey,
@@ -224,21 +285,18 @@ export function useWriteTabs({
       return;
     }
 
-    setOpenTabs((prev) => {
-      if (prev.includes(activeLabelId)) {
-        return prev;
-      }
-
-      return [...prev, activeLabelId];
-    });
+    dispatch({ type: "ADD_TAB", labelId: activeLabelId });
   }, [activeLabelId, labels]);
 
   useEffect(() => {
-    setOpenTabs((prev) => {
-      const nextTabs = prev.filter((tabId) => labelIdSet.has(tabId));
-      return nextTabs.length === prev.length ? prev : nextTabs;
-    });
-  }, [labelIdSet]);
+    const nextTabs = openTabs.filter((tabId) => labelIdSet.has(tabId));
+    if (nextTabs.length !== openTabs.length) {
+      dispatch({
+        type: "PRUNE_TABS",
+        openTabs: nextTabs,
+      });
+    }
+  }, [labelIdSet, openTabs]);
 
   const tabItems = useMemo<EditorTabBarItem[]>(() => {
     const labelsById = new Map(labels.map((label) => [label.id, label]));

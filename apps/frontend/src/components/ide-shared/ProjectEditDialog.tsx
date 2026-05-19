@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type FormEvent } from "react";
+import { useState, useEffect, useRef, useReducer, type FormEvent } from "react";
 import { Loader2, X } from "lucide-react";
 import {
   Dialog,
@@ -22,6 +22,40 @@ interface ProjectEditDialogProps {
   onError?: (error: Error) => void;
 }
 
+interface FormState {
+  name: string;
+  description: string;
+  error: string | null;
+}
+
+type FormAction =
+  | { type: "SET_NAME"; payload: string }
+  | { type: "SET_DESCRIPTION"; payload: string }
+  | { type: "SET_ERROR"; payload: string | null }
+  | {
+      type: "SET_ALL";
+      payload: {
+        name: string;
+        description: string;
+        error: string | null;
+      };
+    };
+
+function formReducer(state: FormState, action: FormAction): FormState {
+  switch (action.type) {
+    case "SET_NAME":
+      return { ...state, name: action.payload };
+    case "SET_DESCRIPTION":
+      return { ...state, description: action.payload };
+    case "SET_ERROR":
+      return { ...state, error: action.payload };
+    case "SET_ALL":
+      return { ...state, ...action.payload };
+    default:
+      return state;
+  }
+}
+
 export function ProjectEditDialog({
   open,
   onOpenChange,
@@ -31,9 +65,11 @@ export function ProjectEditDialog({
   onSuccess,
   onError,
 }: ProjectEditDialogProps) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [formState, dispatch] = useReducer(formReducer, {
+    name: "",
+    description: "",
+    error: null,
+  });
   const [isSaving, setIsSaving] = useState(false);
   const previousOpenRef = useRef(false);
   const previousProjectIdRef = useRef<string | null>(null);
@@ -48,9 +84,14 @@ export function ProjectEditDialog({
       (open && previousProjectIdRef.current !== projectId);
 
     if (isOpenOrProjectChanged && project) {
-      setName(project.name);
-      setDescription(project.description ?? "");
-      setError(null);
+      dispatch({
+        type: "SET_ALL",
+        payload: {
+          name: project.name,
+          description: project.description ?? "",
+          error: null,
+        },
+      });
       previousOpenRef.current = true;
       previousProjectIdRef.current = projectId;
     }
@@ -63,8 +104,8 @@ export function ProjectEditDialog({
 
   const hasChanges =
     project &&
-    (name.trim() !== project.name ||
-      description.trim() !== (project.description ?? "").trim());
+    (formState.name.trim() !== project.name ||
+      formState.description.trim() !== (project.description ?? "").trim());
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -73,25 +114,31 @@ export function ProjectEditDialog({
       return;
     }
 
-    const trimmedName = name.trim();
+    const trimmedName = formState.name.trim();
     if (!trimmedName) {
-      setError("Project name is required");
+      dispatch({ type: "SET_ERROR", payload: "Project name is required" });
       return;
     }
 
-    setError(null);
+    dispatch({ type: "SET_ERROR", payload: null });
     setIsSaving(true);
 
     // Attempt to update project via API call
     try {
       const updatedProject = await onUpdate(project.id, {
         name: trimmedName,
-        description: description.trim() || "",
+        description: formState.description.trim() || "",
       });
 
       // Update local state with the server-returned values
-      setName(updatedProject.name);
-      setDescription(updatedProject.description ?? "");
+      dispatch({
+        type: "SET_ALL",
+        payload: {
+          name: updatedProject.name,
+          description: updatedProject.description ?? "",
+          error: null,
+        },
+      });
       // Trigger success callback (e.g., to refresh project list)
       onSuccess?.();
       // Close dialog on successful update
@@ -100,7 +147,7 @@ export function ProjectEditDialog({
       // Extract user-friendly error message for display in the UI
       const message =
         err instanceof Error ? err.message : "Failed to update project";
-      setError(message);
+      dispatch({ type: "SET_ERROR", payload: message });
       // Ensure we always pass an Error object to the error callback
       const errorToReport =
         err instanceof Error ? err : new Error("Failed to update project");
@@ -144,12 +191,14 @@ export function ProjectEditDialog({
               <Label htmlFor="edit-project-name">Project name</Label>
               <Input
                 id="edit-project-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                value={formState.name}
+                onChange={(e) =>
+                  dispatch({ type: "SET_NAME", payload: e.target.value })
+                }
                 disabled={isSaving}
                 maxLength={200}
-                aria-invalid={error ? true : undefined}
-                aria-describedby={error ? nameErrorId : undefined}
+                aria-invalid={formState.error ? true : undefined}
+                aria-describedby={formState.error ? nameErrorId : undefined}
               />
             </div>
 
@@ -157,8 +206,10 @@ export function ProjectEditDialog({
               <Label htmlFor="edit-project-description">Description</Label>
               <Textarea
                 id="edit-project-description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                value={formState.description}
+                onChange={(e) =>
+                  dispatch({ type: "SET_DESCRIPTION", payload: e.target.value })
+                }
                 disabled={isSaving}
                 maxLength={2000}
                 rows={4}
@@ -166,9 +217,9 @@ export function ProjectEditDialog({
               />
             </div>
 
-            {error && (
+            {formState.error && (
               <p id={nameErrorId} className="text-sm text-destructive">
-                {error}
+                {formState.error}
               </p>
             )}
 

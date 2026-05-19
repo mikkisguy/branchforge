@@ -281,7 +281,11 @@ export function useAutosave<T>({
     }
 
     return () => {
-      clearSaveTimeout();
+      // Inline clearTimeout so lint rules can see the cleanup directly.
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = undefined;
+      }
       // Reset so the next effect run knows it may need to reschedule
       pendingHashRef.current = null;
     };

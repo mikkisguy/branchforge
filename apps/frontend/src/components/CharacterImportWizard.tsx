@@ -5,7 +5,7 @@
  * Shows new characters, existing characters with conflicts, and special characters.
  */
 
-import { useState, useCallback, useId } from "react";
+import { useReducer, useCallback, useId } from "react";
 import {
   X,
   User,
@@ -100,6 +100,109 @@ function groupCharacters(
   return result;
 }
 
+interface WizardState {
+  groups: CharacterGroup;
+  linkToLines: boolean;
+  expandedGroups: Set<keyof CharacterGroup>;
+  isImporting: boolean;
+  showAddForm: boolean;
+  newCharacter: { tag: string; displayName: string; color: string };
+}
+
+type WizardAction =
+  | {
+      type: "UPDATE_CHARACTER";
+      group: keyof CharacterGroup;
+      index: number;
+      updates: Partial<EditableCharacter>;
+    }
+  | { type: "ADD_CHARACTER"; character: EditableCharacter }
+  | { type: "SET_LINK_TO_LINES"; value: boolean }
+  | { type: "TOGGLE_GROUP"; group: keyof CharacterGroup }
+  | { type: "SET_IMPORTING"; value: boolean }
+  | { type: "SET_SHOW_ADD_FORM"; value: boolean }
+  | {
+      type: "UPDATE_NEW_CHARACTER";
+      updates: Partial<{ tag: string; displayName: string; color: string }>;
+    }
+  | { type: "RESET_NEW_CHARACTER" };
+
+function randomColor(): string {
+  return (
+    "#" +
+    Math.floor(Math.random() * 16777215)
+      .toString(16)
+      .padStart(6, "0")
+  );
+}
+
+function createInitialWizardState(
+  detectedCharacters: DetectedCharacter[],
+  conflicts: CharacterConflict[],
+  excludedTags: string[]
+): WizardState {
+  return {
+    groups: groupCharacters(detectedCharacters, conflicts, excludedTags),
+    linkToLines: true,
+    expandedGroups: new Set(["new", "existing", "special"]),
+    isImporting: false,
+    showAddForm: false,
+    newCharacter: { tag: "", displayName: "", color: randomColor() },
+  };
+}
+
+function wizardReducer(state: WizardState, action: WizardAction): WizardState {
+  switch (action.type) {
+    case "UPDATE_CHARACTER":
+      return {
+        ...state,
+        groups: {
+          ...state.groups,
+          [action.group]: state.groups[action.group].map((char, i) =>
+            i === action.index ? { ...char, ...action.updates } : char
+          ),
+        },
+      };
+    case "ADD_CHARACTER":
+      return {
+        ...state,
+        groups: {
+          ...state.groups,
+          new: [...state.groups.new, action.character],
+        },
+        newCharacter: { tag: "", displayName: "", color: randomColor() },
+        showAddForm: false,
+      };
+    case "SET_LINK_TO_LINES":
+      return { ...state, linkToLines: action.value };
+    case "TOGGLE_GROUP": {
+      const next = new Set(state.expandedGroups);
+      if (next.has(action.group)) {
+        next.delete(action.group);
+      } else {
+        next.add(action.group);
+      }
+      return { ...state, expandedGroups: next };
+    }
+    case "SET_IMPORTING":
+      return { ...state, isImporting: action.value };
+    case "SET_SHOW_ADD_FORM":
+      return { ...state, showAddForm: action.value };
+    case "UPDATE_NEW_CHARACTER":
+      return {
+        ...state,
+        newCharacter: { ...state.newCharacter, ...action.updates },
+      };
+    case "RESET_NEW_CHARACTER":
+      return {
+        ...state,
+        newCharacter: { tag: "", displayName: "", color: randomColor() },
+      };
+    default:
+      return state;
+  }
+}
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -118,47 +221,18 @@ export function CharacterImportWizard({
   const { success, error } = useToast();
   const queryClient = useQueryClient();
 
-  // Group characters on mount
-  const [groups, setGroups] = useState<CharacterGroup>(() =>
-    groupCharacters(detectedCharacters, conflicts, excludedTags)
+  const [state, dispatch] = useReducer(
+    wizardReducer,
+    { detectedCharacters, conflicts, excludedTags },
+    ({ detectedCharacters: dc, conflicts: c, excludedTags: et }) =>
+      createInitialWizardState(dc, c, et)
   );
-
-  // Import settings
-  const [linkToLines, setLinkToLines] = useState(true);
-
-  // Track which groups are expanded
-  const [expandedGroups, setExpandedGroups] = useState<
-    Set<keyof CharacterGroup>
-  >(new Set(["new", "existing", "special"]));
-
-  // Loading state
-  const [isImporting, setIsImporting] = useState(false);
-
-  // Add character form state
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newCharacter, setNewCharacter] = useState({
-    tag: "",
-    displayName: "",
-    color:
-      "#" +
-      Math.floor(Math.random() * 16777215)
-        .toString(16)
-        .padStart(6, "0"),
-  });
 
   /**
    * Toggle group expansion
    */
   const toggleGroup = useCallback((group: keyof CharacterGroup) => {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(group)) {
-        next.delete(group);
-      } else {
-        next.add(group);
-      }
-      return next;
-    });
+    dispatch({ type: "TOGGLE_GROUP", group });
   }, []);
 
   /**
@@ -170,12 +244,7 @@ export function CharacterImportWizard({
       index: number,
       updates: Partial<EditableCharacter>
     ) => {
-      setGroups((prev) => ({
-        ...prev,
-        [group]: prev[group].map((char, i) =>
-          i === index ? { ...char, ...updates } : char
-        ),
-      }));
+      dispatch({ type: "UPDATE_CHARACTER", group, index, updates });
     },
     []
   );
@@ -184,13 +253,15 @@ export function CharacterImportWizard({
    * Import characters
    */
   const handleImport = useCallback(async () => {
-    setIsImporting(true);
+    dispatch({ type: "SET_IMPORTING", value: true });
 
     try {
       // Collect all non-excluded characters
-      const charactersToImport = [...groups.new.filter((c) => !c.excluded)];
+      const charactersToImport = [
+        ...state.groups.new.filter((c) => !c.excluded),
+      ];
 
-      for (const c of groups.existing) {
+      for (const c of state.groups.existing) {
         if (!excludedTags.includes(c.tag)) {
           charactersToImport.push({
             tag: c.tag,
@@ -207,7 +278,9 @@ export function CharacterImportWizard({
         }
       }
 
-      charactersToImport.push(...groups.special.filter((c) => !c.excluded));
+      charactersToImport.push(
+        ...state.groups.special.filter((c) => !c.excluded)
+      );
 
       // Map to import format
       const importData: ImportCharacter[] = charactersToImport.map((c) => ({
@@ -221,13 +294,13 @@ export function CharacterImportWizard({
 
       const newExcludedTags = [...excludedTags];
 
-      for (const c of groups.new) {
+      for (const c of state.groups.new) {
         if (c.excluded) {
           newExcludedTags.push(c.tag);
         }
       }
 
-      for (const c of groups.special) {
+      for (const c of state.groups.special) {
         if (c.excluded) {
           newExcludedTags.push(c.tag);
         }
@@ -236,7 +309,7 @@ export function CharacterImportWizard({
       const result = await charactersApi.importCharacters(projectId, {
         characters: importData,
         excludedTags: newExcludedTags,
-        linkToLines,
+        linkToLines: state.linkToLines,
       });
 
       success(`Imported ${result.characters.length} character(s)`);
@@ -265,12 +338,11 @@ export function CharacterImportWizard({
     } catch (err) {
       error(err instanceof Error ? err.message : "Import failed");
     } finally {
-      setIsImporting(false);
+      dispatch({ type: "SET_IMPORTING", value: false });
     }
   }, [
-    groups,
+    state,
     excludedTags,
-    linkToLines,
     projectId,
     onOpenChange,
     onComplete,
@@ -283,54 +355,40 @@ export function CharacterImportWizard({
    * Close handler
    */
   const handleClose = useCallback(() => {
-    if (!isImporting) {
+    if (!state.isImporting) {
       onOpenChange(false);
     }
-  }, [isImporting, onOpenChange]);
+  }, [state.isImporting, onOpenChange]);
 
   /**
    * Add a new character manually
    */
   const addCharacter = useCallback(() => {
-    if (!newCharacter.tag.trim()) {
+    if (!state.newCharacter.tag.trim()) {
       return;
     }
 
     const character: EditableCharacter = {
-      tag: newCharacter.tag.trim(),
-      name: newCharacter.displayName || newCharacter.tag,
-      displayName: newCharacter.displayName || newCharacter.tag,
-      color: newCharacter.color,
+      tag: state.newCharacter.tag.trim(),
+      name: state.newCharacter.displayName || state.newCharacter.tag,
+      displayName: state.newCharacter.displayName || state.newCharacter.tag,
+      color: state.newCharacter.color,
       isSpecial: false,
       sourceFile: "manual",
       confidence: 1,
       excluded: false,
     };
 
-    setGroups((prev) => ({
-      ...prev,
-      new: [...prev.new, character],
-    }));
-
-    setNewCharacter({
-      tag: "",
-      displayName: "",
-      color:
-        "#" +
-        Math.floor(Math.random() * 16777215)
-          .toString(16)
-          .padStart(6, "0"),
-    });
-    setShowAddForm(false);
-  }, [newCharacter]);
+    dispatch({ type: "ADD_CHARACTER", character });
+  }, [state.newCharacter]);
 
   // Count totals
-  const newCount = groups.new.length;
-  const existingCount = groups.existing.length;
-  const specialCount = groups.special.length;
+  const newCount = state.groups.new.length;
+  const existingCount = state.groups.existing.length;
+  const specialCount = state.groups.special.length;
   const selectedCount =
-    groups.new.filter((c) => !c.excluded).length +
-    groups.special.filter((c) => !c.excluded).length;
+    state.groups.new.filter((c) => !c.excluded).length +
+    state.groups.special.filter((c) => !c.excluded).length;
 
   // ============================================================================
   // Render
@@ -359,7 +417,7 @@ export function CharacterImportWizard({
           <button
             onClick={handleClose}
             className="text-muted-foreground hover:text-foreground transition-colors"
-            disabled={isImporting}
+            disabled={state.isImporting}
           >
             <X className="size-5" />
           </button>
@@ -377,13 +435,15 @@ export function CharacterImportWizard({
                 Your RPY files may use custom character definition patterns. You
                 can add characters manually.
               </p>
-              {!showAddForm ? (
+              {!state.showAddForm ? (
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowAddForm(true)}
-                  disabled={isImporting}
+                  onClick={() =>
+                    dispatch({ type: "SET_SHOW_ADD_FORM", value: true })
+                  }
+                  disabled={state.isImporting}
                 >
                   <Plus className="size-4 mr-2" />
                   Add Character
@@ -394,14 +454,14 @@ export function CharacterImportWizard({
                     <Label className="text-xs">Character Tag</Label>
                     <Input
                       placeholder="e.g., s, narrator, protagonist"
-                      value={newCharacter.tag}
+                      value={state.newCharacter.tag}
                       onChange={(e) =>
-                        setNewCharacter((prev) => ({
-                          ...prev,
-                          tag: e.target.value,
-                        }))
+                        dispatch({
+                          type: "UPDATE_NEW_CHARACTER",
+                          updates: { tag: e.target.value },
+                        })
                       }
-                      disabled={isImporting}
+                      disabled={state.isImporting}
                       className="h-8 text-sm"
                     />
                   </div>
@@ -409,14 +469,14 @@ export function CharacterImportWizard({
                     <Label className="text-xs">Display Name</Label>
                     <Input
                       placeholder="e.g., Sarah, Narrator"
-                      value={newCharacter.displayName}
+                      value={state.newCharacter.displayName}
                       onChange={(e) =>
-                        setNewCharacter((prev) => ({
-                          ...prev,
-                          displayName: e.target.value,
-                        }))
+                        dispatch({
+                          type: "UPDATE_NEW_CHARACTER",
+                          updates: { displayName: e.target.value },
+                        })
                       }
-                      disabled={isImporting}
+                      disabled={state.isImporting}
                       className="h-8 text-sm"
                     />
                   </div>
@@ -425,14 +485,14 @@ export function CharacterImportWizard({
                       <Label className="text-xs">Color</Label>
                       <Input
                         type="color"
-                        value={newCharacter.color}
+                        value={state.newCharacter.color}
                         onChange={(e) =>
-                          setNewCharacter((prev) => ({
-                            ...prev,
-                            color: e.target.value,
-                          }))
+                          dispatch({
+                            type: "UPDATE_NEW_CHARACTER",
+                            updates: { color: e.target.value },
+                          })
                         }
-                        disabled={isImporting}
+                        disabled={state.isImporting}
                         className="h-8 p-1"
                       />
                     </div>
@@ -440,7 +500,9 @@ export function CharacterImportWizard({
                       type="button"
                       size="sm"
                       onClick={addCharacter}
-                      disabled={!newCharacter.tag.trim() || isImporting}
+                      disabled={
+                        !state.newCharacter.tag.trim() || state.isImporting
+                      }
                       className="mt-4"
                     >
                       Add
@@ -449,8 +511,10 @@ export function CharacterImportWizard({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => setShowAddForm(false)}
-                      disabled={isImporting}
+                      onClick={() =>
+                        dispatch({ type: "SET_SHOW_ADD_FORM", value: false })
+                      }
+                      disabled={state.isImporting}
                       className="mt-4"
                     >
                       Cancel
@@ -467,17 +531,22 @@ export function CharacterImportWizard({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setShowAddForm(!showAddForm)}
-              disabled={isImporting}
+              onClick={() =>
+                dispatch({
+                  type: "SET_SHOW_ADD_FORM",
+                  value: !state.showAddForm,
+                })
+              }
+              disabled={state.isImporting}
               className="w-full"
             >
               <Plus className="size-4 mr-2" />
-              {showAddForm ? "Cancel" : "Add Another Character"}
+              {state.showAddForm ? "Cancel" : "Add Another Character"}
             </Button>
           )}
 
           {/* Manual add form (expanded) */}
-          {showAddForm &&
+          {state.showAddForm &&
             (newCount > 0 || existingCount > 0 || specialCount > 0) && (
               <div className="p-3 bg-muted/30 rounded-md space-y-2">
                 <div className="grid grid-cols-2 gap-2">
@@ -487,14 +556,14 @@ export function CharacterImportWizard({
                     </Label>
                     <Input
                       placeholder="e.g., s, narrator"
-                      value={newCharacter.tag}
+                      value={state.newCharacter.tag}
                       onChange={(e) =>
-                        setNewCharacter((prev) => ({
-                          ...prev,
-                          tag: e.target.value,
-                        }))
+                        dispatch({
+                          type: "UPDATE_NEW_CHARACTER",
+                          updates: { tag: e.target.value },
+                        })
                       }
-                      disabled={isImporting}
+                      disabled={state.isImporting}
                       className="h-7 text-sm"
                     />
                   </div>
@@ -504,14 +573,14 @@ export function CharacterImportWizard({
                     </Label>
                     <Input
                       placeholder="e.g., Sarah"
-                      value={newCharacter.displayName}
+                      value={state.newCharacter.displayName}
                       onChange={(e) =>
-                        setNewCharacter((prev) => ({
-                          ...prev,
-                          displayName: e.target.value,
-                        }))
+                        dispatch({
+                          type: "UPDATE_NEW_CHARACTER",
+                          updates: { displayName: e.target.value },
+                        })
                       }
-                      disabled={isImporting}
+                      disabled={state.isImporting}
                       className="h-7 text-sm"
                     />
                   </div>
@@ -523,14 +592,14 @@ export function CharacterImportWizard({
                     </Label>
                     <Input
                       type="color"
-                      value={newCharacter.color}
+                      value={state.newCharacter.color}
                       onChange={(e) =>
-                        setNewCharacter((prev) => ({
-                          ...prev,
-                          color: e.target.value,
-                        }))
+                        dispatch({
+                          type: "UPDATE_NEW_CHARACTER",
+                          updates: { color: e.target.value },
+                        })
                       }
-                      disabled={isImporting}
+                      disabled={state.isImporting}
                       className="h-7 w-16 p-1"
                     />
                   </div>
@@ -538,7 +607,9 @@ export function CharacterImportWizard({
                     type="button"
                     size="sm"
                     onClick={addCharacter}
-                    disabled={!newCharacter.tag.trim() || isImporting}
+                    disabled={
+                      !state.newCharacter.tag.trim() || state.isImporting
+                    }
                   >
                     Add
                   </Button>
@@ -546,8 +617,10 @@ export function CharacterImportWizard({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={() => setShowAddForm(false)}
-                    disabled={isImporting}
+                    onClick={() =>
+                      dispatch({ type: "SET_SHOW_ADD_FORM", value: false })
+                    }
+                    disabled={state.isImporting}
                   >
                     Cancel
                   </Button>
@@ -570,16 +643,16 @@ export function CharacterImportWizard({
                     ({newCount})
                   </span>
                 </div>
-                {expandedGroups.has("new") ? (
+                {state.expandedGroups.has("new") ? (
                   <ChevronUp className="size-4" />
                 ) : (
                   <ChevronDown className="size-4" />
                 )}
               </button>
 
-              {expandedGroups.has("new") && (
+              {state.expandedGroups.has("new") && (
                 <div className="p-3 space-y-2 border-t border-border/30">
-                  {groups.new.map((char, index) => (
+                  {state.groups.new.map((char, index) => (
                     <div
                       key={char.tag}
                       className="p-3 bg-background border border-border/30 rounded-md space-y-2"
@@ -595,7 +668,7 @@ export function CharacterImportWizard({
                               })
                             }
                             className="size-4 rounded"
-                            disabled={isImporting}
+                            disabled={state.isImporting}
                           />
                           <span className="font-mono text-sm font-medium">
                             {char.tag}
@@ -627,7 +700,7 @@ export function CharacterImportWizard({
                                 })
                               }
                               className="h-7 text-sm"
-                              disabled={isImporting}
+                              disabled={state.isImporting}
                             />
                           </div>
                           <div>
@@ -643,7 +716,7 @@ export function CharacterImportWizard({
                                 })
                               }
                               className="h-7 text-sm p-1"
-                              disabled={isImporting}
+                              disabled={state.isImporting}
                             />
                           </div>
                         </div>
@@ -670,16 +743,16 @@ export function CharacterImportWizard({
                     ({existingCount})
                   </span>
                 </div>
-                {expandedGroups.has("existing") ? (
+                {state.expandedGroups.has("existing") ? (
                   <ChevronUp className="size-4" />
                 ) : (
                   <ChevronDown className="size-4" />
                 )}
               </button>
 
-              {expandedGroups.has("existing") && (
+              {state.expandedGroups.has("existing") && (
                 <div className="p-3 space-y-2 border-t border-amber-200 dark:border-amber-800">
-                  {groups.existing.map((conflict) => (
+                  {state.groups.existing.map((conflict) => (
                     <div
                       key={conflict.tag}
                       className="p-3 bg-background border border-border/30 rounded-md"
@@ -735,20 +808,20 @@ export function CharacterImportWizard({
                     ({specialCount})
                   </span>
                 </div>
-                {expandedGroups.has("special") ? (
+                {state.expandedGroups.has("special") ? (
                   <ChevronUp className="size-4" />
                 ) : (
                   <ChevronDown className="size-4" />
                 )}
               </button>
 
-              {expandedGroups.has("special") && (
+              {state.expandedGroups.has("special") && (
                 <div className="p-3 space-y-2 border-t border-border/30">
                   <p className="text-xs text-muted-foreground mb-2">
                     These are typically system characters (narration, unknown
                     speakers) that can be excluded from import.
                   </p>
-                  {groups.special.map((char, index) => (
+                  {state.groups.special.map((char, index) => (
                     <div
                       key={char.tag}
                       className="flex items-center justify-between p-2 bg-background border border-border/30 rounded-md"
@@ -763,7 +836,7 @@ export function CharacterImportWizard({
                             })
                           }
                           className="size-4 rounded"
-                          disabled={isImporting}
+                          disabled={state.isImporting}
                         />
                         <span className="font-mono text-sm">{char.tag}</span>
                         <span className="text-xs text-muted-foreground">
@@ -795,10 +868,15 @@ export function CharacterImportWizard({
               <input
                 id={linkToLinesId}
                 type="checkbox"
-                checked={linkToLines}
-                onChange={(e) => setLinkToLines(e.target.checked)}
+                checked={state.linkToLines}
+                onChange={(e) =>
+                  dispatch({
+                    type: "SET_LINK_TO_LINES",
+                    value: e.target.checked,
+                  })
+                }
                 className="size-4 rounded"
-                disabled={isImporting}
+                disabled={state.isImporting}
               />
             </div>
           </div>
@@ -813,15 +891,15 @@ export function CharacterImportWizard({
             <Button
               variant="outline"
               onClick={handleClose}
-              disabled={isImporting}
+              disabled={state.isImporting}
             >
               Cancel
             </Button>
             <Button
               onClick={handleImport}
-              disabled={isImporting || selectedCount === 0}
+              disabled={state.isImporting || selectedCount === 0}
             >
-              {isImporting
+              {state.isImporting
                 ? "Importing..."
                 : `Import ${selectedCount} Character${
                     selectedCount !== 1 ? "s" : ""
