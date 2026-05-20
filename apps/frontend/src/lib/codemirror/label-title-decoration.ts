@@ -71,7 +71,9 @@ const labelTitlesField = StateField.define<LabelTitleMap>({
   update: (value, transaction) => {
     for (const effect of transaction.effects) {
       if (effect.is(setLabelTitlesEffect)) {
-        return effect.value;
+        // Defensively clone to ensure identity changes are detected even
+        // when the caller mutates and re-dispatches the same Map instance.
+        return new Map(effect.value);
       }
     }
     return value;

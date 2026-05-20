@@ -397,6 +397,7 @@ export const updateLabelSchema = z
         /^[a-zA-Z_][a-zA-Z0-9_]*$/,
         "Label name must start with a letter or underscore and contain only letters, numbers, and underscores"
       )
+      .nullable()
       .optional(),
   })
   .strict()

@@ -1893,136 +1893,156 @@ export async function updateLabel(
     route?: string | null;
     status?: LabelStatus;
     visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
-    labelName?: string;
+    labelName?: string | null;
   }
 ): Promise<PublicLabel> {
   const db = getDb();
 
-  // Get label with project owner info, filePath, and file content
-  const [labelWithProject] = await db
-    .select({
-      label: labels,
-      projectOwnerId: projects.userId,
-      filePath: projectFiles.filePath,
-      fileContent: projectFiles.content,
-    })
-    .from(labels)
-    .innerJoin(projects, eq(labels.projectId, projects.id))
-    .innerJoin(projectFiles, eq(labels.projectFileId, projectFiles.id))
-    .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
-    .limit(1);
-
-  if (!labelWithProject) {
-    throw new NotFoundError("Label");
-  }
-
-  if (labelWithProject.projectOwnerId !== userId) {
-    throw new ForbiddenError("Insufficient permissions");
-  }
-
-  // Handle labelName update: validate and update RPY file content
-  let updatedContent: string | null = null;
-  const oldLabelName = labelWithProject.label.labelName;
-
-  if (data.labelName !== undefined && data.labelName !== oldLabelName) {
-    // Validate label name format (must match Ren'Py label name rules)
-    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(data.labelName)) {
-      throw new ValidationError(
-        "Label name must start with a letter or underscore and contain only letters, numbers, and underscores"
-      );
-    }
-
-    if (!oldLabelName) {
-      throw new ValidationError(
-        "Cannot rename a label that has no file-backed label name"
-      );
-    }
-
-    if (!labelWithProject.fileContent) {
-      throw new ValidationError(
-        "Cannot rename a label in a file with no content"
-      );
-    }
-
-    // Check uniqueness in the file
-    const [existingInFile] = await db
-      .select({ id: labels.id })
+  // Wrap the initial DB read, content parsing, and writes in a single
+  // transaction to prevent lost updates from concurrent renames.  The
+  // FOR UPDATE lock on the project file row serialises renames targeting
+  // the same file.
+  return await db.transaction(async (tx) => {
+    // Get label with project owner info, filePath, and file content
+    const [labelWithProject] = await tx
+      .select({
+        label: labels,
+        projectOwnerId: projects.userId,
+        filePath: projectFiles.filePath,
+        fileContent: projectFiles.content,
+      })
       .from(labels)
-      .where(
-        and(
-          eq(labels.projectFileId, labelWithProject.label.projectFileId),
-          eq(labels.labelName, data.labelName),
-          isNull(labels.deletedAt),
-          ne(labels.id, labelId)
-        )
-      )
+      .innerJoin(projects, eq(labels.projectId, projects.id))
+      .innerJoin(projectFiles, eq(labels.projectFileId, projectFiles.id))
+      .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
       .limit(1);
 
-    if (existingInFile) {
-      throw new ConflictError(
-        `A label named "${data.labelName}" already exists in this file`
-      );
+    if (!labelWithProject) {
+      throw new NotFoundError("Label");
     }
 
-    // Replace old label name with new name in the RPY content.
-    // We locate the label definition line (e.g. "label start:") and
-    // replace only the name portion so indentation and trailing text
-    // (like ":") stay intact.
-    const lines = labelWithProject.fileContent.split("\n");
-    let replaced = false;
+    if (labelWithProject.projectOwnerId !== userId) {
+      throw new ForbiddenError("Insufficient permissions");
+    }
 
-    for (let i = 0; i < lines.length; i++) {
-      const match = lines[i].match(RENPY_LABEL_REGEX);
-      if (match && match[1] === oldLabelName) {
-        lines[i] = lines[i].replace(
-          new RegExp(
-            `^(\\s*label\\s+)${oldLabelName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([\\s(:].*)$`
-          ),
-          `$1${data.labelName}$2`
+    // Acquire a row-level lock on the project file so concurrent renames
+    // targeting the same file are serialised and cannot produce lost updates.
+    await tx
+      .select({ id: projectFiles.id })
+      .from(projectFiles)
+      .where(eq(projectFiles.id, labelWithProject.label.projectFileId))
+      .for("update")
+      .limit(1);
+
+    // Handle labelName update: validate and update RPY file content
+    let updatedContent: string | null = null;
+    const oldLabelName = labelWithProject.label.labelName;
+
+    if (data.labelName != null && data.labelName !== oldLabelName) {
+      // Validate label name format (must match Ren'Py label name rules)
+      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(data.labelName)) {
+        throw new ValidationError(
+          "Label name must start with a letter or underscore and contain only letters, numbers, and underscores"
         );
-        replaced = true;
-        break;
+      }
+
+      if (!oldLabelName) {
+        throw new ValidationError(
+          "Cannot rename a label that has no file-backed label name"
+        );
+      }
+
+      if (!labelWithProject.fileContent) {
+        throw new ValidationError(
+          "Cannot rename a label in a file with no content"
+        );
+      }
+
+      // Check uniqueness in the file
+      const [existingInFile] = await tx
+        .select({ id: labels.id })
+        .from(labels)
+        .where(
+          and(
+            eq(labels.projectFileId, labelWithProject.label.projectFileId),
+            eq(labels.labelName, data.labelName),
+            isNull(labels.deletedAt),
+            ne(labels.id, labelId)
+          )
+        )
+        .limit(1);
+
+      if (existingInFile) {
+        throw new ConflictError(
+          `A label named "${data.labelName}" already exists in this file`
+        );
+      }
+
+      // Replace old label name with new name in the RPY content.
+      // We locate the label definition line (e.g. "label start:") and
+      // replace only the name portion so indentation and trailing text
+      // (like ":") stay intact.
+      const lines = labelWithProject.fileContent.split("\n");
+      let replaced = false;
+
+      for (let i = 0; i < lines.length; i++) {
+        const match = lines[i].match(RENPY_LABEL_REGEX);
+        if (match && match[1] === oldLabelName) {
+          lines[i] = lines[i].replace(
+            new RegExp(
+              `^(\\s*label\\s+)${oldLabelName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([\\s(:].*)$`
+            ),
+            `$1${data.labelName}$2`
+          );
+          replaced = true;
+          break;
+        }
+      }
+
+      if (!replaced) {
+        throw new NotFoundError(
+          `Label "${oldLabelName}" not found in file content`
+        );
+      }
+
+      updatedContent = lines.join("\n");
+    }
+
+    // Validate route exists in route_configs for this project
+    // If route is provided but doesn't exist, coerce to null
+    let validatedRoute = data.route;
+    if (validatedRoute !== null && validatedRoute !== undefined) {
+      const [route] = await tx
+        .select({ id: routeConfigs.id })
+        .from(routeConfigs)
+        .where(
+          and(
+            eq(routeConfigs.projectId, labelWithProject.label.projectId),
+            eq(routeConfigs.routeKey, validatedRoute)
+          )
+        )
+        .limit(1);
+
+      if (!route) {
+        // Coerce to null if route doesn't exist
+        logWarn(LogEventType.VALIDATION_WARNING, {
+          event: "invalid_route_configuration",
+          route: validatedRoute,
+          projectId: labelWithProject.label.projectId,
+        });
+        validatedRoute = null;
       }
     }
 
-    if (!replaced) {
-      throw new NotFoundError(
-        `Label "${oldLabelName}" not found in file content`
-      );
-    }
+    const currentVersion = labelWithProject.label.version ?? 1;
+    const auditFields = updateAuditFields(currentVersion, userId);
 
-    updatedContent = lines.join("\n");
-  }
+    // Build update data with validated route and optional labelName
+    const updateData = {
+      ...data,
+      ...(validatedRoute !== undefined ? { route: validatedRoute } : {}),
+    };
 
-  // Validate route exists in route_configs for this project
-  // If route is provided but doesn't exist, coerce to null
-  let validatedRoute = data.route;
-  if (validatedRoute !== null && validatedRoute !== undefined) {
-    const routeExists = await validateRouteExists(
-      labelWithProject.label.projectId,
-      validatedRoute
-    );
-    if (!routeExists) {
-      // Coerce to null if route doesn't exist
-      logWarn(LogEventType.VALIDATION_WARNING, {
-        event: "invalid_route_configuration",
-        route: validatedRoute,
-        projectId: labelWithProject.label.projectId,
-      });
-      validatedRoute = null;
-    }
-  }
-
-  const currentVersion = labelWithProject.label.version ?? 1;
-  const auditFields = updateAuditFields(currentVersion, userId);
-
-  // Build update data with validated route and optional labelName
-  const updateData = {
-    ...data,
-    ...(validatedRoute !== undefined ? { route: validatedRoute } : {}),
-  };
-
-  return await db.transaction(async (tx) => {
     // Also update project_files content if labelName changed
     if (updatedContent !== null) {
       await tx

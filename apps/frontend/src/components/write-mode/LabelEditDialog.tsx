@@ -130,12 +130,20 @@ export function LabelEditDialog({
       changes.route = normalizedRoute;
     }
 
-    if (status !== currentStatus) {
+    // Normalize null props to defaults for change detection, so filling
+    // in a runtime default doesn't count as a user change.
+    if (status !== (currentStatus ?? "DRAFT")) {
       changes.status = status;
     }
 
-    if (visibility !== currentVisibility) {
+    if (visibility !== (currentVisibility ?? "EXCLUSIVE")) {
       changes.visibility = visibility;
+    }
+
+    // Skip saving when no fields actually changed.
+    if (Object.keys(changes).length === 0) {
+      onOpenChange(false);
+      return;
     }
 
     await onSave(changes);

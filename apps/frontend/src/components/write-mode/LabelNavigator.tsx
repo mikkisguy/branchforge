@@ -19,8 +19,8 @@ import {
   Loader2,
   X,
 } from "lucide-react";
-import { LabelContextMenu } from "./LabelContextMenu";
-import { LabelEditDialog } from "./LabelEditDialog";
+import { LabelContextMenu } from "@/components/write-mode/LabelContextMenu";
+import { LabelEditDialog } from "@/components/write-mode/LabelEditDialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { UpdateLabelInput } from "@/lib/api/labels";
 
@@ -61,7 +61,14 @@ function InlineRenameInput({
       onCancel();
       return;
     }
-    await onSave(trimmed);
+    try {
+      await onSave(trimmed);
+      onCancel();
+    } catch {
+      // Save failed — leave the inline input open so the user can correct
+      // or try again. The caller (e.g. mutation hook) should surface the
+      // error through its own mechanism (toast / inline error state).
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

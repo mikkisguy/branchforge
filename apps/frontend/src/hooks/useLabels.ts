@@ -248,8 +248,13 @@ export function useLabels(): UseLabelsReturn {
         if (activeLabelId === labelId) {
           const labelIds = labels.map((l) => l.id);
           const deletedIndex = labelIds.indexOf(labelId);
+          // Guard against label not found in current list (e.g. filtered view)
           const nextLabelId =
-            labelIds[deletedIndex + 1] ?? labelIds[deletedIndex - 1] ?? null;
+            deletedIndex >= 0
+              ? (labelIds[deletedIndex + 1] ??
+                labelIds[deletedIndex - 1] ??
+                null)
+              : null;
           setActiveLabelId(nextLabelId);
         }
 

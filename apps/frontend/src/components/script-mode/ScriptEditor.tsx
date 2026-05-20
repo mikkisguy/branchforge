@@ -22,7 +22,7 @@ import {
   labelTitleExtension,
   setLabelTitlesEffect,
   type LabelTitleMap,
-} from "../../lib/codemirror/label-title-decoration";
+} from "@/lib/codemirror/label-title-decoration";
 import { PaletteSwitcher } from "./PaletteSwitcher";
 import {
   FontSizeSwitcher,
@@ -369,13 +369,17 @@ export const ScriptEditor = function ScriptEditor({
     [lineWrapExtension, updateListener, highlightStateField]
   );
 
-  // Dispatch label title updates when the map changes or visibility toggles
+  // Dispatch label title updates when the map changes or visibility toggles.
+  // Always dispatch (even when labelTitles is undefined) so decorations are
+  // cleared when labels are removed and old decorations don't persist.
   useEffect(() => {
     const view = editorViewRef.current;
-    if (view && labelTitles) {
+    if (view) {
       view.dispatch({
         effects: [
-          setLabelTitlesEffect.of(showLabelTitles ? labelTitles : new Map()),
+          setLabelTitlesEffect.of(
+            showLabelTitles && labelTitles ? labelTitles : new Map()
+          ),
         ],
       });
     }
