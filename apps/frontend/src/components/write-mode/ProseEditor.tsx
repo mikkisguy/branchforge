@@ -647,6 +647,10 @@ export const ProseEditor = function ProseEditor({
       {!isFocusMode && (
         <div className="px-4 py-3 border-b border-border bg-card rounded-t-lg flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
+            {/* Label title */}
+            <span className="text-sm font-medium text-foreground truncate">
+              {activeLabel.title}
+            </span>
             {/* Scene status badge */}
             <span
               className={`px-2 py-0.4 rounded-full text-xs font-medium border shrink-0 ${
