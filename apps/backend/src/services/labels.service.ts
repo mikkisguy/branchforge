@@ -655,20 +655,30 @@ async function syncLabelsInTransaction(
         labelsUpdated++;
         matchedExistingIds.add(existingLabel.id);
       } else {
-        // No match by name — try to detect a rename before creating a new label.
-        //
-        // A rename candidate is an existing label at the same position whose
-        // name no longer appears anywhere in the parsed labels.  If the old
-        // name still exists in the file it was merely *shifted* (labels were
-        // inserted/deleted around it), not renamed.
-        const renameCandidate = existingLabels.find(
+        // No match by name — try to detect a rename by matching content hash.
+        // Position-proximity tiebreaker handles duplicate-hash edge cases.
+        // Limitation: rename + content edit in the same sync is ambiguous
+        // (can't distinguish from delete+recreate), treated as delete+create.
+        const currentLabelLinesHash = calculateLinesHash(labelData.entries);
+
+        const renameCandidates = existingLabels.filter(
           (s) =>
             s.labelName &&
-            s.labelPosition === i &&
             !matchedExistingIds.has(s.id) &&
             !s.deletedAt &&
-            !parsedLabelNames.has(s.labelName)
+            !parsedLabelNames.has(s.labelName) &&
+            (s.contentHash === currentLabelLinesHash ||
+              s.lastSyncedHash === currentLabelLinesHash)
         );
+
+        // Sort by position proximity to break ties
+        renameCandidates.sort(
+          (a, b) =>
+            Math.abs((a.labelPosition ?? 0) - i) -
+            Math.abs((b.labelPosition ?? 0) - i)
+        );
+
+        const renameCandidate = renameCandidates[0];
 
         if (renameCandidate) {
           matchedExistingIds.add(renameCandidate.id);
@@ -2012,29 +2022,31 @@ export async function updateLabel(
     ...(validatedRoute !== undefined ? { route: validatedRoute } : {}),
   };
 
-  // Also update project_files content if labelName changed
-  if (updatedContent !== null) {
-    await db
-      .update(projectFiles)
+  return await db.transaction(async (tx) => {
+    // Also update project_files content if labelName changed
+    if (updatedContent !== null) {
+      await tx
+        .update(projectFiles)
+        .set({
+          content: updatedContent,
+          contentHash: calculateContentHash(updatedContent),
+        })
+        .where(eq(projectFiles.id, labelWithProject.label.projectFileId));
+    }
+
+    const [updated] = await tx
+      .update(labels)
       .set({
-        content: updatedContent,
-        contentHash: calculateContentHash(updatedContent),
+        ...updateData,
+        ...auditFields,
       })
-      .where(eq(projectFiles.id, labelWithProject.label.projectFileId));
-  }
+      .where(eq(labels.id, labelId))
+      .returning();
 
-  const [updated] = await db
-    .update(labels)
-    .set({
-      ...updateData,
-      ...auditFields,
-    })
-    .where(eq(labels.id, labelId))
-    .returning();
-
-  return mapToPublicLabel({
-    ...updated,
-    filePath: labelWithProject.filePath,
+    return mapToPublicLabel({
+      ...updated,
+      filePath: labelWithProject.filePath,
+    });
   });
 }
 
@@ -2111,6 +2123,7 @@ export async function deleteLabel(
         .update(projectFiles)
         .set({
           content: updatedContent,
+          contentHash: calculateContentHash(updatedContent),
           updatedAt: new Date(),
         })
         .where(eq(projectFiles.id, labelWithProject.projectFileId));
