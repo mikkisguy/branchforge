@@ -17,10 +17,12 @@ import {
   FolderOpen,
   Plus,
   Loader2,
+  Search,
   X,
 } from "lucide-react";
 import { LabelContextMenu } from "@/components/write-mode/LabelContextMenu";
 import { LabelEditDialog } from "@/components/write-mode/LabelEditDialog";
+import { Tooltip } from "@/components/ui/tooltip";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { UpdateLabelInput } from "@/lib/api/labels";
 
@@ -151,14 +153,19 @@ function LabelItem({
     );
   }
 
+  const tooltipContent = label.labelName
+    ? `${label.title} (${label.labelName})`
+    : label.title;
+
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      onContextMenu={(e) => onContextMenu(e, label)}
-      onDoubleClick={() => onDoubleClick(label)}
-      aria-pressed={isActive}
-      className={`
+    <Tooltip content={tooltipContent}>
+      <button
+        type="button"
+        onClick={onSelect}
+        onContextMenu={(e) => onContextMenu(e, label)}
+        onDoubleClick={() => onDoubleClick(label)}
+        aria-pressed={isActive}
+        className={`
         relative w-full flex items-center gap-3 px-3 py-2.5 rounded-md border transition-all
         ${
           isActive
@@ -166,27 +173,28 @@ function LabelItem({
             : "bg-card/50 border-border hover:bg-accent/50"
         }
       `}
-    >
-      {/* Status dot on the left */}
-      <div
-        className="size-2 rounded-full flex-shrink-0 ring-2 ring-background"
-        style={{
-          backgroundColor: statusColor,
-        }}
-        title={`Status: ${label.status ?? "DRAFT"}`}
-      />
+      >
+        {/* Status dot on the left */}
+        <div
+          className="size-2 rounded-full flex-shrink-0 ring-2 ring-background"
+          style={{
+            backgroundColor: statusColor,
+          }}
+          title={`Status: ${label.status ?? "DRAFT"}`}
+        />
 
-      {/* Label Title */}
-      <div className="flex-1 min-w-0 text-left" title={label.title}>
-        <h3
-          className={`text-sm font-medium truncate ${
-            isActive ? "text-foreground" : "text-muted-foreground"
-          }`}
-        >
-          {label.title}
-        </h3>
-      </div>
-    </button>
+        {/* Label Title */}
+        <div className="flex-1 min-w-0 text-left">
+          <h3
+            className={`text-sm font-medium truncate ${
+              isActive ? "text-foreground" : "text-muted-foreground"
+            }`}
+          >
+            {label.title}
+          </h3>
+        </div>
+      </button>
+    </Tooltip>
   );
 }
 
@@ -453,6 +461,9 @@ export function LabelNavigator({
     label: PublicLabel | null;
   }>({ open: false, label: null });
 
+  // Search/filter state (local, instant, no debouncing)
+  const [searchQuery, setSearchQuery] = useState("");
+
   // Context menu handler
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, label: PublicLabel) => {
@@ -535,10 +546,20 @@ export function LabelNavigator({
     setPortalTarget(document.body);
   }, []);
 
+  const filteredLabels = useMemo(() => {
+    if (!searchQuery.trim()) return labels;
+    const query = searchQuery.toLowerCase().trim();
+    return labels.filter(
+      (label) =>
+        label.title.toLowerCase().includes(query) ||
+        label.labelName?.toLowerCase().includes(query)
+    );
+  }, [labels, searchQuery]);
+
   const groupedLabels = useMemo(() => {
     const groups = new Map<string, PublicLabel[]>();
 
-    for (const label of labels) {
+    for (const label of filteredLabels) {
       const key = label.projectFileId;
       if (!groups.has(key)) {
         groups.set(key, []);
@@ -559,7 +580,7 @@ export function LabelNavigator({
     }
 
     return sortedGroups;
-  }, [labels]);
+  }, [filteredLabels]);
 
   return (
     <div className="h-full overflow-y-auto">
@@ -592,18 +613,56 @@ export function LabelNavigator({
             </p>
           </div>
         </div>
+
+        {/* Search input */}
+        <div className="mt-2.5 relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Filter..."
+            className="w-full pl-7 pr-7 py-1.5 text-xs border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-muted/80 transition-colors"
+              aria-label="Clear search"
+            >
+              <X className="size-3 text-muted-foreground" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Label List */}
       <div className="p-3 space-y-2">
         {groupedLabels.size === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <FolderOpen className="size-10 text-muted-foreground mb-3" />
-            <p className="text-sm text-muted-foreground">No labels found</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Import a .rpy file or create labels to get started.
-            </p>
-          </div>
+          labels.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <FolderOpen className="size-10 text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">No labels found</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Import a .rpy file or create labels to get started.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Search className="size-10 text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">
+                No labels match "{searchQuery}"
+              </p>
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="text-xs text-[var(--theme-color)] hover:underline mt-2"
+              >
+                Clear search
+              </button>
+            </div>
+          )
         ) : (
           <div className="space-y-3">
             {Array.from(groupedLabels.entries()).map(
