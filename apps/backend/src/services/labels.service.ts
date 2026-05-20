@@ -1909,7 +1909,6 @@ export async function updateLabel(
         label: labels,
         projectOwnerId: projects.userId,
         filePath: projectFiles.filePath,
-        fileContent: projectFiles.content,
       })
       .from(labels)
       .innerJoin(projects, eq(labels.projectId, projects.id))
@@ -1927,16 +1926,28 @@ export async function updateLabel(
 
     // Acquire a row-level lock on the project file so concurrent renames
     // targeting the same file are serialised and cannot produce lost updates.
-    await tx
-      .select({ id: projectFiles.id })
+    // Also re-read content under the lock to avoid stale reads.
+    const [lockedFile] = await tx
+      .select({ id: projectFiles.id, content: projectFiles.content })
       .from(projectFiles)
       .where(eq(projectFiles.id, labelWithProject.label.projectFileId))
       .for("update")
       .limit(1);
 
+    // Use content read under the lock for the rename logic
+    const fileContent = lockedFile?.content ?? null;
+
     // Handle labelName update: validate and update RPY file content
     let updatedContent: string | null = null;
     const oldLabelName = labelWithProject.label.labelName;
+
+    // Reject null labelName for file-backed labels — persisting null
+    // would desync the DB from the file content.
+    if (data.labelName === null && oldLabelName) {
+      throw new ValidationError(
+        "Cannot set labelName to null for file-backed labels"
+      );
+    }
 
     if (data.labelName != null && data.labelName !== oldLabelName) {
       // Validate label name format (must match Ren'Py label name rules)
@@ -1952,7 +1963,7 @@ export async function updateLabel(
         );
       }
 
-      if (!labelWithProject.fileContent) {
+      if (!fileContent) {
         throw new ValidationError(
           "Cannot rename a label in a file with no content"
         );
@@ -1982,7 +1993,7 @@ export async function updateLabel(
       // We locate the label definition line (e.g. "label start:") and
       // replace only the name portion so indentation and trailing text
       // (like ":") stay intact.
-      const lines = labelWithProject.fileContent.split("\n");
+      const lines = fileContent.split("\n");
       let replaced = false;
 
       for (let i = 0; i < lines.length; i++) {
