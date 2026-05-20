@@ -500,6 +500,7 @@ export function LabelNavigator({
   const handleEditSave = useCallback(
     async (data: {
       title?: string;
+      labelName?: string;
       route?: string | null;
       status?: "DRAFT" | "REVIEW" | "FINAL";
       visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
@@ -646,6 +647,7 @@ export function LabelNavigator({
                 setEditDialog((prev) => ({ ...prev, open }))
               }
               currentTitle={editDialog.label.title}
+              currentLabelName={editDialog.label.labelName}
               currentRoute={editDialog.label.routeKey}
               currentStatus={editDialog.label.status}
               currentVisibility={editDialog.label.visibility}

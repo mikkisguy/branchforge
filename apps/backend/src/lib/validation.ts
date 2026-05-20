@@ -388,6 +388,16 @@ export const updateLabelSchema = z
     status: labelStatusSchema.optional(),
     title: z.string().trim().min(1, "Title is required").max(255).optional(),
     visibility: labelVisibilitySchema.optional(),
+    labelName: z
+      .string()
+      .trim()
+      .min(1)
+      .max(255)
+      .regex(
+        /^[a-zA-Z_][a-zA-Z0-9_]*$/,
+        "Label name must start with a letter or underscore and contain only letters, numbers, and underscores"
+      )
+      .optional(),
   })
   .strict()
   .partial();

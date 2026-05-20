@@ -16,6 +16,8 @@ interface LabelEditDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Current title of the label */
   currentTitle: string;
+  /** Current label name (RPY identifier, null for UI-created labels) */
+  currentLabelName: string | null;
   /** Current route key (null = shared/no route) */
   currentRoute: string | null;
   /** Current status */
@@ -27,6 +29,7 @@ interface LabelEditDialogProps {
   /** Called when save is clicked */
   onSave: (data: {
     title?: string;
+    labelName?: string;
     route?: string | null;
     status?: "DRAFT" | "REVIEW" | "FINAL";
     visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
@@ -39,6 +42,7 @@ export function LabelEditDialog({
   open,
   onOpenChange,
   currentTitle,
+  currentLabelName,
   currentRoute,
   currentStatus,
   currentVisibility,
@@ -47,23 +51,34 @@ export function LabelEditDialog({
   isSaving,
 }: LabelEditDialogProps) {
   const [title, setTitle] = useState("");
+  const [labelName, setLabelName] = useState("");
   const [route, setRoute] = useState<string>("");
   const [status, setStatus] = useState<"DRAFT" | "REVIEW" | "FINAL">("DRAFT");
   const [visibility, setVisibility] = useState<
     "EXCLUSIVE" | "SHARED" | "DUO_PAIR"
   >("EXCLUSIVE");
   const [titleError, setTitleError] = useState("");
+  const [labelNameError, setLabelNameError] = useState("");
 
   // Reset form when dialog opens with new values
   useEffect(() => {
     if (open) {
       setTitle(currentTitle);
+      setLabelName(currentLabelName ?? "");
       setRoute(currentRoute ?? "");
       setStatus(currentStatus ?? "DRAFT");
       setVisibility(currentVisibility ?? "EXCLUSIVE");
       setTitleError("");
+      setLabelNameError("");
     }
-  }, [open, currentTitle, currentRoute, currentStatus, currentVisibility]);
+  }, [
+    open,
+    currentTitle,
+    currentLabelName,
+    currentRoute,
+    currentStatus,
+    currentVisibility,
+  ]);
 
   const handleSave = async () => {
     // Validate title
@@ -79,9 +94,24 @@ export function LabelEditDialog({
 
     setTitleError("");
 
+    // Validate label name if provided
+    const trimmedLabelName = labelName.trim();
+    if (
+      trimmedLabelName &&
+      !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(trimmedLabelName)
+    ) {
+      setLabelNameError(
+        "Label name must start with a letter or underscore and contain only letters, numbers, and underscores"
+      );
+      return;
+    }
+
+    setLabelNameError("");
+
     // Only include changed fields
     const changes: {
       title?: string;
+      labelName?: string;
       route?: string | null;
       status?: "DRAFT" | "REVIEW" | "FINAL";
       visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
@@ -89,6 +119,10 @@ export function LabelEditDialog({
 
     if (title.trim() !== currentTitle) {
       changes.title = title.trim();
+    }
+
+    if (trimmedLabelName && trimmedLabelName !== (currentLabelName ?? "")) {
+      changes.labelName = trimmedLabelName;
     }
 
     const normalizedRoute = route || null;
@@ -137,6 +171,35 @@ export function LabelEditDialog({
               <p className="text-xs text-destructive mt-1">{titleError}</p>
             )}
           </div>
+
+          {/* Label Name Field (only shown for file-backed labels) */}
+          {currentLabelName !== null && (
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">
+                Label Name
+              </label>
+              <input
+                type="text"
+                value={labelName}
+                onChange={(e) => {
+                  setLabelName(e.target.value);
+                  if (labelNameError) setLabelNameError("");
+                }}
+                disabled={isSaving}
+                placeholder={currentLabelName}
+                className="w-full px-3 py-2 border border-border rounded-md text-sm bg-background font-mono focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
+              />
+              {labelNameError && (
+                <p className="text-xs text-destructive mt-1">
+                  {labelNameError}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Ren'Py label identifier. Changing this updates the label
+                definition in the .rpy file.
+              </p>
+            </div>
+          )}
 
           {/* Route, Status, Visibility Grid */}
           <div className="grid grid-cols-3 gap-3">

@@ -20,16 +20,21 @@ import {
   projectFiles,
   projectFileSyncState,
 } from "../db/schema/index.js";
-import { eq, and, asc, or, isNull, sql, desc, inArray } from "drizzle-orm";
+import { eq, and, asc, or, isNull, sql, desc, inArray, ne } from "drizzle-orm";
 import type { Label, LabelLine } from "../db/schema/index.js";
 import type { Transaction } from "../db/types.js";
 import type { PublicLabel } from "@branchforge/shared";
-import { LabelStatus, sanitizeLabelName } from "@branchforge/shared";
+import {
+  LabelStatus,
+  sanitizeLabelName,
+  RENPY_LABEL_REGEX,
+} from "@branchforge/shared";
 import { createAuditFields, updateAuditFields } from "../lib/audit.js";
 import {
   NotFoundError,
   ForbiddenError,
   ValidationError,
+  ConflictError,
 } from "../middleware/error-handler.middleware.js";
 import { logError, logWarn, LogEventType } from "../lib/logger.js";
 import { requireProjectOwnership } from "../services/authz.service.js";
@@ -548,6 +553,13 @@ async function syncLabelsInTransaction(
   const errors: Array<{ label: string; error: string }> = [];
   const affectedLabelIds: string[] = [];
 
+  // Build set of parsed label names (for rename detection)
+  const parsedLabelNames = new Set(parsed.labels.map((l) => l.label));
+
+  // Track which existing labels have been matched (by name or rename)
+  // to avoid double-matching an existing label when detecting renames
+  const matchedExistingIds = new Set<string>();
+
   // Process each label
   for (let i = 0; i < parsed.labels.length; i++) {
     const label = parsed.labels[i];
@@ -641,47 +653,113 @@ async function syncLabelsInTransaction(
 
         affectedLabelIds.push(existingLabel.id);
         labelsUpdated++;
+        matchedExistingIds.add(existingLabel.id);
       } else {
-        // Create new scene
-        const labelLinesHash = calculateLinesHash(labelData.entries);
+        // No match by name — try to detect a rename before creating a new label.
+        //
+        // A rename candidate is an existing label at the same position whose
+        // name no longer appears anywhere in the parsed labels.  If the old
+        // name still exists in the file it was merely *shifted* (labels were
+        // inserted/deleted around it), not renamed.
+        const renameCandidate = existingLabels.find(
+          (s) =>
+            s.labelName &&
+            s.labelPosition === i &&
+            !matchedExistingIds.has(s.id) &&
+            !s.deletedAt &&
+            !parsedLabelNames.has(s.labelName)
+        );
 
-        const [newScene] = await tx
-          .insert(labels)
-          .values({
-            projectId,
-            title: label.label,
-            projectFileId: sourceId,
-            labelName: label.label,
-            labelPosition: i,
-            sequenceOrder: i,
-            route: null, // User will assign route later
-            labelNumber: i + 1,
-            status: "DRAFT",
-            prerequisites: {},
-            effects: {},
-            // Sync fields
-            contentHash: labelLinesHash,
-            lastSyncedHash: labelLinesHash,
-            syncStatus: "SYNCED",
-          })
-          .returning();
+        if (renameCandidate) {
+          matchedExistingIds.add(renameCandidate.id);
 
-        affectedLabelIds.push(newScene.id);
+          // Delete old lines
+          await tx
+            .delete(labelLines)
+            .where(eq(labelLines.labelId, renameCandidate.id));
 
-        // Insert lines in batch
-        if (labelData.entries.length > 0) {
-          const lineValues = buildLineValues(
-            newScene.id,
-            labelData.entries,
-            sourceId,
-            lookupMaps
-          );
+          const labelLinesHash = calculateLinesHash(labelData.entries);
 
-          await tx.insert(labelLines).values(lineValues);
-          linesProcessed += lineValues.length;
+          // Insert new lines
+          if (labelData.entries.length > 0) {
+            const lineValues = buildLineValues(
+              renameCandidate.id,
+              labelData.entries,
+              sourceId,
+              lookupMaps
+            );
+            await tx.insert(labelLines).values(lineValues);
+            linesProcessed += lineValues.length;
+          }
+
+          // Rename existing label: update labelName, preserve custom title
+          // if the user has given it a different display name than the original
+          // label name.  If the title still matches the old labelName it was
+          // auto-generated and should be updated to match the new name.
+          const preservedTitle =
+            renameCandidate.title === renameCandidate.labelName
+              ? label.label
+              : renameCandidate.title;
+
+          await tx
+            .update(labels)
+            .set({
+              labelName: label.label,
+              labelPosition: i,
+              sequenceOrder: i,
+              title: preservedTitle,
+              contentHash: labelLinesHash,
+              lastSyncedHash: labelLinesHash,
+              syncStatus: "SYNCED",
+              updatedAt: new Date(),
+              deletedAt: null,
+            })
+            .where(eq(labels.id, renameCandidate.id));
+
+          affectedLabelIds.push(renameCandidate.id);
+          labelsUpdated++;
+        } else {
+          // Create new scene
+          const labelLinesHash = calculateLinesHash(labelData.entries);
+
+          const [newScene] = await tx
+            .insert(labels)
+            .values({
+              projectId,
+              title: label.label,
+              projectFileId: sourceId,
+              labelName: label.label,
+              labelPosition: i,
+              sequenceOrder: i,
+              route: null, // User will assign route later
+              labelNumber: i + 1,
+              status: "DRAFT",
+              prerequisites: {},
+              effects: {},
+              // Sync fields
+              contentHash: labelLinesHash,
+              lastSyncedHash: labelLinesHash,
+              syncStatus: "SYNCED",
+            })
+            .returning();
+
+          affectedLabelIds.push(newScene.id);
+
+          // Insert lines in batch
+          if (labelData.entries.length > 0) {
+            const lineValues = buildLineValues(
+              newScene.id,
+              labelData.entries,
+              sourceId,
+              lookupMaps
+            );
+
+            await tx.insert(labelLines).values(lineValues);
+            linesProcessed += lineValues.length;
+          }
+
+          labelsCreated++;
         }
-
-        labelsCreated++;
       }
     } catch (error) {
       errors.push({
@@ -696,10 +774,14 @@ async function syncLabelsInTransaction(
   if (!skipCleanup) {
     const currentLabelNames = new Set(parsed.labels.map((l) => l.label));
 
-    // Find orphaned labels (excluding already soft-deleted)
+    // Find orphaned labels (excluding already soft-deleted and labels
+    // that were handled during the main loop — matched by name or renamed)
     const orphanedLabels = existingLabels.filter(
       (s: (typeof existingLabels)[0]) =>
-        s.labelName && !currentLabelNames.has(s.labelName) && !s.deletedAt
+        s.labelName &&
+        !currentLabelNames.has(s.labelName) &&
+        !s.deletedAt &&
+        !matchedExistingIds.has(s.id)
     );
 
     if (orphanedLabels.length > 0) {
@@ -1778,13 +1860,20 @@ export async function createLabel(
 }
 
 /**
- * Update label metadata (title, route, status, visibility)
+ * Update label metadata (title, route, status, visibility, labelName)
+ *
+ * When `labelName` changes, the RPY file content is updated to reflect
+ * the new name in the label definition line and the project_file's content
+ * hash is recalculated.
+ *
  * @param labelId - The ID of the label to update
  * @param userId - The ID of the user updating the label
  * @param data - The label data to update
  * @returns The updated label
  * @throws NotFoundError if label not found
  * @throws ForbiddenError if user lacks permission
+ * @throws ValidationError if labelName format is invalid
+ * @throws ConflictError if labelName already exists in the file
  */
 export async function updateLabel(
   labelId: string,
@@ -1794,16 +1883,18 @@ export async function updateLabel(
     route?: string | null;
     status?: LabelStatus;
     visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
+    labelName?: string;
   }
 ): Promise<PublicLabel> {
   const db = getDb();
 
-  // Get label with project owner info and filePath (to avoid extra round-trip)
+  // Get label with project owner info, filePath, and file content
   const [labelWithProject] = await db
     .select({
       label: labels,
       projectOwnerId: projects.userId,
       filePath: projectFiles.filePath,
+      fileContent: projectFiles.content,
     })
     .from(labels)
     .innerJoin(projects, eq(labels.projectId, projects.id))
@@ -1817,6 +1908,80 @@ export async function updateLabel(
 
   if (labelWithProject.projectOwnerId !== userId) {
     throw new ForbiddenError("Insufficient permissions");
+  }
+
+  // Handle labelName update: validate and update RPY file content
+  let updatedContent: string | null = null;
+  const oldLabelName = labelWithProject.label.labelName;
+
+  if (data.labelName !== undefined && data.labelName !== oldLabelName) {
+    // Validate label name format (must match Ren'Py label name rules)
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(data.labelName)) {
+      throw new ValidationError(
+        "Label name must start with a letter or underscore and contain only letters, numbers, and underscores"
+      );
+    }
+
+    if (!oldLabelName) {
+      throw new ValidationError(
+        "Cannot rename a label that has no file-backed label name"
+      );
+    }
+
+    if (!labelWithProject.fileContent) {
+      throw new ValidationError(
+        "Cannot rename a label in a file with no content"
+      );
+    }
+
+    // Check uniqueness in the file
+    const [existingInFile] = await db
+      .select({ id: labels.id })
+      .from(labels)
+      .where(
+        and(
+          eq(labels.projectFileId, labelWithProject.label.projectFileId),
+          eq(labels.labelName, data.labelName),
+          isNull(labels.deletedAt),
+          ne(labels.id, labelId)
+        )
+      )
+      .limit(1);
+
+    if (existingInFile) {
+      throw new ConflictError(
+        `A label named "${data.labelName}" already exists in this file`
+      );
+    }
+
+    // Replace old label name with new name in the RPY content.
+    // We locate the label definition line (e.g. "label start:") and
+    // replace only the name portion so indentation and trailing text
+    // (like ":") stay intact.
+    const lines = labelWithProject.fileContent.split("\n");
+    let replaced = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      const match = lines[i].match(RENPY_LABEL_REGEX);
+      if (match && match[1] === oldLabelName) {
+        lines[i] = lines[i].replace(
+          new RegExp(
+            `^(\\s*label\\s+)${oldLabelName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([\\s(:].*)$`
+          ),
+          `$1${data.labelName}$2`
+        );
+        replaced = true;
+        break;
+      }
+    }
+
+    if (!replaced) {
+      throw new NotFoundError(
+        `Label "${oldLabelName}" not found in file content`
+      );
+    }
+
+    updatedContent = lines.join("\n");
   }
 
   // Validate route exists in route_configs for this project
@@ -1841,11 +2006,22 @@ export async function updateLabel(
   const currentVersion = labelWithProject.label.version ?? 1;
   const auditFields = updateAuditFields(currentVersion, userId);
 
-  // Build update data with validated route
+  // Build update data with validated route and optional labelName
   const updateData = {
     ...data,
     ...(validatedRoute !== undefined ? { route: validatedRoute } : {}),
   };
+
+  // Also update project_files content if labelName changed
+  if (updatedContent !== null) {
+    await db
+      .update(projectFiles)
+      .set({
+        content: updatedContent,
+        contentHash: calculateContentHash(updatedContent),
+      })
+      .where(eq(projectFiles.id, labelWithProject.label.projectFileId));
+  }
 
   const [updated] = await db
     .update(labels)

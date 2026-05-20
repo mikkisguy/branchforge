@@ -73,6 +73,7 @@ export interface UpdateLabelInput {
   route?: string | null;
   status?: "DRAFT" | "REVIEW" | "FINAL";
   visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
+  labelName?: string;
 }
 
 export interface UpdateLabelResponse {

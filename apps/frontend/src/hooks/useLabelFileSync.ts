@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { RENPY_LABEL_REGEX } from "@branchforge/shared";
+import { sanitizeLabelName, RENPY_LABEL_REGEX } from "@branchforge/shared";
 import type { ProjectFileNode } from "./useProjectFiles";
 
 interface UseLabelFileSyncProps {
@@ -76,7 +76,7 @@ export function useLabelFileSync({
 
     const lineNumber = findLabelLineNumber(
       fileWithLabel.content,
-      labelMetadata.labelName ?? labelMetadata.title
+      labelMetadata.labelName ?? sanitizeLabelName(labelMetadata.title)
     );
     let cancelled = false;
 
