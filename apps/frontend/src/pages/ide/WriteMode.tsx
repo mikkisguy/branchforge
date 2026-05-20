@@ -17,6 +17,7 @@ import { EditorTabBar } from "@/components/ide-shared";
 import { Button } from "@/components/ui/button";
 import { useLabels } from "@/hooks/useLabels";
 import { useCharacters } from "@/hooks/useCharacters";
+import { useRouteConfigs } from "@/hooks/useRouteConfigs";
 import { useProject } from "@/hooks/useProject";
 import { useToast } from "@/contexts/ToastContext";
 import { cva } from "class-variance-authority";
@@ -64,9 +65,14 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
     isUpdatingDialogue,
     createLabel,
     isCreatingLabel,
+    updateLabel,
+    isUpdatingLabel,
+    deleteLabel,
+    isDeletingLabel,
   } = useLabels();
 
   const { characters } = useCharacters(currentProject?.id ?? "");
+  const { routeConfigs } = useRouteConfigs(currentProject?.id ?? "");
 
   const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] =
     useLocalStorageBoolean("write:left-sidebar-collapsed", false);
@@ -265,6 +271,19 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
                 });
               }}
               isCreatingLabel={isCreatingLabel}
+              onUpdateLabel={async (labelId, data) => {
+                return updateLabel(labelId, data);
+              }}
+              isUpdatingLabel={isUpdatingLabel}
+              onDeleteLabel={async (labelId) => {
+                await deleteLabel(labelId);
+              }}
+              isDeletingLabel={isDeletingLabel}
+              routeConfigs={routeConfigs.map((rc) => ({
+                id: rc.id,
+                routeKey: rc.routeKey,
+                routeName: rc.routeName,
+              }))}
             />
           </div>
         </div>

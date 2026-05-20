@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import type React from "react";
 import type { ScriptEditorRef } from "./ScriptEditor";
+import type { LabelTitleMap } from "@/lib/codemirror/label-title-decoration";
 
 /**
  * Lazy-loaded ScriptEditor with code-split CodeMirror dependencies.
@@ -29,6 +30,7 @@ interface ScriptEditorProps {
   saveStatus?: import("@/hooks/useAutosave").SaveStatus;
   saveConflict?: boolean;
   onSaveRequest?: () => void;
+  labelTitles?: LabelTitleMap;
   ref?: React.Ref<ScriptEditorRef>;
 }
 

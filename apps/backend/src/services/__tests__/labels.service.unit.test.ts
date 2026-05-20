@@ -230,9 +230,21 @@ describe("LabelsService", () => {
         };
       });
 
+      const selectResult = Promise.resolve([
+        { id: "project-file-123", content: mockContent },
+      ]);
       mockTransaction.mockImplementation(async (callback) => {
         const tx = {
           update: mockUpdate,
+          select: vi.fn(() => ({
+            from: vi.fn(() => ({
+              where: vi.fn(() => ({
+                for: vi.fn(() => ({
+                  limit: vi.fn(() => selectResult),
+                })),
+              })),
+            })),
+          })),
         };
         await callback(tx);
       });

@@ -20,9 +20,8 @@ interface UseLabelFileSyncProps {
 
 export function findLabelLineNumber(
   fileContent: string,
-  labelTitle: string
+  labelName: string
 ): number | null {
-  const labelName = sanitizeLabelName(labelTitle);
   const lines = fileContent.split("\n");
 
   for (let i = 0; i < lines.length; i++) {
@@ -77,7 +76,7 @@ export function useLabelFileSync({
 
     const lineNumber = findLabelLineNumber(
       fileWithLabel.content,
-      labelMetadata.title
+      labelMetadata.labelName ?? sanitizeLabelName(labelMetadata.title)
     );
     let cancelled = false;
 

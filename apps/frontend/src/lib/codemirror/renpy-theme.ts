@@ -53,6 +53,7 @@ export const renPyBaseTheme = EditorView.theme({
   },
   ".cm-line": {
     fontFamily: "'Fira Code', monospace",
+    lineHeight: "1.5",
   },
   // Line numbers
   ".cm-gutters": {
@@ -193,5 +194,23 @@ export const renPyBaseTheme = EditorView.theme({
       backgroundColor: "hsl(var(--accent))",
       color: "hsl(var(--accent-foreground))",
     },
+  },
+  // Label title decoration — inline pill at end of label lines
+  ".cm-label-title-decoration": {
+    display: "inline-block",
+    fontSize: "0.7em",
+    fontWeight: "600",
+    fontFamily: "'Fira Code', monospace",
+    letterSpacing: "0.06em",
+    color: "hsl(var(--muted-foreground) / 0.7)",
+    backgroundColor: "hsl(var(--muted) / 0.35)",
+    border: "1px solid rgba(var(--theme-color-rgb, 61, 74, 194), 0.5)",
+    borderRadius: "9999px",
+    padding: "1px 8px",
+    lineHeight: "1.4",
+    marginLeft: "8px",
+    verticalAlign: "middle",
+    pointerEvents: "none",
+    userSelect: "none",
   },
 });

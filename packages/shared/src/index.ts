@@ -321,6 +321,8 @@ export interface PublicLabel {
   id: string;
   projectId: string;
   title: string;
+  /** Sanitized label identifier in the RPY file (e.g., "first_meeting") */
+  labelName: string | null;
   groupType: string | null; // e.g., "act", "chapter", "episode" or null
   groupValue: string | null; // e.g., "I", "1", "1a" or null
   labelNumber: number;

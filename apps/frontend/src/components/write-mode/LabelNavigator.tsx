@@ -3,10 +3,12 @@
  *
  * Left sidebar for navigating labels in WriteMode.
  * Groups labels by source file name with visual status indicators.
- * Supports inline label creation.
+ * Supports inline label creation, context menu, inline rename,
+ * metadata editing, and soft delete.
  */
 
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo, useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import type { PublicLabel, LabelStatus } from "@branchforge/shared";
 import {
   Sparkles,
@@ -17,12 +19,86 @@ import {
   Loader2,
   X,
 } from "lucide-react";
+import { LabelContextMenu } from "@/components/write-mode/LabelContextMenu";
+import { LabelEditDialog } from "@/components/write-mode/LabelEditDialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import type { UpdateLabelInput } from "@/lib/api/labels";
 
 const STATUS_COLORS: Record<LabelStatus, string> = {
   FINAL: "var(--theme-color)",
   REVIEW: "var(--theme-review-color)",
   DRAFT: "var(--theme-draft-color)",
 };
+
+// ============================================================================
+// Inline Rename Input Component
+// ============================================================================
+
+interface InlineRenameInputProps {
+  initialValue: string;
+  onSave: (value: string) => Promise<void>;
+  onCancel: () => void;
+  isSaving: boolean;
+}
+
+function InlineRenameInput({
+  initialValue,
+  onSave,
+  onCancel,
+  isSaving,
+}: InlineRenameInputProps) {
+  const [value, setValue] = useState(initialValue);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
+
+  const handleSubmit = async () => {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === initialValue) {
+      onCancel();
+      return;
+    }
+    try {
+      await onSave(trimmed);
+      onCancel();
+    } catch {
+      // Save failed — leave the inline input open so the user can correct
+      // or try again. The caller (e.g. mutation hook) should surface the
+      // error through its own mechanism (toast / inline error state).
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSubmit();
+    } else if (e.key === "Escape") {
+      onCancel();
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1.5 min-w-0 px-3 py-2.5">
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onBlur={() => handleSubmit()}
+        className="flex-1 min-w-0 px-2 py-0.5 border rounded text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30"
+        disabled={isSaving}
+        maxLength={255}
+      />
+      {isSaving && (
+        <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+      )}
+    </div>
+  );
+}
 
 // ============================================================================
 // Label Item Component
@@ -32,16 +108,55 @@ interface LabelItemProps {
   label: PublicLabel;
   isActive: boolean;
   onSelect: () => void;
+  onContextMenu: (e: React.MouseEvent, label: PublicLabel) => void;
+  onDoubleClick: (label: PublicLabel) => void;
+  isRenaming: boolean;
+  onRenameSave: (value: string) => Promise<void>;
+  onRenameCancel: () => void;
+  isSavingRename: boolean;
 }
 
-function LabelItem({ label, isActive, onSelect }: LabelItemProps) {
+function LabelItem({
+  label,
+  isActive,
+  onSelect,
+  onContextMenu,
+  onDoubleClick,
+  isRenaming,
+  onRenameSave,
+  onRenameCancel,
+  isSavingRename,
+}: LabelItemProps) {
   const statusColor = STATUS_COLORS[label.status ?? "DRAFT"];
-  const statusLabel = label.status ?? "DRAFT";
+
+  if (isRenaming) {
+    return (
+      <div
+        className={`
+          w-full rounded-md border transition-all
+          ${
+            isActive
+              ? "bg-[var(--theme-color)]/10 border-[var(--theme-color)] shadow-sm"
+              : "bg-card/50 border-border"
+          }
+        `}
+      >
+        <InlineRenameInput
+          initialValue={label.title}
+          onSave={onRenameSave}
+          onCancel={onRenameCancel}
+          isSaving={isSavingRename}
+        />
+      </div>
+    );
+  }
 
   return (
     <button
       type="button"
       onClick={onSelect}
+      onContextMenu={(e) => onContextMenu(e, label)}
+      onDoubleClick={() => onDoubleClick(label)}
       aria-pressed={isActive}
       className={`
         relative w-full flex items-center gap-3 px-3 py-2.5 rounded-md border transition-all
@@ -58,7 +173,7 @@ function LabelItem({ label, isActive, onSelect }: LabelItemProps) {
         style={{
           backgroundColor: statusColor,
         }}
-        title={`Status: ${statusLabel}`}
+        title={`Status: ${label.status ?? "DRAFT"}`}
       />
 
       {/* Label Title */}
@@ -178,6 +293,12 @@ interface FileGroupProps {
     projectFileId: string;
   }) => Promise<unknown>;
   isCreatingLabel?: boolean;
+  onLabelContextMenu: (e: React.MouseEvent, label: PublicLabel) => void;
+  onLabelDoubleClick: (label: PublicLabel) => void;
+  renamingLabelId: string | null;
+  onRenameSave: (labelId: string, value: string) => Promise<void>;
+  onRenameCancel: () => void;
+  isSavingRename: boolean;
 }
 
 function FileGroup({
@@ -188,6 +309,12 @@ function FileGroup({
   onLabelSelect,
   onCreateLabel,
   isCreatingLabel,
+  onLabelContextMenu,
+  onLabelDoubleClick,
+  renamingLabelId,
+  onRenameSave,
+  onRenameCancel,
+  isSavingRename,
 }: FileGroupProps) {
   const [showInput, setShowInput] = useState(false);
 
@@ -220,6 +347,12 @@ function FileGroup({
             label={label}
             isActive={activeLabelId === label.id}
             onSelect={() => onLabelSelect(label.id)}
+            onContextMenu={onLabelContextMenu}
+            onDoubleClick={onLabelDoubleClick}
+            isRenaming={renamingLabelId === label.id}
+            onRenameSave={(value) => onRenameSave(label.id, value)}
+            onRenameCancel={onRenameCancel}
+            isSavingRename={isSavingRename}
           />
         ))}
       </div>
@@ -246,6 +379,16 @@ function FileGroup({
   );
 }
 
+// ============================================================================
+// Label Navigator Component
+// ============================================================================
+
+interface RouteConfigOption {
+  id: string;
+  routeKey: string;
+  routeName: string;
+}
+
 interface LabelNavigatorProps {
   labels: PublicLabel[];
   activeLabelId: string | null;
@@ -259,6 +402,17 @@ interface LabelNavigatorProps {
     projectFileId: string;
   }) => Promise<unknown>;
   isCreatingLabel?: boolean;
+  // Update
+  onUpdateLabel?: (
+    labelId: string,
+    data: UpdateLabelInput
+  ) => Promise<PublicLabel>;
+  isUpdatingLabel?: boolean;
+  // Delete
+  onDeleteLabel?: (labelId: string) => Promise<void>;
+  isDeletingLabel?: boolean;
+  // Route configs for edit dialog
+  routeConfigs?: RouteConfigOption[];
 }
 
 export function LabelNavigator({
@@ -270,7 +424,117 @@ export function LabelNavigator({
   onToggleCollapse,
   onCreateLabel,
   isCreatingLabel,
+  onUpdateLabel,
+  isUpdatingLabel,
+  onDeleteLabel,
+  isDeletingLabel,
+  routeConfigs,
 }: LabelNavigatorProps) {
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    open: boolean;
+    x: number;
+    y: number;
+    label: PublicLabel | null;
+  }>({ open: false, x: 0, y: 0, label: null });
+
+  // Inline rename state
+  const [renamingLabelId, setRenamingLabelId] = useState<string | null>(null);
+
+  // Edit dialog state
+  const [editDialog, setEditDialog] = useState<{
+    open: boolean;
+    label: PublicLabel | null;
+  }>({ open: false, label: null });
+
+  // Delete confirmation state
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    open: boolean;
+    label: PublicLabel | null;
+  }>({ open: false, label: null });
+
+  // Context menu handler
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent, label: PublicLabel) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setContextMenu({ open: true, x: e.clientX, y: e.clientY, label });
+    },
+    []
+  );
+
+  const handleContextMenuClose = useCallback(() => {
+    setContextMenu((prev) => ({ ...prev, open: false }));
+  }, []);
+
+  // Inline rename handlers
+  const handleDoubleClick = useCallback((label: PublicLabel) => {
+    setRenamingLabelId(label.id);
+  }, []);
+
+  const handleRenameSave = useCallback(
+    async (labelId: string, value: string) => {
+      await onUpdateLabel?.(labelId, { title: value });
+      setRenamingLabelId(null);
+    },
+    [onUpdateLabel]
+  );
+
+  const handleRenameCancel = useCallback(() => {
+    setRenamingLabelId(null);
+  }, []);
+
+  // Context menu actions
+  const handleContextRename = useCallback(() => {
+    if (contextMenu.label) {
+      setRenamingLabelId(contextMenu.label.id);
+    }
+  }, [contextMenu.label]);
+
+  const handleContextEditDetails = useCallback(() => {
+    if (contextMenu.label) {
+      setEditDialog({ open: true, label: contextMenu.label });
+    }
+  }, [contextMenu.label]);
+
+  const handleContextDelete = useCallback(() => {
+    if (contextMenu.label) {
+      setDeleteConfirm({ open: true, label: contextMenu.label });
+    }
+  }, [contextMenu.label]);
+
+  // Edit dialog save handler
+  const handleEditSave = useCallback(
+    async (data: {
+      title?: string;
+      labelName?: string;
+      route?: string | null;
+      status?: "DRAFT" | "REVIEW" | "FINAL";
+      visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
+    }) => {
+      if (editDialog.label) {
+        await onUpdateLabel?.(editDialog.label.id, data);
+        setEditDialog({ open: false, label: null });
+      }
+    },
+    [editDialog.label, onUpdateLabel]
+  );
+
+  // Delete confirmation handler
+  const handleDeleteConfirm = useCallback(async () => {
+    if (deleteConfirm.label) {
+      await onDeleteLabel?.(deleteConfirm.label.id);
+      setDeleteConfirm({ open: false, label: null });
+    }
+  }, [deleteConfirm.label, onDeleteLabel]);
+
+  // Portal target — render dialogs at body level to escape
+  // the sidebar's CSS transform containing block
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setPortalTarget(document.body);
+  }, []);
+
   const groupedLabels = useMemo(() => {
     const groups = new Map<string, PublicLabel[]>();
 
@@ -355,6 +619,12 @@ export function LabelNavigator({
                     onLabelSelect={onSelect}
                     onCreateLabel={onCreateLabel}
                     isCreatingLabel={isCreatingLabel}
+                    onLabelContextMenu={handleContextMenu}
+                    onLabelDoubleClick={handleDoubleClick}
+                    renamingLabelId={renamingLabelId}
+                    onRenameSave={handleRenameSave}
+                    onRenameCancel={handleRenameCancel}
+                    isSavingRename={isUpdatingLabel ?? false}
                   />
                 );
               }
@@ -362,6 +632,57 @@ export function LabelNavigator({
           </div>
         )}
       </div>
+
+      {/* Context Menu */}
+      <LabelContextMenu
+        open={contextMenu.open}
+        onClose={handleContextMenuClose}
+        x={contextMenu.x}
+        y={contextMenu.y}
+        onRename={handleContextRename}
+        onEditDetails={handleContextEditDetails}
+        onDelete={handleContextDelete}
+      />
+
+      {/* Edit Details Dialog — portaled to body to escape sidebar transform */}
+      {portalTarget &&
+        createPortal(
+          editDialog.label && (
+            <LabelEditDialog
+              open={editDialog.open}
+              onOpenChange={(open) =>
+                setEditDialog((prev) => ({ ...prev, open }))
+              }
+              currentTitle={editDialog.label.title}
+              currentLabelName={editDialog.label.labelName}
+              currentRoute={editDialog.label.routeKey}
+              currentStatus={editDialog.label.status}
+              currentVisibility={editDialog.label.visibility}
+              routeConfigs={routeConfigs ?? []}
+              onSave={handleEditSave}
+              isSaving={isUpdatingLabel ?? false}
+            />
+          ),
+          portalTarget
+        )}
+
+      {/* Delete Confirmation Dialog — portaled to body to escape sidebar transform */}
+      {portalTarget &&
+        createPortal(
+          <ConfirmDialog
+            open={deleteConfirm.open}
+            onOpenChange={(open) =>
+              setDeleteConfirm((prev) => ({ ...prev, open }))
+            }
+            onConfirm={handleDeleteConfirm}
+            title="Delete Label"
+            description={`Are you sure you want to delete "${deleteConfirm.label?.title ?? "this label"}"? This will remove the label and its content from the file. This action cannot be undone.`}
+            confirmLabel="Delete"
+            isLoading={isDeletingLabel ?? false}
+            loadingLabel="Deleting..."
+          />,
+          portalTarget
+        )}
     </div>
   );
 }

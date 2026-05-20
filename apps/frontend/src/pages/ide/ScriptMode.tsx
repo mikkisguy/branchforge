@@ -20,6 +20,7 @@ import { useLocalStorageBoolean } from "@/hooks/useLocalStorage";
 import { ScriptModeEditorLayout } from "./components/ScriptModeEditorLayout";
 import { ScriptModeEmptyState } from "./components/ScriptModeEmptyState";
 import { useTextUndo } from "@/hooks/useTextUndo";
+import type { LabelTitleMap } from "@/lib/codemirror/label-title-decoration";
 
 interface ScriptModeProps {
   projectId?: string;
@@ -33,8 +34,13 @@ export function ScriptMode({
   onOpenSettings,
 }: ScriptModeProps) {
   const { error: showErrorToast } = useToast();
-  const { activeLabel, activeLabelId, setActiveLabelId, isLoadingLabels } =
-    useLabels();
+  const {
+    labels,
+    activeLabel,
+    activeLabelId,
+    setActiveLabelId,
+    isLoadingLabels,
+  } = useLabels();
 
   const { isProjectLinked, getLinkedRepository } = useGitLab();
   const {
@@ -217,6 +223,19 @@ export function ScriptMode({
     [activeFileId, projectFiles]
   );
 
+  // Build labelName → title map for CodeMirror decorations
+  const labelTitles: LabelTitleMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (activeProjectFile) {
+      for (const label of labels) {
+        if (label.projectFileId === activeProjectFile.id && label.labelName) {
+          map.set(label.labelName, label.title);
+        }
+      }
+    }
+    return map;
+  }, [labels, activeProjectFile]);
+
   useEffect(() => {
     if (!activeProjectFile) {
       return;
@@ -395,6 +414,7 @@ export function ScriptMode({
         saveStatus={activeProjectFile ? fileSaveStatus : undefined}
         saveConflict={activeProjectFile ? hasSaveConflict : undefined}
         onSaveRequest={activeProjectFile ? retryFileSave : undefined}
+        labelTitles={labelTitles}
       />
 
       <StatusBar

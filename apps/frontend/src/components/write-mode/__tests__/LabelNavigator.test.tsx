@@ -24,6 +24,7 @@ function makeLabel(overrides: Partial<PublicLabel> = {}): PublicLabel {
     visibility: null,
     projectFileId: "file-default",
     fileName: "default.rpy",
+    labelName: null,
     createdAt: "2024-01-01T00:00:00.000Z",
     updatedAt: "2024-01-01T00:00:00.000Z",
     ...overrides,
