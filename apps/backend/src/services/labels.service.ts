@@ -1969,14 +1969,15 @@ export async function updateLabel(
         );
       }
 
-      // Check uniqueness in the file
+      // Check uniqueness in the file (case-insensitive, consistent with
+      // validateRPYContent which rejects case-variant duplicates at import).
       const [existingInFile] = await tx
         .select({ id: labels.id })
         .from(labels)
         .where(
           and(
             eq(labels.projectFileId, labelWithProject.label.projectFileId),
-            eq(labels.labelName, data.labelName),
+            sql`lower(${labels.labelName}) = ${data.labelName.toLowerCase()}`,
             isNull(labels.deletedAt),
             ne(labels.id, labelId)
           )
@@ -2099,7 +2100,6 @@ export async function deleteLabel(
     .select({
       label: labels,
       projectOwnerId: projects.userId,
-      projectFileContent: projectFiles.content,
       projectFileId: labels.projectFileId,
     })
     .from(labels)
@@ -2139,25 +2139,32 @@ export async function deleteLabel(
     // If the label has a projectFileId and a valid labelName, rebuild the file content without this label
     // This ensures exports don't re-publish the deleted label.
     // UI-created labels have null labelName and should skip this step since they don't exist in RPY files.
-    if (
-      labelWithProject.projectFileId &&
-      labelWithProject.projectFileContent &&
-      labelName !== null
-    ) {
-      const updatedContent = removeLabelFromRPYContent(
-        labelWithProject.projectFileContent,
-        labelName
-      );
+    if (labelWithProject.projectFileId && labelName !== null) {
+      // Lock and read the project file content to avoid stale reads from
+      // concurrent operations (e.g. a simultaneous rename) targeting the same file.
+      const [lockedFile] = await tx
+        .select({ id: projectFiles.id, content: projectFiles.content })
+        .from(projectFiles)
+        .where(eq(projectFiles.id, labelWithProject.projectFileId))
+        .for("update")
+        .limit(1);
 
-      // Update the project_files.content with the new content (without the deleted label)
-      await tx
-        .update(projectFiles)
-        .set({
-          content: updatedContent,
-          contentHash: calculateContentHash(updatedContent),
-          updatedAt: new Date(),
-        })
-        .where(eq(projectFiles.id, labelWithProject.projectFileId));
+      if (lockedFile?.content) {
+        const updatedContent = removeLabelFromRPYContent(
+          lockedFile.content,
+          labelName
+        );
+
+        // Update the project_files.content with the new content (without the deleted label)
+        await tx
+          .update(projectFiles)
+          .set({
+            content: updatedContent,
+            contentHash: calculateContentHash(updatedContent),
+            updatedAt: new Date(),
+          })
+          .where(eq(projectFiles.id, labelWithProject.projectFileId));
+      }
     }
   });
 }
