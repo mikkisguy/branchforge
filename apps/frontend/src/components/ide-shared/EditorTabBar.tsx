@@ -251,7 +251,7 @@ export function EditorTabBar({
                     }
                   }}
                   className={cn(
-                    "ml-1 rounded p-0.5 opacity-25 transition group-hover:opacity-100",
+                    "ml-1 rounded p-0.5 opacity-25 transition group-hover:opacity-100 focus:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
                     isActive
                       ? "text-foreground/65 hover:bg-muted/70 hover:text-foreground"
                       : "text-muted-foreground/45 hover:bg-muted/60 hover:text-muted-foreground"
