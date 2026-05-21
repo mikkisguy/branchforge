@@ -142,6 +142,38 @@ async function updateSyncOperation(
 }
 
 /**
+ * Compute the top-level directory prefix from a list of file paths.
+ * Extracts the first directory segment from each path with a "/",
+ * and returns it with trailing "/" if all such paths share the same
+ * top-level directory. Returns "" otherwise.
+ *
+ * Example: ["game/ch1/script.rpy", "game/ch2/scene.rpy"] → "game/"
+ *          ["game/script.rpy", "README.md"] → "game/"
+ *          ["src/a.ts", "tests/b.ts"] → ""
+ *          ["README.md", "LICENSE"] → ""
+ */
+export function computeCommonDirectoryPrefix(filePaths: string[]): string {
+  const topDirs: string[] = [];
+  for (const p of filePaths) {
+    const firstSlash = p.indexOf("/");
+    if (firstSlash !== -1) {
+      topDirs.push(p.slice(0, firstSlash));
+    }
+  }
+
+  if (topDirs.length === 0) {
+    return "";
+  }
+
+  const first = topDirs[0];
+  if (topDirs.every((d) => d === first)) {
+    return first + "/";
+  }
+
+  return "";
+}
+
+/**
  * Export scenes from BranchForge to GitLab
  * Uses stored full content from project_files table for Script Mode
  * Each file's stored content is pushed directly to GitLab
@@ -204,16 +236,10 @@ export async function exportToGitlab(
     const filesToExport: Array<{ filePath: string; content: string }> = [];
 
     // Determine the directory prefix for generated files (e.g. "game/")
-    // by extracting the common directory from existing project file paths.
-    const fileDirPrefix = (() => {
-      for (const f of files) {
-        const lastSlash = f.filePath.lastIndexOf("/");
-        if (lastSlash !== -1) {
-          return f.filePath.slice(0, lastSlash + 1);
-        }
-      }
-      return "";
-    })();
+    // by computing the longest common ancestor directory across all file paths.
+    const fileDirPrefix = computeCommonDirectoryPrefix(
+      files.map((f) => f.filePath)
+    );
 
     // Export each project file - Script Mode uses stored content directly
     for (const file of files) {
