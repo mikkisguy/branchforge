@@ -121,6 +121,49 @@ export interface StateVariable {
 }
 
 // ============================================================================
+// Meter Configuration
+// ============================================================================
+
+/**
+ * Meter for tracking relationship stats and character attributes.
+ * Meters are numerical values that change based on player choices.
+ */
+export interface Meter {
+  id: string;
+  projectId: string;
+  characterId: string | null;
+  key: string;
+  name: string;
+  minValue: number;
+  maxValue: number;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Summary of a label's effect on a specific meter.
+ */
+export interface MeterLabelEffect {
+  labelId: string;
+  labelTitle: string;
+  routeKey: string | null;
+  prerequisiteValue: number | null;
+  effectDelta: number | null;
+}
+
+/**
+ * Full progression data for a single meter across all labels.
+ */
+export interface MeterProgression {
+  meterKey: string;
+  meterName: string;
+  minValue: number;
+  maxValue: number;
+  labels: MeterLabelEffect[];
+}
+
+// ============================================================================
 // Ren'Py Definition Configuration
 // ============================================================================
 
