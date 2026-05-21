@@ -527,6 +527,77 @@ export const stateVariableIdParamsSchema = z.object({
 });
 
 // ============================================================================
+// Meter Validation Schemas
+// ============================================================================
+
+/**
+ * Meter key validation schema
+ * Keys must start with lowercase letter, contain only [a-z0-9_]
+ */
+export const meterKeySchema = z
+  .string()
+  .min(1, "Meter key is required")
+  .max(100, "Meter key is too long")
+  .regex(
+    /^[a-z][a-z0-9_]*$/,
+    "Meter key must start with a letter and contain only lowercase letters, numbers, and underscores"
+  );
+
+/**
+ * Create meter request validation
+ */
+export const createMeterSchema = z
+  .object({
+    key: meterKeySchema,
+    name: requiredString(200, "Name is too long"),
+    characterId: uuidSchema.optional().nullable(),
+    minValue: z.number().int().default(0),
+    maxValue: z.number().int().default(100),
+    description: optionalString(500, "Description is too long"),
+  })
+  .strict()
+  .refine((data) => data.minValue <= data.maxValue, {
+    message: "Minimum value must be less than or equal to maximum value",
+    path: ["minValue"],
+  });
+
+/**
+ * Update meter request validation
+ */
+export const updateMeterSchema = z
+  .object({
+    name: requiredString(200, "Name is too long").optional(),
+    characterId: uuidSchema.optional().nullable(),
+    minValue: z.number().int().optional(),
+    maxValue: z.number().int().optional(),
+    description: optionalString(500, "Description is too long"),
+  })
+  .strict()
+  .partial()
+  .refine(
+    (data) => {
+      if (data.minValue !== undefined && data.maxValue !== undefined) {
+        return data.minValue <= data.maxValue;
+      }
+      return true;
+    },
+    {
+      message: "Minimum value must be less than or equal to maximum value",
+    }
+  );
+
+/**
+ * Meter ID params validation
+ */
+export const meterIdParamsSchema = z.object({
+  meterId: uuidSchema,
+});
+
+// Type exports
+export type CreateMeterInput = z.infer<typeof createMeterSchema>;
+export type UpdateMeterInput = z.infer<typeof updateMeterSchema>;
+
+// ============================================================================
 // Ren'Py Definition Schemas
 // ============================================================================
 
