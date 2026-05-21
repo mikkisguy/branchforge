@@ -13,6 +13,7 @@ import {
   labels,
   labelLines,
   characters,
+  meters,
   stateVariables,
   renpyDefinitions,
 } from "../db/schema/index.js";
@@ -31,6 +32,7 @@ import {
 import {
   patchRPYWithStateVariables,
   generateStateVariablesFile,
+  generateMetersFile,
   generateDefinitionsFile,
 } from "./rpy-generator.service.js";
 import { calculateLinesHash, calculateContentHash } from "../lib/hash.js";
@@ -243,6 +245,31 @@ export async function exportToGitlab(
         targetBranch,
         "state_variables.rpy",
         stateVariablesContent,
+        message
+      );
+    }
+
+    // Generate and export meters.rpy file if meters exist
+    const projectMeters = await db
+      .select({
+        key: meters.key,
+        name: meters.name,
+        minValue: meters.minValue,
+        maxValue: meters.maxValue,
+        description: meters.description,
+      })
+      .from(meters)
+      .where(eq(meters.projectId, projectId))
+      .orderBy(meters.key);
+
+    if (projectMeters.length > 0) {
+      const metersContent = generateMetersFile(projectMeters);
+      await createOrUpdateFile(
+        projectId,
+        userId,
+        targetBranch,
+        "meters.rpy",
+        metersContent,
         message
       );
     }

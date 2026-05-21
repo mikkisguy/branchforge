@@ -4,6 +4,7 @@ import {
   SquarePen,
   Route,
   Database,
+  Thermometer,
   Users,
   Palette,
   Settings,
@@ -18,6 +19,7 @@ import type { Tab } from "./SettingsModal";
 import { SettingsModal } from "./SettingsModal";
 import { RouteSettingsModal } from "./RouteSettingsModal";
 import { StateVariablesModal } from "./StateVariablesModal";
+import { MetersDialog } from "@/components/MetersDialog";
 import { CharactersModal } from "./CharactersModal";
 import { GitLabImportDialog } from "./GitLabImportDialog";
 import { ZipImportProjectDialog } from "./ZipImportProjectDialog";
@@ -71,6 +73,7 @@ type ModalKey =
   | "settings"
   | "routes"
   | "stateVars"
+  | "meters"
   | "characters"
   | "projectPopover"
   | "gitLabImport"
@@ -81,6 +84,7 @@ interface ModalState {
   settings: boolean;
   routes: boolean;
   stateVars: boolean;
+  meters: boolean;
   characters: boolean;
   projectPopover: boolean;
   gitLabImport: boolean;
@@ -97,6 +101,7 @@ const initialModalState: ModalState = {
   settings: false,
   routes: false,
   stateVars: false,
+  meters: false,
   characters: false,
   projectPopover: false,
   gitLabImport: false,
@@ -406,6 +411,23 @@ export function LeftSidebar(props: LeftSidebarProps) {
               {showLabel && <span>State Variables</span>}
             </button>
 
+            {/* Meters */}
+            <button
+              onClick={() => dispatchModal({ type: "OPEN", key: "meters" })}
+              disabled={!projectId}
+              className={`flex items-center ${
+                isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
+              } rounded-md text-sm font-medium transition-colors ${
+                !projectId
+                  ? "text-muted-foreground/50 cursor-not-allowed"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+              title="Meters"
+            >
+              <Thermometer className="size-4 flex-shrink-0" />
+              {showLabel && <span>Meters</span>}
+            </button>
+
             {/* Characters */}
             <button
               onClick={() => dispatchModal({ type: "OPEN", key: "characters" })}
@@ -570,6 +592,13 @@ export function LeftSidebar(props: LeftSidebarProps) {
             open={modals.stateVars}
             onOpenChange={(open) =>
               dispatchModal({ type: open ? "OPEN" : "CLOSE", key: "stateVars" })
+            }
+            projectId={projectId}
+          />
+          <MetersDialog
+            open={modals.meters}
+            onOpenChange={(open) =>
+              dispatchModal({ type: open ? "OPEN" : "CLOSE", key: "meters" })
             }
             projectId={projectId}
           />
