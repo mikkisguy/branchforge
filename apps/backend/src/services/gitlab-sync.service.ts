@@ -259,7 +259,8 @@ export async function exportToGitlab(
         description: meters.description,
       })
       .from(meters)
-      .where(eq(meters.projectId, projectId));
+      .where(eq(meters.projectId, projectId))
+      .orderBy(meters.key);
 
     if (projectMeters.length > 0) {
       const metersContent = generateMetersFile(projectMeters);

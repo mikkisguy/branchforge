@@ -19,7 +19,7 @@ import type { Tab } from "./SettingsModal";
 import { SettingsModal } from "./SettingsModal";
 import { RouteSettingsModal } from "./RouteSettingsModal";
 import { StateVariablesModal } from "./StateVariablesModal";
-import { MetersDialog } from "../MetersDialog";
+import { MetersDialog } from "@/components/MetersDialog";
 import { CharactersModal } from "./CharactersModal";
 import { GitLabImportDialog } from "./GitLabImportDialog";
 import { ZipImportProjectDialog } from "./ZipImportProjectDialog";

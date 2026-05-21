@@ -29,12 +29,15 @@ export function MeterProgression({
   }
 
   if (error) {
+    console.error(error);
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <p className="text-sm text-destructive mb-2">
           Failed to load progression data
         </p>
-        <p className="text-xs text-muted-foreground">{error.message}</p>
+        <p className="text-xs text-muted-foreground">
+          Unable to load progression. Please try again.
+        </p>
       </div>
     );
   }

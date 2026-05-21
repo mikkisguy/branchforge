@@ -507,6 +507,14 @@ export function generateStateVariablesFile(
 }
 
 /**
+ * Sanitize a string for use as a comment in RPY files.
+ * Removes line breaks and leading '#' characters.
+ */
+function sanitizeComment(value: string): string {
+  return value.replace(/[\r\n]/g, " ").replace(/^#+/g, "");
+}
+
+/**
  * Generate a complete meters initialization file
  * Creates meters.rpy with all meter default values for Ren'Py.
  *
@@ -546,10 +554,12 @@ export function generateMetersFile(
       continue;
     }
 
+    const sanitizedName = sanitizeComment(meter.name);
+
     if (meter.description) {
-      lines.push(`# ${meter.name} — ${meter.description}`);
+      lines.push(`# ${sanitizedName} — ${sanitizeComment(meter.description)}`);
     } else {
-      lines.push(`# ${meter.name}`);
+      lines.push(`# ${sanitizedName}`);
     }
     lines.push(`default ${meter.key} = ${meter.minValue}`);
     lines.push("");

@@ -13,9 +13,11 @@ import type { Meter, NewMeter } from "../db/schema/index.js";
 import {
   ConflictError,
   NotFoundError,
+  ValidationError,
 } from "../middleware/error-handler.middleware.js";
 import { requireProjectOwnership } from "./authz.service.js";
 import type { MeterLabelEffect, MeterProgression } from "@branchforge/shared";
+import type { CreateMeterInput, UpdateMeterInput } from "../lib/validation.js";
 
 // ============================================================================
 // Public Types
@@ -32,23 +34,6 @@ export interface PublicMeter {
   description: string | null;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface CreateMeterBody {
-  key: string;
-  name: string;
-  characterId?: string | null;
-  minValue?: number;
-  maxValue?: number;
-  description?: string;
-}
-
-export interface UpdateMeterBody {
-  name?: string;
-  characterId?: string | null;
-  minValue?: number;
-  maxValue?: number;
-  description?: string;
 }
 
 // ============================================================================
@@ -120,7 +105,7 @@ export class MetersService {
   async createMeter(
     projectId: string,
     userId: string,
-    input: CreateMeterBody
+    input: CreateMeterInput
   ): Promise<PublicMeter> {
     await requireProjectOwnership(projectId, userId);
 
@@ -163,9 +148,18 @@ export class MetersService {
   async updateMeter(
     meterId: string,
     userId: string,
-    input: UpdateMeterBody
+    input: UpdateMeterInput
   ): Promise<PublicMeter> {
-    await this.requireMeterAccess(meterId, userId);
+    const currentMeter = await this.requireMeterAccess(meterId, userId);
+
+    const effectiveMin = input.minValue ?? currentMeter.minValue;
+    const effectiveMax = input.maxValue ?? currentMeter.maxValue;
+
+    if (effectiveMin > effectiveMax) {
+      throw new ValidationError(
+        "Minimum value must be less than or equal to maximum value"
+      );
+    }
 
     const db = getDb();
 

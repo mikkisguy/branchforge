@@ -5,7 +5,7 @@
  * Supports inline create/edit/delete with validation.
  */
 
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Loader2, Plus, Trash2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,14 +73,11 @@ export function MetersContent({ projectId }: MetersContentProps) {
 
   const [metersList, setMetersList] = useState<MeterForm[]>([]);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const hasInitialized = useRef(false);
 
   const isSaving = isCreatingMeter || isUpdatingMeter || isDeletingMeter;
 
-  // Initialize form state from server data
   useEffect(() => {
-    if (isSaving || hasInitialized.current) return;
-
+    if (isSaving) return;
     if (meters.length > 0) {
       setMetersList(
         meters.map((m) => ({
@@ -92,10 +89,8 @@ export function MetersContent({ projectId }: MetersContentProps) {
           description: m.description ?? "",
         }))
       );
-      hasInitialized.current = true;
-    } else if (meters.length === 0) {
+    } else {
       setMetersList([]);
-      hasInitialized.current = true;
     }
   }, [meters, isSaving]);
 
