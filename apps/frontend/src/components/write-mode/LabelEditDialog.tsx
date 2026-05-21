@@ -162,8 +162,18 @@ export function LabelEditDialog({
 
     dispatch({ type: "SET_TITLE_ERROR", value: "" });
 
-    // Validate label name if provided
     const trimmedLabelName = form.labelName.trim();
+
+    // Require a non-empty label name when the label is file-backed
+    if (!trimmedLabelName && currentLabelName !== null) {
+      dispatch({
+        type: "SET_LABEL_NAME_ERROR",
+        value: "Label name cannot be empty",
+      });
+      return;
+    }
+
+    // Validate label name if provided
     if (
       trimmedLabelName &&
       !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(trimmedLabelName)
