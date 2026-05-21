@@ -149,3 +149,15 @@ export const renpyDefinitionKeys = {
   detail: (renpyDefinitionId: string) =>
     ["renpyDefinitions", "detail", renpyDefinitionId] as const,
 } as const;
+
+// ============================================================================
+// Meter Keys
+// ============================================================================
+
+export const meterKeys = {
+  all: ["meters"] as const,
+  lists: (projectId: string) => ["meters", projectId, "list"] as const,
+  detail: (meterId: string) => ["meters", "detail", meterId] as const,
+  progression: (projectId: string) =>
+    ["meters", projectId, "progression"] as const,
+} as const;
