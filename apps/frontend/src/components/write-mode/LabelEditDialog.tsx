@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useReducer } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -38,6 +38,70 @@ interface LabelEditDialogProps {
   isSaving: boolean;
 }
 
+type FormState = {
+  title: string;
+  labelName: string;
+  route: string;
+  status: "DRAFT" | "REVIEW" | "FINAL";
+  visibility: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
+  titleError: string;
+  labelNameError: string;
+};
+
+type FormAction =
+  | {
+      type: "RESET";
+      title: string;
+      labelName: string;
+      route: string;
+      status: "DRAFT" | "REVIEW" | "FINAL";
+      visibility: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
+    }
+  | { type: "SET_TITLE"; value: string }
+  | { type: "SET_LABEL_NAME"; value: string }
+  | { type: "SET_ROUTE"; value: string }
+  | { type: "SET_STATUS"; value: "DRAFT" | "REVIEW" | "FINAL" }
+  | { type: "SET_VISIBILITY"; value: "EXCLUSIVE" | "SHARED" | "DUO_PAIR" }
+  | { type: "SET_TITLE_ERROR"; value: string }
+  | { type: "SET_LABEL_NAME_ERROR"; value: string };
+
+function formReducer(state: FormState, action: FormAction): FormState {
+  switch (action.type) {
+    case "RESET":
+      return {
+        title: action.title,
+        labelName: action.labelName,
+        route: action.route,
+        status: action.status,
+        visibility: action.visibility,
+        titleError: "",
+        labelNameError: "",
+      };
+    case "SET_TITLE":
+      return {
+        ...state,
+        title: action.value,
+        titleError: action.value ? state.titleError : "",
+      };
+    case "SET_LABEL_NAME":
+      return {
+        ...state,
+        labelName: action.value,
+        labelNameError: action.value ? state.labelNameError : "",
+      };
+    case "SET_ROUTE":
+      return { ...state, route: action.value };
+    case "SET_STATUS":
+      return { ...state, status: action.value };
+    case "SET_VISIBILITY":
+      return { ...state, visibility: action.value };
+    case "SET_TITLE_ERROR":
+      return { ...state, titleError: action.value };
+    case "SET_LABEL_NAME_ERROR":
+      return { ...state, labelNameError: action.value };
+  }
+}
+
 export function LabelEditDialog({
   open,
   onOpenChange,
@@ -50,26 +114,27 @@ export function LabelEditDialog({
   onSave,
   isSaving,
 }: LabelEditDialogProps) {
-  const [title, setTitle] = useState("");
-  const [labelName, setLabelName] = useState("");
-  const [route, setRoute] = useState<string>("");
-  const [status, setStatus] = useState<"DRAFT" | "REVIEW" | "FINAL">("DRAFT");
-  const [visibility, setVisibility] = useState<
-    "EXCLUSIVE" | "SHARED" | "DUO_PAIR"
-  >("EXCLUSIVE");
-  const [titleError, setTitleError] = useState("");
-  const [labelNameError, setLabelNameError] = useState("");
+  const [form, dispatch] = useReducer(formReducer, {
+    title: "",
+    labelName: "",
+    route: "",
+    status: "DRAFT" as const,
+    visibility: "EXCLUSIVE" as const,
+    titleError: "",
+    labelNameError: "",
+  });
 
   // Reset form when dialog opens with new values
   useEffect(() => {
     if (open) {
-      setTitle(currentTitle);
-      setLabelName(currentLabelName ?? "");
-      setRoute(currentRoute ?? "");
-      setStatus(currentStatus ?? "DRAFT");
-      setVisibility(currentVisibility ?? "EXCLUSIVE");
-      setTitleError("");
-      setLabelNameError("");
+      dispatch({
+        type: "RESET",
+        title: currentTitle,
+        labelName: currentLabelName ?? "",
+        route: currentRoute ?? "",
+        status: currentStatus ?? "DRAFT",
+        visibility: currentVisibility ?? "EXCLUSIVE",
+      });
     }
   }, [
     open,
@@ -82,31 +147,36 @@ export function LabelEditDialog({
 
   const handleSave = async () => {
     // Validate title
-    if (!title.trim()) {
-      setTitleError("Title is required");
+    if (!form.title.trim()) {
+      dispatch({ type: "SET_TITLE_ERROR", value: "Title is required" });
       return;
     }
 
-    if (title.length > 255) {
-      setTitleError("Title must be at most 255 characters");
+    if (form.title.length > 255) {
+      dispatch({
+        type: "SET_TITLE_ERROR",
+        value: "Title must be at most 255 characters",
+      });
       return;
     }
 
-    setTitleError("");
+    dispatch({ type: "SET_TITLE_ERROR", value: "" });
 
     // Validate label name if provided
-    const trimmedLabelName = labelName.trim();
+    const trimmedLabelName = form.labelName.trim();
     if (
       trimmedLabelName &&
       !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(trimmedLabelName)
     ) {
-      setLabelNameError(
-        "Label name must start with a letter or underscore and contain only letters, numbers, and underscores"
-      );
+      dispatch({
+        type: "SET_LABEL_NAME_ERROR",
+        value:
+          "Label name must start with a letter or underscore and contain only letters, numbers, and underscores",
+      });
       return;
     }
 
-    setLabelNameError("");
+    dispatch({ type: "SET_LABEL_NAME_ERROR", value: "" });
 
     // Only include changed fields
     const changes: {
@@ -117,27 +187,27 @@ export function LabelEditDialog({
       visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
     } = {};
 
-    if (title.trim() !== currentTitle) {
-      changes.title = title.trim();
+    if (form.title.trim() !== currentTitle) {
+      changes.title = form.title.trim();
     }
 
     if (trimmedLabelName && trimmedLabelName !== (currentLabelName ?? "")) {
       changes.labelName = trimmedLabelName;
     }
 
-    const normalizedRoute = route || null;
+    const normalizedRoute = form.route || null;
     if (normalizedRoute !== currentRoute) {
       changes.route = normalizedRoute;
     }
 
     // Normalize null props to defaults for change detection, so filling
     // in a runtime default doesn't count as a user change.
-    if (status !== (currentStatus ?? "DRAFT")) {
-      changes.status = status;
+    if (form.status !== (currentStatus ?? "DRAFT")) {
+      changes.status = form.status;
     }
 
-    if (visibility !== (currentVisibility ?? "EXCLUSIVE")) {
-      changes.visibility = visibility;
+    if (form.visibility !== (currentVisibility ?? "EXCLUSIVE")) {
+      changes.visibility = form.visibility;
     }
 
     // Skip saving when no fields actually changed.
@@ -162,44 +232,56 @@ export function LabelEditDialog({
         <div className="space-y-4 mt-4">
           {/* Title Field */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground">Title</label>
+            <label
+              htmlFor="label-title"
+              className="text-sm font-medium text-foreground"
+            >
+              Title
+            </label>
             <input
+              id="label-title"
               type="text"
-              value={title}
+              value={form.title}
               onChange={(e) => {
-                setTitle(e.target.value);
-                if (titleError) setTitleError("");
+                dispatch({ type: "SET_TITLE", value: e.target.value });
+                if (form.titleError)
+                  dispatch({ type: "SET_TITLE_ERROR", value: "" });
               }}
               disabled={isSaving}
               placeholder="Enter label title"
               maxLength={255}
               className="w-full px-3 py-2 border border-border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
             />
-            {titleError && (
-              <p className="text-xs text-destructive mt-1">{titleError}</p>
+            {form.titleError && (
+              <p className="text-xs text-destructive mt-1">{form.titleError}</p>
             )}
           </div>
 
           {/* Label Name Field (only shown for file-backed labels) */}
           {currentLabelName !== null && (
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="label-name"
+                className="text-sm font-medium text-foreground"
+              >
                 Label Name
               </label>
               <input
+                id="label-name"
                 type="text"
-                value={labelName}
+                value={form.labelName}
                 onChange={(e) => {
-                  setLabelName(e.target.value);
-                  if (labelNameError) setLabelNameError("");
+                  dispatch({ type: "SET_LABEL_NAME", value: e.target.value });
+                  if (form.labelNameError)
+                    dispatch({ type: "SET_LABEL_NAME_ERROR", value: "" });
                 }}
                 disabled={isSaving}
                 placeholder={currentLabelName}
                 className="w-full px-3 py-2 border border-border rounded-md text-sm bg-background font-mono focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
               />
-              {labelNameError && (
+              {form.labelNameError && (
                 <p className="text-xs text-destructive mt-1">
-                  {labelNameError}
+                  {form.labelNameError}
                 </p>
               )}
               <p className="text-xs text-muted-foreground">
@@ -213,12 +295,18 @@ export function LabelEditDialog({
           <div className="grid grid-cols-3 gap-3">
             {/* Route Field */}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="label-route"
+                className="text-sm font-medium text-foreground"
+              >
                 Route
               </label>
               <select
-                value={route}
-                onChange={(e) => setRoute(e.target.value)}
+                id="label-route"
+                value={form.route}
+                onChange={(e) =>
+                  dispatch({ type: "SET_ROUTE", value: e.target.value })
+                }
                 disabled={isSaving}
                 className="w-full px-3 py-2 border border-border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
               >
@@ -233,13 +321,20 @@ export function LabelEditDialog({
 
             {/* Status Field */}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="label-status"
+                className="text-sm font-medium text-foreground"
+              >
                 Status
               </label>
               <select
-                value={status}
+                id="label-status"
+                value={form.status}
                 onChange={(e) =>
-                  setStatus(e.target.value as "DRAFT" | "REVIEW" | "FINAL")
+                  dispatch({
+                    type: "SET_STATUS",
+                    value: e.target.value as "DRAFT" | "REVIEW" | "FINAL",
+                  })
                 }
                 disabled={isSaving}
                 className="w-full px-3 py-2 border border-border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
@@ -252,15 +347,23 @@ export function LabelEditDialog({
 
             {/* Visibility Field */}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="label-visibility"
+                className="text-sm font-medium text-foreground"
+              >
                 Visibility
               </label>
               <select
-                value={visibility}
+                id="label-visibility"
+                value={form.visibility}
                 onChange={(e) =>
-                  setVisibility(
-                    e.target.value as "EXCLUSIVE" | "SHARED" | "DUO_PAIR"
-                  )
+                  dispatch({
+                    type: "SET_VISIBILITY",
+                    value: e.target.value as
+                      | "EXCLUSIVE"
+                      | "SHARED"
+                      | "DUO_PAIR",
+                  })
                 }
                 disabled={isSaving}
                 className="w-full px-3 py-2 border border-border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
@@ -284,8 +387,8 @@ export function LabelEditDialog({
             <Button variant="default" onClick={handleSave} disabled={isSaving}>
               {isSaving ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Saving…
                 </>
               ) : (
                 "Save"

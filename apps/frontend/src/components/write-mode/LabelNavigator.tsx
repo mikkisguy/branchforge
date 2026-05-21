@@ -146,6 +146,7 @@ function LabelItem({
         `}
       >
         <InlineRenameInput
+          key={label.id}
           initialValue={label.title}
           onSave={onRenameSave}
           onCancel={onRenameCancel}
@@ -573,7 +574,7 @@ export function LabelNavigator({
   const groupedLabels = useMemo(() => {
     // Short-circuit: "lastUpdated" mode only needs the flat list
     if (sortMode === "lastUpdated") {
-      const flat = [...filteredLabels].sort(compareByUpdatedAt);
+      const flat = filteredLabels.toSorted(compareByUpdatedAt);
       return { map: new Map<string, PublicLabel[]>(), flat, mode: sortMode };
     }
 
@@ -598,7 +599,7 @@ export function LabelNavigator({
     for (const [key, groupLabels] of groupEntries) {
       sorted.set(
         key,
-        [...groupLabels].sort((a, b) => a.sequenceOrder - b.sequenceOrder)
+        groupLabels.toSorted((a, b) => a.sequenceOrder - b.sequenceOrder)
       );
     }
 

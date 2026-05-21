@@ -261,8 +261,9 @@ export function CharacterImportWizard({
         ...state.groups.new.filter((c) => !c.excluded),
       ];
 
+      const excludedTagSet = new Set(excludedTags);
       for (const c of state.groups.existing) {
-        if (!excludedTags.includes(c.tag)) {
+        if (!excludedTagSet.has(c.tag)) {
           charactersToImport.push({
             tag: c.tag,
             name: c.detectedName,
@@ -397,9 +398,10 @@ export function CharacterImportWizard({
   const newCount = state.groups.new.length;
   const existingCount = state.groups.existing.length;
   const specialCount = state.groups.special.length;
+  const excludedTagSet = new Set(excludedTags);
   const selectedCount =
     state.groups.new.filter((c) => !c.excluded).length +
-    state.groups.existing.filter((c) => !excludedTags.includes(c.tag)).length +
+    state.groups.existing.filter((c) => !excludedTagSet.has(c.tag)).length +
     state.groups.special.filter((c) => !c.excluded).length;
 
   // ============================================================================
