@@ -369,6 +369,9 @@ export function useGitLabSync(): UseGitLabSyncReturn {
       // on terminal status, but this covers edge cases like polling errors).
       if (projectId) {
         invalidateProjectCaches(projectId);
+        queryClient.invalidateQueries({
+          queryKey: gitlabKeys.operations(projectId),
+        });
       }
 
       updateActiveOperationId(op.id);
@@ -424,6 +427,9 @@ export function useGitLabSync(): UseGitLabSyncReturn {
       // on terminal status, but this covers edge cases like polling errors).
       if (projectId) {
         invalidateProjectCaches(projectId);
+        queryClient.invalidateQueries({
+          queryKey: gitlabKeys.operations(projectId),
+        });
       }
 
       updateActiveOperationId(op.id);

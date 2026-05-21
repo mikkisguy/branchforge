@@ -147,9 +147,10 @@ export function useFileTabs({
   );
 
   const tabItems = useMemo<EditorTabBarItem[]>(() => {
+    const fileMap = new Map(projectFiles.map((f) => [f.id, f]));
     const items: EditorTabBarItem[] = [];
     for (const tabId of openTabs) {
-      const file = projectFiles.find((projectFile) => projectFile.id === tabId);
+      const file = fileMap.get(tabId);
       if (file !== undefined) {
         const fileName = file.filePath.split("/").pop() || file.filePath;
         const fileKind = file.fileType === "SETTINGS" ? "Settings" : "Story";

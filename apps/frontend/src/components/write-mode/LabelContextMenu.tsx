@@ -57,14 +57,10 @@ export function LabelContextMenu({
   onDelete,
 }: LabelContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [position, setPosition] = useState({ x, y });
-  const [mounted, setMounted] = useState(false);
-
-  // Set mounted state after client-side hydration
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const [mounted] = useState(typeof document !== "undefined");
 
   // Calculate position to avoid viewport overflow
   useEffect(() => {
@@ -114,13 +110,24 @@ export function LabelContextMenu({
     [onClose, onRename, onEditDetails, onDelete]
   );
 
+  const handleItemClickRef = useRef(handleItemClick);
+
+  // Sync refs for stable callbacks in effects
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    handleItemClickRef.current = handleItemClick;
+  }, [handleItemClick]);
+
   // Keyboard navigation
   useEffect(() => {
     if (!open) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -139,13 +146,13 @@ export function LabelContextMenu({
       if (e.key === "Enter") {
         e.preventDefault();
         const focusedItem = MENU_ITEMS[focusedIndex];
-        handleItemClick(focusedItem.key);
+        handleItemClickRef.current(focusedItem.key);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, focusedIndex, onClose, handleItemClick]);
+  }, [open, focusedIndex]);
 
   // Focus management for keyboard navigation
   useEffect(() => {
@@ -163,13 +170,13 @@ export function LabelContextMenu({
 
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose();
+        onCloseRef.current();
       }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [open, onClose]);
+  }, [open]);
 
   // Don't render during SSR or when closed
   if (!mounted || !open) return null;
@@ -193,9 +200,15 @@ export function LabelContextMenu({
           type="button"
           className={`flex items-center gap-2 px-3 py-2 text-sm cursor-pointer transition-colors w-full text-left ${
             item.destructive
-              ? "text-destructive hover:bg-destructive/10"
+              ? "text-destructive-muted hover:bg-destructive/10 focus:bg-destructive/10"
               : "hover:bg-accent/50"
-          } ${focusedIndex === index ? "bg-accent/50" : ""}`}
+          } ${
+            focusedIndex === index
+              ? item.destructive
+                ? "bg-destructive/10"
+                : "bg-accent/50"
+              : ""
+          }`}
           onClick={() => handleItemClick(item.key)}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {

@@ -415,7 +415,7 @@ export const DialogueLine = memo(function DialogueLine({
     >
       {/* Speaker Name / Dropdown */}
       <div
-        className={`relative ${isStacked ? "w-full" : "shrink-0 w-32"}`}
+        className={`relative ${isStacked ? "w-full" : "shrink-0 w-40"}`}
         ref={dropdownRef}
         onBlur={handleDropdownBlur}
       >
@@ -431,8 +431,8 @@ export const DialogueLine = memo(function DialogueLine({
           }`}
           className={`flex items-center gap-1.5 rounded-md transition-all border tracking-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
             isStacked
-              ? "inline-flex h-8 py-1.5 px-2.5 -ml-2.5"
-              : "items-start h-auto py-1.5 px-2.5"
+              ? "inline-flex max-w-full h-8 py-1.5 px-2.5 -ml-2.5"
+              : "inline-flex max-w-full items-start h-auto py-1.5 px-2.5 overflow-hidden"
           }`}
           style={{
             fontSize: "var(--prose-editor-font-size, 14px)",
@@ -454,7 +454,7 @@ export const DialogueLine = memo(function DialogueLine({
           }}
           title={
             hasSpeaker
-              ? character?.dialogueStyle || "Character dialogue"
+              ? character?.displayName || "Character dialogue"
               : "Narration"
           }
         >
