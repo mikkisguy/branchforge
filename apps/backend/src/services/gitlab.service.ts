@@ -547,17 +547,29 @@ async function listAllFiles(
   projectId: string,
   branch: string,
   userId: string,
-  gitlabUrl?: string
+  gitlabUrl?: string,
+  preResolved?: { token: string; url: string; gitlabProjectId: string }
 ): Promise<Array<{ name: string; path: string }>> {
-  await requireProjectOwnership(projectId, userId);
+  let token: string;
+  let url: string;
+  let gitlabProjectId: string;
 
-  const repoLink = await getRepositoryLink(projectId);
-  if (!repoLink) {
-    throw new RepositoryNotLinkedError();
+  if (preResolved) {
+    token = preResolved.token;
+    url = preResolved.url;
+    gitlabProjectId = preResolved.gitlabProjectId;
+  } else {
+    await requireProjectOwnership(projectId, userId);
+
+    const repoLink = await getRepositoryLink(projectId);
+    if (!repoLink) {
+      throw new RepositoryNotLinkedError();
+    }
+
+    token = await getDecryptedToken(userId);
+    url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
+    gitlabProjectId = String(repoLink.gitlabProjectId);
   }
-
-  const token = await getDecryptedToken(userId);
-  const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
 
   const allFiles: Array<{ name: string; path: string }> = [];
   let page = 1;
@@ -565,7 +577,7 @@ async function listAllFiles(
 
   do {
     const apiUrl = new URL(
-      `/api/v4/projects/${repoLink.gitlabProjectId}/repository/tree`,
+      `/api/v4/projects/${gitlabProjectId}/repository/tree`,
       url
     );
     apiUrl.searchParams.set("ref", branch);
@@ -884,8 +896,12 @@ export async function batchCommitFiles(
   try {
     await getBranchCommitSha(projectId, userId, branch, gitlabUrl);
     branchExists = true;
-  } catch {
-    // Branch doesn't exist yet — all files will be "create" actions
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("404")) {
+      // Branch doesn't exist yet — all files will be "create" actions
+    } else {
+      throw err;
+    }
   }
 
   if (branchExists) {
@@ -893,7 +909,8 @@ export async function batchCommitFiles(
       projectId,
       branch,
       userId,
-      gitlabUrl
+      gitlabUrl,
+      { token, url, gitlabProjectId: String(repoLink.gitlabProjectId) }
     );
     existingFilePaths = new Set(existingFiles.map((f) => f.path));
   } else {
