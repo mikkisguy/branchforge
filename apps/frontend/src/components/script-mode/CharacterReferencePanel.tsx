@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Heart, ChevronRight, ChevronLeft } from "lucide-react";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cva } from "class-variance-authority";
 import type {
   Character,
@@ -145,25 +146,32 @@ export function CharacterReferencePanel({
                   Other Characters
                 </h3>
 
-                <div className="space-y-1">
+                <div className="flex flex-wrap gap-2 px-2">
                   {otherCharacters.map((character) => (
-                    <div
+                    <Tooltip
                       key={character.id}
-                      className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted transition-colors group"
+                      content={
+                        <span>
+                          {character.displayName}
+                          {character.isLoveInterest && " ♥"}
+                        </span>
+                      }
                     >
                       <div
-                        className="size-6 rounded-full flex items-center justify-center text-white text-xs shrink-0 shadow-sm"
+                        className="size-8 rounded-full flex items-center justify-center text-white text-xs font-medium shrink-0 shadow-sm hover:ring-2 hover:ring-ring transition-all cursor-default"
                         style={{ backgroundColor: character.color }}
                       >
-                        {character.displayName[0] || "?"}
+                        {character.avatarUrl ? (
+                          <img
+                            src={character.avatarUrl}
+                            alt={character.displayName}
+                            className="size-8 rounded-full object-cover"
+                          />
+                        ) : (
+                          character.displayName[0] || "?"
+                        )}
                       </div>
-                      <span className="text-sm text-muted-foreground truncate flex-1">
-                        {character.displayName}
-                      </span>
-                      {character.isLoveInterest && (
-                        <Heart className="size-3.5 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
-                      )}
-                    </div>
+                    </Tooltip>
                   ))}
                 </div>
               </div>
