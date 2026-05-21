@@ -126,6 +126,7 @@ export function MetersContent({ projectId }: MetersContentProps) {
         try {
           await deleteMeter(meter.id);
           setMetersList((prev) => prev.filter((_, i) => i !== index));
+          if (editingIndex === index) setEditingIndex(null);
         } catch {
           // Error handled by hook toast
         }
@@ -214,9 +215,7 @@ export function MetersContent({ projectId }: MetersContentProps) {
           <Loader2 className="size-6 animate-spin text-muted-foreground" />
         </div>
       ) : metersError ? (
-        <InlineMessage variant="error">
-          Failed to load meters
-        </InlineMessage>
+        <InlineMessage variant="error">Failed to load meters</InlineMessage>
       ) : metersList.length === 0 ? (
         <div className="p-6 border border-dashed border-border/30 rounded-md text-center">
           <p className="text-sm text-muted-foreground mb-4">

@@ -566,10 +566,10 @@ export const createMeterSchema = z
  */
 export const updateMeterSchema = z
   .object({
-    name: requiredString(200, "Name is too long").optional(),
-    characterId: uuidSchema.optional().nullable(),
-    minValue: z.number().int().optional(),
-    maxValue: z.number().int().optional(),
+    name: requiredString(200, "Name is too long"),
+    characterId: uuidSchema.nullable(),
+    minValue: z.number().int(),
+    maxValue: z.number().int(),
     description: optionalString(500, "Description is too long"),
   })
   .strict()
@@ -583,6 +583,7 @@ export const updateMeterSchema = z
     },
     {
       message: "Minimum value must be less than or equal to maximum value",
+      path: ["minValue"],
     }
   );
 

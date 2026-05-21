@@ -88,20 +88,20 @@ export interface MeterLabelEffect {
   labelId: string;
   labelTitle: string;
   routeKey: string | null;
-  prerequisiteValue: number | null;  // threshold: "show this scene if meter >= X"
-  effectDelta: number | null;        // change: "meter += X"
+  prerequisiteValue: number | null; // threshold: "show this scene if meter >= X"
+  effectDelta: number | null; // change: "meter += X"
 }
 ```
 
 ## API Routes
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/projects/:projectId/meters` | List all meters for project |
-| POST | `/projects/:projectId/meters` | Create a meter |
-| PUT | `/meters/:meterId` | Update a meter |
-| DELETE | `/meters/:meterId` | Delete a meter |
-| GET | `/projects/:projectId/meters/progression` | Get progression data for all meters |
+| Method | Path                                      | Purpose                             |
+| ------ | ----------------------------------------- | ----------------------------------- |
+| GET    | `/projects/:projectId/meters`             | List all meters for project         |
+| POST   | `/projects/:projectId/meters`             | Create a meter                      |
+| PUT    | `/meters/:meterId`                        | Update a meter                      |
+| DELETE | `/meters/:meterId`                        | Delete a meter                      |
+| GET    | `/projects/:projectId/meters/progression` | Get progression data for all meters |
 
 ### Authentication
 
@@ -112,6 +112,7 @@ All routes require `authenticate` middleware. All operations require project own
 `GET /projects/:projectId/meters/progression` returns `MeterProgression[]`.
 
 Implementation:
+
 1. Fetch meters for the project
 2. Fetch all active labels for the project (select id, title, route, prerequisites, effects)
 3. For each meter, filter labels whose `prerequisites.meters` or `effects.meters` contain the meter's key
@@ -120,25 +121,38 @@ Implementation:
 ## Validation Schemas
 
 ```typescript
-export const createMeterSchema = z.object({
-  key: z.string().min(1).max(100).regex(/^[a-z][a-z0-9_]*$/, "Key must start with a letter and contain only lowercase letters, numbers, and underscores"),
-  name: requiredString(200),
-  characterId: uuidSchema.optional().nullable(),
-  minValue: z.number().int().default(0),
-  maxValue: z.number().int().default(100),
-  description: optionalString(500),
-}).strict().refine(data => data.minValue <= data.maxValue, {
-  message: "Minimum value must be less than or equal to maximum value",
-  path: ["minValue"],
-});
+export const createMeterSchema = z
+  .object({
+    key: z
+      .string()
+      .min(1)
+      .max(100)
+      .regex(
+        /^[a-z][a-z0-9_]*$/,
+        "Key must start with a letter and contain only lowercase letters, numbers, and underscores"
+      ),
+    name: requiredString(200),
+    characterId: uuidSchema.optional().nullable(),
+    minValue: z.number().int().default(0),
+    maxValue: z.number().int().default(100),
+    description: optionalString(500),
+  })
+  .strict()
+  .refine((data) => data.minValue <= data.maxValue, {
+    message: "Minimum value must be less than or equal to maximum value",
+    path: ["minValue"],
+  });
 
-export const updateMeterSchema = z.object({
-  name: requiredString(200).optional(),
-  characterId: uuidSchema.optional().nullable(),
-  minValue: z.number().int().optional(),
-  maxValue: z.number().int().optional(),
-  description: optionalString(500),
-}).strict().partial();
+export const updateMeterSchema = z
+  .object({
+    name: requiredString(200).optional(),
+    characterId: uuidSchema.optional().nullable(),
+    minValue: z.number().int().optional(),
+    maxValue: z.number().int().optional(),
+    description: optionalString(500),
+  })
+  .strict()
+  .partial();
 
 export const meterIdParamsSchema = z.object({ meterId: uuidSchema });
 ```
@@ -148,10 +162,12 @@ export const meterIdParamsSchema = z.object({ meterId: uuidSchema });
 ### MetersDialog
 
 Master-detail layout:
+
 - **Left panel (300px):** List of meters with add/edit/delete. Inline form for create/edit.
 - **Right panel:** Progression view for the selected meter. Shows a table of labels that reference this meter.
 
 States:
+
 - **Loading:** Skeleton placeholders in both panels
 - **Empty:** "No meters defined" with a create button and descriptive text
 - **Error:** Toast notification + retry button
@@ -160,11 +176,11 @@ States:
 
 ### Progression table columns
 
-| Label | Route | Prerequisite | Effect |
-|-------|-------|-------------|--------|
-| "First Meeting" | luna_route | affection_luna >= 50 | +10 |
-| "The Argument" | luna_route | — | -5 |
-| "Reconciliation" | luna_route | affection_luna >= 60 | +20 |
+| Label            | Route      | Prerequisite         | Effect |
+| ---------------- | ---------- | -------------------- | ------ |
+| "First Meeting"  | luna_route | affection_luna >= 50 | +10    |
+| "The Argument"   | luna_route | —                    | -5     |
+| "Reconciliation" | luna_route | affection_luna >= 60 | +20    |
 
 ## Service Implementation
 
@@ -193,7 +209,8 @@ export const meterKeys = {
   all: ["meters"] as const,
   lists: (projectId: string) => ["meters", projectId, "list"] as const,
   detail: (meterId: string) => ["meters", "detail", meterId] as const,
-  progression: (projectId: string) => ["meters", projectId, "progression"] as const,
+  progression: (projectId: string) =>
+    ["meters", projectId, "progression"] as const,
 } as const;
 ```
 

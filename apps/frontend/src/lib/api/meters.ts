@@ -55,10 +55,7 @@ export const metersApi = {
   },
 
   /** Create a new meter */
-  async createMeter(
-    projectId: string,
-    body: CreateMeterBody
-  ): Promise<Meter> {
+  async createMeter(projectId: string, body: CreateMeterBody): Promise<Meter> {
     const response = await request<GetMeterResponse>(
       `/projects/${encodeURIComponent(projectId)}/meters`,
       { method: "POST", body: JSON.stringify(body) }
@@ -67,10 +64,7 @@ export const metersApi = {
   },
 
   /** Update an existing meter */
-  async updateMeter(
-    meterId: string,
-    body: UpdateMeterBody
-  ): Promise<Meter> {
+  async updateMeter(meterId: string, body: UpdateMeterBody): Promise<Meter> {
     const response = await request<GetMeterResponse>(
       `/meters/${encodeURIComponent(meterId)}`,
       { method: "PUT", body: JSON.stringify(body) }

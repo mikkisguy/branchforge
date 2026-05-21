@@ -25,9 +25,7 @@ export function MetersDialog({
   onOpenChange,
   projectId,
 }: MetersDialogProps) {
-  const [selectedMeterKey, setSelectedMeterKey] = useState<string | null>(
-    null
-  );
+  const [selectedMeterKey, setSelectedMeterKey] = useState<string | null>(null);
 
   const {
     meters,
@@ -46,7 +44,7 @@ export function MetersDialog({
   };
 
   const selectedProgression = selectedMeterKey
-    ? progression.find((p) => p.meterKey === selectedMeterKey) ?? null
+    ? (progression.find((p) => p.meterKey === selectedMeterKey) ?? null)
     : null;
 
   return (

@@ -79,10 +79,7 @@ export class MetersService {
   // Authorization helper
   // --------------------------------------------------------------------------
 
-  async requireMeterAccess(
-    meterId: string,
-    userId: string
-  ): Promise<Meter> {
+  async requireMeterAccess(meterId: string, userId: string): Promise<Meter> {
     const db = getDb();
 
     const [meter] = await db
@@ -105,10 +102,7 @@ export class MetersService {
   // --------------------------------------------------------------------------
 
   /** List all meters for a project. */
-  async listMeters(
-    projectId: string,
-    userId: string
-  ): Promise<PublicMeter[]> {
+  async listMeters(projectId: string, userId: string): Promise<PublicMeter[]> {
     await requireProjectOwnership(projectId, userId);
 
     const db = getDb();
@@ -158,11 +152,7 @@ export class MetersService {
       return mapToPublicMeter(result);
     } catch (err) {
       if (err instanceof ConflictError) throw err;
-      if (
-        err instanceof Error &&
-        "code" in err &&
-        err.code === "23505"
-      ) {
+      if (err instanceof Error && "code" in err && err.code === "23505") {
         throw new ConflictError("Meter with this key already exists");
       }
       throw err;
@@ -196,11 +186,7 @@ export class MetersService {
       return mapToPublicMeter(updated);
     } catch (err) {
       if (err instanceof NotFoundError) throw err;
-      if (
-        err instanceof Error &&
-        "code" in err &&
-        err.code === "23505"
-      ) {
+      if (err instanceof Error && "code" in err && err.code === "23505") {
         throw new ConflictError("Meter with this key already exists");
       }
       throw err;
@@ -208,10 +194,7 @@ export class MetersService {
   }
 
   /** Delete a meter. */
-  async deleteMeter(
-    meterId: string,
-    userId: string
-  ): Promise<void> {
+  async deleteMeter(meterId: string, userId: string): Promise<void> {
     await this.requireMeterAccess(meterId, userId);
 
     const db = getDb();
@@ -256,12 +239,7 @@ export class MetersService {
         effects: labels.effects,
       })
       .from(labels)
-      .where(
-        and(
-          eq(labels.projectId, projectId),
-          isNull(labels.deletedAt)
-        )
-      );
+      .where(and(eq(labels.projectId, projectId), isNull(labels.deletedAt)));
 
     // Build progression data for each meter
     return projectMeters.map((meter) => {

@@ -112,8 +112,7 @@ export function useMeters(projectId: string): UseMetersReturn {
 
   // Delete meter mutation
   const deleteMeterMutation = useMutation({
-    mutationFn: async (meterId: string) =>
-      metersApi.deleteMeter(meterId),
+    mutationFn: async (meterId: string) => metersApi.deleteMeter(meterId),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: meterKeys.lists(projectId),
