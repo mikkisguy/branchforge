@@ -11,6 +11,8 @@ import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { PublicLabel, LabelStatus } from "@branchforge/shared";
 import {
+  ArrowUpDown,
+  Clock,
   Sparkles,
   ChevronLeft,
   File,
@@ -464,6 +466,11 @@ export function LabelNavigator({
   // Search/filter state (local, instant, no debouncing)
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Sort mode: "sequence" (default, by sequenceOrder) or "lastUpdated"
+  const [sortMode, setSortMode] = useState<"sequence" | "lastUpdated">(
+    "sequence"
+  );
+
   // Context menu handler
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, label: PublicLabel) => {
@@ -556,7 +563,20 @@ export function LabelNavigator({
     );
   }, [labels, searchQuery]);
 
+  const compareByUpdatedAt = (a: PublicLabel, b: PublicLabel): number => {
+    const timeDiff =
+      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    if (timeDiff !== 0) return timeDiff;
+    return b.labelNumber - a.labelNumber;
+  };
+
   const groupedLabels = useMemo(() => {
+    // Short-circuit: "lastUpdated" mode only needs the flat list
+    if (sortMode === "lastUpdated") {
+      const flat = [...filteredLabels].sort(compareByUpdatedAt);
+      return { map: new Map<string, PublicLabel[]>(), flat, mode: sortMode };
+    }
+
     const groups = new Map<string, PublicLabel[]>();
 
     for (const label of filteredLabels) {
@@ -567,20 +587,23 @@ export function LabelNavigator({
       groups.get(key)!.push(label);
     }
 
-    const sortedGroups = new Map<string, PublicLabel[]>();
     const groupEntries = Array.from(groups.entries());
     groupEntries.sort(([, aLabels], [, bLabels]) => {
       const aName = aLabels[0]?.fileName ?? "";
       const bName = bLabels[0]?.fileName ?? "";
       return aName.localeCompare(bName);
     });
+
+    const sorted = new Map<string, PublicLabel[]>();
     for (const [key, groupLabels] of groupEntries) {
-      groupLabels.sort((a, b) => a.sequenceOrder - b.sequenceOrder);
-      sortedGroups.set(key, groupLabels);
+      sorted.set(
+        key,
+        [...groupLabels].sort((a, b) => a.sequenceOrder - b.sequenceOrder)
+      );
     }
 
-    return sortedGroups;
-  }, [filteredLabels]);
+    return { map: sorted, flat: null, mode: sortMode };
+  }, [filteredLabels, sortMode]);
 
   return (
     <div className="h-full overflow-y-auto">
@@ -614,32 +637,76 @@ export function LabelNavigator({
           </div>
         </div>
 
-        {/* Search input */}
-        <div className="mt-2.5 relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Filter..."
-            className="w-full pl-7 pr-7 py-1.5 text-xs border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30"
-          />
-          {searchQuery && (
+        {/* Search input + sort toggle */}
+        <div className="mt-2.5 flex items-center gap-1">
+          <div className="flex-1 relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Filter..."
+              className="w-full pl-7 pr-7 py-1.5 text-xs border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-muted/80 transition-colors"
+                aria-label="Clear search"
+              >
+                <X className="size-3 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+          <Tooltip
+            content={
+              sortMode === "lastUpdated"
+                ? "Sorted by last updated (click for file order)"
+                : "Sorted by file order (click for recent)"
+            }
+          >
             <button
               type="button"
-              onClick={() => setSearchQuery("")}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-muted/80 transition-colors"
-              aria-label="Clear search"
+              onClick={() =>
+                setSortMode((prev) =>
+                  prev === "lastUpdated" ? "sequence" : "lastUpdated"
+                )
+              }
+              className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+              aria-label={`Sort mode: ${sortMode === "lastUpdated" ? "last updated" : "sequence order"}. Click to toggle.`}
             >
-              <X className="size-3 text-muted-foreground" />
+              {sortMode === "lastUpdated" ? (
+                <Clock className="size-3.5" />
+              ) : (
+                <ArrowUpDown className="size-3.5" />
+              )}
             </button>
-          )}
+          </Tooltip>
         </div>
       </div>
 
       {/* Label List */}
       <div className="p-3 space-y-2">
-        {groupedLabels.size === 0 ? (
+        {groupedLabels.flat && groupedLabels.flat.length > 0 ? (
+          // Flat list for "last updated" sort — no file grouping
+          <div className="space-y-1" key={sortMode}>
+            {groupedLabels.flat.map((label) => (
+              <LabelItem
+                key={label.id}
+                label={label}
+                isActive={activeLabelId === label.id}
+                onSelect={() => onSelect(label.id)}
+                onContextMenu={handleContextMenu}
+                onDoubleClick={handleDoubleClick}
+                isRenaming={renamingLabelId === label.id}
+                onRenameSave={(value) => handleRenameSave(label.id, value)}
+                onRenameCancel={handleRenameCancel}
+                isSavingRename={isUpdatingLabel ?? false}
+              />
+            ))}
+          </div>
+        ) : groupedLabels.map.size === 0 ? (
           labels.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <FolderOpen className="size-10 text-muted-foreground mb-3" />
@@ -664,8 +731,8 @@ export function LabelNavigator({
             </div>
           )
         ) : (
-          <div className="space-y-3">
-            {Array.from(groupedLabels.entries()).map(
+          <div className="space-y-3" key={sortMode}>
+            {Array.from(groupedLabels.map.entries()).map(
               ([projectFileId, fileLabels]) => {
                 const fileName = fileLabels[0]?.fileName ?? "unknown";
                 return (

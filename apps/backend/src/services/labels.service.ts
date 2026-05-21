@@ -2071,6 +2071,7 @@ export async function updateLabel(
       .set({
         ...updateData,
         ...auditFields,
+        updatedAt: new Date(),
       })
       .where(eq(labels.id, labelId))
       .returning();

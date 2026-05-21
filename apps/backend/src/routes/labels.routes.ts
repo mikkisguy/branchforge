@@ -411,6 +411,7 @@ async function updateLabelDialogueHandler(
           ...auditFields,
           contentHash,
           syncStatus: "MODIFIED_LOCAL",
+          updatedAt: new Date(),
         })
         .where(eq(labels.id, labelId));
 

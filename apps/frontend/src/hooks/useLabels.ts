@@ -165,9 +165,9 @@ export function useLabels(): UseLabelsReturn {
       clearHistoryCursor(variables.labelId);
 
       // Invalidate active label detail query (dialogue content changed)
+      // Invalidate labels list (updatedAt timestamp changed on the label)
       // Invalidate writingGoals (word count may have changed)
       // Invalidate project files (file content is reconstructed after dialogue update)
-      // Don't invalidate labels list - metadata hasn't changed
       if (currentProject && variables.labelId) {
         await Promise.all([
           queryClient.invalidateQueries({
@@ -175,6 +175,9 @@ export function useLabels(): UseLabelsReturn {
           }),
           queryClient.invalidateQueries({
             queryKey: labelKeys.versions(variables.labelId),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: labelKeys.lists(currentProject.id),
           }),
           // Invalidate project files for this project and force refetch
           queryClient.refetchQueries({
