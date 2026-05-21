@@ -7,6 +7,7 @@
 
 import { useMemo } from "react";
 import { Heart, ChevronRight, ChevronLeft } from "lucide-react";
+import { CharacterAvatarChip } from "@/components/ui/CharacterAvatarChip";
 import type { Character, LabelDetail } from "@branchforge/shared";
 import { cva } from "class-variance-authority";
 
@@ -172,25 +173,12 @@ export function CharacterReferencePanel({
                       Other Characters
                     </h3>
 
-                    <div className="space-y-1">
+                    <div className="flex flex-wrap gap-2 px-2">
                       {otherCharacters.map((character) => (
-                        <div
+                        <CharacterAvatarChip
                           key={character.id}
-                          className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted transition-colors group"
-                        >
-                          <div
-                            className="size-6 rounded-full flex items-center justify-center text-white text-xs shrink-0 shadow-sm"
-                            style={{ backgroundColor: character.color }}
-                          >
-                            {character.displayName[0] || "?"}
-                          </div>
-                          <span className="text-sm text-muted-foreground truncate flex-1">
-                            {character.displayName}
-                          </span>
-                          {character.isLoveInterest && (
-                            <Heart className="size-3.5 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
-                          )}
-                        </div>
+                          character={character}
+                        />
                       ))}
                     </div>
                   </div>

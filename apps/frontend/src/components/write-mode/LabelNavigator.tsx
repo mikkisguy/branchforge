@@ -173,7 +173,7 @@ function LabelItem({
         ${
           isActive
             ? "bg-[var(--theme-color)]/10 border-[var(--theme-color)] shadow-sm"
-            : "bg-card/50 border-border hover:bg-accent/50"
+            : "bg-card/80 border-transparent hover:border-border hover:bg-accent/50"
         }
       `}
       >
@@ -340,7 +340,7 @@ function FileGroup({
   return (
     <div className="mb-4">
       {/* File Header */}
-      <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-muted/20">
+      <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-muted/20 border border-border/40">
         <File className="size-3.5 text-muted-foreground shrink-0" />
         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
           {fileName}
@@ -351,7 +351,7 @@ function FileGroup({
       </div>
 
       {/* Label list */}
-      <div className="space-y-1">
+      <div className="space-y-2.5">
         {labels.map((label) => (
           <LabelItem
             key={label.id}
@@ -691,7 +691,7 @@ export function LabelNavigator({
       <div className="p-3 space-y-2">
         {groupedLabels.flat && groupedLabels.flat.length > 0 ? (
           // Flat list for "last updated" sort — no file grouping
-          <div className="space-y-1" key={sortMode}>
+          <div className="space-y-2.5" key={sortMode}>
             {groupedLabels.flat.map((label) => (
               <LabelItem
                 key={label.id}
