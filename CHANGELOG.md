@@ -4,6 +4,10 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.9.1 - 2026-05-22
+
+- Fixed Docker builds
+
 ## v0.9.0 - 2026-05-22
 
 - Added meter management
