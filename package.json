@@ -1,6 +1,6 @@
 {
   "name": "branchforge",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "description": "Visual Novel IDE for Ren'Py",
   "scripts": {

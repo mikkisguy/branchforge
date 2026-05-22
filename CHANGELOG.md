@@ -4,6 +4,14 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.9.0 - 2026-05-22
+
+- Added meter management
+- Added the possibility to add a new label on write mode, also some styling updates for the label and file lists
+- Added for labels: edit dialog for title and name, title display to script mode and filtering in write mode
+- Added sorting toggle for labels: file order/recent
+- Fixed GitLab export flow
+
 ## v0.8.0 - 2026-04-24
 
 - Unified project imports and management in a single settings view
