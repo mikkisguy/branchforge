@@ -236,7 +236,7 @@ export async function exportToGitlab(
     const filesToExport: Array<{ filePath: string; content: string }> = [];
 
     // Determine the directory prefix for generated files (e.g. "game/")
-    // by computing the longest common ancestor directory across all file paths.
+    // by computing a shared top-level directory segment from directory paths.
     const fileDirPrefix = computeCommonDirectoryPrefix(
       files.map((f) => f.filePath)
     );
