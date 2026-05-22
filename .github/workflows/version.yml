@@ -64,7 +64,7 @@ jobs:
             pnpm run bump:version
             pnpm --filter @branchforge/shared build
             pnpm typecheck
-            pnpm test
+            pnpm test:unit
             VERSION=$(node -p "require('./package.json').version")
             BRANCH="release/version-v$VERSION"
             PR_TITLE="chore: version packages to v$VERSION [skip-coderabbit]"
