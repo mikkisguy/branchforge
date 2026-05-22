@@ -381,6 +381,11 @@ export interface PublicLabel {
   projectFileId: string;
   /** Basename of the file path (e.g., "act_i.rpy" from "labels/act_i.rpy") */
   fileName: string;
+  /** Meter and state variable prerequisites for this label */
+  prerequisites: {
+    meters?: Record<string, number>;
+    stateVariables?: string[];
+  } | null;
   createdAt: string;
   updatedAt: string;
 }

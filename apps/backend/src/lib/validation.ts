@@ -399,6 +399,13 @@ export const updateLabelSchema = z
       )
       .nullable()
       .optional(),
+    prerequisites: z
+      .object({
+        meters: z.record(z.string(), z.number().finite()).optional(),
+        stateVariables: z.array(z.string()).optional(),
+      })
+      .optional()
+      .nullable(),
   })
   .strict()
   .partial();
