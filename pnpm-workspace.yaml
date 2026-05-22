@@ -2,5 +2,7 @@ packages:
   - apps/*
   - packages/*
 
-ignoredBuiltDependencies:
-  - bcrypt
+allowBuilds:
+  bcrypt: true
+  esbuild: true
+  sharp: true
