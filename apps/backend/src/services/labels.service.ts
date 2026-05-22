@@ -2055,25 +2055,47 @@ export async function updateLabel(
       }
     }
 
-    // Validate meter keys in prerequisites exist in the project's meters table
-    if (
+    // Validate prerequisite meter keys and state variable keys exist in the
+    // project. These two existence checks are independent — run them concurrently.
+    const meterKeys =
       data.prerequisites?.meters &&
       Object.keys(data.prerequisites.meters).length > 0
-    ) {
-      const meterKeys = Object.keys(data.prerequisites.meters);
-      const existingMeters = await tx
-        .select({ key: meters.key })
-        .from(meters)
-        .where(
-          and(
-            eq(meters.projectId, labelWithProject.label.projectId),
-            inArray(meters.key, meterKeys)
-          )
-        );
+        ? Object.keys(data.prerequisites.meters)
+        : [];
+    const stateVariableKeys =
+      data.prerequisites?.stateVariables &&
+      data.prerequisites.stateVariables.length > 0
+        ? data.prerequisites.stateVariables
+        : [];
 
+    const [existingMeters, existingStateVariables] = await Promise.all([
+      meterKeys.length > 0
+        ? tx
+            .select({ key: meters.key })
+            .from(meters)
+            .where(
+              and(
+                eq(meters.projectId, labelWithProject.label.projectId),
+                inArray(meters.key, meterKeys)
+              )
+            )
+        : ([] as { key: string }[]),
+      stateVariableKeys.length > 0
+        ? tx
+            .select({ key: stateVariables.key })
+            .from(stateVariables)
+            .where(
+              and(
+                eq(stateVariables.projectId, labelWithProject.label.projectId),
+                inArray(stateVariables.key, stateVariableKeys)
+              )
+            )
+        : ([] as { key: string }[]),
+    ]);
+
+    if (meterKeys.length > 0) {
       const existingKeys = new Set(existingMeters.map((m) => m.key));
       const invalidKeys = meterKeys.filter((k) => !existingKeys.has(k));
-
       if (invalidKeys.length > 0) {
         throw new ValidationError(
           `Invalid meter key(s): ${invalidKeys.join(", ")}. ` +
@@ -2082,28 +2104,9 @@ export async function updateLabel(
       }
     }
 
-    if (
-      data.prerequisites?.stateVariables &&
-      data.prerequisites.stateVariables.length > 0
-    ) {
-      const stateVariableKeys = data.prerequisites.stateVariables;
-      const existingStateVariables = await tx
-        .select({ key: stateVariables.key })
-        .from(stateVariables)
-        .where(
-          and(
-            eq(stateVariables.projectId, labelWithProject.label.projectId),
-            inArray(stateVariables.key, stateVariableKeys)
-          )
-        );
-
-      const existingKeys = new Set(
-        existingStateVariables.map((stateVariable) => stateVariable.key)
-      );
-      const invalidKeys = stateVariableKeys.filter(
-        (key) => !existingKeys.has(key)
-      );
-
+    if (stateVariableKeys.length > 0) {
+      const existingKeys = new Set(existingStateVariables.map((sv) => sv.key));
+      const invalidKeys = stateVariableKeys.filter((k) => !existingKeys.has(k));
       if (invalidKeys.length > 0) {
         throw new ValidationError(
           `Invalid state variable key(s): ${invalidKeys.join(", ")}. ` +
