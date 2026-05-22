@@ -309,8 +309,7 @@ export function GitLabSettingsContent() {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Required scopes:{" "}
-                  <code className="bg-muted px-1 py-0.5 rounded">read_api</code>
-                  ,{" "}
+                  <code className="bg-muted px-1 py-0.5 rounded">api</code>,{" "}
                   <code className="bg-muted px-1 py-0.5 rounded">
                     read_repository
                   </code>

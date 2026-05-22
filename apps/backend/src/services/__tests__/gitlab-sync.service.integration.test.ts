@@ -727,10 +727,7 @@ describe("GitLabSyncService (Integration)", () => {
   describe("exportToGitlab", () => {
     it("should export files to GitLab when files exist", async () => {
       // Mock the GitLab service
-      vi.spyOn(gitlabService, "createOrUpdateFile").mockResolvedValue({
-        file_path: testGitlabFile.filePath,
-        branch: testBranch,
-      } as any);
+      vi.spyOn(gitlabService, "batchCommitFiles").mockResolvedValue(undefined);
 
       const result = await exportToGitlab(
         testProjectId,
@@ -746,13 +743,12 @@ describe("GitLabSyncService (Integration)", () => {
         branch: testBranch,
         conflictCount: 0,
       });
-      expect(gitlabService.createOrUpdateFile).toHaveBeenCalledWith(
+      expect(gitlabService.batchCommitFiles).toHaveBeenCalledWith(
         testProjectId,
         testUserId,
         testBranch,
-        testGitlabFile.filePath,
-        testGitlabFile.content,
-        "Test export"
+        "Test export",
+        [{ filePath: testGitlabFile.filePath, content: testGitlabFile.content }]
       );
     });
 
@@ -763,12 +759,9 @@ describe("GitLabSyncService (Integration)", () => {
         .where(eq(projectFiles.id, testGitlabFileId));
 
       // Mock the GitLab service (should not be called)
-      const createOrUpdateFileSpy = vi
-        .spyOn(gitlabService, "createOrUpdateFile")
-        .mockResolvedValue({
-          file_path: "game/script.rpy",
-          branch: testBranch,
-        } as any);
+      const batchCommitFilesSpy = vi
+        .spyOn(gitlabService, "batchCommitFiles")
+        .mockResolvedValue(undefined);
 
       const result = await exportToGitlab(
         testProjectId,
@@ -784,12 +777,12 @@ describe("GitLabSyncService (Integration)", () => {
         branch: testBranch,
         conflictCount: 0,
       });
-      expect(createOrUpdateFileSpy).not.toHaveBeenCalled();
+      expect(batchCommitFilesSpy).not.toHaveBeenCalled();
     });
 
     it("should handle GitLab API errors", async () => {
       // Mock the GitLab service to throw error
-      vi.spyOn(gitlabService, "createOrUpdateFile").mockRejectedValue(
+      vi.spyOn(gitlabService, "batchCommitFiles").mockRejectedValue(
         new Error("GitLab API Error")
       );
 
@@ -809,19 +802,16 @@ describe("GitLabSyncService (Integration)", () => {
     });
 
     it("should generate default commit message when not provided", async () => {
-      vi.spyOn(gitlabService, "createOrUpdateFile").mockResolvedValue({
-        file_path: testGitlabFile.filePath,
-        branch: testBranch,
-      } as any);
+      vi.spyOn(gitlabService, "batchCommitFiles").mockResolvedValue(undefined);
 
       await exportToGitlab(testProjectId, testUserId, testBranch);
 
-      expect(gitlabService.createOrUpdateFile).toHaveBeenCalled();
-      const calls = (gitlabService.createOrUpdateFile as any).mock.calls;
-      // createOrUpdateFile(projectId, userId, branch, filePath, content, commitMessage)
-      // The commit message is at index 5
+      expect(gitlabService.batchCommitFiles).toHaveBeenCalled();
+      const calls = (gitlabService.batchCommitFiles as any).mock.calls;
+      // batchCommitFiles(projectId, userId, branch, commitMessage, files)
+      // The commit message is at index 3
       expect(calls.length).toBeGreaterThan(0);
-      const commitMessage = calls[0][5];
+      const commitMessage = calls[0][3];
       expect(commitMessage).toMatch(/Export from BranchForge -/);
     });
 
@@ -833,16 +823,9 @@ describe("GitLabSyncService (Integration)", () => {
       });
       await db.insert(projectFiles).values(testGitlabFile2);
 
-      const createOrUpdateFileSpy = vi
-        .spyOn(gitlabService, "createOrUpdateFile")
-        .mockResolvedValueOnce({
-          file_path: testGitlabFile.filePath,
-          branch: testBranch,
-        } as any)
-        .mockResolvedValueOnce({
-          file_path: testGitlabFile2.filePath,
-          branch: testBranch,
-        } as any);
+      const batchCommitFilesSpy = vi
+        .spyOn(gitlabService, "batchCommitFiles")
+        .mockResolvedValue(undefined);
 
       const result = await exportToGitlab(
         testProjectId,
@@ -852,7 +835,9 @@ describe("GitLabSyncService (Integration)", () => {
       );
 
       expect(result.status).toBe("COMPLETED");
-      expect(createOrUpdateFileSpy).toHaveBeenCalledTimes(2);
+      expect(batchCommitFilesSpy).toHaveBeenCalledTimes(1);
+      const callArgs = batchCommitFilesSpy.mock.calls[0];
+      expect(callArgs[4]).toHaveLength(2);
 
       // Cleanup
       await db
@@ -889,10 +874,7 @@ describe("GitLabSyncService (Integration)", () => {
       });
 
       // Mock the GitLab service
-      vi.spyOn(gitlabService, "createOrUpdateFile").mockResolvedValue({
-        file_path: testGitlabFile.filePath,
-        branch: testBranch,
-      } as any);
+      vi.spyOn(gitlabService, "batchCommitFiles").mockResolvedValue(undefined);
 
       // Perform export
       const result = await exportToGitlab(

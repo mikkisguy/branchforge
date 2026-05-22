@@ -7,6 +7,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
+  computeCommonDirectoryPrefix,
   getSyncOperation,
   listSyncOperations,
 } from "../gitlab-sync.service.js";
@@ -181,6 +182,81 @@ describe("GitLabSyncService", () => {
       const result = await listSyncOperations(testProjectId, testUserId, 10);
 
       expect(result).toEqual(mockOperations);
+    });
+  });
+
+  describe("computeCommonDirectoryPrefix", () => {
+    it("returns shared top-level directory for files in same parent with different subdirectories", () => {
+      const result = computeCommonDirectoryPrefix([
+        "game/ch1/script.rpy",
+        "game/ch2/scene.rpy",
+        "game/ui/menu.rpy",
+      ]);
+      expect(result).toBe("game/");
+    });
+
+    it("returns top-level directory for deeply nested files sharing it", () => {
+      const result = computeCommonDirectoryPrefix([
+        "game/deep/nested/script.rpy",
+        "game/ch2/scene.rpy",
+      ]);
+      expect(result).toBe("game/");
+    });
+
+    it("returns empty string when files have different top-level directories", () => {
+      const result = computeCommonDirectoryPrefix([
+        "src/app.ts",
+        "tests/app.test.ts",
+        "docs/readme.md",
+      ]);
+      expect(result).toBe("");
+    });
+
+    it("returns empty string when no files have a directory component", () => {
+      const result = computeCommonDirectoryPrefix([
+        "README.md",
+        "LICENSE",
+        "CHANGELOG.md",
+      ]);
+      expect(result).toBe("");
+    });
+
+    it("returns empty string for empty input", () => {
+      const result = computeCommonDirectoryPrefix([]);
+      expect(result).toBe("");
+    });
+
+    it("returns top-level dir even when some files are root-level", () => {
+      const result = computeCommonDirectoryPrefix([
+        "game/script.rpy",
+        "game/data.rpy",
+        "README.md",
+      ]);
+      expect(result).toBe("game/");
+    });
+
+    it("returns empty when directed files disagree on top-level dir", () => {
+      const result = computeCommonDirectoryPrefix([
+        "src/app.ts",
+        "tests/app.test.ts",
+        "README.md",
+      ]);
+      expect(result).toBe("");
+    });
+
+    it("handles deeply nested single file", () => {
+      const result = computeCommonDirectoryPrefix([
+        "deeply/nested/path/file.rpy",
+      ]);
+      expect(result).toBe("deeply/");
+    });
+
+    it("only considers first segment, not full common ancestry", () => {
+      const result = computeCommonDirectoryPrefix([
+        "a/b/c/d/e/file1.rpy",
+        "a/b/c/d/f/file2.rpy",
+      ]);
+      expect(result).toBe("a/");
     });
   });
 

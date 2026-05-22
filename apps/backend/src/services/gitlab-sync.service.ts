@@ -21,7 +21,7 @@ import { eq, and, desc, inArray, isNull, sql } from "drizzle-orm";
 import {
   listRpyFiles,
   getFileContent,
-  createOrUpdateFile,
+  batchCommitFiles,
   getBranchCommitSha,
 } from "./gitlab.service.js";
 import {
@@ -142,6 +142,38 @@ async function updateSyncOperation(
 }
 
 /**
+ * Compute the top-level directory prefix from a list of file paths.
+ * Extracts the first directory segment from each path with a "/",
+ * and returns it with trailing "/" if all such paths share the same
+ * top-level directory. Returns "" otherwise.
+ *
+ * Example: ["game/ch1/script.rpy", "game/ch2/scene.rpy"] → "game/"
+ *          ["game/script.rpy", "README.md"] → "game/"
+ *          ["src/a.ts", "tests/b.ts"] → ""
+ *          ["README.md", "LICENSE"] → ""
+ */
+export function computeCommonDirectoryPrefix(filePaths: string[]): string {
+  const topDirs: string[] = [];
+  for (const p of filePaths) {
+    const firstSlash = p.indexOf("/");
+    if (firstSlash !== -1) {
+      topDirs.push(p.slice(0, firstSlash));
+    }
+  }
+
+  if (topDirs.length === 0) {
+    return "";
+  }
+
+  const first = topDirs[0];
+  if (topDirs.every((d) => d === first)) {
+    return first + "/";
+  }
+
+  return "";
+}
+
+/**
  * Export scenes from BranchForge to GitLab
  * Uses stored full content from project_files table for Script Mode
  * Each file's stored content is pushed directly to GitLab
@@ -200,7 +232,16 @@ export async function exportToGitlab(
       }
     }
 
-    // Export each file - Script Mode uses stored content directly
+    // Collect all files to export into a single batch commit
+    const filesToExport: Array<{ filePath: string; content: string }> = [];
+
+    // Determine the directory prefix for generated files (e.g. "game/")
+    // by computing a shared top-level directory segment from directory paths.
+    const fileDirPrefix = computeCommonDirectoryPrefix(
+      files.map((f) => f.filePath)
+    );
+
+    // Export each project file - Script Mode uses stored content directly
     for (const file of files) {
       if (file.content) {
         let contentToExport = file.content;
@@ -214,18 +255,14 @@ export async function exportToGitlab(
           );
         }
 
-        await createOrUpdateFile(
-          projectId,
-          userId,
-          targetBranch,
-          file.filePath,
-          contentToExport,
-          message
-        );
+        filesToExport.push({
+          filePath: file.filePath,
+          content: contentToExport,
+        });
       }
     }
 
-    // Generate and export state_variables.rpy file if state variables exist
+    // Generate state_variables.rpy if state variables exist
     const projectStateVariables = await db
       .select({
         key: stateVariables.key,
@@ -236,20 +273,13 @@ export async function exportToGitlab(
       .where(eq(stateVariables.projectId, projectId));
 
     if (projectStateVariables.length > 0) {
-      const stateVariablesContent = generateStateVariablesFile(
-        projectStateVariables
-      );
-      await createOrUpdateFile(
-        projectId,
-        userId,
-        targetBranch,
-        "state_variables.rpy",
-        stateVariablesContent,
-        message
-      );
+      filesToExport.push({
+        filePath: `${fileDirPrefix}branchforge_state_variables.rpy`,
+        content: generateStateVariablesFile(projectStateVariables),
+      });
     }
 
-    // Generate and export meters.rpy file if meters exist
+    // Generate meters.rpy if meters exist
     const projectMeters = await db
       .select({
         key: meters.key,
@@ -263,18 +293,13 @@ export async function exportToGitlab(
       .orderBy(meters.key);
 
     if (projectMeters.length > 0) {
-      const metersContent = generateMetersFile(projectMeters);
-      await createOrUpdateFile(
-        projectId,
-        userId,
-        targetBranch,
-        "meters.rpy",
-        metersContent,
-        message
-      );
+      filesToExport.push({
+        filePath: `${fileDirPrefix}branchforge_meters.rpy`,
+        content: generateMetersFile(projectMeters),
+      });
     }
 
-    // Generate and export definitions.rpy file if definitions exist
+    // Generate definitions.rpy if definitions exist
     const projectRenpyDefinitions = await db
       .select({
         category: renpyDefinitions.category,
@@ -287,16 +312,20 @@ export async function exportToGitlab(
       .where(eq(renpyDefinitions.projectId, projectId));
 
     if (projectRenpyDefinitions.length > 0) {
-      const definitionsContent = generateDefinitionsFile(
-        projectRenpyDefinitions
-      );
-      await createOrUpdateFile(
+      filesToExport.push({
+        filePath: `${fileDirPrefix}branchforge_definitions.rpy`,
+        content: generateDefinitionsFile(projectRenpyDefinitions),
+      });
+    }
+
+    // Create a single batch commit with all files
+    if (filesToExport.length > 0) {
+      await batchCommitFiles(
         projectId,
         userId,
         targetBranch,
-        "definitions.rpy",
-        definitionsContent,
-        message
+        message,
+        filesToExport
       );
     }
 
@@ -395,8 +424,18 @@ export async function importFromGitlab(
     // Get the commit SHA for this branch at import time
     const importCommitSha = await getBranchCommitSha(projectId, userId, branch);
 
-    // List RPY files in the repository
-    const rpyFiles = await listRpyFiles(projectId, branch, userId);
+    // List RPY files in the repository, excluding BranchForge-generated files
+    // (branchforge_state_variables.rpy, branchforge_meters.rpy,
+    // branchforge_definitions.rpy are auto-generated from management dialogs)
+    const GENERATED_FILE_NAMES = new Set([
+      "branchforge_state_variables.rpy",
+      "branchforge_meters.rpy",
+      "branchforge_definitions.rpy",
+    ]);
+    const allRpyFiles = await listRpyFiles(projectId, branch, userId);
+    const rpyFiles = allRpyFiles.filter(
+      (f) => !GENERATED_FILE_NAMES.has(f.name)
+    );
 
     if (rpyFiles.length === 0) {
       // No files to import - mark as completed

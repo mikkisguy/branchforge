@@ -540,6 +540,82 @@ export async function getBranchCommitSha(
 }
 
 /**
+ * List all files in a GitLab repository (recursive)
+ * Used internally by batchCommitFiles to determine create vs update actions.
+ */
+async function listAllFiles(
+  projectId: string,
+  branch: string,
+  userId: string,
+  gitlabUrl?: string,
+  preResolved?: { token: string; url: string; gitlabProjectId: string }
+): Promise<Array<{ name: string; path: string }>> {
+  let token: string;
+  let url: string;
+  let gitlabProjectId: string;
+
+  if (preResolved) {
+    token = preResolved.token;
+    url = preResolved.url;
+    gitlabProjectId = preResolved.gitlabProjectId;
+  } else {
+    await requireProjectOwnership(projectId, userId);
+
+    const repoLink = await getRepositoryLink(projectId);
+    if (!repoLink) {
+      throw new RepositoryNotLinkedError();
+    }
+
+    token = await getDecryptedToken(userId);
+    url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
+    gitlabProjectId = String(repoLink.gitlabProjectId);
+  }
+
+  const allFiles: Array<{ name: string; path: string }> = [];
+  let page = 1;
+  const perPage = 100;
+
+  do {
+    const apiUrl = new URL(
+      `/api/v4/projects/${gitlabProjectId}/repository/tree`,
+      url
+    );
+    apiUrl.searchParams.set("ref", branch);
+    apiUrl.searchParams.set("recursive", "true");
+    apiUrl.searchParams.set("per_page", perPage.toString());
+    apiUrl.searchParams.set("page", page.toString());
+
+    const response = await fetchWithTimeout(apiUrl.toString(), {
+      headers: {
+        "PRIVATE-TOKEN": token,
+      },
+    });
+
+    if (!response.ok) {
+      // Branch may not exist yet or repo is empty - return empty list
+      return [];
+    }
+
+    const items = (await response.json()) as GitlabTreeItem[];
+
+    for (const item of items) {
+      if (item.type === "blob") {
+        allFiles.push({ name: item.name, path: item.path });
+      }
+    }
+
+    const totalPages = response.headers.get("x-total-pages");
+    if (totalPages && parseInt(totalPages) > page) {
+      page++;
+    } else {
+      break;
+    }
+  } while (true); // eslint-disable-line no-constant-condition
+
+  return allFiles;
+}
+
+/**
  * List .rpy files in a GitLab repository
  * @param projectId - The BranchForge project ID
  * @param branch - The branch to search
@@ -771,6 +847,110 @@ export async function createOrUpdateFile(
   }
 
   return (await response.json()) as { file_path: string; branch: string };
+}
+
+/**
+ * Create a single batch commit with multiple file changes in a GitLab repo.
+ *
+ * Uses the GitLab Commits API to create ONE commit for all file operations,
+ * instead of one commit per file (as createOrUpdateFile does).
+ *
+ * Supports both existing branches (create/update actions) and new branches
+ * (all creates, using the repo's defaultBranch as start_branch).
+ *
+ * @param projectId - The BranchForge project ID
+ * @param userId - The user ID making the request (for authorization/token lookup)
+ * @param branch - The branch to commit to
+ * @param commitMessage - The commit message
+ * @param files - Array of file operations { filePath, content }
+ * @param gitlabUrl - Optional GitLab URL override
+ * @throws RepositoryNotLinkedError if no GitLab link exists
+ */
+export async function batchCommitFiles(
+  projectId: string,
+  userId: string,
+  branch: string,
+  commitMessage: string,
+  files: Array<{ filePath: string; content: string }>,
+  gitlabUrl?: string
+): Promise<void> {
+  await requireProjectOwnership(projectId, userId);
+
+  const repoLink = await getRepositoryLink(projectId);
+  if (!repoLink) {
+    throw new RepositoryNotLinkedError();
+  }
+
+  const token = await getDecryptedToken(userId);
+  const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
+
+  const apiUrl = new URL(
+    `/api/v4/projects/${repoLink.gitlabProjectId}/repository/commits`,
+    url
+  );
+
+  // Determine which files exist on the branch (create vs update actions)
+  let existingFilePaths: Set<string>;
+  let branchExists = false;
+
+  try {
+    await getBranchCommitSha(projectId, userId, branch, gitlabUrl);
+    branchExists = true;
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("404")) {
+      // Branch doesn't exist yet — all files will be "create" actions
+    } else {
+      throw err;
+    }
+  }
+
+  if (branchExists) {
+    const existingFiles = await listAllFiles(
+      projectId,
+      branch,
+      userId,
+      gitlabUrl,
+      { token, url, gitlabProjectId: String(repoLink.gitlabProjectId) }
+    );
+    existingFilePaths = new Set(existingFiles.map((f) => f.path));
+  } else {
+    existingFilePaths = new Set();
+  }
+
+  // Build actions array
+  const actions = files.map((file) => ({
+    action: (existingFilePaths.has(file.filePath) ? "update" : "create") as
+      | "create"
+      | "update",
+    file_path: file.filePath,
+    content: file.content,
+  }));
+
+  // Build the request body
+  const body: Record<string, unknown> = {
+    branch,
+    commit_message: commitMessage,
+    actions,
+  };
+
+  // For new branches, provide start_branch (default branch of the repo)
+  if (!branchExists) {
+    body.start_branch = repoLink.defaultBranch || "main";
+  }
+
+  const response = await fetchWithTimeout(apiUrl.toString(), {
+    method: "POST",
+    headers: {
+      "PRIVATE-TOKEN": token,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`GitLab API error: ${response.status} - ${errorText}`);
+  }
 }
 
 // ============================================================================
