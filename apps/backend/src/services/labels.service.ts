@@ -471,6 +471,60 @@ function buildLineValues(
   });
 }
 
+// ============================================================================
+// Multi-Signal Rename Detection
+// ============================================================================
+
+/**
+ * Minimum line-similarity threshold (Jaccard index) for a rename candidate.
+ * Below this, we don't consider the match valid even if the composite
+ * score is high (position alone should not trigger a rename).
+ */
+const RENAME_MIN_LINE_SIMILARITY = 0.25;
+
+/**
+ * Compute a rename-likelihood score between an existing label and a parsed label.
+ *
+ * Uses two signals:
+ * - **Line Jaccard similarity** (80%): fraction of individual line hashes that
+ *   overlap between the existing label's lines and the new parsed entries.
+ *   This is robust to partial edits (changing some lines while keeping others).
+ * - **Position proximity** (20%): how close the two labels are in file order.
+ *   Closer positions score higher; decays with distance.
+ *
+ * @param existingLineHashes - Set of contentHash values from the existing label's lines
+ * @param parsedEntryHashes  - Set of hashes computed from the parsed label's entries
+ * @param existingPosition   - labelPosition of the existing label in the file
+ * @param parsedPosition     - index of the parsed label in the new file
+ * @returns Score between 0 and 1 (higher = more likely a rename)
+ */
+function computeRenameScore(
+  existingLineHashes: Set<string>,
+  parsedEntryHashes: Set<string>,
+  existingPosition: number,
+  parsedPosition: number
+): { score: number; lineSimilarity: number } {
+  // Edge case: both empty → cannot distinguish, low score
+  if (existingLineHashes.size === 0 && parsedEntryHashes.size === 0) {
+    return { score: 0.1, lineSimilarity: 0 };
+  }
+
+  // Line Jaccard similarity: |intersection| / |union|
+  let intersection = 0;
+  for (const h of existingLineHashes) {
+    if (parsedEntryHashes.has(h)) intersection++;
+  }
+  const union = existingLineHashes.size + parsedEntryHashes.size - intersection;
+  const lineSimilarity = union === 0 ? 0 : intersection / union;
+
+  // Position proximity: 1.0 when adjacent, decays with distance
+  const posDistance = Math.abs(existingPosition - parsedPosition);
+  const posScore = 1 / (1 + posDistance);
+
+  // Weighted composite: content is the primary signal
+  return { score: lineSimilarity * 0.8 + posScore * 0.2, lineSimilarity };
+}
+
 /**
  * Internal helper: Execute the label sync operations within a transaction.
  * This function is called either within a new transaction or with an external one.
@@ -561,6 +615,42 @@ async function syncLabelsInTransaction(
   // Track which existing labels have been matched (by name or rename)
   // to avoid double-matching an existing label when detecting renames
   const matchedExistingIds = new Set<string>();
+
+  // Lazy-loaded map of label ID → Set of per-line content hashes.
+  // Populated on first use to avoid querying when all renames are detected
+  // by exact content hash match.
+  let lineHashesByLabelId: Map<string, Set<string>> | null = null;
+
+  async function getLineHashesForLabel(labelId: string): Promise<Set<string>> {
+    if (!lineHashesByLabelId) {
+      // Batch-fetch all line hashes for active labels in this file
+      const allLines = await tx
+        .select({
+          labelId: labelLines.labelId,
+          contentHash: labelLines.contentHash,
+        })
+        .from(labelLines)
+        .where(
+          and(
+            eq(labelLines.projectFileId, sourceId),
+            isNull(labelLines.deletedAt)
+          )
+        );
+
+      lineHashesByLabelId = new Map<string, Set<string>>();
+      for (const line of allLines) {
+        let hashSet = lineHashesByLabelId.get(line.labelId);
+        if (!hashSet) {
+          hashSet = new Set<string>();
+          lineHashesByLabelId.set(line.labelId, hashSet);
+        }
+        if (line.contentHash) {
+          hashSet.add(line.contentHash);
+        }
+      }
+    }
+    return lineHashesByLabelId.get(labelId) ?? new Set<string>();
+  }
 
   // Process each label
   for (let i = 0; i < parsed.labels.length; i++) {
@@ -657,30 +747,80 @@ async function syncLabelsInTransaction(
         labelsUpdated++;
         matchedExistingIds.add(existingLabel.id);
       } else {
-        // No match by name — try to detect a rename by matching content hash.
-        // Position-proximity tiebreaker handles duplicate-hash edge cases.
-        // Limitation: rename + content edit in the same sync is ambiguous
-        // (can't distinguish from delete+recreate), treated as delete+create.
+        // No match by name — try to detect a rename.
+        // Pass 1: exact content-hash match (handles pure renames).
+        // Pass 2: multi-signal scoring (handles rename + partial edit).
         const currentLabelLinesHash = calculateLinesHash(labelData.entries);
 
-        const renameCandidates = existingLabels.filter(
+        const unmatchedExisting = existingLabels.filter(
           (s) =>
             s.labelName &&
             !matchedExistingIds.has(s.id) &&
             !s.deletedAt &&
-            !parsedLabelNames.has(s.labelName) &&
-            (s.contentHash === currentLabelLinesHash ||
-              s.lastSyncedHash === currentLabelLinesHash)
+            !parsedLabelNames.has(s.labelName)
+        );
+
+        // Pass 1: exact hash match
+        const exactHashCandidates = unmatchedExisting.filter(
+          (s) =>
+            s.contentHash === currentLabelLinesHash ||
+            s.lastSyncedHash === currentLabelLinesHash
         );
 
         // Sort by position proximity to break ties
-        renameCandidates.sort(
+        exactHashCandidates.sort(
           (a, b) =>
             Math.abs((a.labelPosition ?? 0) - i) -
             Math.abs((b.labelPosition ?? 0) - i)
         );
 
-        const renameCandidate = renameCandidates[0];
+        let renameCandidate: (typeof existingLabels)[0] | null =
+          exactHashCandidates[0] || null;
+
+        // Pass 2: if no exact match, try multi-signal scoring
+        if (!renameCandidate && unmatchedExisting.length > 0) {
+          const parsedHashes = new Set<string>(
+            labelData.entries.map((entry) => {
+              const content = entry.target
+                ? `jump ${entry.target}`
+                : entry.text || "";
+              return calculateContentHash(content);
+            })
+          );
+
+          const scored: Array<{
+            labelId: string;
+            lineSimilarity: number;
+            score: number;
+          }> = [];
+          for (const existing of unmatchedExisting) {
+            const existingHashes = await getLineHashesForLabel(existing.id);
+            const { score, lineSimilarity } = computeRenameScore(
+              existingHashes,
+              parsedHashes,
+              existing.labelPosition ?? 0,
+              i
+            );
+
+            if (lineSimilarity >= RENAME_MIN_LINE_SIMILARITY) {
+              scored.push({ labelId: existing.id, lineSimilarity, score });
+            }
+          }
+
+          // Pick best-scoring candidate (only if there's a clear winner)
+          if (scored.length > 0) {
+            scored.sort((a, b) => b.score - a.score);
+            const best = scored[0];
+            const secondBest = scored[1];
+            const hasClearWinner =
+              !secondBest || best.score - secondBest.score > 0.1;
+
+            if (hasClearWinner) {
+              renameCandidate =
+                unmatchedExisting.find((s) => s.id === best.labelId) ?? null;
+            }
+          }
+        }
 
         if (renameCandidate) {
           matchedExistingIds.add(renameCandidate.id);

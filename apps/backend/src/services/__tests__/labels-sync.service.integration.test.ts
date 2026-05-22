@@ -468,6 +468,224 @@ describe("LabelsService Sync (Integration)", () => {
       expect(lines).toHaveLength(1);
       expect(lines[0].speakerId).toBe(character.id);
     });
+
+    describe("Rename Detection", () => {
+      it("should preserve metadata when label is renamed and partially edited in same sync", async () => {
+        // Step 1: Create a label with metadata
+        const content1 =
+          'label start:\n    "Line 1"\n    "Line 2"\n    "Line 3"\n    return';
+
+        const result1 = await syncLabelsFromFile(
+          testProjectId,
+          { filePath: testFile.filePath, fileType: testFile.fileType },
+          content1,
+          testFileId
+        );
+
+        expect(result1.labelsCreated).toBe(1);
+
+        const [originalLabel] = await db
+          .select()
+          .from(labelsTable)
+          .where(eq(labelsTable.labelName, "start"))
+          .limit(1);
+
+        // Simulate user setting metadata on the label
+        await db
+          .update(labelsTable)
+          .set({
+            route: "common",
+            status: "REVIEW",
+          })
+          .where(eq(labelsTable.id, originalLabel!.id));
+
+        // Step 2: Sync content where label is renamed AND partially edited
+        // "start" → "intro", Line 2 changed from "Line 2" to "Line 2 edited"
+        const content2 =
+          'label intro:\n    "Line 1"\n    "Line 2 edited"\n    "Line 3"\n    return';
+
+        const result2 = await syncLabelsFromFile(
+          testProjectId,
+          { filePath: testFile.filePath, fileType: testFile.fileType },
+          content2,
+          testFileId
+        );
+
+        // Should be detected as rename + update, NOT delete + create
+        expect(result2.success).toBe(true);
+        expect(result2.labelsCreated).toBe(0);
+        expect(result2.labelsUpdated).toBe(1);
+        expect(result2.labelsDeleted).toBe(0);
+
+        // Verify metadata was preserved
+        const [renamedLabel] = await db
+          .select()
+          .from(labelsTable)
+          .where(eq(labelsTable.labelName, "intro"))
+          .limit(1);
+
+        expect(renamedLabel).toBeDefined();
+        expect(renamedLabel!.id).toBe(originalLabel!.id); // Same DB row
+        expect(renamedLabel!.route).toBe("common"); // Preserved
+        expect(renamedLabel!.status).toBe("REVIEW"); // Preserved
+        expect(renamedLabel!.title).toBe("intro"); // Updated to new name
+
+        // Verify content was updated
+        const lines = await db
+          .select()
+          .from(labelLines)
+          .where(eq(labelLines.labelId, originalLabel!.id));
+
+        expect(lines).toHaveLength(3);
+        expect(lines[1].content).toBe("Line 2 edited");
+      });
+
+      it("should detect rename when majority of lines are unchanged", async () => {
+        const content1 =
+          'label act1_scene1:\n    "Line A"\n    "Line B"\n    "Line C"\n    "Line D"\n    "Line E"\n    return';
+
+        await syncLabelsFromFile(
+          testProjectId,
+          { filePath: testFile.filePath, fileType: testFile.fileType },
+          content1,
+          testFileId
+        );
+
+        const [originalLabel] = await db
+          .select()
+          .from(labelsTable)
+          .where(eq(labelsTable.labelName, "act1_scene1"))
+          .limit(1);
+
+        // Rename + change 1 out of 5 lines
+        const content2 =
+          'label act1_intro:\n    "Line A"\n    "Line B"\n    "Line C modified"\n    "Line D"\n    "Line E"\n    return';
+
+        const result = await syncLabelsFromFile(
+          testProjectId,
+          { filePath: testFile.filePath, fileType: testFile.fileType },
+          content2,
+          testFileId
+        );
+
+        expect(result.labelsUpdated).toBe(1);
+        expect(result.labelsCreated).toBe(0);
+        expect(result.labelsDeleted).toBe(0);
+
+        const [renamedLabel] = await db
+          .select()
+          .from(labelsTable)
+          .where(eq(labelsTable.labelName, "act1_intro"))
+          .limit(1);
+
+        expect(renamedLabel!.id).toBe(originalLabel!.id);
+      });
+
+      it("should NOT match rename when content is completely different", async () => {
+        const content1 =
+          'label old_label:\n    "Unique A"\n    "Unique B"\n    return';
+
+        await syncLabelsFromFile(
+          testProjectId,
+          { filePath: testFile.filePath, fileType: testFile.fileType },
+          content1,
+          testFileId
+        );
+
+        // Delete + create with completely different content
+        const content2 =
+          'label new_label:\n    "Completely different X"\n    "Completely different Y"\n    return';
+
+        const result = await syncLabelsFromFile(
+          testProjectId,
+          { filePath: testFile.filePath, fileType: testFile.fileType },
+          content2,
+          testFileId
+        );
+
+        // Should be delete + create, NOT a rename
+        expect(result.labelsCreated).toBe(1);
+        expect(result.labelsDeleted).toBe(1);
+      });
+
+      it("should still detect pure rename (no content change) via hash match", async () => {
+        const content1 = 'label original:\n    "Same line"\n    return';
+
+        await syncLabelsFromFile(
+          testProjectId,
+          { filePath: testFile.filePath, fileType: testFile.fileType },
+          content1,
+          testFileId
+        );
+
+        const [originalLabel] = await db
+          .select()
+          .from(labelsTable)
+          .where(eq(labelsTable.labelName, "original"))
+          .limit(1);
+
+        // Pure rename, no content change
+        const content2 = 'label renamed:\n    "Same line"\n    return';
+
+        const result = await syncLabelsFromFile(
+          testProjectId,
+          { filePath: testFile.filePath, fileType: testFile.fileType },
+          content2,
+          testFileId
+        );
+
+        expect(result.labelsUpdated).toBe(1);
+        expect(result.labelsCreated).toBe(0);
+
+        const [renamedLabel] = await db
+          .select()
+          .from(labelsTable)
+          .where(eq(labelsTable.labelName, "renamed"))
+          .limit(1);
+
+        expect(renamedLabel!.id).toBe(originalLabel!.id);
+      });
+
+      it("should handle rename+edit with multiple labels in file", async () => {
+        const content1 =
+          'label label_a:\n    "A line 1"\n    "A line 2"\n    return\nlabel label_b:\n    "B line 1"\n    "B line 2"\n    return';
+
+        await syncLabelsFromFile(
+          testProjectId,
+          { filePath: testFile.filePath, fileType: testFile.fileType },
+          content1,
+          testFileId
+        );
+
+        const [labelA] = await db
+          .select()
+          .from(labelsTable)
+          .where(eq(labelsTable.labelName, "label_a"))
+          .limit(1);
+
+        // Rename label_a → label_alpha (edit 1 line), keep label_b unchanged
+        const content2 =
+          'label label_alpha:\n    "A line 1"\n    "A line 2 edited"\n    return\nlabel label_b:\n    "B line 1"\n    "B line 2"\n    return';
+
+        const result = await syncLabelsFromFile(
+          testProjectId,
+          { filePath: testFile.filePath, fileType: testFile.fileType },
+          content2,
+          testFileId
+        );
+
+        expect(result.labelsUpdated).toBe(2); // label_a renamed + label_b name match
+        expect(result.labelsCreated).toBe(0);
+
+        const [renamedA] = await db
+          .select()
+          .from(labelsTable)
+          .where(eq(labelsTable.labelName, "label_alpha"))
+          .limit(1);
+
+        expect(renamedA!.id).toBe(labelA!.id);
+      });
+    });
   });
 
   describe("syncLabelsFromGitLabFile", () => {
