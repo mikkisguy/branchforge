@@ -19,6 +19,8 @@ import {
   routeConfigs,
   projectFiles,
   projectFileSyncState,
+  meters,
+  stateVariables,
 } from "../db/schema/index.js";
 import { eq, and, asc, or, isNull, sql, desc, inArray, ne } from "drizzle-orm";
 import type { Label, LabelLine } from "../db/schema/index.js";
@@ -1219,6 +1221,7 @@ type LabelForPublic = Pick<
   | "route"
   | "status"
   | "visibility"
+  | "prerequisites"
   | "version"
   | "contentHash"
   | "projectFileId"
@@ -1428,6 +1431,7 @@ export async function listLabels(
       visibility: labels.visibility,
       version: labels.version,
       contentHash: labels.contentHash,
+      prerequisites: labels.prerequisites,
       projectFileId: labels.projectFileId,
       createdAt: labels.createdAt,
       updatedAt: labels.updatedAt,
@@ -1579,6 +1583,7 @@ function mapToPublicLabel(label: LabelForPublic): PublicLabel {
     visibility: label.visibility,
     version: label.version,
     contentHash: label.contentHash,
+    prerequisites: label.prerequisites ?? null,
     projectFileId: label.projectFileId,
     fileName: extractFileName(label.filePath),
     createdAt: label.createdAt.toISOString(),
@@ -1894,6 +1899,10 @@ export async function updateLabel(
     status?: LabelStatus;
     visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
     labelName?: string | null;
+    prerequisites?: {
+      meters?: Record<string, number>;
+      stateVariables?: string[];
+    } | null;
   }
 ): Promise<PublicLabel> {
   const db = getDb();
@@ -2046,14 +2055,76 @@ export async function updateLabel(
       }
     }
 
+    // Validate meter keys in prerequisites exist in the project's meters table
+    if (
+      data.prerequisites?.meters &&
+      Object.keys(data.prerequisites.meters).length > 0
+    ) {
+      const meterKeys = Object.keys(data.prerequisites.meters);
+      const existingMeters = await tx
+        .select({ key: meters.key })
+        .from(meters)
+        .where(
+          and(
+            eq(meters.projectId, labelWithProject.label.projectId),
+            inArray(meters.key, meterKeys)
+          )
+        );
+
+      const existingKeys = new Set(existingMeters.map((m) => m.key));
+      const invalidKeys = meterKeys.filter((k) => !existingKeys.has(k));
+
+      if (invalidKeys.length > 0) {
+        throw new ValidationError(
+          `Invalid meter key(s): ${invalidKeys.join(", ")}. ` +
+            "Referenced meters must exist in the project."
+        );
+      }
+    }
+
+    if (
+      data.prerequisites?.stateVariables &&
+      data.prerequisites.stateVariables.length > 0
+    ) {
+      const stateVariableKeys = data.prerequisites.stateVariables;
+      const existingStateVariables = await tx
+        .select({ key: stateVariables.key })
+        .from(stateVariables)
+        .where(
+          and(
+            eq(stateVariables.projectId, labelWithProject.label.projectId),
+            inArray(stateVariables.key, stateVariableKeys)
+          )
+        );
+
+      const existingKeys = new Set(
+        existingStateVariables.map((stateVariable) => stateVariable.key)
+      );
+      const invalidKeys = stateVariableKeys.filter(
+        (key) => !existingKeys.has(key)
+      );
+
+      if (invalidKeys.length > 0) {
+        throw new ValidationError(
+          `Invalid state variable key(s): ${invalidKeys.join(", ")}. ` +
+            "Referenced state variables must exist in the project."
+        );
+      }
+    }
+
     const currentVersion = labelWithProject.label.version ?? 1;
     const auditFields = updateAuditFields(currentVersion, userId);
 
-    // Build update data with validated route and optional labelName
-    const updateData = {
+    // Build update data with validated route, optional labelName,
+    // and normalized prerequisites (null → {} for the not-null JSONB column).
+    // Using Record<string, unknown> to allow the normalized prerequisites type.
+    const updateData: Record<string, unknown> = {
       ...data,
       ...(validatedRoute !== undefined ? { route: validatedRoute } : {}),
     };
+    if (data.prerequisites !== undefined) {
+      updateData.prerequisites = data.prerequisites ?? {};
+    }
 
     // Also update project_files content if labelName changed
     if (updatedContent !== null) {

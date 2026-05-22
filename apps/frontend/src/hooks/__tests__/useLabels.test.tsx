@@ -50,6 +50,7 @@ const mockLabels: PublicLabel[] = [
     projectFileId: "file-1",
     fileName: "act_i.rpy",
     labelName: null,
+    prerequisites: null,
     createdAt: "2024-01-01T00:00:00.000Z",
     updatedAt: "2024-01-01T00:00:00.000Z",
   },
@@ -271,6 +272,7 @@ describe("useLabels", () => {
             projectFileId: "file-2",
             fileName: "act_ii.rpy",
             labelName: null,
+            prerequisites: null,
             createdAt: "2024-01-01T00:00:00.000Z",
             updatedAt: "2024-01-01T00:00:00.000Z",
           },
@@ -308,6 +310,7 @@ describe("useLabels", () => {
         projectFileId: "file-1",
         fileName: "act_i.rpy",
         labelName: null,
+        prerequisites: null,
         createdAt: "2024-01-01T00:00:00.000Z",
         updatedAt: "2024-01-01T00:00:00.000Z",
       };
