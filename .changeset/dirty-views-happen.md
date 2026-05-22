@@ -4,4 +4,4 @@
 "@branchforge/shared": patch
 ---
 
-Fixed Docker builds (again)
+Fixed Docker builds by updating build permission configs
