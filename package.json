@@ -40,17 +40,20 @@
     "typescript": "^5.9.3"
   },
   "lint-staged": {
-    "*.{js,jsx,ts,tsx,json,css,scss,md,yml,yaml}": [
-      "pnpm exec prettier --write"
-    ],
     "apps/frontend/**/*.{js,ts,tsx}": [
+      "pnpm exec prettier --write",
       "pnpm exec eslint --fix"
     ],
     "apps/backend/**/*.{js,ts}": [
+      "pnpm exec prettier --write",
       "pnpm exec eslint --fix"
     ],
     "packages/**/*.{js,ts}": [
+      "pnpm exec prettier --write",
       "pnpm exec eslint --fix"
+    ],
+    "**/*.{json,css,scss,md,yml,yaml}": [
+      "pnpm exec prettier --write"
     ]
   }
 }

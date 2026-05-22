@@ -1,12 +1,7 @@
 #!/usr/bin/env sh
 
-# Run full typecheck and tests before pushing
-echo "Running pre-push checks..."
-
+# Run typecheck before pushing (CI handles the full test suite)
 echo "▸ Type checking..."
 pnpm typecheck || exit 1
-
-echo "▸ Running tests..."
-pnpm test || exit 1
 
 echo "✓ Pre-push checks passed!"
