@@ -767,12 +767,31 @@ async function syncLabelsInTransaction(
             s.lastSyncedHash === currentLabelLinesHash
         );
 
-        // Sort by position proximity to break ties
-        exactHashCandidates.sort(
-          (a, b) =>
+        // Sort by position proximity, then stable tiebreakers:
+        // 1) prefer lastSyncedHash match (more recent sync state)
+        // 2) prefer exact position match
+        // 3) fallback to createdAt for deterministic ordering
+        exactHashCandidates.sort((a, b) => {
+          const posDiff =
             Math.abs((a.labelPosition ?? 0) - i) -
-            Math.abs((b.labelPosition ?? 0) - i)
-        );
+            Math.abs((b.labelPosition ?? 0) - i);
+          if (posDiff !== 0) return posDiff;
+
+          // Prefer lastSyncedHash match over contentHash-only match
+          const aSynced = a.lastSyncedHash === currentLabelLinesHash ? 0 : 1;
+          const bSynced = b.lastSyncedHash === currentLabelLinesHash ? 0 : 1;
+          if (aSynced !== bSynced) return aSynced - bSynced;
+
+          // Prefer exact position match
+          const aExact = a.labelPosition === i ? 0 : 1;
+          const bExact = b.labelPosition === i ? 0 : 1;
+          if (aExact !== bExact) return aExact - bExact;
+
+          // Stable fallback by createdAt
+          return (
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
+        });
 
         let renameCandidate: (typeof existingLabels)[0] | null =
           exactHashCandidates[0] || null;

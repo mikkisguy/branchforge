@@ -31,7 +31,7 @@ import {
   type NewCharacter,
   type NewProjectFile,
 } from "../../db/schema/index.js";
-import { eq, isNull, and, inArray } from "drizzle-orm";
+import { eq, isNull, and, inArray, asc } from "drizzle-orm";
 import {
   syncLabelsFromFile,
   syncLabelsFromGitLabFile,
@@ -534,7 +534,8 @@ describe("LabelsService Sync (Integration)", () => {
         const lines = await db
           .select()
           .from(labelLines)
-          .where(eq(labelLines.labelId, originalLabel!.id));
+          .where(eq(labelLines.labelId, originalLabel!.id))
+          .orderBy(asc(labelLines.sequence));
 
         expect(lines).toHaveLength(3);
         expect(lines[1].content).toBe("Line 2 edited");
