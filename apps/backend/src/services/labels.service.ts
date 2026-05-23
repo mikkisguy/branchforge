@@ -1728,20 +1728,6 @@ export async function authorizeLabelAccess(
  * @param label - The label data (with filePath from JOIN)
  */
 function mapToPublicLabel(label: LabelForPublic): PublicLabel {
-  // Convert from internal conditions format to public prerequisites format
-  // Internal: { variables?: string[], stats?: Record<string, number> }
-  // Public: { meters?: Record<string, number>, stateVariables?: string[] }
-  const conditions = label.conditions ?? null;
-  const prerequisites: {
-    meters?: Record<string, number>;
-    stateVariables?: string[];
-  } | null = conditions
-    ? {
-        meters: conditions.stats,
-        stateVariables: conditions.variables,
-      }
-    : null;
-
   return {
     id: label.id,
     projectId: label.projectId,
@@ -1756,7 +1742,7 @@ function mapToPublicLabel(label: LabelForPublic): PublicLabel {
     visibility: label.visibility,
     version: label.version,
     contentHash: label.contentHash,
-    prerequisites,
+    conditions: label.conditions ?? null,
     projectFileId: label.projectFileId,
     fileName: extractFileName(label.filePath),
     createdAt: label.createdAt.toISOString(),

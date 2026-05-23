@@ -1,7 +1,7 @@
 /**
- * State Variables Service Integration Tests
+ * Variables Service Integration Tests
  *
- * Tests for the state variables service against a real database.
+ * Tests for the variables service against a real database.
  * These tests cover CRUD operations with authorization checks.
  *
  * Prerequisites:
@@ -14,22 +14,22 @@ import { getDb } from "../../db/index.js";
 import {
   users,
   projects,
-  stateVariables,
+  variables,
   type NewUser,
   type NewProject,
-  type NewStateVariable,
+  type NewVariable,
 } from "../../db/schema/index.js";
 import { eq, inArray } from "drizzle-orm";
 import {
-  listStateVariables,
-  getStateVariable,
-  createStateVariable,
-  updateStateVariable,
-  deleteStateVariable,
-} from "../state_variables.service.js";
+  listVariables,
+  getVariable,
+  createVariable,
+  updateVariable,
+  deleteVariable,
+} from "../variables.service.js";
 import { testEmail, testUuid } from "../../utils/test-ids.js";
 
-describe("StateVariablesService (Integration)", () => {
+describe("VariablesService (Integration)", () => {
   let db: ReturnType<typeof getDb>;
 
   beforeAll(async () => {
@@ -42,14 +42,14 @@ describe("StateVariablesService (Integration)", () => {
 
   const testUser: NewUser = {
     id: testUserId,
-    email: testEmail("state-variables", "owner"),
+    email: testEmail("variables", "owner"),
     passwordHash: "hashed_password",
     role: "OWNER",
   };
 
   const otherUser: NewUser = {
     id: otherUserId,
-    email: testEmail("state-variables", "other"),
+    email: testEmail("variables", "other"),
     passwordHash: "hashed_password",
     role: "OWNER",
   };
@@ -72,7 +72,7 @@ describe("StateVariablesService (Integration)", () => {
     source: "ZIP",
   };
 
-  const testStateVariable1: NewStateVariable = {
+  const testVariable1: NewVariable = {
     id: testUuid("24000000", 1),
     projectId: ownedProject.id!,
     key: "met_eileen",
@@ -80,7 +80,7 @@ describe("StateVariablesService (Integration)", () => {
     category: "characters",
   };
 
-  const testStateVariable2: NewStateVariable = {
+  const testVariable2: NewVariable = {
     id: testUuid("24000000", 2),
     projectId: ownedProject.id!,
     key: "lucas_route_unlocked",
@@ -88,7 +88,7 @@ describe("StateVariablesService (Integration)", () => {
     category: "routes",
   };
 
-  const otherStateVariable: NewStateVariable = {
+  const otherVariable: NewVariable = {
     id: testUuid("24000000", 3),
     projectId: otherProject.id!,
     key: "other_variable",
@@ -101,10 +101,8 @@ describe("StateVariablesService (Integration)", () => {
     const testUserIds = [testUserId, otherUserId];
     const projectIds = [ownedProject.id!, otherProject.id!];
 
-    // Delete state variables for test projects
-    await db
-      .delete(stateVariables)
-      .where(inArray(stateVariables.projectId, projectIds));
+    // Delete variables for test projects
+    await db.delete(variables).where(inArray(variables.projectId, projectIds));
 
     // Delete projects
     await db.delete(projects).where(inArray(projects.id, projectIds));
@@ -121,10 +119,10 @@ describe("StateVariablesService (Integration)", () => {
     // Insert projects
     await db.insert(projects).values([ownedProject, otherProject]);
 
-    // Insert state variables
+    // Insert variables
     await db
-      .insert(stateVariables)
-      .values([testStateVariable1, testStateVariable2, otherStateVariable]);
+      .insert(variables)
+      .values([testVariable1, testVariable2, otherVariable]);
   }
 
   beforeEach(async () => {
@@ -137,12 +135,12 @@ describe("StateVariablesService (Integration)", () => {
   });
 
   // ============================================================================
-  // listStateVariables
+  // listVariables
   // ============================================================================
 
-  describe("listStateVariables", () => {
-    it("should return empty array when project has no state variables", async () => {
-      // Create a new project with no state variables
+  describe("listVariables", () => {
+    it("should return empty array when project has no variables", async () => {
+      // Create a new project with no variables
       const newProjectId = testUuid("14000000", 99);
       await db.insert(projects).values({
         id: newProjectId,
@@ -152,7 +150,7 @@ describe("StateVariablesService (Integration)", () => {
         source: "ZIP",
       });
 
-      const result = await listStateVariables(newProjectId, testUserId);
+      const result = await listVariables(newProjectId, testUserId);
 
       expect(result).toEqual([]);
 
@@ -160,19 +158,19 @@ describe("StateVariablesService (Integration)", () => {
       await db.delete(projects).where(eq(projects.id, newProjectId));
     });
 
-    it("should return all state variables for owned project", async () => {
-      const result = await listStateVariables(ownedProject.id!, testUserId);
+    it("should return all variables for owned project", async () => {
+      const result = await listVariables(ownedProject.id!, testUserId);
 
       expect(result).toHaveLength(2);
       expect(result[0]).toMatchObject({
-        id: testStateVariable1.id!,
+        id: testVariable1.id!,
         projectId: ownedProject.id!,
         key: "met_eileen",
         description: "Player met Eileen",
         category: "characters",
       });
       expect(result[1]).toMatchObject({
-        id: testStateVariable2.id!,
+        id: testVariable2.id!,
         key: "lucas_route_unlocked",
         category: "routes",
       });
@@ -181,7 +179,7 @@ describe("StateVariablesService (Integration)", () => {
 
     it("should order by category then key", async () => {
       // Add a variable that should appear first alphabetically in same category
-      await db.insert(stateVariables).values({
+      await db.insert(variables).values({
         id: testUuid("24000000", 4),
         projectId: ownedProject.id!,
         key: "avery_met", // Alphabetically before "met_eileen"
@@ -189,7 +187,7 @@ describe("StateVariablesService (Integration)", () => {
         category: "characters",
       });
 
-      const result = await listStateVariables(ownedProject.id!, testUserId);
+      const result = await listVariables(ownedProject.id!, testUserId);
 
       // "characters" category comes before "routes" alphabetically
       // Within "characters", "avery_met" comes before "met_eileen"
@@ -200,7 +198,7 @@ describe("StateVariablesService (Integration)", () => {
 
     it("should throw NotFoundError when user does not own project", async () => {
       await expect(
-        listStateVariables(ownedProject.id!, otherUserId)
+        listVariables(ownedProject.id!, otherUserId)
       ).rejects.toThrow("Project");
     });
 
@@ -208,14 +206,14 @@ describe("StateVariablesService (Integration)", () => {
       const nonExistentProjectId = testUuid("14000000", 999999999999);
 
       await expect(
-        listStateVariables(nonExistentProjectId, testUserId)
+        listVariables(nonExistentProjectId, testUserId)
       ).rejects.toThrow("Project");
     });
 
-    it("should return state variables with null category and description", async () => {
-      // Add a state variable with null category and description
+    it("should return variables with null category and description", async () => {
+      // Add a variable with null category and description
       const nullVarId = testUuid("24000000", 5);
-      await db.insert(stateVariables).values({
+      await db.insert(variables).values({
         id: nullVarId,
         projectId: ownedProject.id!,
         key: "no_category",
@@ -223,7 +221,7 @@ describe("StateVariablesService (Integration)", () => {
         category: null,
       });
 
-      const result = await listStateVariables(ownedProject.id!, testUserId);
+      const result = await listVariables(ownedProject.id!, testUserId);
       const nullVar = result.find((v) => v.key === "no_category");
 
       expect(nullVar).toBeDefined();
@@ -233,16 +231,16 @@ describe("StateVariablesService (Integration)", () => {
   });
 
   // ============================================================================
-  // getStateVariable
+  // getVariable
   // ============================================================================
 
-  describe("getStateVariable", () => {
-    it("should return state variable when user has access", async () => {
-      const result = await getStateVariable(testStateVariable1.id!, testUserId);
+  describe("getVariable", () => {
+    it("should return variable when user has access", async () => {
+      const result = await getVariable(testVariable1.id!, testUserId);
 
       expect(result).not.toBeNull();
       expect(result).toMatchObject({
-        id: testStateVariable1.id!,
+        id: testVariable1.id!,
         projectId: ownedProject.id!,
         key: "met_eileen",
         description: "Player met Eileen",
@@ -251,25 +249,22 @@ describe("StateVariablesService (Integration)", () => {
       expect(result?.createdAt).toBeInstanceOf(Date);
     });
 
-    it("should return null when state variable does not exist", async () => {
+    it("should return null when variable does not exist", async () => {
       const nonExistentId = testUuid("24000000", 999999999999);
-      const result = await getStateVariable(nonExistentId, testUserId);
+      const result = await getVariable(nonExistentId, testUserId);
 
       expect(result).toBeNull();
     });
 
     it("should return null when user does not have access", async () => {
-      const result = await getStateVariable(
-        testStateVariable1.id!,
-        otherUserId
-      );
+      const result = await getVariable(testVariable1.id!, otherUserId);
 
       expect(result).toBeNull();
     });
 
-    it("should return state variable with null fields", async () => {
+    it("should return variable with null fields", async () => {
       const nullVarId = testUuid("24000000", 6);
-      await db.insert(stateVariables).values({
+      await db.insert(variables).values({
         id: nullVarId,
         projectId: ownedProject.id!,
         key: "null_fields",
@@ -277,7 +272,7 @@ describe("StateVariablesService (Integration)", () => {
         category: null,
       });
 
-      const result = await getStateVariable(nullVarId, testUserId);
+      const result = await getVariable(nullVarId, testUserId);
 
       expect(result).not.toBeNull();
       expect(result?.category).toBeNull();
@@ -286,27 +281,23 @@ describe("StateVariablesService (Integration)", () => {
   });
 
   // ============================================================================
-  // createStateVariable
+  // createVariable
   // ============================================================================
 
-  describe("createStateVariable", () => {
-    it("should create state variable with all fields", async () => {
+  describe("createVariable", () => {
+    it("should create variable with all fields", async () => {
       const body = {
         key: "new_variable",
-        description: "A new state variable",
+        description: "A new variable",
         category: "test",
       };
 
-      const result = await createStateVariable(
-        testUserId,
-        ownedProject.id!,
-        body
-      );
+      const result = await createVariable(testUserId, ownedProject.id!, body);
 
       expect(result).toMatchObject({
         projectId: ownedProject.id!,
         key: "new_variable",
-        description: "A new state variable",
+        description: "A new variable",
         category: "test",
       });
       expect(result.id).toBeDefined();
@@ -315,23 +306,19 @@ describe("StateVariablesService (Integration)", () => {
       // Verify it was actually created in the database
       const [dbVariable] = await db
         .select()
-        .from(stateVariables)
-        .where(eq(stateVariables.id, result.id))
+        .from(variables)
+        .where(eq(variables.id, result.id))
         .limit(1);
       expect(dbVariable).toBeDefined();
       expect(dbVariable.key).toBe("new_variable");
     });
 
-    it("should create state variable with optional fields omitted", async () => {
+    it("should create variable with optional fields omitted", async () => {
       const body = {
         key: "minimal_variable",
       };
 
-      const result = await createStateVariable(
-        testUserId,
-        ownedProject.id!,
-        body
-      );
+      const result = await createVariable(testUserId, ownedProject.id!, body);
 
       expect(result).toMatchObject({
         key: "minimal_variable",
@@ -346,7 +333,7 @@ describe("StateVariablesService (Integration)", () => {
       };
 
       await expect(
-        createStateVariable(otherUserId, ownedProject.id!, body)
+        createVariable(otherUserId, ownedProject.id!, body)
       ).rejects.toThrow("Project");
     });
 
@@ -357,7 +344,7 @@ describe("StateVariablesService (Integration)", () => {
       const nonExistentProjectId = testUuid("14000000", 999999999999);
 
       await expect(
-        createStateVariable(testUserId, nonExistentProjectId, body)
+        createVariable(testUserId, nonExistentProjectId, body)
       ).rejects.toThrow("Project");
     });
 
@@ -367,7 +354,7 @@ describe("StateVariablesService (Integration)", () => {
       };
 
       await expect(
-        createStateVariable(testUserId, ownedProject.id!, body)
+        createVariable(testUserId, ownedProject.id!, body)
       ).rejects.toThrow("Failed query");
     });
 
@@ -376,11 +363,7 @@ describe("StateVariablesService (Integration)", () => {
         key: "met_eileen", // Same key as in ownedProject
       };
 
-      const result = await createStateVariable(
-        otherUserId,
-        otherProject.id!,
-        body
-      );
+      const result = await createVariable(otherUserId, otherProject.id!, body);
 
       expect(result.key).toBe("met_eileen");
       expect(result.projectId).toBe(otherProject.id!);
@@ -388,20 +371,16 @@ describe("StateVariablesService (Integration)", () => {
   });
 
   // ============================================================================
-  // updateStateVariable
+  // updateVariable
   // ============================================================================
 
-  describe("updateStateVariable", () => {
+  describe("updateVariable", () => {
     it("should update key", async () => {
       const body = {
         key: "updated_key",
       };
 
-      const result = await updateStateVariable(
-        testStateVariable1.id!,
-        testUserId,
-        body
-      );
+      const result = await updateVariable(testVariable1.id!, testUserId, body);
 
       expect(result.key).toBe("updated_key");
       expect(result.description).toBe("Player met Eileen");
@@ -413,11 +392,7 @@ describe("StateVariablesService (Integration)", () => {
         description: "Updated description",
       };
 
-      const result = await updateStateVariable(
-        testStateVariable1.id!,
-        testUserId,
-        body
-      );
+      const result = await updateVariable(testVariable1.id!, testUserId, body);
 
       expect(result.description).toBe("Updated description");
       expect(result.key).toBe("met_eileen");
@@ -428,11 +403,7 @@ describe("StateVariablesService (Integration)", () => {
         category: "updated_category",
       };
 
-      const result = await updateStateVariable(
-        testStateVariable1.id!,
-        testUserId,
-        body
-      );
+      const result = await updateVariable(testVariable1.id!, testUserId, body);
 
       expect(result.category).toBe("updated_category");
     });
@@ -444,11 +415,7 @@ describe("StateVariablesService (Integration)", () => {
         category: "updated",
       };
 
-      const result = await updateStateVariable(
-        testStateVariable1.id!,
-        testUserId,
-        body
-      );
+      const result = await updateVariable(testVariable1.id!, testUserId, body);
 
       expect(result).toMatchObject(body);
     });
@@ -459,25 +426,21 @@ describe("StateVariablesService (Integration)", () => {
         category: null,
       };
 
-      const result = await updateStateVariable(
-        testStateVariable1.id!,
-        testUserId,
-        body
-      );
+      const result = await updateVariable(testVariable1.id!, testUserId, body);
 
       expect(result.description).toBeNull();
       expect(result.category).toBeNull();
     });
 
-    it("should throw NotFoundError when state variable does not exist", async () => {
+    it("should throw NotFoundError when variable does not exist", async () => {
       const body = {
         key: "updated",
       };
       const nonExistentId = testUuid("24000000", 999999999999);
 
       await expect(
-        updateStateVariable(nonExistentId, testUserId, body)
-      ).rejects.toThrow("State Variable");
+        updateVariable(nonExistentId, testUserId, body)
+      ).rejects.toThrow("Variable");
     });
 
     it("should throw NotFoundError when user does not have access", async () => {
@@ -486,15 +449,15 @@ describe("StateVariablesService (Integration)", () => {
       };
 
       await expect(
-        updateStateVariable(testStateVariable1.id!, otherUserId, body)
-      ).rejects.toThrow("State Variable");
+        updateVariable(testVariable1.id!, otherUserId, body)
+      ).rejects.toThrow("Variable");
     });
 
     it("should throw ValidationError when no fields provided", async () => {
       const body = {};
 
       await expect(
-        updateStateVariable(testStateVariable1.id!, testUserId, body)
+        updateVariable(testVariable1.id!, testUserId, body)
       ).rejects.toThrow("No valid fields provided for update");
     });
 
@@ -504,7 +467,7 @@ describe("StateVariablesService (Integration)", () => {
       };
 
       await expect(
-        updateStateVariable(testStateVariable1.id!, testUserId, body)
+        updateVariable(testVariable1.id!, testUserId, body)
       ).rejects.toThrow("Failed query");
     });
 
@@ -515,57 +478,50 @@ describe("StateVariablesService (Integration)", () => {
         key: "lucas_route_unlocked", // Exists in ownedProject
       };
 
-      // otherStateVariable is in otherProject, so this should work
-      const result = await updateStateVariable(
-        otherStateVariable.id!,
-        otherUserId,
-        body
-      );
+      // otherVariable is in otherProject, so this should work
+      const result = await updateVariable(otherVariable.id!, otherUserId, body);
 
       expect(result.key).toBe("lucas_route_unlocked");
     });
   });
 
   // ============================================================================
-  // deleteStateVariable
+  // deleteVariable
   // ============================================================================
 
-  describe("deleteStateVariable", () => {
-    it("should delete state variable", async () => {
-      const result = await deleteStateVariable(
-        testStateVariable1.id!,
-        testUserId
-      );
+  describe("deleteVariable", () => {
+    it("should delete variable", async () => {
+      const result = await deleteVariable(testVariable1.id!, testUserId);
 
       expect(result).toBe(true);
 
       // Verify it was actually deleted
       const [dbVariable] = await db
         .select()
-        .from(stateVariables)
-        .where(eq(stateVariables.id, testStateVariable1.id!))
+        .from(variables)
+        .where(eq(variables.id, testVariable1.id!))
         .limit(1);
       expect(dbVariable).toBeUndefined();
     });
 
-    it("should throw NotFoundError when state variable does not exist", async () => {
+    it("should throw NotFoundError when variable does not exist", async () => {
       const nonExistentId = testUuid("24000000", 999999999999);
 
-      await expect(
-        deleteStateVariable(nonExistentId, testUserId)
-      ).rejects.toThrow("State Variable");
+      await expect(deleteVariable(nonExistentId, testUserId)).rejects.toThrow(
+        "Variable"
+      );
     });
 
     it("should throw NotFoundError when user does not have access", async () => {
       await expect(
-        deleteStateVariable(testStateVariable1.id!, otherUserId)
-      ).rejects.toThrow("State Variable");
+        deleteVariable(testVariable1.id!, otherUserId)
+      ).rejects.toThrow("Variable");
     });
 
     it("should return true after successful deletion", async () => {
       // Create a variable specifically for deletion test
       const deleteTestId = testUuid("24000000", 7);
-      await db.insert(stateVariables).values({
+      await db.insert(variables).values({
         id: deleteTestId,
         projectId: ownedProject.id!,
         key: "to_delete",
@@ -573,7 +529,7 @@ describe("StateVariablesService (Integration)", () => {
         category: null,
       });
 
-      const result = await deleteStateVariable(deleteTestId, testUserId);
+      const result = await deleteVariable(deleteTestId, testUserId);
 
       expect(result).toBe(true);
     });

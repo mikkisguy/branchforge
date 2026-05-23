@@ -267,6 +267,13 @@
       "when": 1779522735806,
       "tag": "0037_perfect_silver_samurai",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1779529676902,
+      "tag": "0038_kind_lionheart",
+      "breakpoints": true
     }
   ]
 }

@@ -293,7 +293,7 @@ export async function createProject(
     userId,
     name: body.name,
     description: body.description,
-    maxMeterDelta: body.maxStatDelta ?? 10,
+    maxMeterDelta: body.maxMeterDelta ?? 10,
     source: body.source,
   };
 
