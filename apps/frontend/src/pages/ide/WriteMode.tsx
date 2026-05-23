@@ -5,13 +5,18 @@
  * Matches app design system with theme colors and simple styling.
  */
 
+import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ProseEditor,
   LabelNavigator,
-  CharacterReferencePanel,
+  LabelPropertiesPanel,
 } from "@/components/write-mode";
 import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
+import { LabelEditDialog } from "@/components/write-mode/LabelEditDialog";
+import { VariablesModal } from "@/components/ide-shared/VariablesModal";
+import { StatsDialog } from "@/components/StatsDialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ChevronRight, FileText, Loader2 } from "lucide-react";
 import { EditorTabBar } from "@/components/ide-shared";
 import { Button } from "@/components/ui/button";
@@ -22,6 +27,8 @@ import { useProject } from "@/hooks/useProject";
 import { useToast } from "@/contexts/ToastContext";
 import { cva } from "class-variance-authority";
 import { useLocalStorageBoolean } from "@/hooks/useLocalStorage";
+import { useStats } from "@/hooks/useStats";
+import { useVariables } from "@/hooks/useVariables";
 import {
   useWriteAutosave,
   getPersistedDialogueFromLabel,
@@ -31,6 +38,7 @@ import { useWriteTabs } from "@/hooks/useWriteTabs";
 import { useLabelSwitcher } from "@/hooks/useLabelSwitcher";
 import { useWriteFocusMode } from "@/hooks/useWriteFocusMode";
 import type { DialogueEntry } from "@/lib/prose-types";
+import type { PublicLabel } from "@branchforge/shared";
 
 const sidebarVariants = cva(
   "min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3 transition-all duration-300 ease-out",
@@ -73,11 +81,27 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
 
   const { characters } = useCharacters(currentProject?.id ?? "");
   const { routeConfigs } = useRouteConfigs(currentProject?.id ?? "");
+  const { stats } = useStats(currentProject?.id ?? "");
+  const { variables } = useVariables(currentProject?.id ?? "");
 
   const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] =
     useLocalStorageBoolean("write:left-sidebar-collapsed", false);
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] =
     useLocalStorageBoolean("write:right-sidebar-collapsed", false);
+
+  // Lifted dialog state (from LabelNavigator)
+  const [editDialog, setEditDialog] = useState<{
+    open: boolean;
+    label: PublicLabel | null;
+  }>({ open: false, label: null });
+
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    open: boolean;
+    label: PublicLabel | null;
+  }>({ open: false, label: null });
+
+  const [stateVariablesModalOpen, setStateVariablesModalOpen] = useState(false);
+  const [statsModalOpen, setStatsModalOpen] = useState(false);
 
   const editorRef = useRef<{ focus: () => void } | null>(null);
 
@@ -176,6 +200,47 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
     [handleSelectLabel]
   );
 
+  const handleEditSave = useCallback(
+    async (data: {
+      title?: string;
+      labelName?: string;
+      route?: string | null;
+      status?: "DRAFT" | "REVIEW" | "FINAL";
+      visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
+      conditions?: {
+        stats?: Record<string, number>;
+        variables?: string[];
+      } | null;
+    }) => {
+      if (editDialog.label) {
+        await updateLabel(editDialog.label.id, data);
+        setEditDialog({ open: false, label: null });
+      }
+    },
+    [editDialog.label, updateLabel]
+  );
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (deleteConfirm.label) {
+      await deleteLabel(deleteConfirm.label.id);
+      setDeleteConfirm({ open: false, label: null });
+    }
+  }, [deleteConfirm.label, deleteLabel]);
+
+  const handleEditLabel = useCallback((label: PublicLabel) => {
+    setEditDialog({ open: true, label });
+  }, []);
+
+  const handleDeleteRequest = useCallback((label: PublicLabel) => {
+    setDeleteConfirm({ open: true, label });
+  }, []);
+
+  const handleEditFromPanel = useCallback(() => {
+    if (activeLabel) {
+      setEditDialog({ open: true, label: activeLabel });
+    }
+  }, [activeLabel]);
+
   const editorSaveProps = useMemo(
     () => ({
       isSaving: saveStatus === "saving",
@@ -261,7 +326,6 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
               labels={labels}
               activeLabelId={activeLabelId}
               onSelect={handleLabelSelect}
-              projectId={currentProject!.id}
               projectName={projectName || currentProject?.name}
               projectLabelCount={labels.length}
               onToggleCollapse={() => setIsLeftSidebarCollapsed(true)}
@@ -276,15 +340,8 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
                 return updateLabel(labelId, data);
               }}
               isUpdatingLabel={isUpdatingLabel}
-              onDeleteLabel={async (labelId) => {
-                await deleteLabel(labelId);
-              }}
-              isDeletingLabel={isDeletingLabel}
-              routeConfigs={routeConfigs.map((rc) => ({
-                id: rc.id,
-                routeKey: rc.routeKey,
-                routeName: rc.routeName,
-              }))}
+              onEditLabel={handleEditLabel}
+              onDeleteRequest={handleDeleteRequest}
             />
           </div>
         </div>
@@ -345,16 +402,91 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
           </div>
         </div>
 
-        <CharacterReferencePanel
-          characters={characters}
+        <LabelPropertiesPanel
           activeLabel={activeLabel}
+          characters={characters}
+          stats={stats}
+          routeConfigs={routeConfigs}
           isCollapsed={isRightSidebarCollapsed || isFocusMode}
           onCollapseToggle={
             !isFocusMode
               ? () => setIsRightSidebarCollapsed((prev) => !prev)
               : undefined
           }
+          onEdit={handleEditFromPanel}
         />
+
+        {/* Lifted Dialogs — portaled to body */}
+        {/* Edit Details Dialog */}
+        {typeof window !== "undefined" &&
+          createPortal(
+            editDialog.label && (
+              <LabelEditDialog
+                open={editDialog.open}
+                onOpenChange={(open) =>
+                  setEditDialog((prev) => ({ ...prev, open }))
+                }
+                currentTitle={editDialog.label.title}
+                currentLabelName={editDialog.label.labelName}
+                currentRoute={editDialog.label.routeKey}
+                currentStatus={editDialog.label.status}
+                currentVisibility={editDialog.label.visibility}
+                currentConditions={editDialog.label.conditions ?? null}
+                routeConfigs={routeConfigs.map((rc) => ({
+                  id: rc.id,
+                  routeKey: rc.routeKey,
+                  routeName: rc.routeName,
+                }))}
+                meters={stats}
+                variables={variables}
+                onSave={handleEditSave}
+                isSaving={isUpdatingLabel}
+                onOpenStateVariables={() => setStateVariablesModalOpen(true)}
+                onOpenStats={() => setStatsModalOpen(true)}
+              />
+            ),
+            document.body
+          )}
+
+        {/* Delete Confirmation Dialog */}
+        {typeof window !== "undefined" &&
+          createPortal(
+            <ConfirmDialog
+              open={deleteConfirm.open}
+              onOpenChange={(open) =>
+                setDeleteConfirm((prev) => ({ ...prev, open }))
+              }
+              onConfirm={handleDeleteConfirm}
+              title="Delete Label"
+              description={`Are you sure you want to delete "${deleteConfirm.label?.title ?? "this label"}"? This will remove the label and its content from the file. This action cannot be undone.`}
+              confirmLabel="Delete"
+              isLoading={isDeletingLabel}
+              loadingLabel="Deleting..."
+            />,
+            document.body
+          )}
+
+        {/* Variables Management Modal */}
+        {typeof window !== "undefined" &&
+          createPortal(
+            <VariablesModal
+              open={stateVariablesModalOpen}
+              onOpenChange={setStateVariablesModalOpen}
+              projectId={currentProject!.id}
+            />,
+            document.body
+          )}
+
+        {/* Stats Management Modal */}
+        {typeof window !== "undefined" &&
+          createPortal(
+            <StatsDialog
+              open={statsModalOpen}
+              onOpenChange={setStatsModalOpen}
+              projectId={currentProject!.id}
+            />,
+            document.body
+          )}
       </div>
     </div>
   );

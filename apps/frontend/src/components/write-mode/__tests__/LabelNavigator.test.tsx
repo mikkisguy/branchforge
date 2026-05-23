@@ -10,40 +10,6 @@ import userEvent from "@testing-library/user-event";
 import type { PublicLabel } from "@branchforge/shared";
 import { LabelNavigator } from "@/components/write-mode/LabelNavigator.js";
 
-vi.mock("@/hooks/useStats", () => ({
-  useStats: vi.fn(() => ({
-    stats: [],
-    isLoadingStats: false,
-    statsError: null,
-    progression: [],
-    isLoadingProgression: false,
-    progressionError: null,
-    isCreatingStat: false,
-    isUpdatingStat: false,
-    isDeletingStat: false,
-    refreshStats: vi.fn(),
-    refreshProgression: vi.fn(),
-    createStat: vi.fn(),
-    updateStat: vi.fn(),
-    deleteStat: vi.fn(),
-  })),
-}));
-
-vi.mock("@/hooks/useVariables", () => ({
-  useVariables: vi.fn(() => ({
-    variables: [],
-    isLoadingVariables: false,
-    variablesError: null,
-    isCreatingVariable: false,
-    isUpdatingVariable: false,
-    isDeletingVariable: false,
-    refreshVariables: vi.fn(),
-    createVariable: vi.fn(),
-    updateVariable: vi.fn(),
-    deleteVariable: vi.fn(),
-  })),
-}));
-
 function makeLabel(overrides: Partial<PublicLabel> = {}): PublicLabel {
   return {
     id: "label-1",
@@ -98,7 +64,6 @@ describe("LabelNavigator", () => {
     it("groups labels by fileName", () => {
       render(
         <LabelNavigator
-          projectId="proj1"
           labels={labelsFromMultipleFiles}
           activeLabelId={null}
           onSelect={vi.fn()}
@@ -112,7 +77,6 @@ describe("LabelNavigator", () => {
     it("shows correct label counts per file", () => {
       render(
         <LabelNavigator
-          projectId="proj1"
           labels={labelsFromMultipleFiles}
           activeLabelId={null}
           onSelect={vi.fn()}
@@ -130,7 +94,6 @@ describe("LabelNavigator", () => {
     it("sorts file groups alphabetically", () => {
       render(
         <LabelNavigator
-          projectId="proj1"
           labels={labelsFromMultipleFiles}
           activeLabelId={null}
           onSelect={vi.fn()}
@@ -147,7 +110,6 @@ describe("LabelNavigator", () => {
     it("sorts labels within each group by sequenceOrder", () => {
       render(
         <LabelNavigator
-          projectId="proj1"
           labels={labelsFromMultipleFiles}
           activeLabelId={null}
           onSelect={vi.fn()}
@@ -171,12 +133,7 @@ describe("LabelNavigator", () => {
   describe("empty state", () => {
     it("shows empty state when no labels", () => {
       render(
-        <LabelNavigator
-          projectId="proj1"
-          labels={[]}
-          activeLabelId={null}
-          onSelect={vi.fn()}
-        />
+        <LabelNavigator labels={[]} activeLabelId={null} onSelect={vi.fn()} />
       );
 
       expect(screen.getByText("No labels found")).toBeInTheDocument();
@@ -188,7 +145,6 @@ describe("LabelNavigator", () => {
       const onSelect = vi.fn();
       render(
         <LabelNavigator
-          projectId="proj1"
           labels={labelsFromMultipleFiles}
           activeLabelId={null}
           onSelect={onSelect}
@@ -202,7 +158,6 @@ describe("LabelNavigator", () => {
     it("highlights the active label", () => {
       render(
         <LabelNavigator
-          projectId="proj1"
           labels={labelsFromMultipleFiles}
           activeLabelId="2"
           onSelect={vi.fn()}
@@ -223,7 +178,6 @@ describe("LabelNavigator", () => {
 
       render(
         <LabelNavigator
-          projectId="proj1"
           labels={singleFileLabels}
           activeLabelId={null}
           onSelect={vi.fn()}
@@ -239,7 +193,6 @@ describe("LabelNavigator", () => {
     it('shows "+" button for each file group', () => {
       render(
         <LabelNavigator
-          projectId="proj1"
           labels={labelsFromMultipleFiles}
           activeLabelId={null}
           onSelect={vi.fn()}
@@ -255,7 +208,6 @@ describe("LabelNavigator", () => {
       const user = userEvent.setup();
       render(
         <LabelNavigator
-          projectId="proj1"
           labels={labelsFromMultipleFiles}
           activeLabelId={null}
           onSelect={vi.fn()}
@@ -274,7 +226,6 @@ describe("LabelNavigator", () => {
       const onCreateLabel = vi.fn().mockResolvedValue(undefined);
       render(
         <LabelNavigator
-          projectId="proj1"
           labels={labelsFromMultipleFiles}
           activeLabelId={null}
           onSelect={vi.fn()}
@@ -301,7 +252,6 @@ describe("LabelNavigator", () => {
       const user = userEvent.setup();
       render(
         <LabelNavigator
-          projectId="proj1"
           labels={labelsFromMultipleFiles}
           activeLabelId={null}
           onSelect={vi.fn()}
@@ -325,7 +275,6 @@ describe("LabelNavigator", () => {
       const user = userEvent.setup();
       render(
         <LabelNavigator
-          projectId="proj1"
           labels={labelsFromMultipleFiles}
           activeLabelId={null}
           onSelect={vi.fn()}
@@ -349,7 +298,6 @@ describe("LabelNavigator", () => {
     it("disables add button during creation", () => {
       render(
         <LabelNavigator
-          projectId="proj1"
           labels={labelsFromMultipleFiles}
           activeLabelId={null}
           onSelect={vi.fn()}
