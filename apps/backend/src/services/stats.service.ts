@@ -16,7 +16,7 @@ import {
   ValidationError,
 } from "../middleware/error-handler.middleware.js";
 import { requireProjectOwnership } from "./authz.service.js";
-import type { StatLabelEffect, StatProgression } from "@branchforge/shared";
+import type { MeterLabelEffect, MeterProgression } from "@branchforge/shared";
 import type { CreateStatInput, UpdateStatInput } from "../lib/validation.js";
 
 // ============================================================================
@@ -201,13 +201,13 @@ export class StatsService {
 
   /**
    * Get progression data for all stats in a project.
-   * Scans all active labels and extracts meter references from
-   * prerequisites and effects JSONB fields.
+   * Scans all active labels and extracts stat references from
+   * conditions and effects JSONB fields.
    */
   async getProgression(
     projectId: string,
     userId: string
-  ): Promise<StatProgression[]> {
+  ): Promise<MeterProgression[]> {
     await requireProjectOwnership(projectId, userId);
 
     const db = getDb();
@@ -237,7 +237,7 @@ export class StatsService {
 
     // Build progression data for each stat
     return projectStats.map((stat) => {
-      const labelEffects: StatLabelEffect[] = [];
+      const labelEffects: MeterLabelEffect[] = [];
 
       for (const label of projectLabels) {
         const conditions = (label.conditions ?? {}) as {
@@ -256,15 +256,15 @@ export class StatsService {
             labelId: label.id,
             labelTitle: label.title,
             routeKey: label.route ?? null,
-            conditionValue,
+            prerequisiteValue: conditionValue,
             effectDelta,
           });
         }
       }
 
       return {
-        statKey: stat.key,
-        statName: stat.name,
+        meterKey: stat.key,
+        meterName: stat.name,
         minValue: stat.minValue,
         maxValue: stat.maxValue,
         labels: labelEffects,

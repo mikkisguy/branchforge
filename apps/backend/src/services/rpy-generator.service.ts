@@ -1,7 +1,7 @@
 /**
  * RPY Generator Service
  *
- * Generates Ren'Py code for state variables (prerequisites and effects).
+ * Generates Ren'Py code for variables (conditions and effects).
  * Patches existing RPY content with conditional logic and variable assignments.
  */
 
@@ -32,26 +32,26 @@ export function isValidRenpyIdentifier(name: string): boolean {
 /**
  * Prerequisites from label configuration
  */
-export interface Prerequisites {
-  stateVariables?: string[];
-  meters?: Record<string, number>;
+export interface Conditions {
+  variables?: string[];
+  stats?: Record<string, number>;
 }
 
 /**
  * Effects from label configuration
  */
 export interface Effects {
-  stateVariablesSet?: string[];
-  stateVariablesUnset?: string[];
-  meters?: Record<string, number>;
+  variablesSet?: string[];
+  variablesUnset?: string[];
+  stats?: Record<string, number>;
 }
 
 /**
- * Label data with prerequisites and effects
+ * Label data with conditions and effects
  */
 export interface LabelWithConditions {
   title: string;
-  prerequisites?: Prerequisites | null;
+  conditions?: Conditions | null;
   effects?: Effects | null;
 }
 
@@ -60,57 +60,57 @@ export interface LabelWithConditions {
 // ============================================================================
 
 /**
- * Generate prerequisite code (if statements)
+ * Generate condition code (if statements)
  * Returns array of code lines to insert after label declaration
  *
- * @param prerequisites - The prerequisites configuration
+ * @param conditions - The conditions configuration
  * @param indentLevel - Indentation level (default 4 spaces)
  * @returns Array of code lines
  *
  * @example
- * generatePrerequisiteCode({ stateVariables: ["met_alex"] })
+ * generateConditionCode({ variables: ["met_alex"] })
  * // Returns: ["    if not met_alex:", "        return"]
  */
-export function generatePrerequisiteCode(
-  prerequisites: Prerequisites,
+export function generateConditionCode(
+  conditions: Conditions,
   indentLevel: number = 1
 ): string[] {
   const lines: string[] = [];
   const indent = "    ".repeat(indentLevel);
   const nestedIndent = "    ".repeat(indentLevel + 1);
 
-  // Generate state variable checks
-  if (prerequisites.stateVariables && prerequisites.stateVariables.length > 0) {
-    // Validate each state variable name and filter out invalid entries
-    const validStateVariables = prerequisites.stateVariables.filter((sv) => {
+  // Generate variable checks
+  if (conditions.variables && conditions.variables.length > 0) {
+    // Validate each variable name and filter out invalid entries
+    const validVariables = conditions.variables.filter((sv) => {
       if (!isValidRenpyIdentifier(sv)) {
         process.stderr.write(
-          `Warning: Skipping invalid state variable name in prerequisites: "${sv}"\n`
+          `Warning: Skipping invalid variable name in conditions: "${sv}"\n`
         );
         return false;
       }
       return true;
     });
 
-    if (validStateVariables.length > 0) {
-      // Combine multiple state variables with OR logic
-      const conditions = validStateVariables.map((sv) => `not ${sv}`);
-      lines.push(`${indent}if ${conditions.join(" or ")}:`);
+    if (validVariables.length > 0) {
+      // Combine multiple variables with OR logic
+      const conditionChecks = validVariables.map((sv) => `not ${sv}`);
+      lines.push(`${indent}if ${conditionChecks.join(" or ")}:`);
       lines.push(`${nestedIndent}return`);
     }
   }
 
-  // Generate meter checks
-  if (prerequisites.meters) {
-    for (const [meter, value] of Object.entries(prerequisites.meters)) {
-      // Validate meter name before using it
-      if (!isValidRenpyIdentifier(meter)) {
+  // Generate stat checks
+  if (conditions.stats) {
+    for (const [stat, value] of Object.entries(conditions.stats)) {
+      // Validate stat name before using it
+      if (!isValidRenpyIdentifier(stat)) {
         process.stderr.write(
-          `Warning: Skipping invalid meter name in prerequisites: "${meter}"\n`
+          `Warning: Skipping invalid stat name in conditions: "${stat}"\n`
         );
         continue;
       }
-      lines.push(`${indent}if ${meter} < ${value}:`);
+      lines.push(`${indent}if ${stat} < ${value}:`);
       lines.push(`${nestedIndent}return`);
     }
   }
@@ -127,7 +127,7 @@ export function generatePrerequisiteCode(
  * @returns Array of code lines
  *
  * @example
- * generateEffectCode({ stateVariablesSet: ["met_alex"] })
+ * generateEffectCode({ variablesSet: ["met_alex"] })
  * // Returns: ["    $ met_alex = True"]
  */
 export function generateEffectCode(
@@ -137,13 +137,13 @@ export function generateEffectCode(
   const lines: string[] = [];
   const indent = "    ".repeat(indentLevel);
 
-  // Generate state variable assignments
-  if (effects.stateVariablesSet && effects.stateVariablesSet.length > 0) {
-    for (const sv of effects.stateVariablesSet) {
-      // Validate state variable name before using it
+  // Generate variable assignments
+  if (effects.variablesSet && effects.variablesSet.length > 0) {
+    for (const sv of effects.variablesSet) {
+      // Validate variable name before using it
       if (!isValidRenpyIdentifier(sv)) {
         process.stderr.write(
-          `Warning: Skipping invalid state variable name in effects (set): "${sv}"\n`
+          `Warning: Skipping invalid variable name in effects (set): "${sv}"\n`
         );
         continue;
       }
@@ -151,12 +151,12 @@ export function generateEffectCode(
     }
   }
 
-  if (effects.stateVariablesUnset && effects.stateVariablesUnset.length > 0) {
-    for (const sv of effects.stateVariablesUnset) {
-      // Validate state variable name before using it
+  if (effects.variablesUnset && effects.variablesUnset.length > 0) {
+    for (const sv of effects.variablesUnset) {
+      // Validate variable name before using it
       if (!isValidRenpyIdentifier(sv)) {
         process.stderr.write(
-          `Warning: Skipping invalid state variable name in effects (unset): "${sv}"\n`
+          `Warning: Skipping invalid variable name in effects (unset): "${sv}"\n`
         );
         continue;
       }
@@ -164,17 +164,17 @@ export function generateEffectCode(
     }
   }
 
-  // Generate meter adjustments
-  if (effects.meters) {
-    for (const [meter, value] of Object.entries(effects.meters)) {
-      // Validate meter name before using it
-      if (!isValidRenpyIdentifier(meter)) {
+  // Generate stat adjustments
+  if (effects.stats) {
+    for (const [stat, value] of Object.entries(effects.stats)) {
+      // Validate stat name before using it
+      if (!isValidRenpyIdentifier(stat)) {
         process.stderr.write(
-          `Warning: Skipping invalid meter name in effects: "${meter}"\n`
+          `Warning: Skipping invalid stat name in effects: "${stat}"\n`
         );
         continue;
       }
-      lines.push(`${indent}$ ${meter} += ${value}`);
+      lines.push(`${indent}$ ${stat} += ${value}`);
     }
   }
 
@@ -182,24 +182,24 @@ export function generateEffectCode(
 }
 
 /**
- * Generate init block for state variable defaults
+ * Generate init block for variable defaults
  * Returns array of code lines for the init section
  *
- * @param stateVariables - Array of state variable names
+ * @param variables - Array of variable names
  * @returns Array of code lines
  *
  * @example
  * generateInitBlock(["met_alex", "has_key"])
  * // Returns: ["default met_alex = False", "default has_key = False"]
  */
-export function generateInitBlock(stateVariables: string[]): string[] {
+export function generateInitBlock(variables: string[]): string[] {
   const lines: string[] = [];
 
-  for (const sv of stateVariables) {
-    // Validate state variable name before using it
+  for (const sv of variables) {
+    // Validate variable name before using it
     if (!isValidRenpyIdentifier(sv)) {
       process.stderr.write(
-        `Warning: Skipping invalid state variable name in init block: "${sv}"\n`
+        `Warning: Skipping invalid variable name in init block: "${sv}"\n`
       );
       continue;
     }
@@ -280,18 +280,18 @@ function detectIndentUnit(lines: string[]): number {
 }
 
 /**
- * Patch RPY content with state variable prerequisites and effects
+ * Patch RPY content with variable conditions and effects
  *
  * This function:
  * 1. Parses the RPY content to find label declarations
- * 2. Inserts prerequisite code after label declarations
+ * 2. Inserts condition code after label declarations
  * 3. Inserts effect code before label endings (jump/return)
  *
  * @param rpyContent - The original RPY file content
- * @param labels - Array of labels with their prerequisites and effects
- * @returns Patched RPY content with state variable logic
+ * @param labels - Array of labels with their conditions and effects
+ * @returns Patched RPY content with variable logic
  */
-export function patchRPYWithStateVariables(
+export function patchRPYWithVariables(
   rpyContent: string,
   labels: LabelWithConditions[]
 ): string {
@@ -325,21 +325,21 @@ export function patchRPYWithStateVariables(
 
       result.push(line);
 
-      // Insert prerequisites after label declaration
+      // Insert conditions after label declaration
       const labelData = labelMap.get(currentLabel);
-      if (labelData?.prerequisites) {
+      if (labelData?.conditions) {
         const hasConditions =
-          (labelData.prerequisites.stateVariables &&
-            labelData.prerequisites.stateVariables.length > 0) ||
-          (labelData.prerequisites.meters &&
-            Object.keys(labelData.prerequisites.meters).length > 0);
+          (labelData.conditions.variables &&
+            labelData.conditions.variables.length > 0) ||
+          (labelData.conditions.stats &&
+            Object.keys(labelData.conditions.stats).length > 0);
 
         if (hasConditions) {
-          const prereqLines = generatePrerequisiteCode(
-            labelData.prerequisites,
+          const conditionLines = generateConditionCode(
+            labelData.conditions,
             Math.round(currentLabelIndent / indentUnit) + 1
           );
-          result.push(...prereqLines);
+          result.push(...conditionLines);
         }
       }
       continue;
@@ -360,12 +360,12 @@ export function patchRPYWithStateVariables(
         const labelData = labelMap.get(currentLabel);
         if (labelData?.effects) {
           const hasEffects =
-            (labelData.effects.stateVariablesSet &&
-              labelData.effects.stateVariablesSet.length > 0) ||
-            (labelData.effects.stateVariablesUnset &&
-              labelData.effects.stateVariablesUnset.length > 0) ||
-            (labelData.effects.meters &&
-              Object.keys(labelData.effects.meters).length > 0);
+            (labelData.effects.variablesSet &&
+              labelData.effects.variablesSet.length > 0) ||
+            (labelData.effects.variablesUnset &&
+              labelData.effects.variablesUnset.length > 0) ||
+            (labelData.effects.stats &&
+              Object.keys(labelData.effects.stats).length > 0);
 
           if (hasEffects) {
             const effectLines = generateEffectCode(
@@ -387,12 +387,12 @@ export function patchRPYWithStateVariables(
   for (const [labelTitle, labelData] of labelMap) {
     if (labelData?.effects && !effectsInserted.has(labelTitle)) {
       const hasEffects =
-        (labelData.effects.stateVariablesSet &&
-          labelData.effects.stateVariablesSet.length > 0) ||
-        (labelData.effects.stateVariablesUnset &&
-          labelData.effects.stateVariablesUnset.length > 0) ||
-        (labelData.effects.meters &&
-          Object.keys(labelData.effects.meters).length > 0);
+        (labelData.effects.variablesSet &&
+          labelData.effects.variablesSet.length > 0) ||
+        (labelData.effects.variablesUnset &&
+          labelData.effects.variablesUnset.length > 0) ||
+        (labelData.effects.stats &&
+          Object.keys(labelData.effects.stats).length > 0);
 
       if (hasEffects) {
         // Find the label in result
@@ -449,14 +449,14 @@ export function patchRPYWithStateVariables(
 }
 
 /**
- * Generate a complete state variables initialization file
- * This creates a new RPY file content with all state variable defaults
+ * Generate a complete variables initialization file
+ * This creates a new RPY file content with all variable defaults
  *
- * @param stateVariables - Array of state variable objects with key, description, category
+ * @param variables - Array of variable objects with key, description, category
  * @returns Complete RPY file content
  */
-export function generateStateVariablesFile(
-  stateVariables: Array<{
+export function generateVariablesFile(
+  variables: Array<{
     key: string;
     description?: string | null;
     category?: string | null;
@@ -468,7 +468,7 @@ export function generateStateVariablesFile(
   lines.push(
     "##############################################################################"
   );
-  lines.push("# State Variables");
+  lines.push("# Variables");
   lines.push("#");
   lines.push("# This file was automatically generated by BranchForge");
   lines.push("# Modifications may be overwritten during future exports");
@@ -479,7 +479,7 @@ export function generateStateVariablesFile(
 
   // Group by category
   const grouped = new Map<string, string[]>();
-  for (const sv of stateVariables) {
+  for (const sv of variables) {
     const category = sv.category?.trim() || "Uncategorized";
     if (!grouped.has(category)) {
       grouped.set(category, []);
@@ -491,10 +491,10 @@ export function generateStateVariablesFile(
   for (const [category, keys] of grouped) {
     lines.push(`# ${category}`);
     for (const key of keys) {
-      // Validate state variable key before using it
+      // Validate variable key before using it
       if (!isValidRenpyIdentifier(key)) {
         process.stderr.write(
-          `Warning: Skipping invalid state variable key in state variables file: "${key}"\n`
+          `Warning: Skipping invalid variable key in variables file: "${key}"\n`
         );
         continue;
       }
@@ -515,14 +515,14 @@ function sanitizeComment(value: string): string {
 }
 
 /**
- * Generate a complete meters initialization file
- * Creates meters.rpy with all meter default values for Ren'Py.
+ * Generate a complete stats initialization file
+ * Creates stats.rpy with all stat default values for Ren'Py.
  *
- * @param metersList - Array of meter objects with key, name, minValue, description
+ * @param statsList - Array of stat objects with key, name, minValue, description
  * @returns Complete RPY file content
  */
-export function generateMetersFile(
-  metersList: Array<{
+export function generateStatsFile(
+  statsList: Array<{
     key: string;
     name: string;
     minValue: number;
@@ -536,7 +536,7 @@ export function generateMetersFile(
   lines.push(
     "##############################################################################"
   );
-  lines.push("# Meters");
+  lines.push("# Stats");
   lines.push("#");
   lines.push("# This file was automatically generated by BranchForge");
   lines.push("# Modifications may be overwritten during future exports");
@@ -545,23 +545,23 @@ export function generateMetersFile(
   );
   lines.push("");
 
-  for (const meter of metersList) {
-    // Validate meter key before using it
-    if (!isValidRenpyIdentifier(meter.key)) {
+  for (const stat of statsList) {
+    // Validate stat key before using it
+    if (!isValidRenpyIdentifier(stat.key)) {
       process.stderr.write(
-        `Warning: Skipping invalid meter key in meters file: "${meter.key}"\n`
+        `Warning: Skipping invalid stat key in stats file: "${stat.key}"\n`
       );
       continue;
     }
 
-    const sanitizedName = sanitizeComment(meter.name);
+    const sanitizedName = sanitizeComment(stat.name);
 
-    if (meter.description) {
-      lines.push(`# ${sanitizedName} — ${sanitizeComment(meter.description)}`);
+    if (stat.description) {
+      lines.push(`# ${sanitizedName} — ${sanitizeComment(stat.description)}`);
     } else {
       lines.push(`# ${sanitizedName}`);
     }
-    lines.push(`default ${meter.key} = ${meter.minValue}`);
+    lines.push(`default ${stat.key} = ${stat.minValue}`);
     lines.push("");
   }
 
