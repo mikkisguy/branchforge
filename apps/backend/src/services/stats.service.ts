@@ -16,6 +16,7 @@ import {
   ValidationError,
 } from "../middleware/error-handler.middleware.js";
 import { requireProjectOwnership } from "./authz.service.js";
+import { isUniqueConstraintViolation } from "../lib/db.js";
 import type { StatLabelEffect, StatProgression } from "@branchforge/shared";
 import type { CreateStatInput, UpdateStatInput } from "../lib/validation.js";
 
@@ -111,13 +112,22 @@ export class StatsService {
 
     const db = getDb();
 
+    const minValue = input.minValue ?? 0;
+    const maxValue = input.maxValue ?? 100;
+
+    if (minValue > maxValue) {
+      throw new ValidationError(
+        "Minimum value must be less than or equal to maximum value"
+      );
+    }
+
     const newStat: NewStat = {
       projectId,
       characterId: input.characterId ?? null,
       key: input.key,
       name: input.name,
-      minValue: input.minValue ?? 0,
-      maxValue: input.maxValue ?? 100,
+      minValue,
+      maxValue,
       description: input.description ?? null,
     };
 
@@ -137,7 +147,7 @@ export class StatsService {
       return mapToPublicStat(result);
     } catch (err) {
       if (err instanceof ConflictError) throw err;
-      if (err instanceof Error && "code" in err && err.code === "23505") {
+      if (isUniqueConstraintViolation(err)) {
         throw new ConflictError("Stat with this key already exists");
       }
       throw err;
@@ -180,7 +190,7 @@ export class StatsService {
       return mapToPublicStat(updated);
     } catch (err) {
       if (err instanceof NotFoundError) throw err;
-      if (err instanceof Error && "code" in err && err.code === "23505") {
+      if (isUniqueConstraintViolation(err)) {
         throw new ConflictError("Stat with this key already exists");
       }
       throw err;

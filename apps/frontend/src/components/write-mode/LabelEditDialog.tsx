@@ -25,10 +25,10 @@ interface LabelEditDialogProps {
   currentStatus: "DRAFT" | "REVIEW" | "FINAL" | null;
   /** Current visibility */
   currentVisibility: "EXCLUSIVE" | "SHARED" | "DUO_PAIR" | null;
-  /** Current prerequisites from the active label */
-  currentPrerequisites: {
-    meters?: Record<string, number>;
-    stateVariables?: string[];
+  /** Current conditions from the active label */
+  currentConditions: {
+    stats?: Record<string, number>;
+    variables?: string[];
   } | null;
   /** Available route configs from the project */
   routeConfigs: Array<{ id: string; routeKey: string; routeName: string }>;
@@ -43,9 +43,9 @@ interface LabelEditDialogProps {
     route?: string | null;
     status?: "DRAFT" | "REVIEW" | "FINAL";
     visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
-    prerequisites?: {
-      meters?: Record<string, number>;
-      stateVariables?: string[];
+    conditions?: {
+      stats?: Record<string, number>;
+      variables?: string[];
     } | null;
   }) => Promise<void>;
   /** Whether save is in progress */
@@ -128,7 +128,7 @@ export function LabelEditDialog({
   currentRoute,
   currentStatus,
   currentVisibility,
-  currentPrerequisites,
+  currentConditions,
   routeConfigs,
   meters,
   variables,
@@ -166,8 +166,8 @@ export function LabelEditDialog({
         status: currentStatus ?? "DRAFT",
         visibility: currentVisibility ?? "EXCLUSIVE",
       });
-      setSelectedVariables(currentPrerequisites?.stateVariables ?? []);
-      setStatConditions(currentPrerequisites?.meters ?? {});
+      setSelectedVariables(currentConditions?.variables ?? []);
+      setStatConditions(currentConditions?.stats ?? {});
       setShowVariablePicker(false);
       setShowStatPicker(false);
     }
@@ -178,7 +178,7 @@ export function LabelEditDialog({
     currentRoute,
     currentStatus,
     currentVisibility,
-    currentPrerequisites,
+    currentConditions,
   ]);
 
   // Derive available variables (not yet assigned)
@@ -270,9 +270,9 @@ export function LabelEditDialog({
       route?: string | null;
       status?: "DRAFT" | "REVIEW" | "FINAL";
       visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
-      prerequisites?: {
-        meters?: Record<string, number>;
-        stateVariables?: string[];
+      conditions?: {
+        stats?: Record<string, number>;
+        variables?: string[];
       } | null;
     } = {};
 
@@ -300,8 +300,8 @@ export function LabelEditDialog({
     }
 
     // Check conditions changes
-    const initialVars = currentPrerequisites?.stateVariables ?? [];
-    const initialStats = currentPrerequisites?.meters ?? {};
+    const initialVars = currentConditions?.variables ?? [];
+    const initialStats = currentConditions?.stats ?? {};
     const varsChanged =
       selectedVariables.length !== initialVars.length ||
       selectedVariables.some((key, i) => key !== initialVars[i]);
@@ -312,10 +312,9 @@ export function LabelEditDialog({
       );
 
     if (varsChanged || statsChanged) {
-      changes.prerequisites = {
-        stateVariables:
-          selectedVariables.length > 0 ? selectedVariables : undefined,
-        meters:
+      changes.conditions = {
+        variables: selectedVariables.length > 0 ? selectedVariables : undefined,
+        stats:
           Object.keys(statConditions).length > 0 ? statConditions : undefined,
       };
       // If both are empty, send null to clear conditions
@@ -323,7 +322,7 @@ export function LabelEditDialog({
         selectedVariables.length === 0 &&
         Object.keys(statConditions).length === 0
       ) {
-        changes.prerequisites = null;
+        changes.conditions = null;
       }
     }
 

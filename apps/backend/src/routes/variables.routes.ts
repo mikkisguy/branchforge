@@ -7,6 +7,7 @@
 
 import type { FastifyInstance } from "fastify";
 import type { FastifyRequest, FastifyReply } from "fastify";
+import { z } from "zod";
 import {
   listVariables,
   getVariable,
@@ -20,6 +21,7 @@ import {
   validateBody,
   validateParams,
 } from "../middleware/validation.middleware.js";
+import { NotFoundError } from "../middleware/error-handler.middleware.js";
 import {
   createVariableSchema,
   updateVariableSchema,
@@ -37,21 +39,14 @@ interface ListVariablesResponse {
   variables: PublicVariable[];
 }
 
-interface GetVariableParams {
-  variableId: string;
-}
+type GetVariableParams = z.infer<typeof variableIdParamsSchema>;
 
 interface GetVariableResponse {
   variable: PublicVariable;
 }
 
-interface ListVariablesByProjectParams {
-  projectId: string;
-}
-
-interface CreateVariableByProjectParams {
-  projectId: string;
-}
+type ListVariablesByProjectParams = z.infer<typeof projectIdParamsSchema>;
+type CreateVariableByProjectParams = z.infer<typeof projectIdParamsSchema>;
 
 interface CreateVariableResponse {
   variable: PublicVariable;
@@ -59,10 +54,6 @@ interface CreateVariableResponse {
 
 interface UpdateVariableResponse {
   variable: PublicVariable;
-}
-
-interface ErrorResponse {
-  error: string;
 }
 
 // ============================================================================
@@ -103,8 +94,7 @@ async function getVariableHandler(
   const variable = await getVariable(variableId, user.id);
 
   if (!variable) {
-    reply.status(404).send({ error: "Variable not found" } as ErrorResponse);
-    return;
+    throw new NotFoundError("Variable not found");
   }
 
   reply.status(200).send({ variable } as GetVariableResponse);
@@ -150,11 +140,6 @@ async function updateVariableHandler(
   const body = request.body;
 
   const variable = await updateVariable(variableId, user.id, body);
-
-  if (!variable) {
-    reply.status(404).send({ error: "Variable not found" } as ErrorResponse);
-    return;
-  }
 
   reply.status(200).send({ variable } as UpdateVariableResponse);
 }

@@ -1,7 +1,7 @@
 /**
  * Stat Progression View
  *
- * Shows all labels that affect a selected stat, including prerequisite
+ * Shows all labels that affect a selected stat, including condition
  * thresholds and effect deltas. This helps authors understand where and
  * how stat values change across the visual novel.
  */
@@ -59,7 +59,7 @@ export function StatProgression({
           No labels reference this stat yet
         </p>
         <p className="text-xs text-muted-foreground">
-          Label prerequisites and effects using &quot;{progression.statKey}
+          Label conditions and effects using &quot;{progression.statKey}
           &quot; will appear here.
         </p>
       </div>
@@ -89,7 +89,7 @@ export function StatProgression({
                 Route
               </th>
               <th className="text-center p-3 font-medium text-muted-foreground">
-                Prerequisite
+                Condition
               </th>
               <th className="text-center p-3 font-medium text-muted-foreground">
                 Effect

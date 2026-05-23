@@ -544,9 +544,9 @@ export function LabelNavigator({
       route?: string | null;
       status?: "DRAFT" | "REVIEW" | "FINAL";
       visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
-      prerequisites?: {
-        meters?: Record<string, number>;
-        stateVariables?: string[];
+      conditions?: {
+        stats?: Record<string, number>;
+        variables?: string[];
       } | null;
     }) => {
       if (editDialog.label) {
@@ -803,14 +803,7 @@ export function LabelNavigator({
               currentRoute={editDialog.label.routeKey}
               currentStatus={editDialog.label.status}
               currentVisibility={editDialog.label.visibility}
-              currentPrerequisites={
-                editDialog.label.conditions
-                  ? {
-                      meters: editDialog.label.conditions.stats,
-                      stateVariables: editDialog.label.conditions.variables,
-                    }
-                  : null
-              }
+              currentConditions={editDialog.label.conditions ?? null}
               routeConfigs={routeConfigs ?? []}
               meters={stats}
               variables={variables}

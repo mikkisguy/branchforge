@@ -277,8 +277,8 @@ Container for logical labels; content in `label_lines`. Represents Ren'Py label 
 | `visibility`          | enum                              | `EXCLUSIVE`, `SHARED`, `DUO_PAIR`                                                                                                                                                                                                                                                            |
 | `duo_pair_id`         | uuid FK → pair_groups, nullable   |                                                                                                                                                                                                                                                                                              |
 | `status`              | `label_status`, default `DRAFT`   |                                                                                                                                                                                                                                                                                              |
-| `prerequisites`       | jsonb                             | `{stateVariables?: [], meters?: {}}`                                                                                                                                                                                                                                                         |
-| `effects`             | jsonb                             | `{stateVariablesSet?: [], stateVariablesUnset?: [], meters?: {}}`                                                                                                                                                                                                                            |
+| `prerequisites`       | jsonb                             | `{variables?: [], stats?: {}}`                                                                                                                                                                                                                                                               |
+| `effects`             | jsonb                             | `{variableSets?: [], variableUnsets?: [], stats?: {}}`                                                                                                                                                                                                                                       |
 | `cross_route_context` | text, nullable                    | Prequel: `"Lucas_Friend_Mode"`                                                                                                                                                                                                                                                               |
 | `reader_notes`        | text, nullable                    | Beta feedback                                                                                                                                                                                                                                                                                |
 | `project_file_id`     | uuid FK → project_files, nullable | Project file reference                                                                                                                                                                                                                                                                       |
@@ -543,10 +543,10 @@ projects
 ├── visual_systems (1:1)
 ├── route_configs (1:m)
 ├── renpy_definitions (1:m)
-├── state_variables (1:m)
+├── variables (1:m)
 ├── characters (1:m)
 ├── pair_groups (1:m)
-├── meters (1:m)
+├── stats (1:m)
 ├── labels (1:m)
 ├── ai_suggestions (1:m)
 ├── exports (1:m)
@@ -568,7 +568,7 @@ label_lines
 └── menu_options (JSON array with targetLabelId references)
 
 characters
-├── meters (1:m, optional)
+├── stats (1:m, optional)
 ├── pair_groups (m:1, optional, via character_a/b_id)
 ├── label_lines (1:m, as speakerId)
 └── renpy_definitions (1:m, optional)

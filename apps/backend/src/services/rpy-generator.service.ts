@@ -51,6 +51,7 @@ export interface Effects {
  */
 export interface LabelWithConditions {
   title: string;
+  labelName: string | null;
   conditions?: Conditions | null;
   effects?: Effects | null;
 }
@@ -301,10 +302,12 @@ export function patchRPYWithVariables(
   // Detect the indentation unit used in this file
   const indentUnit = detectIndentUnit(lines);
 
-  // Create a map for quick label lookup
+  // Create a map for quick label lookup, keyed by immutable labelName
   const labelMap = new Map<string, LabelWithConditions>();
   for (const label of labels) {
-    labelMap.set(label.title, label);
+    if (label.labelName) {
+      labelMap.set(label.labelName, label);
+    }
   }
 
   let currentLabel: string | null = null;

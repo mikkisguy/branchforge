@@ -281,6 +281,13 @@
       "when": 1779550885874,
       "tag": "0039_quiet_zemo",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1779554804923,
+      "tag": "0040_silky_silver_centurion",
+      "breakpoints": true
     }
   ]
 }

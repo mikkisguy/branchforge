@@ -7,6 +7,7 @@
 
 import type { FastifyInstance } from "fastify";
 import type { FastifyRequest, FastifyReply } from "fastify";
+import { z } from "zod";
 import { authenticate } from "../middleware/auth.middleware.js";
 import {
   validateParams,
@@ -26,13 +27,8 @@ import { statsService } from "../services/stats.service.js";
 // Types
 // ============================================================================
 
-interface ProjectParams {
-  projectId: string;
-}
-
-interface StatParams {
-  statId: string;
-}
+type ProjectParams = z.infer<typeof projectIdParamsSchema>;
+type StatParams = z.infer<typeof statIdParamsSchema>;
 
 // ============================================================================
 // Route Handlers

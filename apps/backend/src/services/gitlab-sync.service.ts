@@ -213,6 +213,7 @@ export async function exportToGitlab(
     const projectLabels = await db
       .select({
         title: labels.title,
+        labelName: labels.labelName,
         conditions: labels.conditions,
         effects: labels.effects,
         projectFileId: labels.projectFileId,

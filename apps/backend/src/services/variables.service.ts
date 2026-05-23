@@ -14,6 +14,7 @@ import {
   NotFoundError,
   ValidationError,
 } from "../middleware/error-handler.middleware.js";
+import { isUniqueConstraintViolation } from "../lib/db.js";
 
 // ============================================================================
 // Public Types
@@ -45,8 +46,8 @@ export interface CreateVariableBody {
  */
 export interface UpdateVariableBody {
   key?: string;
-  description?: string;
-  category?: string;
+  description?: string | null;
+  category?: string | null;
 }
 
 // ============================================================================
@@ -158,7 +159,7 @@ export async function createVariable(
     return mapToPublicVariable(result[0]);
   } catch (err) {
     // Handle unique constraint violation (PostgreSQL error code 23505)
-    if (err instanceof Error && "code" in err && err.code === "23505") {
+    if (isUniqueConstraintViolation(err)) {
       throw new ConflictError("Variable key already exists for this project");
     }
     throw err;
@@ -227,7 +228,7 @@ export async function updateVariable(
     return mapToPublicVariable(result[0]);
   } catch (err) {
     // Handle unique constraint violation (PostgreSQL error code 23505)
-    if (err instanceof Error && "code" in err && err.code === "23505") {
+    if (isUniqueConstraintViolation(err)) {
       throw new ConflictError("Variable key already exists for this project");
     }
     throw err;

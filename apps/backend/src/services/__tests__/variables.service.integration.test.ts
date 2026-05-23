@@ -355,7 +355,7 @@ describe("VariablesService (Integration)", () => {
 
       await expect(
         createVariable(testUserId, ownedProject.id!, body)
-      ).rejects.toThrow("Failed query");
+      ).rejects.toThrow("Variable key already exists for this project");
     });
 
     it("should allow same key in different projects", async () => {
@@ -468,7 +468,7 @@ describe("VariablesService (Integration)", () => {
 
       await expect(
         updateVariable(testVariable1.id!, testUserId, body)
-      ).rejects.toThrow("Failed query");
+      ).rejects.toThrow("Variable key already exists for this project");
     });
 
     it("should allow updating to same key in different projects", async () => {
