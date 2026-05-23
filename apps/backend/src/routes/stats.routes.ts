@@ -1,7 +1,7 @@
 /**
- * Meters Routes
+ * Stats Routes
  *
- * Thin HTTP wrappers that delegate all business logic to metersService.
+ * Thin HTTP wrappers that delegate all business logic to statsService.
  * Handles only request parsing and response mapping.
  */
 
@@ -13,14 +13,14 @@ import {
   validateBody,
 } from "../middleware/validation.middleware.js";
 import {
-  createMeterSchema,
-  updateMeterSchema,
-  meterIdParamsSchema,
+  createStatSchema,
+  updateStatSchema,
+  statIdParamsSchema,
   projectIdParamsSchema,
-  type CreateMeterInput,
-  type UpdateMeterInput,
+  type CreateStatInput,
+  type UpdateStatInput,
 } from "../lib/validation.js";
-import { metersService } from "../services/meters.service.js";
+import { statsService } from "../services/stats.service.js";
 
 // ============================================================================
 // Types
@@ -30,78 +30,75 @@ interface ProjectParams {
   projectId: string;
 }
 
-interface MeterParams {
-  meterId: string;
+interface StatParams {
+  statId: string;
 }
 
 // ============================================================================
 // Route Handlers
 // ============================================================================
 
-/** GET /projects/:projectId/meters */
-async function listMetersHandler(
+/** GET /projects/:projectId/stats */
+async function listStatsHandler(
   request: FastifyRequest<{ Params: ProjectParams }>,
   reply: FastifyReply
 ): Promise<void> {
   const { projectId } = request.params;
-  const result = await metersService.listMeters(projectId, request.user!.id);
-  reply.status(200).send({ meters: result });
+  const result = await statsService.listStats(projectId, request.user!.id);
+  reply.status(200).send({ stats: result });
 }
 
-/** POST /projects/:projectId/meters */
-async function createMeterHandler(
+/** POST /projects/:projectId/stats */
+async function createStatHandler(
   request: FastifyRequest<{
     Params: ProjectParams;
-    Body: CreateMeterInput;
+    Body: CreateStatInput;
   }>,
   reply: FastifyReply
 ): Promise<void> {
   const { projectId } = request.params;
-  const meter = await metersService.createMeter(
+  const stat = await statsService.createStat(
     projectId,
     request.user!.id,
     request.body
   );
-  reply.status(201).send({ meter });
+  reply.status(201).send({ stat });
 }
 
-/** PUT /meters/:meterId */
-async function updateMeterHandler(
+/** PUT /stats/:statId */
+async function updateStatHandler(
   request: FastifyRequest<{
-    Params: MeterParams;
-    Body: UpdateMeterInput;
+    Params: StatParams;
+    Body: UpdateStatInput;
   }>,
   reply: FastifyReply
 ): Promise<void> {
-  const { meterId } = request.params;
-  const meter = await metersService.updateMeter(
-    meterId,
+  const { statId } = request.params;
+  const stat = await statsService.updateStat(
+    statId,
     request.user!.id,
     request.body
   );
-  reply.status(200).send({ meter });
+  reply.status(200).send({ stat });
 }
 
-/** DELETE /meters/:meterId */
-async function deleteMeterHandler(
-  request: FastifyRequest<{ Params: MeterParams }>,
+/** DELETE /stats/:statId */
+async function deleteStatHandler(
+  request: FastifyRequest<{ Params: StatParams }>,
   reply: FastifyReply
 ): Promise<void> {
-  const { meterId } = request.params;
-  await metersService.deleteMeter(meterId, request.user!.id);
+  const { statId } = request.params;
+  await statsService.deleteStat(statId, request.user!.id);
   reply.status(204).send();
 }
 
-/** GET /projects/:projectId/meters/progression */
+/** GET /projects/:projectId/stats/progression */
 async function getProgressionHandler(
   request: FastifyRequest<{ Params: ProjectParams }>,
   reply: FastifyReply
 ): Promise<void> {
   const { projectId } = request.params;
-  const result = await metersService.getProgression(
-    projectId,
-    request.user!.id
-  );
+  const result = await statsService.getProgression(projectId, request.user!.id);
   reply.status(200).send({ progression: result });
 }
 
@@ -109,35 +106,35 @@ async function getProgressionHandler(
 // Routes Registration
 // ============================================================================
 
-export async function metersRoutes(fastify: FastifyInstance): Promise<void> {
+export async function statsRoutes(fastify: FastifyInstance): Promise<void> {
   // All routes require authentication
 
-  // List meters for project
+  // List stats for project
   fastify.get<{ Params: ProjectParams }>(
-    "/projects/:projectId/meters",
+    "/projects/:projectId/stats",
     {
       onRequest: authenticate,
       preValidation: validateParams(projectIdParamsSchema),
     },
-    listMetersHandler
+    listStatsHandler
   );
 
-  // Create meter
-  fastify.post<{ Params: ProjectParams; Body: CreateMeterInput }>(
-    "/projects/:projectId/meters",
+  // Create stat
+  fastify.post<{ Params: ProjectParams; Body: CreateStatInput }>(
+    "/projects/:projectId/stats",
     {
       onRequest: authenticate,
       preValidation: [
         validateParams(projectIdParamsSchema),
-        validateBody(createMeterSchema),
+        validateBody(createStatSchema),
       ],
     },
-    createMeterHandler
+    createStatHandler
   );
 
-  // Get progression for all meters
+  // Get progression for all stats
   fastify.get<{ Params: ProjectParams }>(
-    "/projects/:projectId/meters/progression",
+    "/projects/:projectId/stats/progression",
     {
       onRequest: authenticate,
       preValidation: validateParams(projectIdParamsSchema),
@@ -145,26 +142,26 @@ export async function metersRoutes(fastify: FastifyInstance): Promise<void> {
     getProgressionHandler
   );
 
-  // Update meter
-  fastify.put<{ Params: MeterParams; Body: UpdateMeterInput }>(
-    "/meters/:meterId",
+  // Update stat
+  fastify.put<{ Params: StatParams; Body: UpdateStatInput }>(
+    "/stats/:statId",
     {
       onRequest: authenticate,
       preValidation: [
-        validateParams(meterIdParamsSchema),
-        validateBody(updateMeterSchema),
+        validateParams(statIdParamsSchema),
+        validateBody(updateStatSchema),
       ],
     },
-    updateMeterHandler
+    updateStatHandler
   );
 
-  // Delete meter
-  fastify.delete<{ Params: MeterParams }>(
-    "/meters/:meterId",
+  // Delete stat
+  fastify.delete<{ Params: StatParams }>(
+    "/stats/:statId",
     {
       onRequest: authenticate,
-      preValidation: validateParams(meterIdParamsSchema),
+      preValidation: validateParams(statIdParamsSchema),
     },
-    deleteMeterHandler
+    deleteStatHandler
   );
 }

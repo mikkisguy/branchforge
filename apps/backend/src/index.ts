@@ -16,8 +16,8 @@ import {
   characterAvatarRoutes,
 } from "./routes/characters.routes.js";
 import { routeConfigsRoutes } from "./routes/route-configs.routes.js";
-import { stateVariablesRoutes } from "./routes/state-variables.routes.js";
-import { metersRoutes } from "./routes/meters.routes.js";
+import { variablesRoutes } from "./routes/variables.routes.js";
+import { statsRoutes } from "./routes/stats.routes.js";
 import { zipImportRoutes } from "./routes/zip-import.routes.js";
 import { createDrizzleSessionStore } from "./services/session-store.service.js";
 import { setupShutdownHandlers } from "./lib/shutdown.js";
@@ -107,8 +107,8 @@ await server.register(labelsRoutes, { prefix: basePath });
 await server.register(charactersRoutes, { prefix: basePath });
 await server.register(characterAvatarRoutes, { prefix: basePath });
 await server.register(routeConfigsRoutes, { prefix: basePath });
-await server.register(stateVariablesRoutes, { prefix: basePath });
-await server.register(metersRoutes, { prefix: basePath });
+await server.register(variablesRoutes, { prefix: basePath });
+await server.register(statsRoutes, { prefix: basePath });
 // Register zip import routes after multipart plugin (for file uploads)
 await server.register(zipImportRoutes, { prefix: basePath });
 

@@ -1,14 +1,14 @@
 /**
- * State Variables Service
+ * Variables Service
  *
- * Handles state variable CRUD operations for projects.
- * State variables are boolean state variables used in conditional branching.
+ * Handles variable CRUD operations for projects.
+ * Variables are boolean state variables used in conditional branching.
  */
 
 import { getDb } from "../db/index.js";
-import { stateVariables, projects } from "../db/schema/index.js";
+import { variables, projects } from "../db/schema/index.js";
 import { eq, and, asc } from "drizzle-orm";
-import type { StateVariable, NewStateVariable } from "../db/schema/index.js";
+import type { Variable, NewVariable } from "../db/schema/index.js";
 import {
   ConflictError,
   NotFoundError,
@@ -20,9 +20,9 @@ import {
 // ============================================================================
 
 /**
- * Public state variable information
+ * Public variable information
  */
-export interface PublicStateVariable {
+export interface PublicVariable {
   id: string;
   projectId: string;
   key: string;
@@ -32,18 +32,18 @@ export interface PublicStateVariable {
 }
 
 /**
- * Create state variable request body
+ * Create variable request body
  */
-export interface CreateStateVariableBody {
+export interface CreateVariableBody {
   key: string;
   description?: string;
   category?: string;
 }
 
 /**
- * Update state variable request body
+ * Update variable request body
  */
-export interface UpdateStateVariableBody {
+export interface UpdateVariableBody {
   key?: string;
   description?: string;
   category?: string;
@@ -54,15 +54,15 @@ export interface UpdateStateVariableBody {
 // ============================================================================
 
 /**
- * List all state variables for a project
- * @param projectId - The project ID to fetch state variables for
+ * List all variables for a project
+ * @param projectId - The project ID to fetch variables for
  * @param userId - The user ID making the request (for authorization)
  * @returns Array of public state variables
  */
-export async function listStateVariables(
+export async function listVariables(
   projectId: string,
   userId: string
-): Promise<PublicStateVariable[]> {
+): Promise<PublicVariable[]> {
   const db = getDb();
 
   // Verify user owns the project
@@ -76,58 +76,56 @@ export async function listStateVariables(
     throw new NotFoundError("Project");
   }
 
-  // Fetch state variables
+  // Fetch variables
   const result = await db
     .select()
-    .from(stateVariables)
-    .where(eq(stateVariables.projectId, projectId))
-    .orderBy(asc(stateVariables.category), asc(stateVariables.key));
+    .from(variables)
+    .where(eq(variables.projectId, projectId))
+    .orderBy(asc(variables.category), asc(variables.key));
 
-  return result.map(mapToPublicStateVariable);
+  return result.map(mapToPublicVariable);
 }
 
 /**
- * Get a single state variable by ID
- * @param stateVariableId - The state variable ID to fetch
+ * Get a single variable by ID
+ * @param variableId - The variable ID to fetch
  * @param userId - The user ID making the request (for authorization)
  * @returns The state variable if found and accessible, null otherwise
  */
-export async function getStateVariable(
-  stateVariableId: string,
+export async function getVariable(
+  variableId: string,
   userId: string
-): Promise<PublicStateVariable | null> {
+): Promise<PublicVariable | null> {
   const db = getDb();
 
   const result = await db
     .select({
-      stateVariable: stateVariables,
+      variable: variables,
     })
-    .from(stateVariables)
-    .innerJoin(projects, eq(stateVariables.projectId, projects.id))
-    .where(
-      and(eq(stateVariables.id, stateVariableId), eq(projects.userId, userId))
-    )
+    .from(variables)
+    .innerJoin(projects, eq(variables.projectId, projects.id))
+    .where(and(eq(variables.id, variableId), eq(projects.userId, userId)))
     .limit(1);
 
   if (result.length === 0) {
     return null;
   }
 
-  return mapToPublicStateVariable(result[0].stateVariable);
+  return mapToPublicVariable(result[0].variable);
 }
 
 /**
- * Create a new state variable
- * @param userId - The user ID creating the state variable
- * @param projectId - The project ID to create the state variable for
- * @param body - The state variable data
- * @returns The created state variable
+ * Create a new variable
+ * @param userId - The user ID creating the variable
+ * @param projectId - The project ID to create the variable for
+ * @param body - The variable data
+ * @returns The created variable
  */
-export async function createStateVariable(
+export async function createVariable(
   userId: string,
   projectId: string,
-  body: CreateStateVariableBody
-): Promise<PublicStateVariable> {
+  body: CreateVariableBody
+): Promise<PublicVariable> {
   const db = getDb();
 
   // Verify user owns the project
@@ -141,7 +139,7 @@ export async function createStateVariable(
     throw new NotFoundError("Project");
   }
 
-  const newStateVariable: NewStateVariable = {
+  const newVariable: NewVariable = {
     projectId,
     key: body.key,
     description: body.description ?? null,
@@ -149,57 +147,50 @@ export async function createStateVariable(
   };
 
   try {
-    const result = await db
-      .insert(stateVariables)
-      .values(newStateVariable)
-      .returning();
+    const result = await db.insert(variables).values(newVariable).returning();
 
     if (!result || result.length === 0 || !result[0]) {
       throw new Error(
-        "Failed to create state variable: database insert returned no rows"
+        "Failed to create variable: database insert returned no rows"
       );
     }
 
-    return mapToPublicStateVariable(result[0]);
+    return mapToPublicVariable(result[0]);
   } catch (err) {
     // Handle unique constraint violation (PostgreSQL error code 23505)
     if (err instanceof Error && "code" in err && err.code === "23505") {
-      throw new ConflictError(
-        "State variable key already exists for this project"
-      );
+      throw new ConflictError("Variable key already exists for this project");
     }
     throw err;
   }
 }
 
 /**
- * Update an existing state variable
- * @param stateVariableId - The state variable ID to update
+ * Update an existing variable
+ * @param variableId - The variable ID to update
  * @param userId - The user ID making the request (for authorization)
  * @param body - The state variable data to update
  * @returns The updated state variable
  */
-export async function updateStateVariable(
-  stateVariableId: string,
+export async function updateVariable(
+  variableId: string,
   userId: string,
-  body: UpdateStateVariableBody
-): Promise<PublicStateVariable> {
+  body: UpdateVariableBody
+): Promise<PublicVariable> {
   const db = getDb();
 
   // Verify user has access to the state variable
   const accessCheck = await db
     .select({
-      stateVariable: stateVariables,
+      variable: variables,
     })
-    .from(stateVariables)
-    .innerJoin(projects, eq(stateVariables.projectId, projects.id))
-    .where(
-      and(eq(stateVariables.id, stateVariableId), eq(projects.userId, userId))
-    )
+    .from(variables)
+    .innerJoin(projects, eq(variables.projectId, projects.id))
+    .where(and(eq(variables.id, variableId), eq(projects.userId, userId)))
     .limit(1);
 
   if (accessCheck.length === 0) {
-    throw new NotFoundError("State Variable");
+    throw new NotFoundError("Variable");
   }
 
   try {
@@ -220,78 +211,72 @@ export async function updateStateVariable(
       throw new ValidationError("No valid fields provided for update");
     }
 
-    // Update the state variable
+    // Update the variable
     const result = await db
-      .update(stateVariables)
+      .update(variables)
       .set(updateData)
-      .where(eq(stateVariables.id, stateVariableId))
+      .where(eq(variables.id, variableId))
       .returning();
 
     if (!result || result.length === 0 || !result[0]) {
       throw new Error(
-        "Failed to update state variable: database update returned no rows"
+        "Failed to update variable: database update returned no rows"
       );
     }
 
-    return mapToPublicStateVariable(result[0]);
+    return mapToPublicVariable(result[0]);
   } catch (err) {
     // Handle unique constraint violation (PostgreSQL error code 23505)
     if (err instanceof Error && "code" in err && err.code === "23505") {
-      throw new ConflictError(
-        "State variable key already exists for this project"
-      );
+      throw new ConflictError("Variable key already exists for this project");
     }
     throw err;
   }
 }
 
 /**
- * Delete a state variable
- * @param stateVariableId - The state variable ID to delete
+ * Delete a variable
+ * @param variableId - The variable ID to delete
  * @param userId - The user ID making the request (for authorization)
  * @returns True if deleted successfully
  */
-export async function deleteStateVariable(
-  stateVariableId: string,
+export async function deleteVariable(
+  variableId: string,
   userId: string
 ): Promise<boolean> {
   const db = getDb();
 
-  // Verify user has access to the state variable
+  // Verify user has access to the variable
   const accessCheck = await db
-    .select({ id: stateVariables.id })
-    .from(stateVariables)
-    .innerJoin(projects, eq(stateVariables.projectId, projects.id))
-    .where(
-      and(eq(stateVariables.id, stateVariableId), eq(projects.userId, userId))
-    )
+    .select({ id: variables.id })
+    .from(variables)
+    .innerJoin(projects, eq(variables.projectId, projects.id))
+    .where(and(eq(variables.id, variableId), eq(projects.userId, userId)))
     .limit(1);
 
   if (accessCheck.length === 0) {
-    throw new NotFoundError("State Variable");
+    throw new NotFoundError("Variable");
   }
 
-  // Delete the state variable
+  // Delete the variable
   const result = await db
-    .delete(stateVariables)
-    .where(eq(stateVariables.id, stateVariableId))
+    .delete(variables)
+    .where(eq(variables.id, variableId))
     .returning();
 
   return result.length > 0;
 }
 
 /**
- * Map a StateVariable to PublicStateVariable
+ * Map a Variable to PublicVariable
  */
-function mapToPublicStateVariable(
-  stateVariable: StateVariable
-): PublicStateVariable {
+function mapToPublicVariable(variable: Variable): PublicVariable {
   return {
-    id: stateVariable.id,
-    projectId: stateVariable.projectId,
-    key: stateVariable.key,
-    description: stateVariable.description,
-    category: stateVariable.category,
-    createdAt: stateVariable.createdAt,
+    id: variable.id,
+    projectId: variable.projectId,
+    key: variable.key,
+    description: variable.description,
+    category: variable.category,
+    createdAt: variable.createdAt,
   };
 }

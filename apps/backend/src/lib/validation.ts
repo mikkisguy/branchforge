@@ -285,7 +285,7 @@ export const createProjectSchema = z
   .object({
     name: requiredString(200, "Project name is too long"),
     description: optionalString(2000, "Description is too long"),
-    maxMeterDelta: z.number().int().optional(),
+    maxStatDelta: z.number().int().optional(),
     source: sourceOriginSchema,
   })
   .strict();
@@ -398,10 +398,10 @@ export const updateLabelSchema = z
       )
       .nullable()
       .optional(),
-    prerequisites: z
+    conditions: z
       .object({
-        meters: z.record(z.string(), z.number().finite()).optional(),
-        stateVariables: z.array(z.string()).optional(),
+        stats: z.record(z.string(), z.number().finite()).optional(),
+        variables: z.array(z.string()).optional(),
       })
       .optional()
       .nullable(),
@@ -487,74 +487,74 @@ export const routeConfigProjectIdParamsSchema = z.object({
 });
 
 // ============================================================================
-// State Variable Schemas
+// Variable Schemas
 // ============================================================================
 
 /**
- * State variable key validation schema
- * Validates state variable key format (alphanumeric, underscores, hyphens)
+ * Variable key validation schema
+ * Validates variable key format (alphanumeric, underscores, hyphens)
  */
-export const stateVariableKeySchema = z
+export const variableKeySchema = z
   .string()
-  .min(1, "State variable key is required")
-  .max(50, "State variable key is too long")
+  .min(1, "Variable key is required")
+  .max(50, "Variable key is too long")
   .regex(
     /^[a-zA-Z0-9_-]+$/,
-    "State variable key must contain only letters, numbers, underscores, and hyphens"
+    "Variable key must contain only letters, numbers, underscores, and hyphens"
   );
 
 /**
- * Create state variable request validation
+ * Create variable request validation
  */
-export const createStateVariableSchema = z
+export const createVariableSchema = z
   .object({
-    key: stateVariableKeySchema,
+    key: variableKeySchema,
     description: optionalString(500, "Description is too long"),
     category: optionalString(50, "Category is too long"),
   })
   .strict();
 
 /**
- * Update state variable request validation
+ * Update variable request validation
  */
-export const updateStateVariableSchema = z
+export const updateVariableSchema = z
   .object({
-    key: stateVariableKeySchema.optional(),
+    key: variableKeySchema.optional(),
     description: optionalString(500, "Description is too long"),
     category: optionalString(50, "Category is too long"),
   })
   .strict();
 
 /**
- * State variable ID params validation
+ * Variable ID params validation
  */
-export const stateVariableIdParamsSchema = z.object({
-  stateVariableId: uuidSchema,
+export const variableIdParamsSchema = z.object({
+  variableId: uuidSchema,
 });
 
 // ============================================================================
-// Meter Validation Schemas
+// Stat Validation Schemas
 // ============================================================================
 
 /**
- * Meter key validation schema
+ * Stat key validation schema
  * Keys must start with lowercase letter, contain only [a-z0-9_]
  */
-export const meterKeySchema = z
+export const statKeySchema = z
   .string()
-  .min(1, "Meter key is required")
-  .max(100, "Meter key is too long")
+  .min(1, "Stat key is required")
+  .max(100, "Stat key is too long")
   .regex(
     /^[a-z][a-z0-9_]*$/,
-    "Meter key must start with a letter and contain only lowercase letters, numbers, and underscores"
+    "Stat key must start with a letter and contain only lowercase letters, numbers, and underscores"
   );
 
 /**
- * Create meter request validation
+ * Create stat request validation
  */
-export const createMeterSchema = z
+export const createStatSchema = z
   .object({
-    key: meterKeySchema,
+    key: statKeySchema,
     name: requiredString(200, "Name is too long"),
     characterId: uuidSchema.optional().nullable(),
     minValue: z.number().int().default(0),
@@ -568,9 +568,9 @@ export const createMeterSchema = z
   });
 
 /**
- * Update meter request validation
+ * Update stat request validation
  */
-export const updateMeterSchema = z
+export const updateStatSchema = z
   .object({
     name: requiredString(200, "Name is too long"),
     characterId: uuidSchema.nullable(),
@@ -594,15 +594,15 @@ export const updateMeterSchema = z
   );
 
 /**
- * Meter ID params validation
+ * Stat ID params validation
  */
-export const meterIdParamsSchema = z.object({
-  meterId: uuidSchema,
+export const statIdParamsSchema = z.object({
+  statId: uuidSchema,
 });
 
 // Type exports
-export type CreateMeterInput = z.infer<typeof createMeterSchema>;
-export type UpdateMeterInput = z.infer<typeof updateMeterSchema>;
+export type CreateStatInput = z.infer<typeof createStatSchema>;
+export type UpdateStatInput = z.infer<typeof updateStatSchema>;
 
 // ============================================================================
 // Character Schemas
@@ -946,12 +946,8 @@ export type ImportRequestInput = z.infer<typeof importRequestSchema>;
 export type PaginationQuery = z.infer<typeof paginationQuerySchema>;
 export type CreateRouteConfigInput = z.infer<typeof createRouteConfigSchema>;
 export type UpdateRouteConfigInput = z.infer<typeof updateRouteConfigSchema>;
-export type CreateStateVariableInput = z.infer<
-  typeof createStateVariableSchema
->;
-export type UpdateStateVariableInput = z.infer<
-  typeof updateStateVariableSchema
->;
+export type CreateVariableInput = z.infer<typeof createVariableSchema>;
+export type UpdateVariableInput = z.infer<typeof updateVariableSchema>;
 // ============================================================================
 // User Settings Schemas
 // ============================================================================

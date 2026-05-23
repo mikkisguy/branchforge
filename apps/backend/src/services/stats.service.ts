@@ -1,29 +1,29 @@
 /**
- * Meters Service
+ * Stats Service
  *
- * Handles meter CRUD operations and progression queries.
- * Meters are numerical relationship stats (affection, trust, etc.)
+ * Handles stat CRUD operations and progression queries.
+ * Stats are numerical relationship stats (affection, trust, etc.)
  * that change based on player choices across visual novel scenes.
  */
 
 import { getDb } from "../db/index.js";
-import { meters, labels } from "../db/schema/index.js";
+import { stats, labels } from "../db/schema/index.js";
 import { eq, and, isNull } from "drizzle-orm";
-import type { Meter, NewMeter } from "../db/schema/index.js";
+import type { Stat, NewStat } from "../db/schema/index.js";
 import {
   ConflictError,
   NotFoundError,
   ValidationError,
 } from "../middleware/error-handler.middleware.js";
 import { requireProjectOwnership } from "./authz.service.js";
-import type { MeterLabelEffect, MeterProgression } from "@branchforge/shared";
-import type { CreateMeterInput, UpdateMeterInput } from "../lib/validation.js";
+import type { StatLabelEffect, StatProgression } from "@branchforge/shared";
+import type { CreateStatInput, UpdateStatInput } from "../lib/validation.js";
 
 // ============================================================================
 // Public Types
 // ============================================================================
 
-export interface PublicMeter {
+export interface PublicStat {
   id: string;
   projectId: string;
   characterId: string | null;
@@ -40,18 +40,18 @@ export interface PublicMeter {
 // Helpers
 // ============================================================================
 
-function mapToPublicMeter(meter: Meter): PublicMeter {
+function mapToPublicStat(stat: Stat): PublicStat {
   return {
-    id: meter.id,
-    projectId: meter.projectId,
-    characterId: meter.characterId,
-    key: meter.key,
-    name: meter.name,
-    minValue: meter.minValue,
-    maxValue: meter.maxValue,
-    description: meter.description,
-    createdAt: meter.createdAt.toISOString(),
-    updatedAt: meter.updatedAt.toISOString(),
+    id: stat.id,
+    projectId: stat.projectId,
+    characterId: stat.characterId,
+    key: stat.key,
+    name: stat.name,
+    minValue: stat.minValue,
+    maxValue: stat.maxValue,
+    description: stat.description,
+    createdAt: stat.createdAt.toISOString(),
+    updatedAt: stat.updatedAt.toISOString(),
   };
 }
 
@@ -59,59 +59,59 @@ function mapToPublicMeter(meter: Meter): PublicMeter {
 // MetersService
 // ============================================================================
 
-export class MetersService {
+export class StatsService {
   // --------------------------------------------------------------------------
   // Authorization helper
   // --------------------------------------------------------------------------
 
-  async requireMeterAccess(meterId: string, userId: string): Promise<Meter> {
+  async requireStatAccess(statId: string, userId: string): Promise<Stat> {
     const db = getDb();
 
-    const [meter] = await db
+    const [stat] = await db
       .select()
-      .from(meters)
-      .where(eq(meters.id, meterId))
+      .from(stats)
+      .where(eq(stats.id, statId))
       .limit(1);
 
-    if (!meter) {
-      throw new NotFoundError("Meter");
+    if (!stat) {
+      throw new NotFoundError("Stat");
     }
 
-    await requireProjectOwnership(meter.projectId, userId);
+    await requireProjectOwnership(stat.projectId, userId);
 
-    return meter;
+    return stat;
   }
 
   // --------------------------------------------------------------------------
   // CRUD
   // --------------------------------------------------------------------------
 
-  /** List all meters for a project. */
-  async listMeters(projectId: string, userId: string): Promise<PublicMeter[]> {
+  /** List all stats for a project. */
+  async listStats(projectId: string, userId: string): Promise<PublicStat[]> {
     await requireProjectOwnership(projectId, userId);
 
     const db = getDb();
 
     const rows = await db
       .select()
-      .from(meters)
-      .where(eq(meters.projectId, projectId))
-      .orderBy(meters.key);
+      .from(stats)
+      .where(eq(stats.projectId, projectId))
+      .orderBy(stats.key);
 
-    return rows.map(mapToPublicMeter);
+    return rows.map(mapToPublicStat);
   }
 
-  /** Create a new meter. */
-  async createMeter(
+  /** Create a new stat. */
+  async createStat(
     projectId: string,
     userId: string,
-    input: CreateMeterInput
-  ): Promise<PublicMeter> {
+    input: CreateStatInput
+  ): Promise<PublicStat> {
     await requireProjectOwnership(projectId, userId);
 
     const db = getDb();
 
-    const newMeter: NewMeter = {
+    const newStat: NewStat = {
       projectId,
       characterId: input.characterId ?? null,
       key: input.key,
@@ -123,37 +123,37 @@ export class MetersService {
 
     try {
       const [result] = await db
-        .insert(meters)
-        .values(newMeter)
+        .insert(stats)
+        .values(newStat)
         .onConflictDoNothing({
-          target: [meters.projectId, meters.key],
+          target: [stats.projectId, stats.key],
         })
         .returning();
 
       if (!result) {
-        throw new ConflictError("Meter with this key already exists");
+        throw new ConflictError("Stat with this key already exists");
       }
 
-      return mapToPublicMeter(result);
+      return mapToPublicStat(result);
     } catch (err) {
       if (err instanceof ConflictError) throw err;
       if (err instanceof Error && "code" in err && err.code === "23505") {
-        throw new ConflictError("Meter with this key already exists");
+        throw new ConflictError("Stat with this key already exists");
       }
       throw err;
     }
   }
 
-  /** Update an existing meter. */
-  async updateMeter(
-    meterId: string,
+  /** Update an existing stat. */
+  async updateStat(
+    statId: string,
     userId: string,
-    input: UpdateMeterInput
-  ): Promise<PublicMeter> {
-    const currentMeter = await this.requireMeterAccess(meterId, userId);
+    input: UpdateStatInput
+  ): Promise<PublicStat> {
+    const currentStat = await this.requireStatAccess(statId, userId);
 
-    const effectiveMin = input.minValue ?? currentMeter.minValue;
-    const effectiveMax = input.maxValue ?? currentMeter.maxValue;
+    const effectiveMin = input.minValue ?? currentStat.minValue;
+    const effectiveMax = input.maxValue ?? currentStat.maxValue;
 
     if (effectiveMin > effectiveMax) {
       throw new ValidationError(
@@ -165,34 +165,34 @@ export class MetersService {
 
     try {
       const [updated] = await db
-        .update(meters)
+        .update(stats)
         .set({
           ...input,
           updatedAt: new Date(),
         })
-        .where(eq(meters.id, meterId))
+        .where(eq(stats.id, statId))
         .returning();
 
       if (!updated) {
-        throw new NotFoundError("Meter");
+        throw new NotFoundError("Stat");
       }
 
-      return mapToPublicMeter(updated);
+      return mapToPublicStat(updated);
     } catch (err) {
       if (err instanceof NotFoundError) throw err;
       if (err instanceof Error && "code" in err && err.code === "23505") {
-        throw new ConflictError("Meter with this key already exists");
+        throw new ConflictError("Stat with this key already exists");
       }
       throw err;
     }
   }
 
-  /** Delete a meter. */
-  async deleteMeter(meterId: string, userId: string): Promise<void> {
-    await this.requireMeterAccess(meterId, userId);
+  /** Delete a stat. */
+  async deleteStat(statId: string, userId: string): Promise<void> {
+    await this.requireStatAccess(statId, userId);
 
     const db = getDb();
-    await db.delete(meters).where(eq(meters.id, meterId));
+    await db.delete(stats).where(eq(stats.id, statId));
   }
 
   // --------------------------------------------------------------------------
@@ -200,26 +200,26 @@ export class MetersService {
   // --------------------------------------------------------------------------
 
   /**
-   * Get progression data for all meters in a project.
+   * Get progression data for all stats in a project.
    * Scans all active labels and extracts meter references from
    * prerequisites and effects JSONB fields.
    */
   async getProgression(
     projectId: string,
     userId: string
-  ): Promise<MeterProgression[]> {
+  ): Promise<StatProgression[]> {
     await requireProjectOwnership(projectId, userId);
 
     const db = getDb();
 
-    // Fetch all meters for the project
-    const projectMeters = await db
+    // Fetch all stats for the project
+    const projectStats = await db
       .select()
-      .from(meters)
-      .where(eq(meters.projectId, projectId))
-      .orderBy(meters.key);
+      .from(stats)
+      .where(eq(stats.projectId, projectId))
+      .orderBy(stats.key);
 
-    if (projectMeters.length === 0) {
+    if (projectStats.length === 0) {
       return [];
     }
 
@@ -229,48 +229,48 @@ export class MetersService {
         id: labels.id,
         title: labels.title,
         route: labels.route,
-        prerequisites: labels.prerequisites,
+        conditions: labels.conditions,
         effects: labels.effects,
       })
       .from(labels)
       .where(and(eq(labels.projectId, projectId), isNull(labels.deletedAt)));
 
-    // Build progression data for each meter
-    return projectMeters.map((meter) => {
-      const labelEffects: MeterLabelEffect[] = [];
+    // Build progression data for each stat
+    return projectStats.map((stat) => {
+      const labelEffects: StatLabelEffect[] = [];
 
       for (const label of projectLabels) {
-        const prereqs = (label.prerequisites ?? {}) as {
-          meters?: Record<string, number>;
+        const conditions = (label.conditions ?? {}) as {
+          stats?: Record<string, number>;
         };
         const fx = (label.effects ?? {}) as {
-          meters?: Record<string, number>;
+          stats?: Record<string, number>;
         };
 
-        const prerequisiteValue = prereqs.meters?.[meter.key] ?? null;
-        const effectDelta = fx.meters?.[meter.key] ?? null;
+        const conditionValue = conditions.stats?.[stat.key] ?? null;
+        const effectDelta = fx.stats?.[stat.key] ?? null;
 
-        // Only include labels that actually reference this meter
-        if (prerequisiteValue !== null || effectDelta !== null) {
+        // Only include labels that actually reference this stat
+        if (conditionValue !== null || effectDelta !== null) {
           labelEffects.push({
             labelId: label.id,
             labelTitle: label.title,
             routeKey: label.route ?? null,
-            prerequisiteValue,
+            conditionValue,
             effectDelta,
           });
         }
       }
 
       return {
-        meterKey: meter.key,
-        meterName: meter.name,
-        minValue: meter.minValue,
-        maxValue: meter.maxValue,
+        statKey: stat.key,
+        statName: stat.name,
+        minValue: stat.minValue,
+        maxValue: stat.maxValue,
         labels: labelEffects,
       };
     });
   }
 }
 
-export const metersService = new MetersService();
+export const statsService = new StatsService();
