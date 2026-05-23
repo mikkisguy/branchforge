@@ -6,7 +6,7 @@
  */
 
 import { request, requestVoid } from "./client";
-import type { StateVariable } from "@branchforge/shared";
+import type { Variable } from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -25,11 +25,11 @@ export interface UpdateStateVariableBody {
 }
 
 export interface ListStateVariablesResponse {
-  stateVariables: StateVariable[];
+  stateVariables: Variable[];
 }
 
 export interface GetStateVariableResponse {
-  stateVariable: StateVariable;
+  stateVariable: Variable;
 }
 
 // ============================================================================
@@ -40,7 +40,7 @@ export const stateVariablesApi = {
   /**
    * List all state variables for a project
    */
-  async listStateVariables(projectId: string): Promise<StateVariable[]> {
+  async listStateVariables(projectId: string): Promise<Variable[]> {
     const response = await request<ListStateVariablesResponse>(
       `/projects/${encodeURIComponent(projectId)}/state-variables`,
       {
@@ -53,7 +53,7 @@ export const stateVariablesApi = {
   /**
    * Get a single state variable by ID
    */
-  async getStateVariable(stateVariableId: string): Promise<StateVariable> {
+  async getStateVariable(stateVariableId: string): Promise<Variable> {
     const response = await request<GetStateVariableResponse>(
       `/state-variables/${encodeURIComponent(stateVariableId)}`,
       {
@@ -69,7 +69,7 @@ export const stateVariablesApi = {
   async createStateVariable(
     projectId: string,
     body: CreateStateVariableBody
-  ): Promise<StateVariable> {
+  ): Promise<Variable> {
     const response = await request<GetStateVariableResponse>(
       `/projects/${encodeURIComponent(projectId)}/state-variables`,
       {
@@ -86,7 +86,7 @@ export const stateVariablesApi = {
   async updateStateVariable(
     stateVariableId: string,
     body: UpdateStateVariableBody
-  ): Promise<StateVariable> {
+  ): Promise<Variable> {
     const response = await request<GetStateVariableResponse>(
       `/state-variables/${encodeURIComponent(stateVariableId)}`,
       {

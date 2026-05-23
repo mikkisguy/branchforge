@@ -803,10 +803,17 @@ export function LabelNavigator({
               currentRoute={editDialog.label.routeKey}
               currentStatus={editDialog.label.status}
               currentVisibility={editDialog.label.visibility}
-              currentPrerequisites={editDialog.label.prerequisites ?? null}
+              currentPrerequisites={
+                editDialog.label.conditions
+                  ? {
+                      meters: editDialog.label.conditions.stats,
+                      stateVariables: editDialog.label.conditions.variables,
+                    }
+                  : null
+              }
               routeConfigs={routeConfigs ?? []}
               meters={meters}
-              stateVariables={stateVariables}
+              variables={stateVariables}
               onSave={handleEditSave}
               isSaving={isUpdatingLabel ?? false}
               onOpenStateVariables={() => setStateVariablesModalOpen(true)}

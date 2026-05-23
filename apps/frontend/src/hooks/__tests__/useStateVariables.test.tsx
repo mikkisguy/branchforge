@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { useStateVariables } from "../useStateVariables";
 import { stateVariablesApi } from "@/lib/api/state-variables";
-import type { StateVariable } from "@branchforge/shared";
+import type { Variable } from "@branchforge/shared";
 import { createTestQueryClient } from "@/test/query-client";
 
 // Mock the stateVariables API
@@ -34,7 +34,7 @@ vi.mock("@/contexts/ToastContext", () => ({
   }),
 }));
 
-const mockStateVariables: StateVariable[] = [
+const mockVariables: Variable[] = [
   {
     id: "var-1",
     projectId: "project-1",
@@ -63,7 +63,7 @@ describe("useStateVariables", () => {
   describe("Query", () => {
     it("should fetch state variables for project", async () => {
       vi.mocked(stateVariablesApi.listStateVariables).mockResolvedValue(
-        mockStateVariables
+        mockVariables
       );
 
       const { result } = renderHook(() => useStateVariables("project-1"), {
@@ -71,7 +71,7 @@ describe("useStateVariables", () => {
       });
 
       await waitFor(() => {
-        expect(result.current.stateVariables).toEqual(mockStateVariables);
+        expect(result.current.stateVariables).toEqual(mockVariables);
       });
 
       expect(stateVariablesApi.listStateVariables).toHaveBeenCalledWith(
@@ -83,7 +83,7 @@ describe("useStateVariables", () => {
       vi.mocked(stateVariablesApi.listStateVariables).mockImplementation(
         () =>
           new Promise((resolve) =>
-            setTimeout(() => resolve(mockStateVariables), 100)
+            setTimeout(() => resolve(mockVariables), 100)
           )
       );
 
@@ -117,7 +117,7 @@ describe("useStateVariables", () => {
   describe("Create Mutation", () => {
     it("should create state variable and invalidate cache", async () => {
       vi.mocked(stateVariablesApi.listStateVariables).mockResolvedValue(
-        mockStateVariables
+        mockVariables
       );
       vi.mocked(stateVariablesApi.createStateVariable).mockResolvedValue({
         id: "var-2",
@@ -126,7 +126,7 @@ describe("useStateVariables", () => {
         description: "Met Lucas",
         category: "flags",
         createdAt: "2024-01-01T00:00:00.000Z",
-      } as StateVariable);
+      } as Variable);
 
       const { result } = renderHook(() => useStateVariables("project-1"), {
         wrapper,
@@ -162,7 +162,7 @@ describe("useStateVariables", () => {
 
     it("should show loading state during create", async () => {
       vi.mocked(stateVariablesApi.listStateVariables).mockResolvedValue(
-        mockStateVariables
+        mockVariables
       );
       vi.mocked(stateVariablesApi.createStateVariable).mockImplementation(
         () =>
@@ -176,7 +176,7 @@ describe("useStateVariables", () => {
                   description: "Met Lucas",
                   category: "flags",
                   createdAt: "2024-01-01T00:00:00.000Z",
-                } as StateVariable),
+                } as Variable),
               100
             )
           )
@@ -207,7 +207,7 @@ describe("useStateVariables", () => {
 
     it("should show error toast on create failure", async () => {
       vi.mocked(stateVariablesApi.listStateVariables).mockResolvedValue(
-        mockStateVariables
+        mockVariables
       );
       const error = new Error("Create failed");
       vi.mocked(stateVariablesApi.createStateVariable).mockRejectedValue(error);
@@ -234,10 +234,10 @@ describe("useStateVariables", () => {
   describe("Update Mutation", () => {
     it("should update state variable and invalidate cache", async () => {
       vi.mocked(stateVariablesApi.listStateVariables).mockResolvedValue(
-        mockStateVariables
+        mockVariables
       );
       vi.mocked(stateVariablesApi.updateStateVariable).mockResolvedValue({
-        ...mockStateVariables[0],
+        ...mockVariables[0],
         description: "Updated description",
       });
 
@@ -273,11 +273,11 @@ describe("useStateVariables", () => {
 
     it("should toggle isUpdatingStateVariable during update", async () => {
       vi.mocked(stateVariablesApi.listStateVariables).mockResolvedValue(
-        mockStateVariables
+        mockVariables
       );
 
-      let resolveUpdate: (value: StateVariable) => void;
-      const deferredUpdate = new Promise<StateVariable>((resolve) => {
+      let resolveUpdate: (value: Variable) => void;
+      const deferredUpdate = new Promise<Variable>((resolve) => {
         resolveUpdate = resolve;
       });
 
@@ -311,7 +311,7 @@ describe("useStateVariables", () => {
       );
 
       resolveUpdate!({
-        ...mockStateVariables[0],
+        ...mockVariables[0],
         description: "Updated description",
       });
 
@@ -329,7 +329,7 @@ describe("useStateVariables", () => {
 
     it("should show error toast on update failure", async () => {
       vi.mocked(stateVariablesApi.listStateVariables).mockResolvedValue(
-        mockStateVariables
+        mockVariables
       );
       const error = new Error("Update failed");
       vi.mocked(stateVariablesApi.updateStateVariable).mockRejectedValue(error);
@@ -356,7 +356,7 @@ describe("useStateVariables", () => {
   describe("Delete Mutation", () => {
     it("should delete state variable and invalidate cache", async () => {
       vi.mocked(stateVariablesApi.listStateVariables).mockResolvedValue(
-        mockStateVariables
+        mockVariables
       );
       vi.mocked(stateVariablesApi.deleteStateVariable).mockResolvedValue(
         undefined
@@ -389,7 +389,7 @@ describe("useStateVariables", () => {
 
     it("should show error toast on delete failure", async () => {
       vi.mocked(stateVariablesApi.listStateVariables).mockResolvedValue(
-        mockStateVariables
+        mockVariables
       );
       const error = new Error("Delete failed");
       vi.mocked(stateVariablesApi.deleteStateVariable).mockRejectedValue(error);
@@ -416,9 +416,9 @@ describe("useStateVariables", () => {
   describe("Refresh", () => {
     it("should refresh state variables list", async () => {
       vi.mocked(stateVariablesApi.listStateVariables)
-        .mockResolvedValueOnce(mockStateVariables)
+        .mockResolvedValueOnce(mockVariables)
         .mockResolvedValueOnce([
-          ...mockStateVariables,
+          ...mockVariables,
           {
             id: "var-2",
             projectId: "project-1",

@@ -44,7 +44,7 @@ describe("Labels API", () => {
     projectFileId: "file-1",
     fileName: "scene_1.rpy",
     labelName: null,
-    prerequisites: null,
+    conditions: null,
     createdAt: "2024-01-01T00:00:00.000Z",
     updatedAt: "2024-01-01T00:00:00.000Z",
   };

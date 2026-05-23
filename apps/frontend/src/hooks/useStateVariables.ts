@@ -9,7 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { stateVariablesApi } from "@/lib/api/state-variables";
 import { stateVariableKeys } from "@/lib/query-keys";
 import { useToast } from "@/contexts/ToastContext";
-import type { StateVariable } from "@branchforge/shared";
+import type { Variable } from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -29,7 +29,7 @@ interface UpdateStateVariableInput {
 
 export interface UseStateVariablesReturn {
   // State variables state
-  stateVariables: StateVariable[];
+  stateVariables: Variable[];
   isLoadingStateVariables: boolean;
   stateVariablesError: Error | null;
 
@@ -40,13 +40,11 @@ export interface UseStateVariablesReturn {
 
   // Methods
   refreshStateVariables: () => void;
-  createStateVariable: (
-    input: CreateStateVariableInput
-  ) => Promise<StateVariable>;
+  createStateVariable: (input: CreateStateVariableInput) => Promise<Variable>;
   updateStateVariable: (
     stateVariableId: string,
     input: UpdateStateVariableInput
-  ) => Promise<StateVariable>;
+  ) => Promise<Variable>;
   deleteStateVariable: (stateVariableId: string) => Promise<void>;
 }
 
@@ -133,7 +131,7 @@ export function useStateVariables(projectId: string): UseStateVariablesReturn {
   // Create state variable method
   const createStateVariable = async (
     input: CreateStateVariableInput
-  ): Promise<StateVariable> => {
+  ): Promise<Variable> => {
     return createStateVariableMutation.mutateAsync(input);
   };
 
@@ -141,7 +139,7 @@ export function useStateVariables(projectId: string): UseStateVariablesReturn {
   const updateStateVariable = async (
     stateVariableId: string,
     input: UpdateStateVariableInput
-  ): Promise<StateVariable> => {
+  ): Promise<Variable> => {
     return updateStateVariableMutation.mutateAsync({ stateVariableId, input });
   };
 

@@ -104,14 +104,14 @@ export interface RouteConfig {
 }
 
 // ============================================================================
-// State Variable Configuration
+// Variable Configuration
 // ============================================================================
 
 /**
- * State Variable for conditional branching logic
- * State variables are boolean state variables used in prerequisites and effects
+ * Variable for conditional branching logic
+ * Variables are boolean state variables used in conditions and effects
  */
-export interface StateVariable {
+export interface Variable {
   id: string;
   projectId: string;
   key: string;
@@ -345,10 +345,10 @@ export interface PublicLabel {
   projectFileId: string;
   /** Basename of the file path (e.g., "act_i.rpy" from "labels/act_i.rpy") */
   fileName: string;
-  /** Meter and state variable prerequisites for this label */
-  prerequisites: {
-    meters?: Record<string, number>;
-    stateVariables?: string[];
+  /** Variable and stat conditions for this label */
+  conditions: {
+    variables?: string[];
+    stats?: Record<string, number>;
   } | null;
   createdAt: string;
   updatedAt: string;
