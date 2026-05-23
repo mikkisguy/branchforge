@@ -349,13 +349,13 @@ export function patchRPYWithVariables(
     }
 
     // Detect end of label (for effect insertion)
-    // We look for jump, return, or end of file at the same or lower indent level
+    // We look for jump, return, or end of file at a lower indent level
     if (currentLabel && !effectsInserted.has(currentLabel)) {
       const lineIndent = line.match(/^(\s*)/)?.[1].length ?? 0;
 
-      // Check if this line ends the label (jump, return at same or lower indent)
+      // Check if this line ends the label (jump, return at lower indent)
       if (
-        lineIndent <= currentLabelIndent &&
+        lineIndent < currentLabelIndent &&
         (trimmed.startsWith("jump ") ||
           trimmed === "return" ||
           trimmed.startsWith("call "))

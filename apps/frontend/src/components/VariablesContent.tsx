@@ -37,8 +37,8 @@ function validateVariable(stateVariable: VariableForm): string | null {
   if (!stateVariable.key.trim()) {
     return "Variable key is required";
   }
-  if (!/^[a-zA-Z0-9_-]+$/.test(stateVariable.key)) {
-    return "Variable key can only contain letters, numbers, underscores, and hyphens";
+  if (!/^[a-zA-Z0-9_]+$/.test(stateVariable.key)) {
+    return "Variable key can only contain letters, numbers, and underscores";
   }
   if (stateVariable.key.length > 50) {
     return "Variable key is too long (max 50 characters)";
