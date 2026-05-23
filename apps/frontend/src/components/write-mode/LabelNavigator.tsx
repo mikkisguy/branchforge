@@ -8,7 +8,6 @@
  */
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import { createPortal } from "react-dom";
 import type { PublicLabel, LabelStatus } from "@branchforge/shared";
 import {
   ArrowUpDown,
@@ -23,13 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { LabelContextMenu } from "@/components/write-mode/LabelContextMenu";
-import { LabelEditDialog } from "@/components/write-mode/LabelEditDialog";
-import { VariablesModal } from "@/components/ide-shared/VariablesModal";
-import { StatsDialog } from "@/components/StatsDialog";
 import { Tooltip } from "@/components/ui/tooltip";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { useStats } from "@/hooks/useStats";
-import { useVariables } from "@/hooks/useVariables";
 import type { UpdateLabelInput } from "@/lib/api/labels";
 
 const STATUS_COLORS: Record<LabelStatus, string> = {
@@ -398,17 +391,10 @@ function FileGroup({
 // Label Navigator Component
 // ============================================================================
 
-interface RouteConfigOption {
-  id: string;
-  routeKey: string;
-  routeName: string;
-}
-
 interface LabelNavigatorProps {
   labels: PublicLabel[];
   activeLabelId: string | null;
   onSelect: (labelId: string) => void;
-  projectId: string;
   projectName?: string;
   projectLabelCount?: number;
   onToggleCollapse?: () => void;
@@ -424,18 +410,16 @@ interface LabelNavigatorProps {
     data: UpdateLabelInput
   ) => Promise<PublicLabel>;
   isUpdatingLabel?: boolean;
-  // Delete
-  onDeleteLabel?: (labelId: string) => Promise<void>;
-  isDeletingLabel?: boolean;
-  // Route configs for edit dialog
-  routeConfigs?: RouteConfigOption[];
+  /** Called when user wants to edit a label's details (replaces internal dialog) */
+  onEditLabel?: (label: PublicLabel) => void;
+  /** Called when user wants to delete a label (replaces internal confirm dialog) */
+  onDeleteRequest?: (label: PublicLabel) => void;
 }
 
 export function LabelNavigator({
   labels,
   activeLabelId,
   onSelect,
-  projectId,
   projectName,
   projectLabelCount,
   onToggleCollapse,
@@ -443,18 +427,9 @@ export function LabelNavigator({
   isCreatingLabel,
   onUpdateLabel,
   isUpdatingLabel,
-  onDeleteLabel,
-  isDeletingLabel,
-  routeConfigs,
+  onEditLabel,
+  onDeleteRequest,
 }: LabelNavigatorProps) {
-  // Prerequisites data hooks
-  const { stats } = useStats(projectId);
-  const { variables } = useVariables(projectId);
-
-  // Prerequisites management modals
-  const [stateVariablesModalOpen, setStateVariablesModalOpen] = useState(false);
-  const [metersModalOpen, setStatsModalOpen] = useState(false);
-
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
     open: boolean;
@@ -465,18 +440,6 @@ export function LabelNavigator({
 
   // Inline rename state
   const [renamingLabelId, setRenamingLabelId] = useState<string | null>(null);
-
-  // Edit dialog state
-  const [editDialog, setEditDialog] = useState<{
-    open: boolean;
-    label: PublicLabel | null;
-  }>({ open: false, label: null });
-
-  // Delete confirmation state
-  const [deleteConfirm, setDeleteConfirm] = useState<{
-    open: boolean;
-    label: PublicLabel | null;
-  }>({ open: false, label: null });
 
   // Search/filter state (local, instant, no debouncing)
   const [searchQuery, setSearchQuery] = useState("");
@@ -526,51 +489,15 @@ export function LabelNavigator({
 
   const handleContextEditDetails = useCallback(() => {
     if (contextMenu.label) {
-      setEditDialog({ open: true, label: contextMenu.label });
+      onEditLabel?.(contextMenu.label);
     }
-  }, [contextMenu.label]);
+  }, [contextMenu.label, onEditLabel]);
 
   const handleContextDelete = useCallback(() => {
     if (contextMenu.label) {
-      setDeleteConfirm({ open: true, label: contextMenu.label });
+      onDeleteRequest?.(contextMenu.label);
     }
-  }, [contextMenu.label]);
-
-  // Edit dialog save handler
-  const handleEditSave = useCallback(
-    async (data: {
-      title?: string;
-      labelName?: string;
-      route?: string | null;
-      status?: "DRAFT" | "REVIEW" | "FINAL";
-      visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
-      conditions?: {
-        stats?: Record<string, number>;
-        variables?: string[];
-      } | null;
-    }) => {
-      if (editDialog.label) {
-        await onUpdateLabel?.(editDialog.label.id, data);
-        setEditDialog({ open: false, label: null });
-      }
-    },
-    [editDialog.label, onUpdateLabel]
-  );
-
-  // Delete confirmation handler
-  const handleDeleteConfirm = useCallback(async () => {
-    if (deleteConfirm.label) {
-      await onDeleteLabel?.(deleteConfirm.label.id);
-      setDeleteConfirm({ open: false, label: null });
-    }
-  }, [deleteConfirm.label, onDeleteLabel]);
-
-  // Portal target — render dialogs at body level to escape
-  // the sidebar's CSS transform containing block
-  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
-  useEffect(() => {
-    setPortalTarget(document.body);
-  }, []);
+  }, [contextMenu.label, onDeleteRequest]);
 
   const filteredLabels = useMemo(() => {
     if (!searchQuery.trim()) return labels;
@@ -788,73 +715,6 @@ export function LabelNavigator({
         onEditDetails={handleContextEditDetails}
         onDelete={handleContextDelete}
       />
-
-      {/* Edit Details Dialog — portaled to body to escape sidebar transform */}
-      {portalTarget &&
-        createPortal(
-          editDialog.label && (
-            <LabelEditDialog
-              open={editDialog.open}
-              onOpenChange={(open) =>
-                setEditDialog((prev) => ({ ...prev, open }))
-              }
-              currentTitle={editDialog.label.title}
-              currentLabelName={editDialog.label.labelName}
-              currentRoute={editDialog.label.routeKey}
-              currentStatus={editDialog.label.status}
-              currentVisibility={editDialog.label.visibility}
-              currentConditions={editDialog.label.conditions ?? null}
-              routeConfigs={routeConfigs ?? []}
-              meters={stats}
-              variables={variables}
-              onSave={handleEditSave}
-              isSaving={isUpdatingLabel ?? false}
-              onOpenStateVariables={() => setStateVariablesModalOpen(true)}
-              onOpenStats={() => setStatsModalOpen(true)}
-            />
-          ),
-          portalTarget
-        )}
-
-      {/* Delete Confirmation Dialog — portaled to body to escape sidebar transform */}
-      {portalTarget &&
-        createPortal(
-          <ConfirmDialog
-            open={deleteConfirm.open}
-            onOpenChange={(open) =>
-              setDeleteConfirm((prev) => ({ ...prev, open }))
-            }
-            onConfirm={handleDeleteConfirm}
-            title="Delete Label"
-            description={`Are you sure you want to delete "${deleteConfirm.label?.title ?? "this label"}"? This will remove the label and its content from the file. This action cannot be undone.`}
-            confirmLabel="Delete"
-            isLoading={isDeletingLabel ?? false}
-            loadingLabel="Deleting..."
-          />,
-          portalTarget
-        )}
-
-      {/* Variables Management Modal */}
-      {portalTarget &&
-        createPortal(
-          <VariablesModal
-            open={stateVariablesModalOpen}
-            onOpenChange={setStateVariablesModalOpen}
-            projectId={projectId}
-          />,
-          portalTarget
-        )}
-
-      {/* Stats Management Modal */}
-      {portalTarget &&
-        createPortal(
-          <StatsDialog
-            open={metersModalOpen}
-            onOpenChange={setStatsModalOpen}
-            projectId={projectId}
-          />,
-          portalTarget
-        )}
     </div>
   );
 }

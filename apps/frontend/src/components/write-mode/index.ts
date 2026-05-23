@@ -6,5 +6,5 @@
 
 export { ProseEditor } from "./ProseEditor";
 export { LabelNavigator } from "./LabelNavigator";
-export { CharacterReferencePanel } from "./CharacterReferencePanel";
+export { LabelPropertiesPanel } from "./LabelPropertiesPanel";
 export { SaveIndicator } from "./SaveIndicator";
