@@ -261,6 +261,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
               labels={labels}
               activeLabelId={activeLabelId}
               onSelect={handleLabelSelect}
+              projectId={currentProject!.id}
               projectName={projectName || currentProject?.name}
               projectLabelCount={labels.length}
               onToggleCollapse={() => setIsLeftSidebarCollapsed(true)}

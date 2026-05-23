@@ -24,8 +24,12 @@ import {
 } from "lucide-react";
 import { LabelContextMenu } from "@/components/write-mode/LabelContextMenu";
 import { LabelEditDialog } from "@/components/write-mode/LabelEditDialog";
+import { StateVariablesModal } from "@/components/ide-shared/StateVariablesModal";
+import { MetersDialog } from "@/components/MetersDialog";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useMeters } from "@/hooks/useMeters";
+import { useStateVariables } from "@/hooks/useStateVariables";
 import type { UpdateLabelInput } from "@/lib/api/labels";
 
 const STATUS_COLORS: Record<LabelStatus, string> = {
@@ -404,6 +408,7 @@ interface LabelNavigatorProps {
   labels: PublicLabel[];
   activeLabelId: string | null;
   onSelect: (labelId: string) => void;
+  projectId: string;
   projectName?: string;
   projectLabelCount?: number;
   onToggleCollapse?: () => void;
@@ -430,6 +435,7 @@ export function LabelNavigator({
   labels,
   activeLabelId,
   onSelect,
+  projectId,
   projectName,
   projectLabelCount,
   onToggleCollapse,
@@ -441,6 +447,14 @@ export function LabelNavigator({
   isDeletingLabel,
   routeConfigs,
 }: LabelNavigatorProps) {
+  // Prerequisites data hooks
+  const { meters } = useMeters(projectId);
+  const { stateVariables } = useStateVariables(projectId);
+
+  // Prerequisites management modals
+  const [stateVariablesModalOpen, setStateVariablesModalOpen] = useState(false);
+  const [metersModalOpen, setMetersModalOpen] = useState(false);
+
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
     open: boolean;
@@ -530,6 +544,10 @@ export function LabelNavigator({
       route?: string | null;
       status?: "DRAFT" | "REVIEW" | "FINAL";
       visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
+      prerequisites?: {
+        meters?: Record<string, number>;
+        stateVariables?: string[];
+      } | null;
     }) => {
       if (editDialog.label) {
         await onUpdateLabel?.(editDialog.label.id, data);
@@ -785,9 +803,14 @@ export function LabelNavigator({
               currentRoute={editDialog.label.routeKey}
               currentStatus={editDialog.label.status}
               currentVisibility={editDialog.label.visibility}
+              currentPrerequisites={editDialog.label.prerequisites ?? null}
               routeConfigs={routeConfigs ?? []}
+              meters={meters}
+              stateVariables={stateVariables}
               onSave={handleEditSave}
               isSaving={isUpdatingLabel ?? false}
+              onOpenStateVariables={() => setStateVariablesModalOpen(true)}
+              onOpenMeters={() => setMetersModalOpen(true)}
             />
           ),
           portalTarget
@@ -807,6 +830,28 @@ export function LabelNavigator({
             confirmLabel="Delete"
             isLoading={isDeletingLabel ?? false}
             loadingLabel="Deleting..."
+          />,
+          portalTarget
+        )}
+
+      {/* State Variables Management Modal */}
+      {portalTarget &&
+        createPortal(
+          <StateVariablesModal
+            open={stateVariablesModalOpen}
+            onOpenChange={setStateVariablesModalOpen}
+            projectId={projectId}
+          />,
+          portalTarget
+        )}
+
+      {/* Meters Management Modal */}
+      {portalTarget &&
+        createPortal(
+          <MetersDialog
+            open={metersModalOpen}
+            onOpenChange={setMetersModalOpen}
+            projectId={projectId}
           />,
           portalTarget
         )}
