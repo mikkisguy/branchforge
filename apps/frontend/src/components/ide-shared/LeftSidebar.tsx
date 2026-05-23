@@ -4,7 +4,7 @@ import {
   SquarePen,
   Route,
   Database,
-  Thermometer,
+  BarChart3,
   Users,
   Palette,
   Settings,
@@ -18,8 +18,8 @@ import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 import type { Tab } from "./SettingsModal";
 import { SettingsModal } from "./SettingsModal";
 import { RouteSettingsModal } from "./RouteSettingsModal";
-import { StateVariablesModal } from "./StateVariablesModal";
-import { MetersDialog } from "@/components/MetersDialog";
+import { VariablesModal } from "./VariablesModal";
+import { StatsDialog } from "@/components/StatsDialog";
 import { CharactersModal } from "./CharactersModal";
 import { GitLabImportDialog } from "./GitLabImportDialog";
 import { ZipImportProjectDialog } from "./ZipImportProjectDialog";
@@ -394,7 +394,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
               {showLabel && <span>Routes</span>}
             </button>
 
-            {/* State Variables */}
+            {/* Variables */}
             <button
               onClick={() => dispatchModal({ type: "OPEN", key: "stateVars" })}
               disabled={!projectId}
@@ -405,13 +405,13 @@ export function LeftSidebar(props: LeftSidebarProps) {
                   ? "text-muted-foreground/50 cursor-not-allowed"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               }`}
-              title="State Variables"
+              title="Variables"
             >
               <Database className="size-4 flex-shrink-0" />
-              {showLabel && <span>State Variables</span>}
+              {showLabel && <span>Variables</span>}
             </button>
 
-            {/* Meters */}
+            {/* Stats */}
             <button
               onClick={() => dispatchModal({ type: "OPEN", key: "meters" })}
               disabled={!projectId}
@@ -422,10 +422,10 @@ export function LeftSidebar(props: LeftSidebarProps) {
                   ? "text-muted-foreground/50 cursor-not-allowed"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               }`}
-              title="Meters"
+              title="Stats"
             >
-              <Thermometer className="size-4 flex-shrink-0" />
-              {showLabel && <span>Meters</span>}
+              <BarChart3 className="size-4 flex-shrink-0" />
+              {showLabel && <span>Stats</span>}
             </button>
 
             {/* Characters */}
@@ -588,16 +588,16 @@ export function LeftSidebar(props: LeftSidebarProps) {
             }
             projectId={projectId}
           />
-          <StateVariablesModal
+          <VariablesModal
             open={modals.stateVars}
-            onOpenChange={(open) =>
+            onOpenChange={(open: boolean) =>
               dispatchModal({ type: open ? "OPEN" : "CLOSE", key: "stateVars" })
             }
             projectId={projectId}
           />
-          <MetersDialog
+          <StatsDialog
             open={modals.meters}
-            onOpenChange={(open) =>
+            onOpenChange={(open: boolean) =>
               dispatchModal({ type: open ? "OPEN" : "CLOSE", key: "meters" })
             }
             projectId={projectId}

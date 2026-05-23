@@ -4,26 +4,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { StateVariablesContent } from "@/components/StateVariablesContent";
+import { VariablesContent } from "@/components/VariablesContent";
 
-interface StateVariablesModalProps {
+interface VariablesModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;
 }
 
-export function StateVariablesModal({
+export function VariablesModal({
   open,
   onOpenChange,
   projectId,
-}: StateVariablesModalProps) {
+}: VariablesModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[700px] max-w-[95vw]">
         <DialogHeader>
-          <DialogTitle>State Variables Management</DialogTitle>
+          <DialogTitle>Variables Management</DialogTitle>
         </DialogHeader>
-        <StateVariablesContent projectId={projectId} />
+        <VariablesContent projectId={projectId} />
       </DialogContent>
     </Dialog>
   );

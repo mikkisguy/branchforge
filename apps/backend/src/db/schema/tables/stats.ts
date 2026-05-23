@@ -1,5 +1,5 @@
 /**
- * Meters Table
+ * Stats Table
  *
  * Numerical relationship stats (affection, trust, etc.).
  */
@@ -18,8 +18,8 @@ import { sql } from "drizzle-orm";
 import { projects } from "./projects.js";
 import { characters } from "./characters.js";
 
-export const meters = pgTable(
-  "meters",
+export const stats = pgTable(
+  "stats",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     projectId: uuid("project_id")
@@ -37,9 +37,9 @@ export const meters = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    index("meters_project_id_idx").on(table.projectId),
-    index("meters_character_id_idx").on(table.characterId),
-    unique("meters_project_key_idx").on(table.projectId, table.key),
+    index("stats_project_id_idx").on(table.projectId),
+    index("stats_character_id_idx").on(table.characterId),
+    unique("stats_project_key_idx").on(table.projectId, table.key),
     check(
       "min_value_lte_max_value",
       sql`${table.minValue} <= ${table.maxValue}`
@@ -48,5 +48,5 @@ export const meters = pgTable(
 );
 
 // Types
-export type Meter = typeof meters.$inferSelect;
-export type NewMeter = typeof meters.$inferInsert;
+export type Stat = typeof stats.$inferSelect;
+export type NewStat = typeof stats.$inferInsert;

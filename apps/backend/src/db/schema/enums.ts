@@ -65,14 +65,6 @@ export const suggestionStatusEnum = pgEnum("suggestion_status", [
   "REJECTED",
 ]);
 
-// Ren'Py definition categories
-export const renpyDefinitionCategoryEnum = pgEnum("renpy_definition_category", [
-  "CHARACTER",
-  "TRANSFORM",
-  "IMAGE",
-  "INIT",
-]);
-
 // Label visibility types
 export const labelVisibilityEnum = pgEnum("label_visibility", [
   "EXCLUSIVE",

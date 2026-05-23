@@ -7,7 +7,7 @@
  * metadata editing, and soft delete.
  */
 
-import { useMemo, useState, useRef, useEffect, useCallback } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { PublicLabel, LabelStatus } from "@branchforge/shared";
 import {
@@ -24,12 +24,12 @@ import {
 } from "lucide-react";
 import { LabelContextMenu } from "@/components/write-mode/LabelContextMenu";
 import { LabelEditDialog } from "@/components/write-mode/LabelEditDialog";
-import { StateVariablesModal } from "@/components/ide-shared/StateVariablesModal";
-import { MetersDialog } from "@/components/MetersDialog";
+import { VariablesModal } from "@/components/ide-shared/VariablesModal";
+import { StatsDialog } from "@/components/StatsDialog";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { useMeters } from "@/hooks/useMeters";
-import { useStateVariables } from "@/hooks/useStateVariables";
+import { useStats } from "@/hooks/useStats";
+import { useVariables } from "@/hooks/useVariables";
 import type { UpdateLabelInput } from "@/lib/api/labels";
 
 const STATUS_COLORS: Record<LabelStatus, string> = {
@@ -448,12 +448,12 @@ export function LabelNavigator({
   routeConfigs,
 }: LabelNavigatorProps) {
   // Prerequisites data hooks
-  const { meters } = useMeters(projectId);
-  const { stateVariables } = useStateVariables(projectId);
+  const { stats } = useStats(projectId);
+  const { variables } = useVariables(projectId);
 
   // Prerequisites management modals
   const [stateVariablesModalOpen, setStateVariablesModalOpen] = useState(false);
-  const [metersModalOpen, setMetersModalOpen] = useState(false);
+  const [metersModalOpen, setStatsModalOpen] = useState(false);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -544,9 +544,9 @@ export function LabelNavigator({
       route?: string | null;
       status?: "DRAFT" | "REVIEW" | "FINAL";
       visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
-      prerequisites?: {
-        meters?: Record<string, number>;
-        stateVariables?: string[];
+      conditions?: {
+        stats?: Record<string, number>;
+        variables?: string[];
       } | null;
     }) => {
       if (editDialog.label) {
@@ -803,14 +803,14 @@ export function LabelNavigator({
               currentRoute={editDialog.label.routeKey}
               currentStatus={editDialog.label.status}
               currentVisibility={editDialog.label.visibility}
-              currentPrerequisites={editDialog.label.prerequisites ?? null}
+              currentConditions={editDialog.label.conditions ?? null}
               routeConfigs={routeConfigs ?? []}
-              meters={meters}
-              stateVariables={stateVariables}
+              meters={stats}
+              variables={variables}
               onSave={handleEditSave}
               isSaving={isUpdatingLabel ?? false}
               onOpenStateVariables={() => setStateVariablesModalOpen(true)}
-              onOpenMeters={() => setMetersModalOpen(true)}
+              onOpenStats={() => setStatsModalOpen(true)}
             />
           ),
           portalTarget
@@ -834,10 +834,10 @@ export function LabelNavigator({
           portalTarget
         )}
 
-      {/* State Variables Management Modal */}
+      {/* Variables Management Modal */}
       {portalTarget &&
         createPortal(
-          <StateVariablesModal
+          <VariablesModal
             open={stateVariablesModalOpen}
             onOpenChange={setStateVariablesModalOpen}
             projectId={projectId}
@@ -845,12 +845,12 @@ export function LabelNavigator({
           portalTarget
         )}
 
-      {/* Meters Management Modal */}
+      {/* Stats Management Modal */}
       {portalTarget &&
         createPortal(
-          <MetersDialog
+          <StatsDialog
             open={metersModalOpen}
-            onOpenChange={setMetersModalOpen}
+            onOpenChange={setStatsModalOpen}
             projectId={projectId}
           />,
           portalTarget

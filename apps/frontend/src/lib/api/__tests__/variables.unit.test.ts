@@ -1,23 +1,20 @@
 /**
- * State Variables API Unit Tests
+ * Variables API Unit Tests
  *
- * Tests for state variable management API methods.
+ * Tests for variable management API methods.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { stateVariablesApi } from "../state-variables";
-import type {
-  CreateStateVariableBody,
-  UpdateStateVariableBody,
-} from "../state-variables";
-import type { StateVariable } from "@branchforge/shared";
+import { variablesApi } from "../variables";
+import type { CreateVariableBody, UpdateVariableBody } from "../variables";
+import type { Variable } from "@branchforge/shared";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-describe("State Variables API", () => {
-  const mockStateVariable: StateVariable = {
+describe("Variables API", () => {
+  const mockVariable: Variable = {
     id: "var-1",
     projectId: "proj-1",
     key: "met_eileen",
@@ -34,30 +31,30 @@ describe("State Variables API", () => {
     vi.clearAllMocks();
   });
 
-  describe("List State Variables", () => {
-    it("should list all state variables for a project", async () => {
+  describe("List Variables", () => {
+    it("should list all variables for a project", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ stateVariables: [mockStateVariable] }),
+        json: async () => ({ variables: [mockVariable] }),
       });
 
-      const result = await stateVariablesApi.listStateVariables("proj-1");
+      const result = await variablesApi.listVariables("proj-1");
 
-      expect(result).toEqual([mockStateVariable]);
+      expect(result).toEqual([mockVariable]);
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
       const [url, options] = mockFetch.mock.calls[0];
-      expect(url).toContain("/projects/proj-1/state-variables");
+      expect(url).toContain("/projects/proj-1/variables");
       expect(options?.method).toBe("GET");
     });
 
     it("should handle empty list", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ stateVariables: [] }),
+        json: async () => ({ variables: [] }),
       });
 
-      const result = await stateVariablesApi.listStateVariables("proj-1");
+      const result = await variablesApi.listVariables("proj-1");
 
       expect(result).toEqual([]);
     });
@@ -65,10 +62,10 @@ describe("State Variables API", () => {
     it("should include credentials in request", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ stateVariables: [] }),
+        json: async () => ({ variables: [] }),
       });
 
-      await stateVariablesApi.listStateVariables("proj-1");
+      await variablesApi.listVariables("proj-1");
 
       expect(mockFetch.mock.calls[0][1]?.credentials).toBe("include");
     });
@@ -80,36 +77,36 @@ describe("State Variables API", () => {
         json: async () => ({ error: "Unauthorized" }),
       });
 
-      await expect(
-        stateVariablesApi.listStateVariables("proj-1")
-      ).rejects.toThrow("Unauthorized");
+      await expect(variablesApi.listVariables("proj-1")).rejects.toThrow(
+        "Unauthorized"
+      );
     });
   });
 
-  describe("Get State Variable", () => {
-    it("should get state variable by ID", async () => {
+  describe("Get Variable", () => {
+    it("should get variable by ID", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ stateVariable: mockStateVariable }),
+        json: async () => ({ variable: mockVariable }),
       });
 
-      const result = await stateVariablesApi.getStateVariable("var-1");
+      const result = await variablesApi.getVariable("var-1");
 
-      expect(result).toEqual(mockStateVariable);
+      expect(result).toEqual(mockVariable);
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
       const [url, options] = mockFetch.mock.calls[0];
-      expect(url).toContain("/state-variables/var-1");
+      expect(url).toContain("/variables/var-1");
       expect(options?.method).toBe("GET");
     });
 
     it("should include credentials in request", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ stateVariable: mockStateVariable }),
+        json: async () => ({ variable: mockVariable }),
       });
 
-      await stateVariablesApi.getStateVariable("var-1");
+      await variablesApi.getVariable("var-1");
 
       expect(mockFetch.mock.calls[0][1]?.credentials).toBe("include");
     });
@@ -118,25 +115,25 @@ describe("State Variables API", () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 404,
-        json: async () => ({ error: "State variable not found" }),
+        json: async () => ({ error: "Variable not found" }),
       });
 
-      await expect(
-        stateVariablesApi.getStateVariable("unknown")
-      ).rejects.toThrow("State variable not found");
+      await expect(variablesApi.getVariable("unknown")).rejects.toThrow(
+        "Variable not found"
+      );
     });
   });
 
-  describe("Create State Variable", () => {
-    const validBody: CreateStateVariableBody = {
+  describe("Create Variable", () => {
+    const validBody: CreateVariableBody = {
       key: "met_lucas",
       description: "Met Lucas",
       category: "flags",
     };
 
-    it("should create state variable successfully", async () => {
-      const newVariable: StateVariable = {
-        ...mockStateVariable,
+    it("should create variable successfully", async () => {
+      const newVariable: Variable = {
+        ...mockVariable,
         id: "var-2",
         key: "met_lucas",
         description: "Met Lucas",
@@ -144,29 +141,26 @@ describe("State Variables API", () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ stateVariable: newVariable }),
+        json: async () => ({ variable: newVariable }),
       });
 
-      const result = await stateVariablesApi.createStateVariable(
-        "proj-1",
-        validBody
-      );
+      const result = await variablesApi.createVariable("proj-1", validBody);
 
       expect(result).toEqual(newVariable);
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
       const [url, options] = mockFetch.mock.calls[0];
-      expect(url).toContain("/projects/proj-1/state-variables");
+      expect(url).toContain("/projects/proj-1/variables");
       expect(options?.method).toBe("POST");
     });
 
     it("should send request body as JSON", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ stateVariable: mockStateVariable }),
+        json: async () => ({ variable: mockVariable }),
       });
 
-      await stateVariablesApi.createStateVariable("proj-1", validBody);
+      await variablesApi.createVariable("proj-1", validBody);
 
       const requestBody = JSON.parse(
         mockFetch.mock.calls[0][1]?.body as string
@@ -177,10 +171,10 @@ describe("State Variables API", () => {
     it("should include credentials in request", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ stateVariable: mockStateVariable }),
+        json: async () => ({ variable: mockVariable }),
       });
 
-      await stateVariablesApi.createStateVariable("proj-1", validBody);
+      await variablesApi.createVariable("proj-1", validBody);
 
       expect(mockFetch.mock.calls[0][1]?.credentials).toBe("include");
     });
@@ -191,7 +185,7 @@ describe("State Variables API", () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          stateVariable: {
+          variable: {
             id: "var-min",
             projectId: "proj-1",
             key: "minimal_flag",
@@ -200,10 +194,7 @@ describe("State Variables API", () => {
         }),
       });
 
-      const result = await stateVariablesApi.createStateVariable(
-        "proj-1",
-        minimalBody
-      );
+      const result = await variablesApi.createVariable("proj-1", minimalBody);
 
       const requestBody = JSON.parse(
         mockFetch.mock.calls[0][1]?.body as string
@@ -216,53 +207,50 @@ describe("State Variables API", () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 400,
-        json: async () => ({ error: "Invalid state variable data" }),
+        json: async () => ({ error: "Invalid variable data" }),
       });
 
       await expect(
-        stateVariablesApi.createStateVariable("proj-1", validBody)
-      ).rejects.toThrow("Invalid state variable data");
+        variablesApi.createVariable("proj-1", validBody)
+      ).rejects.toThrow("Invalid variable data");
     });
   });
 
-  describe("Update State Variable", () => {
-    const updateBody: UpdateStateVariableBody = {
+  describe("Update Variable", () => {
+    const updateBody: UpdateVariableBody = {
       description: "Updated description",
       category: "story",
     };
 
-    it("should update state variable successfully", async () => {
-      const updatedVariable: StateVariable = {
-        ...mockStateVariable,
+    it("should update variable successfully", async () => {
+      const updatedVariable: Variable = {
+        ...mockVariable,
         description: "Updated description",
         category: "story",
       };
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ stateVariable: updatedVariable }),
+        json: async () => ({ variable: updatedVariable }),
       });
 
-      const result = await stateVariablesApi.updateStateVariable(
-        "var-1",
-        updateBody
-      );
+      const result = await variablesApi.updateVariable("var-1", updateBody);
 
       expect(result).toEqual(updatedVariable);
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
       const [url, options] = mockFetch.mock.calls[0];
-      expect(url).toContain("/state-variables/var-1");
+      expect(url).toContain("/variables/var-1");
       expect(options?.method).toBe("PATCH");
     });
 
     it("should send request body as JSON", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ stateVariable: mockStateVariable }),
+        json: async () => ({ variable: mockVariable }),
       });
 
-      await stateVariablesApi.updateStateVariable("var-1", updateBody);
+      await variablesApi.updateVariable("var-1", updateBody);
 
       const requestBody = JSON.parse(
         mockFetch.mock.calls[0][1]?.body as string
@@ -273,10 +261,10 @@ describe("State Variables API", () => {
     it("should include credentials in request", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ stateVariable: mockStateVariable }),
+        json: async () => ({ variable: mockVariable }),
       });
 
-      await stateVariablesApi.updateStateVariable("var-1", updateBody);
+      await variablesApi.updateVariable("var-1", updateBody);
 
       expect(mockFetch.mock.calls[0][1]?.credentials).toBe("include");
     });
@@ -286,10 +274,10 @@ describe("State Variables API", () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ stateVariable: mockStateVariable }),
+        json: async () => ({ variable: mockVariable }),
       });
 
-      await stateVariablesApi.updateStateVariable("var-1", partialBody);
+      await variablesApi.updateVariable("var-1", partialBody);
 
       const requestBody = JSON.parse(
         mockFetch.mock.calls[0][1]?.body as string
@@ -301,30 +289,30 @@ describe("State Variables API", () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 404,
-        json: async () => ({ error: "State variable not found" }),
+        json: async () => ({ error: "Variable not found" }),
       });
 
       await expect(
-        stateVariablesApi.updateStateVariable("unknown", updateBody)
-      ).rejects.toThrow("State variable not found");
+        variablesApi.updateVariable("unknown", updateBody)
+      ).rejects.toThrow("Variable not found");
     });
   });
 
-  describe("Delete State Variable", () => {
-    it("should delete state variable successfully", async () => {
+  describe("Delete Variable", () => {
+    it("should delete variable successfully", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 204,
         json: async () => ({}),
       });
 
-      const result = await stateVariablesApi.deleteStateVariable("var-1");
+      const result = await variablesApi.deleteVariable("var-1");
 
       expect(result).toBeUndefined();
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
       const [url, options] = mockFetch.mock.calls[0];
-      expect(url).toContain("/state-variables/var-1");
+      expect(url).toContain("/variables/var-1");
       expect(options?.method).toBe("DELETE");
     });
 
@@ -335,7 +323,7 @@ describe("State Variables API", () => {
         json: async () => ({}),
       });
 
-      await stateVariablesApi.deleteStateVariable("var-1");
+      await variablesApi.deleteVariable("var-1");
 
       expect(mockFetch.mock.calls[0][1]?.credentials).toBe("include");
     });
@@ -344,12 +332,12 @@ describe("State Variables API", () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 404,
-        json: async () => ({ error: "State variable not found" }),
+        json: async () => ({ error: "Variable not found" }),
       });
 
-      await expect(
-        stateVariablesApi.deleteStateVariable("unknown")
-      ).rejects.toThrow("State variable not found");
+      await expect(variablesApi.deleteVariable("unknown")).rejects.toThrow(
+        "Variable not found"
+      );
     });
 
     it("should handle successful delete with no content", async () => {
@@ -359,7 +347,7 @@ describe("State Variables API", () => {
         // No body for 204
       });
 
-      const result = await stateVariablesApi.deleteStateVariable("var-1");
+      const result = await variablesApi.deleteVariable("var-1");
 
       expect(result).toBeUndefined();
     });
@@ -369,19 +357,19 @@ describe("State Variables API", () => {
     it("should set Content-Type header for POST/PATCH", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ stateVariable: mockStateVariable }),
+        json: async () => ({ variable: mockVariable }),
       });
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ stateVariable: mockStateVariable }),
+        json: async () => ({ variable: mockVariable }),
       });
 
-      await stateVariablesApi.createStateVariable("proj-1", {
+      await variablesApi.createVariable("proj-1", {
         key: "test",
       });
 
-      await stateVariablesApi.updateStateVariable("var-1", {
+      await variablesApi.updateVariable("var-1", {
         description: "Updated description",
       });
 
@@ -405,9 +393,9 @@ describe("State Variables API", () => {
         json: async () => Promise.reject(new Error("JSON parse error")),
       });
 
-      await expect(
-        stateVariablesApi.listStateVariables("proj-1")
-      ).rejects.toThrow("Unknown error");
+      await expect(variablesApi.listVariables("proj-1")).rejects.toThrow(
+        "Unknown error"
+      );
     });
 
     it("should throw error with status code when no error message", async () => {
@@ -417,7 +405,7 @@ describe("State Variables API", () => {
         json: async () => ({}),
       });
 
-      await expect(stateVariablesApi.getStateVariable("var-1")).rejects.toThrow(
+      await expect(variablesApi.getVariable("var-1")).rejects.toThrow(
         "Request failed with status 503"
       );
     });

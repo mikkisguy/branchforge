@@ -34,16 +34,13 @@ export * from "./tables/project-files.js";
 export * from "./tables/visual-systems.js";
 export * from "./tables/route-configs.js";
 
-// Ren'Py definitions
-export * from "./tables/renpy-definitions.js";
-
 // Character tables
 export * from "./tables/characters.js";
 export * from "./tables/pair-groups.js";
 
 // Game state tables
-export * from "./tables/meters.js";
-export * from "./tables/state_variables.js";
+export * from "./tables/stats.js";
+export * from "./tables/variables.js";
 
 // Content tables
 export * from "./tables/labels.js";

@@ -62,7 +62,7 @@ describe("ProjectsService", () => {
     userId,
     name: "Test Project",
     description: "A test project",
-    maxMeterDelta: 10,
+    maxStatDelta: 10,
     visibility: "OWNER",
     source: "GITLAB",
     createdAt: new Date("2024-01-01"),
@@ -89,7 +89,7 @@ describe("ProjectsService", () => {
         id: projectId,
         name: "Test Project",
         description: "A test project",
-        maxMeterDelta: 10,
+        maxStatDelta: 10,
         visibility: "OWNER",
         source: "GITLAB",
         createdAt: mockProject.createdAt.toISOString(),
@@ -141,7 +141,7 @@ describe("ProjectsService", () => {
       const body: CreateProjectBody = {
         name: "New Project",
         description: "A new project",
-        maxMeterDelta: 15,
+        maxStatDelta: 15,
         source: "GITLAB",
       };
 
@@ -152,21 +152,21 @@ describe("ProjectsService", () => {
 
       expect(project.name).toBe("New Project");
       expect(project.description).toBe("A new project");
-      expect(project.maxMeterDelta).toBe(15);
+      expect(project.maxStatDelta).toBe(15);
     });
 
-    it("should use default maxMeterDelta when not provided", async () => {
+    it("should use default maxStatDelta when not provided", async () => {
       const body: CreateProjectBody = {
         name: "New Project",
         source: "ZIP",
       };
 
-      const newProject = { ...mockProject, ...body, maxMeterDelta: 10 };
+      const newProject = { ...mockProject, ...body, maxStatDelta: 10 };
       mockInsert.mockImplementation(() => createInsertChain([newProject]));
 
       const project = await createProject(userId, body);
 
-      expect(project.maxMeterDelta).toBe(10);
+      expect(project.maxStatDelta).toBe(10);
     });
 
     it("should create project with optional fields undefined", async () => {
@@ -179,7 +179,7 @@ describe("ProjectsService", () => {
         ...mockProject,
         name: "Minimal Project",
         description: null,
-        maxMeterDelta: 10,
+        maxStatDelta: 10,
         source: "ZIP" as const,
       };
       mockInsert.mockImplementation(() => createInsertChain([newProject]));

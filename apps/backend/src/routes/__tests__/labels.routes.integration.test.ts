@@ -50,7 +50,7 @@ describe("LabelsRoutes (Integration)", () => {
     userId: testUserId,
     name: "Labels Route Test Project",
     description: "Project used by labels route integration tests",
-    maxMeterDelta: 10,
+    maxStatDelta: 10,
     source: "ZIP",
   };
 
@@ -106,7 +106,7 @@ describe("LabelsRoutes (Integration)", () => {
         sequenceOrder: 0,
         status: "DRAFT",
         visibility: "EXCLUSIVE",
-        prerequisites: {},
+        conditions: {},
         effects: {},
       },
       {
@@ -120,7 +120,7 @@ describe("LabelsRoutes (Integration)", () => {
         sequenceOrder: 1,
         status: "DRAFT",
         visibility: "EXCLUSIVE",
-        prerequisites: {},
+        conditions: {},
         effects: {},
       },
     ]);

@@ -32,7 +32,7 @@ export const projects = pgTable(
       .references(() => users.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
     description: text("description"),
-    maxMeterDelta: integer("max_meter_delta").default(10),
+    maxStatDelta: integer("max_stat_delta").default(10),
     visibility: projectVisibilityEnum("visibility").default("PRIVATE"),
     source: fileSourceEnum("source").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),

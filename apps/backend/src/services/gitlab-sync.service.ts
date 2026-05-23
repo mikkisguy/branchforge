@@ -13,9 +13,8 @@ import {
   labels,
   labelLines,
   characters,
-  meters,
-  stateVariables,
-  renpyDefinitions,
+  stats,
+  variables,
 } from "../db/schema/index.js";
 import { eq, and, desc, inArray, isNull, sql } from "drizzle-orm";
 import {
@@ -30,10 +29,10 @@ import {
   type ParsedRPYFileWithLabels,
 } from "./rpy-parser.service.js";
 import {
-  patchRPYWithStateVariables,
-  generateStateVariablesFile,
-  generateMetersFile,
-  generateDefinitionsFile,
+  patchRPYWithVariables,
+  generateVariablesFile,
+  generateStatsFile,
+  generateCharacterDefinitionsFile,
 } from "./rpy-generator.service.js";
 import { calculateLinesHash, calculateContentHash } from "../lib/hash.js";
 import { type DetectedCharacter } from "./character-parser.service.js";
@@ -210,11 +209,12 @@ export async function exportToGitlab(
         )
       );
 
-    // Get all labels with projectFileId, prerequisites and effects for state variable patching
+    // Get all labels with projectFileId, conditions and effects for variable patching
     const projectLabels = await db
       .select({
         title: labels.title,
-        prerequisites: labels.prerequisites,
+        labelName: labels.labelName,
+        conditions: labels.conditions,
         effects: labels.effects,
         projectFileId: labels.projectFileId,
       })
@@ -246,13 +246,10 @@ export async function exportToGitlab(
       if (file.content) {
         let contentToExport = file.content;
 
-        // Patch content with state variables if this file has labels with conditions
+        // Patch content with variables if this file has labels with conditions
         const fileLabels = labelsByFile.get(file.id);
         if (fileLabels && fileLabels.length > 0) {
-          contentToExport = patchRPYWithStateVariables(
-            file.content,
-            fileLabels
-          );
+          contentToExport = patchRPYWithVariables(file.content, fileLabels);
         }
 
         filesToExport.push({
@@ -262,59 +259,57 @@ export async function exportToGitlab(
       }
     }
 
-    // Generate state_variables.rpy if state variables exist
-    const projectStateVariables = await db
+    // Generate variables.rpy if variables exist
+    const projectVariables = await db
       .select({
-        key: stateVariables.key,
-        description: stateVariables.description,
-        category: stateVariables.category,
+        key: variables.key,
+        description: variables.description,
+        category: variables.category,
       })
-      .from(stateVariables)
-      .where(eq(stateVariables.projectId, projectId));
+      .from(variables)
+      .where(eq(variables.projectId, projectId));
 
-    if (projectStateVariables.length > 0) {
+    if (projectVariables.length > 0) {
       filesToExport.push({
-        filePath: `${fileDirPrefix}branchforge_state_variables.rpy`,
-        content: generateStateVariablesFile(projectStateVariables),
+        filePath: `${fileDirPrefix}branchforge_variables.rpy`,
+        content: generateVariablesFile(projectVariables),
       });
     }
 
-    // Generate meters.rpy if meters exist
-    const projectMeters = await db
+    // Generate stats.rpy if stats exist
+    const projectStats = await db
       .select({
-        key: meters.key,
-        name: meters.name,
-        minValue: meters.minValue,
-        maxValue: meters.maxValue,
-        description: meters.description,
+        key: stats.key,
+        name: stats.name,
+        minValue: stats.minValue,
+        maxValue: stats.maxValue,
+        description: stats.description,
       })
-      .from(meters)
-      .where(eq(meters.projectId, projectId))
-      .orderBy(meters.key);
+      .from(stats)
+      .where(eq(stats.projectId, projectId))
+      .orderBy(stats.key);
 
-    if (projectMeters.length > 0) {
+    if (projectStats.length > 0) {
       filesToExport.push({
-        filePath: `${fileDirPrefix}branchforge_meters.rpy`,
-        content: generateMetersFile(projectMeters),
+        filePath: `${fileDirPrefix}branchforge_stats.rpy`,
+        content: generateStatsFile(projectStats),
       });
     }
 
-    // Generate definitions.rpy if definitions exist
-    const projectRenpyDefinitions = await db
+    // Generate definitions.rpy from characters
+    const projectCharacters = await db
       .select({
-        category: renpyDefinitions.category,
-        tag: renpyDefinitions.tag,
-        displayName: renpyDefinitions.displayName,
-        definitionCode: renpyDefinitions.definitionCode,
-        sortOrder: renpyDefinitions.sortOrder,
+        renpyTag: characters.renpyTag,
+        displayName: characters.displayName,
+        color: characters.color,
       })
-      .from(renpyDefinitions)
-      .where(eq(renpyDefinitions.projectId, projectId));
+      .from(characters)
+      .where(eq(characters.projectId, projectId));
 
-    if (projectRenpyDefinitions.length > 0) {
+    if (projectCharacters.length > 0) {
       filesToExport.push({
         filePath: `${fileDirPrefix}branchforge_definitions.rpy`,
-        content: generateDefinitionsFile(projectRenpyDefinitions),
+        content: generateCharacterDefinitionsFile(projectCharacters),
       });
     }
 
@@ -425,11 +420,11 @@ export async function importFromGitlab(
     const importCommitSha = await getBranchCommitSha(projectId, userId, branch);
 
     // List RPY files in the repository, excluding BranchForge-generated files
-    // (branchforge_state_variables.rpy, branchforge_meters.rpy,
+    // (branchforge_variables.rpy, branchforge_stats.rpy,
     // branchforge_definitions.rpy are auto-generated from management dialogs)
     const GENERATED_FILE_NAMES = new Set([
-      "branchforge_state_variables.rpy",
-      "branchforge_meters.rpy",
+      "branchforge_variables.rpy",
+      "branchforge_stats.rpy",
       "branchforge_definitions.rpy",
     ]);
     const allRpyFiles = await listRpyFiles(projectId, branch, userId);
@@ -715,7 +710,7 @@ export async function importFromGitlab(
                     route: null, // User will assign route later
                     labelNumber: i + 1,
                     status: "DRAFT",
-                    prerequisites: {},
+                    conditions: {},
                     effects: {},
                     // Sync fields
                     contentHash,

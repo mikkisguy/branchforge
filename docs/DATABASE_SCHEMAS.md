@@ -188,7 +188,7 @@ Unique constraint: `(project_id, tag)`
 
 ---
 
-### 11. State Variables
+### 11. Variables
 
 Boolean story state tracking (simpler alternative to flags).
 
@@ -237,13 +237,13 @@ Sequel duo tracking.
 | `character_a_id`   | uuid FK → characters |                                |
 | `character_b_id`   | uuid FK → characters |                                |
 | `duo_ending_label` | text                 | Jump target if both >threshold |
-| `threshold`        | integer, default 70  | Meter value for duo ending     |
+| `threshold`        | integer, default 70  | Stat value for duo ending      |
 | `created_at`       | timestamp            |                                |
 | `updated_at`       | timestamp            |                                |
 
 ---
 
-### 14. Meters
+### 14. Stats
 
 | Column         | Type                           | Notes                  |
 | -------------- | ------------------------------ | ---------------------- |
@@ -277,8 +277,8 @@ Container for logical labels; content in `label_lines`. Represents Ren'Py label 
 | `visibility`          | enum                              | `EXCLUSIVE`, `SHARED`, `DUO_PAIR`                                                                                                                                                                                                                                                            |
 | `duo_pair_id`         | uuid FK → pair_groups, nullable   |                                                                                                                                                                                                                                                                                              |
 | `status`              | `label_status`, default `DRAFT`   |                                                                                                                                                                                                                                                                                              |
-| `prerequisites`       | jsonb                             | `{stateVariables?: [], meters?: {}}`                                                                                                                                                                                                                                                         |
-| `effects`             | jsonb                             | `{stateVariablesSet?: [], stateVariablesUnset?: [], meters?: {}}`                                                                                                                                                                                                                            |
+| `conditions`          | jsonb                             | `{variables?: [], stats?: {}}`                                                                                                                                                                                                                                                               |
+| `effects`             | jsonb                             | `{variablesSet?: [], variablesUnset?: [], stats?: {}}`                                                                                                                                                                                                                                       |
 | `cross_route_context` | text, nullable                    | Prequel: `"Lucas_Friend_Mode"`                                                                                                                                                                                                                                                               |
 | `reader_notes`        | text, nullable                    | Beta feedback                                                                                                                                                                                                                                                                                |
 | `project_file_id`     | uuid FK → project_files, nullable | Project file reference                                                                                                                                                                                                                                                                       |
@@ -420,17 +420,17 @@ One-time migration tracking (e.g., from Google Docs).
 
 ### 22. Demo Sessions
 
-| Column                  | Type                            | Notes                       |
-| ----------------------- | ------------------------------- | --------------------------- |
-| `id`                    | uuid PK                         |                             |
-| `project_id`            | uuid FK → projects              |                             |
-| `user_id`               | uuid FK → users                 | Who's viewing               |
-| `started_at`            | timestamp                       |                             |
-| `current_label_line_id` | uuid FK → label_lines, nullable | Playback position           |
-| `active_flags`          | jsonb                           | Simulated flag state: `[]`  |
-| `active_meters`         | jsonb                           | Simulated meter state: `{}` |
-| `route_taken`           | text, nullable                  | Locked route if applicable  |
-| `ended_at`              | timestamp, nullable             |                             |
+| Column                  | Type                            | Notes                      |
+| ----------------------- | ------------------------------- | -------------------------- |
+| `id`                    | uuid PK                         |                            |
+| `project_id`            | uuid FK → projects              |                            |
+| `user_id`               | uuid FK → users                 | Who's viewing              |
+| `started_at`            | timestamp                       |                            |
+| `current_label_line_id` | uuid FK → label_lines, nullable | Playback position          |
+| `active_flags`          | jsonb                           | Simulated flag state: `[]` |
+| `active_stats`          | jsonb                           | Simulated stat state: `{}` |
+| `route_taken`           | text, nullable                  | Locked route if applicable |
+| `ended_at`              | timestamp, nullable             |                            |
 
 ---
 
@@ -543,10 +543,10 @@ projects
 ├── visual_systems (1:1)
 ├── route_configs (1:m)
 ├── renpy_definitions (1:m)
-├── state_variables (1:m)
+├── variables (1:m)
 ├── characters (1:m)
 ├── pair_groups (1:m)
-├── meters (1:m)
+├── stats (1:m)
 ├── labels (1:m)
 ├── ai_suggestions (1:m)
 ├── exports (1:m)
@@ -568,7 +568,7 @@ label_lines
 └── menu_options (JSON array with targetLabelId references)
 
 characters
-├── meters (1:m, optional)
+├── stats (1:m, optional)
 ├── pair_groups (m:1, optional, via character_a/b_id)
 ├── label_lines (1:m, as speakerId)
 └── renpy_definitions (1:m, optional)

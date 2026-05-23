@@ -19,8 +19,8 @@ import {
   routeConfigs,
   projectFiles,
   projectFileSyncState,
-  meters,
-  stateVariables,
+  stats,
+  variables,
 } from "../db/schema/index.js";
 import { eq, and, asc, or, isNull, sql, desc, inArray, ne } from "drizzle-orm";
 import type { Label, LabelLine } from "../db/schema/index.js";
@@ -683,7 +683,7 @@ async function syncLabelsInTransaction(
               route: null,
               labelNumber: i + 1,
               status: "DRAFT",
-              prerequisites: {},
+              conditions: {},
               effects: {},
               contentHash: labelLinesHash,
               lastSyncedHash: labelLinesHash,
@@ -905,7 +905,7 @@ async function syncLabelsInTransaction(
               route: null, // User will assign route later
               labelNumber: i + 1,
               status: "DRAFT",
-              prerequisites: {},
+              conditions: {},
               effects: {},
               // Sync fields
               contentHash: labelLinesHash,
@@ -1380,7 +1380,7 @@ type LabelForPublic = Pick<
   | "route"
   | "status"
   | "visibility"
-  | "prerequisites"
+  | "conditions"
   | "version"
   | "contentHash"
   | "projectFileId"
@@ -1590,7 +1590,7 @@ export async function listLabels(
       visibility: labels.visibility,
       version: labels.version,
       contentHash: labels.contentHash,
-      prerequisites: labels.prerequisites,
+      conditions: labels.conditions,
       projectFileId: labels.projectFileId,
       createdAt: labels.createdAt,
       updatedAt: labels.updatedAt,
@@ -1742,7 +1742,7 @@ function mapToPublicLabel(label: LabelForPublic): PublicLabel {
     visibility: label.visibility,
     version: label.version,
     contentHash: label.contentHash,
-    prerequisites: label.prerequisites ?? null,
+    conditions: label.conditions ?? null,
     projectFileId: label.projectFileId,
     fileName: extractFileName(label.filePath),
     createdAt: label.createdAt.toISOString(),
@@ -2011,7 +2011,7 @@ export async function createLabel(
         projectFileId: validProjectFileId,
         labelName,
         labelPosition: insertPosition,
-        prerequisites: {},
+        conditions: {},
         effects: {},
         ...auditFields,
       })
@@ -2058,9 +2058,9 @@ export async function updateLabel(
     status?: LabelStatus;
     visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
     labelName?: string | null;
-    prerequisites?: {
-      meters?: Record<string, number>;
-      stateVariables?: string[];
+    conditions?: {
+      variables?: string[];
+      stats?: Record<string, number>;
     } | null;
   }
 ): Promise<PublicLabel> {
@@ -2214,62 +2214,60 @@ export async function updateLabel(
       }
     }
 
-    // Validate prerequisite meter keys and state variable keys exist in the
+    // Validate condition stat keys and variable keys exist in the
     // project. These two existence checks are independent — run them concurrently.
-    const meterKeys =
-      data.prerequisites?.meters &&
-      Object.keys(data.prerequisites.meters).length > 0
-        ? Object.keys(data.prerequisites.meters)
+    const statKeys =
+      data.conditions?.stats && Object.keys(data.conditions.stats).length > 0
+        ? Object.keys(data.conditions.stats)
         : [];
-    const stateVariableKeys =
-      data.prerequisites?.stateVariables &&
-      data.prerequisites.stateVariables.length > 0
-        ? data.prerequisites.stateVariables
+    const variableKeys =
+      data.conditions?.variables && data.conditions.variables.length > 0
+        ? data.conditions.variables
         : [];
 
-    const [existingMeters, existingStateVariables] = await Promise.all([
-      meterKeys.length > 0
+    const [existingStats, existingVariables] = await Promise.all([
+      statKeys.length > 0
         ? tx
-            .select({ key: meters.key })
-            .from(meters)
+            .select({ key: stats.key })
+            .from(stats)
             .where(
               and(
-                eq(meters.projectId, labelWithProject.label.projectId),
-                inArray(meters.key, meterKeys)
+                eq(stats.projectId, labelWithProject.label.projectId),
+                inArray(stats.key, statKeys)
               )
             )
         : ([] as { key: string }[]),
-      stateVariableKeys.length > 0
+      variableKeys.length > 0
         ? tx
-            .select({ key: stateVariables.key })
-            .from(stateVariables)
+            .select({ key: variables.key })
+            .from(variables)
             .where(
               and(
-                eq(stateVariables.projectId, labelWithProject.label.projectId),
-                inArray(stateVariables.key, stateVariableKeys)
+                eq(variables.projectId, labelWithProject.label.projectId),
+                inArray(variables.key, variableKeys)
               )
             )
         : ([] as { key: string }[]),
     ]);
 
-    if (meterKeys.length > 0) {
-      const existingKeys = new Set(existingMeters.map((m) => m.key));
-      const invalidKeys = meterKeys.filter((k) => !existingKeys.has(k));
+    if (statKeys.length > 0) {
+      const existingKeys = new Set(existingStats.map((m) => m.key));
+      const invalidKeys = statKeys.filter((k) => !existingKeys.has(k));
       if (invalidKeys.length > 0) {
         throw new ValidationError(
-          `Invalid meter key(s): ${invalidKeys.join(", ")}. ` +
-            "Referenced meters must exist in the project."
+          `Invalid stat key(s): ${invalidKeys.join(", ")}. ` +
+            "Referenced stats must exist in the project."
         );
       }
     }
 
-    if (stateVariableKeys.length > 0) {
-      const existingKeys = new Set(existingStateVariables.map((sv) => sv.key));
-      const invalidKeys = stateVariableKeys.filter((k) => !existingKeys.has(k));
+    if (variableKeys.length > 0) {
+      const existingKeys = new Set(existingVariables.map((sv) => sv.key));
+      const invalidKeys = variableKeys.filter((k) => !existingKeys.has(k));
       if (invalidKeys.length > 0) {
         throw new ValidationError(
-          `Invalid state variable key(s): ${invalidKeys.join(", ")}. ` +
-            "Referenced state variables must exist in the project."
+          `Invalid variable key(s): ${invalidKeys.join(", ")}. ` +
+            "Referenced variables must exist in the project."
         );
       }
     }
@@ -2278,14 +2276,14 @@ export async function updateLabel(
     const auditFields = updateAuditFields(currentVersion, userId);
 
     // Build update data with validated route, optional labelName,
-    // and normalized prerequisites (null → {} for the not-null JSONB column).
-    // Using Record<string, unknown> to allow the normalized prerequisites type.
+    // and normalized conditions (null → {} for the not-null JSONB column).
+    // Using Record<string, unknown> to allow the normalized conditions type.
     const updateData: Record<string, unknown> = {
       ...data,
       ...(validatedRoute !== undefined ? { route: validatedRoute } : {}),
     };
-    if (data.prerequisites !== undefined) {
-      updateData.prerequisites = data.prerequisites ?? {};
+    if (data.conditions !== undefined) {
+      updateData.conditions = data.conditions ?? {};
     }
 
     // Also update project_files content if labelName changed

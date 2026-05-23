@@ -1,39 +1,39 @@
 /**
- * Meters Dialog
+ * Stats Dialog
  *
- * Master-detail dialog for meter management:
+ * Master-detail dialog for stat management:
  * - Left panel: list of meters with create/edit/delete
- * - Right panel: progression view for the selected meter
+ * - Right panel: progression view for the selected stat
  */
 
 import { useState } from "react";
 import { X } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { MetersContent } from "./MetersContent";
-import { MeterProgression } from "./MeterProgression";
-import { useMeters } from "@/hooks/useMeters";
+import { StatsContent } from "./StatsContent";
+import { StatProgression } from "./StatProgression";
+import { useStats } from "@/hooks/useStats";
 
-interface MetersDialogProps {
+interface StatsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;
 }
 
-export function MetersDialog({
+export function StatsDialog({
   open,
   onOpenChange,
   projectId,
-}: MetersDialogProps) {
-  const [selectedMeterKey, setSelectedMeterKey] = useState<string | null>(null);
+}: StatsDialogProps) {
+  const [selectedStatKey, setSelectedStatKey] = useState<string | null>(null);
 
   const {
-    meters,
+    stats,
     progression,
     isLoadingProgression,
     progressionError,
     refreshProgression,
-  } = useMeters(projectId);
+  } = useStats(projectId);
 
   // Reload progression when dialog opens
   const handleOpenChange = (isOpen: boolean) => {
@@ -43,8 +43,8 @@ export function MetersDialog({
     onOpenChange(isOpen);
   };
 
-  const selectedProgression = selectedMeterKey
-    ? (progression.find((p) => p.meterKey === selectedMeterKey) ?? null)
+  const selectedProgression = selectedStatKey
+    ? (progression.find((p) => p.statKey === selectedStatKey) ?? null)
     : null;
 
   return (
@@ -53,15 +53,15 @@ export function MetersDialog({
         {/* Header */}
         <div className="p-6 border-b border-border/30 flex items-start justify-between shrink-0">
           <div>
-            <h2 className="text-lg font-medium">Meter Management</h2>
+            <h2 className="text-lg font-medium">Stat Management</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Define meters and see how they change across your visual novel.
+              Define stats and see how they change across your visual novel.
             </p>
           </div>
           <button
             onClick={() => onOpenChange(false)}
             className="text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Close meter dialog"
+            aria-label="Close stat dialog"
           >
             <X className="size-5" />
           </button>
@@ -69,36 +69,36 @@ export function MetersDialog({
 
         {/* Body: two-column layout */}
         <div className="flex-1 overflow-hidden flex">
-          {/* Left panel: Meter list */}
+          {/* Left panel: Stat list */}
           <div className="w-[340px] shrink-0 border-r border-border/30 overflow-y-auto p-6">
-            <h3 className="text-sm font-medium mb-4">Meters</h3>
-            <MetersContent projectId={projectId} />
+            <h3 className="text-sm font-medium mb-4">Stats</h3>
+            <StatsContent projectId={projectId} />
           </div>
 
           {/* Right panel: Progression */}
           <div className="flex-1 overflow-y-auto p-6">
-            {/* Meter selector tabs */}
-            {meters.length > 0 && (
+            {/* Stat selector tabs */}
+            {stats.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-6">
-                {meters.map((meter) => (
+                {stats.map((stat) => (
                   <button
-                    key={meter.id}
-                    onClick={() => setSelectedMeterKey(meter.key)}
+                    key={stat.id}
+                    onClick={() => setSelectedStatKey(stat.key)}
                     className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-                      selectedMeterKey === meter.key
+                      selectedStatKey === stat.key
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted hover:bg-muted/80 text-foreground"
                     }`}
                   >
-                    {meter.name}
+                    {stat.name}
                   </button>
                 ))}
               </div>
             )}
 
-            <MeterProgression
+            <StatProgression
               progression={selectedProgression}
-              isLoading={!selectedMeterKey ? false : isLoadingProgression}
+              isLoading={!selectedStatKey ? false : isLoadingProgression}
               error={progressionError}
             />
           </div>

@@ -34,7 +34,7 @@ export const demoSessions = pgTable(
       }
     ),
     activeFlags: jsonb("active_flags").notNull().$type<string[]>().default([]),
-    activeMeters: jsonb("active_meters")
+    activeStats: jsonb("active_stats")
       .notNull()
       .$type<Record<string, number>>()
       .default({}),

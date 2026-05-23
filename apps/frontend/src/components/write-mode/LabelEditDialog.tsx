@@ -8,7 +8,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import type { Meter, StateVariable } from "@branchforge/shared";
+import type { Stat, Variable } from "@branchforge/shared";
 
 interface LabelEditDialogProps {
   /** Whether the dialog is open */
@@ -25,17 +25,17 @@ interface LabelEditDialogProps {
   currentStatus: "DRAFT" | "REVIEW" | "FINAL" | null;
   /** Current visibility */
   currentVisibility: "EXCLUSIVE" | "SHARED" | "DUO_PAIR" | null;
-  /** Current prerequisites from the active label */
-  currentPrerequisites: {
-    meters?: Record<string, number>;
-    stateVariables?: string[];
+  /** Current conditions from the active label */
+  currentConditions: {
+    stats?: Record<string, number>;
+    variables?: string[];
   } | null;
   /** Available route configs from the project */
   routeConfigs: Array<{ id: string; routeKey: string; routeName: string }>;
-  /** All project meters (for the meter dropdown) */
-  meters: Meter[];
-  /** All project state variables (for the state variable picker) */
-  stateVariables: StateVariable[];
+  /** All project meters (for the stat dropdown) */
+  meters: Stat[];
+  /** All project variables (for the variable picker) */
+  variables: Variable[];
   /** Called when save is clicked */
   onSave: (data: {
     title?: string;
@@ -43,17 +43,17 @@ interface LabelEditDialogProps {
     route?: string | null;
     status?: "DRAFT" | "REVIEW" | "FINAL";
     visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
-    prerequisites?: {
-      meters?: Record<string, number>;
-      stateVariables?: string[];
+    conditions?: {
+      stats?: Record<string, number>;
+      variables?: string[];
     } | null;
   }) => Promise<void>;
   /** Whether save is in progress */
   isSaving: boolean;
-  /** Callback to open the state variables management modal */
+  /** Callback to open the variables management modal */
   onOpenStateVariables: () => void;
   /** Callback to open the meters management modal */
-  onOpenMeters: () => void;
+  onOpenStats: () => void;
 }
 
 type FormState = {
@@ -128,14 +128,14 @@ export function LabelEditDialog({
   currentRoute,
   currentStatus,
   currentVisibility,
-  currentPrerequisites,
+  currentConditions,
   routeConfigs,
   meters,
-  stateVariables,
+  variables,
   onSave,
   isSaving,
   onOpenStateVariables,
-  onOpenMeters,
+  onOpenStats,
 }: LabelEditDialogProps) {
   const [form, dispatch] = useReducer(formReducer, {
     title: "",
@@ -147,15 +147,13 @@ export function LabelEditDialog({
     labelNameError: "",
   });
 
-  // Prerequisites local state
-  const [selectedStateVariables, setSelectedStateVariables] = useState<
-    string[]
-  >([]);
-  const [meterPrerequisites, setMeterPrerequisites] = useState<
-    Record<string, number>
-  >({});
-  const [showStateVarPicker, setShowStateVarPicker] = useState(false);
-  const [showMeterPicker, setShowMeterPicker] = useState(false);
+  // Conditions local state
+  const [selectedVariables, setSelectedVariables] = useState<string[]>([]);
+  const [statConditions, setStatConditions] = useState<Record<string, number>>(
+    {}
+  );
+  const [showVariablePicker, setShowVariablePicker] = useState(false);
+  const [showStatPicker, setShowStatPicker] = useState(false);
 
   // Reset form when dialog opens with new values
   useEffect(() => {
@@ -168,10 +166,10 @@ export function LabelEditDialog({
         status: currentStatus ?? "DRAFT",
         visibility: currentVisibility ?? "EXCLUSIVE",
       });
-      setSelectedStateVariables(currentPrerequisites?.stateVariables ?? []);
-      setMeterPrerequisites(currentPrerequisites?.meters ?? {});
-      setShowStateVarPicker(false);
-      setShowMeterPicker(false);
+      setSelectedVariables(currentConditions?.variables ?? []);
+      setStatConditions(currentConditions?.stats ?? {});
+      setShowVariablePicker(false);
+      setShowStatPicker(false);
     }
   }, [
     open,
@@ -180,45 +178,45 @@ export function LabelEditDialog({
     currentRoute,
     currentStatus,
     currentVisibility,
-    currentPrerequisites,
+    currentConditions,
   ]);
 
-  // Derive available state variables (not yet assigned)
-  const availableStateVariables = stateVariables.filter(
-    (sv) => !selectedStateVariables.includes(sv.key)
+  // Derive available variables (not yet assigned)
+  const availableVariables = variables.filter(
+    (v) => !selectedVariables.includes(v.key)
   );
 
-  // Derive available meters (not yet used as a prerequisite)
-  const availableMeters = meters.filter((m) => !(m.key in meterPrerequisites));
+  // Derive available stats (not yet used as a condition)
+  const availableStats = meters.filter((m) => !(m.key in statConditions));
 
-  // Handlers for state variables
-  const handleAddStateVariable = (key: string) => {
-    setSelectedStateVariables((prev) => [...prev, key]);
-    setShowStateVarPicker(false);
+  // Handlers for variables
+  const handleAddVariable = (key: string) => {
+    setSelectedVariables((prev) => [...prev, key]);
+    setShowVariablePicker(false);
   };
 
-  const handleRemoveStateVariable = (key: string) => {
-    setSelectedStateVariables((prev) => prev.filter((k) => k !== key));
+  const handleRemoveVariable = (key: string) => {
+    setSelectedVariables((prev) => prev.filter((k) => k !== key));
   };
 
-  // Handlers for meter prerequisites
-  const handleAddMeter = (key: string) => {
-    setMeterPrerequisites((prev) => ({ ...prev, [key]: 0 }));
-    setShowMeterPicker(false);
+  // Handlers for stat conditions
+  const handleAddStat = (key: string) => {
+    setStatConditions((prev) => ({ ...prev, [key]: 0 }));
+    setShowStatPicker(false);
   };
 
-  const handleRemoveMeter = (key: string) => {
-    setMeterPrerequisites((prev) => {
+  const handleRemoveStat = (key: string) => {
+    setStatConditions((prev) => {
       const next = { ...prev };
       delete next[key];
       return next;
     });
   };
 
-  const handleMeterThresholdChange = (key: string, value: string) => {
+  const handleStatThresholdChange = (key: string, value: string) => {
     const num = parseFloat(value);
     if (!isNaN(num)) {
-      setMeterPrerequisites((prev) => ({ ...prev, [key]: num }));
+      setStatConditions((prev) => ({ ...prev, [key]: num }));
     }
   };
 
@@ -272,9 +270,9 @@ export function LabelEditDialog({
       route?: string | null;
       status?: "DRAFT" | "REVIEW" | "FINAL";
       visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
-      prerequisites?: {
-        meters?: Record<string, number>;
-        stateVariables?: string[];
+      conditions?: {
+        stats?: Record<string, number>;
+        variables?: string[];
       } | null;
     } = {};
 
@@ -301,36 +299,30 @@ export function LabelEditDialog({
       changes.visibility = form.visibility;
     }
 
-    // Check prerequisites changes
-    const initialSv = currentPrerequisites?.stateVariables ?? [];
-    const initialMeters = currentPrerequisites?.meters ?? {};
-    const svChanged =
-      selectedStateVariables.length !== initialSv.length ||
-      selectedStateVariables.some((key, i) => key !== initialSv[i]);
-    const metersChanged =
-      Object.keys(meterPrerequisites).length !==
-        Object.keys(initialMeters).length ||
-      Object.entries(meterPrerequisites).some(
-        ([key, val]) => initialMeters[key] !== val
+    // Check conditions changes
+    const initialVars = currentConditions?.variables ?? [];
+    const initialStats = currentConditions?.stats ?? {};
+    const varsChanged =
+      selectedVariables.length !== initialVars.length ||
+      selectedVariables.some((key, i) => key !== initialVars[i]);
+    const statsChanged =
+      Object.keys(statConditions).length !== Object.keys(initialStats).length ||
+      Object.entries(statConditions).some(
+        ([key, val]) => initialStats[key] !== val
       );
 
-    if (svChanged || metersChanged) {
-      changes.prerequisites = {
-        stateVariables:
-          selectedStateVariables.length > 0
-            ? selectedStateVariables
-            : undefined,
-        meters:
-          Object.keys(meterPrerequisites).length > 0
-            ? meterPrerequisites
-            : undefined,
+    if (varsChanged || statsChanged) {
+      changes.conditions = {
+        variables: selectedVariables.length > 0 ? selectedVariables : undefined,
+        stats:
+          Object.keys(statConditions).length > 0 ? statConditions : undefined,
       };
-      // If both are empty, send null to clear prerequisites
+      // If both are empty, send null to clear conditions
       if (
-        selectedStateVariables.length === 0 &&
-        Object.keys(meterPrerequisites).length === 0
+        selectedVariables.length === 0 &&
+        Object.keys(statConditions).length === 0
       ) {
-        changes.prerequisites = null;
+        changes.conditions = null;
       }
     }
 
@@ -343,10 +335,10 @@ export function LabelEditDialog({
     await onSave(changes);
   };
 
-  // Resolve a meter key to its display name
-  const getMeterName = (key: string): string => {
-    const meter = meters.find((m) => m.key === key);
-    return meter?.name ?? key;
+  // Resolve a stat key to its display name
+  const getStatName = (key: string): string => {
+    const stat = meters.find((m) => m.key === key);
+    return stat?.name ?? key;
   };
 
   return (
@@ -505,18 +497,16 @@ export function LabelEditDialog({
             </div>
           </div>
 
-          {/* ─── Prerequisites Section ─── */}
+          {/* ─── Conditions Section ─── */}
           <div className="space-y-3">
             {/* Section heading */}
-            <h3 className="text-sm font-medium text-foreground">
-              Prerequisites
-            </h3>
+            <h3 className="text-sm font-medium text-foreground">Conditions</h3>
 
-            {/* State Variables Sub-section — SettingsSection card pattern */}
+            {/* Variables Sub-section — SettingsSection card pattern */}
             <section className="bg-card/40 overflow-hidden rounded-lg">
               <div className="flex items-center justify-between border-b border-border/30 px-4 py-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  State Variables
+                  Variables
                 </h4>
                 <button
                   type="button"
@@ -527,10 +517,10 @@ export function LabelEditDialog({
                 </button>
               </div>
               <div className="p-4 space-y-3">
-                {/* Assigned state variable tags */}
-                {selectedStateVariables.length > 0 ? (
+                {/* Assigned variable tags */}
+                {selectedVariables.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
-                    {selectedStateVariables.map((key) => (
+                    {selectedVariables.map((key) => (
                       <span
                         key={key}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-muted/80 border border-border/50 text-xs font-mono text-foreground"
@@ -538,7 +528,7 @@ export function LabelEditDialog({
                         {key}
                         <button
                           type="button"
-                          onClick={() => handleRemoveStateVariable(key)}
+                          onClick={() => handleRemoveVariable(key)}
                           disabled={isSaving}
                           className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                           aria-label={`Remove ${key}`}
@@ -550,135 +540,133 @@ export function LabelEditDialog({
                   </div>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    No state variables assigned.
+                    No variables assigned.
                   </p>
                 )}
 
-                {/* Add State Variable picker */}
-                {showStateVarPicker ? (
+                {/* Add Variable picker */}
+                {showVariablePicker ? (
                   <select
                     autoFocus
                     defaultValue=""
                     onChange={(e) => {
                       if (e.target.value) {
-                        handleAddStateVariable(e.target.value);
+                        handleAddVariable(e.target.value);
                       }
                     }}
-                    onBlur={() => setShowStateVarPicker(false)}
+                    onBlur={() => setShowVariablePicker(false)}
                     disabled={isSaving}
                     className="w-full px-3 py-2 border border-border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
                   >
                     <option value="" disabled>
-                      Select a state variable…
+                      Select a variable…
                     </option>
-                    {availableStateVariables.map((sv) => (
-                      <option key={sv.id} value={sv.key}>
-                        {sv.key}
-                        {sv.description ? ` — ${sv.description}` : ""}
+                    {availableVariables.map((v) => (
+                      <option key={v.id} value={v.key}>
+                        {v.key}
+                        {v.description ? ` — ${v.description}` : ""}
                       </option>
                     ))}
                   </select>
-                ) : availableStateVariables.length > 0 ? (
+                ) : availableVariables.length > 0 ? (
                   <button
                     type="button"
-                    onClick={() => setShowStateVarPicker(true)}
+                    onClick={() => setShowVariablePicker(true)}
                     disabled={isSaving}
                     className="flex items-center gap-1.5 text-xs text-[var(--theme-color)] hover:underline disabled:opacity-50"
                   >
                     <Plus className="size-3" />
-                    Add State Variable
+                    Add Variable
                   </button>
                 ) : null}
               </div>
             </section>
 
-            {/* Meters Sub-section — SettingsSection card pattern */}
+            {/* Stats Sub-section — SettingsSection card pattern */}
             <section className="bg-card/40 overflow-hidden rounded-lg">
               <div className="flex items-center justify-between border-b border-border/30 px-4 py-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Meters
+                  Stats
                 </h4>
                 <button
                   type="button"
-                  onClick={onOpenMeters}
+                  onClick={onOpenStats}
                   className="text-xs text-[var(--theme-color)] hover:underline"
                 >
                   Manage
                 </button>
               </div>
               <div className="p-4 space-y-3">
-                {/* Meter prerequisite rows */}
-                {Object.keys(meterPrerequisites).length > 0 ? (
+                {/* Stat condition rows */}
+                {Object.keys(statConditions).length > 0 ? (
                   <div className="space-y-2">
-                    {Object.entries(meterPrerequisites).map(
-                      ([key, threshold]) => (
-                        <div key={key} className="flex items-center gap-2">
-                          <span className="flex-1 px-3 py-2 rounded-md bg-muted/80 border border-border/50 text-xs font-mono text-foreground truncate">
-                            {getMeterName(key)}
-                          </span>
-                          <span className="text-xs text-muted-foreground font-medium select-none">
-                            ≥
-                          </span>
-                          <input
-                            type="number"
-                            value={threshold}
-                            onChange={(e) =>
-                              handleMeterThresholdChange(key, e.target.value)
-                            }
-                            disabled={isSaving}
-                            className="w-24 px-2 py-2 border border-border rounded-md text-sm bg-background text-right focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveMeter(key)}
-                            disabled={isSaving}
-                            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
-                            aria-label={`Remove ${getMeterName(key)} prerequisite`}
-                          >
-                            <X className="size-3.5" />
-                          </button>
-                        </div>
-                      )
-                    )}
+                    {Object.entries(statConditions).map(([key, threshold]) => (
+                      <div key={key} className="flex items-center gap-2">
+                        <span className="flex-1 px-3 py-2 rounded-md bg-muted/80 border border-border/50 text-xs font-mono text-foreground truncate">
+                          {getStatName(key)}
+                        </span>
+                        <span className="text-xs text-muted-foreground font-medium select-none">
+                          ≥
+                        </span>
+                        <input
+                          type="number"
+                          value={threshold}
+                          onChange={(e) =>
+                            handleStatThresholdChange(key, e.target.value)
+                          }
+                          disabled={isSaving}
+                          className="w-24 px-2 py-2 border border-border rounded-md text-sm bg-background text-right focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveStat(key)}
+                          disabled={isSaving}
+                          className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
+                          aria-label={`Remove ${getStatName(key)} condition`}
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    No meter prerequisites assigned.
+                    No stat conditions assigned.
                   </p>
                 )}
 
-                {/* Add Meter picker */}
-                {showMeterPicker ? (
+                {/* Add Stat picker */}
+                {showStatPicker ? (
                   <select
                     autoFocus
                     defaultValue=""
                     onChange={(e) => {
                       if (e.target.value) {
-                        handleAddMeter(e.target.value);
+                        handleAddStat(e.target.value);
                       }
                     }}
-                    onBlur={() => setShowMeterPicker(false)}
+                    onBlur={() => setShowStatPicker(false)}
                     disabled={isSaving}
                     className="w-full px-3 py-2 border border-border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
                   >
                     <option value="" disabled>
-                      Select a meter…
+                      Select a stat…
                     </option>
-                    {availableMeters.map((m) => (
-                      <option key={m.id} value={m.key}>
-                        {m.name} ({m.key})
+                    {availableStats.map((s) => (
+                      <option key={s.id} value={s.key}>
+                        {s.name} ({s.key})
                       </option>
                     ))}
                   </select>
-                ) : availableMeters.length > 0 ? (
+                ) : availableStats.length > 0 ? (
                   <button
                     type="button"
-                    onClick={() => setShowMeterPicker(true)}
+                    onClick={() => setShowStatPicker(true)}
                     disabled={isSaving}
                     className="flex items-center gap-1.5 text-xs text-[var(--theme-color)] hover:underline disabled:opacity-50"
                   >
                     <Plus className="size-3" />
-                    Add Meter
+                    Add Stat
                   </button>
                 ) : null}
               </div>

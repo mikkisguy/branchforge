@@ -96,7 +96,7 @@ describe("LabelsService", () => {
     route: "common",
     visibility: "EXCLUSIVE",
     status: "DRAFT",
-    prerequisites: {},
+    conditions: {},
     effects: {},
     crossRouteContext: null,
     readerNotes: null,

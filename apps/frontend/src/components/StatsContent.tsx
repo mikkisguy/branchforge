@@ -1,24 +1,17 @@
-/**
- * Meters Content
- *
- * Reusable content component for meter management.
- * Supports inline create/edit/delete with validation.
- */
-
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { Loader2, Plus, Trash2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { InlineMessage } from "@/components/ui/inline-error";
-import { useMeters } from "@/hooks/useMeters";
+import { useStats } from "@/hooks/useStats";
 import { useToast } from "@/contexts/ToastContext";
 
-interface MetersContentProps {
+interface StatsContentProps {
   projectId: string;
 }
 
-interface MeterForm {
+interface StatForm {
   id?: string;
   key: string;
   name: string;
@@ -27,85 +20,77 @@ interface MeterForm {
   description: string;
 }
 
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function validateMeter(meter: MeterForm): string | null {
-  if (!meter.key.trim()) {
-    return "Meter key is required";
+function validateStat(stat: StatForm): string | null {
+  if (!stat.key.trim()) {
+    return "Stat key is required";
   }
-  if (!/^[a-z][a-z0-9_]*$/.test(meter.key)) {
+  if (!/^[a-z][a-z0-9_]*$/.test(stat.key)) {
     return "Key must start with a letter and contain only lowercase letters, numbers, and underscores";
   }
-  if (meter.key.length > 100) {
+  if (stat.key.length > 100) {
     return "Key is too long (max 100 characters)";
   }
-  if (!meter.name.trim()) {
+  if (!stat.name.trim()) {
     return "Name is required";
   }
-  if (meter.name.length > 200) {
+  if (stat.name.length > 200) {
     return "Name is too long (max 200 characters)";
   }
-  if (meter.minValue > meter.maxValue) {
+  if (stat.minValue > stat.maxValue) {
     return "Minimum value must be less than or equal to maximum value";
   }
   return null;
 }
 
-// ============================================================================
-// Component
-// ============================================================================
-
-export function MetersContent({ projectId }: MetersContentProps) {
+export function StatsContent({ projectId }: StatsContentProps) {
   const {
-    meters,
-    isLoadingMeters,
-    metersError,
-    isCreatingMeter,
-    isUpdatingMeter,
-    isDeletingMeter,
-    createMeter,
-    updateMeter,
-    deleteMeter,
-  } = useMeters(projectId);
+    stats,
+    isLoadingStats,
+    statsError,
+    isCreatingStat,
+    isUpdatingStat,
+    isDeletingStat,
+    createStat,
+    updateStat,
+    deleteStat,
+  } = useStats(projectId);
   const { error } = useToast();
 
-  const [metersList, setMetersList] = useState<MeterForm[]>([]);
+  const [statsList, setStatsList] = useState<StatForm[]>([]);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
-  const isSaving = isCreatingMeter || isUpdatingMeter || isDeletingMeter;
+  const isSaving = isCreatingStat || isUpdatingStat || isDeletingStat;
 
   useEffect(() => {
     if (isSaving) return;
-    if (meters.length > 0) {
-      setMetersList(
-        meters.map((m) => ({
-          id: m.id,
-          key: m.key,
-          name: m.name,
-          minValue: m.minValue,
-          maxValue: m.maxValue,
-          description: m.description ?? "",
+    if (stats.length > 0) {
+      setStatsList(
+        stats.map((s) => ({
+          id: s.id,
+          key: s.key,
+          name: s.name,
+          minValue: s.minValue,
+          maxValue: s.maxValue,
+          description: s.description ?? "",
         }))
       );
     } else {
-      setMetersList([]);
+      setStatsList([]);
     }
-  }, [meters, isSaving]);
+  }, [stats, isSaving]);
 
-  const addMeter = useCallback(() => {
-    const newIndex = metersList.length;
-    setMetersList((prev) => [
+  const addStat = useCallback(() => {
+    const newIndex = statsList.length;
+    setStatsList((prev) => [
       ...prev,
       { key: "", name: "", minValue: 0, maxValue: 100, description: "" },
     ]);
     setEditingIndex(newIndex);
-  }, [metersList.length]);
+  }, [statsList.length]);
 
   const updateField = useCallback(
-    (index: number, field: keyof MeterForm, value: string | number) => {
-      setMetersList((prev) => {
+    (index: number, field: keyof StatForm, value: string | number) => {
+      setStatsList((prev) => {
         const next = [...prev];
         next[index] = { ...next[index], [field]: value };
         return next;
@@ -114,49 +99,49 @@ export function MetersContent({ projectId }: MetersContentProps) {
     []
   );
 
-  const removeMeter = useCallback(
+  const removeStat = useCallback(
     async (index: number) => {
-      const meter = metersList[index];
-      if (meter.id) {
+      const stat = statsList[index];
+      if (stat.id) {
         try {
-          await deleteMeter(meter.id);
-          setMetersList((prev) => prev.filter((_, i) => i !== index));
+          await deleteStat(stat.id);
+          setStatsList((prev) => prev.filter((_, i) => i !== index));
           if (editingIndex === index) setEditingIndex(null);
         } catch {
           // Error handled by hook toast
         }
       } else {
-        setMetersList((prev) => prev.filter((_, i) => i !== index));
+        setStatsList((prev) => prev.filter((_, i) => i !== index));
         if (editingIndex === index) setEditingIndex(null);
       }
     },
-    [metersList, deleteMeter, editingIndex]
+    [statsList, deleteStat, editingIndex]
   );
 
-  const saveMeter = useCallback(
+  const saveStat = useCallback(
     async (index: number) => {
-      const meter = metersList[index];
-      const validationError = validateMeter(meter);
+      const stat = statsList[index];
+      const validationError = validateStat(stat);
       if (validationError) {
         error(validationError);
         return;
       }
 
       try {
-        if (meter.id) {
-          await updateMeter(meter.id, {
-            name: meter.name,
-            minValue: meter.minValue,
-            maxValue: meter.maxValue,
-            description: meter.description || undefined,
+        if (stat.id) {
+          await updateStat(stat.id, {
+            name: stat.name,
+            minValue: stat.minValue,
+            maxValue: stat.maxValue,
+            description: stat.description || undefined,
           });
         } else {
-          await createMeter({
-            key: meter.key,
-            name: meter.name,
-            minValue: meter.minValue,
-            maxValue: meter.maxValue,
-            description: meter.description || undefined,
+          await createStat({
+            key: stat.key,
+            name: stat.name,
+            minValue: stat.minValue,
+            maxValue: stat.maxValue,
+            description: stat.description || undefined,
           });
         }
         setEditingIndex(null);
@@ -164,24 +149,24 @@ export function MetersContent({ projectId }: MetersContentProps) {
         // Error handled by hook toast
       }
     },
-    [metersList, createMeter, updateMeter, error]
+    [statsList, createStat, updateStat, error]
   );
 
   const cancelEdit = useCallback(
     (index: number) => {
-      const meter = metersList[index];
-      if (!meter) return;
+      const stat = statsList[index];
+      if (!stat) return;
 
-      if (!meter.id) {
-        setMetersList((prev) => prev.filter((_, i) => i !== index));
+      if (!stat.id) {
+        setStatsList((prev) => prev.filter((_, i) => i !== index));
       } else {
-        const original = meters.find((m) => m.id === meter.id);
+        const original = stats.find((s) => s.id === stat.id);
         if (!original) {
-          setMetersList((prev) => prev.filter((_, i) => i !== index));
+          setStatsList((prev) => prev.filter((_, i) => i !== index));
           setEditingIndex(null);
           return;
         }
-        setMetersList((prev) => {
+        setStatsList((prev) => {
           const next = [...prev];
           next[index] = {
             id: original.id,
@@ -196,41 +181,41 @@ export function MetersContent({ projectId }: MetersContentProps) {
       }
       setEditingIndex(null);
     },
-    [metersList, meters]
+    [statsList, stats]
   );
 
-  const isMeterValid = useMemo(() => {
-    return (index: number) => validateMeter(metersList[index]) === null;
-  }, [metersList]);
+  const isStatValid = useMemo(() => {
+    return (index: number) => validateStat(statsList[index]) === null;
+  }, [statsList]);
 
   return (
     <div className="space-y-4">
-      {isLoadingMeters ? (
+      {isLoadingStats ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="size-6 animate-spin text-muted-foreground" />
         </div>
-      ) : metersError ? (
-        <InlineMessage variant="error">Failed to load meters</InlineMessage>
-      ) : metersList.length === 0 ? (
+      ) : statsError ? (
+        <InlineMessage variant="error">Failed to load stats</InlineMessage>
+      ) : statsList.length === 0 ? (
         <div className="p-6 border border-dashed border-border/30 rounded-md text-center">
           <p className="text-sm text-muted-foreground mb-4">
-            No meters defined yet. Add your first meter to start tracking
+            No stats defined yet. Add your first stat to start tracking
             relationship stats and character attributes.
           </p>
-          <Button type="button" variant="outline" onClick={addMeter}>
+          <Button type="button" variant="outline" onClick={addStat}>
             <Plus className="size-4 mr-2" />
-            Add Meter
+            Add Stat
           </Button>
         </div>
       ) : (
         <div className="space-y-2">
-          {metersList.map((meter, index) => {
+          {statsList.map((stat, index) => {
             const isEditing = editingIndex === index;
-            const validationError = validateMeter(meter);
+            const validationError = validateStat(stat);
 
             return (
               <div
-                key={meter.id || `new-${index}`}
+                key={stat.id || `new-${index}`}
                 className="border border-border/30 rounded-md p-4 space-y-3"
               >
                 {!isEditing ? (
@@ -238,16 +223,16 @@ export function MetersContent({ projectId }: MetersContentProps) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-medium font-mono text-sm truncate">
-                          {meter.key || "(unnamed)"}
+                          {stat.key || "(unnamed)"}
                         </span>
                         <span className="font-mono text-xs text-muted-foreground shrink-0">
-                          {meter.minValue}&ndash;{meter.maxValue}
+                          {stat.minValue}&ndash;{stat.maxValue}
                         </span>
                       </div>
-                      <p className="text-sm truncate">{meter.name}</p>
-                      {meter.description && (
+                      <p className="text-sm truncate">{stat.name}</p>
+                      {stat.description && (
                         <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                          {meter.description}
+                          {stat.description}
                         </p>
                       )}
                     </div>
@@ -265,7 +250,7 @@ export function MetersContent({ projectId }: MetersContentProps) {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        onClick={() => removeMeter(index)}
+                        onClick={() => removeStat(index)}
                         disabled={isSaving}
                         className="text-destructive hover:text-destructive"
                       >
@@ -278,39 +263,39 @@ export function MetersContent({ projectId }: MetersContentProps) {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <Label
-                          htmlFor={`meter-key-${index}`}
+                          htmlFor={`stat-key-${index}`}
                           className="text-xs"
                         >
                           Key *
                         </Label>
                         <Input
-                          id={`meter-key-${index}`}
+                          id={`stat-key-${index}`}
                           type="text"
                           placeholder="affection_luna"
-                          value={meter.key}
+                          value={stat.key}
                           onChange={(e) =>
                             updateField(index, "key", e.target.value)
                           }
-                          disabled={isSaving || !!meter.id}
+                          disabled={isSaving || !!stat.id}
                         />
                         <p className="text-xs text-muted-foreground">
-                          {meter.id
+                          {stat.id
                             ? "Key cannot be changed after creation"
                             : "Unique identifier (lowercase, underscores)"}
                         </p>
                       </div>
                       <div className="space-y-1">
                         <Label
-                          htmlFor={`meter-name-${index}`}
+                          htmlFor={`stat-name-${index}`}
                           className="text-xs"
                         >
                           Name *
                         </Label>
                         <Input
-                          id={`meter-name-${index}`}
+                          id={`stat-name-${index}`}
                           type="text"
                           placeholder="Luna Affection"
-                          value={meter.name}
+                          value={stat.name}
                           onChange={(e) =>
                             updateField(index, "name", e.target.value)
                           }
@@ -322,15 +307,15 @@ export function MetersContent({ projectId }: MetersContentProps) {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <Label
-                          htmlFor={`meter-min-${index}`}
+                          htmlFor={`stat-min-${index}`}
                           className="text-xs"
                         >
                           Min Value
                         </Label>
                         <Input
-                          id={`meter-min-${index}`}
+                          id={`stat-min-${index}`}
                           type="number"
-                          value={meter.minValue}
+                          value={stat.minValue}
                           onChange={(e) =>
                             updateField(
                               index,
@@ -343,15 +328,15 @@ export function MetersContent({ projectId }: MetersContentProps) {
                       </div>
                       <div className="space-y-1">
                         <Label
-                          htmlFor={`meter-max-${index}`}
+                          htmlFor={`stat-max-${index}`}
                           className="text-xs"
                         >
                           Max Value
                         </Label>
                         <Input
-                          id={`meter-max-${index}`}
+                          id={`stat-max-${index}`}
                           type="number"
-                          value={meter.maxValue}
+                          value={stat.maxValue}
                           onChange={(e) =>
                             updateField(
                               index,
@@ -365,17 +350,14 @@ export function MetersContent({ projectId }: MetersContentProps) {
                     </div>
 
                     <div className="space-y-1">
-                      <Label
-                        htmlFor={`meter-desc-${index}`}
-                        className="text-xs"
-                      >
+                      <Label htmlFor={`stat-desc-${index}`} className="text-xs">
                         Description
                       </Label>
                       <Input
-                        id={`meter-desc-${index}`}
+                        id={`stat-desc-${index}`}
                         type="text"
                         placeholder="Tracks how much Luna trusts the player"
-                        value={meter.description}
+                        value={stat.description}
                         onChange={(e) =>
                           updateField(index, "description", e.target.value)
                         }
@@ -402,8 +384,8 @@ export function MetersContent({ projectId }: MetersContentProps) {
                       <Button
                         type="button"
                         size="sm"
-                        onClick={() => saveMeter(index)}
-                        disabled={!isMeterValid(index) || isSaving}
+                        onClick={() => saveStat(index)}
+                        disabled={!isStatValid(index) || isSaving}
                       >
                         {isSaving && (
                           <Loader2 className="size-4 animate-spin mr-2" />
@@ -420,12 +402,12 @@ export function MetersContent({ projectId }: MetersContentProps) {
           <Button
             type="button"
             variant="outline"
-            onClick={addMeter}
+            onClick={addStat}
             disabled={isSaving}
             className="w-full"
           >
             <Plus className="size-4 mr-2" />
-            Add Another Meter
+            Add Another Stat
           </Button>
         </div>
       )}

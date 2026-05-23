@@ -104,14 +104,14 @@ export interface RouteConfig {
 }
 
 // ============================================================================
-// State Variable Configuration
+// Variable Configuration
 // ============================================================================
 
 /**
- * State Variable for conditional branching logic
- * State variables are boolean state variables used in prerequisites and effects
+ * Variable for conditional branching logic
+ * Variables are boolean variables used in conditions and effects
  */
-export interface StateVariable {
+export interface Variable {
   id: string;
   projectId: string;
   key: string;
@@ -121,14 +121,14 @@ export interface StateVariable {
 }
 
 // ============================================================================
-// Meter Configuration
+// Stat Configuration
 // ============================================================================
 
 /**
- * Meter for tracking relationship stats and character attributes.
- * Meters are numerical values that change based on player choices.
+ * Stat for tracking relationship stats and character attributes.
+ * Stats are numerical values that change based on player choices.
  */
-export interface Meter {
+export interface Stat {
   id: string;
   projectId: string;
   characterId: string | null;
@@ -142,61 +142,25 @@ export interface Meter {
 }
 
 /**
- * Summary of a label's effect on a specific meter.
+ * Summary of a label's effect on a specific stat.
  */
-export interface MeterLabelEffect {
+export interface StatLabelEffect {
   labelId: string;
   labelTitle: string;
   routeKey: string | null;
-  prerequisiteValue: number | null;
+  conditionValue: number | null;
   effectDelta: number | null;
 }
 
 /**
- * Full progression data for a single meter across all labels.
+ * Full progression data for a single stat across all labels.
  */
-export interface MeterProgression {
-  meterKey: string;
-  meterName: string;
+export interface StatProgression {
+  statKey: string;
+  statName: string;
   minValue: number;
   maxValue: number;
-  labels: MeterLabelEffect[];
-}
-
-// ============================================================================
-// Ren'Py Definition Configuration
-// ============================================================================
-
-/**
- * Ren'Py Definition category enumeration
- */
-export type RenpyDefinitionCategory =
-  | "CHARACTER"
-  | "TRANSFORM"
-  | "IMAGE"
-  | "INIT";
-export const RenpyDefinitionCategory = {
-  CHARACTER: "CHARACTER",
-  TRANSFORM: "TRANSFORM",
-  IMAGE: "IMAGE",
-  INIT: "INIT",
-} as const;
-
-/**
- * Ren'Py Definition for export to RPY files
- * Represents static Ren'Py language definitions
- */
-export interface RenpyDefinition {
-  id: string;
-  projectId: string;
-  category: RenpyDefinitionCategory;
-  sortOrder: number;
-  tag: string;
-  displayName: string;
-  definitionCode: string;
-  referenceTag: string | null;
-  createdAt: string;
-  updatedAt: string;
+  labels: StatLabelEffect[];
 }
 
 // ============================================================================
@@ -381,10 +345,10 @@ export interface PublicLabel {
   projectFileId: string;
   /** Basename of the file path (e.g., "act_i.rpy" from "labels/act_i.rpy") */
   fileName: string;
-  /** Meter and state variable prerequisites for this label */
-  prerequisites: {
-    meters?: Record<string, number>;
-    stateVariables?: string[];
+  /** Variable and stat conditions for this label */
+  conditions: {
+    variables?: string[];
+    stats?: Record<string, number>;
   } | null;
   createdAt: string;
   updatedAt: string;
@@ -771,7 +735,7 @@ export interface PublicProject {
   id: string;
   name: string;
   description?: string;
-  maxMeterDelta?: number;
+  maxStatDelta?: number;
   visibility?: UserRole;
   source: SourceOrigin;
   createdAt: string;

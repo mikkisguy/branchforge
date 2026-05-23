@@ -80,7 +80,7 @@ describe("Settings API", () => {
     it("should get all settings successfully", async () => {
       const mockSettings = {
         signups: true,
-        maxMeterDelta: 10,
+        maxStatDelta: 10,
       };
 
       mockFetch.mockResolvedValueOnce({
@@ -170,10 +170,10 @@ describe("Settings API", () => {
     it("should send value in request body", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ key: "maxMeterDelta", value: 15 }),
+        json: async () => ({ key: "maxStatDelta", value: 15 }),
       });
 
-      await settingsApi.updateSetting("maxMeterDelta", 15);
+      await settingsApi.updateSetting("maxStatDelta", 15);
 
       const requestBody = JSON.parse(
         mockFetch.mock.calls[0][1]?.body as string
@@ -183,7 +183,7 @@ describe("Settings API", () => {
 
     it.each([
       ["boolean", "signups", true],
-      ["number", "maxMeterDelta", 20],
+      ["number", "maxStatDelta", 20],
       ["string", "title", "My Title"],
       ["null", "nullable", null],
     ])("should handle %s values", async (_type, key, value) => {
@@ -219,7 +219,7 @@ describe("Settings API", () => {
       });
 
       await expect(
-        settingsApi.updateSetting("maxMeterDelta", "invalid")
+        settingsApi.updateSetting("maxStatDelta", "invalid")
       ).rejects.toThrow("Invalid setting value");
     });
 

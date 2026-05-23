@@ -1,0 +1,1 @@
+ALTER TABLE "projects" RENAME COLUMN "max_meter_delta" TO "max_stat_delta";

@@ -19,7 +19,6 @@ import {
   UserRole,
   ROUTE_KEY_REGEX,
   JUMP_PREFIX_REGEX,
-  RenpyDefinitionCategory,
 } from "@branchforge/shared";
 
 // ============================================================================
@@ -286,7 +285,7 @@ export const createProjectSchema = z
   .object({
     name: requiredString(200, "Project name is too long"),
     description: optionalString(2000, "Description is too long"),
-    maxMeterDelta: z.number().int().optional(),
+    maxStatDelta: z.number().int().optional(),
     source: sourceOriginSchema,
   })
   .strict();
@@ -399,10 +398,10 @@ export const updateLabelSchema = z
       )
       .nullable()
       .optional(),
-    prerequisites: z
+    conditions: z
       .object({
-        meters: z.record(z.string(), z.number().finite()).optional(),
-        stateVariables: z.array(z.string()).optional(),
+        stats: z.record(z.string(), z.number().finite()).optional(),
+        variables: z.array(z.string()).optional(),
       })
       .optional()
       .nullable(),
@@ -488,74 +487,74 @@ export const routeConfigProjectIdParamsSchema = z.object({
 });
 
 // ============================================================================
-// State Variable Schemas
+// Variable Schemas
 // ============================================================================
 
 /**
- * State variable key validation schema
- * Validates state variable key format (alphanumeric, underscores, hyphens)
+ * Variable key validation schema
+ * Validates variable key format (alphanumeric, underscores, hyphens)
  */
-export const stateVariableKeySchema = z
+export const variableKeySchema = z
   .string()
-  .min(1, "State variable key is required")
-  .max(50, "State variable key is too long")
+  .min(1, "Variable key is required")
+  .max(50, "Variable key is too long")
   .regex(
     /^[a-zA-Z0-9_-]+$/,
-    "State variable key must contain only letters, numbers, underscores, and hyphens"
+    "Variable key must contain only letters, numbers, underscores, and hyphens"
   );
 
 /**
- * Create state variable request validation
+ * Create variable request validation
  */
-export const createStateVariableSchema = z
+export const createVariableSchema = z
   .object({
-    key: stateVariableKeySchema,
+    key: variableKeySchema,
     description: optionalString(500, "Description is too long"),
     category: optionalString(50, "Category is too long"),
   })
   .strict();
 
 /**
- * Update state variable request validation
+ * Update variable request validation
  */
-export const updateStateVariableSchema = z
+export const updateVariableSchema = z
   .object({
-    key: stateVariableKeySchema.optional(),
+    key: variableKeySchema.optional(),
     description: optionalString(500, "Description is too long"),
     category: optionalString(50, "Category is too long"),
   })
   .strict();
 
 /**
- * State variable ID params validation
+ * Variable ID params validation
  */
-export const stateVariableIdParamsSchema = z.object({
-  stateVariableId: uuidSchema,
+export const variableIdParamsSchema = z.object({
+  variableId: uuidSchema,
 });
 
 // ============================================================================
-// Meter Validation Schemas
+// Stat Validation Schemas
 // ============================================================================
 
 /**
- * Meter key validation schema
+ * Stat key validation schema
  * Keys must start with lowercase letter, contain only [a-z0-9_]
  */
-export const meterKeySchema = z
+export const statKeySchema = z
   .string()
-  .min(1, "Meter key is required")
-  .max(100, "Meter key is too long")
+  .min(1, "Stat key is required")
+  .max(100, "Stat key is too long")
   .regex(
     /^[a-z][a-z0-9_]*$/,
-    "Meter key must start with a letter and contain only lowercase letters, numbers, and underscores"
+    "Stat key must start with a letter and contain only lowercase letters, numbers, and underscores"
   );
 
 /**
- * Create meter request validation
+ * Create stat request validation
  */
-export const createMeterSchema = z
+export const createStatSchema = z
   .object({
-    key: meterKeySchema,
+    key: statKeySchema,
     name: requiredString(200, "Name is too long"),
     characterId: uuidSchema.optional().nullable(),
     minValue: z.number().int().default(0),
@@ -569,9 +568,9 @@ export const createMeterSchema = z
   });
 
 /**
- * Update meter request validation
+ * Update stat request validation
  */
-export const updateMeterSchema = z
+export const updateStatSchema = z
   .object({
     name: requiredString(200, "Name is too long"),
     characterId: uuidSchema.nullable(),
@@ -595,195 +594,15 @@ export const updateMeterSchema = z
   );
 
 /**
- * Meter ID params validation
+ * Stat ID params validation
  */
-export const meterIdParamsSchema = z.object({
-  meterId: uuidSchema,
+export const statIdParamsSchema = z.object({
+  statId: uuidSchema,
 });
 
 // Type exports
-export type CreateMeterInput = z.infer<typeof createMeterSchema>;
-export type UpdateMeterInput = z.infer<typeof updateMeterSchema>;
-
-// ============================================================================
-// Ren'Py Definition Schemas
-// ============================================================================
-
-/**
- * Ren'Py Definition category enum (matches db enum)
- * Uses values from shared package
- */
-export const renpyDefinitionCategorySchema = z.enum(
-  Object.values(RenpyDefinitionCategory)
-);
-
-/**
- * Tag validation for non-IMAGE categories (single identifier)
- * CHARACTER, TRANSFORM, INIT use simple identifiers like "a", "dissolve"
- */
-const renpyDefinitionTagStrictSchema = z
-  .string()
-  .trim()
-  .min(1, "Tag is required")
-  .max(100, "Tag is too long")
-  .regex(
-    /^[a-zA-Z0-9_]+$/,
-    "Tag can only contain letters, numbers, and underscores"
-  );
-
-/**
- * Tag validation for IMAGE category (allows spaces)
- * IMAGE tags allow space-separated identifiers like "bg cafe"
- */
-const renpyDefinitionTagImageSchema = z
-  .string()
-  .trim()
-  .min(1, "Tag is required")
-  .max(100, "Tag is too long")
-  .regex(
-    /^[a-zA-Z0-9_]+(?:[a-zA-Z0-9_ ]*[a-zA-Z0-9_]+)?$/,
-    "Tag can only contain letters, numbers, underscores, and spaces (no leading/trailing spaces)"
-  );
-
-/**
- * Tag validation (Ren'Py identifier)
- * Category-aware: IMAGE allows spaces for names like "bg cafe"
- * Other categories (CHARACTER, TRANSFORM, INIT) use single identifiers
- */
-export const renpyDefinitionTagSchema = z
-  .string()
-  .trim()
-  .min(1, "Tag is required")
-  .max(100, "Tag is too long")
-  .regex(
-    /^[a-zA-Z0-9_]+$/,
-    "Tag can only contain letters, numbers, and underscores"
-  );
-
-/**
- * Create Ren'Py definition request validation
- * Tag validation is category-aware: IMAGE allows spaces, others don't
- */
-export const createRenpyDefinitionSchema = z
-  .object({
-    category: renpyDefinitionCategorySchema,
-    tag: z
-      .string()
-      .trim()
-      .min(1, "Tag is required")
-      .max(100, "Tag is too long"),
-    displayName: z.string().trim().min(1).max(200, "Display name is too long"),
-    definitionCode: z.string().trim().min(1, "Definition code is required"),
-    referenceTag: z.string().max(100).nullable().optional(),
-    sortOrder: z.number().int().min(0).optional().default(0),
-  })
-  .strict()
-  .superRefine((data, ctx) => {
-    // IMAGE category allows spaces (for names like "bg cafe")
-    if (data.category === "IMAGE") {
-      const imageTagResult = renpyDefinitionTagImageSchema.safeParse(data.tag);
-      if (!imageTagResult.success) {
-        imageTagResult.error.issues.forEach((issue) => {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["tag"],
-            message: issue.message,
-          });
-        });
-      }
-    } else {
-      // Other categories require strict identifier format (no spaces)
-      const strictTagResult = renpyDefinitionTagStrictSchema.safeParse(
-        data.tag
-      );
-      if (!strictTagResult.success) {
-        strictTagResult.error.issues.forEach((issue) => {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["tag"],
-            message: issue.message,
-          });
-        });
-      }
-    }
-  });
-
-/**
- * Update Ren'Py definition request validation
- * Tag validation is category-aware when both category and tag are provided
- */
-export const updateRenpyDefinitionSchema = z
-  .object({
-    category: renpyDefinitionCategorySchema.optional(),
-    tag: z
-      .string()
-      .trim()
-      .min(1, "Tag is required")
-      .max(100, "Tag is too long")
-      .optional(),
-    displayName: z.string().trim().min(1).max(200).optional(),
-    definitionCode: z.string().trim().min(1).optional(),
-    referenceTag: z.string().max(100).nullable().optional(),
-    sortOrder: z.number().int().min(0).optional(),
-  })
-  .strict()
-  .superRefine((data, ctx) => {
-    // Only validate tag if it's provided
-    if (data.tag === undefined) return;
-
-    // If category is also provided, use category-aware validation
-    if (data.category !== undefined) {
-      if (data.category === "IMAGE") {
-        const imageTagResult = renpyDefinitionTagImageSchema.safeParse(
-          data.tag
-        );
-        if (!imageTagResult.success) {
-          imageTagResult.error.issues.forEach((issue) => {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ["tag"],
-              message: issue.message,
-            });
-          });
-        }
-      } else {
-        const strictTagResult = renpyDefinitionTagStrictSchema.safeParse(
-          data.tag
-        );
-        if (!strictTagResult.success) {
-          strictTagResult.error.issues.forEach((issue) => {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ["tag"],
-              message: issue.message,
-            });
-          });
-        }
-      }
-    } else {
-      // If only tag is provided (no category), use strict validation as safe default
-      // The service layer will look up the existing category for full validation
-      const strictTagResult = renpyDefinitionTagStrictSchema.safeParse(
-        data.tag
-      );
-      if (!strictTagResult.success) {
-        strictTagResult.error.issues.forEach((issue) => {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["tag"],
-            message: issue.message,
-          });
-        });
-      }
-    }
-  });
-
-/**
- * Ren'Py Definition ID params validation
- */
-export const renpyDefinitionIdParamsSchema = z.object({
-  renpyDefinitionId: uuidSchema,
-});
+export type CreateStatInput = z.infer<typeof createStatSchema>;
+export type UpdateStatInput = z.infer<typeof updateStatSchema>;
 
 // ============================================================================
 // Character Schemas
@@ -1127,19 +946,8 @@ export type ImportRequestInput = z.infer<typeof importRequestSchema>;
 export type PaginationQuery = z.infer<typeof paginationQuerySchema>;
 export type CreateRouteConfigInput = z.infer<typeof createRouteConfigSchema>;
 export type UpdateRouteConfigInput = z.infer<typeof updateRouteConfigSchema>;
-export type CreateStateVariableInput = z.infer<
-  typeof createStateVariableSchema
->;
-export type UpdateStateVariableInput = z.infer<
-  typeof updateStateVariableSchema
->;
-export type CreateRenpyDefinitionInput = z.infer<
-  typeof createRenpyDefinitionSchema
->;
-export type UpdateRenpyDefinitionInput = z.infer<
-  typeof updateRenpyDefinitionSchema
->;
-
+export type CreateVariableInput = z.infer<typeof createVariableSchema>;
+export type UpdateVariableInput = z.infer<typeof updateVariableSchema>;
 // ============================================================================
 // User Settings Schemas
 // ============================================================================

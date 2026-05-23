@@ -59,7 +59,7 @@ When you need to code, we've got your back. Custom Ren'Py syntax highlighting wi
 
 ### Planned features
 
-- **State Variables**: Simple boolean tracking for branching logic
+- **Variables**: Simple boolean tracking for branching logic
 - **Route Configuration**: Define custom story routes per project
 - **Ren'Py Definitions**: Manage custom code definitions (CHARACTER, TRANSFORM, IMAGE, INIT)
 - **Light Mode toggle**: Explicit light/dark mode switching (currently system-based)
@@ -222,7 +222,7 @@ See [docs/FEATURE_ROADMAP.md](docs/FEATURE_ROADMAP.md) for the full picture.
 **High Priority:**
 
 - Zip file export (download your projects)
-- Meter management (track relationships and stats)
+- Stat management (track relationships and stats)
 - Label-Character relationships (associate characters with scenes)
 - Beta reader sharing (get feedback on your story)
 

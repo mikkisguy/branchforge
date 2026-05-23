@@ -61,7 +61,7 @@ describe("LabelsService - File Scoped (Integration)", () => {
     userId: testUserId,
     name: "Test Project",
     description: "A project for testing file-scoped labels",
-    maxMeterDelta: 10,
+    maxStatDelta: 10,
     source: "ZIP",
   };
 
