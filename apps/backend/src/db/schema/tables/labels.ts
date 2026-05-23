@@ -53,15 +53,15 @@ export const labels = pgTable(
       onDelete: "set null",
     }),
     status: labelStatusEnum("status").default("DRAFT"),
-    prerequisites: jsonb("prerequisites")
+    conditions: jsonb("conditions")
       .notNull()
       .default({})
-      .$type<{ stateVariables?: string[]; meters?: Record<string, number> }>(), // {stateVariables: [], meters: {}}
+      .$type<{ variables?: string[]; stats?: Record<string, number> }>(), // {variables: [], stats: {}}
     effects: jsonb("effects").notNull().default({}).$type<{
-      stateVariablesSet?: string[];
-      stateVariablesUnset?: string[];
-      meters?: Record<string, number>;
-    }>(), // {stateVariablesSet: [], stateVariablesUnset: [], meters: {}}
+      variablesSet?: string[];
+      variablesUnset?: string[];
+      stats?: Record<string, number>;
+    }>(), // {variablesSet: [], variablesUnset: [], stats: {}}
     crossRouteContext: text("cross_route_context"), // Prequel: "Lucas_Friend_Mode"
     readerNotes: text("reader_notes"), // Beta feedback
 

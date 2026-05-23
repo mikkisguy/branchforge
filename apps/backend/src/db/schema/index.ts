@@ -39,8 +39,8 @@ export * from "./tables/characters.js";
 export * from "./tables/pair-groups.js";
 
 // Game state tables
-export * from "./tables/meters.js";
-export * from "./tables/state_variables.js";
+export * from "./tables/stats.js";
+export * from "./tables/variables.js";
 
 // Content tables
 export * from "./tables/labels.js";
