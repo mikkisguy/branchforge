@@ -428,7 +428,7 @@ One-time migration tracking (e.g., from Google Docs).
 | `started_at`            | timestamp                       |                            |
 | `current_label_line_id` | uuid FK → label_lines, nullable | Playback position          |
 | `active_flags`          | jsonb                           | Simulated flag state: `[]` |
-| `active_meters`         | jsonb                           | Simulated stat state: `{}` |
+| `active_stats`          | jsonb                           | Simulated stat state: `{}` |
 | `route_taken`           | text, nullable                  | Locked route if applicable |
 | `ended_at`              | timestamp, nullable             |                            |
 

@@ -4,7 +4,7 @@ import {
   SquarePen,
   Route,
   Database,
-  Thermometer,
+  BarChart3,
   Users,
   Palette,
   Settings,
@@ -424,7 +424,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
               }`}
               title="Stats"
             >
-              <Thermometer className="size-4 flex-shrink-0" />
+              <BarChart3 className="size-4 flex-shrink-0" />
               {showLabel && <span>Stats</span>}
             </button>
 

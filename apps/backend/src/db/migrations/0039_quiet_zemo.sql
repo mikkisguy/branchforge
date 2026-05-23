@@ -1,0 +1,1 @@
+ALTER TABLE "demo_sessions" RENAME COLUMN "active_meters" TO "active_stats";
