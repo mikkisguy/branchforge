@@ -19,7 +19,6 @@ import {
   UserRole,
   ROUTE_KEY_REGEX,
   JUMP_PREFIX_REGEX,
-  RenpyDefinitionCategory,
 } from "@branchforge/shared";
 
 // ============================================================================
@@ -606,186 +605,6 @@ export type CreateMeterInput = z.infer<typeof createMeterSchema>;
 export type UpdateMeterInput = z.infer<typeof updateMeterSchema>;
 
 // ============================================================================
-// Ren'Py Definition Schemas
-// ============================================================================
-
-/**
- * Ren'Py Definition category enum (matches db enum)
- * Uses values from shared package
- */
-export const renpyDefinitionCategorySchema = z.enum(
-  Object.values(RenpyDefinitionCategory)
-);
-
-/**
- * Tag validation for non-IMAGE categories (single identifier)
- * CHARACTER, TRANSFORM, INIT use simple identifiers like "a", "dissolve"
- */
-const renpyDefinitionTagStrictSchema = z
-  .string()
-  .trim()
-  .min(1, "Tag is required")
-  .max(100, "Tag is too long")
-  .regex(
-    /^[a-zA-Z0-9_]+$/,
-    "Tag can only contain letters, numbers, and underscores"
-  );
-
-/**
- * Tag validation for IMAGE category (allows spaces)
- * IMAGE tags allow space-separated identifiers like "bg cafe"
- */
-const renpyDefinitionTagImageSchema = z
-  .string()
-  .trim()
-  .min(1, "Tag is required")
-  .max(100, "Tag is too long")
-  .regex(
-    /^[a-zA-Z0-9_]+(?:[a-zA-Z0-9_ ]*[a-zA-Z0-9_]+)?$/,
-    "Tag can only contain letters, numbers, underscores, and spaces (no leading/trailing spaces)"
-  );
-
-/**
- * Tag validation (Ren'Py identifier)
- * Category-aware: IMAGE allows spaces for names like "bg cafe"
- * Other categories (CHARACTER, TRANSFORM, INIT) use single identifiers
- */
-export const renpyDefinitionTagSchema = z
-  .string()
-  .trim()
-  .min(1, "Tag is required")
-  .max(100, "Tag is too long")
-  .regex(
-    /^[a-zA-Z0-9_]+$/,
-    "Tag can only contain letters, numbers, and underscores"
-  );
-
-/**
- * Create Ren'Py definition request validation
- * Tag validation is category-aware: IMAGE allows spaces, others don't
- */
-export const createRenpyDefinitionSchema = z
-  .object({
-    category: renpyDefinitionCategorySchema,
-    tag: z
-      .string()
-      .trim()
-      .min(1, "Tag is required")
-      .max(100, "Tag is too long"),
-    displayName: z.string().trim().min(1).max(200, "Display name is too long"),
-    definitionCode: z.string().trim().min(1, "Definition code is required"),
-    referenceTag: z.string().max(100).nullable().optional(),
-    sortOrder: z.number().int().min(0).optional().default(0),
-  })
-  .strict()
-  .superRefine((data, ctx) => {
-    // IMAGE category allows spaces (for names like "bg cafe")
-    if (data.category === "IMAGE") {
-      const imageTagResult = renpyDefinitionTagImageSchema.safeParse(data.tag);
-      if (!imageTagResult.success) {
-        imageTagResult.error.issues.forEach((issue) => {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["tag"],
-            message: issue.message,
-          });
-        });
-      }
-    } else {
-      // Other categories require strict identifier format (no spaces)
-      const strictTagResult = renpyDefinitionTagStrictSchema.safeParse(
-        data.tag
-      );
-      if (!strictTagResult.success) {
-        strictTagResult.error.issues.forEach((issue) => {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["tag"],
-            message: issue.message,
-          });
-        });
-      }
-    }
-  });
-
-/**
- * Update Ren'Py definition request validation
- * Tag validation is category-aware when both category and tag are provided
- */
-export const updateRenpyDefinitionSchema = z
-  .object({
-    category: renpyDefinitionCategorySchema.optional(),
-    tag: z
-      .string()
-      .trim()
-      .min(1, "Tag is required")
-      .max(100, "Tag is too long")
-      .optional(),
-    displayName: z.string().trim().min(1).max(200).optional(),
-    definitionCode: z.string().trim().min(1).optional(),
-    referenceTag: z.string().max(100).nullable().optional(),
-    sortOrder: z.number().int().min(0).optional(),
-  })
-  .strict()
-  .superRefine((data, ctx) => {
-    // Only validate tag if it's provided
-    if (data.tag === undefined) return;
-
-    // If category is also provided, use category-aware validation
-    if (data.category !== undefined) {
-      if (data.category === "IMAGE") {
-        const imageTagResult = renpyDefinitionTagImageSchema.safeParse(
-          data.tag
-        );
-        if (!imageTagResult.success) {
-          imageTagResult.error.issues.forEach((issue) => {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ["tag"],
-              message: issue.message,
-            });
-          });
-        }
-      } else {
-        const strictTagResult = renpyDefinitionTagStrictSchema.safeParse(
-          data.tag
-        );
-        if (!strictTagResult.success) {
-          strictTagResult.error.issues.forEach((issue) => {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ["tag"],
-              message: issue.message,
-            });
-          });
-        }
-      }
-    } else {
-      // If only tag is provided (no category), use strict validation as safe default
-      // The service layer will look up the existing category for full validation
-      const strictTagResult = renpyDefinitionTagStrictSchema.safeParse(
-        data.tag
-      );
-      if (!strictTagResult.success) {
-        strictTagResult.error.issues.forEach((issue) => {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["tag"],
-            message: issue.message,
-          });
-        });
-      }
-    }
-  });
-
-/**
- * Ren'Py Definition ID params validation
- */
-export const renpyDefinitionIdParamsSchema = z.object({
-  renpyDefinitionId: uuidSchema,
-});
-
-// ============================================================================
 // Character Schemas
 // ============================================================================
 
@@ -1133,13 +952,6 @@ export type CreateStateVariableInput = z.infer<
 export type UpdateStateVariableInput = z.infer<
   typeof updateStateVariableSchema
 >;
-export type CreateRenpyDefinitionInput = z.infer<
-  typeof createRenpyDefinitionSchema
->;
-export type UpdateRenpyDefinitionInput = z.infer<
-  typeof updateRenpyDefinitionSchema
->;
-
 // ============================================================================
 // User Settings Schemas
 // ============================================================================

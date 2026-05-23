@@ -15,7 +15,6 @@ import {
   characters,
   meters,
   stateVariables,
-  renpyDefinitions,
 } from "../db/schema/index.js";
 import { eq, and, desc, inArray, isNull, sql } from "drizzle-orm";
 import {
@@ -33,7 +32,7 @@ import {
   patchRPYWithStateVariables,
   generateStateVariablesFile,
   generateMetersFile,
-  generateDefinitionsFile,
+  generateCharacterDefinitionsFile,
 } from "./rpy-generator.service.js";
 import { calculateLinesHash, calculateContentHash } from "../lib/hash.js";
 import { type DetectedCharacter } from "./character-parser.service.js";
@@ -299,22 +298,20 @@ export async function exportToGitlab(
       });
     }
 
-    // Generate definitions.rpy if definitions exist
-    const projectRenpyDefinitions = await db
+    // Generate definitions.rpy from characters
+    const projectCharacters = await db
       .select({
-        category: renpyDefinitions.category,
-        tag: renpyDefinitions.tag,
-        displayName: renpyDefinitions.displayName,
-        definitionCode: renpyDefinitions.definitionCode,
-        sortOrder: renpyDefinitions.sortOrder,
+        renpyTag: characters.renpyTag,
+        displayName: characters.displayName,
+        color: characters.color,
       })
-      .from(renpyDefinitions)
-      .where(eq(renpyDefinitions.projectId, projectId));
+      .from(characters)
+      .where(eq(characters.projectId, projectId));
 
-    if (projectRenpyDefinitions.length > 0) {
+    if (projectCharacters.length > 0) {
       filesToExport.push({
         filePath: `${fileDirPrefix}branchforge_definitions.rpy`,
-        content: generateDefinitionsFile(projectRenpyDefinitions),
+        content: generateCharacterDefinitionsFile(projectCharacters),
       });
     }
 

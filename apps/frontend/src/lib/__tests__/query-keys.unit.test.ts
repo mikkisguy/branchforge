@@ -15,7 +15,6 @@ import {
   routeConfigKeys,
   stateVariableKeys,
   characterKeys,
-  renpyDefinitionKeys,
 } from "../query-keys";
 
 describe("Query Keys Factory", () => {
@@ -358,41 +357,6 @@ describe("Query Keys Factory", () => {
       const key = characterKeys.detail("char-1");
       expect(JSON.stringify(key)).toBe(
         JSON.stringify(["characters", "detail", "char-1"])
-      );
-    });
-  });
-
-  describe("Ren'Py Definition Keys", () => {
-    it("should create correct all key", () => {
-      expect(renpyDefinitionKeys.all).toStrictEqual(["renpyDefinitions"]);
-    });
-
-    it("should create correct lists key with projectId", () => {
-      expect(renpyDefinitionKeys.lists("proj-1")).toStrictEqual([
-        "renpyDefinitions",
-        "proj-1",
-        "list",
-      ]);
-    });
-
-    it("should create unique keys for different projects", () => {
-      const key1 = renpyDefinitionKeys.lists("proj-1");
-      const key2 = renpyDefinitionKeys.lists("proj-2");
-      expect(key1).not.toStrictEqual(key2);
-    });
-
-    it("should create correct detail key with renpyDefinitionId", () => {
-      expect(renpyDefinitionKeys.detail("def-1")).toStrictEqual([
-        "renpyDefinitions",
-        "detail",
-        "def-1",
-      ]);
-    });
-
-    it("should be serializable", () => {
-      const key = renpyDefinitionKeys.detail("def-1");
-      expect(JSON.stringify(key)).toBe(
-        JSON.stringify(["renpyDefinitions", "detail", "def-1"])
       );
     });
   });

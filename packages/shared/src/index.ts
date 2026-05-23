@@ -164,42 +164,6 @@ export interface MeterProgression {
 }
 
 // ============================================================================
-// Ren'Py Definition Configuration
-// ============================================================================
-
-/**
- * Ren'Py Definition category enumeration
- */
-export type RenpyDefinitionCategory =
-  | "CHARACTER"
-  | "TRANSFORM"
-  | "IMAGE"
-  | "INIT";
-export const RenpyDefinitionCategory = {
-  CHARACTER: "CHARACTER",
-  TRANSFORM: "TRANSFORM",
-  IMAGE: "IMAGE",
-  INIT: "INIT",
-} as const;
-
-/**
- * Ren'Py Definition for export to RPY files
- * Represents static Ren'Py language definitions
- */
-export interface RenpyDefinition {
-  id: string;
-  projectId: string;
-  category: RenpyDefinitionCategory;
-  sortOrder: number;
-  tag: string;
-  displayName: string;
-  definitionCode: string;
-  referenceTag: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// ============================================================================
 // Public User Interface
 // ============================================================================
 

@@ -34,9 +34,6 @@ export * from "./tables/project-files.js";
 export * from "./tables/visual-systems.js";
 export * from "./tables/route-configs.js";
 
-// Ren'Py definitions
-export * from "./tables/renpy-definitions.js";
-
 // Character tables
 export * from "./tables/characters.js";
 export * from "./tables/pair-groups.js";
