@@ -686,7 +686,7 @@ describe("ProjectsRoutes (Integration)", () => {
         sequenceOrder: 0,
         status: "DRAFT",
         visibility: "EXCLUSIVE",
-        prerequisites: {},
+        conditions: {},
         effects: {},
         deletedAt: new Date(),
       });

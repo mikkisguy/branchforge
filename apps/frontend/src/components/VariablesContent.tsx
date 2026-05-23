@@ -1,7 +1,7 @@
 /**
  * State Variables Content
  *
- * Reusable content component for state variables management.
+ * Reusable content component for state stateVariables management.
  * Can be rendered inline or wrapped in a dialog.
  */
 
@@ -11,8 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { InlineMessage } from "@/components/ui/inline-error";
-import { useStateVariables } from "@/hooks/useStateVariables";
+import { useVariables } from "@/hooks/useVariables";
 import { useToast } from "@/contexts/ToastContext";
+import type { Variable } from "@branchforge/shared";
 
 interface StateVariablesContentProps {
   projectId: string;
@@ -57,20 +58,18 @@ function validateStateVariable(
 // Component
 // ============================================================================
 
-export function StateVariablesContent({
-  projectId,
-}: StateVariablesContentProps) {
+export function VariablesContent({ projectId }: StateVariablesContentProps) {
   const {
-    stateVariables,
-    isLoadingStateVariables,
-    stateVariablesError,
-    isCreatingStateVariable,
-    isUpdatingStateVariable,
-    isDeletingStateVariable,
-    createStateVariable,
-    updateStateVariable: updateStateVariableApi,
-    deleteStateVariable,
-  } = useStateVariables(projectId);
+    variables,
+    isLoadingVariables,
+    variablesError,
+    isCreatingVariable,
+    isUpdatingVariable,
+    isDeletingVariable,
+    createVariable,
+    updateVariable: updateVariableApi,
+    deleteVariable,
+  } = useVariables(projectId);
   const { error } = useToast();
 
   // Form state
@@ -82,12 +81,10 @@ export function StateVariablesContent({
 
   // Combined loading state for any mutation
   const isSaving =
-    isCreatingStateVariable ||
-    isUpdatingStateVariable ||
-    isDeletingStateVariable;
+    isCreatingVariable || isUpdatingVariable || isDeletingVariable;
 
   /**
-   * Initialize form state from state variables
+   * Initialize form state from state stateVariables
    * Guard against re-initialization during save operations
    */
   useEffect(() => {
@@ -96,9 +93,9 @@ export function StateVariablesContent({
       return;
     }
 
-    if (stateVariables.length > 0) {
+    if (variables.length > 0) {
       setStateVariablesList(
-        stateVariables.map((sv) => ({
+        variables.map((sv: Variable) => ({
           id: sv.id,
           key: sv.key,
           description: sv.description ?? "",
@@ -106,12 +103,12 @@ export function StateVariablesContent({
         }))
       );
       hasInitialized.current = true;
-    } else if (stateVariables.length === 0) {
-      // Initialize with empty state variables
+    } else if (variables.length === 0) {
+      // Initialize with empty state stateVariables
       setStateVariablesList([]);
       hasInitialized.current = true;
     }
-  }, [stateVariables, isSaving]);
+  }, [variables, isSaving]);
 
   /**
    * Add new state variable
@@ -154,7 +151,7 @@ export function StateVariablesContent({
       if (stateVariable.id) {
         // Delete existing state variable
         try {
-          await deleteStateVariable(stateVariable.id);
+          await deleteVariable(stateVariable.id);
           setStateVariablesList((prev) => prev.filter((_, i) => i !== index));
         } catch {
           // Error is handled by the hook's toast
@@ -167,7 +164,7 @@ export function StateVariablesContent({
         }
       }
     },
-    [stateVariablesList, deleteStateVariable, editingIndex]
+    [stateVariablesList, deleteVariable, editingIndex]
   );
 
   /**
@@ -185,14 +182,14 @@ export function StateVariablesContent({
       try {
         if (stateVariable.id) {
           // Update existing state variable
-          await updateStateVariableApi(stateVariable.id, {
+          await updateVariableApi(stateVariable.id, {
             key: stateVariable.key,
             description: stateVariable.description || undefined,
             category: stateVariable.category || undefined,
           });
         } else {
           // Create new state variable
-          const newStateVariable = await createStateVariable({
+          const newStateVariable = await createVariable({
             key: stateVariable.key,
             description: stateVariable.description || undefined,
             category: stateVariable.category || undefined,
@@ -214,7 +211,7 @@ export function StateVariablesContent({
         // Error is handled by the hook's toast
       }
     },
-    [stateVariablesList, createStateVariable, updateStateVariableApi, error]
+    [stateVariablesList, createVariable, updateVariableApi, error]
   );
 
   /**
@@ -232,8 +229,8 @@ export function StateVariablesContent({
       } else {
         // Restore the original state variable from server data
         // Use ID-based lookup instead of index for safety
-        const original = stateVariables.find(
-          (sv) => sv.id === stateVariable.id
+        const original = variables.find(
+          (sv: Variable) => sv.id === stateVariable.id
         );
         if (!original) {
           // State variable no longer exists, remove from list
@@ -254,7 +251,7 @@ export function StateVariablesContent({
       }
       setEditingIndex(null);
     },
-    [stateVariablesList, stateVariables]
+    [stateVariablesList, variables]
   );
 
   /**
@@ -265,7 +262,7 @@ export function StateVariablesContent({
       validateStateVariable(stateVariablesList[index]) === null;
   }, [stateVariablesList]);
 
-  // Group state variables by category for display
+  // Group state stateVariables by category for display
   const groupedStateVariables = useMemo(() => {
     const groups: Record<string, StateVariableForm[]> = {};
     for (const stateVariable of stateVariablesList) {
@@ -287,27 +284,27 @@ export function StateVariablesContent({
       <div>
         <h3 className="text-lg font-medium">State Variables Management</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          State variables are boolean state variables used in conditional
-          branching logic. They control label accessibility, menu visibility,
-          and story state changes.
+          State stateVariables are boolean state stateVariables used in
+          conditional branching logic. They control label accessibility, menu
+          visibility, and story state changes.
         </p>
       </div>
 
-      {isLoadingStateVariables ? (
+      {isLoadingVariables ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="size-6 animate-spin text-muted-foreground" />
         </div>
-      ) : stateVariablesError ? (
+      ) : variablesError ? (
         <InlineMessage variant="error">
-          Failed to load state variables
+          Failed to load state stateVariables
         </InlineMessage>
       ) : (
         <>
           {stateVariablesList.length === 0 ? (
             <div className="p-8 border border-dashed border-border/30 rounded-md text-center">
               <p className="text-sm text-muted-foreground mb-4">
-                No state variables configured yet. Add your first state variable
-                to get started.
+                No state stateVariables configured yet. Add your first state
+                variable to get started.
               </p>
               <Button
                 type="button"
@@ -433,7 +430,7 @@ export function StateVariablesContent({
                                       disabled={isSaving}
                                     />
                                     <p className="text-xs text-muted-foreground">
-                                      Group state variables by category
+                                      Group state stateVariables by category
                                     </p>
                                   </div>
                                 </div>

@@ -112,7 +112,7 @@ describe("GitLabSyncService (Integration)", () => {
     sequenceOrder: 0,
     route: "COMMON" as const,
     status: "DRAFT" as const,
-    prerequisites: {},
+    conditions: {},
     effects: {},
     projectFileId: testGitlabFileId,
     labelName: "start",
@@ -615,7 +615,7 @@ describe("GitLabSyncService (Integration)", () => {
         sequenceOrder: 1,
         route: "COMMON" as const,
         status: "DRAFT" as const,
-        prerequisites: {},
+        conditions: {},
         effects: {},
         projectFileId: testGitlabFile2.id, // Uses the dynamically generated ID
         labelName: "chapter1",

@@ -7,7 +7,7 @@
  * metadata editing, and soft delete.
  */
 
-import { useMemo, useState, useRef, useEffect, useCallback } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { PublicLabel, LabelStatus } from "@branchforge/shared";
 import {
@@ -24,12 +24,12 @@ import {
 } from "lucide-react";
 import { LabelContextMenu } from "@/components/write-mode/LabelContextMenu";
 import { LabelEditDialog } from "@/components/write-mode/LabelEditDialog";
-import { StateVariablesModal } from "@/components/ide-shared/StateVariablesModal";
-import { MetersDialog } from "@/components/MetersDialog";
+import { VariablesModal } from "@/components/ide-shared/VariablesModal";
+import { StatsDialog } from "@/components/StatsDialog";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { useMeters } from "@/hooks/useMeters";
-import { useStateVariables } from "@/hooks/useStateVariables";
+import { useStats } from "@/hooks/useStats";
+import { useVariables } from "@/hooks/useVariables";
 import type { UpdateLabelInput } from "@/lib/api/labels";
 
 const STATUS_COLORS: Record<LabelStatus, string> = {
@@ -448,8 +448,8 @@ export function LabelNavigator({
   routeConfigs,
 }: LabelNavigatorProps) {
   // Prerequisites data hooks
-  const { meters } = useMeters(projectId);
-  const { stateVariables } = useStateVariables(projectId);
+  const { stats } = useStats(projectId);
+  const { variables } = useVariables(projectId);
 
   // Prerequisites management modals
   const [stateVariablesModalOpen, setStateVariablesModalOpen] = useState(false);
@@ -812,12 +812,12 @@ export function LabelNavigator({
                   : null
               }
               routeConfigs={routeConfigs ?? []}
-              meters={meters}
-              variables={stateVariables}
+              meters={stats}
+              variables={variables}
               onSave={handleEditSave}
               isSaving={isUpdatingLabel ?? false}
               onOpenStateVariables={() => setStateVariablesModalOpen(true)}
-              onOpenMeters={() => setMetersModalOpen(true)}
+              onOpenStats={() => setMetersModalOpen(true)}
             />
           ),
           portalTarget
@@ -844,7 +844,7 @@ export function LabelNavigator({
       {/* State Variables Management Modal */}
       {portalTarget &&
         createPortal(
-          <StateVariablesModal
+          <VariablesModal
             open={stateVariablesModalOpen}
             onOpenChange={setStateVariablesModalOpen}
             projectId={projectId}
@@ -852,10 +852,10 @@ export function LabelNavigator({
           portalTarget
         )}
 
-      {/* Meters Management Modal */}
+      {/* Stats Management Modal */}
       {portalTarget &&
         createPortal(
-          <MetersDialog
+          <StatsDialog
             open={metersModalOpen}
             onOpenChange={setMetersModalOpen}
             projectId={projectId}

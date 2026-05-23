@@ -106,7 +106,7 @@ describe("LabelsRoutes (Integration)", () => {
         sequenceOrder: 0,
         status: "DRAFT",
         visibility: "EXCLUSIVE",
-        prerequisites: {},
+        conditions: {},
         effects: {},
       },
       {
@@ -120,7 +120,7 @@ describe("LabelsRoutes (Integration)", () => {
         sequenceOrder: 1,
         status: "DRAFT",
         visibility: "EXCLUSIVE",
-        prerequisites: {},
+        conditions: {},
         effects: {},
       },
     ]);

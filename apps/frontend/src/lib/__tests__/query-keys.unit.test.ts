@@ -13,7 +13,7 @@ import {
   projectKeys,
   labelKeys,
   routeConfigKeys,
-  stateVariableKeys,
+  variableKeys,
   characterKeys,
 } from "../query-keys";
 
@@ -291,37 +291,37 @@ describe("Query Keys Factory", () => {
     });
   });
 
-  describe("State Variable Keys", () => {
+  describe("Variable Keys", () => {
     it("should create correct all key", () => {
-      expect(stateVariableKeys.all).toStrictEqual(["stateVariables"]);
+      expect(variableKeys.all).toStrictEqual(["variables"]);
     });
 
     it("should create correct lists key with projectId", () => {
-      expect(stateVariableKeys.lists("proj-1")).toStrictEqual([
-        "stateVariables",
+      expect(variableKeys.lists("proj-1")).toStrictEqual([
+        "variables",
         "proj-1",
         "list",
       ]);
     });
 
     it("should create unique keys for different projects", () => {
-      const key1 = stateVariableKeys.lists("proj-1");
-      const key2 = stateVariableKeys.lists("proj-2");
+      const key1 = variableKeys.lists("proj-1");
+      const key2 = variableKeys.lists("proj-2");
       expect(key1).not.toStrictEqual(key2);
     });
 
-    it("should create correct detail key with stateVariableId", () => {
-      expect(stateVariableKeys.detail("var-1")).toStrictEqual([
-        "stateVariables",
+    it("should create correct detail key with variableId", () => {
+      expect(variableKeys.detail("var-1")).toStrictEqual([
+        "variables",
         "detail",
         "var-1",
       ]);
     });
 
     it("should be serializable", () => {
-      const key = stateVariableKeys.detail("var-1");
+      const key = variableKeys.detail("var-1");
       expect(JSON.stringify(key)).toBe(
-        JSON.stringify(["stateVariables", "detail", "var-1"])
+        JSON.stringify(["variables", "detail", "var-1"])
       );
     });
   });

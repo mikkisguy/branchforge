@@ -121,14 +121,14 @@ export interface Variable {
 }
 
 // ============================================================================
-// Meter Configuration
+// Stat Configuration
 // ============================================================================
 
 /**
- * Meter for tracking relationship stats and character attributes.
- * Meters are numerical values that change based on player choices.
+ * Stat for tracking relationship stats and character attributes.
+ * Stats are numerical values that change based on player choices.
  */
-export interface Meter {
+export interface Stat {
   id: string;
   projectId: string;
   characterId: string | null;
@@ -142,25 +142,25 @@ export interface Meter {
 }
 
 /**
- * Summary of a label's effect on a specific meter.
+ * Summary of a label's effect on a specific stat.
  */
-export interface MeterLabelEffect {
+export interface StatLabelEffect {
   labelId: string;
   labelTitle: string;
   routeKey: string | null;
-  prerequisiteValue: number | null;
+  conditionValue: number | null;
   effectDelta: number | null;
 }
 
 /**
- * Full progression data for a single meter across all labels.
+ * Full progression data for a single stat across all labels.
  */
-export interface MeterProgression {
-  meterKey: string;
-  meterName: string;
+export interface StatProgression {
+  statKey: string;
+  statName: string;
   minValue: number;
   maxValue: number;
-  labels: MeterLabelEffect[];
+  labels: StatLabelEffect[];
 }
 
 // ============================================================================

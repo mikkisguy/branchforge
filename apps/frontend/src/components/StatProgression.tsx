@@ -7,19 +7,19 @@
  */
 
 import { Loader2 } from "lucide-react";
-import type { MeterProgression as MeterProgressionType } from "@branchforge/shared";
+import type { StatProgression as StatProgressionType } from "@branchforge/shared";
 
-interface MeterProgressionProps {
-  progression: MeterProgressionType | null;
+interface StatProgressionProps {
+  progression: StatProgressionType | null;
   isLoading: boolean;
   error: Error | null;
 }
 
-export function MeterProgression({
+export function StatProgression({
   progression,
   isLoading,
   error,
-}: MeterProgressionProps) {
+}: StatProgressionProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -59,7 +59,7 @@ export function MeterProgression({
           No labels reference this meter yet
         </p>
         <p className="text-xs text-muted-foreground">
-          Label prerequisites and effects using &quot;{progression.meterKey}
+          Label prerequisites and effects using &quot;{progression.statKey}
           &quot; will appear here.
         </p>
       </div>
@@ -69,7 +69,7 @@ export function MeterProgression({
   return (
     <div className="space-y-3">
       <div>
-        <h3 className="text-sm font-medium">{progression.meterName}</h3>
+        <h3 className="text-sm font-medium">{progression.statName}</h3>
         <p className="text-xs text-muted-foreground">
           Range: {progression.minValue}&ndash;{progression.maxValue}
           {" · "}
@@ -115,9 +115,9 @@ export function MeterProgression({
                   )}
                 </td>
                 <td className="p-3 text-center">
-                  {le.prerequisiteValue !== null ? (
+                  {le.conditionValue !== null ? (
                     <span className="font-mono text-xs">
-                      &ge; {le.prerequisiteValue}
+                      &ge; {le.conditionValue}
                     </span>
                   ) : (
                     <span className="text-muted-foreground">&mdash;</span>

@@ -8,7 +8,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import type { Meter, Variable } from "@branchforge/shared";
+import type { Stat, Variable } from "@branchforge/shared";
 
 interface LabelEditDialogProps {
   /** Whether the dialog is open */
@@ -33,7 +33,7 @@ interface LabelEditDialogProps {
   /** Available route configs from the project */
   routeConfigs: Array<{ id: string; routeKey: string; routeName: string }>;
   /** All project meters (for the meter dropdown) */
-  meters: Meter[];
+  meters: Stat[];
   /** All project variables (for the variable picker) */
   variables: Variable[];
   /** Called when save is clicked */
@@ -53,7 +53,7 @@ interface LabelEditDialogProps {
   /** Callback to open the state variables management modal */
   onOpenStateVariables: () => void;
   /** Callback to open the meters management modal */
-  onOpenMeters: () => void;
+  onOpenStats: () => void;
 }
 
 type FormState = {
@@ -135,7 +135,7 @@ export function LabelEditDialog({
   onSave,
   isSaving,
   onOpenStateVariables,
-  onOpenMeters,
+  onOpenStats,
 }: LabelEditDialogProps) {
   const [form, dispatch] = useReducer(formReducer, {
     title: "",
@@ -591,7 +591,7 @@ export function LabelEditDialog({
                 </h4>
                 <button
                   type="button"
-                  onClick={onOpenMeters}
+                  onClick={onOpenStats}
                   className="text-xs text-[var(--theme-color)] hover:underline"
                 >
                   Manage

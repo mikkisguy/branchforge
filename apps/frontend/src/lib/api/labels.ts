@@ -74,9 +74,9 @@ export interface UpdateLabelInput {
   status?: "DRAFT" | "REVIEW" | "FINAL";
   visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
   labelName?: string;
-  prerequisites?: {
-    meters?: Record<string, number>;
-    stateVariables?: string[];
+  conditions?: {
+    variables?: string[];
+    stats?: Record<string, number>;
   } | null;
 }
 

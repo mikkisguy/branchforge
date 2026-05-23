@@ -18,8 +18,8 @@ import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 import type { Tab } from "./SettingsModal";
 import { SettingsModal } from "./SettingsModal";
 import { RouteSettingsModal } from "./RouteSettingsModal";
-import { StateVariablesModal } from "./StateVariablesModal";
-import { MetersDialog } from "@/components/MetersDialog";
+import { VariablesModal } from "./VariablesModal";
+import { StatsDialog } from "@/components/StatsDialog";
 import { CharactersModal } from "./CharactersModal";
 import { GitLabImportDialog } from "./GitLabImportDialog";
 import { ZipImportProjectDialog } from "./ZipImportProjectDialog";
@@ -588,16 +588,16 @@ export function LeftSidebar(props: LeftSidebarProps) {
             }
             projectId={projectId}
           />
-          <StateVariablesModal
+          <VariablesModal
             open={modals.stateVars}
-            onOpenChange={(open) =>
+            onOpenChange={(open: boolean) =>
               dispatchModal({ type: open ? "OPEN" : "CLOSE", key: "stateVars" })
             }
             projectId={projectId}
           />
-          <MetersDialog
+          <StatsDialog
             open={modals.meters}
-            onOpenChange={(open) =>
+            onOpenChange={(open: boolean) =>
               dispatchModal({ type: open ? "OPEN" : "CLOSE", key: "meters" })
             }
             projectId={projectId}

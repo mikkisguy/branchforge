@@ -117,14 +117,13 @@ export const routeConfigKeys = {
 } as const;
 
 // ============================================================================
-// State Variable Keys
+// Variable Keys
 // ============================================================================
 
-export const stateVariableKeys = {
-  all: ["stateVariables"] as const,
-  lists: (projectId: string) => ["stateVariables", projectId, "list"] as const,
-  detail: (stateVariableId: string) =>
-    ["stateVariables", "detail", stateVariableId] as const,
+export const variableKeys = {
+  all: ["variables"] as const,
+  lists: (projectId: string) => ["variables", projectId, "list"] as const,
+  detail: (variableId: string) => ["variables", "detail", variableId] as const,
 } as const;
 
 // ============================================================================
@@ -139,13 +138,13 @@ export const characterKeys = {
 } as const;
 
 // ============================================================================
-// Meter Keys
+// Stat Keys
 // ============================================================================
 
-export const meterKeys = {
-  all: ["meters"] as const,
-  lists: (projectId: string) => ["meters", projectId, "list"] as const,
-  detail: (meterId: string) => ["meters", "detail", meterId] as const,
+export const statKeys = {
+  all: ["stats"] as const,
+  lists: (projectId: string) => ["stats", projectId, "list"] as const,
+  detail: (statId: string) => ["stats", "detail", statId] as const,
   progression: (projectId: string) =>
-    ["meters", projectId, "progression"] as const,
+    ["stats", projectId, "progression"] as const,
 } as const;

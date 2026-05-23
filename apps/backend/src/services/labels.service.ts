@@ -2058,9 +2058,9 @@ export async function updateLabel(
     status?: LabelStatus;
     visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
     labelName?: string | null;
-    prerequisites?: {
-      meters?: Record<string, number>;
-      stateVariables?: string[];
+    conditions?: {
+      variables?: string[];
+      stats?: Record<string, number>;
     } | null;
   }
 ): Promise<PublicLabel> {
@@ -2214,17 +2214,15 @@ export async function updateLabel(
       }
     }
 
-    // Validate prerequisite stat keys and variable keys exist in the
+    // Validate condition stat keys and variable keys exist in the
     // project. These two existence checks are independent — run them concurrently.
     const statKeys =
-      data.prerequisites?.meters &&
-      Object.keys(data.prerequisites.meters).length > 0
-        ? Object.keys(data.prerequisites.meters)
+      data.conditions?.stats && Object.keys(data.conditions.stats).length > 0
+        ? Object.keys(data.conditions.stats)
         : [];
     const variableKeys =
-      data.prerequisites?.stateVariables &&
-      data.prerequisites.stateVariables.length > 0
-        ? data.prerequisites.stateVariables
+      data.conditions?.variables && data.conditions.variables.length > 0
+        ? data.conditions.variables
         : [];
 
     const [existingStats, existingVariables] = await Promise.all([
@@ -2284,8 +2282,8 @@ export async function updateLabel(
       ...data,
       ...(validatedRoute !== undefined ? { route: validatedRoute } : {}),
     };
-    if (data.prerequisites !== undefined) {
-      updateData.conditions = data.prerequisites ?? {};
+    if (data.conditions !== undefined) {
+      updateData.conditions = data.conditions ?? {};
     }
 
     // Also update project_files content if labelName changed
