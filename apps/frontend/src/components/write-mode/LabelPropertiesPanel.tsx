@@ -237,19 +237,28 @@ export function LabelPropertiesPanel({
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Title</span>
-                    <span className="text-foreground font-medium truncate ml-2 max-w-[120px]">
+                    <span
+                      className="text-foreground font-medium truncate ml-2 max-w-[120px]"
+                      title={activeLabel.title}
+                    >
                       {activeLabel.title}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Label Name</span>
-                    <span className="text-foreground font-medium font-mono truncate ml-2 max-w-[120px]">
+                    <span
+                      className="text-foreground font-medium font-mono truncate ml-2 max-w-[120px]"
+                      title={activeLabel.labelName ?? "—"}
+                    >
                       {activeLabel.labelName ?? "—"}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Route</span>
-                    <span className="text-foreground font-medium truncate ml-2 max-w-[120px]">
+                    <span
+                      className="text-foreground font-medium truncate ml-2 max-w-[120px]"
+                      title={routeConfig?.routeName ?? "Shared"}
+                    >
                       {routeConfig?.routeName ?? "Shared"}
                     </span>
                   </div>
@@ -274,7 +283,10 @@ export function LabelPropertiesPanel({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Visibility</span>
-                    <span className="text-foreground font-medium truncate ml-2 max-w-[120px]">
+                    <span
+                      className="text-foreground font-medium truncate ml-2 max-w-[120px]"
+                      title={activeLabel.visibility ?? "—"}
+                    >
                       {activeLabel.visibility ?? "—"}
                     </span>
                   </div>
