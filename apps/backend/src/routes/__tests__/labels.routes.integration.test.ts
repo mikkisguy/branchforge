@@ -50,7 +50,7 @@ describe("LabelsRoutes (Integration)", () => {
     userId: testUserId,
     name: "Labels Route Test Project",
     description: "Project used by labels route integration tests",
-    maxMeterDelta: 10,
+    maxStatDelta: 10,
     source: "ZIP",
   };
 

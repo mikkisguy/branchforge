@@ -1,5 +1,5 @@
 /**
- * State Variables Content
+ * Variables Content
  *
  * Reusable content component for state stateVariables management.
  * Can be rendered inline or wrapped in a dialog.
@@ -31,19 +31,19 @@ interface StateVariableForm {
 // ============================================================================
 
 /**
- * Validate a single state variable
+ * Validate a single variable
  */
 function validateStateVariable(
   stateVariable: StateVariableForm
 ): string | null {
   if (!stateVariable.key.trim()) {
-    return "State variable key is required";
+    return "Variable key is required";
   }
   if (!/^[a-zA-Z0-9_-]+$/.test(stateVariable.key)) {
-    return "State variable key can only contain letters, numbers, underscores, and hyphens";
+    return "Variable key can only contain letters, numbers, underscores, and hyphens";
   }
   if (stateVariable.key.length > 50) {
-    return "State variable key is too long (max 50 characters)";
+    return "Variable key is too long (max 50 characters)";
   }
   if (stateVariable.description && stateVariable.description.length > 500) {
     return "Description is too long (max 500 characters)";
@@ -111,7 +111,7 @@ export function VariablesContent({ projectId }: StateVariablesContentProps) {
   }, [variables, isSaving]);
 
   /**
-   * Add new state variable
+   * Add new variable
    */
   const addStateVariable = useCallback(() => {
     setStateVariablesList((prev) => [
@@ -126,7 +126,7 @@ export function VariablesContent({ projectId }: StateVariablesContentProps) {
   }, [stateVariablesList.length]);
 
   /**
-   * Update state variable field
+   * Update variable field
    */
   const updateStateVariableField = useCallback(
     (index: number, field: keyof StateVariableForm, value: string) => {
@@ -143,13 +143,13 @@ export function VariablesContent({ projectId }: StateVariablesContentProps) {
   );
 
   /**
-   * Remove state variable
+   * Remove variable
    */
   const removeStateVariable = useCallback(
     async (index: number) => {
       const stateVariable = stateVariablesList[index];
       if (stateVariable.id) {
-        // Delete existing state variable
+        // Delete existing variable
         try {
           await deleteVariable(stateVariable.id);
           setStateVariablesList((prev) => prev.filter((_, i) => i !== index));
@@ -157,7 +157,7 @@ export function VariablesContent({ projectId }: StateVariablesContentProps) {
           // Error is handled by the hook's toast
         }
       } else {
-        // Remove new state variable (not yet saved)
+        // Remove new variable (not yet saved)
         setStateVariablesList((prev) => prev.filter((_, i) => i !== index));
         if (editingIndex === index) {
           setEditingIndex(null);
@@ -168,7 +168,7 @@ export function VariablesContent({ projectId }: StateVariablesContentProps) {
   );
 
   /**
-   * Save individual state variable (create or update)
+   * Save individual variable (create or update)
    */
   const saveStateVariable = useCallback(
     async (index: number) => {
@@ -181,20 +181,20 @@ export function VariablesContent({ projectId }: StateVariablesContentProps) {
 
       try {
         if (stateVariable.id) {
-          // Update existing state variable
+          // Update existing variable
           await updateVariableApi(stateVariable.id, {
             key: stateVariable.key,
             description: stateVariable.description || undefined,
             category: stateVariable.category || undefined,
           });
         } else {
-          // Create new state variable
+          // Create new variable
           const newStateVariable = await createVariable({
             key: stateVariable.key,
             description: stateVariable.description || undefined,
             category: stateVariable.category || undefined,
           });
-          // Update the form with the new state variable ID
+          // Update the form with the new variable ID
           setStateVariablesList((prev) => {
             const newStateVariables = [...prev];
             newStateVariables[index] = {
@@ -223,17 +223,17 @@ export function VariablesContent({ projectId }: StateVariablesContentProps) {
       if (!stateVariable) {
         return;
       }
-      // If it's a new state variable (no id), remove it
+      // If it's a new variable (no id), remove it
       if (!stateVariable.id) {
         setStateVariablesList((prev) => prev.filter((_, i) => i !== index));
       } else {
-        // Restore the original state variable from server data
+        // Restore the original variable from server data
         // Use ID-based lookup instead of index for safety
         const original = variables.find(
           (sv: Variable) => sv.id === stateVariable.id
         );
         if (!original) {
-          // State variable no longer exists, remove from list
+          // Variable no longer exists, remove from list
           setStateVariablesList((prev) => prev.filter((_, i) => i !== index));
           setEditingIndex(null);
           return;
@@ -255,7 +255,7 @@ export function VariablesContent({ projectId }: StateVariablesContentProps) {
   );
 
   /**
-   * Check if a state variable is valid
+   * Check if a variable is valid
    */
   const isStateVariableValid = useMemo(() => {
     return (index: number) =>
@@ -282,7 +282,7 @@ export function VariablesContent({ projectId }: StateVariablesContentProps) {
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-lg font-medium">State Variables Management</h3>
+        <h3 className="text-lg font-medium">Variables Management</h3>
         <p className="text-sm text-muted-foreground mt-1">
           State stateVariables are boolean state stateVariables used in
           conditional branching logic. They control label accessibility, menu
@@ -312,7 +312,7 @@ export function VariablesContent({ projectId }: StateVariablesContentProps) {
                 onClick={addStateVariable}
               >
                 <Plus className="size-4 mr-2" />
-                Add State Variable
+                Add Variable
               </Button>
             </div>
           ) : (
@@ -386,7 +386,7 @@ export function VariablesContent({ projectId }: StateVariablesContentProps) {
                                       htmlFor={`state-variable-key-${index}`}
                                       className="text-xs"
                                     >
-                                      State Variable Key *
+                                      Variable Key *
                                     </Label>
                                     <Input
                                       id={`state-variable-key-${index}`}
@@ -498,7 +498,7 @@ export function VariablesContent({ projectId }: StateVariablesContentProps) {
                 )
               )}
 
-              {/* Add State Variable Button */}
+              {/* Add Variable Button */}
               <Button
                 type="button"
                 variant="outline"
@@ -507,7 +507,7 @@ export function VariablesContent({ projectId }: StateVariablesContentProps) {
                 className="w-full"
               >
                 <Plus className="size-4 mr-2" />
-                Add Another State Variable
+                Add Another Variable
               </Button>
             </div>
           )}

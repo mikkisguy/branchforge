@@ -10,7 +10,7 @@ Visual novels with branching narratives need to track which content (labels/scen
 
 - **Shared content** — Opening/closing acts that all players see regardless of route
 - **Exclusive content** — Route-specific scenes (confessions, romantic moments)
-- **Duo content** — Scenes accessible only when pursuing two specific characters (e.g., duo endings based on love meter thresholds)
+- **Duo content** — Scenes accessible only when pursuing two specific characters (e.g., duo endings based on love stat thresholds)
 
 ## Decision
 
@@ -39,7 +39,7 @@ jumpPrefix: text("jump_prefix").notNull(), // "hero_" - for Ren'Py labels
 characterAId: uuid("character_a_id").notNull(),
 characterBId: uuid("character_b_id").notNull(),
 duoEndingLabel: text("duo_ending_label").notNull(),
-threshold: integer("threshold").default(70), // Love meter requirement
+threshold: integer("threshold").default(70), // Love stat requirement
 ```
 
 ## Consequences

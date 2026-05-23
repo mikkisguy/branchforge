@@ -453,7 +453,7 @@ export function LabelNavigator({
 
   // Prerequisites management modals
   const [stateVariablesModalOpen, setStateVariablesModalOpen] = useState(false);
-  const [metersModalOpen, setMetersModalOpen] = useState(false);
+  const [metersModalOpen, setStatsModalOpen] = useState(false);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -817,7 +817,7 @@ export function LabelNavigator({
               onSave={handleEditSave}
               isSaving={isUpdatingLabel ?? false}
               onOpenStateVariables={() => setStateVariablesModalOpen(true)}
-              onOpenStats={() => setMetersModalOpen(true)}
+              onOpenStats={() => setStatsModalOpen(true)}
             />
           ),
           portalTarget
@@ -841,7 +841,7 @@ export function LabelNavigator({
           portalTarget
         )}
 
-      {/* State Variables Management Modal */}
+      {/* Variables Management Modal */}
       {portalTarget &&
         createPortal(
           <VariablesModal
@@ -857,7 +857,7 @@ export function LabelNavigator({
         createPortal(
           <StatsDialog
             open={metersModalOpen}
-            onOpenChange={setMetersModalOpen}
+            onOpenChange={setStatsModalOpen}
             projectId={projectId}
           />,
           portalTarget

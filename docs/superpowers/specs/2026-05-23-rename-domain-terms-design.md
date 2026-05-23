@@ -35,7 +35,7 @@ aliasing because this is pre-production.
   via generated migrations.
 - Backend services/routes: rename service modules and update route
   handlers and validation schemas to the new terms.
-- Shared types: rename `StateVariable` -> `Variable`, `Meter` -> `Stat`
+- Shared types: rename `StateVariable` -> `Variable`, `Stat` -> `Stat`
   and update exports so frontend imports stay aligned.
 - Frontend: update hooks, query keys, and API client calls to new
   endpoints/fields; update UI copy (headings, labels, aria labels).

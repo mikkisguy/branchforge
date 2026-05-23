@@ -1,9 +1,9 @@
 /**
- * Meter Progression View
+ * Stat Progression View
  *
- * Shows all labels that affect a selected meter, including prerequisite
+ * Shows all labels that affect a selected stat, including prerequisite
  * thresholds and effect deltas. This helps authors understand where and
- * how meter values change across the visual novel.
+ * how stat values change across the visual novel.
  */
 
 import { Loader2 } from "lucide-react";
@@ -46,7 +46,7 @@ export function StatProgression({
     return (
       <div className="flex items-center justify-center py-16">
         <p className="text-sm text-muted-foreground">
-          Select a meter to see its progression
+          Select a stat to see its progression
         </p>
       </div>
     );
@@ -56,7 +56,7 @@ export function StatProgression({
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <p className="text-sm text-muted-foreground mb-1">
-          No labels reference this meter yet
+          No labels reference this stat yet
         </p>
         <p className="text-xs text-muted-foreground">
           Label prerequisites and effects using &quot;{progression.statKey}

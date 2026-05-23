@@ -77,7 +77,7 @@ const testProject: NewProject = {
   userId: testUserId,
   name: "Test Avatar Project",
   description: "A test project for avatar routes",
-  maxMeterDelta: 10,
+  maxStatDelta: 10,
   source: "ZIP",
 };
 

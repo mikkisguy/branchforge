@@ -285,7 +285,7 @@ export const createProjectSchema = z
   .object({
     name: requiredString(200, "Project name is too long"),
     description: optionalString(2000, "Description is too long"),
-    maxMeterDelta: z.number().int().optional(),
+    maxStatDelta: z.number().int().optional(),
     source: sourceOriginSchema,
   })
   .strict();

@@ -2,7 +2,7 @@
  * Variables Service
  *
  * Handles variable CRUD operations for projects.
- * Variables are boolean state variables used in conditional branching.
+ * Variables are boolean variables used in conditional branching.
  */
 
 import { getDb } from "../db/index.js";
@@ -57,7 +57,7 @@ export interface UpdateVariableBody {
  * List all variables for a project
  * @param projectId - The project ID to fetch variables for
  * @param userId - The user ID making the request (for authorization)
- * @returns Array of public state variables
+ * @returns Array of public variables
  */
 export async function listVariables(
   projectId: string,
@@ -90,7 +90,7 @@ export async function listVariables(
  * Get a single variable by ID
  * @param variableId - The variable ID to fetch
  * @param userId - The user ID making the request (for authorization)
- * @returns The state variable if found and accessible, null otherwise
+ * @returns The variable if found and accessible, null otherwise
  */
 export async function getVariable(
   variableId: string,
@@ -169,8 +169,8 @@ export async function createVariable(
  * Update an existing variable
  * @param variableId - The variable ID to update
  * @param userId - The user ID making the request (for authorization)
- * @param body - The state variable data to update
- * @returns The updated state variable
+ * @param body - The variable data to update
+ * @returns The updated variable
  */
 export async function updateVariable(
   variableId: string,
@@ -179,7 +179,7 @@ export async function updateVariable(
 ): Promise<PublicVariable> {
   const db = getDb();
 
-  // Verify user has access to the state variable
+  // Verify user has access to the variable
   const accessCheck = await db
     .select({
       variable: variables,

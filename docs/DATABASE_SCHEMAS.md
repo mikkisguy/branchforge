@@ -188,7 +188,7 @@ Unique constraint: `(project_id, tag)`
 
 ---
 
-### 11. State Variables
+### 11. Variables
 
 Boolean story state tracking (simpler alternative to flags).
 
@@ -237,13 +237,13 @@ Sequel duo tracking.
 | `character_a_id`   | uuid FK → characters |                                |
 | `character_b_id`   | uuid FK → characters |                                |
 | `duo_ending_label` | text                 | Jump target if both >threshold |
-| `threshold`        | integer, default 70  | Meter value for duo ending     |
+| `threshold`        | integer, default 70  | Stat value for duo ending      |
 | `created_at`       | timestamp            |                                |
 | `updated_at`       | timestamp            |                                |
 
 ---
 
-### 14. Meters
+### 14. Stats
 
 | Column         | Type                           | Notes                  |
 | -------------- | ------------------------------ | ---------------------- |
@@ -420,17 +420,17 @@ One-time migration tracking (e.g., from Google Docs).
 
 ### 22. Demo Sessions
 
-| Column                  | Type                            | Notes                       |
-| ----------------------- | ------------------------------- | --------------------------- |
-| `id`                    | uuid PK                         |                             |
-| `project_id`            | uuid FK → projects              |                             |
-| `user_id`               | uuid FK → users                 | Who's viewing               |
-| `started_at`            | timestamp                       |                             |
-| `current_label_line_id` | uuid FK → label_lines, nullable | Playback position           |
-| `active_flags`          | jsonb                           | Simulated flag state: `[]`  |
-| `active_meters`         | jsonb                           | Simulated meter state: `{}` |
-| `route_taken`           | text, nullable                  | Locked route if applicable  |
-| `ended_at`              | timestamp, nullable             |                             |
+| Column                  | Type                            | Notes                      |
+| ----------------------- | ------------------------------- | -------------------------- |
+| `id`                    | uuid PK                         |                            |
+| `project_id`            | uuid FK → projects              |                            |
+| `user_id`               | uuid FK → users                 | Who's viewing              |
+| `started_at`            | timestamp                       |                            |
+| `current_label_line_id` | uuid FK → label_lines, nullable | Playback position          |
+| `active_flags`          | jsonb                           | Simulated flag state: `[]` |
+| `active_meters`         | jsonb                           | Simulated stat state: `{}` |
+| `route_taken`           | text, nullable                  | Locked route if applicable |
+| `ended_at`              | timestamp, nullable             |                            |
 
 ---
 

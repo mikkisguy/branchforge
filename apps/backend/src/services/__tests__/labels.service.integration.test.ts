@@ -70,7 +70,7 @@ describe("LabelsService (Integration)", () => {
     userId: testUserId,
     name: "Owned Project",
     description: "A project owned by the user",
-    maxMeterDelta: 10,
+    maxStatDelta: 10,
     source: "ZIP",
   };
 
@@ -79,7 +79,7 @@ describe("LabelsService (Integration)", () => {
     userId: otherUserId,
     name: "Shared Project",
     description: "A project shared with the user",
-    maxMeterDelta: 15,
+    maxStatDelta: 15,
     source: "ZIP",
   };
 

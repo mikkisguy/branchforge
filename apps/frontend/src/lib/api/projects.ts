@@ -24,7 +24,7 @@ export interface Project {
   id: string;
   name: string;
   description?: string;
-  maxMeterDelta?: number;
+  maxStatDelta?: number;
   visibility?: UserRole;
   source: SourceOrigin;
   createdAt: string;

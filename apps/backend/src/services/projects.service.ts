@@ -44,7 +44,7 @@ type ProjectRow = {
   id: string;
   name: string;
   description: string | null;
-  maxMeterDelta: number | null;
+  maxStatDelta: number | null;
   source: SourceOrigin;
   createdAt: Date;
   updatedAt: Date;
@@ -67,7 +67,7 @@ function toPublicProject(
     id: project.id,
     name: project.name,
     description: project.description ?? undefined,
-    maxMeterDelta: project.maxMeterDelta ?? undefined,
+    maxStatDelta: project.maxStatDelta ?? undefined,
     visibility,
     source: project.source,
     createdAt: project.createdAt.toISOString(),
@@ -155,7 +155,7 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
       id: projects.id,
       name: projects.name,
       description: projects.description,
-      maxMeterDelta: projects.maxMeterDelta,
+      maxStatDelta: projects.maxStatDelta,
       source: projects.source,
       role: projectUsers.role, // User's role from project_users
       createdAt: projects.createdAt,
@@ -210,7 +210,7 @@ export async function getProject(
       id: projects.id,
       name: projects.name,
       description: projects.description,
-      maxMeterDelta: projects.maxMeterDelta,
+      maxStatDelta: projects.maxStatDelta,
       source: projects.source,
       createdAt: projects.createdAt,
       updatedAt: projects.updatedAt,
@@ -229,7 +229,7 @@ export async function getProject(
       id: projects.id,
       name: projects.name,
       description: projects.description,
-      maxMeterDelta: projects.maxMeterDelta,
+      maxStatDelta: projects.maxStatDelta,
       source: projects.source,
       role: projectUsers.role,
       createdAt: projects.createdAt,
@@ -293,7 +293,7 @@ export async function createProject(
     userId,
     name: body.name,
     description: body.description,
-    maxMeterDelta: body.maxMeterDelta ?? 10,
+    maxStatDelta: body.maxStatDelta ?? 10,
     source: body.source,
   };
 

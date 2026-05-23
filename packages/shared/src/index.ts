@@ -109,7 +109,7 @@ export interface RouteConfig {
 
 /**
  * Variable for conditional branching logic
- * Variables are boolean state variables used in conditions and effects
+ * Variables are boolean variables used in conditions and effects
  */
 export interface Variable {
   id: string;
@@ -735,7 +735,7 @@ export interface PublicProject {
   id: string;
   name: string;
   description?: string;
-  maxMeterDelta?: number;
+  maxStatDelta?: number;
   visibility?: UserRole;
   source: SourceOrigin;
   createdAt: string;

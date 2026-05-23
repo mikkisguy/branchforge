@@ -32,7 +32,7 @@ interface LabelEditDialogProps {
   } | null;
   /** Available route configs from the project */
   routeConfigs: Array<{ id: string; routeKey: string; routeName: string }>;
-  /** All project meters (for the meter dropdown) */
+  /** All project meters (for the stat dropdown) */
   meters: Stat[];
   /** All project variables (for the variable picker) */
   variables: Variable[];
@@ -50,7 +50,7 @@ interface LabelEditDialogProps {
   }) => Promise<void>;
   /** Whether save is in progress */
   isSaving: boolean;
-  /** Callback to open the state variables management modal */
+  /** Callback to open the variables management modal */
   onOpenStateVariables: () => void;
   /** Callback to open the meters management modal */
   onOpenStats: () => void;

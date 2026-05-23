@@ -2,7 +2,7 @@
  * Variables API Client
  *
  * Client for variable management operations.
- * Variables are boolean state variables used in conditional branching.
+ * Variables are boolean variables used in conditional branching.
  */
 
 import { request, requestVoid } from "./client";

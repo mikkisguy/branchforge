@@ -56,7 +56,7 @@ function mapToPublicStat(stat: Stat): PublicStat {
 }
 
 // ============================================================================
-// MetersService
+// StatsService
 // ============================================================================
 
 export class StatsService {

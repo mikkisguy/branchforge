@@ -59,7 +59,7 @@ describe("VariablesService (Integration)", () => {
     userId: testUserId,
     name: "Owned Project",
     description: "A project owned by the user",
-    maxMeterDelta: 10,
+    maxStatDelta: 10,
     source: "ZIP",
   };
 
@@ -68,7 +68,7 @@ describe("VariablesService (Integration)", () => {
     userId: otherUserId,
     name: "Other Project",
     description: "A project owned by another user",
-    maxMeterDelta: 10,
+    maxStatDelta: 10,
     source: "ZIP",
   };
 
@@ -146,7 +146,7 @@ describe("VariablesService (Integration)", () => {
         id: newProjectId,
         userId: testUserId,
         name: "Empty Project",
-        maxMeterDelta: 10,
+        maxStatDelta: 10,
         source: "ZIP",
       });
 

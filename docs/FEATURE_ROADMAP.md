@@ -14,7 +14,7 @@
 > | Feature | Issue |
 > |---------|-------|
 > | Route Visualization / Flow View | #136 |
-> | Meter Management | #13 |
+> | Stat Management | #13 |
 > | Pair Groups | #23 |
 > | World Elements | #26 |
 > | AI Suggestions | #18 |

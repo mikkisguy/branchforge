@@ -62,7 +62,7 @@ describe("GitLabService (Integration)", () => {
     userId: testUserId,
     name: "Owned Project",
     description: "A project owned by the user",
-    maxMeterDelta: 10,
+    maxStatDelta: 10,
     source: "ZIP",
   };
 
@@ -71,7 +71,7 @@ describe("GitLabService (Integration)", () => {
     userId: testUserId,
     name: "Other Project",
     description: "Another project",
-    maxMeterDelta: 10,
+    maxStatDelta: 10,
     source: "ZIP",
   };
 
@@ -657,7 +657,7 @@ describe("GitLabService (Integration)", () => {
         id: testUuid("14000000", 3),
         userId: otherUserId,
         name: "Other User Project",
-        maxMeterDelta: 10,
+        maxStatDelta: 10,
         source: "GITLAB",
       };
 

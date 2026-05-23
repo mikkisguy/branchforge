@@ -1,9 +1,9 @@
 /**
- * Meters Dialog
+ * Stats Dialog
  *
- * Master-detail dialog for meter management:
+ * Master-detail dialog for stat management:
  * - Left panel: list of meters with create/edit/delete
- * - Right panel: progression view for the selected meter
+ * - Right panel: progression view for the selected stat
  */
 
 import { useState } from "react";

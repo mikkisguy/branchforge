@@ -2,7 +2,7 @@
  * useVariables Hook
  *
  * Provides variable state and operations using TanStack Query.
- * Variables are boolean state variables used in conditional branching.
+ * Variables are boolean variables used in conditional branching.
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";

@@ -394,7 +394,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
               {showLabel && <span>Routes</span>}
             </button>
 
-            {/* State Variables */}
+            {/* Variables */}
             <button
               onClick={() => dispatchModal({ type: "OPEN", key: "stateVars" })}
               disabled={!projectId}
@@ -405,13 +405,13 @@ export function LeftSidebar(props: LeftSidebarProps) {
                   ? "text-muted-foreground/50 cursor-not-allowed"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               }`}
-              title="State Variables"
+              title="Variables"
             >
               <Database className="size-4 flex-shrink-0" />
-              {showLabel && <span>State Variables</span>}
+              {showLabel && <span>Variables</span>}
             </button>
 
-            {/* Meters */}
+            {/* Stats */}
             <button
               onClick={() => dispatchModal({ type: "OPEN", key: "meters" })}
               disabled={!projectId}
@@ -422,10 +422,10 @@ export function LeftSidebar(props: LeftSidebarProps) {
                   ? "text-muted-foreground/50 cursor-not-allowed"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               }`}
-              title="Meters"
+              title="Stats"
             >
               <Thermometer className="size-4 flex-shrink-0" />
-              {showLabel && <span>Meters</span>}
+              {showLabel && <span>Stats</span>}
             </button>
 
             {/* Characters */}

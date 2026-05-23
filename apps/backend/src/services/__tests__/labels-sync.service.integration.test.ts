@@ -65,7 +65,7 @@ describe("LabelsService Sync (Integration)", () => {
     userId: testUserId,
     name: "Test Project",
     description: "A test project",
-    maxMeterDelta: 10,
+    maxStatDelta: 10,
     source: "GITLAB",
   };
 

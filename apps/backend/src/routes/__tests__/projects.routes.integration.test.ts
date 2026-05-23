@@ -71,7 +71,7 @@ describe("ProjectsRoutes (Integration)", () => {
     userId: testUserId,
     name: "Owned Project",
     description: "A project owned by the user",
-    maxMeterDelta: 10,
+    maxStatDelta: 10,
     source: "ZIP",
   };
 
@@ -80,7 +80,7 @@ describe("ProjectsRoutes (Integration)", () => {
     userId: otherUserId,
     name: "Shared Project",
     description: "A project shared with the user",
-    maxMeterDelta: 15,
+    maxStatDelta: 15,
     source: "GITLAB",
   };
 
@@ -286,7 +286,7 @@ describe("ProjectsRoutes (Integration)", () => {
         id: ownedProject.id,
         name: "Owned Project",
         description: "A project owned by the user",
-        maxMeterDelta: 10,
+        maxStatDelta: 10,
         visibility: "OWNER",
       });
       expect(json.projects[0].createdAt).toBeDefined();
@@ -371,7 +371,7 @@ describe("ProjectsRoutes (Integration)", () => {
         id: ownedProject.id,
         name: "Owned Project",
         description: "A project owned by the user",
-        maxMeterDelta: 10,
+        maxStatDelta: 10,
         visibility: "OWNER",
       });
     });

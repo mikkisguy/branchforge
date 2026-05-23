@@ -64,7 +64,7 @@ describe("ProjectsService (Integration)", () => {
     userId: testUserId,
     name: "Owned Project",
     description: "A project owned by the user",
-    maxMeterDelta: 10,
+    maxStatDelta: 10,
     source: "ZIP",
   };
 
@@ -73,7 +73,7 @@ describe("ProjectsService (Integration)", () => {
     userId: otherUserId,
     name: "Shared Project",
     description: "A project shared with the user",
-    maxMeterDelta: 15,
+    maxStatDelta: 15,
     source: "ZIP",
   };
 
@@ -136,7 +136,7 @@ describe("ProjectsService (Integration)", () => {
         id: ownedProjectId,
         name: "Owned Project",
         description: "A project owned by the user",
-        maxMeterDelta: 10,
+        maxStatDelta: 10,
       });
       expect(projects[0].createdAt).toBeDefined();
       expect(projects[0].updatedAt).toBeDefined();
@@ -219,7 +219,7 @@ describe("ProjectsService (Integration)", () => {
         id: ownedProject.id,
         name: "Owned Project",
         description: "A project owned by the user",
-        maxMeterDelta: 10,
+        maxStatDelta: 10,
         visibility: "OWNER",
       });
       expect(project?.createdAt).toBeDefined();
@@ -243,7 +243,7 @@ describe("ProjectsService (Integration)", () => {
         id: sharedProject.id,
         name: "Shared Project",
         description: "A project shared with the user",
-        maxMeterDelta: 15,
+        maxStatDelta: 15,
         visibility: "READER",
       });
     });
@@ -316,7 +316,7 @@ describe("ProjectsService (Integration)", () => {
       const newProjectData = {
         name: "New Test Project",
         description: "A newly created test project",
-        maxMeterDelta: 15,
+        maxStatDelta: 15,
         source: "ZIP",
       };
 
@@ -326,7 +326,7 @@ describe("ProjectsService (Integration)", () => {
       expect(project).toMatchObject({
         name: "New Test Project",
         description: "A newly created test project",
-        maxMeterDelta: 15,
+        maxStatDelta: 15,
         visibility: "OWNER",
       });
       expect(project.id).toBeDefined();
@@ -357,23 +357,23 @@ describe("ProjectsService (Integration)", () => {
 
       expect(project).toMatchObject({
         name: "Minimal Project",
-        maxMeterDelta: 10, // Default value
+        maxStatDelta: 10, // Default value
         visibility: "OWNER",
       });
       expect(project.description).toBeUndefined();
     });
 
-    it("should create project with custom maxMeterDelta", async () => {
+    it("should create project with custom maxStatDelta", async () => {
       const customProjectData = {
         name: "Custom Delta Project",
-        maxMeterDelta: 25,
+        maxStatDelta: 25,
         source: "ZIP",
       };
 
       const project = await createProject(testUserId, customProjectData);
       createdProjectIds.push(project.id);
 
-      expect(project.maxMeterDelta).toBe(25);
+      expect(project.maxStatDelta).toBe(25);
     });
 
     it("should assign correct userId to created project", async () => {

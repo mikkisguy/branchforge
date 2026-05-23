@@ -14,7 +14,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## v0.9.0 - 2026-05-22
 
-- Added meter management
+- Added stat management
 - Added the possibility to add a new label on write mode, also some styling updates for the label and file lists
 - Added for labels: edit dialog for title and name, title display to script mode and filtering in write mode
 - Added sorting toggle for labels: file order/recent
@@ -68,7 +68,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Added Ren'Py definitions management service and UI components
 - Added character parser service and import wizard for RPY character management
-- Added game state variables management
+- Added game variables management
 - Added soft delete and sync tracking to labels
 
 ## v0.5.0 - 2026-03-09
