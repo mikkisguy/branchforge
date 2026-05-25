@@ -27,6 +27,25 @@ export type ContentType =
   | "FLAG";
 
 /**
+ * Type for line-level conditions
+ */
+export type LineConditions = {
+  stats?: Record<string, number>;
+  variables?: string[];
+};
+
+/**
+ * Type for visual statements (scene, show, hide)
+ */
+export type VisualStatement = {
+  type: "SCENE" | "SHOW" | "HIDE";
+  target: string;
+  at?: string;
+  with?: string;
+  zorder?: number;
+};
+
+/**
  * Strict content types for label sync operations
  * Subset of ContentType that excludes CHOICE and MENU
  */
@@ -50,6 +69,8 @@ export type LabelLineInsertValues = Pick<
   | "lastSyncedAt"
   | "rpyLineNumber"
   | "rpyIndentLevel"
+  | "conditions"
+  | "visualStatements"
 >;
 
 // ============================================================================
@@ -192,6 +213,8 @@ export function mapEntriesToLabelLineValues(
     speaker?: string;
     lineNumber?: number;
     indentLevel?: number;
+    conditions?: LineConditions;
+    visuals?: VisualStatement[];
   }>,
   labelId: string,
   projectFileId: string,
@@ -214,6 +237,8 @@ export function mapEntriesToLabelLineValues(
       lastSyncedAt: new Date(),
       rpyLineNumber: entry.lineNumber,
       rpyIndentLevel: entry.indentLevel ?? 0,
+      conditions: entry.conditions ?? null,
+      visualStatements: entry.visuals ?? null,
     };
   });
 }
