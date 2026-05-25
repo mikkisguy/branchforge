@@ -234,6 +234,27 @@ export interface ReconstructedFileOptions {
 }
 
 /**
+ * Technical constructs extracted from a single RPY line
+ * Used for displaying badges in write mode
+ */
+export interface TechnicalConstructs {
+  choices?: Array<{
+    label: string;
+    targetLabelId: string;
+    effects?: { stats?: Record<string, number> };
+  }>;
+  jumpTarget?: string;
+  conditions?: { stats?: Record<string, number>; variables?: string[] };
+  visuals?: Array<{
+    type: "SCENE" | "SHOW" | "HIDE";
+    target: string;
+    with?: string;
+    at?: string;
+    zorder?: number;
+  }>;
+}
+
+/**
  * Extract all label definitions from RPY content
  * Labels are entry points: label label_name:
  */
@@ -1800,4 +1821,157 @@ export function generateRpyFile(scene: BranchForgeScene): string {
   lines.push("    return");
 
   return lines.join("\n");
+}
+
+/**
+ * Extract technical constructs from a specific line in RPY content
+ * Used for displaying badges in write mode to show jumps, conditions, visuals, etc.
+ *
+ * @param rpyContent - Full RPY file content
+ * @param lineNumber - Line number to analyze (0-based)
+ * @returns Technical constructs found at or related to this line
+ */
+export function extractTechnicalConstructs(
+  rpyContent: string,
+  lineNumber: number
+): TechnicalConstructs {
+  const lines = rpyContent.split("\n");
+  const constructs: TechnicalConstructs = {};
+
+  // Bounds check
+  if (lineNumber < 0 || lineNumber >= lines.length) {
+    return constructs;
+  }
+
+  const line = lines[lineNumber];
+  const trimmed = line.trim();
+
+  // Extract jump
+  const jumpMatch = trimmed.match(/^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+  if (jumpMatch) {
+    constructs.jumpTarget = jumpMatch[1];
+    return constructs;
+  }
+
+  // Extract scene/show/hide
+  const sceneMatch = trimmed.match(/^scene\s+(\S+)(?:\s+with\s+(\S+))?/);
+  const showMatch = trimmed.match(
+    /^show\s+(.+?)(?:\s+at\s+(\S+))?(?:\s+with\s+(\S+))?(?:\s+zorder\s+(\d+))?$/
+  );
+  const hideMatch = trimmed.match(/^hide\s+(\S+)/);
+
+  if (sceneMatch) {
+    constructs.visuals = constructs.visuals || [];
+    constructs.visuals.push({
+      type: "SCENE",
+      target: sceneMatch[1],
+      with: sceneMatch[2],
+    });
+    return constructs;
+  } else if (showMatch) {
+    constructs.visuals = constructs.visuals || [];
+    constructs.visuals.push({
+      type: "SHOW",
+      target: showMatch[1],
+      at: showMatch[2],
+      with: showMatch[3],
+      zorder: showMatch[4] ? Number.parseInt(showMatch[4], 10) : undefined,
+    });
+    return constructs;
+  } else if (hideMatch) {
+    constructs.visuals = constructs.visuals || [];
+    constructs.visuals.push({ type: "HIDE", target: hideMatch[1] });
+    return constructs;
+  }
+
+  // Extract menu choices
+  if (trimmed.startsWith("menu:")) {
+    constructs.choices = [];
+    const indentLevel = getIndent(line);
+
+    for (let i = lineNumber + 1; i < lines.length; i++) {
+      const menuLine = lines[i];
+      const menuTrimmed = menuLine.trim();
+
+      // End of menu block
+      if (menuTrimmed.length === 0 || getIndent(menuLine) <= indentLevel) {
+        break;
+      }
+
+      // Extract choice
+      const choiceMatch = menuTrimmed.match(/^"([^"]+)":/);
+      if (choiceMatch) {
+        const choice = {
+          label: choiceMatch[1],
+          targetLabelId: "",
+          effects: { stats: {} as Record<string, number> },
+        };
+
+        // Look for jump and stat changes in choice body
+        const choiceIndent = getIndent(menuLine);
+        for (
+          let j = i + 1;
+          j < lines.length && getIndent(lines[j]) > choiceIndent;
+          j++
+        ) {
+          const bodyLine = lines[j].trim();
+
+          // Extract jump target
+          const jumpInChoice = bodyLine.match(
+            /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/
+          );
+          if (jumpInChoice) {
+            choice.targetLabelId = jumpInChoice[1];
+          }
+
+          // Extract stat changes (e.g., $ affection_luna += 10)
+          const statMatch = bodyLine.match(
+            /\$\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*(\+=|-=)\s*(-?\d+)/
+          );
+          if (statMatch) {
+            const statName = statMatch[1];
+            const operator = statMatch[2];
+            const value = Number.parseInt(statMatch[3], 10);
+
+            if (operator === "+=") {
+              choice.effects.stats[statName] = value;
+            } else if (operator === "-=") {
+              choice.effects.stats[statName] = -value;
+            }
+          }
+        }
+
+        constructs.choices.push(choice);
+        i += countLinesInChoice(lines, i);
+      }
+    }
+
+    return constructs;
+  }
+
+  return constructs;
+}
+
+/**
+ * Count the number of lines in a menu choice block
+ */
+function countLinesInChoice(lines: string[], startIndex: number): number {
+  const choiceIndent = getIndent(lines[startIndex]);
+  let count = 0;
+
+  for (let i = startIndex + 1; i < lines.length; i++) {
+    if (getIndent(lines[i]) <= choiceIndent) {
+      break;
+    }
+    count++;
+  }
+
+  return count;
+}
+
+/**
+ * Get the indentation level of a line
+ */
+function getIndent(line: string): number {
+  return line.search(/\S/);
 }
