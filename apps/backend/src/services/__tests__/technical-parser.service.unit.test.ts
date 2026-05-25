@@ -1,23 +1,9 @@
-/**
- * Technical Parser Tests
- *
- * Unit tests for technical constructs extraction from RPY files.
- * Tests are written before implementation (TDD approach).
- *
- * The parser extracts:
- * - Menu choices with targets and effects
- * - Jump statements
- * - Scene/show/hide visual statements
- * - Conditions
- */
-
 import { describe, it, expect } from "vitest";
-import { extractTechnicalConstructs } from "../rpy-parser.service.js";
+import { extractTechnicalConstructs } from "../rpy-parser.service";
 
 describe("extractTechnicalConstructs - menu choices", () => {
   it("extracts menu choices with targets and effects", () => {
-    const rpyContent = `
-      menu:
+    const rpyContent = `menu:
           "Help Luna":
               $ affection_luna += 10
               jump luna_scene_2
@@ -26,29 +12,19 @@ describe("extractTechnicalConstructs - menu choices", () => {
               jump walk_away
     `;
 
-    const result = extractTechnicalConstructs(rpyContent, 1); // Line 1 is menu:
+    const result = extractTechnicalConstructs(rpyContent, 0); // Line 0 is menu:
 
     expect(result.choices).toBeDefined();
-    expect(result.choices!).toHaveLength(2);
-    expect(result.choices![0]).toMatchObject({
+    expect(result.choices).toHaveLength(2);
+    expect(result.choices[0]).toMatchObject({
       label: "Help Luna",
       targetLabelId: "luna_scene_2",
       effects: { stats: { affection_luna: 10 } },
     });
   });
-
-  it("debug: verify stat regex works", () => {
-    const testLine = "$ affection_luna += 10";
-    const regex = /\$\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*(\+=|-=)\s*(-?\d+)/;
-    const match = testLine.match(regex);
-    expect(match).not.toBeNull();
-    expect(match![1]).toBe("affection_luna");
-    expect(match![2]).toBe("+=");
-    expect(match![3]).toBe("10");
-  });
 });
 
-describe("extractTechnicalConstructs - jump statements", () => {
+describe("extractTechnicalConstructs - jumps", () => {
   it("extracts jump target from line", () => {
     const rpyContent = "    jump luna_scene_2";
 
@@ -56,17 +32,25 @@ describe("extractTechnicalConstructs - jump statements", () => {
 
     expect(result.jumpTarget).toBe("luna_scene_2");
   });
+
+  it("extracts jump with expression", () => {
+    const rpyContent = "    jump expression_label if flag";
+
+    const result = extractTechnicalConstructs(rpyContent, 0);
+
+    // Jump extraction should handle basic case first
+    expect(result.jumpTarget).toBeDefined();
+  });
 });
 
 describe("extractTechnicalConstructs - scene/show/hide", () => {
-  it("extracts scene statement with transition", () => {
+  it("extracts scene statement", () => {
     const rpyContent = "    scene bg_school_day with fade";
 
     const result = extractTechnicalConstructs(rpyContent, 0);
 
-    expect(result.visuals).toBeDefined();
     expect(result.visuals).toHaveLength(1);
-    expect(result.visuals![0]).toMatchObject({
+    expect(result.visuals[0]).toMatchObject({
       type: "SCENE",
       target: "bg_school_day",
       with: "fade",
@@ -78,9 +62,8 @@ describe("extractTechnicalConstructs - scene/show/hide", () => {
 
     const result = extractTechnicalConstructs(rpyContent, 0);
 
-    expect(result.visuals).toBeDefined();
     expect(result.visuals).toHaveLength(1);
-    expect(result.visuals![0]).toMatchObject({
+    expect(result.visuals[0]).toMatchObject({
       type: "SHOW",
       target: "e happy",
       at: "right",
@@ -92,11 +75,22 @@ describe("extractTechnicalConstructs - scene/show/hide", () => {
 
     const result = extractTechnicalConstructs(rpyContent, 0);
 
-    expect(result.visuals).toBeDefined();
     expect(result.visuals).toHaveLength(1);
-    expect(result.visuals![0]).toMatchObject({
+    expect(result.visuals[0]).toMatchObject({
       type: "HIDE",
       target: "e",
+    });
+  });
+
+  it("extracts scene without transition", () => {
+    const rpyContent = "    scene bg_school_day";
+
+    const result = extractTechnicalConstructs(rpyContent, 0);
+
+    expect(result.visuals).toHaveLength(1);
+    expect(result.visuals[0]).toMatchObject({
+      type: "SCENE",
+      target: "bg_school_day",
     });
   });
 });
