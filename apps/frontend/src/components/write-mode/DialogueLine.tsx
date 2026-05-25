@@ -10,6 +10,8 @@ import { X, ChevronDown } from "lucide-react";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { Character } from "@branchforge/shared";
 import { withAlpha } from "@/lib/utils";
+import { TechnicalBadge } from "./TechnicalBadge";
+import { TechnicalPopover } from "./TechnicalPopover";
 
 interface DialogueLineProps {
   entry: DialogueEntry;
@@ -23,6 +25,8 @@ interface DialogueLineProps {
   onMoveDown: () => void;
   onAddLine?: (index: number) => void;
   textareaRef?: (el: HTMLTextAreaElement | null) => void;
+  technicalInfo?: DialogueEntry["technicalInfo"];
+  showBadges?: boolean;
 }
 
 function areDialogueLinePropsEqual(
@@ -42,7 +46,9 @@ function areDialogueLinePropsEqual(
     prev.onMoveUp === next.onMoveUp &&
     prev.onMoveDown === next.onMoveDown &&
     prev.onAddLine === next.onAddLine &&
-    prev.textareaRef === next.textareaRef
+    prev.textareaRef === next.textareaRef &&
+    prev.technicalInfo === next.technicalInfo &&
+    prev.showBadges === next.showBadges
   );
 }
 
@@ -58,11 +64,16 @@ export const DialogueLine = memo(function DialogueLine({
   onMoveDown,
   onAddLine,
   textareaRef,
+  technicalInfo,
+  showBadges,
 }: DialogueLineProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [openUpward, setOpenUpward] = useState(false);
   const [focusedOptionIndex, setFocusedOptionIndex] = useState<number>(-1);
+  const [popoverType, setPopoverType] = useState<
+    "conditions" | "jump" | "visuals" | null
+  >(null);
   const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const dropdownMenuRef = useRef<HTMLDivElement>(null);
@@ -566,6 +577,62 @@ export const DialogueLine = memo(function DialogueLine({
         >
           <X className="size-3.5" />
         </button>
+      )}
+
+      {/* Technical Badges */}
+      {showBadges && technicalInfo && (
+        <div className="flex justify-end gap-1 mt-1 relative">
+          {/* Conditions badge */}
+          {technicalInfo.conditions && (
+            <>
+              <TechnicalBadge
+                type="conditions"
+                onClick={() => setPopoverType("conditions")}
+              />
+              {popoverType === "conditions" && (
+                <TechnicalPopover
+                  type="conditions"
+                  data={technicalInfo.conditions}
+                  onClose={() => setPopoverType(null)}
+                />
+              )}
+            </>
+          )}
+
+          {/* Jump badge */}
+          {technicalInfo.jumpTarget && (
+            <>
+              <TechnicalBadge
+                type="jump"
+                onClick={() => setPopoverType("jump")}
+              />
+              {popoverType === "jump" && technicalInfo.jumpTarget && (
+                <TechnicalPopover
+                  type="jump"
+                  data={technicalInfo.jumpTarget}
+                  onClose={() => setPopoverType(null)}
+                />
+              )}
+            </>
+          )}
+
+          {/* Visuals badge */}
+          {technicalInfo.visuals && technicalInfo.visuals.length > 0 && (
+            <>
+              <TechnicalBadge
+                type="visuals"
+                onClick={() => setPopoverType("visuals")}
+              />
+              {popoverType === "visuals" && technicalInfo.visuals && (
+                <TechnicalPopover
+                  type="visuals"
+                  data={technicalInfo.visuals}
+                  onClose={() => setPopoverType(null)}
+                />
+              )}
+            </>
+          )}
+        </div>
       )}
 
       {/* Hidden measuring span — detects font size/family changes via ResizeObserver */}
