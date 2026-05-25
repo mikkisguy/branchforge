@@ -379,7 +379,7 @@ interface TechnicalPopoverProps {
 - Popovers open on click, show correct data
 - Keyboard accessibility (Enter to open, Escape to close)
 
-### Phase 2: Navigation Enhancements
+### Phase 2: Navigation Enhancements (Future)
 
 **Goal**: Click popovers to navigate to related labels
 
@@ -389,17 +389,7 @@ interface TechnicalPopoverProps {
 2. Add navigation hooks for label selection
 3. Sync with write mode label switching
 
-### Phase 3: Script Mode Helpers (Future)
-
-**Goal**: Enhance script mode with better technical construct UI
-
-**Frontend**:
-
-1. CodeMirror gutter decorations for menu/jump/visual lines
-2. Click gutter → highlight related label in navigator
-3. Quick-jump navigation in script mode
-
-**Out of scope for this design**.
+**Out of scope for initial implementation**.
 
 ## Technical Considerations
 
@@ -432,10 +422,6 @@ interface TechnicalPopoverProps {
 - **Empty conditions array**: Don't show badge
 - **Invalid jump target**: Show badge with warning icon, popover shows error
 - **Label deleted**: Jump badge remains, popover shows "label not found"
-
-### Localization
-
-Badge text is dynamic (label names, stat values), but UI labels ("choices", "Jump to:", "Conditions:") should support i18n in future.
 
 ## Alternatives Considered
 
