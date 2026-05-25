@@ -30,7 +30,8 @@ import { FontFamilySwitcher } from "./FontFamilySwitcher";
 import { useWritingGoals } from "@/hooks/useWritingGoals";
 import { useEntriesUndo } from "@/hooks/useEntriesUndo";
 import { UndoRedoControls } from "@/components/ide-shared";
-import { BookOpen, PenLine } from "lucide-react";
+import { useTechnicalInfo } from "@/hooks/useTechnicalInfo";
+import { BookOpen, PenLine, BadgeQuestionMark } from "lucide-react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { Character, LabelDetail } from "@branchforge/shared";
@@ -186,6 +187,9 @@ export const ProseEditor = function ProseEditor({
   // Writing goals from backend
   const { settings: writingGoalSettings } = useWritingGoals();
 
+  // Technical info for badges
+  const { getTechnicalInfoForLine } = useTechnicalInfo(activeLabel);
+
   // Hover state for focus mode dimming
   const [isBottomBarHovered, setIsBottomBarHovered] = useState(false);
   const [entries, setEntries] = useState<DialogueEntry[]>(() =>
@@ -199,6 +203,12 @@ export const ProseEditor = function ProseEditor({
       deserializer: (value) => value as LineLayoutMode,
       validate: (value) => value === "inline" || value === "stacked",
     }
+  );
+
+  // Technical badges toggle state
+  const [showBadges, setShowBadges] = useLocalStorage<boolean>(
+    "show-technical-badges",
+    false
   );
 
   // Writing stats dialog state
@@ -665,6 +675,19 @@ export const ProseEditor = function ProseEditor({
             </span>
           </div>
           <div className="flex items-center gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowBadges(!showBadges)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                showBadges
+                  ? "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                  : "text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/50"
+              }`}
+              title="Toggle technical badges"
+            >
+              <BadgeQuestionMark className="w-4 h-4" />
+              Badges
+            </button>
             <UndoRedoControls
               canUndo={inMemoryUndo.canUndo}
               canRedo={inMemoryUndo.canRedo}
@@ -689,30 +712,38 @@ export const ProseEditor = function ProseEditor({
         }`}
       >
         <div className="mx-auto w-full max-w-[75ch] space-y-1 pb-20">
-          {entries.map((entry, index) => (
-            <DialogueLine
-              key={entry.id}
-              entry={entry}
-              characters={characters}
-              layoutMode={layoutMode}
-              index={index}
-              totalEntries={entries.length}
-              onChange={(updatedEntry) =>
-                handleEntryChange(index, updatedEntry)
-              }
-              onDelete={() => handleDeleteLine(index)}
-              onMoveUp={() => handleMoveUp(index)}
-              onMoveDown={() => handleMoveDown(index)}
-              onAddLine={() => handleAddLine(index)}
-              textareaRef={(el: HTMLTextAreaElement | null) => {
-                if (el) {
-                  textareaRefs.current.set(index, el);
-                } else {
-                  textareaRefs.current.delete(index);
+          {entries.map((entry, index) => {
+            const technicalInfo = getTechnicalInfoForLine(
+              entry.id,
+              activeLabel?.lines
+            );
+            return (
+              <DialogueLine
+                key={entry.id}
+                entry={entry}
+                characters={characters}
+                layoutMode={layoutMode}
+                index={index}
+                totalEntries={entries.length}
+                onChange={(updatedEntry) =>
+                  handleEntryChange(index, updatedEntry)
                 }
-              }}
-            />
-          ))}
+                onDelete={() => handleDeleteLine(index)}
+                onMoveUp={() => handleMoveUp(index)}
+                onMoveDown={() => handleMoveDown(index)}
+                onAddLine={() => handleAddLine(index)}
+                technicalInfo={technicalInfo}
+                showBadges={showBadges}
+                textareaRef={(el: HTMLTextAreaElement | null) => {
+                  if (el) {
+                    textareaRefs.current.set(index, el);
+                  } else {
+                    textareaRefs.current.delete(index);
+                  }
+                }}
+              />
+            );
+          })}
         </div>
       </div>
 
