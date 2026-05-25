@@ -1,54 +1,72 @@
 import { useMemo } from "react";
-import type { LabelLine } from "@branchforge/shared";
+import type { LabelLine, LabelDetail } from "@branchforge/shared";
 import type { DialogueEntry } from "../lib/prose-types";
 
 interface UseTechnicalInfoResult {
-  getTechnicalInfoForLine: (line: LabelLine) => DialogueEntry["technicalInfo"];
+  getTechnicalInfoForLine: (
+    entryId: string,
+    labelLines?: LabelLine[]
+  ) => DialogueEntry["technicalInfo"];
 }
 
 /**
  * Hook to extract technical info from label lines and transform into badge data format.
  * This hook processes LabelLine objects and returns technicalInfo matching the DialogueEntry type.
  */
-export function useTechnicalInfo(): UseTechnicalInfoResult {
-  const getTechnicalInfoForLine = useMemo(() => {
-    return (line: LabelLine): DialogueEntry["technicalInfo"] => {
-      const info: DialogueEntry["technicalInfo"] = {};
+export function useTechnicalInfo(
+  activeLabel: LabelDetail | undefined
+): UseTechnicalInfoResult {
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
+  const labelById = useMemo(() => {
+    if (!activeLabel?.lines) return new Map();
 
-      // Extract conditions
-      if (
-        line.conditions &&
-        (line.conditions.stats || line.conditions.variables)
-      ) {
-        info.conditions = {
-          stats: line.conditions.stats,
-          variables: line.conditions.variables,
+    return new Map(activeLabel.lines.map((line) => [line.id, line]));
+  }, [activeLabel?.lines]);
+
+  const getTechnicalInfoForLine = (
+    entryId: string,
+    _labelLines?: LabelLine[]
+  ): DialogueEntry["technicalInfo"] => {
+    // Map entry ID to label line (they share IDs)
+    const line = labelById.get(entryId);
+    if (!line) return undefined;
+
+    const info: DialogueEntry["technicalInfo"] = {};
+
+    // Parse menu choices
+    if (line.menuOptions && line.menuOptions.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      info.choices = line.menuOptions.map((choice: any) => ({
+        label: choice.label,
+        targetLabelId: choice.targetLabelId,
+        targetLabelName: choice.targetLabelId, // TODO: Resolve to actual label name
+        effects: choice.effects,
+      }));
+    }
+
+    // Parse jump target
+    if (line.contentType === "JUMP" && line.content) {
+      const jumpTargetMatch = line.content.match(/jump\s+(\w+)/);
+      if (jumpTargetMatch) {
+        info.jumpTarget = {
+          labelId: "", // TODO: Resolve from target
+          labelName: jumpTargetMatch[1],
         };
       }
+    }
 
-      // Extract jump target
-      if (line.contentType === "JUMP" && line.content) {
-        const jumpMatch = line.content.match(/^jump\s+(\S+)/);
-        if (jumpMatch) {
-          info.jumpTarget = {
-            labelId: jumpMatch[1],
-            labelName: jumpMatch[1],
-          };
-        }
-      }
+    // Parse conditions
+    if (line.conditions) {
+      info.conditions = line.conditions;
+    }
 
-      // Extract visual statements
-      if (line.visualStatements && line.visualStatements.length > 0) {
-        info.visuals = line.visualStatements.map((visual) => ({
-          type: visual.type,
-          target: visual.target,
-        }));
-      }
+    // Parse visuals
+    if (line.visualStatements && line.visualStatements.length > 0) {
+      info.visuals = line.visualStatements;
+    }
 
-      // Return undefined if no technical info
-      return Object.keys(info).length > 0 ? info : undefined;
-    };
-  }, []);
+    return Object.keys(info).length > 0 ? info : undefined;
+  };
 
   return { getTechnicalInfoForLine };
 }
