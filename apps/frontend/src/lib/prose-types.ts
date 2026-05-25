@@ -26,16 +26,25 @@ export interface DialogueEntry {
 
   // Technical info for badges
   technicalInfo?: {
-    conditions: {
+    choices?: Array<{
+      label: string;
+      targetLabelId: string;
+      targetLabelName: string;
+      effects?: {
+        stats?: Record<string, number>;
+      };
+    }>;
+    jumpTarget?: {
+      labelId: string;
+      labelName: string;
+    };
+    conditions?: {
       stats?: Record<string, number>;
       variables?: string[];
-    } | null;
-    visualStatements: Array<{
+    };
+    visuals?: Array<{
       type: "SCENE" | "SHOW" | "HIDE";
       target: string;
-      at?: string;
-      with?: string;
-      zorder?: number;
-    }> | null;
+    }>;
   };
 }
