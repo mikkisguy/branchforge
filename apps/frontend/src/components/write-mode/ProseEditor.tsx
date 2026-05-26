@@ -31,7 +31,7 @@ import { useWritingGoals } from "@/hooks/useWritingGoals";
 import { useEntriesUndo } from "@/hooks/useEntriesUndo";
 import { UndoRedoControls } from "@/components/ide-shared";
 import { useTechnicalInfo } from "@/hooks/useTechnicalInfo";
-import { BookOpen, PenLine, BadgeQuestionMark } from "lucide-react";
+import { BookOpen, PenLine, Eye, EyeOff } from "lucide-react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { Character, LabelDetail } from "@branchforge/shared";
@@ -678,15 +678,23 @@ export const ProseEditor = function ProseEditor({
             <button
               type="button"
               onClick={() => setShowBadges(!showBadges)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              className={`p-1.5 rounded-md transition-all ${
                 showBadges
-                  ? "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                  : "text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/50"
+                  ? "hover:bg-muted text-foreground hover:text-[var(--theme-color)]"
+                  : "text-muted-foreground"
               }`}
-              title="Toggle technical badges"
+              title={
+                showBadges ? "Hide technical badges" : "Show technical badges"
+              }
+              aria-label={
+                showBadges ? "Hide technical badges" : "Show technical badges"
+              }
             >
-              <BadgeQuestionMark className="w-4 h-4" />
-              Badges
+              {showBadges ? (
+                <Eye className="size-4" />
+              ) : (
+                <EyeOff className="size-4" />
+              )}
             </button>
             <UndoRedoControls
               canUndo={inMemoryUndo.canUndo}
