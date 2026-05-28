@@ -700,10 +700,7 @@ export const ProseEditor = function ProseEditor({
       >
         <div className="mx-auto w-full max-w-[75ch] space-y-1 pb-20">
           {entries.map((entry, index) => {
-            const technicalInfo = getTechnicalInfoForLine(
-              entry.id,
-              activeLabel?.lines
-            );
+            const technicalInfo = getTechnicalInfoForLine(entry.id);
             return (
               <DialogueLine
                 key={entry.id}

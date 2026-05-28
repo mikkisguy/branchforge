@@ -1,4 +1,4 @@
-import { ArrowUpRight, Image, HelpCircle } from "lucide-react";
+import { ArrowUpRight, Image, HelpCircle, Split } from "lucide-react";
 import { useRef, useEffect } from "react";
 
 interface ConditionsData {
@@ -15,9 +15,18 @@ interface VisualData {
   target: string;
 }
 
+interface MenuChoiceData {
+  label: string;
+  targetLabelId: string;
+  targetLabelName: string;
+  effects?: {
+    stats?: Record<string, number>;
+  };
+}
+
 interface TechnicalPopoverProps {
-  type: "conditions" | "jump" | "visuals";
-  data: ConditionsData | JumpData | VisualData[] | null;
+  type: "conditions" | "jump" | "visuals" | "menu";
+  data: ConditionsData | JumpData | VisualData[] | MenuChoiceData[] | null;
   onClose: () => void;
 }
 
@@ -121,6 +130,56 @@ export function TechnicalPopover({
                       <span>{visual.target}</span>
                     </>
                   )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      }
+
+      case "menu": {
+        if (!data || !Array.isArray(data) || data.length === 0) return null;
+        const choicesData = data as MenuChoiceData[];
+        return (
+          <div className="space-y-3">
+            <div className="flex items-center gap-1.5">
+              <Split className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <span className="text-sm font-medium">Menu Choices</span>
+            </div>
+            <ul className="text-xs text-muted-foreground space-y-2">
+              {choicesData.map((choice, index) => (
+                <li key={index} className="space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-muted-foreground/60 w-2 flex-shrink-0 select-none">
+                      -
+                    </span>
+                    <span className="font-medium text-foreground/90">
+                      {choice.label}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 ml-3.5">
+                    <ArrowUpRight className="w-3 h-3 text-muted-foreground/60" />
+                    <span className="text-muted-foreground/70">
+                      {choice.targetLabelName || choice.targetLabelId}
+                    </span>
+                  </div>
+                  {choice.effects?.stats &&
+                    Object.keys(choice.effects.stats).length > 0 && (
+                      <ul className="ml-3.5 space-y-0.5">
+                        {Object.entries(choice.effects.stats).map(
+                          ([key, value]) => (
+                            <li
+                              key={key}
+                              className="flex items-center gap-1.5 text-muted-foreground/60"
+                            >
+                              <span className="w-2" />
+                              {key}: {value > 0 ? "+" : ""}
+                              {value}
+                            </li>
+                          )
+                        )}
+                      </ul>
+                    )}
                 </li>
               ))}
             </ul>

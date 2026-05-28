@@ -1,12 +1,9 @@
 import { useMemo } from "react";
-import type { LabelLine, LabelDetail } from "@branchforge/shared";
+import type { LabelDetail } from "@branchforge/shared";
 import type { DialogueEntry } from "../lib/prose-types";
 
 interface UseTechnicalInfoResult {
-  getTechnicalInfoForLine: (
-    entryId: string,
-    labelLines?: LabelLine[]
-  ) => DialogueEntry["technicalInfo"];
+  getTechnicalInfoForLine: (entryId: string) => DialogueEntry["technicalInfo"];
 }
 
 /**
@@ -16,6 +13,7 @@ interface UseTechnicalInfoResult {
 export function useTechnicalInfo(
   activeLabel: LabelDetail | undefined
 ): UseTechnicalInfoResult {
+  // Map is stable across renders — useMemo ensures identity for the same lines array
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const labelById = useMemo(() => {
     if (!activeLabel?.lines) return new Map();
@@ -24,8 +22,7 @@ export function useTechnicalInfo(
   }, [activeLabel?.lines]);
 
   const getTechnicalInfoForLine = (
-    entryId: string,
-    _labelLines?: LabelLine[]
+    entryId: string
   ): DialogueEntry["technicalInfo"] => {
     // Map entry ID to label line (they share IDs)
     const line = labelById.get(entryId);

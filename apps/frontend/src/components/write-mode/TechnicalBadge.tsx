@@ -1,6 +1,6 @@
-import { BadgeQuestionMark, ArrowUpRight, Image } from "lucide-react";
+import { BadgeQuestionMark, ArrowUpRight, Image, Split } from "lucide-react";
 
-type BadgeType = "conditions" | "jump" | "visuals";
+type BadgeType = "conditions" | "jump" | "visuals" | "menu";
 
 interface ConditionsData {
   stats?: Record<string, number>;
@@ -16,10 +16,19 @@ interface VisualData {
   target: string;
 }
 
+interface MenuChoiceData {
+  label: string;
+  targetLabelId: string;
+  targetLabelName: string;
+  effects?: {
+    stats?: Record<string, number>;
+  };
+}
+
 interface TechnicalBadgeProps {
   type: BadgeType;
   onClick: () => void;
-  data?: ConditionsData | JumpData | VisualData[];
+  data?: ConditionsData | JumpData | VisualData[] | MenuChoiceData[];
   isLineHovered?: boolean;
   className?: string;
 }
@@ -35,6 +44,7 @@ export function TechnicalBadge({
     conditions: BadgeQuestionMark,
     jump: ArrowUpRight,
     visuals: Image,
+    menu: Split,
   };
 
   const Icon = icons[type];
@@ -64,6 +74,14 @@ export function TechnicalBadge({
           return visuals[0].target;
         }
         return `${visuals.length} visuals`;
+      }
+      case "menu": {
+        if (!data || !Array.isArray(data)) return "Menu";
+        const choices = data as MenuChoiceData[];
+        if (choices.length === 1) {
+          return choices[0].label;
+        }
+        return `${choices.length} choices`;
       }
       default:
         return type;

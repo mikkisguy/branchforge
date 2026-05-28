@@ -72,7 +72,7 @@ export const DialogueLine = memo(function DialogueLine({
   const [openUpward, setOpenUpward] = useState(false);
   const [focusedOptionIndex, setFocusedOptionIndex] = useState<number>(-1);
   const [popoverType, setPopoverType] = useState<
-    "conditions" | "jump" | "visuals" | null
+    "conditions" | "jump" | "visuals" | "menu" | null
   >(null);
   const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -588,13 +588,26 @@ export const DialogueLine = memo(function DialogueLine({
       {/* Technical Badges - pill container anchored to parent line */}
       {showBadges &&
         technicalInfo &&
-        (technicalInfo.conditions ||
+        (technicalInfo.choices ||
+          technicalInfo.conditions ||
           technicalInfo.jumpTarget ||
           (technicalInfo.visuals && technicalInfo.visuals.length > 0)) && (
           <div
             className={`mt-1 mb-3 relative ${isStacked ? "" : "ml-[172px]"}`}
           >
             <div className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border-b border-border/40 bg-muted/15">
+              {/* Menu choices badge (first per spec stacking order) */}
+              {technicalInfo.choices && technicalInfo.choices.length > 0 && (
+                <TechnicalBadge
+                  type="menu"
+                  data={technicalInfo.choices}
+                  isLineHovered={isHovered}
+                  onClick={() =>
+                    setPopoverType((prev) => (prev === "menu" ? null : "menu"))
+                  }
+                />
+              )}
+
               {/* Conditions badge */}
               {technicalInfo.conditions && (
                 <TechnicalBadge
@@ -637,6 +650,13 @@ export const DialogueLine = memo(function DialogueLine({
             </div>
 
             {/* Popover - renders once at container level, anchored under badge row */}
+            {popoverType === "menu" && technicalInfo.choices && (
+              <TechnicalPopover
+                type="menu"
+                data={technicalInfo.choices}
+                onClose={() => setPopoverType(null)}
+              />
+            )}
             {popoverType === "conditions" && technicalInfo.conditions && (
               <TechnicalPopover
                 type="conditions"
