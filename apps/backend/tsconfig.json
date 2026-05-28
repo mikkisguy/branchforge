@@ -12,7 +12,11 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src/**/*"],
+  "include": [
+    "src/**/*",
+    "scripts/reset-tech-badges-test-data.ts",
+    "scripts/seed-technical-badges.ts"
+  ],
   "exclude": ["node_modules", "dist", "**/*.test.ts"],
   "references": []
 }
