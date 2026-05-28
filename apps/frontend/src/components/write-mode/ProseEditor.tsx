@@ -31,7 +31,7 @@ import { useWritingGoals } from "@/hooks/useWritingGoals";
 import { useEntriesUndo } from "@/hooks/useEntriesUndo";
 import { UndoRedoControls } from "@/components/ide-shared";
 import { useTechnicalInfo } from "@/hooks/useTechnicalInfo";
-import { BookOpen, PenLine, Eye, EyeOff } from "lucide-react";
+import { BookOpen, PenLine } from "lucide-react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { Character, LabelDetail } from "@branchforge/shared";
@@ -675,27 +675,6 @@ export const ProseEditor = function ProseEditor({
             </span>
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <button
-              type="button"
-              onClick={() => setShowBadges(!showBadges)}
-              className={`p-1.5 rounded-md transition-all ${
-                showBadges
-                  ? "hover:bg-muted text-foreground hover:text-[var(--theme-color)]"
-                  : "text-muted-foreground"
-              }`}
-              title={
-                showBadges ? "Hide technical badges" : "Show technical badges"
-              }
-              aria-label={
-                showBadges ? "Hide technical badges" : "Show technical badges"
-              }
-            >
-              {showBadges ? (
-                <Eye className="size-4" />
-              ) : (
-                <EyeOff className="size-4" />
-              )}
-            </button>
             <UndoRedoControls
               canUndo={inMemoryUndo.canUndo}
               canRedo={inMemoryUndo.canRedo}
@@ -798,6 +777,16 @@ export const ProseEditor = function ProseEditor({
               title="Toggle line layout"
             >
               {layoutMode === "inline" ? "Inline" : "Stacked"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowBadges(!showBadges)}
+              className="px-2 py-1 rounded border border-[hsl(var(--border)/0.6)] hover:bg-[hsl(var(--muted)/0.4)] text-xs text-muted-foreground hover:text-foreground transition-colors"
+              title={
+                showBadges ? "Hide technical badges" : "Show technical badges"
+              }
+            >
+              <span>Badges: {showBadges ? "On" : "Off"}</span>
             </button>
             <FontFamilySwitcher direction="up" />
             <FontSizeSwitcher mode="write" direction="up" />

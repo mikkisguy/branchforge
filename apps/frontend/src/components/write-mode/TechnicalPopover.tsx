@@ -1,4 +1,4 @@
-import { BadgeQuestionMark, ArrowUpRight, Image } from "lucide-react";
+import { ArrowUpRight, Image, HelpCircle } from "lucide-react";
 import { useRef, useEffect } from "react";
 
 interface ConditionsData {
@@ -26,59 +26,62 @@ export function TechnicalPopover({
   data,
   onClose,
 }: TechnicalPopoverProps) {
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
+  // Handle click outside to close
   useEffect(() => {
-    // Start 100ms dismiss timer
-    timeoutRef.current = setTimeout(() => {
-      onClose();
-    }, 100);
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        popoverRef.current &&
+        !popoverRef.current.contains(event.target as Node)
+      ) {
+        onClose();
       }
     };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, [onClose]);
-
-  const icons = {
-    conditions: BadgeQuestionMark,
-    jump: ArrowUpRight,
-    visuals: Image,
-  };
-
-  const Icon = icons[type];
 
   const renderContent = () => {
     switch (type) {
       case "conditions": {
         if (!data) return null;
         const conditionsData = data as ConditionsData;
+        const hasStats =
+          conditionsData.stats && Object.keys(conditionsData.stats).length > 0;
+        const hasVars =
+          conditionsData.variables && conditionsData.variables.length > 0;
         return (
-          <div className="space-y-2">
-            {conditionsData.stats && (
-              <div>
-                <h4 className="text-sm font-medium mb-1">Stats</h4>
-                <ul className="text-xs text-slate-600 space-y-1">
-                  {Object.entries(conditionsData.stats).map(([key, value]) => (
-                    <li key={key}>
-                      {key}: {String(value)}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {conditionsData.variables &&
-              conditionsData.variables.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-medium mb-1">Variables</h4>
-                  <ul className="text-xs text-slate-600 space-y-1">
-                    {conditionsData.variables.map((variable: string) => (
-                      <li key={variable}>{variable}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+          <div className="space-y-3">
+            <div className="flex items-center gap-1.5">
+              <HelpCircle className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <span className="text-sm font-medium">Conditions</span>
+            </div>
+            {/* TODO: Show comparison operators (≥, =, etc.) once LineConditions
+                 data model includes operator field and parser extracts them */}
+            <ul className="text-xs text-muted-foreground space-y-1.5">
+              {hasStats &&
+                Object.entries(conditionsData.stats!).map(([key, value]) => (
+                  <li key={key} className="flex items-center gap-1.5">
+                    <span className="text-muted-foreground/60 w-2 flex-shrink-0 select-none">
+                      -
+                    </span>
+                    {key}: {String(value)}
+                  </li>
+                ))}
+              {hasVars &&
+                conditionsData.variables!.map((variable: string) => (
+                  <li key={variable} className="flex items-center gap-1.5">
+                    <span className="text-muted-foreground/60 w-2 flex-shrink-0 select-none">
+                      -
+                    </span>
+                    {variable}
+                  </li>
+                ))}
+            </ul>
           </div>
         );
       }
@@ -88,9 +91,9 @@ export function TechnicalPopover({
         const jumpData = data as JumpData;
         return (
           <div className="flex items-center gap-2">
-            <ArrowUpRight className="w-4 h-4 text-slate-500" />
+            <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
             <div>
-              <div className="text-xs text-slate-500">Jump to:</div>
+              <div className="text-xs text-muted-foreground">Jump to:</div>
               <div className="text-sm font-medium">{jumpData.labelName}</div>
             </div>
           </div>
@@ -101,20 +104,26 @@ export function TechnicalPopover({
         if (!data || !Array.isArray(data) || data.length === 0) return null;
         const visualsData = data as VisualData[];
         return (
-          <div className="space-y-2">
-            {visualsData.map((visual, index) => (
-              <div key={index} className="flex items-start gap-2">
-                <Image className="w-4 h-4 text-slate-500 mt-0.5" />
-                <div>
-                  <div className="text-sm font-medium">{visual.type}</div>
+          <div className="space-y-3">
+            <div className="flex items-center gap-1.5">
+              <Image className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <span className="text-sm font-medium">Visuals</span>
+            </div>
+            <ul className="text-xs text-muted-foreground space-y-1.5">
+              {visualsData.map((visual, index) => (
+                <li key={index} className="flex items-center gap-1.5">
+                  <span className="font-medium">{visual.type}</span>
                   {visual.target && (
-                    <div className="text-xs text-slate-600">
-                      {visual.target}
-                    </div>
+                    <>
+                      <span className="text-muted-foreground/60 select-none">
+                        :
+                      </span>
+                      <span>{visual.target}</span>
+                    </>
                   )}
-                </div>
-              </div>
-            ))}
+                </li>
+              ))}
+            </ul>
           </div>
         );
       }
@@ -126,13 +135,11 @@ export function TechnicalPopover({
 
   return (
     <div
-      className="absolute right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-lg shadow-lg p-3"
+      ref={popoverRef}
+      className="absolute left-0 top-full mt-1 z-50 bg-popover border border-border rounded-md shadow-lg p-3 min-w-[200px] animate-in fade-in-0 zoom-in-95 duration-200"
       style={{ maxWidth: "280px" }}
     >
-      <div className="flex items-start gap-2">
-        <Icon className="w-4 h-4 text-slate-500 mt-0.5" />
-        <div className="flex-1">{renderContent()}</div>
-      </div>
+      {renderContent()}
     </div>
   );
 }

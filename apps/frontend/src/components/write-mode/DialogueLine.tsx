@@ -413,227 +413,253 @@ export const DialogueLine = memo(function DialogueLine({
   const isStacked = layoutMode === "stacked";
   const isSpeakerInteractive = isHovered || isDropdownOpen;
   const hasSpeaker = Boolean(entry.speakerId);
+  const showDelete = (isHovered || entry.text === "") && totalEntries > 1;
 
   return (
     <div
       className={`group relative transition-colors ${
-        isStacked
-          ? "flex flex-col gap-1.5 py-2"
-          : "flex items-start gap-3 py-1.5"
+        isStacked ? "flex flex-col gap-1.5 py-2" : "flex flex-col gap-1 py-1.5"
       }`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Speaker Name / Dropdown */}
+      {/* Speaker and Text Content Row */}
       <div
-        className={`relative ${isStacked ? "w-full" : "shrink-0 w-40"}`}
-        ref={dropdownRef}
-        onBlur={handleDropdownBlur}
+        className={`flex ${isStacked ? "flex-col gap-1.5" : "items-start gap-3"}`}
       >
-        <button
-          ref={speakerButtonRef}
-          type="button"
-          onClick={handleSpeakerToggle}
-          aria-haspopup="listbox"
-          aria-expanded={isDropdownOpen}
-          aria-controls={dropdownId}
-          aria-label={`Change speaker: ${
-            character?.displayName || "Narration"
-          }`}
-          className={`flex items-center gap-1.5 rounded-md transition-all border tracking-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-            isStacked
-              ? "inline-flex max-w-full h-8 py-1.5 px-2.5 -ml-2.5"
-              : "inline-flex max-w-full items-start h-auto py-1.5 px-2.5 overflow-hidden"
-          }`}
-          style={{
-            fontSize: "var(--prose-editor-font-size, 14px)",
-            backgroundColor: isSpeakerInteractive
-              ? hasSpeaker && speakerColor
-                ? withAlpha(speakerColor, 8)
-                : "hsl(var(--muted) / 0.5)"
-              : "transparent",
-            borderColor: isSpeakerInteractive
-              ? hasSpeaker && speakerColor
-                ? withAlpha(speakerColor, 25)
-                : "hsl(var(--border))"
-              : "transparent",
-            color:
-              hasSpeaker && speakerColor
-                ? speakerColor
-                : "hsl(var(--muted-foreground))",
-            fontStyle: hasSpeaker ? "normal" : "italic",
-          }}
-          title={
-            hasSpeaker
-              ? character?.displayName || "Character dialogue"
-              : "Narration"
-          }
+        {/* Speaker Name / Dropdown */}
+        <div
+          className={`relative ${isStacked ? "w-full" : "shrink-0 w-40"}`}
+          ref={dropdownRef}
+          onBlur={handleDropdownBlur}
         >
-          <span className="truncate">
-            {character?.displayName || "Narration"}
-          </span>
-          <ChevronDown
-            className={`size-3 transition-transform duration-200 flex-shrink-0 ${
-              isDropdownOpen ? "rotate-180" : ""
+          <button
+            ref={speakerButtonRef}
+            type="button"
+            onClick={handleSpeakerToggle}
+            aria-haspopup="listbox"
+            aria-expanded={isDropdownOpen}
+            aria-controls={dropdownId}
+            aria-label={`Change speaker: ${
+              character?.displayName || "Narration"
             }`}
-            style={{ opacity: isSpeakerInteractive ? 0.5 : 0 }}
-          />
-        </button>
-
-        {isDropdownOpen && (
-          <div
-            ref={dropdownMenuRef}
-            id={dropdownId}
-            role="listbox"
-            aria-label="Select speaker"
-            aria-activedescendant={
-              focusedOptionIndex >= 0
-                ? `${dropdownId}-option-${focusedOptionIndex}`
-                : undefined
+            className={`flex items-center gap-1.5 rounded-md transition-all border tracking-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+              isStacked
+                ? "inline-flex max-w-full h-8 py-1.5 px-2.5 -ml-2.5"
+                : "inline-flex max-w-full items-start h-auto py-1.5 px-2.5 overflow-hidden"
+            }`}
+            style={{
+              fontSize: "var(--prose-editor-font-size, 14px)",
+              backgroundColor: isSpeakerInteractive
+                ? hasSpeaker && speakerColor
+                  ? withAlpha(speakerColor, 8)
+                  : "hsl(var(--muted) / 0.5)"
+                : "transparent",
+              borderColor: isSpeakerInteractive
+                ? hasSpeaker && speakerColor
+                  ? withAlpha(speakerColor, 25)
+                  : "hsl(var(--border))"
+                : "transparent",
+              color:
+                hasSpeaker && speakerColor
+                  ? speakerColor
+                  : "hsl(var(--muted-foreground))",
+              fontStyle: hasSpeaker ? "normal" : "italic",
+            }}
+            title={
+              hasSpeaker
+                ? character?.displayName || "Character dialogue"
+                : "Narration"
             }
-            onKeyDown={handleDropdownKeyDown}
-            tabIndex={0}
-            className={`absolute z-50 bg-popover border border-border rounded-md shadow-lg shadow-black/10 py-1 min-w-[160px] max-h-[280px] overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] animate-in fade-in-0 zoom-in-95 duration-200 ease-out ${
-              openUpward ? "bottom-full mb-1" : "top-full mt-1"
-            } ${
-              openUpward ? "slide-in-from-bottom-1" : "slide-in-from-top-1"
-            } ${isStacked ? "-left-2.5" : "left-0"}`}
           >
-            <button
-              id={`${dropdownId}-option-0`}
-              type="button"
-              role="option"
-              aria-selected={!entry.speakerId}
-              onClick={() => handleSpeakerSelect(null)}
-              tabIndex={-1}
-              className={`w-full text-left px-3 py-2 text-sm transition-colors duration-150 ${
-                focusedOptionIndex === 0 ? "bg-muted" : "hover:bg-muted"
+            <span className="truncate">
+              {character?.displayName || "Narration"}
+            </span>
+            <ChevronDown
+              className={`size-3 transition-transform duration-200 flex-shrink-0 ${
+                isDropdownOpen ? "rotate-180" : ""
               }`}
-              style={{
-                fontStyle: "italic",
-                fontWeight: !entry.speakerId ? "600" : "normal",
-              }}
+              style={{ opacity: isSpeakerInteractive ? 0.5 : 0 }}
+            />
+          </button>
+
+          {isDropdownOpen && (
+            <div
+              ref={dropdownMenuRef}
+              id={dropdownId}
+              role="listbox"
+              aria-label="Select speaker"
+              aria-activedescendant={
+                focusedOptionIndex >= 0
+                  ? `${dropdownId}-option-${focusedOptionIndex}`
+                  : undefined
+              }
+              onKeyDown={handleDropdownKeyDown}
+              tabIndex={0}
+              className={`absolute z-50 bg-popover border border-border rounded-md shadow-lg shadow-black/10 py-1 min-w-[160px] max-h-[280px] overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] animate-in fade-in-0 zoom-in-95 duration-200 ease-out ${
+                openUpward ? "bottom-full mb-1" : "top-full mt-1"
+              } ${
+                openUpward ? "slide-in-from-bottom-1" : "slide-in-from-top-1"
+              } ${isStacked ? "-left-2.5" : "left-0"}`}
             >
-              Narration
-            </button>
-
-            <div className="my-1 border-t border-border" role="separator" />
-
-            {characters.map((char, idx) => (
               <button
-                key={char.id}
-                id={`${dropdownId}-option-${idx + 1}`}
+                id={`${dropdownId}-option-0`}
                 type="button"
                 role="option"
-                aria-selected={entry.speakerId === char.id}
-                onClick={() => handleSpeakerSelect(char.id)}
+                aria-selected={!entry.speakerId}
+                onClick={() => handleSpeakerSelect(null)}
                 tabIndex={-1}
-                className={`w-full text-left px-3 py-2 text-sm transition-colors duration-150 flex items-center gap-2 ${
-                  focusedOptionIndex === idx + 1 ? "bg-muted" : "hover:bg-muted"
+                className={`w-full text-left px-3 py-2 text-sm transition-colors duration-150 ${
+                  focusedOptionIndex === 0 ? "bg-muted" : "hover:bg-muted"
                 }`}
                 style={{
-                  color: entry.speakerId === char.id ? char.color : undefined,
-                  fontWeight: entry.speakerId === char.id ? "600" : "normal",
+                  fontStyle: "italic",
+                  fontWeight: !entry.speakerId ? "600" : "normal",
                 }}
               >
-                <span
-                  className="size-2 rounded-full shrink-0"
-                  style={{ backgroundColor: char.color }}
-                />
-                <span>{char.displayName}</span>
+                Narration
               </button>
-            ))}
-          </div>
+
+              <div className="my-1 border-t border-border" role="separator" />
+
+              {characters.map((char, idx) => (
+                <button
+                  key={char.id}
+                  id={`${dropdownId}-option-${idx + 1}`}
+                  type="button"
+                  role="option"
+                  aria-selected={entry.speakerId === char.id}
+                  onClick={() => handleSpeakerSelect(char.id)}
+                  tabIndex={-1}
+                  className={`w-full text-left px-3 py-2 text-sm transition-colors duration-150 flex items-center gap-2 ${
+                    focusedOptionIndex === idx + 1
+                      ? "bg-muted"
+                      : "hover:bg-muted"
+                  }`}
+                  style={{
+                    color: entry.speakerId === char.id ? char.color : undefined,
+                    fontWeight: entry.speakerId === char.id ? "600" : "normal",
+                  }}
+                >
+                  <span
+                    className="size-2 rounded-full shrink-0"
+                    style={{ backgroundColor: char.color }}
+                  />
+                  <span>{char.displayName}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Text Content */}
+        <textarea
+          ref={(el) => {
+            internalTextareaRef.current = el;
+            if (textareaRef) textareaRef(el);
+          }}
+          defaultValue={entry.text}
+          onChange={handleTextChange}
+          onKeyDown={handleKeyDown}
+          placeholder={entry.speakerId ? "Dialogue..." : "Narration..."}
+          className={`relative min-h-[2.5rem] p-0 pr-7 resize-none overflow-hidden bg-transparent border-0 outline-none focus-visible:outline-none focus-visible:ring-0 font-light tracking-normal leading-8 placeholder:text-muted-foreground/50 ${
+            isStacked ? "w-full" : "flex-1"
+          }`}
+          style={{
+            fontSize: "var(--prose-editor-font-size, 16px)",
+            fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
+            fontStyle: !entry.speakerId ? "italic" : "normal",
+            color: "hsl(var(--foreground))",
+          }}
+        />
+
+        {/* Delete Button */}
+        {showDelete && (
+          <button
+            onClick={onDelete}
+            className="z-10 absolute right-0 top-0.5 p-1 rounded text-muted-foreground/70 hover:text-destructive bg-background/90 hover:bg-destructive/10 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            title="Delete line (Backspace)"
+          >
+            <X className="size-3.5" />
+          </button>
         )}
       </div>
 
-      {/* Text Content */}
-      <textarea
-        ref={(el) => {
-          internalTextareaRef.current = el;
-          if (textareaRef) textareaRef(el);
-        }}
-        defaultValue={entry.text}
-        onChange={handleTextChange}
-        onKeyDown={handleKeyDown}
-        placeholder={entry.speakerId ? "Dialogue..." : "Narration..."}
-        className={`relative min-h-[52px] p-0 pr-7 resize-none overflow-hidden bg-transparent border-0 outline-none focus-visible:outline-none focus-visible:ring-0 font-light tracking-normal leading-8 placeholder:text-muted-foreground/50 ${
-          isStacked ? "w-full" : "flex-1"
-        }`}
-        style={{
-          fontSize: "var(--prose-editor-font-size, 16px)",
-          fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
-          fontStyle: !entry.speakerId ? "italic" : "normal",
-          color: "hsl(var(--foreground))",
-        }}
-      />
-
-      {/* Delete Button */}
-      {(isHovered || entry.text === "") && totalEntries > 1 && (
-        <button
-          onClick={onDelete}
-          className="z-10 absolute right-0 top-0.5 p-1 rounded text-muted-foreground/70 hover:text-destructive bg-background/90 hover:bg-destructive/10 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          title="Delete line (Backspace)"
-        >
-          <X className="size-3.5" />
-        </button>
-      )}
-
-      {/* Technical Badges */}
-      {showBadges && technicalInfo && (
-        <div className="flex justify-end gap-1 mt-1 relative">
-          {/* Conditions badge */}
-          {technicalInfo.conditions && (
-            <>
-              <TechnicalBadge
-                type="conditions"
-                onClick={() => setPopoverType("conditions")}
-              />
-              {popoverType === "conditions" && (
-                <TechnicalPopover
+      {/* Technical Badges - pill container anchored to parent line */}
+      {showBadges &&
+        technicalInfo &&
+        (technicalInfo.conditions ||
+          technicalInfo.jumpTarget ||
+          (technicalInfo.visuals && technicalInfo.visuals.length > 0)) && (
+          <div
+            className={`mt-1 mb-3 relative ${isStacked ? "" : "ml-[172px]"}`}
+          >
+            <div className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border border-border/40 bg-muted/15">
+              {/* Conditions badge */}
+              {technicalInfo.conditions && (
+                <TechnicalBadge
                   type="conditions"
                   data={technicalInfo.conditions}
-                  onClose={() => setPopoverType(null)}
+                  isLineHovered={isHovered}
+                  onClick={() =>
+                    setPopoverType((prev) =>
+                      prev === "conditions" ? null : "conditions"
+                    )
+                  }
                 />
               )}
-            </>
-          )}
 
-          {/* Jump badge */}
-          {technicalInfo.jumpTarget && (
-            <>
-              <TechnicalBadge
-                type="jump"
-                onClick={() => setPopoverType("jump")}
-              />
-              {popoverType === "jump" && technicalInfo.jumpTarget && (
-                <TechnicalPopover
+              {/* Jump badge */}
+              {technicalInfo.jumpTarget && (
+                <TechnicalBadge
                   type="jump"
                   data={technicalInfo.jumpTarget}
-                  onClose={() => setPopoverType(null)}
+                  isLineHovered={isHovered}
+                  onClick={() =>
+                    setPopoverType((prev) => (prev === "jump" ? null : "jump"))
+                  }
                 />
               )}
-            </>
-          )}
 
-          {/* Visuals badge */}
-          {technicalInfo.visuals && technicalInfo.visuals.length > 0 && (
-            <>
-              <TechnicalBadge
-                type="visuals"
-                onClick={() => setPopoverType("visuals")}
-              />
-              {popoverType === "visuals" && technicalInfo.visuals && (
-                <TechnicalPopover
+              {/* Visuals badge */}
+              {technicalInfo.visuals && technicalInfo.visuals.length > 0 && (
+                <TechnicalBadge
                   type="visuals"
                   data={technicalInfo.visuals}
-                  onClose={() => setPopoverType(null)}
+                  isLineHovered={isHovered}
+                  onClick={() =>
+                    setPopoverType((prev) =>
+                      prev === "visuals" ? null : "visuals"
+                    )
+                  }
                 />
               )}
-            </>
-          )}
-        </div>
-      )}
+            </div>
+
+            {/* Popover - renders once at container level, anchored under badge row */}
+            {popoverType === "conditions" && technicalInfo.conditions && (
+              <TechnicalPopover
+                type="conditions"
+                data={technicalInfo.conditions}
+                onClose={() => setPopoverType(null)}
+              />
+            )}
+            {popoverType === "jump" && technicalInfo.jumpTarget && (
+              <TechnicalPopover
+                type="jump"
+                data={technicalInfo.jumpTarget}
+                onClose={() => setPopoverType(null)}
+              />
+            )}
+            {popoverType === "visuals" && technicalInfo.visuals && (
+              <TechnicalPopover
+                type="visuals"
+                data={technicalInfo.visuals}
+                onClose={() => setPopoverType(null)}
+              />
+            )}
+          </div>
+        )}
 
       {/* Hidden measuring span — detects font size/family changes via ResizeObserver */}
       <span
