@@ -3,8 +3,6 @@ import {
   BookOpen,
   SquarePen,
   Route,
-  Database,
-  BarChart3,
   Users,
   Palette,
   Settings,
@@ -18,8 +16,6 @@ import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 import type { Tab } from "./SettingsModal";
 import { SettingsModal } from "./SettingsModal";
 import { RouteSettingsModal } from "./RouteSettingsModal";
-import { VariablesModal } from "./VariablesModal";
-import { StatsDialog } from "@/components/StatsDialog";
 import { CharactersModal } from "./CharactersModal";
 import { GitLabImportDialog } from "./GitLabImportDialog";
 import { ZipImportProjectDialog } from "./ZipImportProjectDialog";
@@ -72,8 +68,6 @@ type ModalKey =
   | "themeDropdown"
   | "settings"
   | "routes"
-  | "stateVars"
-  | "stats"
   | "characters"
   | "projectPopover"
   | "gitLabImport"
@@ -83,8 +77,6 @@ interface ModalState {
   themeDropdown: boolean;
   settings: boolean;
   routes: boolean;
-  stateVars: boolean;
-  stats: boolean;
   characters: boolean;
   projectPopover: boolean;
   gitLabImport: boolean;
@@ -100,8 +92,6 @@ const initialModalState: ModalState = {
   themeDropdown: false,
   settings: false,
   routes: false,
-  stateVars: false,
-  stats: false,
   characters: false,
   projectPopover: false,
   gitLabImport: false,
@@ -398,42 +388,6 @@ export function LeftSidebar(props: LeftSidebarProps) {
               {showLabel && <span>Routes</span>}
             </button>
 
-            {/* Variables */}
-            <button
-              type="button"
-              onClick={() => dispatchModal({ type: "OPEN", key: "stateVars" })}
-              disabled={!projectId}
-              className={`flex items-center ${
-                isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
-              } rounded-md text-sm font-medium transition-colors ${
-                !projectId
-                  ? "text-muted-foreground/50 cursor-not-allowed"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              }`}
-              title="Variables"
-            >
-              <Database className="size-4 flex-shrink-0" />
-              {showLabel && <span>Variables</span>}
-            </button>
-
-            {/* Stats */}
-            <button
-              type="button"
-              onClick={() => dispatchModal({ type: "OPEN", key: "stats" })}
-              disabled={!projectId}
-              className={`flex items-center ${
-                isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
-              } rounded-md text-sm font-medium transition-colors ${
-                !projectId
-                  ? "text-muted-foreground/50 cursor-not-allowed"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              }`}
-              title="Stats"
-            >
-              <BarChart3 className="size-4 flex-shrink-0" />
-              {showLabel && <span>Stats</span>}
-            </button>
-
             {/* Characters */}
             <button
               type="button"
@@ -598,20 +552,6 @@ export function LeftSidebar(props: LeftSidebarProps) {
             open={modals.routes}
             onOpenChange={(open) =>
               dispatchModal({ type: open ? "OPEN" : "CLOSE", key: "routes" })
-            }
-            projectId={projectId}
-          />
-          <VariablesModal
-            open={modals.stateVars}
-            onOpenChange={(open: boolean) =>
-              dispatchModal({ type: open ? "OPEN" : "CLOSE", key: "stateVars" })
-            }
-            projectId={projectId}
-          />
-          <StatsDialog
-            open={modals.stats}
-            onOpenChange={(open: boolean) =>
-              dispatchModal({ type: open ? "OPEN" : "CLOSE", key: "stats" })
             }
             projectId={projectId}
           />
