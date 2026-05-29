@@ -6,17 +6,17 @@ import {
 } from "@/components/ui/dialog";
 import { VariablesContent } from "@/components/VariablesContent";
 
-interface VariablesModalProps {
+interface VariablesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;
 }
 
-export function VariablesModal({
+export function VariablesDialog({
   open,
   onOpenChange,
   projectId,
-}: VariablesModalProps) {
+}: VariablesDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[700px] max-w-[95vw]">

@@ -1,9 +1,18 @@
-import { useMemo } from "react";
-import { ChevronRight, ChevronLeft, Heart } from "lucide-react";
+import { useState, useMemo } from "react";
+import {
+  ChevronRight,
+  ChevronLeft,
+  Heart,
+  Plus,
+  Pencil,
+  Loader2,
+} from "lucide-react";
 import { CharacterAvatarChip } from "@/components/ui/CharacterAvatarChip";
 import { CollapsibleSection } from "@/components/ide-shared/CollapsibleSection";
-import { VariablesContent } from "@/components/VariablesContent";
-import { StatsContent } from "@/components/StatsContent";
+import { VariablesDialog } from "./VariablesDialog";
+import { StatsDialog } from "./StatsDialog";
+import { useVariables } from "@/hooks/useVariables";
+import { useStats } from "@/hooks/useStats";
 import { cva } from "class-variance-authority";
 import type { Character, LabelCharacter } from "@branchforge/shared";
 
@@ -34,6 +43,12 @@ export function ScriptReferencePanel({
   isCollapsed = false,
   onCollapseToggle,
 }: ScriptReferencePanelProps) {
+  const [variablesDialogOpen, setVariablesDialogOpen] = useState(false);
+  const [statsDialogOpen, setStatsDialogOpen] = useState(false);
+
+  const { variables, isLoadingVariables } = useVariables(projectId);
+  const { stats, isLoadingStats } = useStats(projectId);
+
   const characterById = useMemo(
     () =>
       new Map(projectCharacters.map((character) => [character.id, character])),
@@ -52,6 +67,20 @@ export function ScriptReferencePanel({
       ),
     [projectCharacters, sceneCharacterIds]
   );
+
+  // Group variables by category for display
+  const groupedVariables = useMemo(() => {
+    const groups: Record<string, typeof variables> = {};
+    for (const variable of variables) {
+      const category =
+        (variable.category?.trim() as string | undefined) || "Uncategorized";
+      if (!groups[category]) {
+        groups[category] = [];
+      }
+      groups[category].push(variable);
+    }
+    return groups;
+  }, [variables]);
 
   return (
     <>
@@ -79,6 +108,7 @@ export function ScriptReferencePanel({
             </p>
           </div>
           <div>
+            {/* Characters */}
             <CollapsibleSection title="Characters" defaultOpen={true}>
               {sceneCharacters.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-4 text-center">
@@ -142,16 +172,167 @@ export function ScriptReferencePanel({
               )}
             </CollapsibleSection>
 
-            <CollapsibleSection title="Variables" defaultOpen={false}>
-              <VariablesContent projectId={projectId} />
+            {/* Variables — read-only list, edit via dialog */}
+            <CollapsibleSection
+              title="Variables"
+              defaultOpen={false}
+              headerAction={
+                <button
+                  type="button"
+                  onClick={() => setVariablesDialogOpen(true)}
+                  className="p-1 rounded hover:bg-muted/80 transition-colors"
+                  aria-label="Manage variables"
+                  title="Manage variables"
+                >
+                  <Pencil className="size-3 text-muted-foreground" />
+                </button>
+              }
+            >
+              {isLoadingVariables ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                </div>
+              ) : variables.length === 0 ? (
+                <div className="text-center py-3">
+                  <p className="text-xs text-muted-foreground mb-2">
+                    No variables defined
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setVariablesDialogOpen(true)}
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    <Plus className="size-3" />
+                    Add variable
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {Object.entries(groupedVariables).map(
+                    ([category, categoryVars]) => (
+                      <div key={category}>
+                        <h3 className="text-xs font-medium text-muted-foreground mb-1.5">
+                          {category}
+                        </h3>
+                        <div className="space-y-1">
+                          {categoryVars.map((variable) => (
+                            <div
+                              key={variable.id}
+                              className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 transition-colors"
+                            >
+                              <span className="font-mono text-xs truncate flex-1">
+                                {variable.key}
+                              </span>
+                              {variable.description && (
+                                <span
+                                  className="text-xs text-muted-foreground truncate max-w-[100px]"
+                                  title={variable.description}
+                                >
+                                  {variable.description}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setVariablesDialogOpen(true)}
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-full justify-center pt-1"
+                  >
+                    <Plus className="size-3" />
+                    {variables.length === 0
+                      ? "Add variable"
+                      : "Manage variables"}
+                  </button>
+                </div>
+              )}
             </CollapsibleSection>
 
-            <CollapsibleSection title="Stats" defaultOpen={false}>
-              <StatsContent projectId={projectId} />
+            {/* Stats — read-only list, edit via dialog */}
+            <CollapsibleSection
+              title="Stats"
+              defaultOpen={false}
+              headerAction={
+                <button
+                  type="button"
+                  onClick={() => setStatsDialogOpen(true)}
+                  className="p-1 rounded hover:bg-muted/80 transition-colors"
+                  aria-label="Manage stats"
+                  title="Manage stats"
+                >
+                  <Pencil className="size-3 text-muted-foreground" />
+                </button>
+              }
+            >
+              {isLoadingStats ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                </div>
+              ) : stats.length === 0 ? (
+                <div className="text-center py-3">
+                  <p className="text-xs text-muted-foreground mb-2">
+                    No stats defined
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setStatsDialogOpen(true)}
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    <Plus className="size-3" />
+                    Add stat
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {stats.map((stat) => (
+                    <div
+                      key={stat.id}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <span className="font-mono text-xs truncate block">
+                          {stat.name}
+                        </span>
+                        {stat.description && (
+                          <span className="text-xs text-muted-foreground truncate block">
+                            {stat.description}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
+                        {stat.minValue}–{stat.maxValue}
+                      </span>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setStatsDialogOpen(true)}
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-full justify-center pt-1"
+                  >
+                    <Plus className="size-3" />
+                    Manage stats
+                  </button>
+                </div>
+              )}
             </CollapsibleSection>
           </div>
         </div>
       </div>
+
+      {/* Dialogs */}
+      <VariablesDialog
+        open={variablesDialogOpen}
+        onOpenChange={setVariablesDialogOpen}
+        projectId={projectId}
+      />
+      <StatsDialog
+        open={statsDialogOpen}
+        onOpenChange={setStatsDialogOpen}
+        projectId={projectId}
+      />
 
       {isCollapsed && onCollapseToggle && (
         <div className="min-h-0 shrink-0 mt-3 flex items-center -ml-4">
