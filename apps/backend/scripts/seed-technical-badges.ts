@@ -116,6 +116,7 @@ async function seedTechnicalBadgesData() {
     .select()
     .from(projectFiles)
     .where(eq(projectFiles.projectId, testProject.id))
+    .orderBy(projectFiles.filePath)
     .limit(1);
 
   let projectFileId: string | null;

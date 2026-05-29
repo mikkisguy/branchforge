@@ -1893,8 +1893,11 @@ export function extractTechnicalConstructs(
       const menuLine = lines[i];
       const menuTrimmed = menuLine.trim();
 
+      // Skip blank/whitespace-only lines between choices
+      if (menuTrimmed.length === 0) continue;
+
       // End of menu block
-      if (menuTrimmed.length === 0 || getIndent(menuLine) <= indentLevel) {
+      if (getIndent(menuLine) <= indentLevel) {
         break;
       }
 
@@ -1944,6 +1947,102 @@ export function extractTechnicalConstructs(
         constructs.choices.push(choice);
         i += countLinesInChoice(lines, i);
       }
+    }
+
+    return constructs;
+  }
+
+  // Extract if/elif conditions
+  if (/^if\s+/.test(trimmed) || /^elif\s+/.test(trimmed)) {
+    constructs.conditions = {
+      stats: {},
+      variables: [],
+    };
+
+    // Remove leading if/elif keyword and trailing colon
+    const conditionExpr = trimmed
+      .replace(/^(if|elif)\s+/, "")
+      .replace(/:+$/, "")
+      .trim();
+
+    // Extract stat comparisons: e.g., "strength >= 5" or "magic < 10"
+    const statRegex = /([a-zA-Z_][a-zA-Z0-9_]*)\s*(>=|<=|>|<|==|!=)\s*(-?\d+)/g;
+    let statMatch;
+    while ((statMatch = statRegex.exec(conditionExpr)) !== null) {
+      const statName = statMatch[1];
+      const value = Number.parseInt(statMatch[3], 10);
+      constructs.conditions.stats![statName] = value;
+    }
+
+    // Extract variable names (bare identifiers used as boolean flags)
+    const keywords = new Set([
+      "if",
+      "elif",
+      "and",
+      "or",
+      "not",
+      "True",
+      "False",
+      "None",
+      "else",
+    ]);
+    // Split on logical operators
+    const varParts = conditionExpr
+      .split(/\s+(?:and|or|\|\||&&)\s+/)
+      .map((s) => s.trim());
+    for (const part of varParts) {
+      // Skip parts that contain operators (already handled as stat checks)
+      if (/[<>=!+\-*/()]/.test(part)) continue;
+      const varMatches = part.match(/([a-zA-Z_][a-zA-Z0-9_]*)/g);
+      if (varMatches) {
+        for (const varName of varMatches) {
+          if (
+            !keywords.has(varName) &&
+            !constructs.conditions.variables!.includes(varName)
+          ) {
+            constructs.conditions.variables!.push(varName);
+          }
+        }
+      }
+    }
+
+    // Look ahead into the condition block for $ stat modifications
+    const ifIndent = getIndent(line);
+    for (let j = lineNumber + 1; j < lines.length; j++) {
+      const bodyLine = lines[j];
+      const bodyTrimmed = bodyLine.trim();
+
+      // Exit when indentation drops back to or below the if level
+      // Skip blank lines (continue, don't break)
+      if (bodyTrimmed.length === 0) continue;
+      if (getIndent(bodyLine) <= ifIndent) break;
+
+      // Check for $ stat += value style modifications
+      const statModMatch = bodyTrimmed.match(
+        /\$\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*(\+=|-=)\s*(-?\d+)/
+      );
+      if (statModMatch) {
+        const statName = statModMatch[1];
+        const operator = statModMatch[2];
+        const value = Number.parseInt(statModMatch[3], 10);
+
+        if (operator === "+=") {
+          constructs.conditions.stats![statName] = value;
+        } else if (operator === "-=") {
+          constructs.conditions.stats![statName] = -value;
+        }
+      }
+    }
+
+    // Clean up empty arrays/objects
+    if (Object.keys(constructs.conditions.stats!).length === 0) {
+      delete constructs.conditions.stats;
+    }
+    if (constructs.conditions.variables!.length === 0) {
+      delete constructs.conditions.variables;
+    }
+    if (!constructs.conditions.stats && !constructs.conditions.variables) {
+      delete constructs.conditions;
     }
 
     return constructs;

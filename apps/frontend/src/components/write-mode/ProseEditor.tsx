@@ -782,6 +782,7 @@ export const ProseEditor = function ProseEditor({
               title={
                 showBadges ? "Hide technical badges" : "Show technical badges"
               }
+              aria-pressed={showBadges}
             >
               <span>Badges: {showBadges ? "On" : "Off"}</span>
             </button>
