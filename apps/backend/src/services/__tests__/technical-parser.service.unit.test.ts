@@ -94,3 +94,40 @@ describe("extractTechnicalConstructs - scene/show/hide", () => {
     });
   });
 });
+
+describe("extractTechnicalConstructs - if/elif conditions with deltas", () => {
+  it("preserves thresholds and stores deltas separately", () => {
+    const rpyContent = `if strength >= 5:
+    $ strength += 10`;
+
+    // Line 0 is "if strength >= 5:"
+    const result = extractTechnicalConstructs(rpyContent, 0);
+
+    expect(result.conditions).toBeDefined();
+    expect(result.conditions!.stats).toEqual({ strength: 5 });
+    expect(result.conditions!.statDeltas).toEqual({ strength: 10 });
+  });
+
+  it("handles -= operator correctly in statDeltas", () => {
+    const rpyContent = `if magic < 10:
+    $ magic -= 5`;
+
+    const result = extractTechnicalConstructs(rpyContent, 0);
+
+    expect(result.conditions).toBeDefined();
+    expect(result.conditions!.stats).toEqual({ magic: 10 });
+    expect(result.conditions!.statDeltas).toEqual({ magic: -5 });
+  });
+
+  it("preserves both stats and deltas when both exist", () => {
+    const rpyContent = `if strength >= 5 and magic < 10:
+    $ strength += 10
+    $ magic -= 5`;
+
+    const result = extractTechnicalConstructs(rpyContent, 0);
+
+    expect(result.conditions).toBeDefined();
+    expect(result.conditions!.stats).toEqual({ strength: 5, magic: 10 });
+    expect(result.conditions!.statDeltas).toEqual({ strength: 10, magic: -5 });
+  });
+});

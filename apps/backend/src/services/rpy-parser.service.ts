@@ -244,7 +244,11 @@ export interface TechnicalConstructs {
     effects?: { stats?: Record<string, number> };
   }>;
   jumpTarget?: string;
-  conditions?: { stats?: Record<string, number>; variables?: string[] };
+  conditions?: {
+    stats?: Record<string, number>;
+    statDeltas?: Record<string, number>;
+    variables?: string[];
+  };
   visuals?: Array<{
     type: "SCENE" | "SHOW" | "HIDE";
     target: string;
@@ -1956,6 +1960,7 @@ export function extractTechnicalConstructs(
   if (/^if\s+/.test(trimmed) || /^elif\s+/.test(trimmed)) {
     constructs.conditions = {
       stats: {},
+      statDeltas: {},
       variables: [],
     };
 
@@ -2026,11 +2031,9 @@ export function extractTechnicalConstructs(
         const operator = statModMatch[2];
         const value = Number.parseInt(statModMatch[3], 10);
 
-        if (operator === "+=") {
-          constructs.conditions.stats![statName] = value;
-        } else if (operator === "-=") {
-          constructs.conditions.stats![statName] = -value;
-        }
+        // Store deltas separately to preserve thresholds from if-expressions
+        constructs.conditions.statDeltas![statName] =
+          operator === "+=" ? value : -value;
       }
     }
 
@@ -2038,10 +2041,17 @@ export function extractTechnicalConstructs(
     if (Object.keys(constructs.conditions.stats!).length === 0) {
       delete constructs.conditions.stats;
     }
+    if (Object.keys(constructs.conditions.statDeltas!).length === 0) {
+      delete constructs.conditions.statDeltas;
+    }
     if (constructs.conditions.variables!.length === 0) {
       delete constructs.conditions.variables;
     }
-    if (!constructs.conditions.stats && !constructs.conditions.variables) {
+    if (
+      !constructs.conditions.stats &&
+      !constructs.conditions.statDeltas &&
+      !constructs.conditions.variables
+    ) {
       delete constructs.conditions;
     }
 
