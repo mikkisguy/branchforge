@@ -317,6 +317,29 @@ export interface Label {
 }
 
 // ============================================================================
+// Technical Badges Types
+// ============================================================================
+
+/**
+ * Technical metadata for line-level conditions (stats and variables)
+ */
+export type LineConditions = {
+  stats?: Record<string, number>;
+  variables?: string[];
+};
+
+/**
+ * Visual statement for technical badges (scene/show/hide commands)
+ */
+export type VisualStatement = {
+  type: "SCENE" | "SHOW" | "HIDE";
+  target: string;
+  at?: string;
+  with?: string;
+  zorder?: number;
+};
+
+// ============================================================================
 // Label Types (for frontend-backend communication)
 // ============================================================================
 
@@ -385,6 +408,9 @@ export interface LabelLine {
   speakerTag: string | null;
   createdAt: string;
   updatedAt: string;
+  // NEW: Technical metadata for badges
+  conditions: LineConditions | null;
+  visualStatements: VisualStatement[] | null;
 }
 
 // ============================================================================

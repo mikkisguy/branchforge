@@ -30,6 +30,7 @@ import { FontFamilySwitcher } from "./FontFamilySwitcher";
 import { useWritingGoals } from "@/hooks/useWritingGoals";
 import { useEntriesUndo } from "@/hooks/useEntriesUndo";
 import { UndoRedoControls } from "@/components/ide-shared";
+import { useTechnicalInfo } from "@/hooks/useTechnicalInfo";
 import { BookOpen, PenLine } from "lucide-react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type { DialogueEntry } from "@/lib/prose-types";
@@ -186,6 +187,9 @@ export const ProseEditor = function ProseEditor({
   // Writing goals from backend
   const { settings: writingGoalSettings } = useWritingGoals();
 
+  // Technical info for badges
+  const { getTechnicalInfoForLine } = useTechnicalInfo(activeLabel);
+
   // Hover state for focus mode dimming
   const [isBottomBarHovered, setIsBottomBarHovered] = useState(false);
   const [entries, setEntries] = useState<DialogueEntry[]>(() =>
@@ -199,6 +203,12 @@ export const ProseEditor = function ProseEditor({
       deserializer: (value) => value as LineLayoutMode,
       validate: (value) => value === "inline" || value === "stacked",
     }
+  );
+
+  // Technical badges toggle state
+  const [showBadges, setShowBadges] = useLocalStorage<boolean>(
+    "show-technical-badges",
+    false
   );
 
   // Writing stats dialog state
@@ -689,30 +699,35 @@ export const ProseEditor = function ProseEditor({
         }`}
       >
         <div className="mx-auto w-full max-w-[75ch] space-y-1 pb-20">
-          {entries.map((entry, index) => (
-            <DialogueLine
-              key={entry.id}
-              entry={entry}
-              characters={characters}
-              layoutMode={layoutMode}
-              index={index}
-              totalEntries={entries.length}
-              onChange={(updatedEntry) =>
-                handleEntryChange(index, updatedEntry)
-              }
-              onDelete={() => handleDeleteLine(index)}
-              onMoveUp={() => handleMoveUp(index)}
-              onMoveDown={() => handleMoveDown(index)}
-              onAddLine={() => handleAddLine(index)}
-              textareaRef={(el: HTMLTextAreaElement | null) => {
-                if (el) {
-                  textareaRefs.current.set(index, el);
-                } else {
-                  textareaRefs.current.delete(index);
+          {entries.map((entry, index) => {
+            const technicalInfo = getTechnicalInfoForLine(entry.id);
+            return (
+              <DialogueLine
+                key={entry.id}
+                entry={entry}
+                characters={characters}
+                layoutMode={layoutMode}
+                index={index}
+                totalEntries={entries.length}
+                onChange={(updatedEntry) =>
+                  handleEntryChange(index, updatedEntry)
                 }
-              }}
-            />
-          ))}
+                onDelete={() => handleDeleteLine(index)}
+                onMoveUp={() => handleMoveUp(index)}
+                onMoveDown={() => handleMoveDown(index)}
+                onAddLine={() => handleAddLine(index)}
+                technicalInfo={technicalInfo}
+                showBadges={showBadges}
+                textareaRef={(el: HTMLTextAreaElement | null) => {
+                  if (el) {
+                    textareaRefs.current.set(index, el);
+                  } else {
+                    textareaRefs.current.delete(index);
+                  }
+                }}
+              />
+            );
+          })}
         </div>
       </div>
 
@@ -759,6 +774,17 @@ export const ProseEditor = function ProseEditor({
               title="Toggle line layout"
             >
               {layoutMode === "inline" ? "Inline" : "Stacked"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowBadges(!showBadges)}
+              className="px-2 py-1 rounded border border-[hsl(var(--border)/0.6)] hover:bg-[hsl(var(--muted)/0.4)] text-xs text-muted-foreground hover:text-foreground transition-colors"
+              title={
+                showBadges ? "Hide technical badges" : "Show technical badges"
+              }
+              aria-pressed={showBadges}
+            >
+              <span>Badges: {showBadges ? "On" : "Off"}</span>
             </button>
             <FontFamilySwitcher direction="up" />
             <FontSizeSwitcher mode="write" direction="up" />

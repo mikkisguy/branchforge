@@ -43,6 +43,24 @@ export const labelLines = pgTable(
         conditionFlags?: string[];
       }>
     >(),
+
+    // Line-level conditions (from issue #160)
+    conditions: jsonb("conditions").$type<{
+      stats?: Record<string, number>;
+      variables?: string[];
+    }>(),
+
+    // Scene/show/hide statements
+    visualStatements: jsonb("visual_statements").$type<
+      Array<{
+        type: "SCENE" | "SHOW" | "HIDE";
+        target: string;
+        at?: string;
+        with?: string;
+        zorder?: number;
+      }>
+    >(),
+
     wordCount: integer("word_count"), // Computed on insert/update via trigger
     demoPlaceholderColor: text("demo_placeholder_color"), // Black screen fallback hex
     demoNotes: text("demo_notes"), // "Character enters from left"

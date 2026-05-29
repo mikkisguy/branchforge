@@ -228,6 +228,8 @@ describe("Labels API", () => {
             speakerTag: "a",
             createdAt: "2024-01-01T00:00:00.000Z",
             updatedAt: "2024-01-01T00:00:00.000Z",
+            conditions: null,
+            visualStatements: null,
           },
         ],
         characters: [

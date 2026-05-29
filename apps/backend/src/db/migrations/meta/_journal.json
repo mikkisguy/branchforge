@@ -288,6 +288,13 @@
       "when": 1779554804923,
       "tag": "0040_silky_silver_centurion",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1779734488951,
+      "tag": "0041_daily_rachel_grey",
+      "breakpoints": true
     }
   ]
 }
