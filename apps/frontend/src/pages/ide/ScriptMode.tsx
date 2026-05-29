@@ -261,13 +261,6 @@ export function ScriptMode({
     return activeLabel?.characters ?? [];
   }, [activeLabel]);
 
-  const statusColor =
-    activeLabel?.status === "FINAL"
-      ? "var(--theme-color)"
-      : activeLabel?.status === "REVIEW"
-        ? "var(--theme-review-color)"
-        : "var(--theme-draft-color)";
-
   const activeFileContent =
     activeProjectFile && currentEditFileId === activeProjectFile.id
       ? editedFileContent
@@ -382,6 +375,7 @@ export function ScriptMode({
     <div className="h-screen flex flex-col overflow-hidden">
       <ScriptModeEditorLayout
         projectName={projectName}
+        projectId={projectId}
         projectFiles={projectFiles}
         activeFileId={activeFileId}
         activeLabelId={activeLabelId}
@@ -393,7 +387,6 @@ export function ScriptMode({
         tabItems={tabItems}
         sceneCharacters={sceneCharacters}
         projectCharacters={projectCharacters}
-        statusColor={statusColor}
         isLeftSidebarCollapsed={isLeftSidebarCollapsed}
         setIsLeftSidebarCollapsed={setIsLeftSidebarCollapsed}
         isRightSidebarCollapsed={isRightSidebarCollapsed}

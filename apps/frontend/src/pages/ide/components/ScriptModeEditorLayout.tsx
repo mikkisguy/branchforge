@@ -1,10 +1,7 @@
 import { useCallback } from "react";
 import { Sparkles, X, ChevronRight, ChevronLeft } from "lucide-react";
 import { cva } from "class-variance-authority";
-import {
-  CharacterReferencePanel,
-  ScriptEditor,
-} from "@/components/script-mode";
+import { ScriptReferencePanel, ScriptEditor } from "@/components/script-mode";
 import { ProjectFileTree } from "@/components/script-mode/ProjectFileTree";
 import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
 import {
@@ -45,6 +42,7 @@ const sidebarVariants = cva(
 
 interface ScriptModeEditorLayoutProps {
   projectName?: string;
+  projectId?: string;
   projectFiles: ProjectFileNode[];
   activeFileId: string | null;
   activeLabelId: string | null;
@@ -56,7 +54,6 @@ interface ScriptModeEditorLayoutProps {
   tabItems: EditorTabBarItem[];
   sceneCharacters: LabelDetail["characters"];
   projectCharacters: Character[];
-  statusColor: string;
   isLeftSidebarCollapsed: boolean;
   setIsLeftSidebarCollapsed: Dispatch<SetStateAction<boolean>>;
   isRightSidebarCollapsed: boolean;
@@ -83,6 +80,7 @@ interface ScriptModeEditorLayoutProps {
 
 export function ScriptModeEditorLayout({
   projectName,
+  projectId,
   projectFiles,
   activeFileId,
   activeLabelId,
@@ -94,7 +92,6 @@ export function ScriptModeEditorLayout({
   tabItems,
   sceneCharacters,
   projectCharacters,
-  statusColor,
   isLeftSidebarCollapsed,
   setIsLeftSidebarCollapsed,
   isRightSidebarCollapsed,
@@ -276,11 +273,10 @@ export function ScriptModeEditorLayout({
           </div>
         </div>
 
-        <CharacterReferencePanel
+        <ScriptReferencePanel
+          projectId={projectId ?? ""}
           sceneCharacters={sceneCharacters}
           projectCharacters={projectCharacters}
-          activeLabel={activeLabel}
-          statusColor={statusColor}
           isCollapsed={isRightSidebarCollapsed || isFocusMode}
           onCollapseToggle={!isFocusMode ? toggleRightSidebar : undefined}
         />
