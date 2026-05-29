@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useReducer, useState, useRef } from "react";
 import { Loader2, Plus, X } from "lucide-react";
 import {
   Dialog,
@@ -32,8 +32,8 @@ interface LabelEditDialogProps {
   } | null;
   /** Available route configs from the project */
   routeConfigs: Array<{ id: string; routeKey: string; routeName: string }>;
-  /** All project meters (for the stat dropdown) */
-  meters: Stat[];
+  /** All project stats (for the stat dropdown) */
+  stats: Stat[];
   /** All project variables (for the variable picker) */
   variables: Variable[];
   /** Called when save is clicked */
@@ -52,7 +52,7 @@ interface LabelEditDialogProps {
   isSaving: boolean;
   /** Callback to open the variables management modal */
   onOpenStateVariables: () => void;
-  /** Callback to open the meters management modal */
+  /** Callback to open the stats management modal */
   onOpenStats: () => void;
 }
 
@@ -130,7 +130,7 @@ export function LabelEditDialog({
   currentVisibility,
   currentConditions,
   routeConfigs,
-  meters,
+  stats,
   variables,
   onSave,
   isSaving,
@@ -155,9 +155,14 @@ export function LabelEditDialog({
   const [showVariablePicker, setShowVariablePicker] = useState(false);
   const [showStatPicker, setShowStatPicker] = useState(false);
 
-  // Reset form when dialog opens with new values
+  // Track whether we've initialized for this open session
+  const initializationRef = useRef(false);
+
+  // Initialize form only when dialog transitions from closed to open
   useEffect(() => {
-    if (open) {
+    if (open && !initializationRef.current) {
+      // Dialog just opened - initialize from props
+      initializationRef.current = true;
       dispatch({
         type: "RESET",
         title: currentTitle,
@@ -171,15 +176,11 @@ export function LabelEditDialog({
       setShowVariablePicker(false);
       setShowStatPicker(false);
     }
-  }, [
-    open,
-    currentTitle,
-    currentLabelName,
-    currentRoute,
-    currentStatus,
-    currentVisibility,
-    currentConditions,
-  ]);
+    // Reset initialization flag when dialog closes
+    if (!open) {
+      initializationRef.current = false;
+    }
+  }, [open]);
 
   // Derive available variables (not yet assigned)
   const availableVariables = variables.filter(
@@ -187,7 +188,7 @@ export function LabelEditDialog({
   );
 
   // Derive available stats (not yet used as a condition)
-  const availableStats = meters.filter((m) => !(m.key in statConditions));
+  const availableStats = stats.filter((m) => !(m.key in statConditions));
 
   // Handlers for variables
   const handleAddVariable = (key: string) => {
@@ -337,7 +338,7 @@ export function LabelEditDialog({
 
   // Resolve a stat key to its display name
   const getStatName = (key: string): string => {
-    const stat = meters.find((m) => m.key === key);
+    const stat = stats.find((m) => m.key === key);
     return stat?.name ?? key;
   };
 
@@ -615,7 +616,7 @@ export function LabelEditDialog({
                             handleStatThresholdChange(key, e.target.value)
                           }
                           disabled={isSaving}
-                          className="w-24 px-2 py-2 border border-border rounded-md text-sm bg-background text-right focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
+                          className="w-24 p-2 border border-border rounded-md text-sm bg-background text-right focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
                         />
                         <button
                           type="button"

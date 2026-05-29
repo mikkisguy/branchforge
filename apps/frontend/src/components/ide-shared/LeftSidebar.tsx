@@ -73,7 +73,7 @@ type ModalKey =
   | "settings"
   | "routes"
   | "stateVars"
-  | "meters"
+  | "stats"
   | "characters"
   | "projectPopover"
   | "gitLabImport"
@@ -84,7 +84,7 @@ interface ModalState {
   settings: boolean;
   routes: boolean;
   stateVars: boolean;
-  meters: boolean;
+  stats: boolean;
   characters: boolean;
   projectPopover: boolean;
   gitLabImport: boolean;
@@ -101,7 +101,7 @@ const initialModalState: ModalState = {
   settings: false,
   routes: false,
   stateVars: false,
-  meters: false,
+  stats: false,
   characters: false,
   projectPopover: false,
   gitLabImport: false,
@@ -254,6 +254,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
             } bg-muted/50 rounded-md p-0.5`}
           >
             <button
+              type="button"
               onClick={() => setMode("write")}
               className={`flex ${
                 isCollapsed ? "w-full p-2.5" : "flex-1 px-2 py-1.5"
@@ -268,6 +269,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
               {showLabel && <span>Write</span>}
             </button>
             <button
+              type="button"
               onClick={() => setMode("script")}
               className={`flex ${
                 isCollapsed ? "w-full p-2.5" : "flex-1 px-2 py-1.5"
@@ -289,6 +291,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
               <>
                 {/* Collapsed: Icon button with popover */}
                 <button
+                  type="button"
                   onClick={() =>
                     dispatchModal({ type: "TOGGLE", key: "projectPopover" })
                   }
@@ -379,6 +382,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
           <nav className="flex flex-col gap-1">
             {/* Routes */}
             <button
+              type="button"
               onClick={() => dispatchModal({ type: "OPEN", key: "routes" })}
               disabled={!projectId}
               className={`flex items-center ${
@@ -396,6 +400,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
 
             {/* Variables */}
             <button
+              type="button"
               onClick={() => dispatchModal({ type: "OPEN", key: "stateVars" })}
               disabled={!projectId}
               className={`flex items-center ${
@@ -413,7 +418,8 @@ export function LeftSidebar(props: LeftSidebarProps) {
 
             {/* Stats */}
             <button
-              onClick={() => dispatchModal({ type: "OPEN", key: "meters" })}
+              type="button"
+              onClick={() => dispatchModal({ type: "OPEN", key: "stats" })}
               disabled={!projectId}
               className={`flex items-center ${
                 isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
@@ -430,6 +436,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
 
             {/* Characters */}
             <button
+              type="button"
               onClick={() => dispatchModal({ type: "OPEN", key: "characters" })}
               disabled={!projectId}
               className={`flex items-center ${
@@ -451,6 +458,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
         <div className="flex flex-col p-2 gap-1 border-t border-border/30">
           {/* Collapse/Expand Toggle */}
           <button
+            type="button"
             onClick={handleToggleCollapse}
             className={`flex items-center ${
               isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
@@ -473,6 +481,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
               <>
                 {/* Collapsed: Icon button with popover */}
                 <button
+                  type="button"
                   onClick={() =>
                     dispatchModal({ type: "TOGGLE", key: "themeDropdown" })
                   }
@@ -491,6 +500,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
                     <div className="flex gap-2">
                       {themePalettes.map((palette) => (
                         <button
+                          type="button"
                           key={palette.key}
                           onClick={() => {
                             setTheme(palette.key);
@@ -519,6 +529,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
                   <div className="flex gap-1.5 flex-1">
                     {themePalettes.map((palette) => (
                       <button
+                        type="button"
                         key={palette.key}
                         onClick={() => setTheme(palette.key)}
                         className={`flex-1 h-7 rounded transition-all ${
@@ -538,6 +549,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
 
           {/* Settings */}
           <button
+            type="button"
             onClick={() => setSettingsOpen(true)}
             className={`flex items-center ${
               isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
@@ -550,6 +562,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
 
           {/* Logout */}
           <button
+            type="button"
             onClick={onLogout}
             className={`flex items-center ${
               isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
@@ -596,9 +609,9 @@ export function LeftSidebar(props: LeftSidebarProps) {
             projectId={projectId}
           />
           <StatsDialog
-            open={modals.meters}
+            open={modals.stats}
             onOpenChange={(open: boolean) =>
-              dispatchModal({ type: open ? "OPEN" : "CLOSE", key: "meters" })
+              dispatchModal({ type: open ? "OPEN" : "CLOSE", key: "stats" })
             }
             projectId={projectId}
           />

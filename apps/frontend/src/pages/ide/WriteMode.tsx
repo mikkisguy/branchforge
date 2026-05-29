@@ -437,7 +437,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
                   routeKey: rc.routeKey,
                   routeName: rc.routeName,
                 }))}
-                meters={stats}
+                stats={stats}
                 variables={variables}
                 onSave={handleEditSave}
                 isSaving={isUpdatingLabel}
