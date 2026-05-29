@@ -59,6 +59,7 @@ export function StatsDialog({
             </p>
           </div>
           <button
+            type="button"
             onClick={() => onOpenChange(false)}
             className="text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Close stat dialog"
@@ -82,6 +83,7 @@ export function StatsDialog({
               <div className="flex flex-wrap gap-2 mb-6">
                 {stats.map((stat) => (
                   <button
+                    type="button"
                     key={stat.id}
                     onClick={() => setSelectedStatKey(stat.key)}
                     className={`px-3 py-1.5 rounded-md text-sm transition-colors ${

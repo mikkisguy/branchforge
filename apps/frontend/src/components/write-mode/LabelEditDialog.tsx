@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useReducer, useState, useRef } from "react";
 import { Loader2, Plus, X } from "lucide-react";
 import {
   Dialog,
@@ -155,9 +155,14 @@ export function LabelEditDialog({
   const [showVariablePicker, setShowVariablePicker] = useState(false);
   const [showStatPicker, setShowStatPicker] = useState(false);
 
-  // Reset form when dialog opens with new values
+  // Track whether we've initialized for this open session
+  const initializationRef = useRef(false);
+
+  // Initialize form only when dialog transitions from closed to open
   useEffect(() => {
-    if (open) {
+    if (open && !initializationRef.current) {
+      // Dialog just opened - initialize from props
+      initializationRef.current = true;
       dispatch({
         type: "RESET",
         title: currentTitle,
@@ -171,15 +176,11 @@ export function LabelEditDialog({
       setShowVariablePicker(false);
       setShowStatPicker(false);
     }
-  }, [
-    open,
-    currentTitle,
-    currentLabelName,
-    currentRoute,
-    currentStatus,
-    currentVisibility,
-    currentConditions,
-  ]);
+    // Reset initialization flag when dialog closes
+    if (!open) {
+      initializationRef.current = false;
+    }
+  }, [open]);
 
   // Derive available variables (not yet assigned)
   const availableVariables = variables.filter(
@@ -615,7 +616,7 @@ export function LabelEditDialog({
                             handleStatThresholdChange(key, e.target.value)
                           }
                           disabled={isSaving}
-                          className="w-24 px-2 py-2 border border-border rounded-md text-sm bg-background text-right focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
+                          className="w-24 p-2 border border-border rounded-md text-sm bg-background text-right focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
                         />
                         <button
                           type="button"
