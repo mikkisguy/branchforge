@@ -1,12 +1,7 @@
-import { useMemo, useState } from "react";
-import {
-  Heart,
-  ChevronRight,
-  ChevronLeft,
-  ChevronDown,
-  Pencil,
-} from "lucide-react";
+import { useMemo } from "react";
+import { Heart, ChevronRight, ChevronLeft, Pencil } from "lucide-react";
 import { CharacterAvatarChip } from "@/components/ui/CharacterAvatarChip";
+import { CollapsibleSection } from "@/components/ide-shared/CollapsibleSection";
 import type {
   Character,
   LabelDetail,
@@ -32,33 +27,6 @@ const STATUS_COLORS = {
   REVIEW: "var(--theme-review-color)",
   DRAFT: "var(--theme-draft-color)",
 } as const;
-
-function CollapsibleSection({
-  title,
-  defaultOpen = false,
-  children,
-}: {
-  title: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-  return (
-    <div className="border-b border-border/40 last:border-b-0">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:bg-muted/30 transition-colors"
-      >
-        {title}
-        <ChevronDown
-          className={`size-3.5 transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`}
-        />
-      </button>
-      {isOpen && <div className="px-3 pb-3">{children}</div>}
-    </div>
-  );
-}
 
 interface LabelPropertiesPanelProps {
   activeLabel: LabelDetail | undefined;
