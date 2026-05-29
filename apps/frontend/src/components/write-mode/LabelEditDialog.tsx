@@ -32,8 +32,8 @@ interface LabelEditDialogProps {
   } | null;
   /** Available route configs from the project */
   routeConfigs: Array<{ id: string; routeKey: string; routeName: string }>;
-  /** All project meters (for the stat dropdown) */
-  meters: Stat[];
+  /** All project stats (for the stat dropdown) */
+  stats: Stat[];
   /** All project variables (for the variable picker) */
   variables: Variable[];
   /** Called when save is clicked */
@@ -52,7 +52,7 @@ interface LabelEditDialogProps {
   isSaving: boolean;
   /** Callback to open the variables management modal */
   onOpenStateVariables: () => void;
-  /** Callback to open the meters management modal */
+  /** Callback to open the stats management modal */
   onOpenStats: () => void;
 }
 
@@ -130,7 +130,7 @@ export function LabelEditDialog({
   currentVisibility,
   currentConditions,
   routeConfigs,
-  meters,
+  stats,
   variables,
   onSave,
   isSaving,
@@ -187,7 +187,7 @@ export function LabelEditDialog({
   );
 
   // Derive available stats (not yet used as a condition)
-  const availableStats = meters.filter((m) => !(m.key in statConditions));
+  const availableStats = stats.filter((m) => !(m.key in statConditions));
 
   // Handlers for variables
   const handleAddVariable = (key: string) => {
@@ -337,7 +337,7 @@ export function LabelEditDialog({
 
   // Resolve a stat key to its display name
   const getStatName = (key: string): string => {
-    const stat = meters.find((m) => m.key === key);
+    const stat = stats.find((m) => m.key === key);
     return stat?.name ?? key;
   };
 

@@ -73,7 +73,7 @@ type ModalKey =
   | "settings"
   | "routes"
   | "stateVars"
-  | "meters"
+  | "stats"
   | "characters"
   | "projectPopover"
   | "gitLabImport"
@@ -84,7 +84,7 @@ interface ModalState {
   settings: boolean;
   routes: boolean;
   stateVars: boolean;
-  meters: boolean;
+  stats: boolean;
   characters: boolean;
   projectPopover: boolean;
   gitLabImport: boolean;
@@ -101,7 +101,7 @@ const initialModalState: ModalState = {
   settings: false,
   routes: false,
   stateVars: false,
-  meters: false,
+  stats: false,
   characters: false,
   projectPopover: false,
   gitLabImport: false,
@@ -413,7 +413,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
 
             {/* Stats */}
             <button
-              onClick={() => dispatchModal({ type: "OPEN", key: "meters" })}
+              onClick={() => dispatchModal({ type: "OPEN", key: "stats" })}
               disabled={!projectId}
               className={`flex items-center ${
                 isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
@@ -596,9 +596,9 @@ export function LeftSidebar(props: LeftSidebarProps) {
             projectId={projectId}
           />
           <StatsDialog
-            open={modals.meters}
+            open={modals.stats}
             onOpenChange={(open: boolean) =>
-              dispatchModal({ type: open ? "OPEN" : "CLOSE", key: "meters" })
+              dispatchModal({ type: open ? "OPEN" : "CLOSE", key: "stats" })
             }
             projectId={projectId}
           />
