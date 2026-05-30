@@ -193,9 +193,9 @@ describe("CharacterDialog", () => {
         { wrapper }
       );
 
-      await user.click(screen.getByRole("button", { name: /add character/i }));
+      await user.click(screen.getByText(/add character/i));
 
-      // CharacterEditDialog should render with "Add Character" title as a heading
+      // CharacterEditDialog should render with "Add Character" title
       expect(
         screen.getByRole("heading", { name: "Add Character" })
       ).toBeInTheDocument();
