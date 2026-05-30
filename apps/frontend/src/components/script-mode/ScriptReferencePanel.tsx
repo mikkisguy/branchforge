@@ -14,11 +14,10 @@ import { StatsDialog } from "./StatsDialog";
 import { useVariables } from "@/hooks/useVariables";
 import { useStats } from "@/hooks/useStats";
 import { cva } from "class-variance-authority";
-import type { Character, LabelCharacter } from "@branchforge/shared";
+import type { Character } from "@branchforge/shared";
 
 interface ScriptReferencePanelProps {
   projectId: string;
-  sceneCharacters: LabelCharacter[];
   projectCharacters: Character[];
   isCollapsed?: boolean;
   onCollapseToggle?: () => void;
@@ -38,7 +37,6 @@ const panelVariants = cva(
 
 export function ScriptReferencePanel({
   projectId,
-  sceneCharacters,
   projectCharacters,
   isCollapsed = false,
   onCollapseToggle,
