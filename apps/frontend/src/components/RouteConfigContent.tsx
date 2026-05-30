@@ -295,14 +295,6 @@ export function RouteConfigContent({ projectId }: RouteConfigContentProps) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-lg font-medium">Route Configuration</h3>
-        <p className="text-sm text-muted-foreground mt-1">
-          Define the routes for your visual novel project. Routes determine
-          character paths and story branching.
-        </p>
-      </div>
-
       {isLoadingRouteConfigs ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="size-6 animate-spin text-muted-foreground" />

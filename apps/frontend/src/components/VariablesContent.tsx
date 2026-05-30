@@ -17,6 +17,7 @@ import type { Variable } from "@branchforge/shared";
 
 interface VariablesContentProps {
   projectId: string;
+  showHeader?: boolean;
 }
 
 interface VariableForm {
@@ -276,14 +277,6 @@ export function VariablesContent({ projectId }: VariablesContentProps) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-lg font-medium">Variables Management</h3>
-        <p className="text-sm text-muted-foreground mt-1">
-          Variables are boolean flags used in conditional branching logic. They
-          control label accessibility, menu visibility, and story state changes.
-        </p>
-      </div>
-
       {isLoadingVariables ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="size-6 animate-spin text-muted-foreground" />

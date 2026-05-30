@@ -17,12 +17,8 @@ import {
   ReferenceLine,
 } from "recharts";
 import { X } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 interface DailyWordCount {
   date: string;
@@ -84,21 +80,25 @@ export function WritingStatsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[500px] max-w-[95vw]">
-        <DialogHeader className="flex-row items-center justify-between p-6 pb-4">
-          <DialogTitle className="text-lg font-medium">
-            Writing Statistics
-          </DialogTitle>
+      <DialogContent className="max-w-3xl w-full max-h-[90vh] p-0 gap-0 flex flex-col">
+        <div className="p-6 border-b border-border/30 flex items-start justify-between shrink-0">
+          <div>
+            <h2 className="text-lg font-medium">Writing Statistics</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Track your seven-day word count against your daily goal.
+            </p>
+          </div>
           <button
+            type="button"
             onClick={() => onOpenChange(false)}
             className="text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Close dialog"
+            aria-label="Close writing statistics dialog"
           >
             <X className="size-5" />
           </button>
-        </DialogHeader>
+        </div>
 
-        <div className="p-6 pt-0 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Summary Stats */}
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-muted/50 rounded-lg p-3 text-center">
@@ -185,6 +185,12 @@ export function WritingStatsDialog({
             Your daily writing goal is {dailyGoal.toLocaleString()} words. Word
             counts reset at midnight your local time.
           </p>
+        </div>
+
+        <div className="p-6 border-t border-border/30 flex justify-end shrink-0">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

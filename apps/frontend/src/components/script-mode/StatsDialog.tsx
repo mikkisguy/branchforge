@@ -49,8 +49,7 @@ export function StatsDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-5xl w-full max-h-[85vh] p-0 gap-0 flex flex-col">
-        {/* Header */}
+      <DialogContent className="max-w-5xl w-full max-h-[90vh] p-0 gap-0 flex flex-col">
         <div className="p-6 border-b border-border/30 flex items-start justify-between shrink-0">
           <div>
             <h2 className="text-lg font-medium">Stat Management</h2>
@@ -68,17 +67,13 @@ export function StatsDialog({
           </button>
         </div>
 
-        {/* Body: two-column layout */}
         <div className="flex-1 overflow-hidden flex">
-          {/* Left panel: Stat list */}
           <div className="w-[340px] shrink-0 border-r border-border/30 overflow-y-auto p-6">
             <h3 className="text-sm font-medium mb-4">Stats</h3>
             <StatsContent projectId={projectId} />
           </div>
 
-          {/* Right panel: Progression */}
           <div className="flex-1 overflow-y-auto p-6">
-            {/* Stat selector tabs */}
             {stats.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-6">
                 {stats.map((stat) => (
@@ -106,8 +101,7 @@ export function StatsDialog({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-border/30 flex justify-end shrink-0">
+        <div className="p-6 border-t border-border/30 flex justify-end shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
