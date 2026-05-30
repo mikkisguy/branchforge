@@ -16,7 +16,7 @@ import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 import type { Tab } from "./SettingsModal";
 import { SettingsModal } from "./SettingsModal";
 import { RouteSettingsModal } from "./RouteSettingsModal";
-import { CharactersModal } from "./CharactersModal";
+import { CharacterDialog } from "@/components/CharacterDialog";
 import { GitLabImportDialog } from "./GitLabImportDialog";
 import { ZipImportProjectDialog } from "./ZipImportProjectDialog";
 import { Logo } from "@/components/ui/logo";
@@ -555,9 +555,9 @@ export function LeftSidebar(props: LeftSidebarProps) {
             }
             projectId={projectId}
           />
-          <CharactersModal
+          <CharacterDialog
             open={modals.characters}
-            onOpenChange={(open) =>
+            onOpenChange={(open: boolean) =>
               dispatchModal({
                 type: open ? "OPEN" : "CLOSE",
                 key: "characters",
