@@ -1,10 +1,5 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { VariablesContent } from "@/components/VariablesContent";
+import { DialogShell } from "@/components/ui/DialogShell";
+import { VariablesManagementContent } from "@/components/VariablesManagementContent";
 
 interface VariablesDialogProps {
   open: boolean;
@@ -18,13 +13,14 @@ export function VariablesDialog({
   projectId,
 }: VariablesDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[700px] max-w-[95vw]">
-        <DialogHeader>
-          <DialogTitle>Variables Management</DialogTitle>
-        </DialogHeader>
-        <VariablesContent projectId={projectId} />
-      </DialogContent>
-    </Dialog>
+    <DialogShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Variables Management"
+      description="Manage variables used in branching logic."
+      maxWidth="3xl"
+    >
+      <VariablesManagementContent projectId={projectId} showHeader={false} />
+    </DialogShell>
   );
 }

@@ -15,7 +15,7 @@ import { useRouteConfigs } from "@/hooks/useRouteConfigs";
 import { useToast } from "@/contexts/ToastContext";
 import { isValidRouteKey, isValidJumpPrefix } from "@branchforge/shared";
 
-interface RouteConfigContentProps {
+interface RouteSettingsContentProps {
   projectId: string;
 }
 
@@ -31,7 +31,7 @@ interface RouteConfigForm {
 // Component
 // ============================================================================
 
-export function RouteConfigContent({ projectId }: RouteConfigContentProps) {
+export function RouteSettingsContent({ projectId }: RouteSettingsContentProps) {
   const {
     routeConfigs,
     isLoadingRouteConfigs,
@@ -295,14 +295,6 @@ export function RouteConfigContent({ projectId }: RouteConfigContentProps) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-lg font-medium">Route Configuration</h3>
-        <p className="text-sm text-muted-foreground mt-1">
-          Define the routes for your visual novel project. Routes determine
-          character paths and story branching.
-        </p>
-      </div>
-
       {isLoadingRouteConfigs ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="size-6 animate-spin text-muted-foreground" />

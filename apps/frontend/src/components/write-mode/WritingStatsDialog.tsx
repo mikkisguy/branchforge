@@ -16,13 +16,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
-import { X } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { DialogShell } from "@/components/ui/DialogShell";
 
 interface DailyWordCount {
   date: string;
@@ -83,110 +77,99 @@ export function WritingStatsDialog({
   ).length;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[500px] max-w-[95vw]">
-        <DialogHeader className="flex-row items-center justify-between p-6 pb-4">
-          <DialogTitle className="text-lg font-medium">
-            Writing Statistics
-          </DialogTitle>
-          <button
-            onClick={() => onOpenChange(false)}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Close dialog"
-          >
-            <X className="size-5" />
-          </button>
-        </DialogHeader>
+    <DialogShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Writing Statistics"
+      description="Track your seven-day word count against your daily goal."
+      maxWidth="3xl"
+    >
+      <div className="space-y-6">
+        {/* Summary Stats */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-muted/50 rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold text-[var(--theme-color)]">
+              {totalWords.toLocaleString()}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">Total words</p>
+          </div>
+          <div className="bg-muted/50 rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold text-foreground">
+              {avgWords.toLocaleString()}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">Avg/day</p>
+          </div>
+          <div className="bg-muted/50 rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold text-green-500">
+              {daysMetGoal}/{dailyWordCounts.length}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">Goals met</p>
+          </div>
+        </div>
 
-        <div className="p-6 pt-0 space-y-6">
-          {/* Summary Stats */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-muted/50 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-[var(--theme-color)]">
-                {totalWords.toLocaleString()}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">Total words</p>
-            </div>
-            <div className="bg-muted/50 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-foreground">
-                {avgWords.toLocaleString()}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">Avg/day</p>
-            </div>
-            <div className="bg-muted/50 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-green-500">
-                {daysMetGoal}/{dailyWordCounts.length}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">Goals met</p>
+        {/* Chart */}
+        {chartData.length > 0 ? (
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium">Last 7 Days</h3>
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 20, right: 10, left: 10, bottom: 20 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="var(--border)"
+                    opacity={0.3}
+                  />
+                  <XAxis
+                    dataKey="dateLabel"
+                    tick={{
+                      fill: "hsl(var(--muted-foreground))",
+                      fontSize: 11,
+                    }}
+                    axisLine={{ stroke: "var(--border)" }}
+                  />
+                  <YAxis
+                    tick={{
+                      fill: "hsl(var(--muted-foreground))",
+                      fontSize: 11,
+                    }}
+                    axisLine={{ stroke: "var(--border)" }}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <ReferenceLine
+                    y={dailyGoal}
+                    stroke="hsl(var(--muted-foreground) / 0.5)"
+                    strokeDasharray="4 4"
+                    label={{
+                      value: "Goal",
+                      fill: "hsl(var(--muted-foreground))",
+                      fontSize: 10,
+                    }}
+                  />
+                  <Bar
+                    dataKey="count"
+                    fill="var(--theme-color)"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">
+            <p className="text-sm">No writing data yet</p>
+            <p className="text-xs mt-1">Start writing to track your progress</p>
+          </div>
+        )}
 
-          {/* Chart */}
-          {chartData.length > 0 ? (
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium">Last 7 Days</h3>
-              <div className="h-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={chartData}
-                    margin={{ top: 20, right: 10, left: 10, bottom: 20 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="var(--border)"
-                      opacity={0.3}
-                    />
-                    <XAxis
-                      dataKey="dateLabel"
-                      tick={{
-                        fill: "hsl(var(--muted-foreground))",
-                        fontSize: 11,
-                      }}
-                      axisLine={{ stroke: "var(--border)" }}
-                    />
-                    <YAxis
-                      tick={{
-                        fill: "hsl(var(--muted-foreground))",
-                        fontSize: 11,
-                      }}
-                      axisLine={{ stroke: "var(--border)" }}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <ReferenceLine
-                      y={dailyGoal}
-                      stroke="hsl(var(--muted-foreground) / 0.5)"
-                      strokeDasharray="4 4"
-                      label={{
-                        value: "Goal",
-                        fill: "hsl(var(--muted-foreground))",
-                        fontSize: 10,
-                      }}
-                    />
-                    <Bar
-                      dataKey="count"
-                      fill="var(--theme-color)"
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <p className="text-sm">No writing data yet</p>
-              <p className="text-xs mt-1">
-                Start writing to track your progress
-              </p>
-            </div>
-          )}
-
-          {/* Info text */}
-          <p className="text-xs text-muted-foreground text-center">
-            Your daily writing goal is {dailyGoal.toLocaleString()} words. Word
-            counts reset at midnight your local time.
-          </p>
-        </div>
-      </DialogContent>
-    </Dialog>
+        {/* Info text */}
+        <p className="text-xs text-muted-foreground text-center">
+          Your daily writing goal is {dailyGoal.toLocaleString()} words. Word
+          counts reset at midnight your local time.
+        </p>
+      </div>
+    </DialogShell>
   );
 }
