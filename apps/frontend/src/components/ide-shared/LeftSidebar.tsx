@@ -15,7 +15,7 @@ import type { ThemePalette } from "@/contexts/ThemeContext";
 import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 import type { Tab } from "./SettingsModal";
 import { SettingsModal } from "./SettingsModal";
-import { RouteSettingsModal } from "./RouteSettingsModal";
+import { RouteSettingsDialog } from "./RouteSettingsDialog";
 import { CharacterDialog } from "@/components/CharacterDialog";
 import { GitLabImportDialog } from "./GitLabImportDialog";
 import { ZipImportProjectDialog } from "./ZipImportProjectDialog";
@@ -548,7 +548,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
       />
       {projectId && (
         <>
-          <RouteSettingsModal
+          <RouteSettingsDialog
             open={modals.routes}
             onOpenChange={(open) =>
               dispatchModal({ type: open ? "OPEN" : "CLOSE", key: "routes" })

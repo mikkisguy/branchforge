@@ -3,5 +3,5 @@ export type { ScriptEditorRef } from "./ScriptEditor.lazy";
 export { StatusBar } from "./StatusBar";
 export { ScriptReferencePanel } from "./ScriptReferencePanel";
 export { VariablesDialog } from "./VariablesDialog";
-export { StatsDialog } from "./StatsDialog";
+export { StatManagementDialog } from "./StatManagementDialog";
 export { UndoRedoControls } from "@/components/ide-shared";

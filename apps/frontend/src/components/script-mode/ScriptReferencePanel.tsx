@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { CollapsibleSection } from "@/components/ide-shared/CollapsibleSection";
 import { VariablesDialog } from "./VariablesDialog";
-import { StatsDialog } from "./StatsDialog";
+import { StatManagementDialog } from "./StatManagementDialog";
 import { useVariables } from "@/hooks/useVariables";
 import { useStats } from "@/hooks/useStats";
 import { cva } from "class-variance-authority";
@@ -355,7 +355,7 @@ export function ScriptReferencePanel({
         onOpenChange={setVariablesDialogOpen}
         projectId={projectId}
       />
-      <StatsDialog
+      <StatManagementDialog
         open={statsDialogOpen}
         onOpenChange={setStatsDialogOpen}
         projectId={projectId}
