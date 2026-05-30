@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { cn } from "@/lib/utils";
 import {
   ChevronRight,
   ChevronLeft,
@@ -42,6 +43,9 @@ export function ScriptReferencePanel({
 }: ScriptReferencePanelProps) {
   const [variablesDialogOpen, setVariablesDialogOpen] = useState(false);
   const [statsDialogOpen, setStatsDialogOpen] = useState(false);
+  const [failedAvatars, setFailedAvatars] = useState<Record<string, boolean>>(
+    {}
+  );
 
   // Skip API calls if projectId is not valid
   const { variables, isLoadingVariables } = useVariables(
@@ -119,15 +123,33 @@ export function ScriptReferencePanel({
                     >
                       {/* Avatar: image or colored circle */}
                       {character.avatarUrl ? (
-                        <img
-                          src={character.avatarUrl}
-                          alt={character.displayName}
-                          className="size-8 rounded-full shrink-0 object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = "none";
-                          }}
-                        />
+                        <>
+                          <img
+                            src={character.avatarUrl}
+                            alt={character.displayName}
+                            className={cn(
+                              "size-8 rounded-full shrink-0 object-cover",
+                              failedAvatars[character.id] && "hidden"
+                            )}
+                            onError={() => {
+                              setFailedAvatars((prev) => ({
+                                ...prev,
+                                [character.id]: true,
+                              }));
+                            }}
+                          />
+                          {failedAvatars[character.id] && (
+                            <div
+                              className="size-8 rounded-full flex items-center justify-center text-white text-[10px] font-medium shrink-0 shadow-sm"
+                              style={{
+                                backgroundColor:
+                                  character.color ?? "var(--theme-color)",
+                              }}
+                            >
+                              {character.displayName[0] || "?"}
+                            </div>
+                          )}
+                        </>
                       ) : (
                         <div
                           className="size-8 rounded-full flex items-center justify-center text-white text-[10px] font-medium shrink-0 shadow-sm"

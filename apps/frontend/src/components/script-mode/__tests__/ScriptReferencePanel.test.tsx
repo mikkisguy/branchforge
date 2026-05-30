@@ -17,8 +17,35 @@ vi.mock("@/contexts/ToastContext", () => ({
 vi.mock("@/hooks/useVariables", () => ({
   useVariables: () => ({
     variables: [],
-    isLoading: false,
-    error: null,
+    isLoadingVariables: false,
+    variablesError: null,
+    isCreatingVariable: false,
+    isUpdatingVariable: false,
+    isDeletingVariable: false,
+    refreshVariables: vi.fn(),
+    createVariable: vi.fn(),
+    updateVariable: vi.fn(),
+    deleteVariable: vi.fn(),
+  }),
+}));
+
+// Mock useStats hook
+vi.mock("@/hooks/useStats", () => ({
+  useStats: () => ({
+    stats: [],
+    isLoadingStats: false,
+    statsError: null,
+    progression: [],
+    isLoadingProgression: false,
+    progressionError: null,
+    isCreatingStat: false,
+    isUpdatingStat: false,
+    isDeletingStat: false,
+    refreshStats: vi.fn(),
+    refreshProgression: vi.fn(),
+    createStat: vi.fn(),
+    updateStat: vi.fn(),
+    deleteStat: vi.fn(),
   }),
 }));
 
