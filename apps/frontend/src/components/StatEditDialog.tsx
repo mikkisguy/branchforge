@@ -138,15 +138,31 @@ export function StatEditDialog({
   }, [open, statId, stats, isLoadingStats, initializedForStatId]);
 
   const handleChange = (field: keyof StatFormState, value: string) => {
-    setForm((prev) => ({
-      ...prev,
-      [field]:
-        field === "minValue" || field === "maxValue" ? Number(value) : value,
-    }));
+    setForm((prev) => {
+      if (field === "minValue" || field === "maxValue") {
+        const parsedValue = Number(value);
+        return {
+          ...prev,
+          [field]: Number.isNaN(parsedValue) ? prev[field] : parsedValue,
+        };
+      }
+
+      return {
+        ...prev,
+        [field]: value,
+      };
+    });
     setErrors({});
   };
 
   const handleSave = async () => {
+    if (Number.isNaN(form.minValue) || Number.isNaN(form.maxValue)) {
+      setErrors({
+        range: "Min and max values must be valid numbers",
+      });
+      return;
+    }
+
     const validationErrors = validateStat(form);
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);

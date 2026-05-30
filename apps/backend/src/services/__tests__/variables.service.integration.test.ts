@@ -430,6 +430,39 @@ describe("VariablesService (Integration)", () => {
       ).rejects.toThrow("Variable");
     });
 
+    it("should ignore key updates", async () => {
+      const body: {
+        description: string;
+        key: string;
+      } = {
+        description: "updated",
+        key: "new_key",
+      };
+
+      let result: Awaited<ReturnType<typeof updateVariable>> | null = null;
+      let updateError: unknown = null;
+
+      try {
+        result = await updateVariable(testVariable1.id!, testUserId, body);
+      } catch (error) {
+        updateError = error;
+      }
+
+      if (updateError) {
+        expect(updateError).toBeInstanceOf(Error);
+      } else {
+        expect(result?.key).toBe(testVariable1.key);
+
+        const [dbVariable] = await db
+          .select()
+          .from(variables)
+          .where(eq(variables.id, testVariable1.id!))
+          .limit(1);
+
+        expect(dbVariable?.key).toBe(testVariable1.key);
+      }
+    });
+
     it("should throw NotFoundError when user does not have access", async () => {
       const body = {
         description: "updated",

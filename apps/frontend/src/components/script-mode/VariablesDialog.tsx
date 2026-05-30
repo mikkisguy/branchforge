@@ -98,7 +98,7 @@ export function VariablesDialog({
       )}
 
       <VariableEditDialog
-        open={editingVariableId !== null}
+        open={open && editingVariableId !== null}
         onOpenChange={(nextOpen) => {
           if (!nextOpen) setEditingVariableId(null);
         }}

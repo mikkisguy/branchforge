@@ -55,21 +55,17 @@ export function StatList({
           return (
             <div
               key={stat.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => onSelect(stat.key)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  onSelect(stat.key);
-                }
-              }}
-              className={`border border-border/30 rounded-md p-3 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring ${
-                isSelected ? "bg-muted" : "hover:bg-muted/40"
-              }`}
+              className="border border-border/30 rounded-md p-3"
             >
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
+                <button
+                  type="button"
+                  onClick={() => onSelect(stat.key)}
+                  className={`min-w-0 flex-1 text-left rounded-md p-1 transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${
+                    isSelected ? "bg-muted" : "hover:bg-muted/40"
+                  }`}
+                  aria-pressed={isSelected}
+                >
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm truncate">
                       {stat.name}
@@ -86,16 +82,13 @@ export function StatList({
                       {stat.description}
                     </p>
                   )}
-                </div>
+                </button>
                 <div className="flex items-center gap-1 shrink-0">
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onEdit(stat.id);
-                    }}
+                    onClick={() => onEdit(stat.id)}
                     disabled={isSaving}
                     aria-label={`Edit ${stat.name}`}
                   >
@@ -105,10 +98,7 @@ export function StatList({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setDeleteTarget(stat);
-                    }}
+                    onClick={() => setDeleteTarget(stat)}
                     disabled={isSaving}
                     className="text-destructive hover:text-destructive"
                     aria-label={`Delete ${stat.name}`}
