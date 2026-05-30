@@ -111,18 +111,18 @@ export function ScriptReferencePanel({
                   </p>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {sortedCharacters.map((character) => (
                     <div
                       key={character.id}
-                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors group"
+                      className="flex items-center gap-2 p-1.5 rounded-md hover:bg-muted transition-colors group"
                     >
                       {/* Avatar: image or colored circle */}
                       {character.avatarUrl ? (
                         <img
                           src={character.avatarUrl}
                           alt={character.displayName}
-                          className="size-8 rounded-full shrink-0 object-cover"
+                          className="size-6 rounded-full shrink-0 object-cover"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
                             target.style.display = "none";
@@ -130,7 +130,7 @@ export function ScriptReferencePanel({
                         />
                       ) : (
                         <div
-                          className="size-8 rounded-full flex items-center justify-center text-white text-xs font-medium shrink-0 shadow-sm"
+                          className="size-6 rounded-full flex items-center justify-center text-white text-[10px] font-medium shrink-0 shadow-sm"
                           style={{
                             backgroundColor:
                               character.color ?? "var(--theme-color)",
@@ -145,14 +145,14 @@ export function ScriptReferencePanel({
                         <p className="text-xs font-medium truncate">
                           {character.displayName}
                         </p>
-                        <span className="font-mono text-xs text-muted-foreground">
+                        <span className="font-mono text-[10px] text-foreground/70 font-semibold">
                           {character.renpyTag}
                         </span>
                       </div>
 
                       {/* Love interest indicator */}
                       {character.isLoveInterest && (
-                        <Heart className="size-3 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
+                        <Heart className="size-2.5 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
                       )}
                     </div>
                   ))}
