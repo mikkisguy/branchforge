@@ -220,24 +220,24 @@ describe("CharacterDialog", () => {
       );
 
       // Click edit button for Eileen
-      const editButtons = screen.getAllByRole("button", { name: /edit/i });
-      await user.click(editButtons[0]);
+      const editButton = screen.getByRole("button", { name: /edit eileen/i });
+      await user.click(editButton);
 
       // CharacterEditDialog should render with "Edit Character" title
       expect(
-        screen.getByRole("heading", { name: "Edit Character" })
+        await screen.findByRole("heading", { name: "Edit Character" })
       ).toBeInTheDocument();
 
       // Character's name should be pre-filled
-      const nameInput = screen.getByLabelText("Name *");
+      const nameInput = await screen.findByLabelText("Name *");
       expect(nameInput).toHaveValue("Eileen");
 
       // Character's display name should be pre-filled
-      const displayNameInput = screen.getByLabelText("Display Name *");
+      const displayNameInput = await screen.findByLabelText("Display Name *");
       expect(displayNameInput).toHaveValue("Eileen");
 
       // Character's renpyTag should be pre-filled
-      const tagInput = screen.getByLabelText("Ren'Py Tag *");
+      const tagInput = await screen.findByLabelText("Ren'Py Tag *");
       expect(tagInput).toHaveValue("a");
     });
   });
