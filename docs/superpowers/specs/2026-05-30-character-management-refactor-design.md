@@ -244,7 +244,8 @@ CharacterEditDialog avatar flow:
 
 1. ScriptReferencePanel: add onCharacterEdit prop, make cards clickable
 2. LabelPropertiesPanel: add onCharacterEdit prop, make cards clickable
-3. Update parent components to manage edit dialog state and render CharacterEditDialog
+3. ScriptModeEditorLayout: add state management and CharacterEditDialog rendering
+4. WriteMode: add state management and CharacterEditDialog rendering
 
 ### Phase 4: Cleanup
 

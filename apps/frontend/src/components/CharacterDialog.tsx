@@ -38,9 +38,9 @@ export function CharacterDialog({
     deleteCharacter,
   } = useCharacters(projectId);
 
-  const [editingCharacterId, setEditingCharacterId] = useState<
-    string | undefined
-  >(undefined);
+  const [editingCharacterId, setEditingCharacterId] = useState<string | null>(
+    null
+  );
 
   const isSaving =
     isCreatingCharacter ||
@@ -101,7 +101,7 @@ export function CharacterDialog({
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setEditingCharacterId(undefined)}
+                    onClick={() => setEditingCharacterId("__new__")}
                   >
                     <Plus className="size-4 mr-2" />
                     Add Character
@@ -118,7 +118,7 @@ export function CharacterDialog({
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setEditingCharacterId(undefined)}
+                    onClick={() => setEditingCharacterId("__new__")}
                     disabled={isSaving}
                     className="w-full"
                   >
@@ -140,12 +140,16 @@ export function CharacterDialog({
       </Dialog>
 
       <CharacterEditDialog
-        open={editingCharacterId !== undefined}
+        open={editingCharacterId !== null}
         onOpenChange={(open) => {
-          if (!open) setEditingCharacterId(undefined);
+          if (!open) setEditingCharacterId(null);
         }}
         projectId={projectId}
-        characterId={editingCharacterId}
+        characterId={
+          editingCharacterId === "__new__"
+            ? undefined
+            : (editingCharacterId ?? undefined)
+        }
       />
     </>
   );
