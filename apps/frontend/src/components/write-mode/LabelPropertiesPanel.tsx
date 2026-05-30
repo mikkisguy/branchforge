@@ -36,6 +36,7 @@ interface LabelPropertiesPanelProps {
   isCollapsed: boolean;
   onCollapseToggle?: () => void;
   onEdit: () => void;
+  onCharacterEdit?: (characterId: string) => void;
 }
 
 export function LabelPropertiesPanel({
@@ -46,6 +47,7 @@ export function LabelPropertiesPanel({
   isCollapsed,
   onCollapseToggle,
   onEdit,
+  onCharacterEdit,
 }: LabelPropertiesPanelProps) {
   const labelCharacters = useMemo(
     () => activeLabel?.characters ?? [],
@@ -141,9 +143,11 @@ export function LabelPropertiesPanel({
                 {resolvedLabelChars.length > 0 ? (
                   <div className="space-y-2">
                     {resolvedLabelChars.map((char) => (
-                      <div
+                      <button
                         key={char.id}
-                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors group"
+                        type="button"
+                        onClick={() => onCharacterEdit?.(char.id)}
+                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors group w-full text-left cursor-pointer"
                       >
                         <div
                           className="size-10 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0 shadow-sm"
@@ -164,7 +168,7 @@ export function LabelPropertiesPanel({
                         {char.isLoveInterest && (
                           <Heart className="size-4 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
                         )}
-                      </div>
+                      </button>
                     ))}
                   </div>
                 ) : characters.length === 0 ? (
