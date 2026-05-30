@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { Sparkles, X, ChevronRight, ChevronLeft } from "lucide-react";
 import { cva } from "class-variance-authority";
 import { ScriptReferencePanel, ScriptEditor } from "@/components/script-mode";
@@ -10,6 +10,7 @@ import {
   UndoRedoControls,
 } from "@/components/ide-shared";
 import { Button } from "@/components/ui/button";
+import { CharacterEditDialog } from "@/components/CharacterEditDialog";
 import type { LabelDetail } from "@branchforge/shared";
 import type { Character } from "@branchforge/shared";
 import type { ScriptEditorRef } from "@/components/script-mode/ScriptEditor";
@@ -114,6 +115,9 @@ export function ScriptModeEditorLayout({
   labelTitles,
 }: ScriptModeEditorLayoutProps) {
   const { isFocusMode, focusToggleRef } = focusModeState;
+  const [editingCharacterId, setEditingCharacterId] = useState<string | null>(
+    null
+  );
 
   const toggleRightSidebar = useCallback(
     () => setIsRightSidebarCollapsed((previous) => !previous),
@@ -276,8 +280,18 @@ export function ScriptModeEditorLayout({
           projectCharacters={projectCharacters}
           isCollapsed={isRightSidebarCollapsed || isFocusMode}
           onCollapseToggle={!isFocusMode ? toggleRightSidebar : undefined}
+          onCharacterEdit={setEditingCharacterId}
         />
       </div>
+
+      <CharacterEditDialog
+        open={editingCharacterId !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditingCharacterId(null);
+        }}
+        projectId={projectId ?? ""}
+        characterId={editingCharacterId ?? undefined}
+      />
     </>
   );
 }
