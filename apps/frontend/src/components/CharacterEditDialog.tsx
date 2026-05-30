@@ -431,7 +431,7 @@ export function CharacterEditDialog({
                 placeholder="a"
                 value={form.renpyTag}
                 onChange={(e) => handleFieldChange("renpyTag", e.target.value)}
-                disabled={isSaving}
+                disabled={isSaving || isEditMode}
               />
               <p className="text-xs text-muted-foreground">
                 Unique identifier (e.g., "a", "lucas")

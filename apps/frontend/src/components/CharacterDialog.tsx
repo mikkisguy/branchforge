@@ -65,7 +65,13 @@ export function CharacterDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog
+        open={open}
+        onOpenChange={(open) => {
+          if (!open) setEditingCharacterId(null);
+          onOpenChange(open);
+        }}
+      >
         <DialogContent className="max-w-3xl w-full max-h-[90vh] p-0 gap-0 flex flex-col">
           {/* Header */}
           <div className="p-6 border-b border-border/30 flex items-start justify-between">

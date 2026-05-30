@@ -202,6 +202,46 @@ describe("CharacterDialog", () => {
     });
   });
 
+  describe("Edit Character", () => {
+    it("should open CharacterEditDialog in edit mode with character data pre-filled", async () => {
+      const user = userEvent.setup({ delay: null });
+      vi.mocked(useCharacters).mockReturnValue({
+        ...mockUseCharactersDefault,
+        characters: mockCharacters,
+      });
+
+      render(
+        <CharacterDialog
+          open={true}
+          onOpenChange={onOpenChange}
+          projectId={projectId}
+        />,
+        { wrapper }
+      );
+
+      // Click edit button for Eileen
+      const editButtons = screen.getAllByRole("button", { name: /edit/i });
+      await user.click(editButtons[0]);
+
+      // CharacterEditDialog should render with "Edit Character" title
+      expect(
+        screen.getByRole("heading", { name: "Edit Character" })
+      ).toBeInTheDocument();
+
+      // Character's name should be pre-filled
+      const nameInput = screen.getByLabelText("Name *");
+      expect(nameInput).toHaveValue("Eileen");
+
+      // Character's display name should be pre-filled
+      const displayNameInput = screen.getByLabelText("Display Name *");
+      expect(displayNameInput).toHaveValue("Eileen");
+
+      // Character's renpyTag should be pre-filled
+      const tagInput = screen.getByLabelText("Ren'Py Tag *");
+      expect(tagInput).toHaveValue("a");
+    });
+  });
+
   describe("Dialog Controls", () => {
     it("should close dialog when clicking footer close button", async () => {
       const user = userEvent.setup({ delay: null });

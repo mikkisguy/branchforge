@@ -84,6 +84,7 @@ export function CharacterList({
               size="sm"
               onClick={() => onEdit(character.id)}
               disabled={isSaving}
+              aria-label={`Edit ${character.displayName || character.name || "character"}`}
             >
               <Pencil className="size-4" />
             </Button>
@@ -94,6 +95,7 @@ export function CharacterList({
               onClick={() => onDelete(character.id)}
               disabled={isSaving}
               className="text-destructive hover:text-destructive"
+              aria-label={`Delete ${character.displayName || character.name || "character"}`}
             >
               <Trash2 className="size-4" />
             </Button>

@@ -146,34 +146,49 @@ export function LabelPropertiesPanel({
                       In Label
                     </h3>
                     <div className="space-y-2">
-                      {resolvedLabelChars.map((char) => (
-                        <button
-                          key={char.id}
-                          type="button"
-                          onClick={() => onCharacterEdit?.(char.id)}
-                          className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors group w-full text-left cursor-pointer"
-                        >
-                          <div
-                            className="size-10 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0 shadow-sm"
-                            style={{ backgroundColor: char.color }}
-                          >
-                            {char.displayName[0] || "?"}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium truncate">
-                              {char.displayName}
-                            </p>
-                            {char.dialogueStyle && (
-                              <p className="text-xs text-muted-foreground truncate italic">
-                                "{char.dialogueStyle}"
+                      {resolvedLabelChars.map((char) => {
+                        const content = (
+                          <>
+                            <div
+                              className="size-10 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0 shadow-sm"
+                              style={{ backgroundColor: char.color }}
+                            >
+                              {char.displayName[0] || "?"}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate">
+                                {char.displayName}
                               </p>
+                              {char.dialogueStyle && (
+                                <p className="text-xs text-muted-foreground truncate italic">
+                                  "{char.dialogueStyle}"
+                                </p>
+                              )}
+                            </div>
+                            {char.isLoveInterest && (
+                              <Heart className="size-4 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
                             )}
+                          </>
+                        );
+
+                        return onCharacterEdit ? (
+                          <button
+                            key={char.id}
+                            type="button"
+                            onClick={() => onCharacterEdit(char.id)}
+                            className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors group w-full text-left cursor-pointer"
+                          >
+                            {content}
+                          </button>
+                        ) : (
+                          <div
+                            key={char.id}
+                            className="flex items-center gap-3 p-2 rounded-lg w-full text-left"
+                          >
+                            {content}
                           </div>
-                          {char.isLoveInterest && (
-                            <Heart className="size-4 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
-                          )}
-                        </button>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 ) : characters.length === 0 ? (
