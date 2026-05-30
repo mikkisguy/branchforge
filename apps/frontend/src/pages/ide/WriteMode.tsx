@@ -15,6 +15,7 @@ import {
 import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
 import { LabelEditDialog } from "@/components/write-mode/LabelEditDialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { CharacterEditDialog } from "@/components/CharacterEditDialog";
 import { ChevronRight, FileText, Loader2 } from "lucide-react";
 import { EditorTabBar } from "@/components/ide-shared";
 import { Button } from "@/components/ui/button";
@@ -95,6 +96,10 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
     open: boolean;
     label: PublicLabel | null;
   }>({ open: false, label: null });
+
+  const [editingCharacterId, setEditingCharacterId] = useState<string | null>(
+    null
+  );
 
   const editorRef = useRef<{ focus: () => void } | null>(null);
 
@@ -403,6 +408,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
               : undefined
           }
           onEdit={handleEditFromPanel}
+          onCharacterEdit={setEditingCharacterId}
         />
 
         {/* Lifted Dialogs — portaled to body */}
@@ -446,6 +452,20 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
               confirmLabel="Delete"
               isLoading={isDeletingLabel}
               loadingLabel="Deleting..."
+            />,
+            document.body
+          )}
+
+        {/* Character Edit Dialog */}
+        {typeof window !== "undefined" &&
+          createPortal(
+            <CharacterEditDialog
+              open={editingCharacterId !== null}
+              onOpenChange={(open) => {
+                if (!open) setEditingCharacterId(null);
+              }}
+              projectId={currentProject.id}
+              characterId={editingCharacterId ?? undefined}
             />,
             document.body
           )}

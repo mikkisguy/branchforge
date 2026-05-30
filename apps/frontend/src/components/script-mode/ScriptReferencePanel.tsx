@@ -21,6 +21,7 @@ interface ScriptReferencePanelProps {
   projectCharacters: Character[];
   isCollapsed?: boolean;
   onCollapseToggle?: () => void;
+  onCharacterEdit?: (characterId: string) => void;
 }
 
 const panelVariants = cva(
@@ -40,6 +41,7 @@ export function ScriptReferencePanel({
   projectCharacters,
   isCollapsed = false,
   onCollapseToggle,
+  onCharacterEdit,
 }: ScriptReferencePanelProps) {
   const [variablesDialogOpen, setVariablesDialogOpen] = useState(false);
   const [statsDialogOpen, setStatsDialogOpen] = useState(false);
@@ -116,68 +118,85 @@ export function ScriptReferencePanel({
                 </div>
               ) : (
                 <div className="space-y-1">
-                  {sortedCharacters.map((character) => (
-                    <div
-                      key={character.id}
-                      className="flex items-center gap-2 p-1.5 rounded-md hover:bg-muted transition-colors group"
-                    >
-                      {/* Avatar: image or colored circle */}
-                      {character.avatarUrl ? (
-                        <>
-                          <img
-                            src={character.avatarUrl}
-                            alt={character.displayName}
-                            className={cn(
-                              "size-8 rounded-full shrink-0 object-cover",
-                              failedAvatars[character.id] && "hidden"
-                            )}
-                            onError={() => {
-                              setFailedAvatars((prev) => ({
-                                ...prev,
-                                [character.id]: true,
-                              }));
-                            }}
-                          />
-                          {failedAvatars[character.id] && (
-                            <div
-                              className="size-8 rounded-full flex items-center justify-center text-white text-[10px] font-medium shrink-0 shadow-sm"
-                              style={{
-                                backgroundColor:
-                                  character.color ?? "var(--theme-color)",
+                  {sortedCharacters.map((character) => {
+                    const characterNode = (
+                      <>
+                        {/* Avatar: image or colored circle */}
+                        {character.avatarUrl ? (
+                          <>
+                            <img
+                              src={character.avatarUrl}
+                              alt={character.displayName}
+                              className={cn(
+                                "size-8 rounded-full shrink-0 object-cover",
+                                failedAvatars[character.id] && "hidden"
+                              )}
+                              onError={() => {
+                                setFailedAvatars((prev) => ({
+                                  ...prev,
+                                  [character.id]: true,
+                                }));
                               }}
-                            >
-                              {character.displayName[0] || "?"}
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <div
-                          className="size-8 rounded-full flex items-center justify-center text-white text-[10px] font-medium shrink-0 shadow-sm"
-                          style={{
-                            backgroundColor:
-                              character.color ?? "var(--theme-color)",
-                          }}
-                        >
-                          {character.displayName[0] || "?"}
+                            />
+                            {failedAvatars[character.id] && (
+                              <div
+                                className="size-8 rounded-full flex items-center justify-center text-white text-[10px] font-medium shrink-0 shadow-sm"
+                                style={{
+                                  backgroundColor:
+                                    character.color ?? "var(--theme-color)",
+                                }}
+                              >
+                                {character.displayName[0] || "?"}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div
+                            className="size-8 rounded-full flex items-center justify-center text-white text-[10px] font-medium shrink-0 shadow-sm"
+                            style={{
+                              backgroundColor:
+                                character.color ?? "var(--theme-color)",
+                            }}
+                          >
+                            {character.displayName[0] || "?"}
+                          </div>
+                        )}
+
+                        {/* Name and tag */}
+                        <div className="min-w-0 flex-1 ml-1.5">
+                          <p className="text-xs font-medium truncate">
+                            {character.displayName}
+                          </p>
+                          <span className="font-mono text-[10px] text-foreground/70 font-semibold">
+                            {character.renpyTag}
+                          </span>
                         </div>
-                      )}
 
-                      {/* Name and tag */}
-                      <div className="min-w-0 flex-1 ml-1.5">
-                        <p className="text-xs font-medium truncate">
-                          {character.displayName}
-                        </p>
-                        <span className="font-mono text-[10px] text-foreground/70 font-semibold">
-                          {character.renpyTag}
-                        </span>
+                        {/* Love interest indicator */}
+                        {character.isLoveInterest && (
+                          <Heart className="size-2.5 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
+                        )}
+                      </>
+                    );
+
+                    return onCharacterEdit ? (
+                      <button
+                        key={character.id}
+                        type="button"
+                        onClick={() => onCharacterEdit(character.id)}
+                        className="flex items-center gap-2 p-1.5 rounded-md hover:bg-muted transition-colors group cursor-pointer w-full text-left"
+                      >
+                        {characterNode}
+                      </button>
+                    ) : (
+                      <div
+                        key={character.id}
+                        className="flex items-center gap-2 p-1.5 rounded-md w-full text-left"
+                      >
+                        {characterNode}
                       </div>
-
-                      {/* Love interest indicator */}
-                      {character.isLoveInterest && (
-                        <Heart className="size-2.5 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CollapsibleSection>
