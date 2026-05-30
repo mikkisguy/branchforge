@@ -1,19 +1,18 @@
 /**
  * CharacterDialog Component Tests
  *
- * Tests for the CharacterDialog component which manages character CRUD operations.
+ * Tests for the CharacterDialog refactored to use CharacterList + CharacterEditDialog.
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { CharacterDialog } from "../CharacterDialog";
-import { charactersApi } from "@/lib/api/characters";
 import type { Character } from "@branchforge/shared";
 import { createTestQueryClient } from "@/test/query-client";
 
-// Mock the toast context with persistent mock functions
+// Mock the toast context
 export const mockToastSuccess = vi.fn();
 export const mockToastError = vi.fn();
 
@@ -24,16 +23,12 @@ vi.mock("@/contexts/ToastContext", () => ({
   }),
 }));
 
-// Mock the characters API
-vi.mock("@/lib/api/characters", () => ({
-  charactersApi: {
-    listCharacters: vi.fn(),
-    getCharacter: vi.fn(),
-    createCharacter: vi.fn(),
-    updateCharacter: vi.fn(),
-    deleteCharacter: vi.fn(),
-  },
+// Mock the useCharacters hook
+vi.mock("@/hooks/useCharacters", () => ({
+  useCharacters: vi.fn(),
 }));
+
+import { useCharacters } from "@/hooks/useCharacters";
 
 const mockCharacters: Character[] = [
   {
@@ -68,6 +63,23 @@ const mockCharacters: Character[] = [
   },
 ];
 
+const mockUseCharactersDefault = {
+  characters: [] as Character[],
+  isLoadingCharacters: false,
+  charactersError: null,
+  isCreatingCharacter: false,
+  isUpdatingCharacter: false,
+  isDeletingCharacter: false,
+  isUploadingAvatar: false,
+  isDeletingAvatar: false,
+  createCharacter: vi.fn(),
+  updateCharacter: vi.fn(),
+  deleteCharacter: vi.fn(),
+  uploadAvatar: vi.fn(),
+  deleteAvatar: vi.fn(),
+  refreshCharacters: vi.fn(),
+};
+
 describe("CharacterDialog", () => {
   let queryClient: QueryClient;
   const projectId = "test-project-id";
@@ -82,13 +94,15 @@ describe("CharacterDialog", () => {
     vi.clearAllMocks();
     mockToastSuccess.mockClear();
     mockToastError.mockClear();
+    vi.mocked(useCharacters).mockReturnValue(mockUseCharactersDefault);
   });
 
   describe("Rendering", () => {
     it("should show loading state", () => {
-      vi.mocked(charactersApi.listCharacters).mockImplementation(
-        () => new Promise(() => {}) // Never resolves
-      );
+      vi.mocked(useCharacters).mockReturnValue({
+        ...mockUseCharactersDefault,
+        isLoadingCharacters: true,
+      });
 
       render(
         <CharacterDialog
@@ -102,10 +116,11 @@ describe("CharacterDialog", () => {
       expect(screen.getByRole("status")).toBeInTheDocument();
     });
 
-    it("should show error state", async () => {
-      vi.mocked(charactersApi.listCharacters).mockRejectedValue(
-        new Error("Failed to fetch")
-      );
+    it("should show error state", () => {
+      vi.mocked(useCharacters).mockReturnValue({
+        ...mockUseCharactersDefault,
+        charactersError: new Error("Failed to fetch"),
+      });
 
       render(
         <CharacterDialog
@@ -116,15 +131,16 @@ describe("CharacterDialog", () => {
         { wrapper }
       );
 
-      await waitFor(() => {
-        expect(
-          screen.getByText(/failed to load characters/i)
-        ).toBeInTheDocument();
-      });
+      expect(
+        screen.getByText(/failed to load characters/i)
+      ).toBeInTheDocument();
     });
 
-    it("should show empty state when no characters", async () => {
-      vi.mocked(charactersApi.listCharacters).mockResolvedValue([]);
+    it("should show empty state when no characters", () => {
+      vi.mocked(useCharacters).mockReturnValue({
+        ...mockUseCharactersDefault,
+        characters: [],
+      });
 
       render(
         <CharacterDialog
@@ -135,15 +151,16 @@ describe("CharacterDialog", () => {
         { wrapper }
       );
 
-      await waitFor(() => {
-        expect(
-          screen.getByText(/no characters configured yet/i)
-        ).toBeInTheDocument();
-      });
+      expect(
+        screen.getByText(/no characters configured yet/i)
+      ).toBeInTheDocument();
     });
 
-    it("should display characters in list view", async () => {
-      vi.mocked(charactersApi.listCharacters).mockResolvedValue(mockCharacters);
+    it("should display characters in list view", () => {
+      vi.mocked(useCharacters).mockReturnValue({
+        ...mockUseCharactersDefault,
+        characters: mockCharacters,
+      });
 
       render(
         <CharacterDialog
@@ -154,17 +171,18 @@ describe("CharacterDialog", () => {
         { wrapper }
       );
 
-      await waitFor(() => {
-        expect(screen.getByText("Eileen")).toBeInTheDocument();
-        expect(screen.getByText("Lucas")).toBeInTheDocument();
-      });
+      expect(screen.getByText("Eileen")).toBeInTheDocument();
+      expect(screen.getByText("Lucas")).toBeInTheDocument();
     });
   });
 
   describe("Add Character", () => {
-    it("should open add form when clicking add button", async () => {
+    it("should open CharacterEditDialog when clicking add button", async () => {
       const user = userEvent.setup({ delay: null });
-      vi.mocked(charactersApi.listCharacters).mockResolvedValue([]);
+      vi.mocked(useCharacters).mockReturnValue({
+        ...mockUseCharactersDefault,
+        characters: [],
+      });
 
       render(
         <CharacterDialog
@@ -175,21 +193,22 @@ describe("CharacterDialog", () => {
         { wrapper }
       );
 
-      await waitFor(() => {
-        expect(screen.getByText(/add character/i)).toBeInTheDocument();
-      });
+      await user.click(screen.getByRole("button", { name: /add character/i }));
 
-      await user.click(screen.getByText(/add character/i));
-
-      // Check for the Ren'Py Tag field which is unique to the edit form
-      expect(screen.getByText(/Ren'Py Tag \*/i)).toBeInTheDocument();
+      // CharacterEditDialog should render with "Add Character" title as a heading
+      expect(
+        screen.getByRole("heading", { name: "Add Character" })
+      ).toBeInTheDocument();
     });
   });
 
   describe("Dialog Controls", () => {
     it("should close dialog when clicking footer close button", async () => {
       const user = userEvent.setup({ delay: null });
-      vi.mocked(charactersApi.listCharacters).mockResolvedValue([]);
+      vi.mocked(useCharacters).mockReturnValue({
+        ...mockUseCharactersDefault,
+        characters: [],
+      });
 
       render(
         <CharacterDialog
@@ -199,12 +218,6 @@ describe("CharacterDialog", () => {
         />,
         { wrapper }
       );
-
-      await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /Close/i })
-        ).toBeInTheDocument();
-      });
 
       await user.click(screen.getByRole("button", { name: /Close/i }));
 
