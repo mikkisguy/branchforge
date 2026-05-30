@@ -257,10 +257,6 @@ export function ScriptMode({
 
   const { characters: projectCharacters } = useCharacters(projectId ?? "");
 
-  const sceneCharacters = useMemo(() => {
-    return activeLabel?.characters ?? [];
-  }, [activeLabel]);
-
   const activeFileContent =
     activeProjectFile && currentEditFileId === activeProjectFile.id
       ? editedFileContent
@@ -385,7 +381,6 @@ export function ScriptMode({
         scrollToLine={scrollToLine}
         initialExpandedFolders={initialExpandedFolders}
         tabItems={tabItems}
-        sceneCharacters={sceneCharacters}
         projectCharacters={projectCharacters}
         isLeftSidebarCollapsed={isLeftSidebarCollapsed}
         setIsLeftSidebarCollapsed={setIsLeftSidebarCollapsed}
