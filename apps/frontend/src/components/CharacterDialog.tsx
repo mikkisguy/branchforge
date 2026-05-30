@@ -21,6 +21,14 @@ interface CharacterDialogProps {
   projectId: string;
 }
 
+// Special mode ID for creating a new character.
+// EditMode uses a three-state pattern:
+// - null: Not editing any character
+// - MODE_NEW ("__new__"): Creating a new character (undefined characterId in edit dialog)
+// - string (actual ID): Editing existing character
+const MODE_NEW = "__new__" as const;
+type EditMode = null | typeof MODE_NEW | string;
+
 export function CharacterDialog({
   open,
   onOpenChange,
@@ -38,9 +46,7 @@ export function CharacterDialog({
     deleteCharacter,
   } = useCharacters(projectId);
 
-  const [editingCharacterId, setEditingCharacterId] = useState<string | null>(
-    null
-  );
+  const [editingCharacterId, setEditingCharacterId] = useState<EditMode>(null);
 
   const isSaving =
     isCreatingCharacter ||
@@ -94,18 +100,10 @@ export function CharacterDialog({
                 </InlineMessage>
               ) : characters.length === 0 ? (
                 <div className="p-8 border border-dashed border-border/30 rounded-md text-center">
-                  <p className="text-sm text-muted-foreground mb-4">
+                  <p className="text-sm text-muted-foreground">
                     No characters configured yet. Add your first character to
                     get started.
                   </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setEditingCharacterId("__new__")}
-                  >
-                    <Plus className="size-4 mr-2" />
-                    Add Character
-                  </Button>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -118,7 +116,7 @@ export function CharacterDialog({
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setEditingCharacterId("__new__")}
+                    onClick={() => setEditingCharacterId(MODE_NEW)}
                     disabled={isSaving}
                     className="w-full"
                   >
@@ -131,9 +129,17 @@ export function CharacterDialog({
           </div>
 
           {/* Footer */}
-          <div className="p-6 border-t border-border/30 flex justify-end">
+          <div className="p-6 border-t border-border/30 flex justify-between">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Close
+            </Button>
+            <Button
+              type="button"
+              onClick={() => setEditingCharacterId(MODE_NEW)}
+              disabled={isSaving}
+            >
+              <Plus className="size-4 mr-2" />
+              Add Character
             </Button>
           </div>
         </DialogContent>
@@ -146,9 +152,9 @@ export function CharacterDialog({
         }}
         projectId={projectId}
         characterId={
-          editingCharacterId === "__new__"
+          editingCharacterId === MODE_NEW
             ? undefined
-            : (editingCharacterId ?? undefined)
+            : (editingCharacterId as string | undefined)
         }
       />
     </>
