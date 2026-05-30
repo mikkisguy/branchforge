@@ -52,7 +52,6 @@ interface ScriptModeEditorLayoutProps {
   scrollToLine: number | null;
   initialExpandedFolders: string[];
   tabItems: EditorTabBarItem[];
-  sceneCharacters: LabelDetail["characters"];
   projectCharacters: Character[];
   isLeftSidebarCollapsed: boolean;
   setIsLeftSidebarCollapsed: Dispatch<SetStateAction<boolean>>;
@@ -90,7 +89,6 @@ export function ScriptModeEditorLayout({
   scrollToLine,
   initialExpandedFolders,
   tabItems,
-  sceneCharacters,
   projectCharacters,
   isLeftSidebarCollapsed,
   setIsLeftSidebarCollapsed,
@@ -275,7 +273,6 @@ export function ScriptModeEditorLayout({
 
         <ScriptReferencePanel
           projectId={projectId ?? ""}
-          sceneCharacters={sceneCharacters}
           projectCharacters={projectCharacters}
           isCollapsed={isRightSidebarCollapsed || isFocusMode}
           onCollapseToggle={!isFocusMode ? toggleRightSidebar : undefined}
