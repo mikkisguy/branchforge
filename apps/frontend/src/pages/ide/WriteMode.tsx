@@ -14,8 +14,6 @@ import {
 } from "@/components/write-mode";
 import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
 import { LabelEditDialog } from "@/components/write-mode/LabelEditDialog";
-import { VariablesModal } from "@/components/ide-shared/VariablesModal";
-import { StatsDialog } from "@/components/StatsDialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ChevronRight, FileText, Loader2 } from "lucide-react";
 import { EditorTabBar } from "@/components/ide-shared";
@@ -28,7 +26,6 @@ import { useToast } from "@/contexts/ToastContext";
 import { cva } from "class-variance-authority";
 import { useLocalStorageBoolean } from "@/hooks/useLocalStorage";
 import { useStats } from "@/hooks/useStats";
-import { useVariables } from "@/hooks/useVariables";
 import {
   useWriteAutosave,
   getPersistedDialogueFromLabel,
@@ -82,7 +79,6 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
   const { characters } = useCharacters(currentProject?.id ?? "");
   const { routeConfigs } = useRouteConfigs(currentProject?.id ?? "");
   const { stats } = useStats(currentProject?.id ?? "");
-  const { variables } = useVariables(currentProject?.id ?? "");
 
   const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] =
     useLocalStorageBoolean("write:left-sidebar-collapsed", false);
@@ -99,9 +95,6 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
     open: boolean;
     label: PublicLabel | null;
   }>({ open: false, label: null });
-
-  const [stateVariablesModalOpen, setStateVariablesModalOpen] = useState(false);
-  const [statsModalOpen, setStatsModalOpen] = useState(false);
 
   const editorRef = useRef<{ focus: () => void } | null>(null);
 
@@ -207,10 +200,6 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
       route?: string | null;
       status?: "DRAFT" | "REVIEW" | "FINAL";
       visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
-      conditions?: {
-        stats?: Record<string, number>;
-        variables?: string[];
-      } | null;
     }) => {
       if (editDialog.label) {
         await updateLabel(editDialog.label.id, data);
@@ -431,18 +420,13 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
                 currentRoute={editDialog.label.routeKey}
                 currentStatus={editDialog.label.status}
                 currentVisibility={editDialog.label.visibility}
-                currentConditions={editDialog.label.conditions ?? null}
                 routeConfigs={routeConfigs.map((rc) => ({
                   id: rc.id,
                   routeKey: rc.routeKey,
                   routeName: rc.routeName,
                 }))}
-                stats={stats}
-                variables={variables}
                 onSave={handleEditSave}
                 isSaving={isUpdatingLabel}
-                onOpenStateVariables={() => setStateVariablesModalOpen(true)}
-                onOpenStats={() => setStatsModalOpen(true)}
               />
             ),
             document.body
@@ -462,28 +446,6 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
               confirmLabel="Delete"
               isLoading={isDeletingLabel}
               loadingLabel="Deleting..."
-            />,
-            document.body
-          )}
-
-        {/* Variables Management Modal */}
-        {typeof window !== "undefined" &&
-          createPortal(
-            <VariablesModal
-              open={stateVariablesModalOpen}
-              onOpenChange={setStateVariablesModalOpen}
-              projectId={currentProject!.id}
-            />,
-            document.body
-          )}
-
-        {/* Stats Management Modal */}
-        {typeof window !== "undefined" &&
-          createPortal(
-            <StatsDialog
-              open={statsModalOpen}
-              onOpenChange={setStatsModalOpen}
-              projectId={currentProject!.id}
             />,
             document.body
           )}

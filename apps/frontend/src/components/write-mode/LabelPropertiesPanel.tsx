@@ -1,12 +1,7 @@
-import { useMemo, useState } from "react";
-import {
-  Heart,
-  ChevronRight,
-  ChevronLeft,
-  ChevronDown,
-  Pencil,
-} from "lucide-react";
+import { useMemo } from "react";
+import { Heart, ChevronRight, ChevronLeft, Pencil } from "lucide-react";
 import { CharacterAvatarChip } from "@/components/ui/CharacterAvatarChip";
+import { CollapsibleSection } from "@/components/ide-shared/CollapsibleSection";
 import type {
   Character,
   LabelDetail,
@@ -32,33 +27,6 @@ const STATUS_COLORS = {
   REVIEW: "var(--theme-review-color)",
   DRAFT: "var(--theme-draft-color)",
 } as const;
-
-function CollapsibleSection({
-  title,
-  defaultOpen = false,
-  children,
-}: {
-  title: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-  return (
-    <div className="border-b border-border/40 last:border-b-0">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:bg-muted/30 transition-colors"
-      >
-        {title}
-        <ChevronDown
-          className={`size-3.5 transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`}
-        />
-      </button>
-      {isOpen && <div className="px-3 pb-3">{children}</div>}
-    </div>
-  );
-}
 
 interface LabelPropertiesPanelProps {
   activeLabel: LabelDetail | undefined;
@@ -293,9 +261,11 @@ export function LabelPropertiesPanel({
                 </div>
               </CollapsibleSection>
 
-              <CollapsibleSection title="Conditions" defaultOpen={false}>
+              <CollapsibleSection title="Access Conditions" defaultOpen={false}>
                 {!activeLabel.conditions ? (
-                  <p className="text-xs text-muted-foreground">No conditions</p>
+                  <p className="text-xs text-muted-foreground">
+                    No access conditions
+                  </p>
                 ) : (
                   <div className="space-y-3 text-xs">
                     <div>
@@ -345,7 +315,7 @@ export function LabelPropertiesPanel({
                 )}
               </CollapsibleSection>
 
-              <CollapsibleSection title="Jumps" defaultOpen={false}>
+              <CollapsibleSection title="Outgoing Jump" defaultOpen={false}>
                 {routeConfig ? (
                   <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/80 border border-border/50 text-xs font-mono text-foreground">
                     {routeConfig.jumpPrefix}
@@ -353,7 +323,7 @@ export function LabelPropertiesPanel({
                   </span>
                 ) : (
                   <span className="text-xs text-muted-foreground">
-                    Shared label (no jump)
+                    Shared label (no outgoing jump)
                   </span>
                 )}
               </CollapsibleSection>

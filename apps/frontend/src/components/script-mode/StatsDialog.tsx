@@ -10,8 +10,8 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { StatsContent } from "./StatsContent";
-import { StatProgression } from "./StatProgression";
+import { StatsContent } from "@/components/StatsContent";
+import { StatProgression } from "@/components/StatProgression";
 import { useStats } from "@/hooks/useStats";
 
 interface StatsDialogProps {

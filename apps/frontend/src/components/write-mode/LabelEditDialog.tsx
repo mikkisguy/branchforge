@@ -1,5 +1,5 @@
-import { useEffect, useReducer, useState, useRef } from "react";
-import { Loader2, Plus, X } from "lucide-react";
+import { useEffect, useReducer, useState } from "react";
+import { Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -8,7 +8,6 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import type { Stat, Variable } from "@branchforge/shared";
 
 interface LabelEditDialogProps {
   /** Whether the dialog is open */
@@ -25,17 +24,8 @@ interface LabelEditDialogProps {
   currentStatus: "DRAFT" | "REVIEW" | "FINAL" | null;
   /** Current visibility */
   currentVisibility: "EXCLUSIVE" | "SHARED" | "DUO_PAIR" | null;
-  /** Current conditions from the active label */
-  currentConditions: {
-    stats?: Record<string, number>;
-    variables?: string[];
-  } | null;
   /** Available route configs from the project */
   routeConfigs: Array<{ id: string; routeKey: string; routeName: string }>;
-  /** All project stats (for the stat dropdown) */
-  stats: Stat[];
-  /** All project variables (for the variable picker) */
-  variables: Variable[];
   /** Called when save is clicked */
   onSave: (data: {
     title?: string;
@@ -43,17 +33,9 @@ interface LabelEditDialogProps {
     route?: string | null;
     status?: "DRAFT" | "REVIEW" | "FINAL";
     visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
-    conditions?: {
-      stats?: Record<string, number>;
-      variables?: string[];
-    } | null;
   }) => Promise<void>;
   /** Whether save is in progress */
   isSaving: boolean;
-  /** Callback to open the variables management modal */
-  onOpenStateVariables: () => void;
-  /** Callback to open the stats management modal */
-  onOpenStats: () => void;
 }
 
 type FormState = {
@@ -128,14 +110,9 @@ export function LabelEditDialog({
   currentRoute,
   currentStatus,
   currentVisibility,
-  currentConditions,
   routeConfigs,
-  stats,
-  variables,
   onSave,
   isSaving,
-  onOpenStateVariables,
-  onOpenStats,
 }: LabelEditDialogProps) {
   const [form, dispatch] = useReducer(formReducer, {
     title: "",
@@ -147,22 +124,13 @@ export function LabelEditDialog({
     labelNameError: "",
   });
 
-  // Conditions local state
-  const [selectedVariables, setSelectedVariables] = useState<string[]>([]);
-  const [statConditions, setStatConditions] = useState<Record<string, number>>(
-    {}
-  );
-  const [showVariablePicker, setShowVariablePicker] = useState(false);
-  const [showStatPicker, setShowStatPicker] = useState(false);
+  const [initializedForOpen, setInitializedForOpen] = useState(false);
 
-  // Track whether we've initialized for this open session
-  const initializationRef = useRef(false);
-
-  // Initialize form only when dialog transitions from closed to open
+  // Initialize form when dialog opens. Limited to [open] to prevent
+  // re-initialization while user is editing, even if props change.
   useEffect(() => {
-    if (open && !initializationRef.current) {
-      // Dialog just opened - initialize from props
-      initializationRef.current = true;
+    if (open && !initializedForOpen) {
+      setInitializedForOpen(true);
       dispatch({
         type: "RESET",
         title: currentTitle,
@@ -171,58 +139,13 @@ export function LabelEditDialog({
         status: currentStatus ?? "DRAFT",
         visibility: currentVisibility ?? "EXCLUSIVE",
       });
-      setSelectedVariables(currentConditions?.variables ?? []);
-      setStatConditions(currentConditions?.stats ?? {});
-      setShowVariablePicker(false);
-      setShowStatPicker(false);
     }
-    // Reset initialization flag when dialog closes
     if (!open) {
-      initializationRef.current = false;
+      setInitializedForOpen(false);
     }
   }, [open]);
 
-  // Derive available variables (not yet assigned)
-  const availableVariables = variables.filter(
-    (v) => !selectedVariables.includes(v.key)
-  );
-
-  // Derive available stats (not yet used as a condition)
-  const availableStats = stats.filter((m) => !(m.key in statConditions));
-
-  // Handlers for variables
-  const handleAddVariable = (key: string) => {
-    setSelectedVariables((prev) => [...prev, key]);
-    setShowVariablePicker(false);
-  };
-
-  const handleRemoveVariable = (key: string) => {
-    setSelectedVariables((prev) => prev.filter((k) => k !== key));
-  };
-
-  // Handlers for stat conditions
-  const handleAddStat = (key: string) => {
-    setStatConditions((prev) => ({ ...prev, [key]: 0 }));
-    setShowStatPicker(false);
-  };
-
-  const handleRemoveStat = (key: string) => {
-    setStatConditions((prev) => {
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
-  };
-
-  const handleStatThresholdChange = (key: string, value: string) => {
-    const num = parseFloat(value);
-    if (!isNaN(num)) {
-      setStatConditions((prev) => ({ ...prev, [key]: num }));
-    }
-  };
-
   const handleSave = async () => {
-    // Validate title
     if (!form.title.trim()) {
       dispatch({ type: "SET_TITLE_ERROR", value: "Title is required" });
       return;
@@ -240,7 +163,6 @@ export function LabelEditDialog({
 
     const trimmedLabelName = form.labelName.trim();
 
-    // Require a non-empty label name when the label is file-backed
     if (!trimmedLabelName && currentLabelName !== null) {
       dispatch({
         type: "SET_LABEL_NAME_ERROR",
@@ -249,7 +171,6 @@ export function LabelEditDialog({
       return;
     }
 
-    // Validate label name if provided
     if (
       trimmedLabelName &&
       !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(trimmedLabelName)
@@ -264,17 +185,12 @@ export function LabelEditDialog({
 
     dispatch({ type: "SET_LABEL_NAME_ERROR", value: "" });
 
-    // Only include changed fields
     const changes: {
       title?: string;
       labelName?: string;
       route?: string | null;
       status?: "DRAFT" | "REVIEW" | "FINAL";
       visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
-      conditions?: {
-        stats?: Record<string, number>;
-        variables?: string[];
-      } | null;
     } = {};
 
     if (form.title.trim() !== currentTitle) {
@@ -290,8 +206,6 @@ export function LabelEditDialog({
       changes.route = normalizedRoute;
     }
 
-    // Normalize null props to defaults for change detection, so filling
-    // in a runtime default doesn't count as a user change.
     if (form.status !== (currentStatus ?? "DRAFT")) {
       changes.status = form.status;
     }
@@ -300,46 +214,12 @@ export function LabelEditDialog({
       changes.visibility = form.visibility;
     }
 
-    // Check conditions changes
-    const initialVars = currentConditions?.variables ?? [];
-    const initialStats = currentConditions?.stats ?? {};
-    const varsChanged =
-      selectedVariables.length !== initialVars.length ||
-      selectedVariables.some((key, i) => key !== initialVars[i]);
-    const statsChanged =
-      Object.keys(statConditions).length !== Object.keys(initialStats).length ||
-      Object.entries(statConditions).some(
-        ([key, val]) => initialStats[key] !== val
-      );
-
-    if (varsChanged || statsChanged) {
-      changes.conditions = {
-        variables: selectedVariables.length > 0 ? selectedVariables : undefined,
-        stats:
-          Object.keys(statConditions).length > 0 ? statConditions : undefined,
-      };
-      // If both are empty, send null to clear conditions
-      if (
-        selectedVariables.length === 0 &&
-        Object.keys(statConditions).length === 0
-      ) {
-        changes.conditions = null;
-      }
-    }
-
-    // Skip saving when no fields actually changed.
     if (Object.keys(changes).length === 0) {
       onOpenChange(false);
       return;
     }
 
     await onSave(changes);
-  };
-
-  // Resolve a stat key to its display name
-  const getStatName = (key: string): string => {
-    const stat = stats.find((m) => m.key === key);
-    return stat?.name ?? key;
   };
 
   return (
@@ -496,182 +376,6 @@ export function LabelEditDialog({
                 <option value="DUO_PAIR">DUO_PAIR</option>
               </select>
             </div>
-          </div>
-
-          {/* ─── Conditions Section ─── */}
-          <div className="space-y-3">
-            {/* Section heading */}
-            <h3 className="text-sm font-medium text-foreground">Conditions</h3>
-
-            {/* Variables Sub-section — SettingsSection card pattern */}
-            <section className="bg-card/40 overflow-hidden rounded-lg">
-              <div className="flex items-center justify-between border-b border-border/30 px-4 py-3">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Variables
-                </h4>
-                <button
-                  type="button"
-                  onClick={onOpenStateVariables}
-                  className="text-xs text-[var(--theme-color)] hover:underline"
-                >
-                  Manage
-                </button>
-              </div>
-              <div className="p-4 space-y-3">
-                {/* Assigned variable tags */}
-                {selectedVariables.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedVariables.map((key) => (
-                      <span
-                        key={key}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-muted/80 border border-border/50 text-xs font-mono text-foreground"
-                      >
-                        {key}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveVariable(key)}
-                          disabled={isSaving}
-                          className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-                          aria-label={`Remove ${key}`}
-                        >
-                          <X className="size-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    No variables assigned.
-                  </p>
-                )}
-
-                {/* Add Variable picker */}
-                {showVariablePicker ? (
-                  <select
-                    autoFocus
-                    defaultValue=""
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        handleAddVariable(e.target.value);
-                      }
-                    }}
-                    onBlur={() => setShowVariablePicker(false)}
-                    disabled={isSaving}
-                    className="w-full px-3 py-2 border border-border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
-                  >
-                    <option value="" disabled>
-                      Select a variable…
-                    </option>
-                    {availableVariables.map((v) => (
-                      <option key={v.id} value={v.key}>
-                        {v.key}
-                        {v.description ? ` — ${v.description}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                ) : availableVariables.length > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowVariablePicker(true)}
-                    disabled={isSaving}
-                    className="flex items-center gap-1.5 text-xs text-[var(--theme-color)] hover:underline disabled:opacity-50"
-                  >
-                    <Plus className="size-3" />
-                    Add Variable
-                  </button>
-                ) : null}
-              </div>
-            </section>
-
-            {/* Stats Sub-section — SettingsSection card pattern */}
-            <section className="bg-card/40 overflow-hidden rounded-lg">
-              <div className="flex items-center justify-between border-b border-border/30 px-4 py-3">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Stats
-                </h4>
-                <button
-                  type="button"
-                  onClick={onOpenStats}
-                  className="text-xs text-[var(--theme-color)] hover:underline"
-                >
-                  Manage
-                </button>
-              </div>
-              <div className="p-4 space-y-3">
-                {/* Stat condition rows */}
-                {Object.keys(statConditions).length > 0 ? (
-                  <div className="space-y-2">
-                    {Object.entries(statConditions).map(([key, threshold]) => (
-                      <div key={key} className="flex items-center gap-2">
-                        <span className="flex-1 px-3 py-2 rounded-md bg-muted/80 border border-border/50 text-xs font-mono text-foreground truncate">
-                          {getStatName(key)}
-                        </span>
-                        <span className="text-xs text-muted-foreground font-medium select-none">
-                          ≥
-                        </span>
-                        <input
-                          type="number"
-                          value={threshold}
-                          onChange={(e) =>
-                            handleStatThresholdChange(key, e.target.value)
-                          }
-                          disabled={isSaving}
-                          className="w-24 p-2 border border-border rounded-md text-sm bg-background text-right focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveStat(key)}
-                          disabled={isSaving}
-                          className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
-                          aria-label={`Remove ${getStatName(key)} condition`}
-                        >
-                          <X className="size-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    No stat conditions assigned.
-                  </p>
-                )}
-
-                {/* Add Stat picker */}
-                {showStatPicker ? (
-                  <select
-                    autoFocus
-                    defaultValue=""
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        handleAddStat(e.target.value);
-                      }
-                    }}
-                    onBlur={() => setShowStatPicker(false)}
-                    disabled={isSaving}
-                    className="w-full px-3 py-2 border border-border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
-                  >
-                    <option value="" disabled>
-                      Select a stat…
-                    </option>
-                    {availableStats.map((s) => (
-                      <option key={s.id} value={s.key}>
-                        {s.name} ({s.key})
-                      </option>
-                    ))}
-                  </select>
-                ) : availableStats.length > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowStatPicker(true)}
-                    disabled={isSaving}
-                    className="flex items-center gap-1.5 text-xs text-[var(--theme-color)] hover:underline disabled:opacity-50"
-                  >
-                    <Plus className="size-3" />
-                    Add Stat
-                  </button>
-                ) : null}
-              </div>
-            </section>
           </div>
 
           {/* Footer Buttons */}
