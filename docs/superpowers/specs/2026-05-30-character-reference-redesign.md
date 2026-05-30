@@ -1,7 +1,7 @@
 # Character Reference Section Redesign
 
 **Date:** 2026-05-30
-**Status:** Approved
+**Status:** Completed
 
 ## Overview
 
@@ -162,3 +162,16 @@ Use `onError` handler to fall back to colored circle if image fails to load.
 - Avatars (image or colored circle) render correctly
 - Empty state shows when no characters
 - No breaking changes to parent component usage
+
+## Implementation Notes
+
+**Date completed:** 2026-05-30
+**Changes:**
+
+- Removed sceneCharacters prop from ScriptReferencePanel and parent
+- Removed scene-character filtering logic (sceneCharacterIds, otherCharacters)
+- Added alphabetical sorting by displayName
+- Added Ren'Py tag display in monospace
+- Updated avatar display to show image when available, fallback to colored circle
+- Empty state for no characters
+- Unit tests covering all character display behaviors
