@@ -1,4 +1,4 @@
-import { DialogShell } from "@/components/ui/dialog-shell";
+import { DialogShell } from "@/components/ui/DialogShell";
 import { RouteSettingsContent } from "@/components/RouteSettingsContent";
 
 interface RouteSettingsDialogProps {

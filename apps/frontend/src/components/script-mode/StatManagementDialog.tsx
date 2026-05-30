@@ -7,7 +7,7 @@
  */
 
 import { useState } from "react";
-import { DialogShell } from "@/components/ui/dialog-shell";
+import { DialogShell } from "@/components/ui/DialogShell";
 import { StatManagementContent } from "@/components/StatManagementContent";
 import { StatProgression } from "@/components/StatProgression";
 import { useStats } from "@/hooks/useStats";

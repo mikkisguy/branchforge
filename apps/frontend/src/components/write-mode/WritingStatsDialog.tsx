@@ -16,7 +16,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
-import { DialogShell } from "@/components/ui/dialog-shell";
+import { DialogShell } from "@/components/ui/DialogShell";
 
 interface DailyWordCount {
   date: string;

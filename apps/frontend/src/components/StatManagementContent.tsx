@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Loader2, Plus, Trash2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -186,9 +186,8 @@ export function StatManagementContent({
     [statsList, stats]
   );
 
-  const isStatValid = useMemo(() => {
-    return (index: number) => validateStat(statsList[index]) === null;
-  }, [statsList]);
+  const isStatValid = (index: number) =>
+    validateStat(statsList[index]) === null;
 
   return (
     <div className="space-y-4">

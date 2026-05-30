@@ -5,7 +5,7 @@
  * Can be rendered inline or wrapped in a dialog.
  */
 
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Loader2, Plus, Trash2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,7 +77,6 @@ export function VariablesManagementContent({
   // Form state - list of state variable entries
   const [variablesList, setVariablesList] = useState<VariableForm[]>([]);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const hasInitialized = useRef(false);
 
   // Combined loading state for any mutation
   const isSaving =
@@ -88,10 +87,7 @@ export function VariablesManagementContent({
    * Guard against re-initialization during save operations.
    */
   useEffect(() => {
-    // Skip if saving or already initialized for this session
-    if (isSaving || hasInitialized.current) {
-      return;
-    }
+    if (isSaving) return;
 
     if (variables.length > 0) {
       setVariablesList(
@@ -102,11 +98,8 @@ export function VariablesManagementContent({
           category: sv.category ?? "",
         }))
       );
-      hasInitialized.current = true;
-    } else if (variables.length === 0) {
-      // Initialize with empty variables
+    } else {
       setVariablesList([]);
-      hasInitialized.current = true;
     }
   }, [variables, isSaving]);
 
@@ -257,9 +250,8 @@ export function VariablesManagementContent({
   /**
    * Check if a variable is valid
    */
-  const isVariableValid = useMemo(() => {
-    return (index: number) => validateVariable(variablesList[index]) === null;
-  }, [variablesList]);
+  const isVariableValid = (index: number) =>
+    validateVariable(variablesList[index]) === null;
 
   // Group variables by category for display
   const groupedVariables = useMemo(() => {
