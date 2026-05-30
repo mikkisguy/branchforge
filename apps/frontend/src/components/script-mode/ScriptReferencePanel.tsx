@@ -122,7 +122,7 @@ export function ScriptReferencePanel({
                         <img
                           src={character.avatarUrl}
                           alt={character.displayName}
-                          className="size-6 rounded-full shrink-0 object-cover"
+                          className="size-8 rounded-full shrink-0 object-cover"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
                             target.style.display = "none";
@@ -130,7 +130,7 @@ export function ScriptReferencePanel({
                         />
                       ) : (
                         <div
-                          className="size-6 rounded-full flex items-center justify-center text-white text-[10px] font-medium shrink-0 shadow-sm"
+                          className="size-8 rounded-full flex items-center justify-center text-white text-[10px] font-medium shrink-0 shadow-sm"
                           style={{
                             backgroundColor:
                               character.color ?? "var(--theme-color)",
@@ -141,7 +141,7 @@ export function ScriptReferencePanel({
                       )}
 
                       {/* Name and tag */}
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 ml-1.5">
                         <p className="text-xs font-medium truncate">
                           {character.displayName}
                         </p>
