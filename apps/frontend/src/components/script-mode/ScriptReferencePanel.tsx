@@ -46,8 +46,13 @@ export function ScriptReferencePanel({
   const [variablesDialogOpen, setVariablesDialogOpen] = useState(false);
   const [statsDialogOpen, setStatsDialogOpen] = useState(false);
 
-  const { variables, isLoadingVariables } = useVariables(projectId);
-  const { stats, isLoadingStats } = useStats(projectId);
+  // Skip API calls if projectId is not valid
+  const { variables, isLoadingVariables } = useVariables(
+    projectId && projectId.trim() ? projectId : ""
+  );
+  const { stats, isLoadingStats } = useStats(
+    projectId && projectId.trim() ? projectId : ""
+  );
 
   const characterById = useMemo(
     () =>

@@ -261,9 +261,11 @@ export function LabelPropertiesPanel({
                 </div>
               </CollapsibleSection>
 
-              <CollapsibleSection title="Conditions" defaultOpen={false}>
+              <CollapsibleSection title="Access Conditions" defaultOpen={false}>
                 {!activeLabel.conditions ? (
-                  <p className="text-xs text-muted-foreground">No conditions</p>
+                  <p className="text-xs text-muted-foreground">
+                    No access conditions
+                  </p>
                 ) : (
                   <div className="space-y-3 text-xs">
                     <div>
@@ -313,7 +315,7 @@ export function LabelPropertiesPanel({
                 )}
               </CollapsibleSection>
 
-              <CollapsibleSection title="Jumps" defaultOpen={false}>
+              <CollapsibleSection title="Outgoing Jump" defaultOpen={false}>
                 {routeConfig ? (
                   <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/80 border border-border/50 text-xs font-mono text-foreground">
                     {routeConfig.jumpPrefix}
@@ -321,7 +323,7 @@ export function LabelPropertiesPanel({
                   </span>
                 ) : (
                   <span className="text-xs text-muted-foreground">
-                    Shared label (no jump)
+                    Shared label (no outgoing jump)
                   </span>
                 )}
               </CollapsibleSection>
