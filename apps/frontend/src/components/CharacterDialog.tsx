@@ -126,7 +126,6 @@ export function CharacterDialog({
                 <div className="space-y-4">
                   <Button
                     type="button"
-                    variant="outline"
                     onClick={() => setEditingCharacterId(MODE_NEW)}
                     disabled={isSaving}
                     className="w-full"

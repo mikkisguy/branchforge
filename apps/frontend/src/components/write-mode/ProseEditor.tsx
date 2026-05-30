@@ -611,7 +611,7 @@ export const ProseEditor = function ProseEditor({
         <div className="size-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
           <BookOpen className="size-8 opacity-40" />
         </div>
-        <p className="text-lg">Select a scene to start writing</p>
+        <p className="text-lg">Create new or select a label to start writing</p>
       </div>
     );
   }
@@ -624,7 +624,7 @@ export const ProseEditor = function ProseEditor({
         </div>
         <div className="text-center space-y-1">
           <p className="text-lg font-medium text-foreground">
-            This scene is empty
+            This label is empty
           </p>
           <p className="text-sm opacity-70">Start writing your story</p>
         </div>

@@ -375,18 +375,6 @@ describe("VariablesService (Integration)", () => {
   // ============================================================================
 
   describe("updateVariable", () => {
-    it("should update key", async () => {
-      const body = {
-        key: "updated_key",
-      };
-
-      const result = await updateVariable(testVariable1.id!, testUserId, body);
-
-      expect(result.key).toBe("updated_key");
-      expect(result.description).toBe("Player met Eileen");
-      expect(result.category).toBe("characters");
-    });
-
     it("should update description", async () => {
       const body = {
         description: "Updated description",
@@ -410,7 +398,6 @@ describe("VariablesService (Integration)", () => {
 
     it("should update all fields", async () => {
       const body = {
-        key: "fully_updated",
         description: "Fully updated description",
         category: "updated",
       };
@@ -434,7 +421,7 @@ describe("VariablesService (Integration)", () => {
 
     it("should throw NotFoundError when variable does not exist", async () => {
       const body = {
-        key: "updated",
+        description: "updated",
       };
       const nonExistentId = testUuid("24000000", 999999999999);
 
@@ -445,7 +432,7 @@ describe("VariablesService (Integration)", () => {
 
     it("should throw NotFoundError when user does not have access", async () => {
       const body = {
-        key: "updated",
+        description: "updated",
       };
 
       await expect(
@@ -459,29 +446,6 @@ describe("VariablesService (Integration)", () => {
       await expect(
         updateVariable(testVariable1.id!, testUserId, body)
       ).rejects.toThrow("No valid fields provided for update");
-    });
-
-    it("should throw ConflictError when key already exists", async () => {
-      const body = {
-        key: "lucas_route_unlocked", // Already exists in same project
-      };
-
-      await expect(
-        updateVariable(testVariable1.id!, testUserId, body)
-      ).rejects.toThrow("Variable key already exists for this project");
-    });
-
-    it("should allow updating to same key in different projects", async () => {
-      // This verifies that the unique constraint is on (projectId, key)
-      // and not just on key globally
-      const body = {
-        key: "lucas_route_unlocked", // Exists in ownedProject
-      };
-
-      // otherVariable is in otherProject, so this should work
-      const result = await updateVariable(otherVariable.id!, otherUserId, body);
-
-      expect(result.key).toBe("lucas_route_unlocked");
     });
   });
 

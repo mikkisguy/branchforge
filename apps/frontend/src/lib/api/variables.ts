@@ -19,7 +19,6 @@ export interface CreateVariableBody {
 }
 
 export interface UpdateVariableBody {
-  key?: string;
   description?: string;
   category?: string;
 }

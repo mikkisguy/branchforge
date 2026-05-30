@@ -48,7 +48,6 @@ export interface CreateRouteConfigBody {
  * Update route configuration request body
  */
 export interface UpdateRouteConfigBody {
-  routeKey?: string;
   routeName?: string;
   jumpPrefix?: string;
   sortOrder?: number;
@@ -207,7 +206,6 @@ export async function updateRouteConfig(
   try {
     // Build update payload with only allowed fields
     const updateData: {
-      routeKey?: string;
       routeName?: string;
       jumpPrefix?: string;
       sortOrder?: number;
@@ -215,7 +213,6 @@ export async function updateRouteConfig(
       updatedAt: Date;
     } = { updatedAt: new Date() };
 
-    if (body.routeKey !== undefined) updateData.routeKey = body.routeKey;
     if (body.routeName !== undefined) updateData.routeName = body.routeName;
     if (body.jumpPrefix !== undefined) updateData.jumpPrefix = body.jumpPrefix;
     if (body.sortOrder !== undefined) updateData.sortOrder = body.sortOrder;
