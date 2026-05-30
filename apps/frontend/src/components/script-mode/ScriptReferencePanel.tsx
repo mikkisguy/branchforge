@@ -21,6 +21,7 @@ interface ScriptReferencePanelProps {
   projectCharacters: Character[];
   isCollapsed?: boolean;
   onCollapseToggle?: () => void;
+  onCharacterEdit?: (characterId: string) => void;
 }
 
 const panelVariants = cva(
@@ -40,6 +41,7 @@ export function ScriptReferencePanel({
   projectCharacters,
   isCollapsed = false,
   onCollapseToggle,
+  onCharacterEdit,
 }: ScriptReferencePanelProps) {
   const [variablesDialogOpen, setVariablesDialogOpen] = useState(false);
   const [statsDialogOpen, setStatsDialogOpen] = useState(false);
@@ -117,9 +119,11 @@ export function ScriptReferencePanel({
               ) : (
                 <div className="space-y-1">
                   {sortedCharacters.map((character) => (
-                    <div
+                    <button
                       key={character.id}
-                      className="flex items-center gap-2 p-1.5 rounded-md hover:bg-muted transition-colors group"
+                      type="button"
+                      onClick={() => onCharacterEdit?.(character.id)}
+                      className="flex items-center gap-2 p-1.5 rounded-md hover:bg-muted transition-colors group cursor-pointer w-full text-left"
                     >
                       {/* Avatar: image or colored circle */}
                       {character.avatarUrl ? (
@@ -176,7 +180,7 @@ export function ScriptReferencePanel({
                       {character.isLoveInterest && (
                         <Heart className="size-2.5 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
                       )}
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
