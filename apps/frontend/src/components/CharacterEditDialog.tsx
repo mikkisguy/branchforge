@@ -189,6 +189,10 @@ export function CharacterEditDialog({
   const previewUrlRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Track if form has been initialized for current character to prevent
+  // re-initialization when the characters array changes due to other characters being updated
+  const hasInitializedRef = useRef(false);
+
   const isSaving =
     isCreatingCharacter ||
     isUpdatingCharacter ||
@@ -205,36 +209,28 @@ export function CharacterEditDialog({
         previewUrlRef.current = null;
       }
       setInitializedForCharacterId(null);
+      hasInitializedRef.current = false;
       return;
     }
 
-    // Only populate if editing existing character
-    if (
-      characterId &&
-      characterId !== initializedForCharacterId &&
-      characters.length > 0
-    ) {
-      setInitializedForCharacterId(characterId);
+    // Wait for characters to load before initializing
+    if (isLoadingCharacters) {
+      return;
+    }
+
+    // Only populate if editing existing character and not yet initialized for this character
+    if (characterId && !hasInitializedRef.current && characters.length > 0) {
       const char = characters.find((c) => c.id === characterId);
       if (char) {
+        setInitializedForCharacterId(characterId);
+        hasInitializedRef.current = true;
         dispatch({ type: "RESET_EXISTING", char });
       }
     }
-  }, [open, characterId, initializedForCharacterId, characters]);
 
-  // Wait for characters to load before initializing existing character
-  useEffect(() => {
-    if (
-      open &&
-      characterId &&
-      initializedForCharacterId !== characterId &&
-      !isLoadingCharacters &&
-      characters.length > 0
-    ) {
-      const char = characters.find((c) => c.id === characterId);
-      if (char) {
-        dispatch({ type: "RESET_EXISTING", char });
-      }
+    // Reset initialization flag when switching to a different character
+    if (characterId && characterId !== initializedForCharacterId) {
+      hasInitializedRef.current = false;
     }
   }, [
     open,
@@ -435,7 +431,7 @@ export function CharacterEditDialog({
                 placeholder="a"
                 value={form.renpyTag}
                 onChange={(e) => handleFieldChange("renpyTag", e.target.value)}
-                disabled={isSaving || isEditMode}
+                disabled={isSaving}
               />
               <p className="text-xs text-muted-foreground">
                 Unique identifier (e.g., "a", "lucas")

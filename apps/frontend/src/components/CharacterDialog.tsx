@@ -99,11 +99,22 @@ export function CharacterDialog({
                   Failed to load characters
                 </InlineMessage>
               ) : characters.length === 0 ? (
-                <div className="p-8 border border-dashed border-border/30 rounded-md text-center">
-                  <p className="text-sm text-muted-foreground">
-                    No characters configured yet. Add your first character to
-                    get started.
-                  </p>
+                <div className="space-y-4">
+                  <div className="p-8 border border-dashed border-border/30 rounded-md text-center">
+                    <p className="text-sm text-muted-foreground">
+                      No characters configured yet. Add your first character to
+                      get started.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => setEditingCharacterId(MODE_NEW)}
+                    disabled={isSaving}
+                    className="w-full"
+                  >
+                    <Plus className="size-4 mr-2" />
+                    Add Character
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-4">
