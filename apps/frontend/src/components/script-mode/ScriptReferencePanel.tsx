@@ -58,19 +58,6 @@ export function ScriptReferencePanel({
     [projectCharacters]
   );
 
-  const sceneCharacterIds = useMemo(
-    () => new Set(sceneCharacters.map((character) => character.id)),
-    [sceneCharacters]
-  );
-
-  const otherCharacters = useMemo(
-    () =>
-      projectCharacters.filter(
-        (character) => !sceneCharacterIds.has(character.id)
-      ),
-    [projectCharacters, sceneCharacterIds]
-  );
-
   // Group variables by category for display
   const groupedVariables = useMemo(() => {
     const groups: Record<string, typeof variables> = {};
