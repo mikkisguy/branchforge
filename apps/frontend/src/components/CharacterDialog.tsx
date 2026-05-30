@@ -107,12 +107,6 @@ export function CharacterDialog({
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <CharacterList
-                    characters={characters}
-                    isSaving={isSaving}
-                    onEdit={setEditingCharacterId}
-                    onDelete={handleDelete}
-                  />
                   <Button
                     type="button"
                     variant="outline"
@@ -123,23 +117,21 @@ export function CharacterDialog({
                     <Plus className="size-4 mr-2" />
                     Add Another Character
                   </Button>
+                  <CharacterList
+                    characters={characters}
+                    isSaving={isSaving}
+                    onEdit={setEditingCharacterId}
+                    onDelete={handleDelete}
+                  />
                 </div>
               )}
             </div>
           </div>
 
           {/* Footer */}
-          <div className="p-6 border-t border-border/30 flex justify-between">
+          <div className="p-6 border-t border-border/30 flex justify-end">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Close
-            </Button>
-            <Button
-              type="button"
-              onClick={() => setEditingCharacterId(MODE_NEW)}
-              disabled={isSaving}
-            >
-              <Plus className="size-4 mr-2" />
-              Add Character
             </Button>
           </div>
         </DialogContent>

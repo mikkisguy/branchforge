@@ -141,35 +141,40 @@ export function LabelPropertiesPanel({
             <div>
               <CollapsibleSection title="Characters" defaultOpen={true}>
                 {resolvedLabelChars.length > 0 ? (
-                  <div className="space-y-2">
-                    {resolvedLabelChars.map((char) => (
-                      <button
-                        key={char.id}
-                        type="button"
-                        onClick={() => onCharacterEdit?.(char.id)}
-                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors group w-full text-left cursor-pointer"
-                      >
-                        <div
-                          className="size-10 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0 shadow-sm"
-                          style={{ backgroundColor: char.color }}
+                  <div>
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
+                      In Label
+                    </h3>
+                    <div className="space-y-2">
+                      {resolvedLabelChars.map((char) => (
+                        <button
+                          key={char.id}
+                          type="button"
+                          onClick={() => onCharacterEdit?.(char.id)}
+                          className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors group w-full text-left cursor-pointer"
                         >
-                          {char.displayName[0] || "?"}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium truncate">
-                            {char.displayName}
-                          </p>
-                          {char.dialogueStyle && (
-                            <p className="text-xs text-muted-foreground truncate italic">
-                              "{char.dialogueStyle}"
+                          <div
+                            className="size-10 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0 shadow-sm"
+                            style={{ backgroundColor: char.color }}
+                          >
+                            {char.displayName[0] || "?"}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium truncate">
+                              {char.displayName}
                             </p>
+                            {char.dialogueStyle && (
+                              <p className="text-xs text-muted-foreground truncate italic">
+                                "{char.dialogueStyle}"
+                              </p>
+                            )}
+                          </div>
+                          {char.isLoveInterest && (
+                            <Heart className="size-4 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
                           )}
-                        </div>
-                        {char.isLoveInterest && (
-                          <Heart className="size-4 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
-                        )}
-                      </button>
-                    ))}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 ) : characters.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -190,19 +195,22 @@ export function LabelPropertiesPanel({
                     </p>
                   </div>
                 )}
-                {otherCharacters.length > 0 &&
-                  resolvedLabelChars.length > 0 && (
-                    <div className="pt-4 border-t border-border">
-                      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
-                        Other Characters
-                      </h3>
-                      <div className="flex flex-wrap gap-2 px-2">
-                        {otherCharacters.map((char) => (
-                          <CharacterAvatarChip key={char.id} character={char} />
-                        ))}
-                      </div>
+                {otherCharacters.length > 0 && (
+                  <div className="pt-4 border-t border-border">
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
+                      Other Characters
+                    </h3>
+                    <div className="flex flex-wrap gap-2 px-2">
+                      {otherCharacters.map((char) => (
+                        <CharacterAvatarChip
+                          key={char.id}
+                          character={char}
+                          onClick={() => onCharacterEdit?.(char.id)}
+                        />
+                      ))}
                     </div>
-                  )}
+                  </div>
+                )}
               </CollapsibleSection>
 
               <CollapsibleSection title="Identity" defaultOpen={false}>

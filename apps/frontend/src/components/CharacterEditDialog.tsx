@@ -182,8 +182,8 @@ export function CharacterEditDialog({
 
   const [form, dispatch] = useReducer(formReducer, INITIAL_EMPTY);
   const [initializedForCharacterId, setInitializedForCharacterId] = useState<
-    string | undefined
-  >(undefined);
+    string | undefined | null
+  >(null);
 
   // Track preview URL for cleanup
   const previewUrlRef = useRef<string | null>(null);
@@ -197,29 +197,28 @@ export function CharacterEditDialog({
 
   // Initialize form when dialog opens or characterId changes
   useEffect(() => {
-    if (open && characterId !== initializedForCharacterId) {
-      setInitializedForCharacterId(characterId);
-
-      if (characterId && characters.length > 0) {
-        const char = characters.find((c) => c.id === characterId);
-        if (char) {
-          dispatch({ type: "RESET_EXISTING", char });
-          return;
-        }
-      }
-
-      if (!characterId) {
-        dispatch({ type: "RESET_NEW" });
-      }
-    }
-
     if (!open) {
-      // Cleanup preview URL
+      // Reset form and cleanup when dialog closes
+      dispatch({ type: "RESET_NEW" });
       if (previewUrlRef.current) {
         URL.revokeObjectURL(previewUrlRef.current);
         previewUrlRef.current = null;
       }
-      setInitializedForCharacterId(undefined);
+      setInitializedForCharacterId(null);
+      return;
+    }
+
+    // Only populate if editing existing character
+    if (
+      characterId &&
+      characterId !== initializedForCharacterId &&
+      characters.length > 0
+    ) {
+      setInitializedForCharacterId(characterId);
+      const char = characters.find((c) => c.id === characterId);
+      if (char) {
+        dispatch({ type: "RESET_EXISTING", char });
+      }
     }
   }, [open, characterId, initializedForCharacterId, characters]);
 
@@ -228,7 +227,7 @@ export function CharacterEditDialog({
     if (
       open &&
       characterId &&
-      initializedForCharacterId === characterId &&
+      initializedForCharacterId !== characterId &&
       !isLoadingCharacters &&
       characters.length > 0
     ) {
