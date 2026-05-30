@@ -248,9 +248,7 @@ export function ScriptReferencePanel({
                     className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-full justify-center pt-1"
                   >
                     <Plus className="size-3" />
-                    {variables.length === 0
-                      ? "Add variable"
-                      : "Manage variables"}
+                    Manage variables
                   </button>
                 </div>
               )}
