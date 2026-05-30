@@ -7,7 +7,6 @@ import {
   Pencil,
   Loader2,
 } from "lucide-react";
-import { CharacterAvatarChip } from "@/components/ui/CharacterAvatarChip";
 import { CollapsibleSection } from "@/components/ide-shared/CollapsibleSection";
 import { VariablesDialog } from "./VariablesDialog";
 import { StatsDialog } from "./StatsDialog";
@@ -50,12 +49,6 @@ export function ScriptReferencePanel({
   );
   const { stats, isLoadingStats } = useStats(
     projectId && projectId.trim() ? projectId : ""
-  );
-
-  const characterById = useMemo(
-    () =>
-      new Map(projectCharacters.map((character) => [character.id, character])),
-    [projectCharacters]
   );
 
   // Group variables by category for display
@@ -108,64 +101,61 @@ export function ScriptReferencePanel({
           <div>
             {/* Characters */}
             <CollapsibleSection title="Characters" defaultOpen={true}>
-              {sceneCharacters.length === 0 ? (
+              {sortedCharacters.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-4 text-center">
                   <div className="size-10 rounded-full bg-muted/50 flex items-center justify-center mb-2">
                     <span className="text-xl opacity-40">👥</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    No characters in this scene
+                    No characters defined
                   </p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {sceneCharacters.map((sceneCharacter) => {
-                    const resolvedCharacter = characterById.get(
-                      sceneCharacter.id
-                    );
-                    const displayName =
-                      resolvedCharacter?.displayName ??
-                      sceneCharacter.displayName;
-                    const avatarColor =
-                      resolvedCharacter?.color ?? "var(--theme-color)";
-
-                    return (
-                      <div
-                        key={sceneCharacter.id}
-                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors group"
-                      >
+                  {sortedCharacters.map((character) => (
+                    <div
+                      key={character.id}
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors group"
+                    >
+                      {/* Avatar: image or colored circle */}
+                      {character.avatarUrl ? (
+                        <img
+                          src={character.avatarUrl}
+                          alt={character.displayName}
+                          className="size-8 rounded-full shrink-0 object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = "none";
+                          }}
+                        />
+                      ) : (
                         <div
                           className="size-8 rounded-full flex items-center justify-center text-white text-xs font-medium shrink-0 shadow-sm"
-                          style={{ backgroundColor: avatarColor }}
+                          style={{
+                            backgroundColor:
+                              character.color ?? "var(--theme-color)",
+                          }}
                         >
-                          {displayName[0] || "?"}
+                          {character.displayName[0] || "?"}
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium truncate">
-                            {displayName}
-                          </p>
-                        </div>
-                        {resolvedCharacter?.isLoveInterest && (
-                          <Heart className="size-3 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
-                        )}
+                      )}
+
+                      {/* Name and tag */}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium truncate">
+                          {character.displayName}
+                        </p>
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {character.renpyTag}
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-              {otherCharacters.length > 0 && sceneCharacters.length > 0 && (
-                <div className="pt-3 border-t border-border mt-3">
-                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                    Others
-                  </h3>
-                  <div className="flex flex-wrap gap-1.5">
-                    {otherCharacters.map((character) => (
-                      <CharacterAvatarChip
-                        key={character.id}
-                        character={character}
-                      />
-                    ))}
-                  </div>
+
+                      {/* Love interest indicator */}
+                      {character.isLoveInterest && (
+                        <Heart className="size-3 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </CollapsibleSection>
