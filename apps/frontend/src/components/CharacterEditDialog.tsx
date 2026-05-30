@@ -20,7 +20,11 @@ import { Label } from "@/components/ui/label";
 import { useCharacters } from "@/hooks/useCharacters";
 import { useToast } from "@/contexts/ToastContext";
 import type { Character } from "@branchforge/shared";
-import { AVATAR_MAX_SIZE, AVATAR_MAX_SIZE_MB } from "@branchforge/shared";
+import {
+  AVATAR_MAX_SIZE,
+  AVATAR_MAX_SIZE_MB,
+  isValidAvatarMimeType,
+} from "@branchforge/shared";
 
 interface CharacterEditDialogProps {
   open: boolean;
@@ -55,7 +59,6 @@ type FormAction =
   | { type: "SET_AVATAR_FILE"; file: File }
   | { type: "SET_AVATAR_PREVIEW"; preview: string }
   | { type: "REMOVE_AVATAR" }
-  | { type: "CLEAR_AVATAR_ERRORS" }
   | { type: "SET_NAME_ERROR"; value: string }
   | { type: "SET_DISPLAY_NAME_ERROR"; value: string }
   | { type: "SET_RENPY_TAG_ERROR"; value: string }
@@ -120,8 +123,6 @@ function formReducer(
         avatarPreview: undefined,
         removedAvatar: true,
       };
-    case "CLEAR_AVATAR_ERRORS":
-      return { ...state };
     case "SET_NAME_ERROR":
       return { ...state, nameError: action.value };
     case "SET_DISPLAY_NAME_ERROR":
@@ -177,15 +178,15 @@ export function CharacterEditDialog({
     isDeletingAvatar,
   } = useCharacters(projectId);
 
-  const { error: toastError } = useToast();
+  const { error } = useToast();
 
   const [form, dispatch] = useReducer(formReducer, INITIAL_EMPTY);
   const [initializedForCharacterId, setInitializedForCharacterId] = useState<
     string | undefined
   >(undefined);
 
-  // Track preview URLs for cleanup
-  const previewUrlsRef = useRef<Set<string>>(new Set());
+  // Track preview URL for cleanup
+  const previewUrlRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const isSaving =
@@ -213,9 +214,11 @@ export function CharacterEditDialog({
     }
 
     if (!open) {
-      // Cleanup preview URLs
-      previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-      previewUrlsRef.current.clear();
+      // Cleanup preview URL
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
       setInitializedForCharacterId(undefined);
     }
   }, [open, characterId, initializedForCharacterId, characters]);
@@ -245,61 +248,52 @@ export function CharacterEditDialog({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-      previewUrlsRef.current.clear();
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
     };
   }, []);
 
   const handleFieldChange = (field: string, value: string | boolean) => {
     dispatch({ type: "SET_FIELD", field, value });
-    // Clear error for field
-    const errorActionMap: Record<string, FormAction> = {
-      name: { type: "SET_NAME_ERROR", value: "" },
-      displayName: { type: "SET_DISPLAY_NAME_ERROR", value: "" },
-      renpyTag: { type: "SET_RENPY_TAG_ERROR", value: "" },
-      color: { type: "SET_COLOR_ERROR", value: "" },
-    };
-    if (errorActionMap[field]) {
-      dispatch(errorActionMap[field]);
-    }
+    // Clear all validation errors on any field change
+    dispatch({ type: "SET_NAME_ERROR", value: "" });
+    dispatch({ type: "SET_DISPLAY_NAME_ERROR", value: "" });
+    dispatch({ type: "SET_RENPY_TAG_ERROR", value: "" });
+    dispatch({ type: "SET_COLOR_ERROR", value: "" });
   };
 
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const allowedMimeTypes = [
-      "image/png",
-      "image/jpeg",
-      "image/webp",
-      "image/gif",
-    ];
-    if (!allowedMimeTypes.includes(file.type)) {
-      toastError("Please select a PNG, JPEG, WEBP, or GIF image");
+    if (!isValidAvatarMimeType(file.type)) {
+      error("Please select a PNG, JPEG, WEBP, or GIF image");
       return;
     }
     if (file.size > AVATAR_MAX_SIZE) {
-      toastError(`Image must be smaller than ${AVATAR_MAX_SIZE_MB}MB`);
+      error(`Image must be smaller than ${AVATAR_MAX_SIZE_MB}MB`);
       return;
     }
 
     // Revoke previous preview
-    if (form.avatarPreview) {
-      URL.revokeObjectURL(form.avatarPreview);
-      previewUrlsRef.current.delete(form.avatarPreview);
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
     }
 
     const preview = URL.createObjectURL(file);
-    previewUrlsRef.current.add(preview);
+    previewUrlRef.current = preview;
 
     dispatch({ type: "SET_AVATAR_FILE", file });
     dispatch({ type: "SET_AVATAR_PREVIEW", preview });
   };
 
   const handleAvatarRemove = () => {
-    if (form.avatarPreview) {
-      URL.revokeObjectURL(form.avatarPreview);
-      previewUrlsRef.current.delete(form.avatarPreview);
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
     }
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -360,13 +354,15 @@ export function CharacterEditDialog({
         await deleteAvatar(targetCharId);
       }
 
-      // Cleanup preview URLs before closing
-      previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-      previewUrlsRef.current.clear();
+      // Cleanup preview URL before closing
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
 
       onOpenChange(false);
     } catch {
-      // Error handled by hook's toast
+      // Hook's mutation.onError already shows toast
     }
   };
 
