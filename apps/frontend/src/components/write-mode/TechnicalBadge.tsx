@@ -22,7 +22,7 @@ interface MenuChoiceData {
   targetLabelId: string;
   targetLabelName: string;
   effects?: {
-    stats?: Record<string, StatCondition>;
+    stats?: Record<string, number>;
   };
 }
 
