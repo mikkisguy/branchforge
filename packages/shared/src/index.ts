@@ -382,7 +382,10 @@ export interface PublicLabel {
   /** Basename of the file path (e.g., "act_i.rpy" from "labels/act_i.rpy") */
   fileName: string;
   /** Variable and stat conditions for this label */
-  conditions: LineConditions | null;
+  conditions: {
+    variables?: string[];
+    stats?: Record<string, number>;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }
