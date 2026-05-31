@@ -95,6 +95,30 @@ describe("extractTechnicalConstructs - scene/show/hide", () => {
   });
 });
 
+describe("extractTechnicalConstructs - comparison operators", () => {
+  it("captures >= operator", () => {
+    const rpyContent = "if affection_luna >= 50:";
+    const result = extractTechnicalConstructs(rpyContent, 0);
+    expect(result.conditions).toEqual({
+      stats: { affection_luna: { value: 50, operator: ">=" } },
+    });
+  });
+
+  it("captures <=, >, <, ==, != operators", () => {
+    const rpyContent = `if strength <= 5 and magic > 10 and charm < 3 and mood == 2 and trust != 1:`;
+    const result = extractTechnicalConstructs(rpyContent, 0);
+    expect(result.conditions).toEqual({
+      stats: {
+        strength: { value: 5, operator: "<=" },
+        magic: { value: 10, operator: ">" },
+        charm: { value: 3, operator: "<" },
+        mood: { value: 2, operator: "==" },
+        trust: { value: 1, operator: "!=" },
+      },
+    });
+  });
+});
+
 describe("extractTechnicalConstructs - if/elif conditions with deltas", () => {
   it("preserves thresholds and stores deltas separately", () => {
     const rpyContent = `if strength >= 5:
