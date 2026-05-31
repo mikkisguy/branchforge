@@ -1,6 +1,7 @@
 import { useMemo, useCallback, useRef, useEffect } from "react";
 import type { LabelDetail } from "@branchforge/shared";
 import type { DialogueEntry } from "../lib/prose-types";
+import type { ComparisonOperator, StatCondition } from "@branchforge/shared";
 
 interface UseTechnicalInfoResult {
   getTechnicalInfoForLine: (entryId: string) => DialogueEntry["technicalInfo"];
@@ -11,6 +12,25 @@ type CachedInfo = {
   /** JSON stability key derived from the source line fields */
   key: string;
 };
+
+const DEFAULT_OPERATOR: ComparisonOperator = ">=";
+
+function normalizeStatCondition(value: number | StatCondition): StatCondition {
+  return typeof value === "number"
+    ? { value, operator: DEFAULT_OPERATOR }
+    : value;
+}
+
+function normalizeConditions(
+  conditions: LabelDetail["lines"][number]["conditions"]
+) {
+  if (!conditions?.stats) return conditions || undefined;
+  const stats: Record<string, StatCondition> = {};
+  for (const [key, value] of Object.entries(conditions.stats)) {
+    stats[key] = normalizeStatCondition(value as number | StatCondition);
+  }
+  return { ...conditions, stats };
+}
 
 /**
  * Compute a stability key from the line fields that affect technicalInfo.
@@ -104,7 +124,7 @@ export function useTechnicalInfo(
 
       // Parse conditions
       if (line.conditions) {
-        info.conditions = line.conditions;
+        info.conditions = normalizeConditions(line.conditions);
       }
 
       // Parse visuals

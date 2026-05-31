@@ -1,0 +1,25 @@
+import { render, screen } from "@testing-library/react";
+import { TechnicalPopover } from "../write-mode/TechnicalPopover";
+import type { StatCondition } from "@branchforge/shared";
+
+describe("TechnicalPopover", () => {
+  it("renders operator symbols for stat conditions", () => {
+    const data = {
+      stats: {
+        affection_luna: { value: 50, operator: ">=" } as StatCondition,
+        trust: { value: 1, operator: "!=" } as StatCondition,
+      },
+    };
+
+    render(
+      <TechnicalPopover
+        type="conditions"
+        onClose={() => undefined}
+        data={data}
+      />
+    );
+
+    expect(screen.getByText("affection_luna: ≥ 50")).toBeInTheDocument();
+    expect(screen.getByText("trust: ≠ 1")).toBeInTheDocument();
+  });
+});

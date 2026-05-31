@@ -7,6 +7,8 @@ import type {
   LabelDetail,
   Stat,
   RouteConfig,
+  StatCondition,
+  ComparisonOperator,
 } from "@branchforge/shared";
 import { cva } from "class-variance-authority";
 
@@ -27,6 +29,22 @@ const STATUS_COLORS = {
   REVIEW: "var(--theme-review-color)",
   DRAFT: "var(--theme-draft-color)",
 } as const;
+
+const OPERATOR_SYMBOLS: Record<ComparisonOperator, string> = {
+  ">=": "≥",
+  "<=": "≤",
+  "==": "=",
+  "!=": "≠",
+  ">": ">",
+  "<": "<",
+};
+
+function formatStatCondition(value: number | StatCondition): string {
+  if (typeof value === "number") {
+    return `${OPERATOR_SYMBOLS[">="]} ${value}`;
+  }
+  return `${OPERATOR_SYMBOLS[value.operator]} ${value.value}`;
+}
 
 interface LabelPropertiesPanelProps {
   activeLabel: LabelDetail | undefined;
@@ -328,7 +346,10 @@ export function LabelPropertiesPanel({
                                   key={statKey}
                                   className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/80 border border-border/50 text-xs font-mono text-foreground"
                                 >
-                                  {stat?.name ?? statKey} ≥ {value}
+                                  {stat?.name ?? statKey}{" "}
+                                  {formatStatCondition(
+                                    value as number | StatCondition
+                                  )}
                                 </span>
                               );
                             }
