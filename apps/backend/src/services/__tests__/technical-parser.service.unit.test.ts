@@ -117,6 +117,26 @@ describe("extractTechnicalConstructs - comparison operators", () => {
       },
     });
   });
+
+  it("handles nested conditions with parentheses", () => {
+    const rpyContent = "if (strength >= 5 or magic > 10):";
+    const result = extractTechnicalConstructs(rpyContent, 0);
+    expect(result.conditions).toBeDefined();
+    expect(result.conditions?.stats).toEqual({
+      strength: { value: 5, operator: ">=" },
+      magic: { value: 10, operator: ">" },
+    });
+  });
+
+  it("extracts stats when mixed with variables", () => {
+    const rpyContent = "if strength >= 5 and flag_luna:";
+    const result = extractTechnicalConstructs(rpyContent, 0);
+    expect(result.conditions).toBeDefined();
+    expect(result.conditions?.stats).toEqual({
+      strength: { value: 5, operator: ">=" },
+    });
+    expect(result.conditions?.variables).toEqual(["flag_luna"]);
+  });
 });
 
 describe("extractTechnicalConstructs - if/elif conditions with deltas", () => {

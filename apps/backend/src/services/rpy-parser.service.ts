@@ -1976,6 +1976,7 @@ export function extractTechnicalConstructs(
       .trim();
 
     // Extract stat comparisons: e.g., "strength >= 5" or "magic < 10"
+    // Limitations: Does not handle variable comparisons (e.g., "strength >= max_value")
     const statRegex = /([a-zA-Z_][a-zA-Z0-9_]*)\s*(>=|<=|>|<|==|!=)\s*(-?\d+)/g;
     let statMatch;
     while ((statMatch = statRegex.exec(conditionExpr)) !== null) {

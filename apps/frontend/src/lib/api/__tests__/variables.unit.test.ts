@@ -11,7 +11,7 @@ import type { Variable } from "@branchforge/shared";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
+globalThis.fetch = mockFetch;
 
 describe("Variables API", () => {
   const mockVariable: Variable = {

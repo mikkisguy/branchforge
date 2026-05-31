@@ -10,7 +10,7 @@ import type { LoginCredentials, RegisterCredentials } from "../auth";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
+globalThis.fetch = mockFetch;
 
 describe("Auth API", () => {
   beforeEach(() => {
