@@ -50,63 +50,77 @@ export function StatList({
     <>
       <div className="space-y-2">
         {stats.map((stat) => {
-          const isSelected = selectedStatKey === stat.key;
+          const isActive = selectedStatKey === stat.key;
 
           return (
             <div
               key={stat.id}
-              className="border border-border/30 rounded-md p-3"
+              className={`rounded-md border transition-colors ${
+                isActive ? "bg-muted/30 border-border/60" : "border-border/30"
+              }`}
             >
-              <div className="flex items-start justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => onSelect(stat.key)}
-                  className={`min-w-0 flex-1 text-left rounded-md p-1 transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${
-                    isSelected ? "bg-muted" : "hover:bg-muted/40"
-                  }`}
-                  aria-pressed={isSelected}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm truncate">
-                      {stat.name}
-                    </span>
-                    <span className="text-xs font-mono text-muted-foreground">
-                      {stat.minValue}&ndash;{stat.maxValue}
-                    </span>
-                  </div>
-                  <p className="text-xs font-mono text-muted-foreground truncate">
-                    {stat.key}
-                  </p>
-                  {stat.description && (
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                      {stat.description}
+              <button
+                type="button"
+                onClick={() => onSelect(stat.key)}
+                className={`w-full text-left p-3 transition-colors ${
+                  isActive ? "hover:bg-muted/40" : "hover:bg-muted/20"
+                }`}
+                aria-pressed={isActive}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`font-medium text-sm truncate ${
+                          isActive ? "text-foreground" : "text-muted-foreground"
+                        }`}
+                      >
+                        {stat.name}
+                      </span>
+                      <span className="text-xs font-mono text-muted-foreground">
+                        {stat.minValue}&ndash;{stat.maxValue}
+                      </span>
+                    </div>
+                    <p className="text-xs font-mono text-muted-foreground truncate">
+                      {stat.key}
                     </p>
-                  )}
-                </button>
-                <div className="flex items-center gap-1 shrink-0">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onEdit(stat.id)}
-                    disabled={isSaving}
-                    aria-label={`Edit ${stat.name}`}
-                  >
-                    <Pencil className="size-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setDeleteTarget(stat)}
-                    disabled={isSaving}
-                    className="text-destructive hover:text-destructive"
-                    aria-label={`Delete ${stat.name}`}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
+                    {stat.description && (
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                        {stat.description}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onEdit(stat.id);
+                      }}
+                      disabled={isSaving}
+                      aria-label={`Edit ${stat.name}`}
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setDeleteTarget(stat);
+                      }}
+                      disabled={isSaving}
+                      className="text-destructive hover:text-destructive"
+                      aria-label={`Delete ${stat.name}`}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              </button>
             </div>
           );
         })}

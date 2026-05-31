@@ -81,7 +81,7 @@ export function StatManagementDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Stat Management"
-      description="Define stats and see how they change across your visual novel."
+      description="Define stats and track values like relationships and character attributes."
       maxWidth="5xl"
       onOpenTrigger={refreshProgression}
     >
@@ -133,25 +133,6 @@ export function StatManagementDialog({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          {stats.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-6">
-              {stats.map((stat) => (
-                <button
-                  type="button"
-                  key={stat.id}
-                  onClick={() => setSelectedStatKey(stat.key)}
-                  className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-                    selectedStatKey === stat.key
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted hover:bg-muted/80 text-foreground"
-                  }`}
-                >
-                  {stat.name}
-                </button>
-              ))}
-            </div>
-          )}
-
           <StatProgression
             progression={selectedProgression}
             isLoading={!selectedStatKey ? false : isLoadingProgression}

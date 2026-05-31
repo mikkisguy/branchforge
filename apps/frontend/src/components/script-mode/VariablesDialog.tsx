@@ -80,7 +80,6 @@ export function VariablesDialog({
         <div className="space-y-4">
           <Button
             type="button"
-            variant="outline"
             onClick={() => setEditingVariableId(MODE_NEW)}
             disabled={isSaving}
             className="w-full"
