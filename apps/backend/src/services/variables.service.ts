@@ -45,7 +45,6 @@ export interface CreateVariableBody {
  * Update variable request body
  */
 export interface UpdateVariableBody {
-  key?: string;
   description?: string | null;
   category?: string | null;
 }
@@ -197,12 +196,10 @@ export async function updateVariable(
   try {
     // Build update payload with only allowed fields
     const updateData: {
-      key?: string;
       description?: string | null;
       category?: string | null;
     } = {};
 
-    if (body.key !== undefined) updateData.key = body.key;
     if (body.description !== undefined)
       updateData.description = body.description;
     if (body.category !== undefined) updateData.category = body.category;

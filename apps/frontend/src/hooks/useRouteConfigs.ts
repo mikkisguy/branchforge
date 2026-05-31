@@ -24,7 +24,6 @@ interface CreateRouteConfigInput {
 }
 
 interface UpdateRouteConfigInput {
-  routeKey?: string;
   routeName?: string;
   jumpPrefix?: string;
   sortOrder?: number;

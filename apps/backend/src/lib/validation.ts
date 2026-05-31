@@ -456,7 +456,6 @@ export const createRouteConfigSchema = z
  */
 export const updateRouteConfigSchema = z
   .object({
-    routeKey: routeConfigKeySchema.optional(),
     routeName: requiredString(200, "Route name is too long").optional(),
     jumpPrefix: z
       .string()
@@ -519,7 +518,6 @@ export const createVariableSchema = z
  */
 export const updateVariableSchema = z
   .object({
-    key: variableKeySchema.optional(),
     description: optionalString(500, "Description is too long"),
     category: optionalString(50, "Category is too long"),
   })

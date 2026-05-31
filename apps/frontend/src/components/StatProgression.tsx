@@ -54,14 +54,23 @@ export function StatProgression({
 
   if (progression.labels.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <p className="text-sm text-muted-foreground mb-1">
-          No labels reference this stat yet
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Label conditions and effects using &quot;{progression.statKey}
-          &quot; will appear here.
-        </p>
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-sm font-medium">{progression.statName}</h3>
+          <p className="text-xs text-muted-foreground">
+            Range: {progression.minValue}&ndash;{progression.maxValue}
+            {" · "}0 labels
+          </p>
+        </div>
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <p className="text-sm text-muted-foreground mb-1">
+            No labels reference this stat yet
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Label conditions and effects using &quot;{progression.statKey}
+            &quot; will appear here.
+          </p>
+        </div>
       </div>
     );
   }

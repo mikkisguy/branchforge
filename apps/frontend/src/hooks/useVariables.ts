@@ -22,7 +22,6 @@ interface CreateVariableInput {
 }
 
 interface UpdateVariableInput {
-  key?: string;
   description?: string;
   category?: string;
 }

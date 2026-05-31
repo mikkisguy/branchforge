@@ -21,7 +21,6 @@ export interface CreateRouteConfigBody {
 }
 
 export interface UpdateRouteConfigBody {
-  routeKey?: string;
   routeName?: string;
   jumpPrefix?: string;
   sortOrder?: number;
