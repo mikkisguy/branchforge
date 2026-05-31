@@ -9,6 +9,7 @@ import { calculateContentHash } from "../lib/hash.js";
 import type { NewLabelLine } from "../db/schema/index.js";
 import { ValidationError } from "../middleware/error-handler.middleware.js";
 import { logError, LogEventType } from "../lib/logger.js";
+import type { ComparisonOperator, StatCondition } from "@branchforge/shared";
 
 // ============================================================================
 // Type Definitions
@@ -30,7 +31,7 @@ export type ContentType =
  * Type for line-level conditions
  */
 export type LineConditions = {
-  stats?: Record<string, number>;
+  stats?: Record<string, number | StatCondition>;
   variables?: string[];
 };
 
@@ -88,6 +89,11 @@ const FLAG_MAPPED_TYPE: StrictContentType = "JUMP";
  */
 const DEFAULT_CONTENT_TYPE: StrictContentType = "NARRATION";
 
+/**
+ * Default operator for stat conditions when not explicitly specified
+ */
+const DEFAULT_OPERATOR: ComparisonOperator = ">=";
+
 // ============================================================================
 // Type Mapping Functions
 // ============================================================================
@@ -100,6 +106,37 @@ const DEFAULT_CONTENT_TYPE: StrictContentType = "NARRATION";
  */
 function isStrictContentType(type: string): type is StrictContentType {
   return type === "NARRATION" || type === "DIALOGUE" || type === "JUMP";
+}
+
+/**
+ * Normalize a stat condition to ensure it has the correct shape.
+ * Converts plain numbers to StatCondition objects with the default operator.
+ *
+ * @param value - Either a number or a StatCondition object
+ * @returns A normalized StatCondition object
+ */
+function normalizeStatCondition(value: number | StatCondition): StatCondition {
+  if (typeof value === "number") {
+    return { value, operator: DEFAULT_OPERATOR };
+  }
+  return value;
+}
+
+/**
+ * Normalize line conditions to ensure all stats are StatCondition objects.
+ *
+ * @param conditions - LineConditions object to normalize
+ * @returns Normalized LineConditions with StatCondition objects for stats
+ */
+function normalizeLineConditions(
+  conditions?: LineConditions
+): LineConditions | undefined {
+  if (!conditions?.stats) return conditions;
+  const normalized: Record<string, StatCondition> = {};
+  for (const [key, value] of Object.entries(conditions.stats)) {
+    normalized[key] = normalizeStatCondition(value);
+  }
+  return { ...conditions, stats: normalized };
 }
 
 /**
@@ -224,6 +261,7 @@ export function mapEntriesToLabelLineValues(
     const mapped = mapEntryToDbContentType(entry);
     const entryContentHash = calculateContentHash(mapped.content);
     const speakerId = getCharacterIdByTag(entry.speaker, charactersByTag);
+    const normalizedConditions = normalizeLineConditions(entry.conditions);
     return {
       labelId,
       sequence: index + 1,
@@ -237,7 +275,7 @@ export function mapEntriesToLabelLineValues(
       lastSyncedAt: new Date(),
       rpyLineNumber: entry.lineNumber,
       rpyIndentLevel: entry.indentLevel ?? 0,
-      conditions: entry.conditions ?? null,
+      conditions: normalizedConditions ?? null,
       visualStatements: entry.visuals ?? null,
     };
   });

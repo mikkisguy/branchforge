@@ -128,7 +128,9 @@ describe("extractTechnicalConstructs - if/elif conditions with deltas", () => {
     const result = extractTechnicalConstructs(rpyContent, 0);
 
     expect(result.conditions).toBeDefined();
-    expect(result.conditions!.stats).toEqual({ strength: 5 });
+    expect(result.conditions!.stats).toEqual({
+      strength: { value: 5, operator: ">=" },
+    });
     expect(result.conditions!.statDeltas).toEqual({ strength: 10 });
   });
 
@@ -139,7 +141,9 @@ describe("extractTechnicalConstructs - if/elif conditions with deltas", () => {
     const result = extractTechnicalConstructs(rpyContent, 0);
 
     expect(result.conditions).toBeDefined();
-    expect(result.conditions!.stats).toEqual({ magic: 10 });
+    expect(result.conditions!.stats).toEqual({
+      magic: { value: 10, operator: "<" },
+    });
     expect(result.conditions!.statDeltas).toEqual({ magic: -5 });
   });
 
@@ -151,7 +155,10 @@ describe("extractTechnicalConstructs - if/elif conditions with deltas", () => {
     const result = extractTechnicalConstructs(rpyContent, 0);
 
     expect(result.conditions).toBeDefined();
-    expect(result.conditions!.stats).toEqual({ strength: 5, magic: 10 });
+    expect(result.conditions!.stats).toEqual({
+      strength: { value: 5, operator: ">=" },
+      magic: { value: 10, operator: "<" },
+    });
     expect(result.conditions!.statDeltas).toEqual({ strength: 10, magic: -5 });
   });
 });
