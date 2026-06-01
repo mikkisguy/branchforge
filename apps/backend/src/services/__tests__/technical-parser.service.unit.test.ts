@@ -104,6 +104,14 @@ describe("extractTechnicalConstructs - comparison operators", () => {
     });
   });
 
+  it("handles elif the same as if", () => {
+    const rpyContent = "elif affection_luna >= 50:";
+    const result = extractTechnicalConstructs(rpyContent, 0);
+    expect(result.conditions).toEqual({
+      stats: { affection_luna: { value: 50, operator: ">=" } },
+    });
+  });
+
   it("captures <=, >, <, ==, != operators", () => {
     const rpyContent = `if strength <= 5 and magic > 10 and charm < 3 and mood == 2 and trust != 1:`;
     const result = extractTechnicalConstructs(rpyContent, 0);

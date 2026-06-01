@@ -384,7 +384,7 @@ export interface PublicLabel {
   /** Variable and stat conditions for this label */
   conditions: {
     variables?: string[];
-    stats?: Record<string, number>;
+    stats?: Record<string, StatCondition>;
   } | null;
   createdAt: string;
   updatedAt: string;

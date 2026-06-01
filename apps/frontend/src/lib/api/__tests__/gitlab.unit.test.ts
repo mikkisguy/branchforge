@@ -10,7 +10,7 @@ import { gitlabApi } from "../gitlab.js";
 
 // Mock fetch
 const mockFetch = vi.fn();
-globalThis.fetch = mockFetch as unknown as typeof fetch;
+globalThis.fetch = mockFetch;
 
 describe("GitLab API Client", () => {
   afterEach(() => {

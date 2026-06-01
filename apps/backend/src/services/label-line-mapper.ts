@@ -33,6 +33,7 @@ export type ContentType =
 export type LineConditions = {
   stats?: Record<string, number | StatCondition>;
   variables?: string[];
+  statDeltas?: Record<string, number>;
 };
 
 /**

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mapEntriesToLabelLineValues } from "../label-line-mapper";
-import type { ComparisonOperator } from "@branchforge/shared";
+import type { ComparisonOperator, StatCondition } from "@branchforge/shared";
 
 describe("mapEntriesToLabelLineValues - technical metadata", () => {
   const charactersByTag = new Map<string, string>();
@@ -115,6 +115,39 @@ describe("mapEntriesToLabelLineValues - technical metadata", () => {
 
     expect(result[0].conditions).toMatchObject({
       stats: { affection_luna: { value: 50, operator: ">=" } },
+    });
+  });
+
+  it("preserves statDeltas when present with stats", () => {
+    const entries = [
+      {
+        type: "DIALOGUE" as const,
+        text: "Hello",
+        speaker: "char1",
+        lineNumber: 1,
+        indentLevel: 0,
+        conditions: {
+          stats: {
+            affection_luna: {
+              value: 50,
+              operator: ">=",
+            } as StatCondition,
+          },
+          statDeltas: { affection_luna: 10 },
+        },
+      },
+    ];
+
+    const result = mapEntriesToLabelLineValues(
+      entries,
+      "label1",
+      "project1",
+      charactersByTag
+    );
+
+    expect(result[0].conditions).toMatchObject({
+      stats: { affection_luna: { value: 50, operator: ">=" } },
+      statDeltas: { affection_luna: 10 },
     });
   });
 

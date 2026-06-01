@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { TechnicalPopover } from "../write-mode/TechnicalPopover";
+import { describe, it, expect } from "vitest";
+import { TechnicalPopover } from "@/components/write-mode/TechnicalPopover";
 import type { StatCondition } from "@branchforge/shared";
 
 describe("TechnicalPopover", () => {

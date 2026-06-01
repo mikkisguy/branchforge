@@ -332,26 +332,6 @@ async function seedTechnicalBadgesData() {
       },
     },
 
-    // Line 10: All comparison operators in one place
-    {
-      labelId,
-      sequence: 10,
-      content: "Testing all comparison operators.",
-      contentType: "NARRATION",
-      speakerId: null,
-      visualType: "GENERATED",
-      conditions: {
-        stats: {
-          strength: { value: 10, operator: ">=" },
-          dexterity: { value: 5, operator: "<=" },
-          intelligence: { value: 15, operator: ">" },
-          wisdom: { value: 3, operator: "<" },
-          charisma: { value: 8, operator: "==" },
-          luck: { value: 0, operator: "!=" },
-        },
-      },
-    },
-
     // Line 9: Complex menu with condition flags
     {
       labelId,
@@ -375,6 +355,26 @@ async function seedTechnicalBadgesData() {
           targetLabelId: "label_nothing",
         },
       ],
+    },
+
+    // Line 10: All comparison operators in one place
+    {
+      labelId,
+      sequence: 10,
+      content: "Testing all comparison operators.",
+      contentType: "NARRATION",
+      speakerId: null,
+      visualType: "GENERATED",
+      conditions: {
+        stats: {
+          strength: { value: 10, operator: ">=" },
+          dexterity: { value: 5, operator: "<=" },
+          intelligence: { value: 15, operator: ">" },
+          wisdom: { value: 3, operator: "<" },
+          charisma: { value: 8, operator: "==" },
+          luck: { value: 0, operator: "!=" },
+        },
+      },
     },
   ];
 
