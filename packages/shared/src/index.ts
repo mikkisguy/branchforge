@@ -424,6 +424,16 @@ export interface LabelLine {
   // NEW: Technical metadata for badges
   conditions: LineConditions | null;
   visualStatements: VisualStatement[] | null;
+  // Menu options for choice lines
+  menuOptions?: Array<{
+    label: string;
+    targetLabelId: string;
+    targetLabelName: string;
+    conditionFlags?: string[];
+    effects?: {
+      stats?: Record<string, number>;
+    };
+  }> | null;
 }
 
 // ============================================================================

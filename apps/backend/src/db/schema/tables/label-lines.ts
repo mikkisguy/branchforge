@@ -41,6 +41,7 @@ export const labelLines = pgTable(
       Array<{
         label: string;
         targetLabelId: string;
+        targetLabelName: string;
         conditionFlags?: string[];
       }>
     >(),

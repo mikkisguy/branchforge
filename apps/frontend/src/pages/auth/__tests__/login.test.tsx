@@ -146,15 +146,13 @@ describe("LoginPage", () => {
       await user.type(passwordInput, "password123");
       await user.click(submitButton);
 
-      // Should show loading state
+      // Should show loading state and disabled button
       await waitFor(() => {
         expect(submitButton).toHaveTextContent("Signing in...");
+        expect(submitButton).toBeDisabled();
+        expect(emailInput).toBeDisabled();
+        expect(passwordInput).toBeDisabled();
       });
-
-      // Button and inputs should be disabled
-      expect(submitButton).toBeDisabled();
-      expect(emailInput).toBeDisabled();
-      expect(passwordInput).toBeDisabled();
     });
 
     it("should display error message on failed login", async () => {

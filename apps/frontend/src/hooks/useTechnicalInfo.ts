@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useRef, useEffect } from "react";
-import type { LabelDetail } from "@branchforge/shared";
+import type { LabelDetail, LabelLine } from "@branchforge/shared";
 import type { DialogueEntry } from "../lib/prose-types";
 import type { ComparisonOperator, StatCondition } from "@branchforge/shared";
 
@@ -63,7 +63,7 @@ export function useTechnicalInfo(
   // Map is stable across renders — useMemo ensures identity for the same lines array
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const labelById = useMemo(() => {
-    if (!activeLabel?.lines) return new Map();
+    if (!activeLabel?.lines) return new Map<string, LabelLine>();
 
     return new Map(activeLabel.lines.map((line) => [line.id, line]));
   }, [activeLabel?.lines]);
@@ -102,22 +102,22 @@ export function useTechnicalInfo(
 
       // Parse menu choices
       if (line.menuOptions && line.menuOptions.length > 0) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        info.choices = line.menuOptions.map((choice: any) => ({
+        info.choices = line.menuOptions.map((choice) => ({
           label: choice.label,
           targetLabelId: choice.targetLabelId,
-          targetLabelName: choice.targetLabelId, // TODO: Resolve to actual label name
+          targetLabelName: choice.targetLabelName,
+          conditionFlags: choice.conditionFlags,
           effects: choice.effects,
         }));
       }
 
-      // Parse jump target
+      // Parse jump target from content (extract label name)
       if (line.contentType === "JUMP" && line.content) {
         const jumpTargetMatch = line.content.match(/jump\s+(\w+)/);
         if (jumpTargetMatch) {
           info.jumpTarget = {
-            labelId: "", // TODO: Resolve from target
             labelName: jumpTargetMatch[1],
+            labelId: "", // Jumps are parsed from content, resolved label ID would need backend support
           };
         }
       }

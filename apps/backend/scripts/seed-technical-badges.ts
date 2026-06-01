@@ -173,6 +173,48 @@ async function seedTechnicalBadgesData() {
   const labelId = newLabel.id;
   console.log(`✅ Created test label: ${labelId}\n`);
 
+  // Create target labels for menu choices and jumps
+  const targetLabels = [
+    { name: "Fight Scene", labelName: "label_fight" },
+    { name: "Run Away Scene", labelName: "label_run" },
+    { name: "Talk Scene", labelName: "label_talk" },
+    { name: "Light Path", labelName: "label_light" },
+    { name: "Dark Path", labelName: "label_dark" },
+    { name: "Gold Scene", labelName: "label_gold" },
+    { name: "Gem Scene", labelName: "label_gem" },
+    { name: "Nothing Scene", labelName: "label_nothing" },
+    { name: "Chapter Two Scene One", labelName: "chapter_two_scene_one" },
+  ];
+
+  const createdTargetLabels: Array<{ id: string; labelName: string }> = [];
+  for (const target of targetLabels) {
+    const [targetLabel] = await db
+      .insert(labels)
+      .values({
+        projectId: testProject.id,
+        projectFileId: projectFileId!,
+        title: target.name,
+        labelName: target.labelName,
+        labelNumber: createdTargetLabels.length + 2,
+        sequenceOrder: createdTargetLabels.length + 1,
+        visibility: "EXCLUSIVE",
+        status: "DRAFT",
+        conditions: {},
+        effects: {},
+        createdBy: testUser.id,
+        updatedBy: testUser.id,
+      })
+      .returning({ id: labels.id, labelName: labels.labelName });
+    createdTargetLabels.push({
+      id: targetLabel.id,
+      labelName: targetLabel.labelName!,
+    });
+    console.log(
+      `✅ Created target label: ${target.name} (${target.labelName})`
+    );
+  }
+  console.log();
+
   // Create label lines with various technical features
   const testLines: NewLabelLine[] = [
     // Line 1: Simple dialogue (no technical info)
@@ -197,15 +239,18 @@ async function seedTechnicalBadgesData() {
         {
           label: "Fight",
           targetLabelId: "label_fight",
+          targetLabelName: "label_fight",
         },
         {
           label: "Run away",
           targetLabelId: "label_run",
+          targetLabelName: "label_run",
           conditionFlags: ["has_stamina"],
         },
         {
           label: "Talk",
           targetLabelId: "label_talk",
+          targetLabelName: "label_talk",
         },
       ],
     },
@@ -279,10 +324,12 @@ async function seedTechnicalBadgesData() {
         {
           label: "Light path",
           targetLabelId: "label_light",
+          targetLabelName: "label_light",
         },
         {
           label: "Dark path",
           targetLabelId: "label_dark",
+          targetLabelName: "label_dark",
         },
       ],
       conditions: {
@@ -344,15 +391,18 @@ async function seedTechnicalBadgesData() {
         {
           label: "Gold coins",
           targetLabelId: "label_gold",
+          targetLabelName: "label_gold",
         },
         {
           label: "Magic gem",
           targetLabelId: "label_gem",
+          targetLabelName: "label_gem",
           conditionFlags: ["has_gem"],
         },
         {
           label: "Nothing",
           targetLabelId: "label_nothing",
+          targetLabelName: "label_nothing",
         },
       ],
     },
@@ -384,14 +434,19 @@ async function seedTechnicalBadgesData() {
   // Summary
   console.log("🎉 Technical badges test data seeded successfully!\n");
   console.log("Test features included:");
-  console.log("  ✅ Menu options (choices with condition flags)");
+  console.log(
+    "  ✅ Menu options (choices with condition flags and resolved target IDs)"
+  );
   console.log(
     "  ✅ Conditions with all comparison operators (>=, <=, >, <, ==, !=)"
   );
   console.log("  ✅ Variables conditions");
   console.log("  ✅ Visual statements (SCENE, SHOW, HIDE)");
   console.log("  ✅ Jump targets");
-  console.log("  ✅ Combinations of multiple features\n");
+  console.log("  ✅ Combinations of multiple features");
+  console.log(
+    `  ✅ ${createdTargetLabels.length} target labels created for testing resolution\n`
+  );
   console.log("To test comparison operators:");
   console.log(`  1. Open the app and login with: ${TEST_EMAIL}`);
   console.log(`  2. Password: ${TEST_PASSWORD}`);
@@ -403,7 +458,14 @@ async function seedTechnicalBadgesData() {
   console.log(
     "  6. Click/hover on badges on lines 3, 8, and 10 to see operator symbols"
   );
-  console.log("  7. Verify symbols: ≥, ≤, =, ≠ are displayed correctly\n");
+  console.log("  7. Verify symbols: ≥, ≤, =, ≠ are displayed correctly");
+  console.log("\n  8. Navigate to lines with menu options (lines 2, 6, 9)");
+  console.log(
+    "  9. Hover over the choice badges to see resolved target label IDs"
+  );
+  console.log(
+    " 10. Verify that targetLabelId is populated with actual database IDs"
+  );
 
   process.exit(0);
 }

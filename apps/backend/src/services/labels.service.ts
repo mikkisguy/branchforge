@@ -52,6 +52,7 @@ import {
 } from "./rpy-parser.service.js";
 import { calculateContentHash, calculateLinesHash } from "../lib/hash.js";
 import { mapEntryToDbType, type ContentType } from "./label-line-mapper.js";
+import { resolveLabelNames } from "./label-name-resolver.service.js";
 
 // Re-export PublicLabel from shared for route handlers
 export type { PublicLabel };
@@ -1666,12 +1667,23 @@ export async function getLabel(
     updatedAt: row.line.updatedAt.toISOString(),
   }));
 
+  // Resolve jump targets to actual label IDs
+  // Fetch all labels in the same project for resolution
+  const allLabels = await db
+    .select({ id: labels.id, labelName: labels.labelName })
+    .from(labels)
+    .where(
+      and(eq(labels.projectId, label.projectId), isNull(labels.deletedAt))
+    );
+
+  const resolvedLines = resolveJumpTargets(lines, allLabels);
+
   // Derive characters using the shared helper function
   const labelCharactersWithInfo = await getDerivedCharactersForLabel(labelId);
 
   return {
     ...mapToPublicLabel({ ...label, filePath }),
-    lines,
+    lines: resolvedLines,
     characters: labelCharactersWithInfo,
   };
 }
@@ -2467,4 +2479,64 @@ export async function getLabelCharacters(
 
   // Return characters derived from dialogue speakers
   return await getDerivedCharactersForLabel(labelId);
+}
+
+// ============================================================================
+// Jump Target Resolution
+// ============================================================================
+
+/**
+ * Resolve jump targets in label lines to actual label IDs.
+ *
+ * @param lines - Label lines to resolve targets for
+ * @param allLabels - All labels in the project for resolution
+ * @returns Lines with resolved targetLabelId in menuOptions
+ */
+export function resolveJumpTargets<
+  T extends {
+    menuOptions?: Array<{
+      label: string;
+      targetLabelId: string;
+      targetLabelName: string;
+      conditionFlags?: string[];
+    }> | null;
+  },
+>(lines: T[], allLabels: Array<{ id: string; labelName: string | null }>): T[] {
+  // If no lines or no menuOptions, return as-is
+  if (!lines || lines.length === 0) {
+    return lines;
+  }
+
+  // Build list of all target names to resolve
+  const targetNames: string[] = [];
+  for (const line of lines) {
+    if (line.menuOptions) {
+      for (const choice of line.menuOptions) {
+        if (choice.targetLabelId && choice.targetLabelId !== "") {
+          targetNames.push(choice.targetLabelId);
+        }
+      }
+    }
+  }
+
+  // Resolve all target names to label IDs
+  const resolvedMap = resolveLabelNames(allLabels, targetNames);
+
+  // Update lines with resolved IDs
+  return lines.map((line) => {
+    if (!line.menuOptions) {
+      return line;
+    }
+
+    return {
+      ...line,
+      menuOptions: line.menuOptions.map((choice) => ({
+        ...choice,
+        targetLabelId:
+          choice.targetLabelId && choice.targetLabelId !== ""
+            ? (resolvedMap[choice.targetLabelId] ?? "")
+            : "",
+      })),
+    };
+  });
 }
