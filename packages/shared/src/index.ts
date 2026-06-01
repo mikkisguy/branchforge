@@ -321,10 +321,23 @@ export interface Label {
 // ============================================================================
 
 /**
+ * Comparison operators for stat conditions
+ */
+export type ComparisonOperator = ">=" | "<=" | ">" | "<" | "==" | "!=";
+
+/**
+ * Stat condition with value and operator
+ */
+export type StatCondition = {
+  value: number;
+  operator: ComparisonOperator;
+};
+
+/**
  * Technical metadata for line-level conditions (stats and variables)
  */
 export type LineConditions = {
-  stats?: Record<string, number>;
+  stats?: Record<string, StatCondition>;
   variables?: string[];
 };
 
@@ -371,7 +384,7 @@ export interface PublicLabel {
   /** Variable and stat conditions for this label */
   conditions: {
     variables?: string[];
-    stats?: Record<string, number>;
+    stats?: Record<string, StatCondition>;
   } | null;
   createdAt: string;
   updatedAt: string;

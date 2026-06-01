@@ -30,6 +30,8 @@ import {
   LabelStatus,
   sanitizeLabelName,
   RENPY_LABEL_REGEX,
+  type ComparisonOperator,
+  type StatCondition,
 } from "@branchforge/shared";
 import { createAuditFields, updateAuditFields } from "../lib/audit.js";
 import {
@@ -1728,6 +1730,31 @@ export async function authorizeLabelAccess(
  * @param label - The label data (with filePath from JOIN)
  */
 function mapToPublicLabel(label: LabelForPublic): PublicLabel {
+  // Transform database format to API format for conditions.stats
+  // Database stores stats as Record<string, number | StatCondition>, API expects Record<string, StatCondition>
+  const transformedConditions: PublicLabel["conditions"] = label.conditions
+    ? {
+        variables: label.conditions.variables,
+        stats: label.conditions.stats
+          ? Object.fromEntries(
+              Object.entries(label.conditions.stats).map(([key, value]) => [
+                key,
+                // Check if already a StatCondition object (has value and operator properties)
+                typeof value === "object" &&
+                value !== null &&
+                "value" in value &&
+                "operator" in value
+                  ? (value as StatCondition)
+                  : {
+                      value: value as number,
+                      operator: ">=" as ComparisonOperator,
+                    },
+              ])
+            )
+          : undefined,
+      }
+    : null;
+
   return {
     id: label.id,
     projectId: label.projectId,
@@ -1742,7 +1769,7 @@ function mapToPublicLabel(label: LabelForPublic): PublicLabel {
     visibility: label.visibility,
     version: label.version,
     contentHash: label.contentHash,
-    conditions: label.conditions ?? null,
+    conditions: transformedConditions,
     projectFileId: label.projectFileId,
     fileName: extractFileName(label.filePath),
     createdAt: label.createdAt.toISOString(),

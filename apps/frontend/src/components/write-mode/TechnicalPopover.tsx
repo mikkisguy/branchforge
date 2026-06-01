@@ -1,8 +1,9 @@
 import { ArrowUpRight, Image, HelpCircle, Split } from "lucide-react";
 import { useRef, useEffect } from "react";
+import type { ComparisonOperator, StatCondition } from "@branchforge/shared";
 
 interface ConditionsData {
-  stats?: Record<string, number>;
+  stats?: Record<string, StatCondition>;
   variables?: string[];
 }
 
@@ -28,6 +29,19 @@ interface TechnicalPopoverProps {
   type: "conditions" | "jump" | "visuals" | "menu";
   data: ConditionsData | JumpData | VisualData[] | MenuChoiceData[] | null;
   onClose: () => void;
+}
+
+const OPERATOR_SYMBOLS: Record<ComparisonOperator, string> = {
+  ">=": "≥",
+  "<=": "≤",
+  "==": "=",
+  "!=": "≠",
+  ">": ">",
+  "<": "<",
+};
+
+function formatStatCondition(condition: StatCondition): string {
+  return `${OPERATOR_SYMBOLS[condition.operator]} ${condition.value}`;
 }
 
 export function TechnicalPopover({
@@ -69,8 +83,6 @@ export function TechnicalPopover({
               <HelpCircle className="w-4 h-4 text-muted-foreground flex-shrink-0" />
               <span className="text-sm font-medium">Conditions</span>
             </div>
-            {/* TODO: Show comparison operators (≥, =, etc.) once LineConditions
-                 data model includes operator field and parser extracts them */}
             <ul className="text-xs text-muted-foreground space-y-1.5">
               {hasStats &&
                 Object.entries(conditionsData.stats!).map(([key, value]) => (
@@ -78,7 +90,7 @@ export function TechnicalPopover({
                     <span className="text-muted-foreground/60 w-2 flex-shrink-0 select-none">
                       -
                     </span>
-                    {key}: {String(value)}
+                    {key}: {formatStatCondition(value)}
                   </li>
                 ))}
               {hasVars &&

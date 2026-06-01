@@ -95,6 +95,58 @@ describe("extractTechnicalConstructs - scene/show/hide", () => {
   });
 });
 
+describe("extractTechnicalConstructs - comparison operators", () => {
+  it("captures >= operator", () => {
+    const rpyContent = "if affection_luna >= 50:";
+    const result = extractTechnicalConstructs(rpyContent, 0);
+    expect(result.conditions).toEqual({
+      stats: { affection_luna: { value: 50, operator: ">=" } },
+    });
+  });
+
+  it("handles elif the same as if", () => {
+    const rpyContent = "elif affection_luna >= 50:";
+    const result = extractTechnicalConstructs(rpyContent, 0);
+    expect(result.conditions).toEqual({
+      stats: { affection_luna: { value: 50, operator: ">=" } },
+    });
+  });
+
+  it("captures <=, >, <, ==, != operators", () => {
+    const rpyContent = `if strength <= 5 and magic > 10 and charm < 3 and mood == 2 and trust != 1:`;
+    const result = extractTechnicalConstructs(rpyContent, 0);
+    expect(result.conditions).toEqual({
+      stats: {
+        strength: { value: 5, operator: "<=" },
+        magic: { value: 10, operator: ">" },
+        charm: { value: 3, operator: "<" },
+        mood: { value: 2, operator: "==" },
+        trust: { value: 1, operator: "!=" },
+      },
+    });
+  });
+
+  it("handles nested conditions with parentheses", () => {
+    const rpyContent = "if (strength >= 5 or magic > 10):";
+    const result = extractTechnicalConstructs(rpyContent, 0);
+    expect(result.conditions).toBeDefined();
+    expect(result.conditions?.stats).toEqual({
+      strength: { value: 5, operator: ">=" },
+      magic: { value: 10, operator: ">" },
+    });
+  });
+
+  it("extracts stats when mixed with variables", () => {
+    const rpyContent = "if strength >= 5 and flag_luna:";
+    const result = extractTechnicalConstructs(rpyContent, 0);
+    expect(result.conditions).toBeDefined();
+    expect(result.conditions?.stats).toEqual({
+      strength: { value: 5, operator: ">=" },
+    });
+    expect(result.conditions?.variables).toEqual(["flag_luna"]);
+  });
+});
+
 describe("extractTechnicalConstructs - if/elif conditions with deltas", () => {
   it("preserves thresholds and stores deltas separately", () => {
     const rpyContent = `if strength >= 5:
@@ -104,7 +156,9 @@ describe("extractTechnicalConstructs - if/elif conditions with deltas", () => {
     const result = extractTechnicalConstructs(rpyContent, 0);
 
     expect(result.conditions).toBeDefined();
-    expect(result.conditions!.stats).toEqual({ strength: 5 });
+    expect(result.conditions!.stats).toEqual({
+      strength: { value: 5, operator: ">=" },
+    });
     expect(result.conditions!.statDeltas).toEqual({ strength: 10 });
   });
 
@@ -115,7 +169,9 @@ describe("extractTechnicalConstructs - if/elif conditions with deltas", () => {
     const result = extractTechnicalConstructs(rpyContent, 0);
 
     expect(result.conditions).toBeDefined();
-    expect(result.conditions!.stats).toEqual({ magic: 10 });
+    expect(result.conditions!.stats).toEqual({
+      magic: { value: 10, operator: "<" },
+    });
     expect(result.conditions!.statDeltas).toEqual({ magic: -5 });
   });
 
@@ -127,7 +183,10 @@ describe("extractTechnicalConstructs - if/elif conditions with deltas", () => {
     const result = extractTechnicalConstructs(rpyContent, 0);
 
     expect(result.conditions).toBeDefined();
-    expect(result.conditions!.stats).toEqual({ strength: 5, magic: 10 });
+    expect(result.conditions!.stats).toEqual({
+      strength: { value: 5, operator: ">=" },
+      magic: { value: 10, operator: "<" },
+    });
     expect(result.conditions!.statDeltas).toEqual({ strength: 10, magic: -5 });
   });
 });

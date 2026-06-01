@@ -10,7 +10,12 @@
  */
 
 import { NotFoundError } from "../middleware/error-handler.middleware.js";
-import { sanitizeLabelName, RENPY_LABEL_REGEX } from "@branchforge/shared";
+import {
+  sanitizeLabelName,
+  RENPY_LABEL_REGEX,
+  type StatCondition,
+  type ComparisonOperator,
+} from "@branchforge/shared";
 
 // Parsed RPY data structures
 export interface RPYParsedData {
@@ -245,7 +250,7 @@ export interface TechnicalConstructs {
   }>;
   jumpTarget?: string;
   conditions?: {
-    stats?: Record<string, number>;
+    stats?: Record<string, StatCondition>;
     statDeltas?: Record<string, number>;
     variables?: string[];
   };
@@ -1971,12 +1976,14 @@ export function extractTechnicalConstructs(
       .trim();
 
     // Extract stat comparisons: e.g., "strength >= 5" or "magic < 10"
+    // Limitations: Does not handle variable comparisons (e.g., "strength >= max_value")
     const statRegex = /([a-zA-Z_][a-zA-Z0-9_]*)\s*(>=|<=|>|<|==|!=)\s*(-?\d+)/g;
     let statMatch;
     while ((statMatch = statRegex.exec(conditionExpr)) !== null) {
       const statName = statMatch[1];
+      const operator = statMatch[2] as ComparisonOperator;
       const value = Number.parseInt(statMatch[3], 10);
-      constructs.conditions.stats![statName] = value;
+      constructs.conditions.stats![statName] = { value, operator };
     }
 
     // Extract variable names (bare identifiers used as boolean flags)

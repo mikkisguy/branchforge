@@ -1,9 +1,10 @@
 import { BadgeQuestionMark, ArrowUpRight, Image, Split } from "lucide-react";
+import { type StatCondition } from "@branchforge/shared";
 
 type BadgeType = "conditions" | "jump" | "visuals" | "menu";
 
 interface ConditionsData {
-  stats?: Record<string, number>;
+  stats?: Record<string, StatCondition>;
   variables?: string[];
 }
 

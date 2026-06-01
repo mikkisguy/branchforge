@@ -210,7 +210,7 @@ async function seedTechnicalBadgesData() {
       ],
     },
 
-    // Line 3: Conditions (stats and variables)
+    // Line 3: Conditions with different comparison operators
     {
       labelId,
       sequence: 3,
@@ -220,8 +220,10 @@ async function seedTechnicalBadgesData() {
       visualType: "BLACK",
       conditions: {
         stats: {
-          strength: 5,
-          charisma: 3,
+          strength: { value: 5, operator: ">=" },
+          charisma: { value: 3, operator: "<=" },
+          intelligence: { value: 10, operator: ">" },
+          luck: { value: 2, operator: "<" },
         },
         variables: ["has_key", "is_daytime"],
       },
@@ -312,7 +314,7 @@ async function seedTechnicalBadgesData() {
       ],
     },
 
-    // Line 8: Multiple conditions with different types
+    // Line 8: Multiple conditions with different operators
     {
       labelId,
       sequence: 8,
@@ -322,9 +324,9 @@ async function seedTechnicalBadgesData() {
       visualType: "GENERATED",
       conditions: {
         stats: {
-          magic: 10,
-          luck: 5,
-          gold: 100,
+          magic: { value: 10, operator: ">=" },
+          luck: { value: 5, operator: "==" },
+          gold: { value: 100, operator: "!=" },
         },
         variables: ["has_spell", "is_main_quest"],
       },
@@ -354,6 +356,26 @@ async function seedTechnicalBadgesData() {
         },
       ],
     },
+
+    // Line 10: All comparison operators in one place
+    {
+      labelId,
+      sequence: 10,
+      content: "Testing all comparison operators.",
+      contentType: "NARRATION",
+      speakerId: null,
+      visualType: "GENERATED",
+      conditions: {
+        stats: {
+          strength: { value: 10, operator: ">=" },
+          dexterity: { value: 5, operator: "<=" },
+          intelligence: { value: 15, operator: ">" },
+          wisdom: { value: 3, operator: "<" },
+          charisma: { value: 8, operator: "==" },
+          luck: { value: 0, operator: "!=" },
+        },
+      },
+    },
   ];
 
   await db.insert(labelLines).values(testLines);
@@ -363,11 +385,14 @@ async function seedTechnicalBadgesData() {
   console.log("🎉 Technical badges test data seeded successfully!\n");
   console.log("Test features included:");
   console.log("  ✅ Menu options (choices with condition flags)");
-  console.log("  ✅ Conditions (stats and variables)");
+  console.log(
+    "  ✅ Conditions with all comparison operators (>=, <=, >, <, ==, !=)"
+  );
+  console.log("  ✅ Variables conditions");
   console.log("  ✅ Visual statements (SCENE, SHOW, HIDE)");
   console.log("  ✅ Jump targets");
   console.log("  ✅ Combinations of multiple features\n");
-  console.log("To test:");
+  console.log("To test comparison operators:");
   console.log(`  1. Open the app and login with: ${TEST_EMAIL}`);
   console.log(`  2. Password: ${TEST_PASSWORD}`);
   console.log("  3. Open the 'Technical Badges Test' project");
@@ -376,8 +401,9 @@ async function seedTechnicalBadgesData() {
     "  5. Click the eye icon in the top-right to toggle technical badges"
   );
   console.log(
-    "  6. You should see badges on lines 2-9 (line 1 has no badges)\n"
+    "  6. Click/hover on badges on lines 3, 8, and 10 to see operator symbols"
   );
+  console.log("  7. Verify symbols: ≥, ≤, =, ≠ are displayed correctly\n");
 
   process.exit(0);
 }
