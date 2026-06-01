@@ -35,6 +35,7 @@ export interface DialogueEntry {
       effects?: {
         stats?: Record<string, number>;
       };
+      conditionFlags?: string[];
     }>;
     jumpTarget?: {
       labelId: string;

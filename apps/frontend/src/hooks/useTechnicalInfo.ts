@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useRef, useEffect } from "react";
-import type { LabelDetail } from "@branchforge/shared";
+import type { LabelDetail, LabelLine } from "@branchforge/shared";
 import type { DialogueEntry } from "../lib/prose-types";
 import type { ComparisonOperator, StatCondition } from "@branchforge/shared";
 
@@ -63,7 +63,7 @@ export function useTechnicalInfo(
   // Map is stable across renders — useMemo ensures identity for the same lines array
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const labelById = useMemo(() => {
-    if (!activeLabel?.lines) return new Map();
+    if (!activeLabel?.lines) return new Map<string, LabelLine>();
 
     return new Map(activeLabel.lines.map((line) => [line.id, line]));
   }, [activeLabel?.lines]);
@@ -102,19 +102,13 @@ export function useTechnicalInfo(
 
       // Parse menu choices
       if (line.menuOptions && line.menuOptions.length > 0) {
-        info.choices = line.menuOptions.map(
-          (choice: {
-            label: string;
-            targetLabelId: string;
-            targetLabelName: string;
-            effects?: { stats?: Record<string, number> };
-          }) => ({
-            label: choice.label,
-            targetLabelId: choice.targetLabelId,
-            targetLabelName: choice.targetLabelName,
-            effects: choice.effects,
-          })
-        );
+        info.choices = line.menuOptions.map((choice) => ({
+          label: choice.label,
+          targetLabelId: choice.targetLabelId,
+          targetLabelName: choice.targetLabelName,
+          conditionFlags: choice.conditionFlags,
+          effects: choice.effects,
+        }));
       }
 
       // Parse jump target from content (extract label name)

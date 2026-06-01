@@ -2532,9 +2532,10 @@ export function resolveJumpTargets<
       ...line,
       menuOptions: line.menuOptions.map((choice) => ({
         ...choice,
-        targetLabelId: choice.targetLabelId
-          ? (resolvedMap[choice.targetLabelId] ?? "")
-          : "",
+        targetLabelId:
+          choice.targetLabelId && choice.targetLabelId !== ""
+            ? (resolvedMap[choice.targetLabelId] ?? "")
+            : "",
       })),
     };
   });
