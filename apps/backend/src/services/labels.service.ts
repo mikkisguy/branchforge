@@ -31,6 +31,7 @@ import {
   sanitizeLabelName,
   RENPY_LABEL_REGEX,
   type ComparisonOperator,
+  type StatCondition,
 } from "@branchforge/shared";
 import { createAuditFields, updateAuditFields } from "../lib/audit.js";
 import {
@@ -1730,7 +1731,7 @@ export async function authorizeLabelAccess(
  */
 function mapToPublicLabel(label: LabelForPublic): PublicLabel {
   // Transform database format to API format for conditions.stats
-  // Database stores stats as Record<string, number>, API expects Record<string, StatCondition>
+  // Database stores stats as Record<string, number | StatCondition>, API expects Record<string, StatCondition>
   const transformedConditions: PublicLabel["conditions"] = label.conditions
     ? {
         variables: label.conditions.variables,
@@ -1738,7 +1739,16 @@ function mapToPublicLabel(label: LabelForPublic): PublicLabel {
           ? Object.fromEntries(
               Object.entries(label.conditions.stats).map(([key, value]) => [
                 key,
-                { value, operator: ">=" as ComparisonOperator },
+                // Check if already a StatCondition object (has value and operator properties)
+                typeof value === "object" &&
+                value !== null &&
+                "value" in value &&
+                "operator" in value
+                  ? (value as StatCondition)
+                  : {
+                      value: value as number,
+                      operator: ">=" as ComparisonOperator,
+                    },
               ])
             )
           : undefined,
