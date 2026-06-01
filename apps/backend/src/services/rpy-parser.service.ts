@@ -1916,6 +1916,7 @@ export function extractTechnicalConstructs(
         const choice = {
           label: choiceMatch[1],
           targetLabelId: "",
+          targetLabelName: "",
           effects: { stats: {} as Record<string, number> },
         };
 
@@ -1934,6 +1935,7 @@ export function extractTechnicalConstructs(
           );
           if (jumpInChoice) {
             choice.targetLabelId = jumpInChoice[1];
+            choice.targetLabelName = jumpInChoice[1];
           }
 
           // Extract stat changes (e.g., $ affection_luna += 10)

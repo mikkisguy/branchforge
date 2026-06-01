@@ -102,22 +102,28 @@ export function useTechnicalInfo(
 
       // Parse menu choices
       if (line.menuOptions && line.menuOptions.length > 0) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        info.choices = line.menuOptions.map((choice: any) => ({
-          label: choice.label,
-          targetLabelId: choice.targetLabelId,
-          targetLabelName: choice.targetLabelId, // TODO: Resolve to actual label name
-          effects: choice.effects,
-        }));
+        info.choices = line.menuOptions.map(
+          (choice: {
+            label: string;
+            targetLabelId: string;
+            targetLabelName: string;
+            effects?: { stats?: Record<string, number> };
+          }) => ({
+            label: choice.label,
+            targetLabelId: choice.targetLabelId,
+            targetLabelName: choice.targetLabelName,
+            effects: choice.effects,
+          })
+        );
       }
 
-      // Parse jump target
+      // Parse jump target from content (extract label name)
       if (line.contentType === "JUMP" && line.content) {
         const jumpTargetMatch = line.content.match(/jump\s+(\w+)/);
         if (jumpTargetMatch) {
           info.jumpTarget = {
-            labelId: "", // TODO: Resolve from target
             labelName: jumpTargetMatch[1],
+            labelId: "", // Jumps are parsed from content, resolved label ID would need backend support
           };
         }
       }
