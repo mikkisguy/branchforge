@@ -43,6 +43,9 @@ export const labelLines = pgTable(
         targetLabelId: string;
         targetLabelName: string;
         conditionFlags?: string[];
+        effects?: {
+          stats?: Record<string, number>;
+        };
       }>
     >(),
 
