@@ -1,5 +1,11 @@
 import { ArrowUpRight, Image, HelpCircle, Split } from "lucide-react";
-import { useRef, useEffect } from "react";
+import {
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useCallback,
+} from "react";
 import type { ComparisonOperator, StatCondition } from "@branchforge/shared";
 
 interface ConditionsData {
@@ -50,6 +56,23 @@ export function TechnicalPopover({
   onClose,
 }: TechnicalPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
+  const [isFlipped, setIsFlipped] = useState(false);
+
+  const measureAndSetFlip = useCallback(() => {
+    const popover = popoverRef.current;
+    if (!popover) return;
+
+    const rect = popover.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const spaceBelow = viewportHeight - rect.bottom;
+
+    // If less than 16px space below (allow some margin), flip upwards
+    if (spaceBelow < 16) {
+      setIsFlipped(true);
+    } else {
+      setIsFlipped(false);
+    }
+  }, []);
 
   // Handle click outside to close
   useEffect(() => {
@@ -67,6 +90,22 @@ export function TechnicalPopover({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [onClose]);
+
+  // Calculate position - flip upwards if not enough space below
+  useLayoutEffect(() => {
+    measureAndSetFlip();
+
+    const handleResize = () => measureAndSetFlip();
+    const handleScroll = () => measureAndSetFlip();
+
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("scroll", handleScroll);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [measureAndSetFlip, type, data]);
 
   const renderContent = () => {
     switch (type) {
@@ -207,7 +246,9 @@ export function TechnicalPopover({
   return (
     <div
       ref={popoverRef}
-      className="absolute left-0 top-full mt-1 z-50 bg-popover border border-border rounded-md shadow-lg p-3 min-w-[200px] animate-in fade-in-0 zoom-in-95 duration-200"
+      className={`absolute left-0 z-50 bg-popover border border-border rounded-md shadow-lg p-3 min-w-[200px] animate-in fade-in-0 zoom-in-95 duration-200 ${
+        isFlipped ? "bottom-full mb-1" : "top-full mt-1"
+      }`}
       style={{ maxWidth: "280px" }}
     >
       {renderContent()}

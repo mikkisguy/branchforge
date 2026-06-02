@@ -240,17 +240,34 @@ async function seedTechnicalBadgesData() {
           label: "Fight",
           targetLabelId: "label_fight",
           targetLabelName: "label_fight",
+          effects: {
+            stats: {
+              bravery: 10,
+            },
+          },
         },
         {
           label: "Run away",
           targetLabelId: "label_run",
           targetLabelName: "label_run",
           conditionFlags: ["has_stamina"],
+          effects: {
+            stats: {
+              stamina: -5,
+              cowardice: 3,
+            },
+          },
         },
         {
           label: "Talk",
           targetLabelId: "label_talk",
           targetLabelName: "label_talk",
+          effects: {
+            stats: {
+              charisma: 5,
+              trust: 8,
+            },
+          },
         },
       ],
     },
@@ -325,11 +342,23 @@ async function seedTechnicalBadgesData() {
           label: "Light path",
           targetLabelId: "label_light",
           targetLabelName: "label_light",
+          effects: {
+            stats: {
+              light: 5,
+              darkness: -3,
+            },
+          },
         },
         {
           label: "Dark path",
           targetLabelId: "label_dark",
           targetLabelName: "label_dark",
+          effects: {
+            stats: {
+              darkness: 8,
+              suspicion: 2,
+            },
+          },
         },
       ],
       conditions: {
@@ -392,17 +421,35 @@ async function seedTechnicalBadgesData() {
           label: "Gold coins",
           targetLabelId: "label_gold",
           targetLabelName: "label_gold",
+          effects: {
+            stats: {
+              gold: -50,
+              trust: 3,
+            },
+          },
         },
         {
           label: "Magic gem",
           targetLabelId: "label_gem",
           targetLabelName: "label_gem",
           conditionFlags: ["has_gem"],
+          effects: {
+            stats: {
+              magic: 10,
+              greed: -5,
+            },
+          },
         },
         {
           label: "Nothing",
           targetLabelId: "label_nothing",
           targetLabelName: "label_nothing",
+          effects: {
+            stats: {
+              trust: -5,
+              anger: 7,
+            },
+          },
         },
       ],
     },
@@ -425,6 +472,102 @@ async function seedTechnicalBadgesData() {
           luck: { value: 0, operator: "!=" },
         },
       },
+    },
+
+    // Line 11: Menu with multiple stat effects per choice
+    {
+      labelId,
+      sequence: 11,
+      content: "Who will you ally with?",
+      contentType: "DIALOGUE",
+      speakerId: characterId,
+      visualType: "GENERATED",
+      menuOptions: [
+        {
+          label: "The Kingdom",
+          targetLabelId: "label_fight",
+          targetLabelName: "label_fight",
+          effects: {
+            stats: {
+              honor: 15,
+              kingdom_reputation: 20,
+              rebel_loyalty: -10,
+            },
+          },
+        },
+        {
+          label: "The Rebels",
+          targetLabelId: "label_run",
+          targetLabelName: "label_run",
+          effects: {
+            stats: {
+              honor: -10,
+              kingdom_reputation: -15,
+              rebel_loyalty: 25,
+              freedom: 10,
+            },
+          },
+        },
+        {
+          label: "Stay Neutral",
+          targetLabelId: "label_talk",
+          targetLabelName: "label_talk",
+          effects: {
+            stats: {
+              caution: 8,
+              wisdom: 5,
+            },
+          },
+        },
+      ],
+    },
+
+    // Line 12: Menu with mixed positive and negative effects
+    {
+      labelId,
+      sequence: 12,
+      content: "What's your strategy?",
+      contentType: "DIALOGUE",
+      speakerId: characterId,
+      visualType: "GENERATED",
+      menuOptions: [
+        {
+          label: "Aggressive approach",
+          targetLabelId: "label_gold",
+          targetLabelName: "label_gold",
+          effects: {
+            stats: {
+              damage: 20,
+              stealth: -15,
+              health_risk: 10,
+            },
+          },
+        },
+        {
+          label: "Stealthy approach",
+          targetLabelId: "label_gem",
+          targetLabelName: "label_gem",
+          effects: {
+            stats: {
+              stealth: 25,
+              reputation: 5,
+              damage: -5,
+            },
+          },
+        },
+        {
+          label: "Diplomatic approach",
+          targetLabelId: "label_nothing",
+          targetLabelName: "label_nothing",
+          effects: {
+            stats: {
+              charisma: 15,
+              reputation: 10,
+              intimidation: -10,
+            },
+          },
+        },
+      ],
     },
   ];
 

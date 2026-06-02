@@ -2499,6 +2499,9 @@ export function resolveJumpTargets<
       targetLabelId: string;
       targetLabelName: string;
       conditionFlags?: string[];
+      effects?: {
+        stats?: Record<string, number>;
+      };
     }> | null;
   },
 >(lines: T[], allLabels: Array<{ id: string; labelName: string | null }>): T[] {
