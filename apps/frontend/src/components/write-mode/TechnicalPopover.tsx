@@ -1,5 +1,11 @@
 import { ArrowUpRight, Image, HelpCircle, Split } from "lucide-react";
-import { useRef, useEffect, useState } from "react";
+import {
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useCallback,
+} from "react";
 import type { ComparisonOperator, StatCondition } from "@branchforge/shared";
 
 interface ConditionsData {
@@ -52,6 +58,22 @@ export function TechnicalPopover({
   const popoverRef = useRef<HTMLDivElement>(null);
   const [isFlipped, setIsFlipped] = useState(false);
 
+  const measureAndSetFlip = useCallback(() => {
+    const popover = popoverRef.current;
+    if (!popover) return;
+
+    const rect = popover.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const spaceBelow = viewportHeight - rect.bottom;
+
+    // If less than 16px space below (allow some margin), flip upwards
+    if (spaceBelow < 16) {
+      setIsFlipped(true);
+    } else {
+      setIsFlipped(false);
+    }
+  }, []);
+
   // Handle click outside to close
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -70,21 +92,20 @@ export function TechnicalPopover({
   }, [onClose]);
 
   // Calculate position - flip upwards if not enough space below
-  useEffect(() => {
-    const popover = popoverRef.current;
-    if (!popover) return;
+  useLayoutEffect(() => {
+    measureAndSetFlip();
 
-    const rect = popover.getBoundingClientRect();
-    const viewportHeight = window.innerHeight;
-    const spaceBelow = viewportHeight - rect.bottom;
+    const handleResize = () => measureAndSetFlip();
+    const handleScroll = () => measureAndSetFlip();
 
-    // If less than 16px space below (allow some margin), flip upwards
-    if (spaceBelow < 16) {
-      setIsFlipped(true);
-    } else {
-      setIsFlipped(false);
-    }
-  }, []);
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("scroll", handleScroll);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [measureAndSetFlip, type, data]);
 
   const renderContent = () => {
     switch (type) {
