@@ -1,0 +1,1 @@
+ALTER TABLE "labels" ADD COLUMN "incoming_jumps" jsonb;

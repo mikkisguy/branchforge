@@ -295,6 +295,13 @@
       "when": 1779734488951,
       "tag": "0041_daily_rachel_grey",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1780468214901,
+      "tag": "0042_right_fabian_cortez",
+      "breakpoints": true
     }
   ]
 }
