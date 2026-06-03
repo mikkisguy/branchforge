@@ -377,6 +377,8 @@ export interface PublicLabel {
   version?: number | null;
   /** SHA hash of label content for change detection */
   contentHash?: string | null;
+  /** Incoming jumps to this label */
+  incomingJumps?: IncomingJump[] | null;
   /** ID of the project file this label is associated with */
   projectFileId: string;
   /** Basename of the file path (e.g., "act_i.rpy" from "labels/act_i.rpy") */
@@ -399,6 +401,21 @@ export type LabelLineContentType =
   | "CHOICE"
   | "MENU"
   | "JUMP";
+
+/**
+ * Incoming jump information - which labels jump TO this label
+ */
+export interface IncomingJump {
+  sourceLabelId: string;
+  sourceLabelTitle: string;
+  sourceLabelName: string | null;
+  jumpType: "MENU_CHOICE" | "AUTOMATIC";
+  choiceText: string | null; // Menu option label, or "Automatic jump"
+  conditions?: {
+    stats?: Record<string, StatCondition>;
+    variables?: string[];
+  };
+}
 
 /**
  * Label visual type enumeration
