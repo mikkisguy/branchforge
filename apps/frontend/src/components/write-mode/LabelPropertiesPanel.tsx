@@ -375,6 +375,66 @@ export function LabelPropertiesPanel({
                   </span>
                 )}
               </CollapsibleSection>
+
+              <CollapsibleSection
+                title="Incoming Jumps"
+                defaultOpen={false}
+                headerAction={
+                  activeLabel.incomingJumps &&
+                  activeLabel.incomingJumps.length > 0 ? (
+                    <span className="text-xs text-muted-foreground">
+                      ({activeLabel.incomingJumps.length})
+                    </span>
+                  ) : null
+                }
+              >
+                {!activeLabel.incomingJumps ||
+                activeLabel.incomingJumps.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No incoming jumps
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {activeLabel.incomingJumps.map((jump) => (
+                      <div
+                        key={`${jump.sourceLabelId}-${jump.choiceText}`}
+                        className="p-2 rounded-lg bg-muted/30 border border-border/50 text-xs"
+                      >
+                        <div className="font-medium text-foreground truncate">
+                          {jump.sourceLabelTitle}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1 text-muted-foreground">
+                          {jump.jumpType === "MENU_CHOICE" ? (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600">
+                              Choice
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-green-500/10 text-green-600">
+                              Auto
+                            </span>
+                          )}
+                          <span className="truncate flex-1">
+                            {jump.choiceText}
+                          </span>
+                        </div>
+                        {jump.conditions && (
+                          <div className="mt-1.5 flex flex-wrap gap-1">
+                            {jump.conditions.variables &&
+                              jump.conditions.variables.map((variable) => (
+                                <span
+                                  key={variable}
+                                  className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted/80 border border-border/50 font-mono text-muted-foreground"
+                                >
+                                  {variable}
+                                </span>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CollapsibleSection>
             </div>
           )}
         </div>

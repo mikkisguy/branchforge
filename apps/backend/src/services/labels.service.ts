@@ -33,6 +33,7 @@ import {
   type ComparisonOperator,
   type StatCondition,
 } from "@branchforge/shared";
+import type { IncomingJump } from "@branchforge/shared";
 import { createAuditFields, updateAuditFields } from "../lib/audit.js";
 import {
   NotFoundError,
@@ -985,6 +986,11 @@ async function syncLabelsInTransaction(
       // Track orphaned label IDs as affected for downstream cache/webhook handling
       affectedLabelIds.push(...orphanedIds);
     }
+  }
+
+  // Update incoming jumps for all affected labels
+  for (const labelId of affectedLabelIds) {
+    await updateIncomingJumpsForLabel(tx, labelId, projectId);
   }
 
   return {
@@ -2479,6 +2485,110 @@ export async function getLabelCharacters(
 
   // Return characters derived from dialogue speakers
   return await getDerivedCharactersForLabel(labelId);
+}
+
+// ============================================================================
+// Incoming Jumps Resolution
+// ============================================================================
+
+/**
+ * Update incoming jumps for a label by scanning all label lines in the project.
+ *
+ * @param context - Database query context (db connection or transaction)
+ * @param labelId - The label ID to update incoming jumps for
+ * @param projectId - The project ID to scan for incoming jumps
+ */
+async function updateIncomingJumpsForLabel(
+  context: Pick<ReturnType<typeof getDb>, "select" | "update">,
+  labelId: string,
+  projectId: string
+): Promise<void> {
+  // Query all label lines in the project
+  const allLines = await context
+    .select({
+      line: labelLines,
+      sourceLabel: {
+        id: labels.id,
+        title: labels.title,
+        labelName: labels.labelName,
+      },
+    })
+    .from(labelLines)
+    .innerJoin(labels, eq(labelLines.labelId, labels.id))
+    .where(
+      and(
+        eq(labels.projectId, projectId),
+        isNull(labels.deletedAt),
+        isNull(labelLines.deletedAt)
+      )
+    );
+
+  // Build incoming jumps array
+  const seen = new Set<string>();
+  const incomingJumpsArray: IncomingJump[] = [];
+
+  for (const row of allLines) {
+    const { line, sourceLabel } = row;
+
+    // Check for menu choice jumps
+    if (line.menuOptions) {
+      for (const option of line.menuOptions) {
+        if (option.targetLabelId && option.targetLabelId === labelId) {
+          const key = `${sourceLabel.id}::${option.label}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            incomingJumpsArray.push({
+              sourceLabelId: sourceLabel.id,
+              sourceLabelTitle: sourceLabel.title,
+              sourceLabelName: sourceLabel.labelName,
+              jumpType: "MENU_CHOICE" as const,
+              choiceText: option.label,
+              conditions: option.conditionFlags
+                ? { variables: option.conditionFlags }
+                : undefined,
+            });
+          }
+        }
+      }
+    }
+
+    // Check for automatic jumps in content
+    const jumpMatch = line.content.match(/^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+    if (jumpMatch) {
+      const targetLabelName = jumpMatch[1];
+      const [targetLabel] = await context
+        .select({ id: labels.id, labelName: labels.labelName })
+        .from(labels)
+        .where(
+          and(
+            eq(labels.projectId, projectId),
+            eq(labels.labelName, targetLabelName),
+            isNull(labels.deletedAt)
+          )
+        )
+        .limit(1);
+
+      if (targetLabel && targetLabel.id === labelId) {
+        const key = `${sourceLabel.id}::automatic`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          incomingJumpsArray.push({
+            sourceLabelId: sourceLabel.id,
+            sourceLabelTitle: sourceLabel.title,
+            sourceLabelName: sourceLabel.labelName,
+            jumpType: "AUTOMATIC" as const,
+            choiceText: "Automatic jump",
+          });
+        }
+      }
+    }
+  }
+
+  // Update the label with incoming jumps
+  await context
+    .update(labels)
+    .set({ incomingJumps: incomingJumpsArray })
+    .where(eq(labels.id, labelId));
 }
 
 // ============================================================================
