@@ -988,8 +988,91 @@ async function syncLabelsInTransaction(
     }
   }
 
-  // Update incoming jumps for all affected labels (batched, single pass)
-  await updateIncomingJumpsForLabels(tx, affectedLabelIds, projectId);
+  // Expand the recompute scope to include cross-file jump targets so their
+  // `incomingJumps` stay in sync after the synced file changes.  Without this
+  // expansion, labels in *other* files that are referenced by (or were
+  // previously referenced from) the changed labels would never be recomputed
+  // and would carry stale entries.
+  const expandedLabelIdSet = new Set<string>(affectedLabelIds);
+
+  if (affectedLabelIds.length > 0) {
+    const affectedSet = new Set(affectedLabelIds);
+
+    // a) Current jump targets referenced by the affected labels' lines.
+    //    These need their incomingJumps recomputed to pick up new edges.
+    const affectedLines = await tx
+      .select({
+        menuOptions: labelLines.menuOptions,
+        content: labelLines.content,
+      })
+      .from(labelLines)
+      .where(
+        and(
+          inArray(labelLines.labelId, affectedLabelIds),
+          isNull(labelLines.deletedAt)
+        )
+      );
+
+    const referencedNames = new Set<string>();
+    for (const line of affectedLines) {
+      if (line.menuOptions) {
+        for (const opt of line.menuOptions) {
+          if (opt.targetLabelId && opt.targetLabelId !== "") {
+            if (UUID_REGEX.test(opt.targetLabelId)) {
+              expandedLabelIdSet.add(opt.targetLabelId);
+            } else {
+              referencedNames.add(opt.targetLabelId);
+            }
+          }
+        }
+      }
+      const jumpMatch = line.content.match(/^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+      if (jumpMatch) {
+        referencedNames.add(jumpMatch[1]);
+      }
+    }
+
+    if (referencedNames.size > 0) {
+      const resolvedTargets = await tx
+        .select({ id: labels.id })
+        .from(labels)
+        .where(
+          and(
+            eq(labels.projectId, projectId),
+            inArray(labels.labelName, Array.from(referencedNames)),
+            isNull(labels.deletedAt)
+          )
+        );
+      for (const r of resolvedTargets) {
+        expandedLabelIdSet.add(r.id);
+      }
+    }
+
+    // b) Stale targets: labels whose existing incomingJumps reference an
+    //    affected label as source.  These need recomputation to drop edges
+    //    that no longer exist after the sync.
+    const labelsWithIncoming = await tx
+      .select({ id: labels.id, incomingJumps: labels.incomingJumps })
+      .from(labels)
+      .where(and(eq(labels.projectId, projectId), isNull(labels.deletedAt)));
+    for (const l of labelsWithIncoming) {
+      if (l.incomingJumps) {
+        for (const ij of l.incomingJumps) {
+          if (affectedSet.has(ij.sourceLabelId)) {
+            expandedLabelIdSet.add(l.id);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Update incoming jumps for all expanded labels (batched, single pass)
+  await updateIncomingJumpsForLabels(
+    tx,
+    Array.from(expandedLabelIdSet),
+    projectId
+  );
 
   return {
     labelsCreated,
@@ -2493,6 +2576,13 @@ export async function getLabelCharacters(
 // ============================================================================
 
 /**
+ * Matches canonical UUIDs.  Used to distinguish raw label IDs from
+ * label-name references in menu option `targetLabelId` fields.
+ */
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
  * Update incoming jumps for multiple labels by scanning all label lines in the
  * project once.  Resolves both menu-choice and automatic jump targets in batch
  * to avoid N+1 queries.
@@ -2530,12 +2620,18 @@ async function updateIncomingJumpsForLabels(
       )
     );
 
-  // 2. Collect all jump target names (menu choices + automatic jumps)
+  // 2. Collect all jump target names (menu choices + automatic jumps).
+  // Menu option `targetLabelId` can be either a raw UUID (already-resolved
+  // label ID) or a label name; only the latter needs name → ID lookup.
   const targetNames = new Set<string>();
   for (const row of allLines) {
     if (row.line.menuOptions) {
       for (const option of row.line.menuOptions) {
-        if (option.targetLabelId && option.targetLabelId !== "") {
+        if (
+          option.targetLabelId &&
+          option.targetLabelId !== "" &&
+          !UUID_REGEX.test(option.targetLabelId)
+        ) {
           targetNames.add(option.targetLabelId);
         }
       }
@@ -2584,7 +2680,11 @@ async function updateIncomingJumpsForLabels(
     if (line.menuOptions) {
       for (const option of line.menuOptions) {
         if (option.targetLabelId && option.targetLabelId !== "") {
-          const resolvedId = nameToId.get(option.targetLabelId.toLowerCase());
+          // UUID targetLabelId is already a label ID; name targets must be
+          // resolved via the name → ID map built above.
+          const resolvedId = UUID_REGEX.test(option.targetLabelId)
+            ? option.targetLabelId
+            : nameToId.get(option.targetLabelId.toLowerCase());
           if (resolvedId && targetSet.has(resolvedId)) {
             const key = `${sourceLabel.id}::${option.label}`;
             const seenKeys = seen.get(resolvedId) ?? new Set();
@@ -2671,8 +2771,6 @@ export function resolveJumpTargets<
   }
 
   // Build list of all target names to resolve (skip UUIDs - already resolved)
-  const UUID_REGEX =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const targetNames: string[] = [];
   for (const line of lines) {
     if (line.menuOptions) {

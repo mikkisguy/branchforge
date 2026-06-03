@@ -115,6 +115,7 @@ export function LabelPropertiesPanel({
     for (const line of activeLabel.lines) {
       if (line.menuOptions) {
         for (const opt of line.menuOptions) {
+          if (!opt.targetLabelId) continue;
           jumps.push({
             targetLabelId: opt.targetLabelId,
             targetLabelName: opt.targetLabelName,
@@ -521,7 +522,9 @@ export function LabelPropertiesPanel({
                             </span>
                           )}
                           <span className="truncate flex-1">
-                            {jump.choiceText}
+                            {jump.choiceText?.trim()
+                              ? jump.choiceText
+                              : "Untitled choice"}
                           </span>
                         </div>
                         {jump.conditions && (
