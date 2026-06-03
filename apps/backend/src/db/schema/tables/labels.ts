@@ -25,6 +25,7 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import type { IncomingJump } from "@branchforge/shared";
 import {
   labelStatusEnum,
   labelVisibilityEnum,
@@ -57,6 +58,7 @@ export const labels = pgTable(
       .notNull()
       .default({})
       .$type<{ variables?: string[]; stats?: Record<string, number> }>(), // {variables: [], stats: {}}
+    incomingJumps: jsonb("incoming_jumps").$type<IncomingJump[] | null>(),
     effects: jsonb("effects").notNull().default({}).$type<{
       variablesSet?: string[];
       variablesUnset?: string[];

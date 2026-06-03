@@ -33,6 +33,7 @@ import {
   type ComparisonOperator,
   type StatCondition,
 } from "@branchforge/shared";
+import type { IncomingJump } from "@branchforge/shared";
 import { createAuditFields, updateAuditFields } from "../lib/audit.js";
 import {
   NotFoundError,
@@ -987,6 +988,92 @@ async function syncLabelsInTransaction(
     }
   }
 
+  // Expand the recompute scope to include cross-file jump targets so their
+  // `incomingJumps` stay in sync after the synced file changes.  Without this
+  // expansion, labels in *other* files that are referenced by (or were
+  // previously referenced from) the changed labels would never be recomputed
+  // and would carry stale entries.
+  const expandedLabelIdSet = new Set<string>(affectedLabelIds);
+
+  if (affectedLabelIds.length > 0) {
+    const affectedSet = new Set(affectedLabelIds);
+
+    // a) Current jump targets referenced by the affected labels' lines.
+    //    These need their incomingJumps recomputed to pick up new edges.
+    const affectedLines = await tx
+      .select({
+        menuOptions: labelLines.menuOptions,
+        content: labelLines.content,
+      })
+      .from(labelLines)
+      .where(
+        and(
+          inArray(labelLines.labelId, affectedLabelIds),
+          isNull(labelLines.deletedAt)
+        )
+      );
+
+    const referencedNames = new Set<string>();
+    for (const line of affectedLines) {
+      if (line.menuOptions) {
+        for (const opt of line.menuOptions) {
+          if (opt.targetLabelId && opt.targetLabelId !== "") {
+            if (UUID_REGEX.test(opt.targetLabelId)) {
+              expandedLabelIdSet.add(opt.targetLabelId);
+            } else {
+              referencedNames.add(opt.targetLabelId);
+            }
+          }
+        }
+      }
+      const jumpMatch = line.content.match(/^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+      if (jumpMatch) {
+        referencedNames.add(jumpMatch[1]);
+      }
+    }
+
+    if (referencedNames.size > 0) {
+      const resolvedTargets = await tx
+        .select({ id: labels.id })
+        .from(labels)
+        .where(
+          and(
+            eq(labels.projectId, projectId),
+            inArray(labels.labelName, Array.from(referencedNames)),
+            isNull(labels.deletedAt)
+          )
+        );
+      for (const r of resolvedTargets) {
+        expandedLabelIdSet.add(r.id);
+      }
+    }
+
+    // b) Stale targets: labels whose existing incomingJumps reference an
+    //    affected label as source.  These need recomputation to drop edges
+    //    that no longer exist after the sync.
+    const labelsWithIncoming = await tx
+      .select({ id: labels.id, incomingJumps: labels.incomingJumps })
+      .from(labels)
+      .where(and(eq(labels.projectId, projectId), isNull(labels.deletedAt)));
+    for (const l of labelsWithIncoming) {
+      if (l.incomingJumps) {
+        for (const ij of l.incomingJumps) {
+          if (affectedSet.has(ij.sourceLabelId)) {
+            expandedLabelIdSet.add(l.id);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Update incoming jumps for all expanded labels (batched, single pass)
+  await updateIncomingJumpsForLabels(
+    tx,
+    Array.from(expandedLabelIdSet),
+    projectId
+  );
+
   return {
     labelsCreated,
     labelsUpdated,
@@ -1384,6 +1471,7 @@ type LabelForPublic = Pick<
   | "status"
   | "visibility"
   | "conditions"
+  | "incomingJumps"
   | "version"
   | "contentHash"
   | "projectFileId"
@@ -1594,6 +1682,7 @@ export async function listLabels(
       version: labels.version,
       contentHash: labels.contentHash,
       conditions: labels.conditions,
+      incomingJumps: labels.incomingJumps,
       projectFileId: labels.projectFileId,
       createdAt: labels.createdAt,
       updatedAt: labels.updatedAt,
@@ -1781,6 +1870,7 @@ function mapToPublicLabel(label: LabelForPublic): PublicLabel {
     visibility: label.visibility,
     version: label.version,
     contentHash: label.contentHash,
+    incomingJumps: label.incomingJumps,
     conditions: transformedConditions,
     projectFileId: label.projectFileId,
     fileName: extractFileName(label.filePath),
@@ -2482,6 +2572,176 @@ export async function getLabelCharacters(
 }
 
 // ============================================================================
+// Incoming Jumps Resolution
+// ============================================================================
+
+/**
+ * Matches canonical UUIDs.  Used to distinguish raw label IDs from
+ * label-name references in menu option `targetLabelId` fields.
+ */
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Update incoming jumps for multiple labels by scanning all label lines in the
+ * project once.  Resolves both menu-choice and automatic jump targets in batch
+ * to avoid N+1 queries.
+ *
+ * @param context - Database query context (db connection or transaction)
+ * @param labelIds - The label IDs to update incoming jumps for
+ * @param projectId - The project ID to scan for incoming jumps
+ */
+async function updateIncomingJumpsForLabels(
+  context: Pick<ReturnType<typeof getDb>, "select" | "update">,
+  labelIds: string[],
+  projectId: string
+): Promise<void> {
+  if (labelIds.length === 0) return;
+
+  const targetSet = new Set(labelIds);
+
+  // 1. Fetch all label lines in the project (single query)
+  const allLines = await context
+    .select({
+      line: labelLines,
+      sourceLabel: {
+        id: labels.id,
+        title: labels.title,
+        labelName: labels.labelName,
+      },
+    })
+    .from(labelLines)
+    .innerJoin(labels, eq(labelLines.labelId, labels.id))
+    .where(
+      and(
+        eq(labels.projectId, projectId),
+        isNull(labels.deletedAt),
+        isNull(labelLines.deletedAt)
+      )
+    );
+
+  // 2. Collect all jump target names (menu choices + automatic jumps).
+  // Menu option `targetLabelId` can be either a raw UUID (already-resolved
+  // label ID) or a label name; only the latter needs name → ID lookup.
+  const targetNames = new Set<string>();
+  for (const row of allLines) {
+    if (row.line.menuOptions) {
+      for (const option of row.line.menuOptions) {
+        if (
+          option.targetLabelId &&
+          option.targetLabelId !== "" &&
+          !UUID_REGEX.test(option.targetLabelId)
+        ) {
+          targetNames.add(option.targetLabelId);
+        }
+      }
+    }
+    const jumpMatch = row.line.content.match(
+      /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/
+    );
+    if (jumpMatch) {
+      targetNames.add(jumpMatch[1]);
+    }
+  }
+
+  // 3. Batch-resolve names to label IDs (single query)
+  const nameToId = new Map<string, string>();
+  if (targetNames.size > 0) {
+    const resolvedLabels = await context
+      .select({ id: labels.id, labelName: labels.labelName })
+      .from(labels)
+      .where(
+        and(
+          eq(labels.projectId, projectId),
+          inArray(labels.labelName, Array.from(targetNames)),
+          isNull(labels.deletedAt)
+        )
+      );
+
+    for (const l of resolvedLabels) {
+      if (l.labelName) {
+        nameToId.set(l.labelName.toLowerCase(), l.id);
+      }
+    }
+  }
+
+  // 4. Compute incoming jumps for all affected labels in a single pass
+  const incomingJumpsByLabel = new Map<string, IncomingJump[]>();
+  for (const id of labelIds) {
+    incomingJumpsByLabel.set(id, []);
+  }
+
+  const seen = new Map<string, Set<string>>();
+
+  for (const row of allLines) {
+    const { line, sourceLabel } = row;
+
+    // Check for menu choice jumps
+    if (line.menuOptions) {
+      for (const option of line.menuOptions) {
+        if (option.targetLabelId && option.targetLabelId !== "") {
+          // UUID targetLabelId is already a label ID; name targets must be
+          // resolved via the name → ID map built above.
+          const resolvedId = UUID_REGEX.test(option.targetLabelId)
+            ? option.targetLabelId
+            : nameToId.get(option.targetLabelId.toLowerCase());
+          if (resolvedId && targetSet.has(resolvedId)) {
+            const key = `${sourceLabel.id}::${option.label}`;
+            const seenKeys = seen.get(resolvedId) ?? new Set();
+            if (!seenKeys.has(key)) {
+              seenKeys.add(key);
+              seen.set(resolvedId, seenKeys);
+              incomingJumpsByLabel.get(resolvedId)!.push({
+                sourceLabelId: sourceLabel.id,
+                sourceLabelTitle: sourceLabel.title,
+                sourceLabelName: sourceLabel.labelName,
+                jumpType: "MENU_CHOICE" as const,
+                choiceText: option.label,
+                conditions: option.conditionFlags
+                  ? { variables: option.conditionFlags }
+                  : undefined,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // Check for automatic jumps in content
+    const jumpMatch = line.content.match(/^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+    if (jumpMatch) {
+      const targetLabelName = jumpMatch[1];
+      const resolvedId = nameToId.get(targetLabelName.toLowerCase());
+      if (resolvedId && targetSet.has(resolvedId)) {
+        const key = `${sourceLabel.id}::automatic`;
+        const seenKeys = seen.get(resolvedId) ?? new Set();
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          seen.set(resolvedId, seenKeys);
+          incomingJumpsByLabel.get(resolvedId)!.push({
+            sourceLabelId: sourceLabel.id,
+            sourceLabelTitle: sourceLabel.title,
+            sourceLabelName: sourceLabel.labelName,
+            jumpType: "AUTOMATIC" as const,
+            choiceText: "Automatic jump",
+          });
+        }
+      }
+    }
+  }
+
+  // 5. Batch-update all affected labels
+  await Promise.all(
+    labelIds.map((id) =>
+      context
+        .update(labels)
+        .set({ incomingJumps: incomingJumpsByLabel.get(id) ?? [] })
+        .where(eq(labels.id, id))
+    )
+  );
+}
+
+// ============================================================================
 // Jump Target Resolution
 // ============================================================================
 
@@ -2510,12 +2770,16 @@ export function resolveJumpTargets<
     return lines;
   }
 
-  // Build list of all target names to resolve
+  // Build list of all target names to resolve (skip UUIDs - already resolved)
   const targetNames: string[] = [];
   for (const line of lines) {
     if (line.menuOptions) {
       for (const choice of line.menuOptions) {
-        if (choice.targetLabelId && choice.targetLabelId !== "") {
+        if (
+          choice.targetLabelId &&
+          choice.targetLabelId !== "" &&
+          !UUID_REGEX.test(choice.targetLabelId)
+        ) {
           targetNames.push(choice.targetLabelId);
         }
       }
@@ -2533,13 +2797,19 @@ export function resolveJumpTargets<
 
     return {
       ...line,
-      menuOptions: line.menuOptions.map((choice) => ({
-        ...choice,
-        targetLabelId:
-          choice.targetLabelId && choice.targetLabelId !== ""
-            ? (resolvedMap[choice.targetLabelId] ?? "")
-            : "",
-      })),
+      menuOptions: line.menuOptions.map((choice) => {
+        if (!choice.targetLabelId || choice.targetLabelId === "") {
+          return { ...choice, targetLabelId: "" };
+        }
+        // Already a UUID, preserve it
+        if (UUID_REGEX.test(choice.targetLabelId)) {
+          return choice;
+        }
+        return {
+          ...choice,
+          targetLabelId: resolvedMap[choice.targetLabelId] ?? "",
+        };
+      }),
     };
   });
 }

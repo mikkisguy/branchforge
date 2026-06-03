@@ -18,11 +18,13 @@ import {
   labels,
   labelLines,
   characters,
+  routeConfigs,
   type NewLabelLine,
 } from "../src/db/schema/index.js";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { calculateContentHash } from "../src/lib/hash.js";
 import { hashPassword } from "../src/services/auth.service.js";
+import type { IncomingJump } from "@branchforge/shared";
 
 const TEST_EMAIL = "tech-badges-test@example.com";
 const TEST_PASSWORD = "testpassword123";
@@ -139,6 +141,33 @@ async function seedTechnicalBadgesData() {
     console.log("✅ Using existing test project file");
   }
 
+  // Create route config for outgoing jump display
+  const TEST_ROUTE_KEY = "tech_test";
+  const [existingRouteConfig] = await db
+    .select()
+    .from(routeConfigs)
+    .where(
+      and(
+        eq(routeConfigs.projectId, testProject.id),
+        eq(routeConfigs.routeKey, TEST_ROUTE_KEY)
+      )
+    )
+    .limit(1);
+
+  if (!existingRouteConfig) {
+    await db.insert(routeConfigs).values({
+      projectId: testProject.id,
+      routeKey: TEST_ROUTE_KEY,
+      routeName: "Tech Test Route",
+      jumpPrefix: "tech_test_",
+      sortOrder: 0,
+      isShared: false,
+    });
+    console.log(`✅ Created route config: ${TEST_ROUTE_KEY}`);
+  } else {
+    console.log(`✅ Using existing route config: ${TEST_ROUTE_KEY}`);
+  }
+
   // Clean up existing test label
   const [existingLabel] = await db
     .select()
@@ -160,6 +189,7 @@ async function seedTechnicalBadgesData() {
       projectFileId: projectFileId!,
       title: TEST_LABEL_TITLE,
       labelNumber: 1,
+      route: TEST_ROUTE_KEY,
       sequenceOrder: 0,
       visibility: "EXCLUSIVE",
       status: "DRAFT",
@@ -574,6 +604,168 @@ async function seedTechnicalBadgesData() {
   await db.insert(labelLines).values(testLines);
   console.log(`✅ Created ${testLines.length} test lines\n`);
 
+  // Build incoming jumps for target labels
+  const targetLabelMap = new Map(
+    createdTargetLabels.map((l) => [l.labelName, l.id])
+  );
+
+  const incomingJumpsByTarget: Record<string, IncomingJump[]> = {
+    label_fight: [
+      {
+        sourceLabelId: labelId,
+        sourceLabelTitle: TEST_LABEL_TITLE,
+        sourceLabelName: TEST_LABEL_TITLE,
+        jumpType: "MENU_CHOICE",
+        choiceText: "Fight",
+      },
+      {
+        sourceLabelId: labelId,
+        sourceLabelTitle: TEST_LABEL_TITLE,
+        sourceLabelName: TEST_LABEL_TITLE,
+        jumpType: "MENU_CHOICE",
+        choiceText: "The Kingdom",
+      },
+    ],
+    label_run: [
+      {
+        sourceLabelId: labelId,
+        sourceLabelTitle: TEST_LABEL_TITLE,
+        sourceLabelName: TEST_LABEL_TITLE,
+        jumpType: "MENU_CHOICE",
+        choiceText: "Run away",
+        conditions: {
+          variables: ["has_stamina"],
+        },
+      },
+      {
+        sourceLabelId: labelId,
+        sourceLabelTitle: TEST_LABEL_TITLE,
+        sourceLabelName: TEST_LABEL_TITLE,
+        jumpType: "MENU_CHOICE",
+        choiceText: "The Rebels",
+      },
+    ],
+    label_talk: [
+      {
+        sourceLabelId: labelId,
+        sourceLabelTitle: TEST_LABEL_TITLE,
+        sourceLabelName: TEST_LABEL_TITLE,
+        jumpType: "MENU_CHOICE",
+        choiceText: "Talk",
+      },
+      {
+        sourceLabelId: labelId,
+        sourceLabelTitle: TEST_LABEL_TITLE,
+        sourceLabelName: TEST_LABEL_TITLE,
+        jumpType: "MENU_CHOICE",
+        choiceText: "Stay Neutral",
+      },
+    ],
+    label_light: [
+      {
+        sourceLabelId: labelId,
+        sourceLabelTitle: TEST_LABEL_TITLE,
+        sourceLabelName: TEST_LABEL_TITLE,
+        jumpType: "MENU_CHOICE",
+        choiceText: "Light path",
+      },
+    ],
+    label_dark: [
+      {
+        sourceLabelId: labelId,
+        sourceLabelTitle: TEST_LABEL_TITLE,
+        sourceLabelName: TEST_LABEL_TITLE,
+        jumpType: "MENU_CHOICE",
+        choiceText: "Dark path",
+      },
+    ],
+    label_gold: [
+      {
+        sourceLabelId: labelId,
+        sourceLabelTitle: TEST_LABEL_TITLE,
+        sourceLabelName: TEST_LABEL_TITLE,
+        jumpType: "MENU_CHOICE",
+        choiceText: "Gold coins",
+      },
+      {
+        sourceLabelId: labelId,
+        sourceLabelTitle: TEST_LABEL_TITLE,
+        sourceLabelName: TEST_LABEL_TITLE,
+        jumpType: "MENU_CHOICE",
+        choiceText: "Aggressive approach",
+      },
+    ],
+    label_gem: [
+      {
+        sourceLabelId: labelId,
+        sourceLabelTitle: TEST_LABEL_TITLE,
+        sourceLabelName: TEST_LABEL_TITLE,
+        jumpType: "MENU_CHOICE",
+        choiceText: "Magic gem",
+        conditions: {
+          variables: ["has_gem"],
+        },
+      },
+      {
+        sourceLabelId: labelId,
+        sourceLabelTitle: TEST_LABEL_TITLE,
+        sourceLabelName: TEST_LABEL_TITLE,
+        jumpType: "MENU_CHOICE",
+        choiceText: "Stealthy approach",
+      },
+    ],
+    label_nothing: [
+      {
+        sourceLabelId: labelId,
+        sourceLabelTitle: TEST_LABEL_TITLE,
+        sourceLabelName: TEST_LABEL_TITLE,
+        jumpType: "MENU_CHOICE",
+        choiceText: "Nothing",
+      },
+      {
+        sourceLabelId: labelId,
+        sourceLabelTitle: TEST_LABEL_TITLE,
+        sourceLabelName: TEST_LABEL_TITLE,
+        jumpType: "MENU_CHOICE",
+        choiceText: "Diplomatic approach",
+      },
+    ],
+    chapter_two_scene_one: [
+      {
+        sourceLabelId: labelId,
+        sourceLabelTitle: TEST_LABEL_TITLE,
+        sourceLabelName: TEST_LABEL_TITLE,
+        jumpType: "AUTOMATIC",
+        choiceText: "Automatic jump",
+      },
+      ...createdTargetLabels
+        .filter((l) =>
+          ["label_gold", "label_gem", "label_nothing"].includes(l.labelName)
+        )
+        .map((l) => ({
+          sourceLabelId: l.id,
+          sourceLabelTitle: targetLabels.find(
+            (t) => t.labelName === l.labelName
+          )!.name,
+          sourceLabelName: l.labelName,
+          jumpType: "AUTOMATIC" as const,
+          choiceText: "Automatic jump" as const,
+        })),
+    ],
+  };
+
+  for (const [labelName, jumps] of Object.entries(incomingJumpsByTarget)) {
+    const targetId = targetLabelMap.get(labelName);
+    if (targetId) {
+      await db
+        .update(labels)
+        .set({ incomingJumps: jumps })
+        .where(eq(labels.id, targetId));
+      console.log(`✅ Added ${jumps.length} incoming jump(s) to ${labelName}`);
+    }
+  }
+  console.log();
+
   // Summary
   console.log("🎉 Technical badges test data seeded successfully!\n");
   console.log("Test features included:");
@@ -586,6 +778,8 @@ async function seedTechnicalBadgesData() {
   console.log("  ✅ Variables conditions");
   console.log("  ✅ Visual statements (SCENE, SHOW, HIDE)");
   console.log("  ✅ Jump targets");
+  console.log("  ✅ Incoming jumps on target labels");
+  console.log("  ✅ Outgoing jump (route-based prefix via route config)");
   console.log("  ✅ Combinations of multiple features");
   console.log(
     `  ✅ ${createdTargetLabels.length} target labels created for testing resolution\n`
