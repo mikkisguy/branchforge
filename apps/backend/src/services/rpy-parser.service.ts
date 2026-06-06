@@ -450,12 +450,14 @@ export function extractChoices(
     }
 
     // Check for menu end (indentation decreases)
-    // Pop from stack until we find the appropriate menu level
+    // Pop from stack until we find the appropriate menu level.
+    // A line at the same indent as `menu:` is outside the menu (a sibling
+    // of the menu block, e.g. the next label or a keyword), so pop with `<=`.
     const lineIndent = line.search(/\S/);
     if (
       menuStack.length > 0 &&
       trimmed &&
-      lineIndent < menuStack[menuStack.length - 1]
+      lineIndent <= menuStack[menuStack.length - 1]
     ) {
       menuStack.pop();
     }
@@ -1122,8 +1124,19 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
   const labelIndentation = new Map<string, string>();
   let lastDialogueIndent = "    "; // Default RPY indentation
 
-  // Keywords that signal the end of a label's dialogue block
-  const labelEndKeywords = new Set(["return", "menu", "jump", "call"]);
+  // Track menu block nesting to prevent premature dialogue insertion.
+  // Menu titles are editable dialogue entries, so they must be matched and
+  // replaced inside menu blocks. However, jump/call/return statements inside
+  // menu choice bodies should NOT trigger dialogue insertion — they're part of
+  // the menu structure, not the label's main dialogue flow.
+  const menuStack: number[] = [];
+
+  // Keywords that signal the end of a label's dialogue block.
+  // The `menuStack.length === 0` guard below prevents premature insertion at
+  // `menu:` (and any other line inside a menu block). This is the mechanism
+  // that stops the menu title from being inserted before `menu:` and again
+  // matched in place, which would produce duplicate dialogue entries.
+  const labelEndKeywords = new Set(["return", "jump", "call"]);
   const isLabelEndKeyword = (trimmed: string): boolean => {
     const firstWord = trimmed.split(/\s+/)[0];
     // Normalize by stripping trailing colon and other punctuation
@@ -1171,8 +1184,23 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
 
       currentLabel = labelMatch[1];
       labelDialogueIndices.set(currentLabel, 0);
+      // Reset menu tracking on label boundary
+      menuStack.length = 0;
       result.push(line);
       continue;
+    }
+
+    // Track menu block nesting: push on menu:, pop on dedent
+    if (trimmed === "menu:") {
+      menuStack.push(line.search(/\S/));
+    } else if (menuStack.length > 0 && trimmed) {
+      const lineIndent = line.search(/\S/);
+      while (
+        menuStack.length > 0 &&
+        lineIndent <= menuStack[menuStack.length - 1]
+      ) {
+        menuStack.pop();
+      }
     }
 
     // Check if this is a dialogue line
@@ -1181,6 +1209,10 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
     );
     const narrationMatch = trimmed.match(/^"(.*)"$/);
 
+    // Match and replace dialogue/narration both outside AND inside menu blocks.
+    // Menu titles are editable entries that should be updated like any other
+    // dialogue. The label-end insertion below handles the case where there are
+    // more entries than original lines.
     if (
       (dialogueMatch || narrationMatch) &&
       currentLabel &&
@@ -1216,8 +1248,14 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
       // The line will be added by the fall-through below.
     }
 
-    // Before adding a line that ends the label block, insert any remaining dialogue
-    if (currentLabel && updatedDialogue.has(currentLabel)) {
+    // Before adding a line that ends the label block, insert any remaining dialogue.
+    // Only do this OUTSIDE menu blocks — jump/call/return inside menu choice
+    // bodies are part of the menu structure, not the label's dialogue flow.
+    if (
+      currentLabel &&
+      updatedDialogue.has(currentLabel) &&
+      menuStack.length === 0
+    ) {
       const labelDialogue = updatedDialogue.get(currentLabel)!;
       const currentIndex = labelDialogueIndices.get(currentLabel) ?? 0;
 

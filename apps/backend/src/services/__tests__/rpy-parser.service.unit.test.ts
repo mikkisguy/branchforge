@@ -263,6 +263,26 @@ label START:
 
       expect(dialogue[0].text).toContain("multiline dialogue");
     });
+
+    it("should extract menu titles as editable dialogue", () => {
+      const menuRPY = `label start:
+    "Before menu"
+    menu:
+        "Menu title"
+        "Choice 1":
+            jump somewhere
+        "Choice 2":
+            jump elsewhere
+    "After menu"
+`;
+      const dialogue = extractDialogue(menuRPY);
+
+      // Menu titles are editable in write mode — extract them as narration
+      expect(dialogue).toHaveLength(3);
+      expect(dialogue[0].text).toBe("Before menu");
+      expect(dialogue[1].text).toBe("Menu title");
+      expect(dialogue[2].text).toBe("After menu");
+    });
   });
 
   describe("extractChoices", () => {
@@ -776,6 +796,29 @@ label title:
       );
       expect(resultWithPartial.fileType).toBe("STORY");
     });
+
+    it("should extract menu titles as editable dialogue in label dialogue", () => {
+      const menuRPY = `label start:
+    "Before menu"
+    menu:
+        "Menu title"
+        "Choice 1":
+            jump somewhere
+        "Choice 2":
+            jump elsewhere
+    "After menu"
+`;
+      const result = parseRPYFileWithLabels(menuRPY);
+
+      const startLabel = result.labels.find((l) => l.label === "start");
+      expect(startLabel).toBeDefined();
+
+      // Menu titles are editable in write mode — extract them as narration
+      expect(startLabel?.dialogue).toHaveLength(3);
+      expect(startLabel?.dialogue[0].text).toBe("Before menu");
+      expect(startLabel?.dialogue[1].text).toBe("Menu title");
+      expect(startLabel?.dialogue[2].text).toBe("After menu");
+    });
   });
 
   describe("convertToBranchForgeFormatFromLabels", () => {
@@ -1123,6 +1166,70 @@ label chapter1:
       });
 
       expect(result).toContain('e "Updated speaker"');
+    });
+
+    it("should NOT duplicate menu title during reconstruction", () => {
+      const originalContent = `label start:
+    "Some narration"
+    menu:
+        "Are you sure?"
+        "Yes":
+            jump yes_label
+        "No":
+            jump no_label
+`;
+
+      const updatedDialogue = new Map([
+        [
+          "start",
+          [
+            { speaker: null, text: "Some narration" },
+            { speaker: null, text: "Are you sure?" },
+          ],
+        ],
+      ]);
+
+      const result = reconstructRPYFile({
+        originalContent,
+        updatedDialogue,
+      });
+
+      // The menu title "Are you sure?" should NOT be duplicated outside the menu
+      expect(result).toContain("menu:");
+      expect(result).toContain('"Are you sure?"');
+
+      // Count occurrences of "Are you sure?" - should be exactly 1.
+      // Pre-fix, the second entry would be inserted before `menu:` and the
+      // original title line preserved inside the menu, producing two matches.
+      const matches = result.match(/"Are you sure\?"/g);
+      expect(matches).toHaveLength(1);
+    });
+
+    it("should NOT duplicate jump statements during reconstruction", () => {
+      const originalContent = `label end:
+    ma "Always."
+    jump end
+`;
+
+      const updatedDialogue = new Map([
+        ["end", [{ speaker: "ma", text: "Always." }]],
+      ]);
+
+      const result = reconstructRPYFile({
+        originalContent,
+        updatedDialogue,
+      });
+
+      // Should contain the jump statement exactly once
+      const jumpMatches = result.match(/jump end/g);
+      expect(jumpMatches).toHaveLength(1);
+
+      // Should NOT contain jump statement as a dialogue string
+      expect(result).not.toContain('"jump end"');
+
+      // Verify the reconstruction preserves the original structure
+      expect(result).toContain('ma "Always."');
+      expect(result).toContain("jump end");
     });
   });
 
