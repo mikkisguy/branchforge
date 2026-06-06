@@ -1555,6 +1555,7 @@ export async function reconstructFileForLabel(
       labelId: labelLines.labelId,
       speakerId: labelLines.speakerId,
       speakerTag: characters.renpyTag,
+      contentType: labelLines.contentType,
       content: labelLines.content,
       sequence: labelLines.sequence,
     })
@@ -1574,7 +1575,11 @@ export async function reconstructFileForLabel(
   // Group lines by labelId in-memory
   const linesByLabelId = new Map<
     string,
-    Array<{ speaker: string | null; content: string }>
+    Array<{
+      speaker: string | null;
+      content: string;
+      contentType: string;
+    }>
   >();
   for (const line of allLabelLines) {
     if (!linesByLabelId.has(line.labelId)) {
@@ -1584,10 +1589,15 @@ export async function reconstructFileForLabel(
       // Use Ren'Py speaker tag for script-safe reconstruction
       speaker: line.speakerTag ?? null,
       content: line.content,
+      contentType: line.contentType,
     });
   }
 
-  // Build dialogue map from grouped lines
+  // Build dialogue map from grouped lines.
+  // Only include DIALOGUE and NARRATION entries. JUMP, MENU, and CHOICE lines are
+  // structural keywords already present in the original file (handled via menuStack
+  // and other mechanisms) and must not be emitted as quoted text, otherwise they
+  // appear duplicated (e.g. "jump end" + jump end).
   for (const l of allLabels) {
     // Skip labels without a labelName (UI-created labels that don't exist in RPY files)
     if (l.labelName === null) {
@@ -1596,10 +1606,15 @@ export async function reconstructFileForLabel(
 
     const labelLinesData = linesByLabelId.get(l.id) || [];
 
-    const labelDialogue = labelLinesData.map((line) => ({
-      speaker: line.speaker,
-      text: line.content,
-    }));
+    const labelDialogue = labelLinesData
+      .filter(
+        (line) =>
+          line.contentType === "DIALOGUE" || line.contentType === "NARRATION"
+      )
+      .map((line) => ({
+        speaker: line.speaker,
+        text: line.content,
+      }));
     updatedDialogue.set(l.labelName, labelDialogue);
   }
 
