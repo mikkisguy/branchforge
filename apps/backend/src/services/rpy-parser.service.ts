@@ -453,8 +453,10 @@ export function extractChoices(
     // Pop from stack until we find the appropriate menu level.
     // A line at the same indent as `menu:` is outside the menu (a sibling
     // of the menu block, e.g. the next label or a keyword), so pop with `<=`.
+    // Use a while loop so a single dedent unwinds all nested menu levels
+    // the line has escaped.
     const lineIndent = line.search(/\S/);
-    if (
+    while (
       menuStack.length > 0 &&
       trimmed &&
       lineIndent <= menuStack[menuStack.length - 1]
