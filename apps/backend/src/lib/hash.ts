@@ -39,7 +39,13 @@ function normalizeToCanonicalString(
   entry:
     | { content: string }
     | { text?: string; target?: string }
-    | { type?: string; speaker?: string; text?: string; target?: string }
+    | {
+        type?: string;
+        speaker?: string;
+        text?: string;
+        target?: string;
+        menuOptions?: Array<Record<string, unknown>>;
+      }
     | { speakerId: string | null; text: string }
 ): string {
   // Handle database canonical format ({ content: string })
@@ -60,6 +66,12 @@ function normalizeToCanonicalString(
       case "FLAG":
         // Menu choice/flag: represent as dialogue with null speaker
         return `:${entry.text ?? ""}`;
+      case "MENU":
+        // Menu block: serialize menuOptions for consistent hashing
+        if ("menuOptions" in entry && entry.menuOptions) {
+          return `menu:${JSON.stringify(entry.menuOptions)}`;
+        }
+        return "";
       default:
         return "";
     }
@@ -124,7 +136,13 @@ export function calculateLinesHash(
   lines: Array<
     | { content: string }
     | { text?: string; target?: string }
-    | { type?: string; speaker?: string; text?: string; target?: string }
+    | {
+        type?: string;
+        speaker?: string;
+        text?: string;
+        target?: string;
+        menuOptions?: Array<Record<string, unknown>>;
+      }
     | { speakerId: string | null; text: string }
   >
 ): string {

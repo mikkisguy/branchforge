@@ -73,6 +73,7 @@ export type LabelLineInsertValues = Pick<
   | "rpyIndentLevel"
   | "conditions"
   | "visualStatements"
+  | "menuOptions"
 >;
 
 // ============================================================================
@@ -253,12 +254,45 @@ export function mapEntriesToLabelLineValues(
     indentLevel?: number;
     conditions?: LineConditions;
     visuals?: VisualStatement[];
+    menuOptions?: Array<{
+      label: string;
+      targetLabelId: string;
+      targetLabelName: string;
+      conditionFlags?: string[];
+      effects?: {
+        stats?: Record<string, number>;
+      };
+    }>;
   }>,
   labelId: string,
   projectFileId: string,
   charactersByTag: Map<string, string>
 ): LabelLineInsertValues[] {
   return entries.map((entry, index) => {
+    // Handle MENU entries with menuOptions
+    if (entry.type === "MENU") {
+      const contentHash = calculateContentHash(
+        JSON.stringify(entry.menuOptions ?? [])
+      );
+      return {
+        labelId,
+        sequence: index + 1,
+        contentType: "MENU" as const,
+        content: "",
+        speakerId: null,
+        projectFileId,
+        linePosition: index,
+        contentHash,
+        lastSyncedHash: contentHash,
+        lastSyncedAt: new Date(),
+        rpyLineNumber: entry.lineNumber,
+        rpyIndentLevel: entry.indentLevel ?? 0,
+        conditions: null,
+        visualStatements: null,
+        menuOptions: entry.menuOptions ?? null,
+      };
+    }
+
     const mapped = mapEntryToDbContentType(entry);
     const entryContentHash = calculateContentHash(mapped.content);
     const speakerId = getCharacterIdByTag(entry.speaker, charactersByTag);
@@ -278,6 +312,7 @@ export function mapEntriesToLabelLineValues(
       rpyIndentLevel: entry.indentLevel ?? 0,
       conditions: normalizedConditions ?? null,
       visualStatements: entry.visuals ?? null,
+      menuOptions: null,
     };
   });
 }
