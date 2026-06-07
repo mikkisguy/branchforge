@@ -615,9 +615,9 @@ describe("useGitLabSync", () => {
         { timeout: 5000 }
       );
 
-      // Labels are immediately refetched after export to ensure data freshness
-      expect(refetchQueriesSpy).toHaveBeenCalledWith({
-        queryKey: labelKeys.lists("project-1"),
+      // Labels are invalidated after export to ensure data freshness
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+        queryKey: labelKeys.scoped("project-1"),
       });
       // Project files are also refetched to reflect any file changes from export
       expect(refetchQueriesSpy).toHaveBeenCalledWith({

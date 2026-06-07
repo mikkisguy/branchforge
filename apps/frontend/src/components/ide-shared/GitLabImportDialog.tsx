@@ -26,7 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/contexts/ToastContext";
 import { useGitLab } from "@/hooks/useGitLab";
 import { gitlabApi } from "@/lib/api/gitlab";
-import { projectKeys, gitlabKeys } from "@/lib/query-keys";
+import { projectKeys, gitlabKeys, labelKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
 import type { GitLabRepository } from "@/lib/api/gitlab";
 import { CharacterImportWizard } from "@/components/CharacterImportWizard";
@@ -275,6 +275,12 @@ export function GitLabImportDialog({
       await queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
       await queryClient.invalidateQueries({
         queryKey: gitlabKeys.repositories(),
+      });
+
+      // Invalidate label queries for the new project to ensure fresh data
+      // (including incomingJumps computed during sync).
+      await queryClient.invalidateQueries({
+        queryKey: labelKeys.scoped(result.project.id),
       });
 
       const currentImportId = importIdRef.current;

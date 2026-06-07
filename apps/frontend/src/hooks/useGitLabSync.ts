@@ -162,9 +162,11 @@ export function useGitLabSync(): UseGitLabSyncReturn {
 
   const invalidateProjectCaches = useCallback(
     (projectId: string) => {
-      // Invalidate and refetch list queries to ensure immediate data refresh
-      void queryClient.refetchQueries({
-        queryKey: labelKeys.lists(projectId),
+      // Invalidate all label queries for this project to ensure data refresh
+      // (e.g. incomingJumps recomputed after import). We use invalidateQueries
+      // to mark queries as stale so they refetch when next mounted/used.
+      queryClient.invalidateQueries({
+        queryKey: labelKeys.scoped(projectId),
       });
       void queryClient.refetchQueries({
         queryKey: gitlabKeys.importedFiles(projectId),

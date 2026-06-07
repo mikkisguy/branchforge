@@ -9,12 +9,16 @@
 import JSZip from "jszip";
 import { getDb } from "../db/index.js";
 import { projectFiles } from "../db/schema/index.js";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, isNull, sql } from "drizzle-orm";
 import { calculateContentHash } from "../lib/hash.js";
 import { parseRPYFileWithLabels } from "./rpy-parser.service.js";
 import { logError, LogEventType } from "../lib/logger.js";
-import { syncLabelsFromFile } from "./labels.service.js";
+import {
+  syncLabelsFromFile,
+  updateIncomingJumpsForLabels,
+} from "./labels.service.js";
 import { createProject, deleteProject } from "./projects.service.js";
+import { labels } from "../db/schema/index.js";
 
 // ============================================================================
 // Import Guardrails
@@ -356,6 +360,22 @@ export async function importZipFile(
         fileIndex++;
       }
     });
+
+    // Compute incomingJumps for all project labels after import so
+    // cross-file jumps are captured regardless of file processing order.
+    // Skip if every file failed — no new labels were written.
+    if (filesImported + filesUpdated + filesSkipped > 0) {
+      await db.transaction(async (tx) => {
+        const allProjectLabels = await tx
+          .select({ id: labels.id })
+          .from(labels)
+          .where(
+            and(eq(labels.projectId, projectId), isNull(labels.deletedAt))
+          );
+        const allLabelIds = allProjectLabels.map((l) => l.id);
+        await updateIncomingJumpsForLabels(tx, allLabelIds, projectId);
+      });
+    }
 
     // Construct success result
     const success: ImportZipSuccess = {

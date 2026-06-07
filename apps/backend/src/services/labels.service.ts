@@ -2651,7 +2651,7 @@ const UUID_REGEX =
  * @param labelIds - The label IDs to update incoming jumps for
  * @param projectId - The project ID to scan for incoming jumps
  */
-async function updateIncomingJumpsForLabels(
+export async function updateIncomingJumpsForLabels(
   context: Pick<ReturnType<typeof getDb>, "select" | "update">,
   labelIds: string[],
   projectId: string
