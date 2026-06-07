@@ -1062,7 +1062,7 @@ export function parseRPYFileWithLabels(
         }> = [];
 
         // Look ahead for choice labels inside this menu
-        for (let j = i + 1; j < lines.length && j < i + 20; j++) {
+        for (let j = i + 1; j < lines.length; j++) {
           const choiceLine = lines[j];
           const choiceTrimmed = choiceLine.trim();
           const choiceIndent = choiceLine.search(/\S/);
@@ -1073,21 +1073,34 @@ export function parseRPYFileWithLabels(
             break;
           }
 
-          // Try double-quoted choice
+          // Try double-quoted, single-quoted, or unquoted choice
           const doubleQuoteMatch = choiceTrimmed.match(/^"(.+)":/);
-          if (doubleQuoteMatch) {
-            let choiceLabel = doubleQuoteMatch[1];
-            choiceLabel = choiceLabel
-              .replace(/"+$/, "")
-              .replace(/\\"/g, '"')
-              .replace(/""/g, '"');
+          const singleQuoteMatch = choiceTrimmed.match(/^'(.+)':/);
+          const unquotedMatch = choiceTrimmed.match(
+            /^([a-zA-Z_][a-zA-Z0-9_ ]*):$/
+          );
+          const quoteMatch =
+            doubleQuoteMatch || singleQuoteMatch || unquotedMatch;
+          if (quoteMatch) {
+            let choiceLabel = quoteMatch[1];
+            if (doubleQuoteMatch) {
+              choiceLabel = choiceLabel
+                .replace(/"+$/, "")
+                .replace(/\\"/g, '"')
+                .replace(/""/g, '"');
+            } else if (singleQuoteMatch) {
+              choiceLabel = choiceLabel
+                .replace(/'+$/, "")
+                .replace(/\\'/g, "'")
+                .replace(/''/g, "'");
+            }
             let target: string | null = null;
             const statEffects: Record<string, number> = {};
             const flags: string[] = [];
 
-            // Look ahead for jump and stat changes in this choice block
+            // Look ahead for jump and stat changes in this choice body
             const choiceBodyIndent = choiceIndent;
-            for (let k = j + 1; k < lines.length && k < j + 10; k++) {
+            for (let k = j + 1; k < lines.length; k++) {
               const bodyLine = lines[k];
               const bodyTrimmed = bodyLine.trim();
               const bodyIndent = bodyLine.search(/\S/);
@@ -1097,6 +1110,17 @@ export function parseRPYFileWithLabels(
 
               // Exit choice block if indentation decreased
               if (bodyIndent <= choiceBodyIndent) break;
+
+              // Exit if we hit another choice or dedent past menu level
+              // Exclude if/elif/else — those are valid choice body lines
+              if (
+                bodyIndent <= menuIndent ||
+                bodyTrimmed.match(/^["'][^"']+["']:/) ||
+                (bodyTrimmed.match(/^[a-zA-Z_][a-zA-Z0-9_ ]*:$/) &&
+                  !bodyTrimmed.match(/^(if|elif|else)\b/))
+              ) {
+                break;
+              }
 
               // Extract jump target
               const jumpInChoice = bodyTrimmed.match(
@@ -1959,6 +1983,35 @@ export function generateRpyFile(scene: BranchForgeScene): string {
         inMenu = false;
       }
       lines.push(`    "${entry.text}"`);
+    } else if (
+      entry.type === "MENU" &&
+      entry.menuOptions &&
+      entry.menuOptions.length > 0
+    ) {
+      const menuIndent = " ".repeat(
+        entry.indentLevel ? entry.indentLevel * 4 : 4
+      );
+      const choiceIndent = menuIndent + "    ";
+      const bodyIndent = choiceIndent + "    ";
+      lines.push(`${menuIndent}menu:`);
+      for (const opt of entry.menuOptions) {
+        lines.push(`${choiceIndent}"${opt.label}":`);
+        if (opt.targetLabelName) {
+          lines.push(`${bodyIndent}jump ${opt.targetLabelName}`);
+        }
+        if (opt.effects?.stats) {
+          for (const [stat, value] of Object.entries(opt.effects.stats)) {
+            const op = value >= 0 ? "+=" : "-=";
+            lines.push(`${bodyIndent}$ ${stat} ${op} ${Math.abs(value)}`);
+          }
+        }
+        if (opt.conditionFlags && opt.conditionFlags.length > 0) {
+          for (const flag of opt.conditionFlags) {
+            lines.push(`${bodyIndent}if ${flag}:`);
+          }
+        }
+      }
+      inMenu = false;
     } else if (entry.type === "FLAG" && entry.text && entry.target) {
       // Open menu if not already open
       if (!inMenu) {
@@ -1967,6 +2020,11 @@ export function generateRpyFile(scene: BranchForgeScene): string {
       }
       lines.push(`        "${entry.text}":`);
       lines.push(`            jump ${entry.target}`);
+    } else if (entry.type === "JUMP" && entry.target) {
+      if (inMenu) {
+        inMenu = false;
+      }
+      lines.push(`    jump ${entry.target}`);
     }
   }
 

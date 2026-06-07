@@ -65,26 +65,32 @@ describe("Incoming Jumps", () => {
   });
 
   afterAll(async () => {
-    const lbls = await db
-      .select({ id: labelsTable.id })
-      .from(labelsTable)
-      .where(eq(labelsTable.projectId, testProjectId));
-    if (lbls.length > 0) {
-      await db.delete(labelLines).where(
-        inArray(
-          labelLines.labelId,
-          lbls.map((l) => l.id)
-        )
-      );
+    const zipUserId = testUuid("99110000", 9);
+    const zipProjectId = testUuid("99110000", 10);
+
+    // Clean up both testProjectId and zipProjectId data
+    for (const projectId of [testProjectId, zipProjectId]) {
+      const lbls = await db
+        .select({ id: labelsTable.id })
+        .from(labelsTable)
+        .where(eq(labelsTable.projectId, projectId));
+      if (lbls.length > 0) {
+        await db.delete(labelLines).where(
+          inArray(
+            labelLines.labelId,
+            lbls.map((l) => l.id)
+          )
+        );
+      }
+      await db.delete(labelsTable).where(eq(labelsTable.projectId, projectId));
+      await db
+        .delete(projectFiles)
+        .where(eq(projectFiles.projectId, projectId));
+      await db.delete(projects).where(eq(projects.id, projectId));
     }
-    await db
-      .delete(labelsTable)
-      .where(eq(labelsTable.projectId, testProjectId));
-    await db
-      .delete(projectFiles)
-      .where(eq(projectFiles.projectId, testProjectId));
-    await db.delete(projects).where(eq(projects.id, testProjectId));
-    await db.delete(users).where(eq(users.id, testUserId));
+    for (const userId of [testUserId, zipUserId]) {
+      await db.delete(users).where(eq(users.id, userId));
+    }
   });
 
   it("populates incomingJumps for labels targeted by menu choices", async () => {

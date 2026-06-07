@@ -52,9 +52,8 @@ import {
   characters,
 } from "../db/schema/index.js";
 import { eq, asc, inArray, isNull, and, sql } from "drizzle-orm";
-import { calculateDialogueHash } from "../lib/hash.js";
+import { calculateLinesHash, calculateContentHash } from "../lib/hash.js";
 import { updateAuditFields } from "../lib/audit.js";
-import { calculateContentHash } from "../lib/hash.js";
 import { trackWordsForLabel } from "../services/word-count.service.js";
 
 // ============================================================================
@@ -252,9 +251,6 @@ async function updateLabelDialogueHandler(
       }
     }
 
-    // Calculate content hash for new dialogue
-    const contentHash = calculateDialogueHash(dialogue);
-
     const updateResult = await db.transaction(async (tx) => {
       // Serialize concurrent updates for the same label to avoid duplicate rows
       // from overlapping delete + insert operations.
@@ -412,7 +408,19 @@ async function updateLabelDialogueHandler(
         await tx.delete(labelLines).where(inArray(labelLines.id, idsToDelete));
       }
 
-      // 4. Update label with audit fields and sync status
+      // 4. Compute content hash from the actual persisted label_lines
+      // (includes MENU/JUMP rows preserved during prose edits) so the hash
+      // stays consistent with sync/import flows that use calculateLinesHash.
+      const finalLines = await tx
+        .select()
+        .from(labelLines)
+        .where(
+          and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt))
+        )
+        .orderBy(asc(labelLines.sequence));
+      const contentHash = calculateLinesHash(finalLines);
+
+      // 5. Update label with audit fields and sync status
       const auditFields = updateAuditFields(lockedCurrentVersion, user.id);
       await tx
         .update(labels)

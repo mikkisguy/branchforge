@@ -833,6 +833,7 @@ label title:
           ],
           choices: [],
           jumps: [],
+          menus: [],
         },
         {
           label: "chapter1",
@@ -840,6 +841,7 @@ label title:
           dialogue: [{ speaker: "s", text: "Chapter content", lineNumber: 6 }],
           choices: [{ label: "Choice 1", target: "route_a", lineNumber: 7 }],
           jumps: [{ to: "ending", lineNumber: 8 }],
+          menus: [],
         },
       ],
       characters: [{ tag: "s", name: "Sylvie", color: "#c8ffc8" }],
@@ -984,6 +986,7 @@ label chapter1:
             ],
             choices: [],
             jumps: [],
+            menus: [],
           },
         ],
         characters: [],
