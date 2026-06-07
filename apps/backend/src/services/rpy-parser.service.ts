@@ -1964,6 +1964,9 @@ export function replaceLabelDialogue(
 export function generateRpyFile(scene: BranchForgeScene): string {
   const lines: string[] = [];
 
+  const escapeRenPyString = (s: string) =>
+    s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+
   // Start with label
   lines.push(`label ${scene.name}:`);
   lines.push("");
@@ -1976,13 +1979,13 @@ export function generateRpyFile(scene: BranchForgeScene): string {
       if (inMenu) {
         inMenu = false;
       }
-      lines.push(`    ${entry.speaker} "${entry.text}"`);
+      lines.push(`    ${entry.speaker} "${escapeRenPyString(entry.text)}"`);
     } else if (entry.type === "NARRATION" && entry.text) {
       // Close any open menu before narration
       if (inMenu) {
         inMenu = false;
       }
-      lines.push(`    "${entry.text}"`);
+      lines.push(`    "${escapeRenPyString(entry.text)}"`);
     } else if (
       entry.type === "MENU" &&
       entry.menuOptions &&
@@ -1995,10 +1998,7 @@ export function generateRpyFile(scene: BranchForgeScene): string {
       const bodyIndent = choiceIndent + "    ";
       lines.push(`${menuIndent}menu:`);
       for (const opt of entry.menuOptions) {
-        lines.push(`${choiceIndent}"${opt.label}":`);
-        if (opt.targetLabelName) {
-          lines.push(`${bodyIndent}jump ${opt.targetLabelName}`);
-        }
+        lines.push(`${choiceIndent}"${escapeRenPyString(opt.label)}":`);
         if (opt.effects?.stats) {
           for (const [stat, value] of Object.entries(opt.effects.stats)) {
             const op = value >= 0 ? "+=" : "-=";
@@ -2010,6 +2010,9 @@ export function generateRpyFile(scene: BranchForgeScene): string {
             lines.push(`${bodyIndent}if ${flag}:`);
           }
         }
+        if (opt.targetLabelName) {
+          lines.push(`${bodyIndent}jump ${opt.targetLabelName}`);
+        }
       }
       inMenu = false;
     } else if (entry.type === "FLAG" && entry.text && entry.target) {
@@ -2018,7 +2021,7 @@ export function generateRpyFile(scene: BranchForgeScene): string {
         lines.push(`    menu:`);
         inMenu = true;
       }
-      lines.push(`        "${entry.text}":`);
+      lines.push(`        "${escapeRenPyString(entry.text)}":`);
       lines.push(`            jump ${entry.target}`);
     } else if (entry.type === "JUMP" && entry.target) {
       if (inMenu) {
