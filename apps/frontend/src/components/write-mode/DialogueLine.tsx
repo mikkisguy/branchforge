@@ -6,7 +6,7 @@
  */
 
 import { memo, useState, useCallback, useRef, useEffect, useId } from "react";
-import { X, ChevronDown } from "lucide-react";
+import { X, ChevronDown, Split, ArrowUpRight } from "lucide-react";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { Character } from "@branchforge/shared";
 import { withAlpha } from "@/lib/utils";
@@ -37,6 +37,14 @@ function areDialogueLinePropsEqual(
     prev.entry.id === next.entry.id &&
     prev.entry.speakerId === next.entry.speakerId &&
     prev.entry.text === next.entry.text &&
+    prev.entry.choiceData?.lineId === next.entry.choiceData?.lineId &&
+    prev.entry.choiceData?.targetLabelId ===
+      next.entry.choiceData?.targetLabelId &&
+    prev.entry.choiceData?.optionIndex === next.entry.choiceData?.optionIndex &&
+    JSON.stringify(prev.entry.choiceData?.conditionFlags) ===
+      JSON.stringify(next.entry.choiceData?.conditionFlags) &&
+    JSON.stringify(prev.entry.choiceData?.effects) ===
+      JSON.stringify(next.entry.choiceData?.effects) &&
     prev.entry.contentType === next.entry.contentType &&
     prev.index === next.index &&
     prev.totalEntries === next.totalEntries &&
@@ -290,11 +298,12 @@ export const DialogueLine = memo(function DialogueLine({
         speakerId,
         text: entry.text,
         contentType: entry.contentType,
+        choiceData: entry.choiceData,
       });
       setIsDropdownOpen(false);
       setFocusedOptionIndex(-1);
     },
-    [entry.id, entry.text, onChange]
+    [onChange, entry.id, entry.text, entry.contentType, entry.choiceData]
   );
 
   const handleTextChange = useCallback(
@@ -307,11 +316,18 @@ export const DialogueLine = memo(function DialogueLine({
         speakerId: entry.speakerId,
         text: e.target.value,
         contentType: entry.contentType,
+        choiceData: entry.choiceData,
       });
       // Resize immediately for smooth typing experience
       resizeTextarea();
     },
-    [entry.id, entry.speakerId, resizeTextarea]
+    [
+      entry.id,
+      entry.speakerId,
+      entry.contentType,
+      entry.choiceData,
+      resizeTextarea,
+    ]
   );
 
   const handleKeyDown = useCallback(
@@ -420,13 +436,22 @@ export const DialogueLine = memo(function DialogueLine({
   const isStacked = layoutMode === "stacked";
   const isSpeakerInteractive = isHovered || isDropdownOpen;
   const hasSpeaker = Boolean(entry.speakerId);
-  const showDelete = (isHovered || entry.text === "") && totalEntries > 1;
+  const isChoice = entry.contentType === "CHOICE";
+  const choiceTargetName = entry.choiceData?.targetLabelName;
+  const showDelete =
+    (isHovered || entry.text === "") && totalEntries > 1 && !isChoice;
+
+  const wrapperClass = isChoice
+    ? `group relative transition-colors pl-3 ${
+        isStacked ? "flex flex-col gap-1.5 py-2" : "flex flex-col gap-1 py-1.5"
+      }`
+    : `group relative transition-colors ${
+        isStacked ? "flex flex-col gap-1.5 py-2" : "flex flex-col gap-1 py-1.5"
+      }`;
 
   return (
     <div
-      className={`group relative transition-colors ${
-        isStacked ? "flex flex-col gap-1.5 py-2" : "flex flex-col gap-1 py-1.5"
-      }`}
+      className={wrapperClass}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -434,130 +459,149 @@ export const DialogueLine = memo(function DialogueLine({
       <div
         className={`flex ${isStacked ? "flex-col gap-1.5" : "items-start gap-3"}`}
       >
-        {/* Speaker Name / Dropdown */}
-        <div
-          className={`relative ${isStacked ? "w-full" : "shrink-0 w-40"}`}
-          ref={dropdownRef}
-          onBlur={handleDropdownBlur}
-        >
-          <button
-            ref={speakerButtonRef}
-            type="button"
-            onClick={handleSpeakerToggle}
-            aria-haspopup="listbox"
-            aria-expanded={isDropdownOpen}
-            aria-controls={dropdownId}
-            aria-label={`Change speaker: ${
-              character?.displayName || "Narration"
-            }`}
-            className={`flex items-center gap-1.5 rounded-md transition-all border tracking-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-              isStacked
-                ? "inline-flex max-w-full h-8 py-1.5 px-2.5 -ml-2.5"
-                : "inline-flex max-w-full items-start h-auto py-1.5 px-2.5 overflow-hidden"
-            }`}
-            style={{
-              fontSize: "var(--prose-editor-font-size, 14px)",
-              backgroundColor: isSpeakerInteractive
-                ? hasSpeaker && speakerColor
-                  ? withAlpha(speakerColor, 8)
-                  : "hsl(var(--muted) / 0.5)"
-                : "transparent",
-              borderColor: isSpeakerInteractive
-                ? hasSpeaker && speakerColor
-                  ? withAlpha(speakerColor, 25)
-                  : "hsl(var(--border))"
-                : "transparent",
-              color:
-                hasSpeaker && speakerColor
-                  ? speakerColor
-                  : "hsl(var(--muted-foreground))",
-              fontStyle: hasSpeaker ? "normal" : "italic",
-            }}
-            title={
-              hasSpeaker
-                ? character?.displayName || "Character dialogue"
-                : "Narration"
-            }
-          >
-            <span className="truncate">
-              {character?.displayName || "Narration"}
-            </span>
-            <ChevronDown
-              className={`size-3 transition-transform duration-200 flex-shrink-0 ${
-                isDropdownOpen ? "rotate-180" : ""
-              }`}
-              style={{ opacity: isSpeakerInteractive ? 0.5 : 0 }}
-            />
-          </button>
-
-          {isDropdownOpen && (
+        {isChoice ? (
+          <div className={`relative ${isStacked ? "w-full" : "shrink-0 w-40"}`}>
             <div
-              ref={dropdownMenuRef}
-              id={dropdownId}
-              role="listbox"
-              aria-label="Select speaker"
-              aria-activedescendant={
-                focusedOptionIndex >= 0
-                  ? `${dropdownId}-option-${focusedOptionIndex}`
-                  : undefined
-              }
-              onKeyDown={handleDropdownKeyDown}
-              tabIndex={0}
-              className={`absolute z-50 bg-popover border border-border rounded-md shadow-lg shadow-black/10 py-1 min-w-[160px] max-h-[280px] overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] animate-in fade-in-0 zoom-in-95 duration-200 ease-out ${
-                openUpward ? "bottom-full mb-1" : "top-full mt-1"
-              } ${
-                openUpward ? "slide-in-from-bottom-1" : "slide-in-from-top-1"
-              } ${isStacked ? "-left-2.5" : "left-0"}`}
+              className={`flex items-center gap-1.5 rounded-md transition-all h-8 py-1.5 px-2.5 ${
+                isStacked ? "-ml-2.5" : ""
+              }`}
+              style={{
+                fontSize: "var(--prose-editor-font-size, 14px)",
+                color: "hsl(var(--muted-foreground))",
+                fontStyle: "italic",
+              }}
             >
-              <button
-                id={`${dropdownId}-option-0`}
-                type="button"
-                role="option"
-                aria-selected={!entry.speakerId}
-                onClick={() => handleSpeakerSelect(null)}
-                tabIndex={-1}
-                className={`w-full text-left px-3 py-2 text-sm transition-colors duration-150 ${
-                  focusedOptionIndex === 0 ? "bg-muted" : "hover:bg-muted"
+              <Split className="size-3 opacity-50" />
+              <span className="truncate text-xs">Choice</span>
+            </div>
+          </div>
+        ) : (
+          <div
+            className={`relative ${isStacked ? "w-full" : "shrink-0 w-40"}`}
+            ref={dropdownRef}
+            onBlur={handleDropdownBlur}
+          >
+            <button
+              ref={speakerButtonRef}
+              type="button"
+              onClick={handleSpeakerToggle}
+              aria-haspopup="listbox"
+              aria-expanded={isDropdownOpen}
+              aria-controls={dropdownId}
+              aria-label={`Change speaker: ${
+                character?.displayName || "Narration"
+              }`}
+              className={`flex items-center gap-1.5 rounded-md transition-all border tracking-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                isStacked
+                  ? "inline-flex max-w-full h-8 py-1.5 px-2.5 -ml-2.5"
+                  : "inline-flex max-w-full items-start h-auto py-1.5 px-2.5 overflow-hidden"
+              }`}
+              style={{
+                fontSize: "var(--prose-editor-font-size, 14px)",
+                backgroundColor: isSpeakerInteractive
+                  ? hasSpeaker && speakerColor
+                    ? withAlpha(speakerColor, 8)
+                    : "hsl(var(--muted) / 0.5)"
+                  : "transparent",
+                borderColor: isSpeakerInteractive
+                  ? hasSpeaker && speakerColor
+                    ? withAlpha(speakerColor, 25)
+                    : "hsl(var(--border))"
+                  : "transparent",
+                color:
+                  hasSpeaker && speakerColor
+                    ? speakerColor
+                    : "hsl(var(--muted-foreground))",
+                fontStyle: hasSpeaker ? "normal" : "italic",
+              }}
+              title={
+                hasSpeaker
+                  ? character?.displayName || "Character dialogue"
+                  : "Narration"
+              }
+            >
+              <span className="truncate">
+                {character?.displayName || "Narration"}
+              </span>
+              <ChevronDown
+                className={`size-3 transition-transform duration-200 flex-shrink-0 ${
+                  isDropdownOpen ? "rotate-180" : ""
                 }`}
-                style={{
-                  fontStyle: "italic",
-                  fontWeight: !entry.speakerId ? "600" : "normal",
-                }}
+                style={{ opacity: isSpeakerInteractive ? 0.5 : 0 }}
+              />
+            </button>
+
+            {isDropdownOpen && (
+              <div
+                ref={dropdownMenuRef}
+                id={dropdownId}
+                role="listbox"
+                aria-label="Select speaker"
+                aria-activedescendant={
+                  focusedOptionIndex >= 0
+                    ? `${dropdownId}-option-${focusedOptionIndex}`
+                    : undefined
+                }
+                onKeyDown={handleDropdownKeyDown}
+                tabIndex={0}
+                className={`absolute z-50 bg-popover border border-border rounded-md shadow-lg shadow-black/10 py-1 min-w-[160px] max-h-[280px] overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] animate-in fade-in-0 zoom-in-95 duration-200 ease-out ${
+                  openUpward ? "bottom-full mb-1" : "top-full mt-1"
+                } ${
+                  openUpward ? "slide-in-from-bottom-1" : "slide-in-from-top-1"
+                } ${isStacked ? "-left-2.5" : "left-0"}`}
               >
-                Narration
-              </button>
-
-              <div className="my-1 border-t border-border" role="separator" />
-
-              {characters.map((char, idx) => (
                 <button
-                  key={char.id}
-                  id={`${dropdownId}-option-${idx + 1}`}
+                  id={`${dropdownId}-option-0`}
                   type="button"
                   role="option"
-                  aria-selected={entry.speakerId === char.id}
-                  onClick={() => handleSpeakerSelect(char.id)}
+                  aria-selected={!entry.speakerId}
+                  onClick={() => handleSpeakerSelect(null)}
                   tabIndex={-1}
-                  className={`w-full text-left px-3 py-2 text-sm transition-colors duration-150 flex items-center gap-2 ${
-                    focusedOptionIndex === idx + 1
-                      ? "bg-muted"
-                      : "hover:bg-muted"
+                  className={`w-full text-left px-3 py-2 text-sm transition-colors duration-150 ${
+                    focusedOptionIndex === 0 ? "bg-muted" : "hover:bg-muted"
                   }`}
                   style={{
-                    color: entry.speakerId === char.id ? char.color : undefined,
-                    fontWeight: entry.speakerId === char.id ? "600" : "normal",
+                    fontStyle: "italic",
+                    fontWeight: !entry.speakerId ? "600" : "normal",
                   }}
                 >
-                  <span
-                    className="size-2 rounded-full shrink-0"
-                    style={{ backgroundColor: char.color }}
-                  />
-                  <span>{char.displayName}</span>
+                  Narration
                 </button>
-              ))}
-            </div>
-          )}
-        </div>
+
+                <div className="my-1 border-t border-border" role="separator" />
+
+                {characters.map((char, idx) => (
+                  <button
+                    key={char.id}
+                    id={`${dropdownId}-option-${idx + 1}`}
+                    type="button"
+                    role="option"
+                    aria-selected={entry.speakerId === char.id}
+                    onClick={() => handleSpeakerSelect(char.id)}
+                    tabIndex={-1}
+                    className={`w-full text-left px-3 py-2 text-sm transition-colors duration-150 flex items-center gap-2 ${
+                      focusedOptionIndex === idx + 1
+                        ? "bg-muted"
+                        : "hover:bg-muted"
+                    }`}
+                    style={{
+                      color:
+                        entry.speakerId === char.id ? char.color : undefined,
+                      fontWeight:
+                        entry.speakerId === char.id ? "600" : "normal",
+                    }}
+                  >
+                    <span
+                      className="size-2 rounded-full shrink-0"
+                      style={{ backgroundColor: char.color }}
+                    />
+                    <span>{char.displayName}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Text Content */}
         <textarea
@@ -568,7 +612,13 @@ export const DialogueLine = memo(function DialogueLine({
           defaultValue={entry.text}
           onChange={handleTextChange}
           onKeyDown={handleKeyDown}
-          placeholder={entry.speakerId ? "Dialogue..." : "Narration..."}
+          placeholder={
+            isChoice
+              ? "Choice text..."
+              : entry.speakerId
+                ? "Dialogue..."
+                : "Narration..."
+          }
           className={`relative min-h-[2.5rem] p-0 pr-7 resize-none overflow-hidden bg-transparent border-0 outline-none focus-visible:outline-none focus-visible:ring-0 font-light tracking-normal leading-8 placeholder:text-muted-foreground/50 ${
             isStacked ? "w-full" : "flex-1"
           }`}
@@ -591,6 +641,18 @@ export const DialogueLine = memo(function DialogueLine({
           </button>
         )}
       </div>
+
+      {/* Destination indicator for CHOICE entries — placed below the text row */}
+      {isChoice && choiceTargetName && (
+        <span
+          className={`text-xs text-muted-foreground/50 flex items-center gap-1 ${
+            isStacked ? "" : "ml-[172px]"
+          }`}
+        >
+          <ArrowUpRight className="size-3" />
+          {choiceTargetName}
+        </span>
+      )}
 
       {/* Technical Badges - pill container anchored to parent line */}
       {showBadges &&

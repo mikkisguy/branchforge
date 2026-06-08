@@ -121,6 +121,16 @@ export const labelsApi = {
     options?: {
       expectedVersion?: number;
       expectedContentHash?: string;
+      menuBlocks?: Array<{
+        lineId: string;
+        menuOptions: Array<{
+          label: string;
+          targetLabelId: string;
+          targetLabelName: string;
+          conditionFlags?: string[];
+          effects?: { stats?: Record<string, number> };
+        }>;
+      }>;
     }
   ): Promise<UpdateDialogueResponse> {
     return await request<UpdateDialogueResponse>(
@@ -129,6 +139,7 @@ export const labelsApi = {
         method: "PUT",
         body: JSON.stringify({
           dialogue,
+          menuBlocks: options?.menuBlocks,
           expectedVersion: options?.expectedVersion,
           expectedContentHash: options?.expectedContentHash,
         }),

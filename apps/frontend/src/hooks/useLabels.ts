@@ -65,6 +65,16 @@ export interface UseLabelsReturn {
     options?: {
       expectedVersion?: number;
       expectedContentHash?: string;
+      menuBlocks?: Array<{
+        lineId: string;
+        menuOptions: Array<{
+          label: string;
+          targetLabelId: string;
+          targetLabelName: string;
+          conditionFlags?: string[];
+          effects?: { stats?: Record<string, number> };
+        }>;
+      }>;
     }
   ) => Promise<UpdateDialogueResponse>;
   isUpdatingDialogue: boolean;
@@ -151,15 +161,27 @@ export function useLabels(): UseLabelsReturn {
       dialogue,
       expectedVersion,
       expectedContentHash,
+      menuBlocks,
     }: {
       labelId: string;
       dialogue: Array<{ speakerId: string | null; text: string }>;
       expectedVersion?: number;
       expectedContentHash?: string;
+      menuBlocks?: Array<{
+        lineId: string;
+        menuOptions: Array<{
+          label: string;
+          targetLabelId: string;
+          targetLabelName: string;
+          conditionFlags?: string[];
+          effects?: { stats?: Record<string, number> };
+        }>;
+      }>;
     }) =>
       labelsApi.updateDialogue(labelId, dialogue, {
         expectedVersion,
         expectedContentHash,
+        menuBlocks,
       }),
     onSuccess: async (_data, variables) => {
       clearHistoryCursor(variables.labelId);
@@ -324,6 +346,16 @@ export function useLabels(): UseLabelsReturn {
       options?: {
         expectedVersion?: number;
         expectedContentHash?: string;
+        menuBlocks?: Array<{
+          lineId: string;
+          menuOptions: Array<{
+            label: string;
+            targetLabelId: string;
+            targetLabelName: string;
+            conditionFlags?: string[];
+            effects?: { stats?: Record<string, number> };
+          }>;
+        }>;
       }
     ) => {
       return updateDialogueMutation.mutateAsync({
@@ -331,6 +363,7 @@ export function useLabels(): UseLabelsReturn {
         dialogue,
         expectedVersion: options?.expectedVersion,
         expectedContentHash: options?.expectedContentHash,
+        menuBlocks: options?.menuBlocks,
       });
     },
     [updateDialogueMutation]

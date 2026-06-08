@@ -59,7 +59,7 @@ export function areDialogueEntriesEqual(
  * Converts DialogueEntry[] to backend dialogue payload format
  * This converts prose editor entries to the format expected by the backend API
  * Filters out entries with empty or whitespace-only text
- * Skips structural entries (MENU, JUMP, CHOICE) which are not editable dialogue
+ * Skips structural entries (MENU, JUMP, CHOICE) which are handled separately
  *
  * @param entries - Dialogue entries from the prose editor
  * @returns Backend dialogue payload
@@ -73,7 +73,7 @@ export function dialogueToPayload(entries: DialogueEntry[]): Array<{
     text: string;
   }> = [];
   for (const entry of entries) {
-    // Skip structural entries (MENU, JUMP, CHOICE) - they are read-only
+    // Skip structural entries (MENU, JUMP, CHOICE) - they are handled via menuBlocks
     if (
       entry.contentType !== undefined &&
       entry.contentType !== "DIALOGUE" &&
@@ -87,6 +87,72 @@ export function dialogueToPayload(entries: DialogueEntry[]): Array<{
         text: entry.text,
       });
     }
+  }
+  return result;
+}
+
+/**
+ * Menu block payload for backend save
+ * Groups adjacent CHOICE entries by their parent MENU line ID
+ * and reconstructs the menuOptions arrays.
+ */
+export interface MenuBlockPayload {
+  lineId: string;
+  menuOptions: Array<{
+    label: string;
+    targetLabelId: string;
+    targetLabelName: string;
+    conditionFlags?: string[];
+    effects?: {
+      stats?: Record<string, number>;
+    };
+  }>;
+}
+
+/**
+ * Extracts menu blocks from DialogueEntry[] for backend save.
+ * Groups adjacent CHOICE entries by their parent MENU line ID (choiceData.lineId)
+ * and reconstructs menuOptions arrays with updated labels.
+ *
+ * @param entries - Dialogue entries from the prose editor
+ * @returns Menu block payloads for the backend
+ */
+export function extractMenuBlocks(
+  entries: DialogueEntry[]
+): MenuBlockPayload[] {
+  const blockMap = new Map<
+    string,
+    Array<{
+      label: string;
+      targetLabelId: string;
+      targetLabelName: string;
+      conditionFlags?: string[];
+      effects?: { stats?: Record<string, number> };
+    }>
+  >();
+
+  for (const entry of entries) {
+    if (entry.contentType !== "CHOICE" || !entry.choiceData) continue;
+
+    const { lineId, targetLabelId, targetLabelName, conditionFlags, effects } =
+      entry.choiceData;
+
+    if (!blockMap.has(lineId)) {
+      blockMap.set(lineId, []);
+    }
+
+    blockMap.get(lineId)!.push({
+      label: entry.text,
+      targetLabelId,
+      targetLabelName,
+      conditionFlags,
+      effects,
+    });
+  }
+
+  const result: MenuBlockPayload[] = [];
+  for (const [lineId, menuOptions] of blockMap) {
+    result.push({ lineId, menuOptions });
   }
   return result;
 }
