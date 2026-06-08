@@ -61,6 +61,7 @@ vi.mock("../labels.service.js", () => ({
     skipped: false,
     affectedLabelIds: [],
   }),
+  updateIncomingJumpsForLabels: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe("ZipImportService", () => {
@@ -270,6 +271,9 @@ describe("ZipImportService", () => {
       execute: vi.fn().mockResolvedValue(undefined),
       rollback: vi.fn(),
       commit: vi.fn(),
+      // Allow mockTx to be awaited (resolves to []) so that
+      // `await tx.select(…).from(…).where(…)` returns an array.
+      then: (resolve: (v: unknown[]) => void) => resolve([]),
     };
 
     const mockDb = {

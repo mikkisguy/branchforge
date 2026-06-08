@@ -430,13 +430,22 @@ function buildLineValues(
     text?: string;
     lineNumber?: number;
     indentLevel?: number;
+    menuOptions?: Array<{
+      label: string;
+      targetLabelId: string;
+      targetLabelName: string;
+      conditionFlags?: string[];
+      effects?: {
+        stats?: Record<string, number>;
+      };
+    }>;
   }>,
   sourceId: string,
   lookupMaps: CharacterLookupMaps
 ): Array<{
   labelId: string;
   sequence: number;
-  contentType: "NARRATION" | "DIALOGUE" | "JUMP";
+  contentType: "NARRATION" | "DIALOGUE" | "JUMP" | "MENU";
   content: string;
   speakerId: string | null;
   visualType: "GENERATED";
@@ -447,8 +456,41 @@ function buildLineValues(
   lastSyncedAt: Date;
   rpyLineNumber: number | null;
   rpyIndentLevel: number;
+  menuOptions?: Array<{
+    label: string;
+    targetLabelId: string;
+    targetLabelName: string;
+    conditionFlags?: string[];
+    effects?: {
+      stats?: Record<string, number>;
+    };
+  }> | null;
 }> {
   return entries.map((entry, index) => {
+    // Handle MENU entries with menuOptions
+    if (entry.type === "MENU") {
+      const contentHash = calculateContentHash(
+        JSON.stringify(entry.menuOptions ?? [])
+      );
+      return {
+        labelId,
+        sequence: index + 1,
+        contentType: "MENU" as const,
+        content: "",
+        speakerId: null,
+        visualType: "GENERATED" as const,
+        projectFileId: sourceId,
+        linePosition: index,
+        contentHash,
+        lastSyncedHash: contentHash,
+        lastSyncedAt: new Date(),
+        rpyLineNumber: entry.lineNumber ?? null,
+        rpyIndentLevel: entry.indentLevel ?? 0,
+        menuOptions: entry.menuOptions ?? null,
+      };
+    }
+
+    // Existing logic for non-MENU entries
     const contentType = mapEntryToDbType(entry);
     const content = entry.target ? `jump ${entry.target}` : entry.text || "";
     const lineHash = calculateContentHash(content);
@@ -804,6 +846,9 @@ async function syncLabelsInTransaction(
         if (!renameCandidate && unmatchedExisting.length > 0) {
           const parsedHashes = new Set<string>(
             labelData.entries.map((entry) => {
+              if (entry.type === "MENU" && entry.menuOptions) {
+                return calculateContentHash(JSON.stringify(entry.menuOptions));
+              }
               const content = entry.target
                 ? `jump ${entry.target}`
                 : entry.text || "";
@@ -1555,6 +1600,7 @@ export async function reconstructFileForLabel(
       labelId: labelLines.labelId,
       speakerId: labelLines.speakerId,
       speakerTag: characters.renpyTag,
+      contentType: labelLines.contentType,
       content: labelLines.content,
       sequence: labelLines.sequence,
     })
@@ -1574,7 +1620,11 @@ export async function reconstructFileForLabel(
   // Group lines by labelId in-memory
   const linesByLabelId = new Map<
     string,
-    Array<{ speaker: string | null; content: string }>
+    Array<{
+      speaker: string | null;
+      content: string;
+      contentType: string;
+    }>
   >();
   for (const line of allLabelLines) {
     if (!linesByLabelId.has(line.labelId)) {
@@ -1584,10 +1634,15 @@ export async function reconstructFileForLabel(
       // Use Ren'Py speaker tag for script-safe reconstruction
       speaker: line.speakerTag ?? null,
       content: line.content,
+      contentType: line.contentType,
     });
   }
 
-  // Build dialogue map from grouped lines
+  // Build dialogue map from grouped lines.
+  // Only include DIALOGUE and NARRATION entries. JUMP, MENU, and CHOICE lines are
+  // structural keywords already present in the original file (handled via menuStack
+  // and other mechanisms) and must not be emitted as quoted text, otherwise they
+  // appear duplicated (e.g. "jump end" + jump end).
   for (const l of allLabels) {
     // Skip labels without a labelName (UI-created labels that don't exist in RPY files)
     if (l.labelName === null) {
@@ -1596,10 +1651,15 @@ export async function reconstructFileForLabel(
 
     const labelLinesData = linesByLabelId.get(l.id) || [];
 
-    const labelDialogue = labelLinesData.map((line) => ({
-      speaker: line.speaker,
-      text: line.content,
-    }));
+    const labelDialogue = labelLinesData
+      .filter(
+        (line) =>
+          line.contentType === "DIALOGUE" || line.contentType === "NARRATION"
+      )
+      .map((line) => ({
+        speaker: line.speaker,
+        text: line.content,
+      }));
     updatedDialogue.set(l.labelName, labelDialogue);
   }
 
@@ -2591,7 +2651,7 @@ const UUID_REGEX =
  * @param labelIds - The label IDs to update incoming jumps for
  * @param projectId - The project ID to scan for incoming jumps
  */
-async function updateIncomingJumpsForLabels(
+export async function updateIncomingJumpsForLabels(
   context: Pick<ReturnType<typeof getDb>, "select" | "update">,
   labelIds: string[],
   projectId: string

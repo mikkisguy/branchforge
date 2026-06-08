@@ -23,7 +23,7 @@ import {
   type NewUser,
   type NewProject,
 } from "../../db/schema/index.js";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, asc } from "drizzle-orm";
 import { calculateContentHash } from "../../lib/hash.js";
 
 describe("LabelsRoutes (Integration)", () => {
@@ -303,5 +303,147 @@ describe("LabelsRoutes (Integration)", () => {
         reason: "STALE_LABEL_VERSION",
       },
     });
+  });
+
+  it("preserves MENU and JUMP lines when updating dialogue", async () => {
+    const auth = await createAuthenticatedRequest(testUserId);
+
+    // Insert MENU and JUMP lines alongside the existing NARRATION (sequence 1)
+    await db.insert(labelLines).values([
+      {
+        labelId: introLabelId,
+        sequence: 2,
+        contentType: "MENU",
+        content: "",
+        projectFileId: testFileId,
+        menuOptions: [
+          {
+            label: "Go left",
+            targetLabelId: testUuid("23000009", 1),
+            targetLabelName: "left_path",
+          },
+        ],
+      },
+      {
+        labelId: introLabelId,
+        sequence: 3,
+        contentType: "JUMP",
+        content: "jump ending",
+        projectFileId: testFileId,
+      },
+    ]);
+
+    const response = await fastify.inject({
+      method: "PUT",
+      url: `/labels/${introLabelId}/dialogue`,
+      payload: {
+        dialogue: [{ speakerId: null, text: "Updated prose" }],
+      },
+      cookies: {
+        [SESSION_COOKIE_NAME]: auth.sessionId,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ success: true });
+
+    const lines = await db
+      .select()
+      .from(labelLines)
+      .where(eq(labelLines.labelId, introLabelId))
+      .orderBy(asc(labelLines.sequence));
+
+    expect(lines).toHaveLength(3);
+    expect(lines[0].contentType).toBe("NARRATION");
+    expect(lines[0].content).toBe("Updated prose");
+    expect(lines[1].contentType).toBe("MENU");
+    expect(lines[1].menuOptions).toEqual([
+      {
+        label: "Go left",
+        targetLabelId: testUuid("23000009", 1),
+        targetLabelName: "left_path",
+      },
+    ]);
+    expect(lines[2].contentType).toBe("JUMP");
+    expect(lines[2].content).toBe("jump ending");
+  });
+
+  it("appends new prose lines after non-prose lines when dialogue entries exceed existing prose", async () => {
+    const auth = await createAuthenticatedRequest(testUserId);
+
+    // Seed: 1 NARRATION (seq 1) + 1 MENU (seq 2) + 1 JUMP (seq 3)
+    await db.insert(labelLines).values([
+      {
+        labelId: introLabelId,
+        sequence: 2,
+        contentType: "MENU",
+        content: "",
+        projectFileId: testFileId,
+        menuOptions: [
+          {
+            label: "Go left",
+            targetLabelId: testUuid("23000009", 1),
+            targetLabelName: "left_path",
+          },
+        ],
+      },
+      {
+        labelId: introLabelId,
+        sequence: 3,
+        contentType: "JUMP",
+        content: "jump ending",
+        projectFileId: testFileId,
+      },
+    ]);
+
+    // Send 3 dialogue entries but only 1 prose line exists
+    const response = await fastify.inject({
+      method: "PUT",
+      url: `/labels/${introLabelId}/dialogue`,
+      payload: {
+        dialogue: [
+          { speakerId: null, text: "First prose" },
+          { speakerId: testCharacterId, text: "Second prose" },
+          { speakerId: null, text: "Third prose" },
+        ],
+      },
+      cookies: {
+        [SESSION_COOKIE_NAME]: auth.sessionId,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ success: true });
+
+    const lines = await db
+      .select()
+      .from(labelLines)
+      .where(eq(labelLines.labelId, introLabelId))
+      .orderBy(asc(labelLines.sequence));
+
+    // seq 1: updated NARRATION, seq 2: MENU, seq 3: JUMP, seq 4: new DIALOGUE, seq 5: new NARRATION
+    expect(lines).toHaveLength(5);
+
+    expect(lines[0].contentType).toBe("NARRATION");
+    expect(lines[0].content).toBe("First prose");
+
+    expect(lines[1].contentType).toBe("MENU");
+    expect(lines[1].menuOptions).toEqual([
+      {
+        label: "Go left",
+        targetLabelId: testUuid("23000009", 1),
+        targetLabelName: "left_path",
+      },
+    ]);
+
+    expect(lines[2].contentType).toBe("JUMP");
+    expect(lines[2].content).toBe("jump ending");
+
+    expect(lines[3].contentType).toBe("DIALOGUE");
+    expect(lines[3].content).toBe("Second prose");
+    expect(lines[3].speakerId).toBe(testCharacterId);
+
+    expect(lines[4].contentType).toBe("NARRATION");
+    expect(lines[4].content).toBe("Third prose");
   });
 });

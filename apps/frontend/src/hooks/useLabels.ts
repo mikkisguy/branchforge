@@ -307,25 +307,12 @@ export function useLabels(): UseLabelsReturn {
   // Invalidate labels method
   const invalidateLabels = useCallback(async () => {
     if (currentProject) {
-      // Refetch list queries to ensure immediate data refresh after import
-      // Also invalidate all detail queries for this project
-      // This ensures Write Mode gets fresh label data after import
-      await Promise.all([
-        queryClient.refetchQueries({
-          queryKey: labelKeys.lists(currentProject.id),
-        }),
-        queryClient.invalidateQueries({
-          predicate: (query) => {
-            const key = query.queryKey as unknown[];
-            return (
-              Array.isArray(key) &&
-              key[0] === "labels" &&
-              key[1] === currentProject.id &&
-              key[2] === "detail"
-            );
-          },
-        }),
-      ]);
+      // Invalidate all label queries for this project (list, detail, activeLabelId, etc.)
+      // using scoped prefix match. This marks queries as stale so they refetch
+      // when next mounted/used, ensuring fresh data including incomingJumps.
+      await queryClient.invalidateQueries({
+        queryKey: labelKeys.scoped(currentProject.id),
+      });
     }
   }, [currentProject, queryClient]);
 

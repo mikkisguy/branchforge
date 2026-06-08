@@ -52,9 +52,8 @@ import {
   characters,
 } from "../db/schema/index.js";
 import { eq, asc, inArray, isNull, and, sql } from "drizzle-orm";
-import { calculateDialogueHash } from "../lib/hash.js";
+import { calculateLinesHash, calculateContentHash } from "../lib/hash.js";
 import { updateAuditFields } from "../lib/audit.js";
-import { calculateContentHash } from "../lib/hash.js";
 import { trackWordsForLabel } from "../services/word-count.service.js";
 
 // ============================================================================
@@ -252,9 +251,6 @@ async function updateLabelDialogueHandler(
       }
     }
 
-    // Calculate content hash for new dialogue
-    const contentHash = calculateDialogueHash(dialogue);
-
     const updateResult = await db.transaction(async (tx) => {
       // Serialize concurrent updates for the same label to avoid duplicate rows
       // from overlapping delete + insert operations.
@@ -349,18 +345,28 @@ async function updateLabelDialogueHandler(
         )
         .orderBy(asc(labelLines.sequence));
 
-      const existingLinesBySequence = new Map(
-        existingLines.map((line) => [line.sequence, line])
+      // Separate prose lines (DIALOGUE/NARRATION) from non-prose lines (MENU/JUMP).
+      // Non-prose lines are structural and must be preserved during prose edits –
+      // the frontend only sends DIALOGUE/NARRATION entries, so mapping 1:1 by
+      // sequence would overwrite or delete MENU/JUMP lines.
+      const proseLines = existingLines.filter(
+        (line) =>
+          line.contentType === "DIALOGUE" || line.contentType === "NARRATION"
+      );
+      const _nonProseLines = existingLines.filter(
+        (line) =>
+          line.contentType !== "DIALOGUE" && line.contentType !== "NARRATION"
       );
 
-      const newSequences = new Set<number>();
+      const maxExistingSequence = Math.max(
+        ...existingLines.map((l) => l.sequence),
+        0
+      );
+      let nextSequence = maxExistingSequence + 1;
 
-      // 2. Update existing rows and insert new rows for each entry
+      // 2. Update existing prose lines by position among prose lines, insert new ones
       for (const [index, entry] of dialogue.entries()) {
-        const sequence = index + 1;
-        newSequences.add(sequence);
-
-        const existingLine = existingLinesBySequence.get(sequence);
+        const existingProseLine = proseLines[index];
 
         const values = {
           contentType: (entry.speakerId ? "DIALOGUE" : "NARRATION") as
@@ -371,39 +377,50 @@ async function updateLabelDialogueHandler(
           demoNotes: null,
           isDirty: true,
           projectFileId: lockedProjectFile.id,
-          linePosition: (lockedLabel.labelPosition ?? 0) + index,
           contentHash: calculateContentHash(entry.text),
           lastSyncedHash: null,
         };
 
-        if (existingLine) {
-          // Update existing row, preserving its ID
+        if (existingProseLine) {
+          // Update existing prose line, preserving its sequence position
+          // so non-prose lines at other sequences remain undisturbed
           await tx
             .update(labelLines)
             .set(values)
-            .where(eq(labelLines.id, existingLine.id));
+            .where(eq(labelLines.id, existingProseLine.id));
         } else {
-          // Insert new row for sequences that don't exist yet
+          // Insert new line after all existing sequences
           await tx.insert(labelLines).values({
             labelId,
-            sequence,
+            sequence: nextSequence++,
+            linePosition: existingLines.length + index,
             ...values,
           });
         }
       }
 
-      // 3. Delete rows whose sequences are no longer present
-      const sequencesToDelete = existingLines
-        .filter((line) => !newSequences.has(line.sequence))
-        .map((line) => line.id);
+      // 3. Delete only prose lines beyond the dialogue entry count.
+      // Non-prose lines (MENU/JUMP) are never deleted during prose edits.
+      const proseLinesToDelete = proseLines.slice(dialogue.length);
+      const idsToDelete = proseLinesToDelete.map((line) => line.id);
 
-      if (sequencesToDelete.length > 0) {
-        await tx
-          .delete(labelLines)
-          .where(inArray(labelLines.id, sequencesToDelete));
+      if (idsToDelete.length > 0) {
+        await tx.delete(labelLines).where(inArray(labelLines.id, idsToDelete));
       }
 
-      // 2. Update label with audit fields and sync status
+      // 4. Compute content hash from the actual persisted label_lines
+      // (includes MENU/JUMP rows preserved during prose edits) so the hash
+      // stays consistent with sync/import flows that use calculateLinesHash.
+      const finalLines = await tx
+        .select()
+        .from(labelLines)
+        .where(
+          and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt))
+        )
+        .orderBy(asc(labelLines.sequence));
+      const contentHash = calculateLinesHash(finalLines);
+
+      // 5. Update label with audit fields and sync status
       const auditFields = updateAuditFields(lockedCurrentVersion, user.id);
       await tx
         .update(labels)

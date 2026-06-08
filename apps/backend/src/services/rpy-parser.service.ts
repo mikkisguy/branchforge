@@ -66,12 +66,21 @@ export interface RPYCharacter {
 export interface BranchForgeScene {
   name: string;
   entries: Array<{
-    type: "DIALOGUE" | "NARRATION" | "FLAG" | "JUMP";
+    type: "DIALOGUE" | "NARRATION" | "FLAG" | "JUMP" | "MENU";
     speaker?: string;
     text?: string;
     target?: string;
     lineNumber?: number; // RPY line number for accurate export
     indentLevel?: number; // Indent level for proper formatting
+    menuOptions?: Array<{
+      label: string;
+      targetLabelId: string;
+      targetLabelName: string;
+      conditionFlags?: string[];
+      effects?: {
+        stats?: Record<string, number>;
+      };
+    }>;
   }>;
   characters?: Array<{ tag: string; name: string }>;
 }
@@ -96,6 +105,17 @@ export interface LabeledDialogue {
   jumps: Array<{
     to: string;
     lineNumber: number;
+  }>;
+  // NEW: Grouped menu blocks with structured options
+  menus: Array<{
+    lineNumber: number;
+    options: Array<{
+      label: string;
+      target: string | null;
+      lineNumber: number;
+      effects?: Record<string, number>;
+      conditionFlags?: string[];
+    }>;
   }>;
 }
 
@@ -936,6 +956,7 @@ export function parseRPYFileWithLabels(
           dialogue: [],
           choices: [],
           jumps: [],
+          menus: [], // NEW
         };
         continue;
       }
@@ -1032,8 +1053,16 @@ export function parseRPYFileWithLabels(
       // Check for menu start
       if (trimmed === "menu:") {
         const menuIndent = line.search(/\S/);
+        const menuOptions: Array<{
+          label: string;
+          target: string | null;
+          lineNumber: number;
+          effects: Record<string, number>;
+          conditionFlags: string[];
+        }> = [];
+
         // Look ahead for choice labels inside this menu
-        for (let j = i + 1; j < lines.length && j < i + 20; j++) {
+        for (let j = i + 1; j < lines.length; j++) {
           const choiceLine = lines[j];
           const choiceTrimmed = choiceLine.trim();
           const choiceIndent = choiceLine.search(/\S/);
@@ -1044,48 +1073,109 @@ export function parseRPYFileWithLabels(
             break;
           }
 
-          // Try double-quoted choice
+          // Try double-quoted, single-quoted, or unquoted choice
           const doubleQuoteMatch = choiceTrimmed.match(/^"(.+)":/);
-          if (doubleQuoteMatch) {
-            let choiceLabel = doubleQuoteMatch[1];
-            choiceLabel = choiceLabel
-              .replace(/"+$/, "")
-              .replace(/\\"/g, '"')
-              .replace(/""/g, '"');
+          const singleQuoteMatch = choiceTrimmed.match(/^'(.+)':/);
+          const unquotedMatch = choiceTrimmed.match(
+            /^([a-zA-Z_][a-zA-Z0-9_ ]*):$/
+          );
+          const quoteMatch =
+            doubleQuoteMatch || singleQuoteMatch || unquotedMatch;
+          if (quoteMatch) {
+            let choiceLabel = quoteMatch[1];
+            if (doubleQuoteMatch) {
+              choiceLabel = choiceLabel
+                .replace(/"+$/, "")
+                .replace(/\\"/g, '"')
+                .replace(/""/g, '"');
+            } else if (singleQuoteMatch) {
+              choiceLabel = choiceLabel
+                .replace(/'+$/, "")
+                .replace(/\\'/g, "'")
+                .replace(/''/g, "'");
+            }
             let target: string | null = null;
+            const statEffects: Record<string, number> = {};
+            const flags: string[] = [];
 
-            // Look ahead for jump statement in this choice block
-            for (let k = j + 1; k < lines.length && k < j + 10; k++) {
-              const jumpLine = lines[k];
-              const jumpTrimmed = jumpLine.trim();
-              const jumpIndent = jumpLine.search(/\S/);
+            // Look ahead for jump and stat changes in this choice body
+            const choiceBodyIndent = choiceIndent;
+            for (let k = j + 1; k < lines.length; k++) {
+              const bodyLine = lines[k];
+              const bodyTrimmed = bodyLine.trim();
+              const bodyIndent = bodyLine.search(/\S/);
 
-              // Skip empty/whitespace-only lines
-              if (!jumpTrimmed) {
-                continue;
+              // Skip empty lines
+              if (!bodyTrimmed) continue;
+
+              // Exit choice block if indentation decreased
+              if (bodyIndent <= choiceBodyIndent) break;
+
+              // Exit if we hit another choice or dedent past menu level
+              // Exclude if/elif/else — those are valid choice body lines
+              if (
+                bodyIndent <= menuIndent ||
+                bodyTrimmed.match(/^["'][^"']+["']:/) ||
+                (bodyTrimmed.match(/^[a-zA-Z_][a-zA-Z0-9_ ]*:$/) &&
+                  !bodyTrimmed.match(/^(if|elif|else)\b/))
+              ) {
+                break;
               }
 
-              // Check for jump statement before breaking on indentation
-              const jumpMatch = jumpTrimmed.match(
+              // Extract jump target
+              const jumpInChoice = bodyTrimmed.match(
                 /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/
               );
-              if (jumpMatch) {
-                target = jumpMatch[1];
-                break;
+              if (jumpInChoice) {
+                target = jumpInChoice[1];
               }
 
-              // Exit choice block if indentation decreased to menu level or above
-              if (jumpIndent <= menuIndent) {
-                break;
+              // Extract stat changes (e.g., $ affection_luna += 10)
+              const statMatch = bodyTrimmed.match(
+                /\$\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*(\+=|-=)\s*(-?\d+)/
+              );
+              if (statMatch) {
+                const statName = statMatch[1];
+                const operator = statMatch[2];
+                const value = Number.parseInt(statMatch[3], 10);
+                if (operator === "+=") {
+                  statEffects[statName] = value;
+                } else if (operator === "-=") {
+                  statEffects[statName] = -value;
+                }
+              }
+
+              // Extract if conditions as flags
+              const ifMatch = bodyTrimmed.match(/^if\s+(\w+)\s*:/);
+              if (ifMatch) {
+                flags.push(ifMatch[1]);
               }
             }
 
+            // Push to flat choices (backward compatible)
             labelData.choices.push({
               label: choiceLabel,
               target,
               lineNumber: j + 1,
             });
+
+            // Push to structured menu options
+            menuOptions.push({
+              label: choiceLabel,
+              target,
+              lineNumber: j + 1,
+              effects: statEffects,
+              conditionFlags: flags,
+            });
           }
+        }
+
+        // Store the menu block with its options
+        if (menuOptions.length > 0) {
+          labelData.menus.push({
+            lineNumber: i + 1,
+            options: menuOptions,
+          });
         }
       }
 
@@ -1390,25 +1480,63 @@ export function convertToBranchForgeFormatFromLabels(
     });
   }
 
-  // Add choice entries (as flags) for THIS label only
-  for (const c of labelData.choices) {
-    entries.push({
-      type: "FLAG",
-      text: c.label,
-      target: c.target || undefined,
-      lineNumber: c.lineNumber,
-      indentLevel: getIndentLevel(c.lineNumber),
-    });
+  // Add menu entries (as MENU type with menuOptions) for THIS label
+  if (labelData.menus && labelData.menus.length > 0) {
+    for (const menu of labelData.menus) {
+      entries.push({
+        type: "MENU",
+        lineNumber: menu.lineNumber,
+        indentLevel: getIndentLevel(menu.lineNumber),
+        menuOptions: menu.options.map((o) => ({
+          label: o.label,
+          targetLabelId: o.target || "",
+          targetLabelName: o.target || "",
+          conditionFlags:
+            o.conditionFlags && o.conditionFlags.length > 0
+              ? o.conditionFlags
+              : undefined,
+          effects:
+            o.effects && Object.keys(o.effects).length > 0
+              ? { stats: o.effects }
+              : undefined,
+        })),
+      });
+    }
+  } else {
+    // Fallback to flat choices (backward compatible for old data)
+    for (const c of labelData.choices) {
+      entries.push({
+        type: "FLAG",
+        text: c.label,
+        target: c.target || undefined,
+        lineNumber: c.lineNumber,
+        indentLevel: getIndentLevel(c.lineNumber),
+      });
+    }
   }
 
-  // Add jump entries for THIS label only
+  // Collect all targets from menu options to avoid duplicate jump entries
+  // when menu choice bodies contain explicit jump statements
+  const menuTargets = new Set<string>();
+  if (labelData.menus) {
+    for (const menu of labelData.menus) {
+      for (const opt of menu.options) {
+        if (opt.target) menuTargets.add(opt.target);
+      }
+    }
+  }
+
+  // Add jump entries for THIS label only, excluding those already captured
+  // as menu choice targets (jumps inside menu bodies are redundant with menuOptions)
   for (const j of labelData.jumps) {
-    entries.push({
-      type: "JUMP",
-      target: j.to,
-      lineNumber: j.lineNumber,
-      indentLevel: getIndentLevel(j.lineNumber),
-    });
+    if (!menuTargets.has(j.to)) {
+      entries.push({
+        type: "JUMP",
+        target: j.to,
+        lineNumber: j.lineNumber,
+        indentLevel: getIndentLevel(j.lineNumber),
+      });
+    }
   }
 
   // Extract unique characters from this label's dialogue
@@ -1836,6 +1964,9 @@ export function replaceLabelDialogue(
 export function generateRpyFile(scene: BranchForgeScene): string {
   const lines: string[] = [];
 
+  const escapeRenPyString = (s: string) =>
+    s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+
   // Start with label
   lines.push(`label ${scene.name}:`);
   lines.push("");
@@ -1848,21 +1979,55 @@ export function generateRpyFile(scene: BranchForgeScene): string {
       if (inMenu) {
         inMenu = false;
       }
-      lines.push(`    ${entry.speaker} "${entry.text}"`);
+      lines.push(`    ${entry.speaker} "${escapeRenPyString(entry.text)}"`);
     } else if (entry.type === "NARRATION" && entry.text) {
       // Close any open menu before narration
       if (inMenu) {
         inMenu = false;
       }
-      lines.push(`    "${entry.text}"`);
+      lines.push(`    "${escapeRenPyString(entry.text)}"`);
+    } else if (
+      entry.type === "MENU" &&
+      entry.menuOptions &&
+      entry.menuOptions.length > 0
+    ) {
+      const menuIndent = " ".repeat(
+        entry.indentLevel ? entry.indentLevel * 4 : 4
+      );
+      const choiceIndent = menuIndent + "    ";
+      const bodyIndent = choiceIndent + "    ";
+      lines.push(`${menuIndent}menu:`);
+      for (const opt of entry.menuOptions) {
+        lines.push(`${choiceIndent}"${escapeRenPyString(opt.label)}":`);
+        if (opt.effects?.stats) {
+          for (const [stat, value] of Object.entries(opt.effects.stats)) {
+            const op = value >= 0 ? "+=" : "-=";
+            lines.push(`${bodyIndent}$ ${stat} ${op} ${Math.abs(value)}`);
+          }
+        }
+        if (opt.conditionFlags && opt.conditionFlags.length > 0) {
+          for (const flag of opt.conditionFlags) {
+            lines.push(`${bodyIndent}if ${flag}:`);
+          }
+        }
+        if (opt.targetLabelName) {
+          lines.push(`${bodyIndent}jump ${opt.targetLabelName}`);
+        }
+      }
+      inMenu = false;
     } else if (entry.type === "FLAG" && entry.text && entry.target) {
       // Open menu if not already open
       if (!inMenu) {
         lines.push(`    menu:`);
         inMenu = true;
       }
-      lines.push(`        "${entry.text}":`);
+      lines.push(`        "${escapeRenPyString(entry.text)}":`);
       lines.push(`            jump ${entry.target}`);
+    } else if (entry.type === "JUMP" && entry.target) {
+      if (inMenu) {
+        inMenu = false;
+      }
+      lines.push(`    jump ${entry.target}`);
     }
   }
 

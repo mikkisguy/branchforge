@@ -28,6 +28,7 @@ import {
   convertToBranchForgeFormatFromLabels,
   type ParsedRPYFileWithLabels,
 } from "./rpy-parser.service.js";
+import { updateIncomingJumpsForLabels } from "./labels.service.js";
 import {
   patchRPYWithVariables,
   generateVariablesFile,
@@ -750,7 +751,8 @@ export async function importFromGitlab(
       }
     }
 
-    // If all file fetches failed, mark operation as failed
+    // If all file fetches failed, mark operation as failed and skip
+    // the incomingJumps sweep (no new labels to compute for).
     if (!anySuccess && rpyFiles.length > 0) {
       const errorMessage = firstError?.message || "All file fetches failed";
       await updateSyncOperation(operation.id, {
@@ -763,6 +765,31 @@ export async function importFromGitlab(
         status: "FAILED",
         errorMessage,
       };
+    }
+
+    // Compute incomingJumps for all labels in the project after import.
+    // This must happen after all files are processed so cross-file jumps are captured.
+    // Wrapped in try/catch so a recompute failure does not invalidate per-file
+    // transactions that have already committed.
+    try {
+      await db.transaction(async (tx) => {
+        const allProjectLabels = await tx
+          .select({ id: labels.id })
+          .from(labels)
+          .where(
+            and(eq(labels.projectId, projectId), isNull(labels.deletedAt))
+          );
+        const allLabelIds = allProjectLabels.map((l) => l.id);
+        await updateIncomingJumpsForLabels(tx, allLabelIds, projectId);
+      });
+    } catch (recomputeError) {
+      logError("gitlab_sync.incoming_jumps_recompute_failed", {
+        projectId,
+        error:
+          recomputeError instanceof Error
+            ? recomputeError.message
+            : String(recomputeError),
+      });
     }
 
     // Determine final status based on file processing failures

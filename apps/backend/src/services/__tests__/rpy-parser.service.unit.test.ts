@@ -833,6 +833,7 @@ label title:
           ],
           choices: [],
           jumps: [],
+          menus: [],
         },
         {
           label: "chapter1",
@@ -840,6 +841,7 @@ label title:
           dialogue: [{ speaker: "s", text: "Chapter content", lineNumber: 6 }],
           choices: [{ label: "Choice 1", target: "route_a", lineNumber: 7 }],
           jumps: [{ to: "ending", lineNumber: 8 }],
+          menus: [],
         },
       ],
       characters: [{ tag: "s", name: "Sylvie", color: "#c8ffc8" }],
@@ -984,6 +986,7 @@ label chapter1:
             ],
             choices: [],
             jumps: [],
+            menus: [],
           },
         ],
         characters: [],
@@ -1230,6 +1233,26 @@ label chapter1:
       // Verify the reconstruction preserves the original structure
       expect(result).toContain('ma "Always."');
       expect(result).toContain("jump end");
+    });
+
+    it("should preserve legitimate narration that starts with 'jump'", () => {
+      const originalContent = `label test:
+    "jump over the fence"
+    return
+`;
+
+      const updatedDialogue = new Map([
+        ["test", [{ speaker: null, text: "jump over the fence" }]],
+      ]);
+
+      const result = reconstructRPYFile({
+        originalContent,
+        updatedDialogue,
+      });
+
+      // "jump over the fence" is NOT a keyword pattern (not followed by
+      // just an identifier), so it must be preserved as legitimate narration
+      expect(result).toContain('"jump over the fence"');
     });
   });
 
