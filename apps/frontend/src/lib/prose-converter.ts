@@ -11,12 +11,12 @@ import type { DialogueEntry } from "./prose-types";
 // ============================================================================
 
 /**
- * Computes a hash for a dialogue entry (speakerId + text)
+ * Computes a hash for a dialogue entry (speakerId + text + contentType)
  * Uses JSON.stringify for unambiguous encoding that won't collide
  * even if speakerId or text contain delimiter characters
  */
 function hashDialogueEntry(entry: DialogueEntry): string {
-  return JSON.stringify([entry.speakerId, entry.text]);
+  return JSON.stringify([entry.speakerId, entry.text, entry.contentType]);
 }
 
 /**
@@ -30,7 +30,7 @@ export function hashDialogueEntries(entries: DialogueEntry[]): string {
 
 /**
  * Shared comparison function for dialogue entries
- * Compares content (speakerId + text), ignoring stable 'id' field
+ * Compares content (speakerId + text + contentType), ignoring stable 'id' field
  */
 export function areDialogueEntriesEqual(
   left: DialogueEntry[],
@@ -41,7 +41,8 @@ export function areDialogueEntriesEqual(
   for (let i = 0; i < left.length; i++) {
     if (
       left[i].speakerId !== right[i].speakerId ||
-      left[i].text !== right[i].text
+      left[i].text !== right[i].text ||
+      left[i].contentType !== right[i].contentType
     ) {
       return false;
     }
@@ -58,6 +59,7 @@ export function areDialogueEntriesEqual(
  * Converts DialogueEntry[] to backend dialogue payload format
  * This converts prose editor entries to the format expected by the backend API
  * Filters out entries with empty or whitespace-only text
+ * Skips structural entries (MENU, JUMP, CHOICE) which are not editable dialogue
  *
  * @param entries - Dialogue entries from the prose editor
  * @returns Backend dialogue payload
@@ -71,6 +73,14 @@ export function dialogueToPayload(entries: DialogueEntry[]): Array<{
     text: string;
   }> = [];
   for (const entry of entries) {
+    // Skip structural entries (MENU, JUMP, CHOICE) - they are read-only
+    if (
+      entry.contentType !== undefined &&
+      entry.contentType !== "DIALOGUE" &&
+      entry.contentType !== "NARRATION"
+    ) {
+      continue;
+    }
     if (entry.text.trim().length > 0) {
       result.push({
         speakerId: entry.speakerId,

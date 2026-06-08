@@ -779,9 +779,7 @@ export const ProseEditor = function ProseEditor({
               type="button"
               onClick={() => setShowBadges(!showBadges)}
               className="px-2 py-1 rounded border border-[hsl(var(--border)/0.6)] hover:bg-[hsl(var(--muted)/0.4)] text-xs text-muted-foreground hover:text-foreground transition-colors"
-              title={
-                showBadges ? "Hide technical badges" : "Show technical badges"
-              }
+              title="Toggle technical badges (jumps, menus, etc.)"
               aria-pressed={showBadges}
             >
               <span>Badges: {showBadges ? "On" : "Off"}</span>
