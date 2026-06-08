@@ -37,6 +37,7 @@ function areDialogueLinePropsEqual(
     prev.entry.id === next.entry.id &&
     prev.entry.speakerId === next.entry.speakerId &&
     prev.entry.text === next.entry.text &&
+    prev.entry.contentType === next.entry.contentType &&
     prev.index === next.index &&
     prev.totalEntries === next.totalEntries &&
     prev.layoutMode === next.layoutMode &&
