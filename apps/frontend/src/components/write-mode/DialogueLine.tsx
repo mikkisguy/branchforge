@@ -98,6 +98,8 @@ export const DialogueLine = memo(function DialogueLine({
   const [popoverType, setPopoverType] = useState<
     "conditions" | "jump" | "visuals" | "menu" | null
   >(null);
+  const [showRemoveHint, setShowRemoveHint] = useState(false);
+  const removeHintTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const dropdownMenuRef = useRef<HTMLDivElement>(null);
@@ -107,6 +109,7 @@ export const DialogueLine = memo(function DialogueLine({
   const textOnChangeRef = useRef(onChange);
   const previousTextRef = useRef(entry.text);
   const measureRef = useRef<HTMLSpanElement>(null);
+  const isChoice = entry.contentType === "CHOICE";
 
   const resizeTextarea = useCallback(() => {
     const textarea = internalTextareaRef.current;
@@ -166,6 +169,13 @@ export const DialogueLine = memo(function DialogueLine({
     observer.observe(measure);
     return () => observer.disconnect();
   }, [resizeTextarea]);
+
+  // Clean up remove-hint timer on unmount
+  useEffect(() => {
+    return () => {
+      if (removeHintTimerRef.current) clearTimeout(removeHintTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -323,6 +333,18 @@ export const DialogueLine = memo(function DialogueLine({
 
   const handleTextChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      // CHOICE entries must not have empty text — parser requires it
+      if (entry.contentType === "CHOICE" && e.target.value === "") {
+        e.target.value = previousTextRef.current;
+        if (removeHintTimerRef.current)
+          clearTimeout(removeHintTimerRef.current);
+        setShowRemoveHint(true);
+        removeHintTimerRef.current = setTimeout(
+          () => setShowRemoveHint(false),
+          2500
+        );
+        return;
+      }
       // Update the ref so we know this change came from user input
       previousTextRef.current = e.target.value;
       // Call onChange with updated entry (using ref to avoid stale closure)
@@ -356,7 +378,8 @@ export const DialogueLine = memo(function DialogueLine({
       if (
         e.key === "Backspace" &&
         internalTextareaRef.current?.value === "" &&
-        totalEntries > 1
+        totalEntries > 1 &&
+        !isChoice
       ) {
         e.preventDefault();
         onDelete();
@@ -375,7 +398,7 @@ export const DialogueLine = memo(function DialogueLine({
         onMoveDown();
       }
     },
-    [index, totalEntries, onDelete, onMoveUp, onMoveDown, onAddLine]
+    [totalEntries, isChoice, index, onAddLine, onDelete, onMoveUp, onMoveDown]
   );
 
   const handleDropdownKeyDown = useCallback(
@@ -451,7 +474,6 @@ export const DialogueLine = memo(function DialogueLine({
   const isStacked = layoutMode === "stacked";
   const isSpeakerInteractive = isHovered || isDropdownOpen;
   const hasSpeaker = Boolean(entry.speakerId);
-  const isChoice = entry.contentType === "CHOICE";
   const choiceTargetName = entry.choiceData?.targetLabelName;
   const showDelete =
     (isHovered || entry.text === "") && totalEntries > 1 && !isChoice;
@@ -666,6 +688,17 @@ export const DialogueLine = memo(function DialogueLine({
         >
           <ArrowUpRight className="size-3" />
           {choiceTargetName}
+        </span>
+      )}
+
+      {/* Hint shown when user tries to empty a CHOICE */}
+      {showRemoveHint && (
+        <span
+          className={`text-xs text-muted-foreground/70 animate-in fade-in-0 slide-in-from-top-1 duration-200 ${
+            isStacked ? "" : "ml-[172px]"
+          }`}
+        >
+          Remove choices in Script mode
         </span>
       )}
 
