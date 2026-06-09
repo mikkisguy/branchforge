@@ -24,9 +24,7 @@
     "typecheck": "pnpm -r --filter './packages/*' --filter './apps/*' typecheck",
     "sync:agents": "node scripts/sync-agents-docs.js",
     "clean": "rm -rf node_modules apps/*/node_modules apps/*/dist packages/*/node_modules packages/*/dist",
-    "prepare": "node scripts/prepare-husky.js",
-    "doctor": "pnpx react-doctor@0.4.2 --verbose",
-    "doctor:empty": "rm -rf node_modules/.cache/react-doctor"
+    "prepare": "node scripts/prepare-husky.js"
   },
   "engines": {
     "node": ">=24.0.0",
