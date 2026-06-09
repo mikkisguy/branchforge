@@ -131,7 +131,13 @@ export function extractMenuBlocks(
     }>
   >();
 
-  for (const entry of entries) {
+  const indexMap = new Map<
+    string,
+    { min: number; max: number; count: number }
+  >();
+
+  for (let idx = 0; idx < entries.length; idx++) {
+    const entry = entries[idx];
     if (entry.contentType !== "CHOICE" || !entry.choiceData) continue;
 
     const { lineId, targetLabelId, targetLabelName, conditionFlags, effects } =
@@ -139,7 +145,13 @@ export function extractMenuBlocks(
 
     if (!blockMap.has(lineId)) {
       blockMap.set(lineId, []);
+      indexMap.set(lineId, { min: idx, max: idx, count: 0 });
     }
+
+    const meta = indexMap.get(lineId)!;
+    meta.min = Math.min(meta.min, idx);
+    meta.max = Math.max(meta.max, idx);
+    meta.count += 1;
 
     blockMap.get(lineId)!.push({
       label: entry.text,
@@ -150,9 +162,58 @@ export function extractMenuBlocks(
     });
   }
 
+  // Validate contiguity: for each lineId, all CHOICE entries must be adjacent
+  for (const [lineId, meta] of indexMap) {
+    if (meta.max - meta.min + 1 !== meta.count) {
+      throw new Error(
+        `[extractMenuBlocks] Non-contiguous CHOICE entries for lineId ${lineId}: ` +
+          `indices ${meta.min}-${meta.max} span ${meta.max - meta.min + 1} slots but only ${meta.count} CHOICE entries found`
+      );
+    }
+  }
+
   const result: MenuBlockPayload[] = [];
   for (const [lineId, menuOptions] of blockMap) {
     result.push({ lineId, menuOptions });
+  }
+  return result;
+}
+
+/**
+ * Converts a MENU label line's menuOptions into CHOICE dialogue entries.
+ * Used to expand menu lines into editable choice entries in the prose editor.
+ *
+ * @param line - A label line with menuOptions
+ * @returns Array of CHOICE DialogueEntry items
+ */
+export function menuLineToChoiceEntries(line: {
+  id: string;
+  menuOptions?: Array<{
+    label: string;
+    targetLabelId: string;
+    targetLabelName: string;
+    conditionFlags?: string[];
+    effects?: { stats?: Record<string, number> };
+  }> | null;
+}): DialogueEntry[] {
+  if (!line.menuOptions || line.menuOptions.length === 0) return [];
+  const result: DialogueEntry[] = [];
+  for (let i = 0; i < line.menuOptions.length; i++) {
+    const option = line.menuOptions[i];
+    result.push({
+      id: `${line.id}-choice-${i}`,
+      speakerId: null,
+      text: option.label,
+      contentType: "CHOICE",
+      choiceData: {
+        lineId: line.id,
+        optionIndex: i,
+        targetLabelId: option.targetLabelId,
+        targetLabelName: option.targetLabelName,
+        conditionFlags: option.conditionFlags,
+        effects: option.effects,
+      },
+    });
   }
   return result;
 }

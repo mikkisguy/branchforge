@@ -253,10 +253,19 @@ function trackBlocks(
  * Options for reconstructing RPY file with updated dialogue
  * Used for Write Mode saves to merge dialogue changes with original keywords
  */
+/** A single menu option carried through RPY reconstruction */
+export interface MenuOptionForReconstruction {
+  label: string;
+  targetLabelId?: string;
+  targetLabelName?: string;
+  conditionFlags?: string[];
+  effects?: { stats?: Record<string, number> };
+}
+
 export interface ReconstructedFileOptions {
   originalContent: string;
   updatedDialogue: Map<string, Array<{ speaker: string | null; text: string }>>; // label -> dialogue
-  updatedMenuChoices?: Map<string, string[][]>; // label -> [menuBlock1Choices, menuBlock2Choices, ...]
+  updatedMenuChoices?: Map<string, MenuOptionForReconstruction[][]>; // label -> [menuBlock1, menuBlock2, ...]
 }
 
 /**
@@ -1315,8 +1324,13 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
       currentLabel &&
       updatedMenuChoices?.has(currentLabel)
     ) {
-      // Match a choice line: "text": or "text" if condition:
-      const choiceMatch = trimmed.match(/^"(.+?)"(?:\s+(if\s+.+))?:(?:\s*)?$/);
+      // Match a choice line with any quoting style: "text", 'text', or unquoted
+      // Also captures optional "if ..." condition
+      // Negative lookahead excludes Ren'Py control-flow keywords (if/elif/else/jump/etc.)
+      // that appear inside menu blocks at the same indent level as choices.
+      const choiceMatch = trimmed.match(
+        /^(?:"(.+?)"|'(.+?)'|(?!(?:if|elif|else|pass|jump|call|return|python|while|for|default|define|label|menu|init)\s*:)([a-zA-Z_][a-zA-Z0-9_ ]*?))(?:\s+(if\s+.+))?:(?:\s*)?$/
+      );
       if (choiceMatch) {
         const labelBlocks = updatedMenuChoices.get(currentLabel)!;
         const blockIdx = (menuBlockIndices.get(currentLabel) ?? 1) - 1;
@@ -1326,17 +1340,21 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
           blockIdx < labelBlocks.length &&
           choiceIdx < labelBlocks[blockIdx].length
         ) {
-          const newChoiceText = labelBlocks[blockIdx][choiceIdx];
+          const newChoiceText = labelBlocks[blockIdx][choiceIdx].label;
           menuChoiceIndices.set(currentLabel, choiceIdx + 1);
 
           // Reconstruct the line preserving indentation and any trailing syntax
           const indent = line.match(/^(\s*)/)?.[1] || "";
           // Preserve condition suffix if present: "text" if condition:
-          const conditionPart = choiceMatch[2];
+          const conditionPart = choiceMatch[4];
+          // Determine quote style from the original match
+          const quote = choiceMatch[1] ? '"' : choiceMatch[2] ? "'" : "";
           if (conditionPart) {
-            result.push(`${indent}"${newChoiceText}" ${conditionPart}:`);
+            result.push(
+              `${indent}${quote}${newChoiceText}${quote} ${conditionPart}:`
+            );
           } else {
-            result.push(`${indent}"${newChoiceText}":`);
+            result.push(`${indent}${quote}${newChoiceText}${quote}:`);
           }
           continue;
         }

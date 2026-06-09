@@ -7,6 +7,7 @@ import {
   dialogueToPayload,
   hashDialogueEntries,
   extractMenuBlocks,
+  menuLineToChoiceEntries,
 } from "@/lib/prose-converter";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { UpdateDialogueResponse } from "@/lib/api/labels";
@@ -239,23 +240,7 @@ export function getPersistedDialogueFromLabel(
       line.menuOptions &&
       line.menuOptions.length > 0
     ) {
-      for (let i = 0; i < line.menuOptions.length; i++) {
-        const option = line.menuOptions[i];
-        result.push({
-          id: `${line.id}-choice-${i}`,
-          speakerId: null,
-          text: option.label,
-          contentType: "CHOICE",
-          choiceData: {
-            lineId: line.id,
-            optionIndex: i,
-            targetLabelId: option.targetLabelId,
-            targetLabelName: option.targetLabelName,
-            conditionFlags: option.conditionFlags,
-            effects: option.effects,
-          },
-        });
-      }
+      result.push(...menuLineToChoiceEntries(line));
     }
   }
   return result;

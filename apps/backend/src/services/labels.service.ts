@@ -1647,7 +1647,18 @@ export async function reconstructFileForLabel(
   //
   // Also build a menu choices map from MENU lines' menuOptions, so that
   // reconstructRPYFile can update choice text in the RPY file.
-  const updatedMenuChoices = new Map<string, string[][]>();
+  const updatedMenuChoices = new Map<
+    string,
+    Array<
+      Array<{
+        label: string;
+        targetLabelId?: string;
+        targetLabelName?: string;
+        conditionFlags?: string[];
+        effects?: { stats?: Record<string, number> };
+      }>
+    >
+  >();
 
   for (const l of allLabels) {
     // Skip labels without a labelName (UI-created labels that don't exist in RPY files)
@@ -1678,7 +1689,15 @@ export async function reconstructFileForLabel(
           line.menuOptions.length > 0
       )
       .sort((a, b) => a.sequence - b.sequence)
-      .map((line) => line.menuOptions!.map((opt) => opt.label));
+      .map((line) =>
+        line.menuOptions!.map((opt) => ({
+          label: opt.label,
+          targetLabelId: opt.targetLabelId,
+          targetLabelName: opt.targetLabelName,
+          conditionFlags: opt.conditionFlags,
+          effects: opt.effects,
+        }))
+      );
 
     if (menuBlocks.length > 0) {
       updatedMenuChoices.set(l.labelName, menuBlocks);

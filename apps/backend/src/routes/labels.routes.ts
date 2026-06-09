@@ -412,10 +412,14 @@ async function updateLabelDialogueHandler(
       // 3.5. Process menu blocks - update MENU lines' menuOptions
       if (menuBlocks && menuBlocks.length > 0) {
         for (const block of menuBlocks) {
-          await tx
+          const menuContentHash = calculateContentHash(
+            JSON.stringify(block.menuOptions)
+          );
+          const result = await tx
             .update(labelLines)
             .set({
               menuOptions: block.menuOptions,
+              contentHash: menuContentHash,
               isDirty: true,
               lastSyncedHash: null,
             })
@@ -423,9 +427,15 @@ async function updateLabelDialogueHandler(
               and(
                 eq(labelLines.id, block.lineId),
                 eq(labelLines.labelId, labelId),
+                eq(labelLines.contentType, "MENU"),
                 isNull(labelLines.deletedAt)
               )
             );
+          if (result.rowCount === 0) {
+            throw new NotFoundError(
+              `Menu line ${block.lineId} not found in label ${labelId}`
+            );
+          }
         }
       }
 

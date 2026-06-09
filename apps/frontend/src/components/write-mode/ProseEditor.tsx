@@ -17,7 +17,10 @@ import {
 } from "react";
 import type React from "react";
 import { DialogueLine } from "./DialogueLine";
-import { areDialogueEntriesEqual } from "@/lib/prose-converter";
+import {
+  areDialogueEntriesEqual,
+  menuLineToChoiceEntries,
+} from "@/lib/prose-converter";
 import { WritingGoalPill } from "./WritingGoalPill";
 const WritingStatsDialog = lazy(() =>
   import("./WritingStatsDialog").then((m) => ({
@@ -82,24 +85,7 @@ function convertLabelLinesToEntries(
       line.menuOptions &&
       line.menuOptions.length > 0
     ) {
-      // Expand each menu option into a CHOICE entry
-      for (let i = 0; i < line.menuOptions.length; i++) {
-        const option = line.menuOptions[i];
-        result.push({
-          id: `${line.id}-choice-${i}`,
-          speakerId: null,
-          text: option.label,
-          contentType: "CHOICE",
-          choiceData: {
-            lineId: line.id,
-            optionIndex: i,
-            targetLabelId: option.targetLabelId,
-            targetLabelName: option.targetLabelName,
-            conditionFlags: option.conditionFlags,
-            effects: option.effects,
-          },
-        });
-      }
+      result.push(...menuLineToChoiceEntries(line));
     }
   }
   return result;

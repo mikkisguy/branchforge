@@ -29,6 +29,17 @@ interface DialogueLineProps {
   showBadges?: boolean;
 }
 
+/**
+ * Structural equality check for memo comparison.
+ * Handles nested objects (e.g. effects.stats) and arrays (e.g. conditionFlags)
+ * correctly via JSON.stringify, unlike shallow reference comparison.
+ */
+function isEqualJson(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a == null || b == null) return a === b;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 function areDialogueLinePropsEqual(
   prev: DialogueLineProps,
   next: DialogueLineProps
@@ -41,10 +52,14 @@ function areDialogueLinePropsEqual(
     prev.entry.choiceData?.targetLabelId ===
       next.entry.choiceData?.targetLabelId &&
     prev.entry.choiceData?.optionIndex === next.entry.choiceData?.optionIndex &&
-    JSON.stringify(prev.entry.choiceData?.conditionFlags) ===
-      JSON.stringify(next.entry.choiceData?.conditionFlags) &&
-    JSON.stringify(prev.entry.choiceData?.effects) ===
-      JSON.stringify(next.entry.choiceData?.effects) &&
+    isEqualJson(
+      prev.entry.choiceData?.conditionFlags,
+      next.entry.choiceData?.conditionFlags
+    ) &&
+    isEqualJson(
+      prev.entry.choiceData?.effects,
+      next.entry.choiceData?.effects
+    ) &&
     prev.entry.contentType === next.entry.contentType &&
     prev.index === next.index &&
     prev.totalEntries === next.totalEntries &&
