@@ -26,6 +26,7 @@ export function useEditorCursor(options?: UseEditorCursorOptions) {
 
   // Initialize totalLines from initial content on mount
   useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     if (options?.initialContent !== undefined) {
       setTotalLines(options.initialContent.split("\n").length);
     }

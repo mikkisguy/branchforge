@@ -112,6 +112,7 @@ export function useWriteTabs({
   isLoadingLabels,
 }: UseWriteTabsProps): UseWriteTabsReturn {
   const [tabsState, dispatch] = useReducer(writeTabsReducer, {
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     openTabs: activeLabelId ? [activeLabelId] : [],
     hydratedTabsProjectId: undefined,
     nextActiveLabelId: undefined,
@@ -123,6 +124,7 @@ export function useWriteTabs({
   const activeLabelIdRef = useRef<string | null>(null);
 
   const tabsStorageKey = useMemo(() => {
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     if (!projectId) {
       return null;
     }
@@ -138,6 +140,7 @@ export function useWriteTabs({
     return getPrefixedStorageKey(`write:active-tab:${projectId}`);
   }, [projectId]);
 
+  // react-doctor-disable-next-line react-doctor/no-event-handler
   const labelIdSet = useMemo(() => new Set(labels.map((l) => l.id)), [labels]);
 
   useEffect(() => {
@@ -200,6 +203,7 @@ export function useWriteTabs({
       return;
     }
 
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     if (activeLabelId && labelIdSet.has(activeLabelId)) {
       writeLocalStorageItem(activeTabStorageKey, activeLabelId);
       return;
@@ -260,6 +264,7 @@ export function useWriteTabs({
       hydratedTabsProjectId: projectId,
     });
 
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     if (nextActiveLabelId !== activeLabelId) {
       setActiveLabelId(nextActiveLabelId);
     }

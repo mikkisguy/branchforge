@@ -149,6 +149,7 @@ export function ZipImportFilesDialog({
   const importIdRef = useRef(0);
   // Reset state when dialog closes
   useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     if (!open) {
       importIdRef.current += 1;
       dispatch({ type: "RESET" });

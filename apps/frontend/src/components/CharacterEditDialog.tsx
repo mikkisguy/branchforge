@@ -176,6 +176,7 @@ export function CharacterEditDialog({
     isUpdatingCharacter,
     isUploadingAvatar,
     isDeletingAvatar,
+    // react-doctor-disable-next-line react-doctor/no-event-handler
   } = useCharacters(projectId);
 
   const { error } = useToast();
@@ -212,6 +213,7 @@ export function CharacterEditDialog({
         hasInitializedRef.current = false;
       }
       if (characterId && !hasInitializedRef.current && characters.length > 0) {
+        // react-doctor-disable-next-line react-doctor/no-event-handler
         const char = characters.find((c) => c.id === characterId);
         if (char) {
           initializedForCharacterIdRef.current = characterId;

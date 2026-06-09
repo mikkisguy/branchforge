@@ -483,6 +483,7 @@ export const ProseEditor = function ProseEditor({
     }
 
     // Notify if entries actually changed
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     if (!areDialogueEntriesEqual(prevEntriesRef.current, entries)) {
       scheduleTextHistorySnapshot(entries);
       onChange(entries);

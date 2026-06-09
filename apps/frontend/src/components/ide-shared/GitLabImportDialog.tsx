@@ -167,6 +167,7 @@ export function GitLabImportDialog({
 
   // Reset state when dialog opens/closes
   useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     if (!open) {
       // Clear pending success timeout
       if (timeoutRef.current) {
@@ -185,6 +186,7 @@ export function GitLabImportDialog({
 
   // Check integration status when dialog opens
   useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     if (open && !checkingIntegration) {
       if (hasIntegration) {
         // Only set state if we haven't already

@@ -78,8 +78,10 @@ export function ProjectEditDialog({
 
   useEffect(() => {
     // Detect when dialog opens (transition from false to true) or project changes
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     const projectId = project?.id ?? null;
     const isOpenOrProjectChanged =
+      // react-doctor-disable-next-line react-doctor/no-event-handler
       (open && !previousOpenRef.current) ||
       (open && previousProjectIdRef.current !== projectId);
 

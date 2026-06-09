@@ -11,7 +11,7 @@
  * Uses local in-memory undo only for instant response.
  */
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import { Undo2, Redo2 } from "lucide-react";
 
 interface UndoRedoControlsProps {
@@ -27,8 +27,21 @@ export function UndoRedoControls({
   onUndo,
   onRedo,
 }: UndoRedoControlsProps) {
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
+  // Store handlers in refs to avoid re-subscribing to keydown on every render
+  const onUndoRef = useRef(onUndo);
+  const onRedoRef = useRef(onRedo);
+  const canUndoRef = useRef(canUndo);
+  const canRedoRef = useRef(canRedo);
+
+  useEffect(() => {
+    onUndoRef.current = onUndo;
+    onRedoRef.current = onRedo;
+    canUndoRef.current = canUndo;
+    canRedoRef.current = canRedo;
+  }, [onUndo, onRedo, canUndo, canRedo]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       // Preserve native undo/redo in editable elements (inputs, textareas, contenteditable)
       const target = e.target as HTMLElement;
       if (
@@ -42,8 +55,8 @@ export function UndoRedoControls({
       // Ctrl+Z for undo
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyZ") {
         e.preventDefault();
-        if (canUndo) {
-          onUndo();
+        if (canUndoRef.current) {
+          onUndoRef.current();
         }
       }
 
@@ -54,18 +67,15 @@ export function UndoRedoControls({
           (e.shiftKey && e.code === "KeyZ"))
       ) {
         e.preventDefault();
-        if (canRedo) {
-          onRedo();
+        if (canRedoRef.current) {
+          onRedoRef.current();
         }
       }
-    },
-    [canUndo, canRedo, onUndo, onRedo]
-  );
+    };
 
-  useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleKeyDown]);
+  }, []); // Stable - reads from refs
 
   return (
     <div className="flex items-center gap-1">

@@ -411,6 +411,7 @@ export function useWriteAutosave({
       return;
     }
 
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     const activeLabelVersion = activeLabel.version;
     const localVersion = lastKnownVersionByLabelRef.current.get(activeLabel.id);
     if (

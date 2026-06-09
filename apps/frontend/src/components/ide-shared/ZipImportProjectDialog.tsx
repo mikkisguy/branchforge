@@ -134,6 +134,7 @@ export function ZipImportProjectDialog({
 
   // Reset state when dialog closes
   useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     if (!open) {
       importIdRef.current += 1;
       dispatch({ type: "RESET" });

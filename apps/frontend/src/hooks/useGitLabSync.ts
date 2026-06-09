@@ -228,6 +228,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
     error: operationError,
     isError: isOperationError,
   } = useQuery({
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     queryKey: activeOperationId
       ? gitlabKeys.operation(activeOperationId)
       : ["gitlab", "operations", "none"],

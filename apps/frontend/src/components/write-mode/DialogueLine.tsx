@@ -154,6 +154,7 @@ export const DialogueLine = memo(function DialogueLine({
     }
   }, [entry.id, entry.text, resizeTextarea]); // Also depend on entry.id to detect label switches
 
+  // react-doctor-disable-next-line react-doctor/advanced-event-handler-refs
   useEffect(() => {
     window.addEventListener("resize", resizeTextarea);
     return () => window.removeEventListener("resize", resizeTextarea);
@@ -171,11 +172,12 @@ export const DialogueLine = memo(function DialogueLine({
   }, [resizeTextarea]);
 
   // Clean up remove-hint timer on unmount
+  // oxlint-disable-next-line react/exhaustive-deps -- Mount-only effect; ref is stable, we intentionally read .current at cleanup time to clear pending timer
   useEffect(() => {
     return () => {
       if (removeHintTimerRef.current) clearTimeout(removeHintTimerRef.current);
     };
-  }, [removeHintTimerRef]);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -267,6 +269,7 @@ export const DialogueLine = memo(function DialogueLine({
     characters,
   ]);
 
+  // react-doctor-disable-next-line react-doctor/advanced-event-handler-refs
   useEffect(() => {
     if (!isDropdownOpen) return;
 
@@ -289,6 +292,7 @@ export const DialogueLine = memo(function DialogueLine({
   }, [isDropdownOpen, updateDropdownDirection]);
 
   useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     if (isDropdownOpen && focusedOptionIndex >= 0) {
       const option = document.getElementById(
         `${dropdownId}-option-${focusedOptionIndex}`

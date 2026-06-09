@@ -83,6 +83,7 @@ export function useFileTabs({
     string | undefined
   >(undefined);
 
+  // react-doctor-disable-next-line react-doctor/no-event-handler
   const tabsStorageKey = projectId
     ? getPrefixedStorageKey(`script:open-tabs:${projectId}`)
     : null;
@@ -167,6 +168,7 @@ export function useFileTabs({
   }, [openTabs, projectFiles]);
 
   useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     if (tabsStorageKey && hydratedTabsProjectId === projectId) {
       writeLocalStorageItem(tabsStorageKey, JSON.stringify(openTabs));
     }

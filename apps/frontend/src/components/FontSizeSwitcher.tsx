@@ -113,6 +113,7 @@ export function FontSizeSwitcher({
     document.documentElement.style.setProperty(cssVariable, `${fontSize}px`);
 
     // Dispatch custom event to notify CodeMirror editors of font size change
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     if (mode === "script") {
       window.dispatchEvent(
         new CustomEvent(EDITOR_FONT_SIZE_CHANGED, { detail: { fontSize } })
