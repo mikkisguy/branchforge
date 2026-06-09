@@ -59,6 +59,7 @@ type LineLayoutMode = "inline" | "stacked";
 const LINE_LAYOUT_STORAGE_KEY = "write:line-layout";
 const NEW_LINE_BOTTOM_SAFE_OFFSET = 96;
 const TEXT_HISTORY_DEBOUNCE_MS = 450;
+const EMPTY_ARRAY: { date: string; count: number }[] = [];
 
 interface TimezoneDateParts {
   year: number;
@@ -112,7 +113,18 @@ function formatDateKey(year: number, month: number, day: number): string {
   )}`;
 }
 
-const dateTimeFormatCache = new Map<string, Intl.DateTimeFormat>();
+const utcDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "UTC",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  hourCycle: "h23",
+});
+
+const dateTimeFormatCache = new Map<string, Intl.DateTimeFormat>([
+  ["UTC", utcDateFormatter],
+]);
 
 function getDatePartsInTimezone(
   date: Date,
@@ -265,7 +277,10 @@ export const ProseEditor = function ProseEditor({
     50 // Max 50 in-memory undo steps
   );
 
-  const textareaRefs = useRef<Map<number, HTMLTextAreaElement>>(new Map());
+  const textareaRefs = useRef<Map<number, HTMLTextAreaElement> | null>(null);
+  if (textareaRefs.current === null) {
+    textareaRefs.current = new Map();
+  }
 
   useImperativeHandle(
     ref,
@@ -274,7 +289,7 @@ export const ProseEditor = function ProseEditor({
         const activeElement = document.activeElement;
 
         if (activeElement instanceof HTMLTextAreaElement) {
-          for (const textarea of textareaRefs.current.values()) {
+          for (const textarea of textareaRefs.current!.values()) {
             if (textarea === activeElement) {
               textarea.focus();
               return;
@@ -282,7 +297,7 @@ export const ProseEditor = function ProseEditor({
           }
         }
 
-        const textarea = textareaRefs.current.get(0);
+        const textarea = textareaRefs.current!.get(0);
         if (textarea) {
           textarea.focus();
         }
@@ -297,7 +312,7 @@ export const ProseEditor = function ProseEditor({
       return false;
     }
 
-    for (const textarea of textareaRefs.current.values()) {
+    for (const textarea of textareaRefs.current!.values()) {
       if (textarea === activeElement) {
         return true;
       }
@@ -357,6 +372,19 @@ export const ProseEditor = function ProseEditor({
     [flushPendingTextHistory]
   );
 
+  // Handler for creating the first entry in an empty label
+  const handleCreateFirstEntry = useCallback(() => {
+    const newEntries: DialogueEntry[] = [
+      {
+        id: crypto.randomUUID(),
+        speakerId: characters.length > 0 ? characters[0].id : null,
+        text: "",
+      },
+    ];
+    recordImmediateHistorySnapshot(newEntries);
+    setEntries(newEntries);
+  }, [characters, recordImmediateHistorySnapshot]);
+
   // Process pending immediate snapshots after entries have been updated
   useEffect(() => {
     if (pendingImmediateSnapshotRef.current) {
@@ -370,7 +398,7 @@ export const ProseEditor = function ProseEditor({
     if (pendingFocusRef.current) {
       const { index, scrollIntoView } = pendingFocusRef.current;
       requestAnimationFrame(() => {
-        const textarea = textareaRefs.current.get(index);
+        const textarea = textareaRefs.current!.get(index);
         if (textarea) {
           textarea.focus({ preventScroll: true });
 
@@ -667,17 +695,7 @@ export const ProseEditor = function ProseEditor({
         </div>
         <button
           type="button"
-          onClick={() => {
-            const newEntries = [
-              {
-                id: crypto.randomUUID(),
-                speakerId: characters.length > 0 ? characters[0].id : null,
-                text: "",
-              },
-            ];
-            recordImmediateHistorySnapshot(newEntries);
-            setEntries(newEntries);
-          }}
+          onClick={handleCreateFirstEntry}
           className="group px-6 py-3 rounded-lg bg-[var(--theme-color)] text-white hover:bg-[var(--theme-color-hover)] transition-all duration-200 hover:shadow-lg hover:shadow-[var(--theme-color)]/20 focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)] focus:ring-offset-2 focus:ring-offset-background"
         >
           <span className="flex items-center gap-2">
@@ -758,9 +776,9 @@ export const ProseEditor = function ProseEditor({
                 showBadges={showBadges}
                 textareaRef={(el: HTMLTextAreaElement | null) => {
                   if (el) {
-                    textareaRefs.current.set(index, el);
+                    textareaRefs.current!.set(index, el);
                   } else {
-                    textareaRefs.current.delete(index);
+                    textareaRefs.current!.delete(index);
                   }
                 }}
               />
@@ -847,7 +865,7 @@ export const ProseEditor = function ProseEditor({
           open={statsDialogOpen}
           onOpenChange={setStatsDialogOpen}
           dailyGoal={writingGoalSettings?.dailyWritingGoal ?? 500}
-          dailyWordCounts={writingGoalSettings?.dailyWordCounts ?? []}
+          dailyWordCounts={writingGoalSettings?.dailyWordCounts ?? EMPTY_ARRAY}
         />
       </Suspense>
     </div>

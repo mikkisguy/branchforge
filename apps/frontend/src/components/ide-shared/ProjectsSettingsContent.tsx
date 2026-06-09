@@ -18,6 +18,10 @@ import { useToast } from "@/contexts/ToastContext";
 import { useGitLab } from "@/hooks/useGitLab";
 import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 
+function isProjectOwner(project: Project): boolean {
+  return project.visibility === "OWNER";
+}
+
 interface ProjectsSettingsContentProps {
   projects: Project[];
   onUpdateProject?: (
@@ -69,10 +73,6 @@ export function ProjectsSettingsContent({
       throw new Error("Delete project handler not provided");
     }
     return onDeleteProject(projectId);
-  };
-
-  const isProjectOwner = (project: Project) => {
-    return project.visibility === "OWNER";
   };
 
   // Empty state

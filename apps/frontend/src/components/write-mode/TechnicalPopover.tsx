@@ -99,7 +99,7 @@ export function TechnicalPopover({
     const handleScroll = () => measureAndSetFlip();
 
     window.addEventListener("resize", handleResize);
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
 
     return () => {
       window.removeEventListener("resize", handleResize);
@@ -170,8 +170,11 @@ export function TechnicalPopover({
               <span className="text-sm font-medium">Visuals</span>
             </div>
             <ul className="text-xs text-muted-foreground space-y-1.5">
-              {visualsData.map((visual, index) => (
-                <li key={index} className="flex items-center gap-1.5">
+              {visualsData.map((visual) => (
+                <li
+                  key={`${visual.type}_${visual.target}`}
+                  className="flex items-center gap-1.5"
+                >
                   <span className="font-medium">{visual.type}</span>
                   {visual.target && (
                     <>
@@ -198,8 +201,8 @@ export function TechnicalPopover({
               <span className="text-sm font-medium">Menu Choices</span>
             </div>
             <ul className="text-xs text-muted-foreground space-y-2">
-              {choicesData.map((choice, index) => (
-                <li key={index} className="space-y-1">
+              {choicesData.map((choice) => (
+                <li key={choice.targetLabelId} className="space-y-1">
                   <div className="flex items-center gap-1.5">
                     <span className="text-muted-foreground/60 w-2 flex-shrink-0 select-none">
                       -

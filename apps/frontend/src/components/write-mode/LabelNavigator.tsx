@@ -31,6 +31,13 @@ const STATUS_COLORS: Record<LabelStatus, string> = {
   DRAFT: "var(--theme-draft-color)",
 };
 
+function compareByUpdatedAt(a: PublicLabel, b: PublicLabel): number {
+  const timeDiff =
+    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  if (timeDiff !== 0) return timeDiff;
+  return b.labelNumber - a.labelNumber;
+}
+
 // ============================================================================
 // Inline Rename Input Component
 // ============================================================================
@@ -508,13 +515,6 @@ export function LabelNavigator({
         label.labelName?.toLowerCase().includes(query)
     );
   }, [labels, searchQuery]);
-
-  const compareByUpdatedAt = (a: PublicLabel, b: PublicLabel): number => {
-    const timeDiff =
-      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-    if (timeDiff !== 0) return timeDiff;
-    return b.labelNumber - a.labelNumber;
-  };
 
   const groupedLabels = useMemo(() => {
     // Short-circuit: "lastUpdated" mode only needs the flat list

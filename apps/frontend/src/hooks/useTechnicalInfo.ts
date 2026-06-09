@@ -148,7 +148,8 @@ export function useTechnicalInfo(
 
   // Cache computed technicalInfo objects keyed by entryId.
   // Using useRef avoids triggering re-renders when the cache is updated.
-  const cacheRef = useRef<Map<string, CachedInfo>>(new Map());
+  const cacheRef = useRef<Map<string, CachedInfo> | null>(null);
+  if (cacheRef.current === null) cacheRef.current = new Map();
 
   // Clear cache when the active label changes to avoid unbounded growth.
   // ProseEditor stays mounted across label switches, so stale entries
@@ -163,7 +164,7 @@ export function useTechnicalInfo(
       const line = labelById.get(entryId);
       if (!line) {
         // Clean stale cache entries for deleted lines
-        cacheRef.current.delete(entryId);
+        cacheRef.current!.delete(entryId);
         return undefined;
       }
 
@@ -187,7 +188,7 @@ export function useTechnicalInfo(
       }
 
       const sourceKey = buildSourceKey(line, adjacentStructural);
-      const cached = cacheRef.current.get(entryId);
+      const cached = cacheRef.current!.get(entryId);
 
       // Return cached object reference when source data is semantically identical
       if (cached && cached.key === sourceKey) {
@@ -208,7 +209,7 @@ export function useTechnicalInfo(
       }
 
       const result = Object.keys(info).length > 0 ? info : undefined;
-      cacheRef.current.set(entryId, { value: result, key: sourceKey });
+      cacheRef.current!.set(entryId, { value: result, key: sourceKey });
       return result;
     },
     [labelById, lineIndexMap, linesArray]

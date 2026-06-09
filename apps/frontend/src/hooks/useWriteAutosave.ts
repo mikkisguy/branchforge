@@ -217,6 +217,12 @@ function pruneRefMap<V>(map: Map<string, V>, validLabelIds: Set<string>): void {
   }
 }
 
+const INITIAL_AUTOSAVE_STATE: AutosaveState = {
+  lastKnownVersionByLabel: new Map(),
+  conflictByLabel: new Map(),
+  lastSaved: null,
+};
+
 export function getPersistedDialogueFromLabel(
   activeLabel: LabelDetail | undefined
 ): DialogueEntry[] {
@@ -256,23 +262,21 @@ export function useWriteAutosave({
   onUpdateDialogue,
   showErrorToast,
 }: UseWriteAutosaveProps): UseWriteAutosaveReturn {
-  const initialState: AutosaveState = {
-    lastKnownVersionByLabel: new Map(),
-    conflictByLabel: new Map(),
-    lastSaved: null,
-  };
-
-  const [state, dispatch] = useReducer(autosaveReducer, initialState);
+  const [state, dispatch] = useReducer(autosaveReducer, INITIAL_AUTOSAVE_STATE);
 
   const { lastKnownVersionByLabel, conflictByLabel, lastSaved } = state;
 
   const lastKnownVersionByLabelRef = useRef(lastKnownVersionByLabel);
-  const savedHashesRef = useRef<Map<string, string>>(new Map());
-  const serverContentHashesRef = useRef<Map<string, string>>(new Map());
+  const savedHashesRef = useRef<Map<string, string> | null>(null);
+  if (savedHashesRef.current === null) savedHashesRef.current = new Map();
+  const serverContentHashesRef = useRef<Map<string, string> | null>(null);
+  if (serverContentHashesRef.current === null)
+    serverContentHashesRef.current = new Map();
   const triggerSaveRef = useRef<() => Promise<boolean>>(async () => true);
   const isDirtyRef = useRef(false);
   const prevProjectIdRef = useRef<string | undefined>(undefined);
-  const prevLabelIdsRef = useRef<Set<string>>(new Set());
+  const prevLabelIdsRef = useRef<Set<string> | null>(null);
+  if (prevLabelIdsRef.current === null) prevLabelIdsRef.current = new Set();
 
   useEffect(() => {
     lastKnownVersionByLabelRef.current = lastKnownVersionByLabel;
@@ -286,8 +290,8 @@ export function useWriteAutosave({
       const clearedVersions = new Map<string, number>();
       lastKnownVersionByLabelRef.current = clearedVersions;
       dispatch({ type: "CLEAR_STATE" });
-      savedHashesRef.current.clear();
-      serverContentHashesRef.current.clear();
+      savedHashesRef.current!.clear();
+      serverContentHashesRef.current!.clear();
     }
 
     prevProjectIdRef.current = projectId;
@@ -317,7 +321,7 @@ export function useWriteAutosave({
           const expectedVersion = lastKnownVersionByLabelRef.current.get(
             draftToSave.labelId
           );
-          const expectedContentHash = serverContentHashesRef.current.get(
+          const expectedContentHash = serverContentHashesRef.current!.get(
             draftToSave.labelId
           );
 
@@ -328,7 +332,7 @@ export function useWriteAutosave({
           });
 
           if (result.success) {
-            savedHashesRef.current.set(
+            savedHashesRef.current!.set(
               draftToSave.labelId,
               hashDialogueEntries(draftToSave.entries)
             );
@@ -341,7 +345,7 @@ export function useWriteAutosave({
               draftToSave.labelId!,
               result.version
             );
-            serverContentHashesRef.current.set(
+            serverContentHashesRef.current!.set(
               draftToSave.labelId,
               result.contentHash
             );
@@ -363,12 +367,12 @@ export function useWriteAutosave({
           }
 
           if (typeof result.conflict.currentContentHash === "string") {
-            serverContentHashesRef.current.set(
+            serverContentHashesRef.current!.set(
               draftToSave.labelId,
               result.conflict.currentContentHash
             );
           } else {
-            serverContentHashesRef.current.delete(draftToSave.labelId);
+            serverContentHashesRef.current!.delete(draftToSave.labelId);
           }
 
           dispatch({ type: "SET_CONFLICT", labelId: draftToSave.labelId! });
@@ -423,18 +427,18 @@ export function useWriteAutosave({
     }
 
     const persistedDialogue = getPersistedDialogueFromLabel(activeLabel);
-    savedHashesRef.current.set(
+    savedHashesRef.current!.set(
       activeLabel.id,
       hashDialogueEntries(persistedDialogue)
     );
 
     if (typeof activeLabel.contentHash === "string") {
-      serverContentHashesRef.current.set(
+      serverContentHashesRef.current!.set(
         activeLabel.id,
         activeLabel.contentHash
       );
     } else {
-      serverContentHashesRef.current.delete(activeLabel.id);
+      serverContentHashesRef.current!.delete(activeLabel.id);
     }
 
     if (typeof activeLabelVersion === "number") {
@@ -457,7 +461,7 @@ export function useWriteAutosave({
 
     // Avoid dispatching if label IDs haven't changed — prevents infinite
     // re-render loop when labels array has a new identity but same contents
-    const prevIds = prevLabelIdsRef.current;
+    const prevIds = prevLabelIdsRef.current!;
     if (
       prevIds.size === validLabelIds.size &&
       [...validLabelIds].every((id) => prevIds.has(id))
@@ -471,8 +475,8 @@ export function useWriteAutosave({
       lastKnownVersionByLabelRef.current,
       validLabelIds
     );
-    pruneRefMap(savedHashesRef.current, validLabelIds);
-    pruneRefMap(serverContentHashesRef.current, validLabelIds);
+    pruneRefMap(savedHashesRef.current!, validLabelIds);
+    pruneRefMap(serverContentHashesRef.current!, validLabelIds);
   }, [labels]);
 
   useEffect(() => {
@@ -523,8 +527,8 @@ export function useWriteAutosave({
   }, []);
 
   useEffect(() => {
-    const savedMap = savedHashesRef.current;
-    const serverMap = serverContentHashesRef.current;
+    const savedMap = savedHashesRef.current!;
+    const serverMap = serverContentHashesRef.current!;
 
     return () => {
       savedMap.clear();

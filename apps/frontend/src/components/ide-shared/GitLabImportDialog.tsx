@@ -293,10 +293,14 @@ export function GitLabImportDialog({
 
       // Detect characters from imported RPY files
       try {
+        // Fast skip: don't detect characters if this import was superseded
+        if (currentImportId !== importIdRef.current) return;
+
         const detectionResult = await charactersApi.detectCharacters(
           result.project.id
         );
 
+        // Stale check: import could have been superseded during the API call
         if (currentImportId !== importIdRef.current) return;
 
         // Filter out characters that already exist in the database
