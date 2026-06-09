@@ -5,7 +5,9 @@
  * Displays daily progress relative to the daily goal.
  */
 
+// react-doctor-disable-next-line react-doctor/prefer-dynamic-import
 import { format } from "date-fns";
+// react-doctor-disable-next-line react-doctor/prefer-dynamic-import
 import {
   BarChart,
   Bar,

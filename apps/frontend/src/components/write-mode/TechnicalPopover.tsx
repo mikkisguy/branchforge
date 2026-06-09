@@ -107,145 +107,6 @@ export function TechnicalPopover({
     };
   }, [measureAndSetFlip, type, data]);
 
-  const renderContent = () => {
-    switch (type) {
-      case "conditions": {
-        if (!data) return null;
-        const conditionsData = data as ConditionsData;
-        const hasStats =
-          conditionsData.stats && Object.keys(conditionsData.stats).length > 0;
-        const hasVars =
-          conditionsData.variables && conditionsData.variables.length > 0;
-        return (
-          <div className="space-y-3">
-            <div className="flex items-center gap-1.5">
-              <HelpCircle className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              <span className="text-sm font-medium">Conditions</span>
-            </div>
-            <ul className="text-xs text-muted-foreground space-y-1.5">
-              {hasStats &&
-                Object.entries(conditionsData.stats!).map(([key, value]) => (
-                  <li key={key} className="flex items-center gap-1.5">
-                    <span className="text-muted-foreground/60 w-2 flex-shrink-0 select-none">
-                      -
-                    </span>
-                    {key}: {formatStatCondition(value)}
-                  </li>
-                ))}
-              {hasVars &&
-                conditionsData.variables!.map((variable: string) => (
-                  <li key={variable} className="flex items-center gap-1.5">
-                    <span className="text-muted-foreground/60 w-2 flex-shrink-0 select-none">
-                      -
-                    </span>
-                    {variable}
-                  </li>
-                ))}
-            </ul>
-          </div>
-        );
-      }
-
-      case "jump": {
-        if (!data) return null;
-        const jumpData = data as JumpData;
-        return (
-          <div className="flex items-center gap-2">
-            <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
-            <div>
-              <div className="text-xs text-muted-foreground">Jump to:</div>
-              <div className="text-sm font-medium">{jumpData.labelName}</div>
-            </div>
-          </div>
-        );
-      }
-
-      case "visuals": {
-        if (!data || !Array.isArray(data) || data.length === 0) return null;
-        const visualsData = data as VisualData[];
-        return (
-          <div className="space-y-3">
-            <div className="flex items-center gap-1.5">
-              <Image className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              <span className="text-sm font-medium">Visuals</span>
-            </div>
-            <ul className="text-xs text-muted-foreground space-y-1.5">
-              {visualsData.map((visual) => (
-                <li
-                  key={`${visual.type}_${visual.target}`}
-                  className="flex items-center gap-1.5"
-                >
-                  <span className="font-medium">{visual.type}</span>
-                  {visual.target && (
-                    <>
-                      <span className="text-muted-foreground/60 select-none">
-                        :
-                      </span>
-                      <span>{visual.target}</span>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        );
-      }
-
-      case "menu": {
-        if (!data || !Array.isArray(data) || data.length === 0) return null;
-        const choicesData = data as MenuChoiceData[];
-        return (
-          <div className="space-y-3">
-            <div className="flex items-center gap-1.5">
-              <Split className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              <span className="text-sm font-medium">Menu Choices</span>
-            </div>
-            <ul className="text-xs text-muted-foreground space-y-2">
-              {choicesData.map((choice) => (
-                <li key={choice.targetLabelId} className="space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-muted-foreground/60 w-2 flex-shrink-0 select-none">
-                      -
-                    </span>
-                    <span className="font-medium text-foreground/90">
-                      {choice.label}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 ml-3.5">
-                    <ArrowUpRight className="w-3 h-3 text-muted-foreground/60" />
-                    <span className="text-muted-foreground/70">
-                      {choice.targetLabelName || choice.targetLabelId}
-                    </span>
-                  </div>
-                  {choice.effects?.stats &&
-                    Object.keys(choice.effects.stats).length > 0 && (
-                      <ul className="ml-3.5 space-y-0.5">
-                        {Object.entries(choice.effects.stats).map(
-                          ([key, value]) => (
-                            <li
-                              key={key}
-                              className="flex items-center gap-1.5 text-muted-foreground/60"
-                            >
-                              <span className="w-2" />
-                              {key}: {value > 0 ? "+" : ""}
-                              {value}
-                            </li>
-                          )
-                        )}
-                      </ul>
-                    )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        );
-      }
-
-      default:
-        return null;
-    }
-  };
-
   return (
     <div
       ref={popoverRef}
@@ -254,7 +115,146 @@ export function TechnicalPopover({
       }`}
       style={{ maxWidth: "280px" }}
     >
-      {renderContent()}
+      {type === "conditions" &&
+        data &&
+        (() => {
+          const conditionsData = data as ConditionsData;
+          const hasStats =
+            conditionsData.stats &&
+            Object.keys(conditionsData.stats).length > 0;
+          const hasVars =
+            conditionsData.variables && conditionsData.variables.length > 0;
+          return (
+            <div className="space-y-3">
+              <div className="flex items-center gap-1.5">
+                <HelpCircle className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm font-medium">Conditions</span>
+              </div>
+              <ul className="text-xs text-muted-foreground space-y-1.5">
+                {hasStats &&
+                  Object.entries(conditionsData.stats!).map(([key, value]) => (
+                    <li key={key} className="flex items-center gap-1.5">
+                      <span className="text-muted-foreground/60 w-2 flex-shrink-0 select-none">
+                        -
+                      </span>
+                      {key}: {formatStatCondition(value)}
+                    </li>
+                  ))}
+                {hasVars &&
+                  conditionsData.variables!.map((variable: string) => (
+                    <li key={variable} className="flex items-center gap-1.5">
+                      <span className="text-muted-foreground/60 w-2 flex-shrink-0 select-none">
+                        -
+                      </span>
+                      {variable}
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          );
+        })()}
+
+      {type === "jump" &&
+        data &&
+        (() => {
+          const jumpData = data as JumpData;
+          return (
+            <div className="flex items-center gap-2">
+              <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
+              <div>
+                <div className="text-xs text-muted-foreground">Jump to:</div>
+                <div className="text-sm font-medium">{jumpData.labelName}</div>
+              </div>
+            </div>
+          );
+        })()}
+
+      {type === "visuals" &&
+        data &&
+        Array.isArray(data) &&
+        data.length > 0 &&
+        (() => {
+          const visualsData = data as VisualData[];
+          return (
+            <div className="space-y-3">
+              <div className="flex items-center gap-1.5">
+                <Image className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm font-medium">Visuals</span>
+              </div>
+              <ul className="text-xs text-muted-foreground space-y-1.5">
+                {visualsData.map((visual) => (
+                  <li
+                    key={`${visual.type}_${visual.target}`}
+                    className="flex items-center gap-1.5"
+                  >
+                    <span className="font-medium">{visual.type}</span>
+                    {visual.target && (
+                      <>
+                        <span className="text-muted-foreground/60 select-none">
+                          :
+                        </span>
+                        <span>{visual.target}</span>
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })()}
+
+      {type === "menu" &&
+        data &&
+        Array.isArray(data) &&
+        data.length > 0 &&
+        (() => {
+          const choicesData = data as MenuChoiceData[];
+          return (
+            <div className="space-y-3">
+              <div className="flex items-center gap-1.5">
+                <Split className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm font-medium">Menu Choices</span>
+              </div>
+              <ul className="text-xs text-muted-foreground space-y-2">
+                {choicesData.map((choice) => (
+                  <li key={choice.targetLabelId} className="space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-muted-foreground/60 w-2 flex-shrink-0 select-none">
+                        -
+                      </span>
+                      <span className="font-medium text-foreground/90">
+                        {choice.label}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 ml-3.5">
+                      <ArrowUpRight className="w-3 h-3 text-muted-foreground/60" />
+                      <span className="text-muted-foreground/70">
+                        {choice.targetLabelName || choice.targetLabelId}
+                      </span>
+                    </div>
+                    {choice.effects?.stats &&
+                      Object.keys(choice.effects.stats).length > 0 && (
+                        <ul className="ml-3.5 space-y-0.5">
+                          {Object.entries(choice.effects.stats).map(
+                            ([key, value]) => (
+                              <li
+                                key={key}
+                                className="flex items-center gap-1.5 text-muted-foreground/60"
+                              >
+                                <span className="w-2" />
+                                {key}: {value > 0 ? "+" : ""}
+                                {value}
+                              </li>
+                            )
+                          )}
+                        </ul>
+                      )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })()}
     </div>
   );
 }

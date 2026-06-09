@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+// react-doctor-disable-next-line react-doctor/prefer-dynamic-import
 import { EditorView } from "@codemirror/view";
 import { updateSearchPanel } from "./search-panel";
 

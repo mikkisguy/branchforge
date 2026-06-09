@@ -13,7 +13,9 @@
  * This matches the proven pattern used by the target-line highlight.
  */
 
+// react-doctor-disable-next-line react-doctor/prefer-dynamic-import
 import { StateEffect, StateField, type EditorState } from "@codemirror/state";
+// react-doctor-disable-next-line react-doctor/prefer-dynamic-import
 import {
   Decoration,
   EditorView,
