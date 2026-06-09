@@ -34,13 +34,18 @@ function normalizeConditions(
 
 /**
  * Build technical info from a single line into the info accumulator.
+ * @param line - The label line to process
+ * @param info - The accumulator for technical info
+ * @param skipMenuChoices - When true, skip aggregating menuOptions into choices
+ *   (used when choices are rendered as inline entries in the prose editor)
  */
 function buildLineInfo(
   line: LabelLine,
-  info: NonNullable<DialogueEntry["technicalInfo"]>
+  info: NonNullable<DialogueEntry["technicalInfo"]>,
+  skipMenuChoices = false
 ) {
-  // Parse menu choices
-  if (line.menuOptions && line.menuOptions.length > 0) {
+  // Parse menu choices — skip when choices are shown as inline entries
+  if (!skipMenuChoices && line.menuOptions && line.menuOptions.length > 0) {
     info.choices = [
       ...(info.choices || []),
       ...line.menuOptions.map((choice) => ({
@@ -126,7 +131,7 @@ export function useTechnicalInfo(
   const lines = activeLabel?.lines;
 
   // Map is stable across renders — useMemo ensures identity for the same lines array
-   
+
   const labelById = useMemo(() => {
     if (!lines) return new Map<string, LabelLine>();
 
@@ -193,11 +198,13 @@ export function useTechnicalInfo(
       const info: NonNullable<DialogueEntry["technicalInfo"]> = {};
 
       // Parse technical info from the dialogue/narration line itself
-      buildLineInfo(line, info);
+      // Skip menu choices since they are now rendered as inline CHOICE entries
+      buildLineInfo(line, info, true);
 
       // Aggregate from adjacent structural lines (MENU, JUMP, CHOICE, etc.)
+      // Skip menu choices here too since they're inline entries
       for (const adjLine of adjacentStructural) {
-        buildLineInfo(adjLine, info);
+        buildLineInfo(adjLine, info, true);
       }
 
       const result = Object.keys(info).length > 0 ? info : undefined;

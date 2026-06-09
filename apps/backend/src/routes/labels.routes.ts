@@ -176,7 +176,8 @@ async function updateLabelDialogueHandler(
   reply: FastifyReply
 ): Promise<void> {
   const { labelId } = request.params;
-  const { dialogue, expectedVersion, expectedContentHash } = request.body;
+  const { dialogue, menuBlocks, expectedVersion, expectedContentHash } =
+    request.body;
   const user = request.user!;
 
   try {
@@ -406,6 +407,36 @@ async function updateLabelDialogueHandler(
 
       if (idsToDelete.length > 0) {
         await tx.delete(labelLines).where(inArray(labelLines.id, idsToDelete));
+      }
+
+      // 3.5. Process menu blocks - update MENU lines' menuOptions
+      if (menuBlocks && menuBlocks.length > 0) {
+        for (const block of menuBlocks) {
+          const menuContentHash = calculateContentHash(
+            JSON.stringify(block.menuOptions)
+          );
+          const result = await tx
+            .update(labelLines)
+            .set({
+              menuOptions: block.menuOptions,
+              contentHash: menuContentHash,
+              isDirty: true,
+              lastSyncedHash: null,
+            })
+            .where(
+              and(
+                eq(labelLines.id, block.lineId),
+                eq(labelLines.labelId, labelId),
+                eq(labelLines.contentType, "MENU"),
+                isNull(labelLines.deletedAt)
+              )
+            );
+          if (result.rowCount === 0) {
+            throw new NotFoundError(
+              `Menu line ${block.lineId} not found in label ${labelId}`
+            );
+          }
+        }
       }
 
       // 4. Compute content hash from the actual persisted label_lines

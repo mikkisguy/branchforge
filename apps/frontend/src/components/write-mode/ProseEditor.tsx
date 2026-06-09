@@ -17,7 +17,10 @@ import {
 } from "react";
 import type React from "react";
 import { DialogueLine } from "./DialogueLine";
-import { areDialogueEntriesEqual } from "@/lib/prose-converter";
+import {
+  areDialogueEntriesEqual,
+  menuLineToChoiceEntries,
+} from "@/lib/prose-converter";
 import { WritingGoalPill } from "./WritingGoalPill";
 const WritingStatsDialog = lazy(() =>
   import("./WritingStatsDialog").then((m) => ({
@@ -77,6 +80,12 @@ function convertLabelLinesToEntries(
         speakerId: line.speakerId,
         text: line.content,
       });
+    } else if (
+      line.contentType === "MENU" &&
+      line.menuOptions &&
+      line.menuOptions.length > 0
+    ) {
+      result.push(...menuLineToChoiceEntries(line));
     }
   }
   return result;
@@ -496,12 +505,34 @@ export const ProseEditor = function ProseEditor({
     (index: number) => {
       setEntries((prev) => {
         const newEntries = [...prev];
-        const newEntry: DialogueEntry = {
-          id: crypto.randomUUID(),
-          speakerId: prev[index]?.speakerId || null,
-          text: "",
-        };
-        newEntries.splice(index + 1, 0, newEntry);
+        const currentEntry = prev[index];
+
+        // If adding from a CHOICE entry, create another CHOICE entry
+        if (currentEntry?.contentType === "CHOICE" && currentEntry.choiceData) {
+          const { lineId, targetLabelId, targetLabelName } =
+            currentEntry.choiceData;
+          const newEntry: DialogueEntry = {
+            id: crypto.randomUUID(),
+            speakerId: null,
+            text: "",
+            contentType: "CHOICE",
+            choiceData: {
+              lineId,
+              optionIndex: index + 1, // Will be recalculated on save
+              targetLabelId,
+              targetLabelName,
+            },
+          };
+          newEntries.splice(index + 1, 0, newEntry);
+        } else {
+          // Default: create a dialogue/narration entry
+          const newEntry: DialogueEntry = {
+            id: crypto.randomUUID(),
+            speakerId: prev[index]?.speakerId || null,
+            text: "",
+          };
+          newEntries.splice(index + 1, 0, newEntry);
+        }
 
         // Record history snapshot
         recordImmediateHistorySnapshot(newEntries);

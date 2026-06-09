@@ -412,20 +412,38 @@ export const updateLabelSchema = z
 /**
  * Update label dialogue request validation
  */
+const menuOptionSchema = z.object({
+  label: z.string().min(1, "Choice label cannot be empty"),
+  targetLabelId: z.string().uuid(),
+  targetLabelName: z.string(),
+  conditionFlags: z.array(z.string()).optional(),
+  effects: z.object({ stats: z.record(z.string(), z.number()) }).optional(),
+});
+
+const menuBlockSchema = z.object({
+  lineId: z.string().uuid(),
+  menuOptions: z.array(menuOptionSchema),
+});
+
 export const updateLabelDialogueBodySchema = z
   .object({
-    dialogue: z
-      .array(
-        z.object({
-          speakerId: z.string().uuid().nullable(),
-          text: z.string().min(1, "Dialogue text cannot be empty"),
-        })
-      )
-      .min(1, "At least one dialogue entry is required"),
+    dialogue: z.array(
+      z.object({
+        speakerId: z.string().uuid().nullable(),
+        text: z.string().min(1, "Dialogue text cannot be empty"),
+      })
+    ),
+    menuBlocks: z.array(menuBlockSchema).optional(),
     expectedVersion: z.number().int().min(1).optional(),
     expectedContentHash: expectedContentHashSchema,
   })
-  .strict();
+  .refine(
+    (data) =>
+      (data.dialogue?.length ?? 0) > 0 || (data.menuBlocks?.length ?? 0) > 0,
+    {
+      message: "At least one dialogue entry or menu block is required",
+    }
+  );
 
 // ============================================================================
 // Route Configuration Schemas

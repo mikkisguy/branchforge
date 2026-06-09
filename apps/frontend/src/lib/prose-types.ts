@@ -26,6 +26,18 @@ export interface DialogueEntry {
   contentType?: string;
   speakerTag?: string | null;
 
+  // For structural CHOICE entries: link back to parent MENU line and choice data
+  choiceData?: {
+    lineId: string; // parent MENU label line ID
+    optionIndex: number; // index in menuOptions array
+    targetLabelId: string;
+    targetLabelName: string;
+    conditionFlags?: string[];
+    effects?: {
+      stats?: Record<string, number>;
+    };
+  };
+
   // Technical info for badges
   technicalInfo?: {
     choices?: Array<{

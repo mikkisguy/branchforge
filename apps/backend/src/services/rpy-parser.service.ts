@@ -253,9 +253,19 @@ function trackBlocks(
  * Options for reconstructing RPY file with updated dialogue
  * Used for Write Mode saves to merge dialogue changes with original keywords
  */
+/** A single menu option carried through RPY reconstruction */
+export interface MenuOptionForReconstruction {
+  label: string;
+  targetLabelId?: string;
+  targetLabelName?: string;
+  conditionFlags?: string[];
+  effects?: { stats?: Record<string, number> };
+}
+
 export interface ReconstructedFileOptions {
   originalContent: string;
   updatedDialogue: Map<string, Array<{ speaker: string | null; text: string }>>; // label -> dialogue
+  updatedMenuChoices?: Map<string, MenuOptionForReconstruction[][]>; // label -> [menuBlock1, menuBlock2, ...]
 }
 
 /**
@@ -1205,7 +1215,7 @@ export function parseRPYFileWithLabels(
  * @returns Reconstructed RPY file content
  */
 export function reconstructRPYFile(options: ReconstructedFileOptions): string {
-  const { originalContent, updatedDialogue } = options;
+  const { originalContent, updatedDialogue, updatedMenuChoices } = options;
   const lines = originalContent.split("\n");
   const result: string[] = [];
 
@@ -1222,6 +1232,11 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
   // menu choice bodies should NOT trigger dialogue insertion — they're part of
   // the menu structure, not the label's main dialogue flow.
   const menuStack: number[] = [];
+
+  // Track menu choice replacement: per label, track which menu block index
+  // we're in and which choice index within that block.
+  const menuBlockIndices = new Map<string, number>(); // label -> current menu block index
+  const menuChoiceIndices = new Map<string, number>(); // label -> current choice index
 
   // Keywords that signal the end of a label's dialogue block.
   // The `menuStack.length === 0` guard below prevents premature insertion at
@@ -1285,6 +1300,12 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
     // Track menu block nesting: push on menu:, pop on dedent
     if (trimmed === "menu:") {
       menuStack.push(line.search(/\S/));
+      // Track menu block index for choice text replacement
+      if (currentLabel) {
+        const blockIdx = menuBlockIndices.get(currentLabel) ?? 0;
+        menuBlockIndices.set(currentLabel, blockIdx + 1);
+        menuChoiceIndices.set(currentLabel, 0);
+      }
     } else if (menuStack.length > 0 && trimmed) {
       const lineIndent = line.search(/\S/);
       while (
@@ -1292,6 +1313,51 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
         lineIndent <= menuStack[menuStack.length - 1]
       ) {
         menuStack.pop();
+      }
+    }
+
+    // Replace menu choice text inside menu blocks.
+    // Choice lines in RPY look like: "Choice text":
+    // or with conditions: "Choice text" if condition:
+    if (
+      menuStack.length > 0 &&
+      currentLabel &&
+      updatedMenuChoices?.has(currentLabel)
+    ) {
+      // Match a choice line with any quoting style: "text", 'text', or unquoted
+      // Also captures optional "if ..." condition
+      // Negative lookahead excludes Ren'Py control-flow keywords (if/elif/else/jump/etc.)
+      // that appear inside menu blocks at the same indent level as choices.
+      const choiceMatch = trimmed.match(
+        /^(?:"(.+?)"|'(.+?)'|(?!(?:if|elif|else|pass|jump|call|return|python|while|for|default|define|label|menu|init)\s*:)([a-zA-Z_][a-zA-Z0-9_ ]*?))(?:\s+(if\s+.+))?:(?:\s*)?$/
+      );
+      if (choiceMatch) {
+        const labelBlocks = updatedMenuChoices.get(currentLabel)!;
+        const blockIdx = (menuBlockIndices.get(currentLabel) ?? 1) - 1;
+        const choiceIdx = menuChoiceIndices.get(currentLabel) ?? 0;
+
+        if (
+          blockIdx < labelBlocks.length &&
+          choiceIdx < labelBlocks[blockIdx].length
+        ) {
+          const newChoiceText = labelBlocks[blockIdx][choiceIdx].label;
+          menuChoiceIndices.set(currentLabel, choiceIdx + 1);
+
+          // Reconstruct the line preserving indentation and any trailing syntax
+          const indent = line.match(/^(\s*)/)?.[1] || "";
+          // Preserve condition suffix if present: "text" if condition:
+          const conditionPart = choiceMatch[4];
+          // Determine quote style from the original match
+          const quote = choiceMatch[1] ? '"' : choiceMatch[2] ? "'" : "";
+          if (conditionPart) {
+            result.push(
+              `${indent}${quote}${newChoiceText}${quote} ${conditionPart}:`
+            );
+          } else {
+            result.push(`${indent}${quote}${newChoiceText}${quote}:`);
+          }
+          continue;
+        }
       }
     }
 
@@ -1481,11 +1547,17 @@ export function convertToBranchForgeFormatFromLabels(
   }
 
   // Add menu entries (as MENU type with menuOptions) for THIS label
+  // Use the first choice option's line number so the MENU entry sorts AFTER
+  // any caption text (narration lines between `menu:` and the first choice)
   if (labelData.menus && labelData.menus.length > 0) {
     for (const menu of labelData.menus) {
+      // Use first option's line number for sort ordering; fall back to
+      // the menu keyword's line if there are no options (shouldn't happen)
+      const sortLineNumber =
+        menu.options.length > 0 ? menu.options[0].lineNumber : menu.lineNumber;
       entries.push({
         type: "MENU",
-        lineNumber: menu.lineNumber,
+        lineNumber: sortLineNumber,
         indentLevel: getIndentLevel(menu.lineNumber),
         menuOptions: menu.options.map((o) => ({
           label: o.label,
@@ -1557,7 +1629,7 @@ export function convertToBranchForgeFormatFromLabels(
 
   return {
     name: labelName,
-    entries,
+    entries: entries.sort((a, b) => (a.lineNumber ?? 0) - (b.lineNumber ?? 0)),
     characters: characters.length > 0 ? characters : undefined,
   };
 }

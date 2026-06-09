@@ -1603,6 +1603,7 @@ export async function reconstructFileForLabel(
       contentType: labelLines.contentType,
       content: labelLines.content,
       sequence: labelLines.sequence,
+      menuOptions: labelLines.menuOptions,
     })
     .from(labelLines)
     .leftJoin(characters, eq(labelLines.speakerId, characters.id))
@@ -1643,6 +1644,22 @@ export async function reconstructFileForLabel(
   // structural keywords already present in the original file (handled via menuStack
   // and other mechanisms) and must not be emitted as quoted text, otherwise they
   // appear duplicated (e.g. "jump end" + jump end).
+  //
+  // Also build a menu choices map from MENU lines' menuOptions, so that
+  // reconstructRPYFile can update choice text in the RPY file.
+  const updatedMenuChoices = new Map<
+    string,
+    Array<
+      Array<{
+        label: string;
+        targetLabelId?: string;
+        targetLabelName?: string;
+        conditionFlags?: string[];
+        effects?: { stats?: Record<string, number> };
+      }>
+    >
+  >();
+
   for (const l of allLabels) {
     // Skip labels without a labelName (UI-created labels that don't exist in RPY files)
     if (l.labelName === null) {
@@ -1661,12 +1678,37 @@ export async function reconstructFileForLabel(
         text: line.content,
       }));
     updatedDialogue.set(l.labelName, labelDialogue);
+
+    // Build menu choices from MENU lines' menuOptions
+    const menuBlocks = allLabelLines
+      .filter(
+        (line) =>
+          line.labelId === l.id &&
+          line.contentType === "MENU" &&
+          line.menuOptions &&
+          line.menuOptions.length > 0
+      )
+      .sort((a, b) => a.sequence - b.sequence)
+      .map((line) =>
+        line.menuOptions!.map((opt) => ({
+          label: opt.label,
+          targetLabelId: opt.targetLabelId,
+          targetLabelName: opt.targetLabelName,
+          conditionFlags: opt.conditionFlags,
+          effects: opt.effects,
+        }))
+      );
+
+    if (menuBlocks.length > 0) {
+      updatedMenuChoices.set(l.labelName, menuBlocks);
+    }
   }
 
   // Reconstruct and return file content using current file content as base
   return reconstructRPYFile({
     originalContent: reconstructionBaseContent,
     updatedDialogue,
+    updatedMenuChoices,
   });
 }
 

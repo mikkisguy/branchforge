@@ -3,7 +3,12 @@ import type { RefObject } from "react";
 import type { PublicLabel, LabelDetail } from "@branchforge/shared";
 import { useAutosave, type SaveStatus } from "@/hooks/useAutosave";
 import { registerModeFlushHandler } from "@/lib/editor-sync-coordinator";
-import { dialogueToPayload, hashDialogueEntries } from "@/lib/prose-converter";
+import {
+  dialogueToPayload,
+  hashDialogueEntries,
+  extractMenuBlocks,
+  menuLineToChoiceEntries,
+} from "@/lib/prose-converter";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { UpdateDialogueResponse } from "@/lib/api/labels";
 
@@ -20,7 +25,18 @@ interface UpdateDialogueOptions {
 type UpdateDialogue = (
   labelId: string,
   dialogue: Array<{ speakerId: string | null; text: string }>,
-  options?: UpdateDialogueOptions
+  options?: UpdateDialogueOptions & {
+    menuBlocks?: Array<{
+      lineId: string;
+      menuOptions: Array<{
+        label: string;
+        targetLabelId: string;
+        targetLabelName: string;
+        conditionFlags?: string[];
+        effects?: { stats?: Record<string, number> };
+      }>;
+    }>;
+  }
 ) => Promise<UpdateDialogueResponse>;
 
 interface UseWriteAutosaveProps {
@@ -219,6 +235,12 @@ export function getPersistedDialogueFromLabel(
         speakerId: line.speakerId,
         text: line.content,
       });
+    } else if (
+      line.contentType === "MENU" &&
+      line.menuOptions &&
+      line.menuOptions.length > 0
+    ) {
+      result.push(...menuLineToChoiceEntries(line));
     }
   }
   return result;
@@ -285,9 +307,10 @@ export function useWriteAutosave({
           }
 
           const payload = dialogueToPayload(draftToSave.entries);
+          const menuBlocks = extractMenuBlocks(draftToSave.entries);
 
-          // Skip saving if all entries are empty — backend requires at least 1 entry
-          if (payload.length === 0) {
+          // Skip saving if all entries are empty and no menu blocks to update
+          if (payload.length === 0 && menuBlocks.length === 0) {
             return;
           }
 
@@ -301,6 +324,7 @@ export function useWriteAutosave({
           const result = await onUpdateDialogue(draftToSave.labelId, payload, {
             expectedVersion,
             expectedContentHash,
+            menuBlocks: menuBlocks.length > 0 ? menuBlocks : undefined,
           });
 
           if (result.success) {
