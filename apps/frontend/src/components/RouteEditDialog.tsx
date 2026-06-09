@@ -4,7 +4,7 @@
  * Modal for creating or editing a single route configuration.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -98,6 +98,15 @@ function RouteFormContent({
   const [errors, setErrors] = useState<RouteFormErrors>({});
 
   const isEditMode = !!routeId;
+
+  // Close dialog if editing a route that no longer exists
+  useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-event-handler
+    if (isEditMode && !routeConfigs.find((item) => item.id === routeId)) {
+      // react-doctor-disable-next-line react-doctor/no-prop-callback-in-effect
+      onClose();
+    }
+  }, [isEditMode, routeId, routeConfigs, onClose]);
 
   const handleChange = (
     field: keyof RouteFormState,

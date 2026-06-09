@@ -255,6 +255,9 @@ export function ZipImportFilesDialog({
 
         // Detect characters from imported RPY files
         try {
+          // Fast skip: don't detect characters if this import was superseded
+          if (currentImportId !== importIdRef.current) return;
+
           // react-doctor-disable-next-line react-doctor/async-defer-await
           const detectionResult =
             await charactersApi.detectCharacters(projectId);

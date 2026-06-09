@@ -147,6 +147,16 @@ export function useFileTabs({
     [activeFileId, onNoTabsRemaining, openTabs, selectFileTab]
   );
 
+  // Sync openTabs when projectFiles changes to remove stale file IDs
+  useEffect(() => {
+    const fileIds = new Set(projectFiles.map((file) => file.id));
+    // react-doctor-disable-next-line react-doctor/no-derived-state
+    setOpenTabs((prev) => {
+      const nextTabs = prev.filter((tabId) => fileIds.has(tabId));
+      return nextTabs.length === prev.length ? prev : nextTabs;
+    });
+  }, [projectFiles]);
+
   // Derive valid tabs during render (files that still exist in projectFiles)
   const validOpenTabs = useMemo(() => {
     const fileIds = new Set(projectFiles.map((file) => file.id));

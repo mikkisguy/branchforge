@@ -4,7 +4,7 @@
  * Modal for creating or editing a single stat.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -105,6 +105,15 @@ function StatFormContent({
   const [errors, setErrors] = useState<StatFormErrors>({});
 
   const isEditMode = !!statId;
+
+  // Close dialog if editing a stat that no longer exists
+  useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-event-handler
+    if (isEditMode && !stats.find((item) => item.id === statId)) {
+      // react-doctor-disable-next-line react-doctor/no-prop-callback-in-effect
+      onClose();
+    }
+  }, [isEditMode, statId, stats, onClose]);
 
   const handleChange = (field: keyof StatFormState, value: string) => {
     setForm((prev) => {

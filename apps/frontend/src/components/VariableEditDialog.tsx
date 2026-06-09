@@ -4,7 +4,7 @@
  * Modal for creating or editing a single variable.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -98,6 +98,15 @@ function VariableFormContent({
   const [errors, setErrors] = useState<VariableFormErrors>({});
 
   const isEditMode = !!variableId;
+
+  // Close dialog if editing a variable that no longer exists
+  useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-event-handler
+    if (isEditMode && !variables.find((item) => item.id === variableId)) {
+      // react-doctor-disable-next-line react-doctor/no-prop-callback-in-effect
+      onClose();
+    }
+  }, [isEditMode, variableId, variables, onClose]);
 
   const handleChange = (field: keyof VariableFormState, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
