@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { X } from "lucide-react";
 import {
   Dialog,
@@ -69,15 +69,6 @@ export function SettingsModal({
   const [activeTab, setActiveTab] = useState<Tab>(initialTab ?? "user");
   const prevOpenRef = useRef<boolean>(open);
 
-  // Reset to initial tab when dialog opens (false → true edge)
-  useEffect(() => {
-    if (open && !prevOpenRef.current && initialTab) {
-      setActiveTab(initialTab);
-    }
-    // Update ref for next render
-    prevOpenRef.current = open;
-  }, [open, initialTab]);
-
   const { user } = useAuth();
   const {
     signUpsEnabled,
@@ -86,6 +77,18 @@ export function SettingsModal({
     isSaving,
   } = useSettings();
 
+  // Detect dialog open transition to apply initialTab
+  useEffect(() => {
+    const justOpened = open && !prevOpenRef.current;
+    prevOpenRef.current = open;
+
+    if (justOpened && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [open, initialTab]);
+
+  const desiredTab = activeTab;
+
   // Compute visible tabs and ensure valid active tab
   // Only users with OWNER role can see the System Admin tab.
   const { visibleTabs, adjustedActiveTab } = useMemo(() => {
@@ -93,17 +96,18 @@ export function SettingsModal({
       (tab) => tab.id !== "system" || user?.role === "OWNER"
     );
 
-    // If current active tab is not visible, switch to first visible tab
-    const adjustedActiveTab = visibleTabs.find((t) => t.id === activeTab)
-      ? activeTab
-      : visibleTabs[0]?.id || activeTab;
+    // If current desired tab is not visible, switch to first visible tab
+    const adjustedActiveTab = visibleTabs.find((t) => t.id === desiredTab)
+      ? desiredTab
+      : visibleTabs[0]?.id || desiredTab;
 
     return { visibleTabs, adjustedActiveTab };
-  }, [activeTab, user?.role]);
+  }, [desiredTab, user?.role]);
 
   // Sync derived state during render: adjustedActiveTab is computed from visibleTabs,
-  // activeTab, and user?.role. If the active tab becomes invalid (e.g., user loses OWNER
-  // role), we must sync immediately to avoid a flash/stale UI that useEffect would cause.
+  // desiredTab, and user?.role. If the active tab becomes invalid (e.g., user loses OWNER
+  // role or the dialog just opened with an initialTab), we sync immediately to avoid a
+  // flash/stale UI that useEffect would cause.
   // The condition (adjustedActiveTab !== activeTab) becomes false after setActiveTab
   // updates state, preventing render loops.
   if (adjustedActiveTab !== activeTab) {

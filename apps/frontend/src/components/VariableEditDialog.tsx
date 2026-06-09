@@ -84,58 +84,48 @@ export function VariableEditDialog({
 
   const [form, setForm] = useState<VariableFormState>(INITIAL_FORM);
   const [errors, setErrors] = useState<VariableFormErrors>({});
-  const [initializedForVariableId, setInitializedForVariableId] = useState<
-    string | null
-  >(null);
+  const initializedForVariableIdRef = useRef<string | null>(null);
   const hasInitializedRef = useRef(false);
 
   const isSaving = isCreatingVariable || isUpdatingVariable;
   const isEditMode = !!variableId;
 
+  // Initialize form state when dialog opens/closes
   useEffect(() => {
     if (!open) {
-      setForm(INITIAL_FORM);
-      setErrors({});
-      setInitializedForVariableId(null);
-      hasInitializedRef.current = false;
-      return;
-    }
-
-    if (isLoadingVariables) {
-      return;
-    }
-
-    if (variableId && variableId !== initializedForVariableId) {
-      hasInitializedRef.current = false;
-    }
-
-    if (!hasInitializedRef.current) {
-      if (variableId) {
-        const variable = variables.find(
-          (item: Variable) => item.id === variableId
-        );
-        if (variable) {
-          setForm({
-            key: variable.key,
-            description: variable.description ?? "",
-            category: variable.category ?? "",
-          });
-          setInitializedForVariableId(variableId);
-        }
-      } else {
+      if (hasInitializedRef.current) {
         setForm(INITIAL_FORM);
-        setInitializedForVariableId(null);
+        setErrors({});
+        initializedForVariableIdRef.current = null;
+        hasInitializedRef.current = false;
       }
-      setErrors({});
-      hasInitializedRef.current = true;
+    } else if (!isLoadingVariables) {
+      if (variableId && variableId !== initializedForVariableIdRef.current) {
+        hasInitializedRef.current = false;
+      }
+
+      if (!hasInitializedRef.current) {
+        if (variableId) {
+          const variable = variables.find(
+            (item: Variable) => item.id === variableId
+          );
+          if (variable) {
+            setForm({
+              key: variable.key,
+              description: variable.description ?? "",
+              category: variable.category ?? "",
+            });
+            initializedForVariableIdRef.current = variableId;
+          }
+        } else {
+          setForm(INITIAL_FORM);
+          initializedForVariableIdRef.current = null;
+        }
+        setErrors({});
+        hasInitializedRef.current = true;
+      }
     }
-  }, [
-    open,
-    variableId,
-    variables,
-    isLoadingVariables,
-    initializedForVariableId,
-  ]);
+  }, [open, isLoadingVariables, variableId, variables]);
 
   const handleChange = (field: keyof VariableFormState, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));

@@ -5,7 +5,7 @@
  * Used by CharacterDialog (list view) and reference panels.
  */
 
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import { Loader2, Upload } from "lucide-react";
 import {
   Dialog,
@@ -181,10 +181,6 @@ export function CharacterEditDialog({
   const { error } = useToast();
 
   const [form, dispatch] = useReducer(formReducer, INITIAL_EMPTY);
-  const [initializedForCharacterId, setInitializedForCharacterId] = useState<
-    string | undefined | null
-  >(null);
-
   // Track preview URL for cleanup
   const previewUrlRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -192,6 +188,7 @@ export function CharacterEditDialog({
   // Track if form has been initialized for current character to prevent
   // re-initialization when the characters array changes due to other characters being updated
   const hasInitializedRef = useRef(false);
+  const initializedForCharacterIdRef = useRef<string | undefined | null>(null);
 
   const isSaving =
     isCreatingCharacter ||
@@ -199,46 +196,32 @@ export function CharacterEditDialog({
     isUploadingAvatar ||
     isDeletingAvatar;
 
-  // Initialize form when dialog opens or characterId changes
+  // Initialize form state when dialog opens/closes
   useEffect(() => {
     if (!open) {
-      // Reset form and cleanup when dialog closes
-      dispatch({ type: "RESET_NEW" });
-      if (previewUrlRef.current) {
-        URL.revokeObjectURL(previewUrlRef.current);
-        previewUrlRef.current = null;
+      if (hasInitializedRef.current) {
+        dispatch({ type: "RESET_NEW" });
+        if (previewUrlRef.current) {
+          URL.revokeObjectURL(previewUrlRef.current);
+          previewUrlRef.current = null;
+        }
+        initializedForCharacterIdRef.current = null;
+        hasInitializedRef.current = false;
       }
-      setInitializedForCharacterId(null);
-      hasInitializedRef.current = false;
-      return;
-    }
-
-    // Wait for characters to load before initializing
-    if (isLoadingCharacters) {
-      return;
-    }
-
-    // Only populate if editing existing character and not yet initialized for this character
-    if (characterId && !hasInitializedRef.current && characters.length > 0) {
-      const char = characters.find((c) => c.id === characterId);
-      if (char) {
-        setInitializedForCharacterId(characterId);
-        hasInitializedRef.current = true;
-        dispatch({ type: "RESET_EXISTING", char });
+    } else if (!isLoadingCharacters) {
+      if (characterId && characterId !== initializedForCharacterIdRef.current) {
+        hasInitializedRef.current = false;
+      }
+      if (characterId && !hasInitializedRef.current && characters.length > 0) {
+        const char = characters.find((c) => c.id === characterId);
+        if (char) {
+          initializedForCharacterIdRef.current = characterId;
+          hasInitializedRef.current = true;
+          dispatch({ type: "RESET_EXISTING", char });
+        }
       }
     }
-
-    // Reset initialization flag when switching to a different character
-    if (characterId && characterId !== initializedForCharacterId) {
-      hasInitializedRef.current = false;
-    }
-  }, [
-    open,
-    characterId,
-    initializedForCharacterId,
-    isLoadingCharacters,
-    characters,
-  ]);
+  }, [open, isLoadingCharacters, characterId, characters]);
 
   // Cleanup on unmount
   useEffect(() => {

@@ -88,59 +88,48 @@ export function RouteEditDialog({
 
   const [form, setForm] = useState<RouteFormState>(INITIAL_FORM);
   const [errors, setErrors] = useState<RouteFormErrors>({});
-  const [initializedForRouteId, setInitializedForRouteId] = useState<
-    string | null
-  >(null);
+  const initializedForRouteIdRef = useRef<string | null>(null);
   const hasInitializedRef = useRef(false);
 
   const isSaving = isCreatingRouteConfig || isUpdatingRouteConfig;
   const isEditMode = !!routeId;
 
+  // Initialize form state when dialog opens/closes
   useEffect(() => {
     if (!open) {
-      setForm(INITIAL_FORM);
-      setErrors({});
-      setInitializedForRouteId(null);
-      hasInitializedRef.current = false;
-      return;
-    }
-
-    if (isLoadingRouteConfigs) {
-      return;
-    }
-
-    if (routeId && routeId !== initializedForRouteId) {
-      hasInitializedRef.current = false;
-    }
-
-    if (!hasInitializedRef.current) {
-      if (routeId) {
-        const route = routeConfigs.find(
-          (item: RouteConfig) => item.id === routeId
-        );
-        if (route) {
-          setForm({
-            routeKey: route.routeKey,
-            routeName: route.routeName,
-            jumpPrefix: route.jumpPrefix,
-            isShared: route.isShared,
-          });
-          setInitializedForRouteId(routeId);
-        }
-      } else {
+      if (hasInitializedRef.current) {
         setForm(INITIAL_FORM);
-        setInitializedForRouteId(null);
+        setErrors({});
+        initializedForRouteIdRef.current = null;
+        hasInitializedRef.current = false;
       }
-      setErrors({});
-      hasInitializedRef.current = true;
+    } else if (!isLoadingRouteConfigs) {
+      if (routeId && routeId !== initializedForRouteIdRef.current) {
+        hasInitializedRef.current = false;
+      }
+      if (!hasInitializedRef.current) {
+        if (routeId) {
+          const route = routeConfigs.find(
+            (item: RouteConfig) => item.id === routeId
+          );
+          if (route) {
+            setForm({
+              routeKey: route.routeKey,
+              routeName: route.routeName,
+              jumpPrefix: route.jumpPrefix,
+              isShared: route.isShared,
+            });
+            initializedForRouteIdRef.current = routeId;
+          }
+        } else {
+          setForm(INITIAL_FORM);
+          initializedForRouteIdRef.current = null;
+        }
+        setErrors({});
+        hasInitializedRef.current = true;
+      }
     }
-  }, [
-    open,
-    routeId,
-    routeConfigs,
-    isLoadingRouteConfigs,
-    initializedForRouteId,
-  ]);
+  }, [open, isLoadingRouteConfigs, routeId, routeConfigs]);
 
   const handleChange = (
     field: keyof RouteFormState,

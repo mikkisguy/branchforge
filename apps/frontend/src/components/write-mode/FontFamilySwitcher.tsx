@@ -92,43 +92,14 @@ export function FontFamilySwitcher({
     );
   }, [fontFamily]);
 
-  // Set focused index to current option when dropdown opens
+  // DOM focus management when dropdown opens/closes
   useEffect(() => {
     if (dropdownState.isOpen) {
-      const currentIndex = FONT_FAMILY_OPTIONS.findIndex(
-        (opt) => opt.value === fontFamily
-      );
-      const newFocusedIndex = currentIndex >= 0 ? currentIndex : 0;
-      if (dropdownState.isKeyboardNav) {
-        if (
-          dropdownState.focusedIndex !== newFocusedIndex ||
-          dropdownState.closeReason !== "keyboard"
-        ) {
-          updateDropdownState({
-            focusedIndex: newFocusedIndex,
-            closeReason: "keyboard",
-          });
-        }
-      } else if (dropdownState.closeReason !== "keyboard") {
-        updateDropdownState({ closeReason: "keyboard" });
-      }
       listboxRef.current?.focus();
-    } else {
-      if (dropdownState.focusedIndex !== -1) {
-        updateDropdownState({ focusedIndex: -1 });
-      }
-      if (dropdownState.closeReason === "keyboard") {
-        buttonRef.current?.focus();
-      }
+    } else if (dropdownState.closeReason === "keyboard") {
+      buttonRef.current?.focus();
     }
-  }, [
-    dropdownState.isOpen,
-    dropdownState.closeReason,
-    dropdownState.isKeyboardNav,
-    fontFamily,
-    updateDropdownState,
-    dropdownState.focusedIndex,
-  ]);
+  }, [dropdownState.isOpen, dropdownState.closeReason]);
 
   const handleSelect = (value: string) => {
     setFontFamily(value);

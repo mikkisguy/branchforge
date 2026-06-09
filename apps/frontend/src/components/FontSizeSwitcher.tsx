@@ -120,7 +120,7 @@ export function FontSizeSwitcher({
     }
   }, [cssVariable, fontSize, mode]);
 
-  // Set focused index to current option when dropdown opens
+  // DOM focus management when dropdown opens/closes
   useEffect(() => {
     if (isOpen) {
       const currentIndex = sizeOptions.findIndex(
@@ -129,21 +129,16 @@ export function FontSizeSwitcher({
       focusedIndexRef.current = currentIndex >= 0 ? currentIndex : 0;
       // Reset close reason when opening
       closeReasonRef.current = "keyboard";
-      // Only update state if keyboard navigation was used
-      if (isKeyboardNav) {
-        setFocusedIndex(focusedIndexRef.current);
-      }
       // Focus the listbox when opened
       listboxRef.current?.focus();
     } else {
       focusedIndexRef.current = -1;
-      setFocusedIndex(-1);
       // Only restore focus to button when closed via keyboard
       if (closeReasonRef.current === "keyboard") {
         buttonRef.current?.focus();
       }
     }
-  }, [isOpen, fontSize, sizeOptions, isKeyboardNav]);
+  }, [isOpen, fontSize, sizeOptions]);
 
   const handleSelect = (size: number) => {
     setFontSize(size);

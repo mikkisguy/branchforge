@@ -271,17 +271,16 @@ export function GitLabImportDialog({
       // Store imported project immediately so all success paths can access it
       dispatch({ type: "SET_IMPORTED_PROJECT", payload: result.project });
 
-      // Invalidate projects and GitLab linked repos cache
-      await queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
-      await queryClient.invalidateQueries({
-        queryKey: gitlabKeys.repositories(),
-      });
-
-      // Invalidate label queries for the new project to ensure fresh data
-      // (including incomingJumps computed during sync).
-      await queryClient.invalidateQueries({
-        queryKey: labelKeys.scoped(result.project.id),
-      });
+      // Invalidate projects, GitLab repos, and label caches in parallel
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: projectKeys.lists() }),
+        queryClient.invalidateQueries({
+          queryKey: gitlabKeys.repositories(),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: labelKeys.scoped(result.project.id),
+        }),
+      ]);
 
       const currentImportId = importIdRef.current;
 
@@ -377,7 +376,7 @@ export function GitLabImportDialog({
       }
       onOpenChange(nextOpen);
     },
-    [state.importState.status, onSuccess, onOpenChange]
+    [onOpenChange, state.importState.status, state.importedProject, onSuccess]
   );
 
   // ============================================================================

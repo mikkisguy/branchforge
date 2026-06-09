@@ -90,52 +90,47 @@ export function StatEditDialog({
 
   const [form, setForm] = useState<StatFormState>(INITIAL_FORM);
   const [errors, setErrors] = useState<StatFormErrors>({});
-  const [initializedForStatId, setInitializedForStatId] = useState<
-    string | null
-  >(null);
+  const initializedForStatIdRef = useRef<string | null>(null);
   const hasInitializedRef = useRef(false);
 
   const isSaving = isCreatingStat || isUpdatingStat;
   const isEditMode = !!statId;
 
+  // Initialize form state when dialog opens/closes
   useEffect(() => {
     if (!open) {
-      setForm(INITIAL_FORM);
-      setErrors({});
-      setInitializedForStatId(null);
-      hasInitializedRef.current = false;
-      return;
-    }
-
-    if (isLoadingStats) {
-      return;
-    }
-
-    if (statId && statId !== initializedForStatId) {
-      hasInitializedRef.current = false;
-    }
-
-    if (!hasInitializedRef.current) {
-      if (statId) {
-        const stat = stats.find((item: Stat) => item.id === statId);
-        if (stat) {
-          setForm({
-            key: stat.key,
-            name: stat.name,
-            minValue: stat.minValue,
-            maxValue: stat.maxValue,
-            description: stat.description ?? "",
-          });
-          setInitializedForStatId(statId);
-        }
-      } else {
+      if (hasInitializedRef.current) {
         setForm(INITIAL_FORM);
-        setInitializedForStatId(null);
+        setErrors({});
+        initializedForStatIdRef.current = null;
+        hasInitializedRef.current = false;
       }
-      setErrors({});
-      hasInitializedRef.current = true;
+    } else if (!isLoadingStats) {
+      if (statId && statId !== initializedForStatIdRef.current) {
+        hasInitializedRef.current = false;
+      }
+      if (!hasInitializedRef.current) {
+        if (statId) {
+          const stat = stats.find((item: Stat) => item.id === statId);
+          if (stat) {
+            setForm({
+              key: stat.key,
+              name: stat.name,
+              minValue: stat.minValue,
+              maxValue: stat.maxValue,
+              description: stat.description ?? "",
+            });
+            initializedForStatIdRef.current = statId;
+          }
+        } else {
+          setForm(INITIAL_FORM);
+          initializedForStatIdRef.current = null;
+        }
+        setErrors({});
+        hasInitializedRef.current = true;
+      }
     }
-  }, [open, statId, stats, isLoadingStats, initializedForStatId]);
+  }, [open, isLoadingStats, statId, stats]);
 
   const handleChange = (field: keyof StatFormState, value: string) => {
     setForm((prev) => {

@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -124,13 +124,12 @@ export function LabelEditDialog({
     labelNameError: "",
   });
 
-  const [initializedForOpen, setInitializedForOpen] = useState(false);
+  const initializedForOpenRef = useRef(false);
 
-  // Initialize form when dialog opens. Limited to [open] to prevent
-  // re-initialization while user is editing, even if props change.
+  // Initialize form state when dialog opens
   useEffect(() => {
-    if (open && !initializedForOpen) {
-      setInitializedForOpen(true);
+    if (open && !initializedForOpenRef.current) {
+      initializedForOpenRef.current = true;
       dispatch({
         type: "RESET",
         title: currentTitle,
@@ -141,9 +140,16 @@ export function LabelEditDialog({
       });
     }
     if (!open) {
-      setInitializedForOpen(false);
+      initializedForOpenRef.current = false;
     }
-  }, [open]);
+  }, [
+    open,
+    currentTitle,
+    currentLabelName,
+    currentRoute,
+    currentStatus,
+    currentVisibility,
+  ]);
 
   const handleSave = async () => {
     if (!form.title.trim()) {
