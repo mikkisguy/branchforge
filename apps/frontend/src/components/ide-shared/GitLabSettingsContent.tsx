@@ -240,6 +240,7 @@ export function GitLabSettingsContent() {
                 </p>
               </div>
               <Button
+                type="button"
                 variant="destructive"
                 size="sm"
                 onClick={handleRemoveClick}
@@ -341,6 +342,7 @@ export function GitLabSettingsContent() {
 
               <div className="flex gap-2">
                 <Button
+                  type="button"
                   variant="outline"
                   onClick={handleValidate}
                   disabled={
@@ -354,6 +356,7 @@ export function GitLabSettingsContent() {
                   Validate
                 </Button>
                 <Button
+                  type="button"
                   onClick={handleStore}
                   disabled={
                     !state.token.trim() ||
@@ -396,10 +399,18 @@ export function GitLabSettingsContent() {
 
           {/* Footer */}
           <div className="p-6 border-t border-border/30 flex justify-end gap-2">
-            <Button variant="outline" onClick={handleRemoveCancelled}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleRemoveCancelled}
+            >
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleRemoveConfirmed}>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleRemoveConfirmed}
+            >
               Remove Integration
             </Button>
           </div>

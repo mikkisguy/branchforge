@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { X } from "lucide-react";
 import {
   Dialog,
@@ -67,7 +67,7 @@ export function SettingsModal({
   initialTab,
 }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<Tab>(initialTab ?? "user");
-  const prevOpenRef = useRef<boolean>(open);
+  const prevOpenRef = useRef(open);
 
   const { user } = useAuth();
   const {
@@ -79,12 +79,10 @@ export function SettingsModal({
 
   // Detect dialog open transition to apply initialTab
   useEffect(() => {
-    const justOpened = open && !prevOpenRef.current;
-    prevOpenRef.current = open;
-
-    if (justOpened && initialTab) {
+    if (open && !prevOpenRef.current && initialTab) {
       setActiveTab(initialTab);
     }
+    prevOpenRef.current = open;
   }, [open, initialTab]);
 
   const desiredTab = activeTab;
@@ -136,6 +134,7 @@ export function SettingsModal({
             <div className="space-y-1">
               {visibleTabs.map((tab) => (
                 <button
+                  type="button"
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={cn(

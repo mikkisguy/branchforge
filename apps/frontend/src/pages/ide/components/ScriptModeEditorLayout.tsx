@@ -147,6 +147,7 @@ export function ScriptModeEditorLayout({
           <div className="h-full overflow-y-auto relative">
             <div className="sticky top-0 z-20 bg-card border-b border-border pl-10 pr-4 py-3">
               <button
+                type="button"
                 onClick={() => setIsLeftSidebarCollapsed(true)}
                 className="absolute top-2 left-2 z-30 p-1 rounded-md hover:bg-muted/80 transition-colors"
                 aria-label="Collapse project files sidebar"
@@ -196,6 +197,7 @@ export function ScriptModeEditorLayout({
         {isLeftSidebarCollapsed && !isFocusMode && (
           <div className="min-h-0 shrink-0 mt-3 flex items-center -ml-4">
             <button
+              type="button"
               onClick={() => setIsLeftSidebarCollapsed(false)}
               className="p-2 rounded-lg border border-border bg-card/50 hover:bg-muted/80 transition-colors"
               aria-label="Expand project files sidebar"
@@ -262,7 +264,12 @@ export function ScriptModeEditorLayout({
                     have been deleted or there was an error loading the project
                     files.
                   </p>
-                  <Button variant="outline" size="sm" onClick={onRefreshFiles}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onRefreshFiles}
+                  >
                     Refresh files
                   </Button>
                 </div>

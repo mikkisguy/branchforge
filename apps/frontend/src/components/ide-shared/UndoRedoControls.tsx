@@ -70,6 +70,7 @@ export function UndoRedoControls({
   return (
     <div className="flex items-center gap-1">
       <button
+        type="button"
         onClick={onUndo}
         disabled={!canUndo}
         aria-disabled={!canUndo}
@@ -84,6 +85,7 @@ export function UndoRedoControls({
         <Undo2 className="size-4" />
       </button>
       <button
+        type="button"
         onClick={onRedo}
         disabled={!canRedo}
         aria-disabled={!canRedo}

@@ -139,9 +139,6 @@ export function LabelEditDialog({
         visibility: currentVisibility ?? "EXCLUSIVE",
       });
     }
-    if (!open) {
-      initializedForOpenRef.current = false;
-    }
   }, [
     open,
     currentTitle,
@@ -221,15 +218,23 @@ export function LabelEditDialog({
     }
 
     if (Object.keys(changes).length === 0) {
+      initializedForOpenRef.current = false;
       onOpenChange(false);
       return;
     }
 
     await onSave(changes);
+    initializedForOpenRef.current = false;
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(newOpen) => {
+        if (!newOpen) initializedForOpenRef.current = false;
+        onOpenChange(newOpen);
+      }}
+    >
       <DialogContent className="w-[560px] max-w-[95vw] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Label</DialogTitle>
@@ -387,13 +392,22 @@ export function LabelEditDialog({
           {/* Footer Buttons */}
           <div className="flex justify-end gap-2 mt-6">
             <Button
+              type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => {
+                initializedForOpenRef.current = false;
+                onOpenChange(false);
+              }}
               disabled={isSaving}
             >
               Cancel
             </Button>
-            <Button variant="default" onClick={handleSave} disabled={isSaving}>
+            <Button
+              type="button"
+              variant="default"
+              onClick={handleSave}
+              disabled={isSaving}
+            >
               {isSaving ? (
                 <>
                   <Loader2 className="mr-2 size-4 animate-spin" />

@@ -106,12 +106,14 @@ export class ErrorBoundary extends Component<
             )}
             <div className="flex gap-3 mt-4">
               <button
+                type="button"
                 onClick={() => this.resetErrorBoundary()}
                 className="px-4 py-2 text-slate-300 border border-slate-600 rounded hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-slate-500"
               >
                 Try Again
               </button>
               <button
+                type="button"
                 onClick={() => window.location.reload()}
                 className="px-4 py-2 bg-theme-primary text-white rounded hover:opacity-90 transition-opacity"
               >

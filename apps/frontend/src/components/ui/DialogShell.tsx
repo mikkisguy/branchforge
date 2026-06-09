@@ -84,7 +84,11 @@ export function DialogShell({
             {footerMode === "custom" ? (
               footerActions
             ) : (
-              <Button variant="outline" onClick={() => handleOpenChange(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleOpenChange(false)}
+              >
                 Close
               </Button>
             )}

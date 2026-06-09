@@ -660,6 +660,7 @@ export const ProseEditor = function ProseEditor({
           <p className="text-sm opacity-70">Start writing your story</p>
         </div>
         <button
+          type="button"
           onClick={() => {
             const newEntries = [
               {
@@ -796,6 +797,7 @@ export const ProseEditor = function ProseEditor({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
+              type="button"
               onClick={() =>
                 setLayoutMode((prev) =>
                   prev === "inline" ? "stacked" : "inline"

@@ -334,6 +334,7 @@ export function ZipImportProjectDialog({
                   </div>
                 </div>
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon"
                   onClick={() => onOpenChange(false)}
@@ -463,6 +464,7 @@ export function ZipImportProjectDialog({
 
                 {/* Import button */}
                 <Button
+                  type="button"
                   onClick={handleImport}
                   disabled={!state.selectedFile || !state.projectName.trim()}
                   className="w-full"
@@ -493,6 +495,7 @@ export function ZipImportProjectDialog({
                   {state.importState.result?.labelsCreated} labels created
                 </p>
                 <Button
+                  type="button"
                   onClick={() => {
                     if (!didCallOnSuccessRef.current) {
                       didCallOnSuccessRef.current = true;
@@ -518,6 +521,7 @@ export function ZipImportProjectDialog({
                 </p>
                 <div className="flex gap-2">
                   <Button
+                    type="button"
                     variant="outline"
                     onClick={() =>
                       dispatch({
@@ -528,7 +532,11 @@ export function ZipImportProjectDialog({
                   >
                     Try Again
                   </Button>
-                  <Button variant="outline" onClick={() => onOpenChange(false)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => onOpenChange(false)}
+                  >
                     Cancel
                   </Button>
                 </div>

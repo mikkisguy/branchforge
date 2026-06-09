@@ -175,7 +175,7 @@ export const DialogueLine = memo(function DialogueLine({
     return () => {
       if (removeHintTimerRef.current) clearTimeout(removeHintTimerRef.current);
     };
-  }, []);
+  }, [removeHintTimerRef]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -605,7 +605,7 @@ export const DialogueLine = memo(function DialogueLine({
                   Narration
                 </button>
 
-                <div className="my-1 border-t border-border" role="separator" />
+                <hr className="my-1 border-t border-border" />
 
                 {characters.map((char, idx) => (
                   <button
@@ -670,6 +670,7 @@ export const DialogueLine = memo(function DialogueLine({
         {/* Delete Button */}
         {showDelete && (
           <button
+            type="button"
             onClick={onDelete}
             className="z-10 absolute right-0 top-0.5 p-1 rounded text-muted-foreground/70 hover:text-destructive bg-background/90 hover:bg-destructive/10 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             title="Delete line (Backspace)"

@@ -434,6 +434,7 @@ export function CharacterImportWizard({
             </div>
           </div>
           <button
+            type="button"
             onClick={handleClose}
             className="text-muted-foreground hover:text-foreground transition-colors"
             disabled={state.isImporting}
@@ -908,6 +909,7 @@ export function CharacterImportWizard({
           </span>
           <div className="flex gap-2">
             <Button
+              type="button"
               variant="outline"
               onClick={handleClose}
               disabled={state.isImporting}
@@ -915,6 +917,7 @@ export function CharacterImportWizard({
               Cancel
             </Button>
             <Button
+              type="button"
               onClick={handleImport}
               disabled={state.isImporting || selectedCount === 0}
             >

@@ -95,6 +95,7 @@ export function ProjectFileTree({
         <div key={folder} className="mb-2">
           {folder && (
             <button
+              type="button"
               onClick={() => toggleFolder(folder)}
               role="treeitem"
               aria-expanded={expandedFolders.has(folder)}
@@ -131,6 +132,7 @@ export function ProjectFileTree({
                   >
                     {file.fileType === "STORY" && file.labels.length > 0 ? (
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           toggleFile(file.id);
@@ -149,6 +151,7 @@ export function ProjectFileTree({
                       <span className="w-3" />
                     )}
                     <button
+                      type="button"
                       onClick={() => onFileSelect(file.id)}
                       className="flex-1 text-left flex items-center gap-2 py-0.5 px-1 -my-0.5 rounded transition-colors"
                     >
@@ -178,6 +181,7 @@ export function ProjectFileTree({
 
                           return (
                             <button
+                              type="button"
                               key={label.id}
                               onClick={() => onSceneSelect(label.id)}
                               role="treeitem"

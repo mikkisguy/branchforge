@@ -109,6 +109,7 @@ export function PaletteSwitcher({
                 </div>
                 {palettes.map((palette) => (
                   <button
+                    type="button"
                     key={palette.originalIndex}
                     onClick={() => handleSelect(palette.originalIndex)}
                     className={`w-full px-3 py-2 text-left text-xs font-code hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2 ${

@@ -126,6 +126,7 @@ function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
               )}
             </div>
             <button
+              type="button"
               onClick={() => onRemove(toast.id)}
               className="text-muted-foreground hover:text-foreground transition-colors"
             >

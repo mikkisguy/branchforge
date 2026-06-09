@@ -408,6 +408,7 @@ export function GitLabImportDialog({
                     access token first.
                   </p>
                   <Button
+                    type="button"
                     size="sm"
                     variant="outline"
                     onClick={() => {
@@ -562,6 +563,7 @@ export function GitLabImportDialog({
 
               {/* Import button */}
               <Button
+                type="button"
                 onClick={handleImport}
                 disabled={
                   !state.selectedRepository || !state.projectName.trim()
@@ -617,6 +619,7 @@ export function GitLabImportDialog({
                     {state.importState.message}
                   </p>
                   <Button
+                    type="button"
                     size="sm"
                     variant="outline"
                     onClick={() =>

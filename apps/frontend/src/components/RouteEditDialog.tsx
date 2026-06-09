@@ -89,45 +89,41 @@ export function RouteEditDialog({
   const [form, setForm] = useState<RouteFormState>(INITIAL_FORM);
   const [errors, setErrors] = useState<RouteFormErrors>({});
   const initializedForRouteIdRef = useRef<string | null>(null);
-  const hasInitializedRef = useRef(false);
 
   const isSaving = isCreatingRouteConfig || isUpdatingRouteConfig;
   const isEditMode = !!routeId;
 
-  // Initialize form state when dialog opens/closes
+  const resetForm = () => {
+    setForm(INITIAL_FORM);
+    setErrors({});
+    initializedForRouteIdRef.current = null;
+  };
+
+  // Initialize form via useEffect when dialog opens with route data
   useEffect(() => {
-    if (!open) {
-      if (hasInitializedRef.current) {
-        setForm(INITIAL_FORM);
-        setErrors({});
-        initializedForRouteIdRef.current = null;
-        hasInitializedRef.current = false;
-      }
-    } else if (!isLoadingRouteConfigs) {
-      if (routeId && routeId !== initializedForRouteIdRef.current) {
-        hasInitializedRef.current = false;
-      }
-      if (!hasInitializedRef.current) {
-        if (routeId) {
-          const route = routeConfigs.find(
-            (item: RouteConfig) => item.id === routeId
-          );
-          if (route) {
-            setForm({
-              routeKey: route.routeKey,
-              routeName: route.routeName,
-              jumpPrefix: route.jumpPrefix,
-              isShared: route.isShared,
-            });
-            initializedForRouteIdRef.current = routeId;
-          }
-        } else {
-          setForm(INITIAL_FORM);
-          initializedForRouteIdRef.current = null;
+    if (
+      open &&
+      !isLoadingRouteConfigs &&
+      routeId !== initializedForRouteIdRef.current
+    ) {
+      if (routeId) {
+        const route = routeConfigs.find(
+          (item: RouteConfig) => item.id === routeId
+        );
+        if (route) {
+          setForm({
+            routeKey: route.routeKey,
+            routeName: route.routeName,
+            jumpPrefix: route.jumpPrefix,
+            isShared: route.isShared,
+          });
+          initializedForRouteIdRef.current = routeId;
         }
-        setErrors({});
-        hasInitializedRef.current = true;
+      } else {
+        setForm(INITIAL_FORM);
+        initializedForRouteIdRef.current = null;
       }
+      setErrors({});
     }
   }, [open, isLoadingRouteConfigs, routeId, routeConfigs]);
 
@@ -162,6 +158,7 @@ export function RouteEditDialog({
         });
       }
 
+      resetForm();
       onOpenChange(false);
     } catch {
       // Error handled by hook toast
@@ -169,7 +166,13 @@ export function RouteEditDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(newOpen) => {
+        if (!newOpen) resetForm();
+        onOpenChange(newOpen);
+      }}
+    >
       <DialogContent className="max-w-xl w-full">
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Edit Route" : "Add Route"}</DialogTitle>
@@ -272,7 +275,10 @@ export function RouteEditDialog({
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => {
+                resetForm();
+                onOpenChange(false);
+              }}
               disabled={isSaving}
             >
               Cancel

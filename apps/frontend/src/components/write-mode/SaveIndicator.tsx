@@ -52,9 +52,8 @@ export const SaveIndicator = memo(function SaveIndicator({
 }: SaveIndicatorProps) {
   if (saveConflict) {
     return (
-      <div
+      <output
         className="flex items-center gap-1.5 text-xs text-destructive"
-        role="status"
         aria-live="polite"
         title="Edit conflict detected"
       >
@@ -64,7 +63,7 @@ export const SaveIndicator = memo(function SaveIndicator({
           <AlertCircle className="size-3" />
         </span>
         {displayMode === "verbose" && <span>Conflict detected</span>}
-      </div>
+      </output>
     );
   }
 
@@ -85,14 +84,13 @@ export const SaveIndicator = memo(function SaveIndicator({
   // For compact mode with no lastSaved timestamp, show only icon
   if (displayMode === "compact" && saveStatus === "saved" && !lastSaved) {
     return (
-      <div
+      <output
         className="flex items-center justify-center text-xs transition-colors duration-300"
-        role="status"
         aria-live="polite"
         title={text}
       >
         <span className={STATUS_TEXT_COLORS.saved}>{icon}</span>
-      </div>
+      </output>
     );
   }
 

@@ -85,45 +85,40 @@ export function VariableEditDialog({
   const [form, setForm] = useState<VariableFormState>(INITIAL_FORM);
   const [errors, setErrors] = useState<VariableFormErrors>({});
   const initializedForVariableIdRef = useRef<string | null>(null);
-  const hasInitializedRef = useRef(false);
 
   const isSaving = isCreatingVariable || isUpdatingVariable;
   const isEditMode = !!variableId;
 
-  // Initialize form state when dialog opens/closes
-  useEffect(() => {
-    if (!open) {
-      if (hasInitializedRef.current) {
-        setForm(INITIAL_FORM);
-        setErrors({});
-        initializedForVariableIdRef.current = null;
-        hasInitializedRef.current = false;
-      }
-    } else if (!isLoadingVariables) {
-      if (variableId && variableId !== initializedForVariableIdRef.current) {
-        hasInitializedRef.current = false;
-      }
+  const resetForm = () => {
+    setForm(INITIAL_FORM);
+    setErrors({});
+    initializedForVariableIdRef.current = null;
+  };
 
-      if (!hasInitializedRef.current) {
-        if (variableId) {
-          const variable = variables.find(
-            (item: Variable) => item.id === variableId
-          );
-          if (variable) {
-            setForm({
-              key: variable.key,
-              description: variable.description ?? "",
-              category: variable.category ?? "",
-            });
-            initializedForVariableIdRef.current = variableId;
-          }
-        } else {
-          setForm(INITIAL_FORM);
-          initializedForVariableIdRef.current = null;
+  // Initialize form via useEffect when dialog opens with variable data
+  useEffect(() => {
+    if (
+      open &&
+      !isLoadingVariables &&
+      variableId !== initializedForVariableIdRef.current
+    ) {
+      if (variableId) {
+        const variable = variables.find(
+          (item: Variable) => item.id === variableId
+        );
+        if (variable) {
+          setForm({
+            key: variable.key,
+            description: variable.description ?? "",
+            category: variable.category ?? "",
+          });
+          initializedForVariableIdRef.current = variableId;
         }
-        setErrors({});
-        hasInitializedRef.current = true;
+      } else {
+        setForm(INITIAL_FORM);
+        initializedForVariableIdRef.current = null;
       }
+      setErrors({});
     }
   }, [open, isLoadingVariables, variableId, variables]);
 
@@ -153,6 +148,7 @@ export function VariableEditDialog({
         });
       }
 
+      resetForm();
       onOpenChange(false);
     } catch {
       // Error handled by hook toast
@@ -160,7 +156,13 @@ export function VariableEditDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(newOpen) => {
+        if (!newOpen) resetForm();
+        onOpenChange(newOpen);
+      }}
+    >
       <DialogContent className="max-w-xl w-full">
         <DialogHeader>
           <DialogTitle>
@@ -240,7 +242,10 @@ export function VariableEditDialog({
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => {
+                resetForm();
+                onOpenChange(false);
+              }}
               disabled={isSaving}
             >
               Cancel

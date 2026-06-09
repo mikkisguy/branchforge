@@ -67,7 +67,6 @@ export function FontFamilySwitcher({
     isOpen: false,
     focusedIndex: -1,
     isKeyboardNav: false,
-    closeReason: "keyboard" as "keyboard" | "mouse",
   });
 
   const listboxRef = useRef<HTMLDivElement>(null);
@@ -92,14 +91,7 @@ export function FontFamilySwitcher({
     );
   }, [fontFamily]);
 
-  // DOM focus management when dropdown opens/closes
-  useEffect(() => {
-    if (dropdownState.isOpen) {
-      listboxRef.current?.focus();
-    } else if (dropdownState.closeReason === "keyboard") {
-      buttonRef.current?.focus();
-    }
-  }, [dropdownState.isOpen, dropdownState.closeReason]);
+  // Focus is managed directly in each event handler (no useEffect needed)
 
   const handleSelect = (value: string) => {
     setFontFamily(value);
@@ -118,6 +110,7 @@ export function FontFamilySwitcher({
       ) {
         e.preventDefault();
         updateDropdownState({ isOpen: true });
+        requestAnimationFrame(() => listboxRef.current?.focus());
       }
       return;
     }
@@ -125,10 +118,8 @@ export function FontFamilySwitcher({
     switch (e.key) {
       case "Escape":
         e.preventDefault();
-        updateDropdownState({
-          isOpen: false,
-          closeReason: "keyboard",
-        });
+        updateDropdownState({ isOpen: false });
+        buttonRef.current?.focus();
         break;
       case "ArrowDown":
         e.preventDefault();
@@ -152,8 +143,8 @@ export function FontFamilySwitcher({
           dropdownState.focusedIndex >= 0 &&
           dropdownState.focusedIndex < FONT_FAMILY_OPTIONS.length
         ) {
-          updateDropdownState({ closeReason: "keyboard" });
           handleSelect(FONT_FAMILY_OPTIONS[dropdownState.focusedIndex].value);
+          buttonRef.current?.focus();
         }
         break;
       case "Home":
@@ -173,10 +164,7 @@ export function FontFamilySwitcher({
 
   const closeOnFocusLeave = (e: React.FocusEvent) => {
     if (!e.currentTarget.contains(e.relatedTarget)) {
-      updateDropdownState({
-        isOpen: false,
-        closeReason: "mouse",
-      });
+      updateDropdownState({ isOpen: false });
     }
   };
 
@@ -196,9 +184,13 @@ export function FontFamilySwitcher({
       <button
         ref={buttonRef}
         type="button"
-        onClick={() =>
-          setDropdownState((prev) => ({ ...prev, isOpen: !prev.isOpen }))
-        }
+        onClick={() => {
+          const nextOpen = !dropdownState.isOpen;
+          setDropdownState((prev) => ({ ...prev, isOpen: nextOpen }));
+          if (nextOpen) {
+            requestAnimationFrame(() => listboxRef.current?.focus());
+          }
+        }}
         onKeyDown={handleKeyDown}
         onMouseDown={handleMouseDown}
         aria-expanded={dropdownState.isOpen}
@@ -255,10 +247,7 @@ export function FontFamilySwitcher({
             className="fixed inset-0 z-40"
             aria-hidden="true"
             onClick={() => {
-              updateDropdownState({
-                isOpen: false,
-                closeReason: "mouse",
-              });
+              updateDropdownState({ isOpen: false });
             }}
           />
           <div
@@ -282,7 +271,6 @@ export function FontFamilySwitcher({
                 role="option"
                 aria-selected={option.value === fontFamily}
                 onClick={() => {
-                  updateDropdownState({ closeReason: "mouse" });
                   handleSelect(option.value);
                 }}
                 tabIndex={-1}

@@ -15,96 +15,51 @@ export function Dialog({
   children,
   closeOnBackdropClick = true,
 }: DialogProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
 
-  const handleOpenChange = useEffectEvent(() => onOpenChange?.(false));
+  const handleClose = useEffectEvent(() => onOpenChange?.(false));
 
-  useEffect(() => {
-    if (!open || !dialogRef.current) return;
-
-    const dialog = dialogRef.current;
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-    previouslyFocusedElementRef.current = previouslyFocused;
-
-    // Find all focusable elements within the dialog
-    const getFocusableElements = (): HTMLElement[] => {
-      const focusableSelectors = [
-        "button:not([disabled])",
-        "[href]",
-        "input:not([disabled])",
-        "select:not([disabled])",
-        "textarea:not([disabled])",
-        '[tabindex]:not([tabindex="-1"])',
-      ];
-      return Array.from(
-        dialog.querySelectorAll<HTMLElement>(focusableSelectors.join(","))
-      );
-    };
-
-    // Focus the first focusable element
-    const focusableElements = getFocusableElements();
-    if (focusableElements.length > 0) {
-      focusableElements[0].focus();
+  // Sync open prop with native dialog showModal/close API via ref callback
+  // (runs at commit time, same timing as event handlers)
+  const syncDialogRef = (el: HTMLDialogElement | null) => {
+    dialogRef.current = el;
+    if (!el) return;
+    if (open && !el.open) {
+      el.showModal?.();
+    } else if (!open && el.open) {
+      el.close?.();
     }
+  };
 
-    // Handle Escape key and Tab/Shift+Tab for focus trap
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        handleOpenChange();
-        return;
-      }
+  // Listen for native close event (Escape key, programmatic close)
+  // Also handle backdrop click via the native click event on the dialog element
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
 
-      // Focus trap for Tab/Shift+Tab
-      if (e.key === "Tab") {
-        const currentFocusable = getFocusableElements();
-        if (currentFocusable.length === 0) return;
-
-        const firstElement = currentFocusable[0];
-        const lastElement = currentFocusable[currentFocusable.length - 1];
-
-        if (e.shiftKey) {
-          // Shift+Tab: if at first element, wrap to last
-          if (document.activeElement === firstElement) {
-            e.preventDefault();
-            lastElement.focus();
-          }
-        } else {
-          // Tab: if at last element, wrap to first
-          if (document.activeElement === lastElement) {
-            e.preventDefault();
-            firstElement.focus();
-          }
-        }
+    const onClose = () => handleClose();
+    const onClick = (e: MouseEvent) => {
+      // Backdrop click: target is the dialog element itself (not its children)
+      if (closeOnBackdropClick && e.target === dialog) {
+        handleClose();
       }
     };
 
-    document.addEventListener("keydown", handleKeyDown);
-
-    // Cleanup: restore focus and remove listener
+    dialog.addEventListener("close", onClose);
+    dialog.addEventListener("click", onClick);
     return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      if (previouslyFocusedElementRef.current) {
-        previouslyFocusedElementRef.current.focus();
-      }
+      dialog.removeEventListener("close", onClose);
+      dialog.removeEventListener("click", onClick);
     };
-  }, [open]);
-
-  if (!open) return null;
+  }, [closeOnBackdropClick, dialogRef]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/30 backdrop-blur-sm"
-        aria-hidden="true"
-        onClick={closeOnBackdropClick ? () => onOpenChange?.(false) : undefined}
-      />
-      {/* Content */}
-      <div ref={dialogRef} role="dialog" aria-modal="true">
-        {children}
-      </div>
-    </div>
+    <dialog
+      ref={syncDialogRef}
+      className="backdrop:bg-black/30 backdrop:backdrop-blur-sm m-auto border-0 p-0 bg-transparent text-[hsl(var(--foreground))]"
+    >
+      {children}
+    </dialog>
   );
 }
 

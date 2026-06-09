@@ -393,17 +393,12 @@ export function GitLabSyncDialog({
                     </span>
                     <span className="font-medium">{state.progress}%</span>
                   </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary transition-all duration-300"
-                      style={{ width: `${state.progress}%` }}
-                      role="progressbar"
-                      aria-label="GitLab sync progress"
-                      aria-valuenow={state.progress}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                    />
-                  </div>
+                  <progress
+                    className="h-2 w-full rounded-full bg-muted [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-value]:bg-primary [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:transition-all [&::-webkit-progress-value]:duration-300 [&::-moz-progress-bar]:bg-primary [&::-moz-progress-bar]:rounded-full"
+                    value={state.progress}
+                    max={100}
+                    aria-label="GitLab sync progress"
+                  />
                 </div>
               )}
             </div>
@@ -507,10 +502,14 @@ export function GitLabSyncDialog({
         <div className="p-6 border-t border-border/30 flex justify-end gap-2">
           {!state.isProcessing && !state.operation && (
             <>
-              <Button variant="outline" onClick={handleClose}>
+              <Button type="button" variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button onClick={handleSync} disabled={!branch.trim()}>
+              <Button
+                type="button"
+                onClick={handleSync}
+                disabled={!branch.trim()}
+              >
                 {operationType === "export" ? "Export" : "Import"}
               </Button>
             </>
@@ -518,6 +517,7 @@ export function GitLabSyncDialog({
           {(state.isProcessing || state.operation) &&
             state.operation?.status !== "COMPLETED" && (
               <Button
+                type="button"
                 onClick={handleClose}
                 variant="outline"
                 disabled={state.isProcessing}
@@ -526,7 +526,9 @@ export function GitLabSyncDialog({
               </Button>
             )}
           {state.operation?.status === "COMPLETED" && (
-            <Button onClick={handleClose}>Close</Button>
+            <Button type="button" onClick={handleClose}>
+              Close
+            </Button>
           )}
         </div>
       </DialogContent>

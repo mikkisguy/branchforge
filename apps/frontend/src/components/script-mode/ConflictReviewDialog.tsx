@@ -329,6 +329,7 @@ export function ConflictReviewDialog({
               <h2 className="text-lg font-medium">Review Sync Conflicts</h2>
               {userRole === "OWNER" && (
                 <Button
+                  type="button"
                   size="sm"
                   variant="ghost"
                   onClick={loadMockConflicts}
@@ -344,6 +345,7 @@ export function ConflictReviewDialog({
             </p>
           </div>
           <button
+            type="button"
             onClick={() => onOpenChange(false)}
             className="text-muted-foreground hover:text-foreground transition-colors"
             disabled={state.isLoading}
@@ -371,6 +373,7 @@ export function ConflictReviewDialog({
                 </p>
                 {userRole === "OWNER" && (
                   <Button
+                    type="button"
                     size="sm"
                     variant="outline"
                     onClick={loadMockConflicts}
@@ -404,6 +407,7 @@ export function ConflictReviewDialog({
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <button
+                    type="button"
                     onClick={goPrevious}
                     disabled={state.currentIndex === 0 || state.isLoading}
                     className="p-1 hover:bg-muted rounded transition-colors disabled:opacity-50"
@@ -414,6 +418,7 @@ export function ConflictReviewDialog({
                     {state.currentIndex + 1} / {totalCount}
                   </span>
                   <button
+                    type="button"
                     onClick={goNext}
                     disabled={
                       state.currentIndex === totalCount - 1 || state.isLoading
@@ -448,6 +453,7 @@ export function ConflictReviewDialog({
                   <div className="flex items-center justify-between">
                     <h4 className="text-sm font-medium">BranchForge Version</h4>
                     <Button
+                      type="button"
                       size="sm"
                       variant={
                         currentResolution === "local" ? "default" : "outline"
@@ -470,6 +476,7 @@ export function ConflictReviewDialog({
                   <div className="flex items-center justify-between">
                     <h4 className="text-sm font-medium">GitLab Version</h4>
                     <Button
+                      type="button"
                       size="sm"
                       variant={
                         currentResolution === "remote" ? "default" : "outline"
@@ -491,6 +498,7 @@ export function ConflictReviewDialog({
               {/* Skip Option */}
               <div className="flex justify-center">
                 <Button
+                  type="button"
                   variant="ghost"
                   size="sm"
                   onClick={() => setResolution("skip")}
@@ -517,6 +525,7 @@ export function ConflictReviewDialog({
         {/* Footer */}
         <div className="p-6 border-t border-border/30 flex justify-between">
           <Button
+            type="button"
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={state.isLoading}
@@ -530,6 +539,7 @@ export function ConflictReviewDialog({
               </span>
             )}
             <Button
+              type="button"
               onClick={handleApply}
               disabled={state.isLoading || hasUnresolved}
             >

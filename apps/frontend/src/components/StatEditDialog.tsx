@@ -91,44 +91,36 @@ export function StatEditDialog({
   const [form, setForm] = useState<StatFormState>(INITIAL_FORM);
   const [errors, setErrors] = useState<StatFormErrors>({});
   const initializedForStatIdRef = useRef<string | null>(null);
-  const hasInitializedRef = useRef(false);
 
   const isSaving = isCreatingStat || isUpdatingStat;
   const isEditMode = !!statId;
 
-  // Initialize form state when dialog opens/closes
+  const resetForm = () => {
+    setForm(INITIAL_FORM);
+    setErrors({});
+    initializedForStatIdRef.current = null;
+  };
+
+  // Initialize form via useEffect when dialog opens with stat data
   useEffect(() => {
-    if (!open) {
-      if (hasInitializedRef.current) {
-        setForm(INITIAL_FORM);
-        setErrors({});
-        initializedForStatIdRef.current = null;
-        hasInitializedRef.current = false;
-      }
-    } else if (!isLoadingStats) {
-      if (statId && statId !== initializedForStatIdRef.current) {
-        hasInitializedRef.current = false;
-      }
-      if (!hasInitializedRef.current) {
-        if (statId) {
-          const stat = stats.find((item: Stat) => item.id === statId);
-          if (stat) {
-            setForm({
-              key: stat.key,
-              name: stat.name,
-              minValue: stat.minValue,
-              maxValue: stat.maxValue,
-              description: stat.description ?? "",
-            });
-            initializedForStatIdRef.current = statId;
-          }
-        } else {
-          setForm(INITIAL_FORM);
-          initializedForStatIdRef.current = null;
+    if (open && !isLoadingStats && statId !== initializedForStatIdRef.current) {
+      if (statId) {
+        const stat = stats.find((item: Stat) => item.id === statId);
+        if (stat) {
+          setForm({
+            key: stat.key,
+            name: stat.name,
+            minValue: stat.minValue,
+            maxValue: stat.maxValue,
+            description: stat.description ?? "",
+          });
+          initializedForStatIdRef.current = statId;
         }
-        setErrors({});
-        hasInitializedRef.current = true;
+      } else {
+        setForm(INITIAL_FORM);
+        initializedForStatIdRef.current = null;
       }
+      setErrors({});
     }
   }, [open, isLoadingStats, statId, stats]);
 
@@ -182,6 +174,7 @@ export function StatEditDialog({
         });
       }
 
+      resetForm();
       onOpenChange(false);
     } catch {
       // Error handled by hook toast
@@ -189,7 +182,13 @@ export function StatEditDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(newOpen) => {
+        if (!newOpen) resetForm();
+        onOpenChange(newOpen);
+      }}
+    >
       <DialogContent className="max-w-xl w-full">
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Edit Stat" : "Add Stat"}</DialogTitle>
@@ -298,7 +297,10 @@ export function StatEditDialog({
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => {
+                resetForm();
+                onOpenChange(false);
+              }}
               disabled={isSaving}
             >
               Cancel

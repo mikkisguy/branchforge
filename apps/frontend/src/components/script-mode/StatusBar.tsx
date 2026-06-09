@@ -111,6 +111,7 @@ export function StatusBar({
             <>
               <div className="flex items-center gap-2 border-l border-border/30 pl-4">
                 <button
+                  type="button"
                   onClick={handleImportClick}
                   className={cn(
                     "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
@@ -124,6 +125,7 @@ export function StatusBar({
               </div>
               <div className="border-l border-border/30 pl-4">
                 <button
+                  type="button"
                   onClick={handleExportClick}
                   className={cn(
                     "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
@@ -142,6 +144,7 @@ export function StatusBar({
           {isZipAvailable && onOpenZipImportDialog && (
             <div className="flex items-center gap-2 border-l border-border/30 pl-4">
               <button
+                type="button"
                 onClick={handleZipImportClick}
                 className={cn(
                   "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",

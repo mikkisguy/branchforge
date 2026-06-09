@@ -244,6 +244,7 @@ export function HomePageIDE() {
                 </span>
                 <p>Failed to load editor. Please refresh or retry.</p>
                 <button
+                  type="button"
                   onClick={handleScriptModeRetry}
                   className="px-4 py-2 mt-2 text-sm text-white bg-theme-primary rounded hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-theme-primary"
                 >
