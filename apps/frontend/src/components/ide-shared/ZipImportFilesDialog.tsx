@@ -453,6 +453,7 @@ export function ZipImportFilesDialog({
                       accept=".zip,application/zip,application/x-zip-compressed"
                       onChange={handleFileChange}
                       className="hidden"
+                      aria-label="Upload zip file"
                     />
                     <p className="text-xs text-muted-foreground">
                       Maximum file size: {ZIP_IMPORT_MAX_SIZE_MB}MB

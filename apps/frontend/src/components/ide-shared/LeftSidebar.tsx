@@ -470,6 +470,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
                           }`}
                           style={{ background: palette.color }}
                           title={palette.name}
+                          aria-label={palette.name}
                         />
                       ))}
                     </div>
@@ -493,6 +494,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
                         }`}
                         style={{ background: palette.color }}
                         title={palette.name}
+                        aria-label={palette.name}
                       />
                     ))}
                   </div>

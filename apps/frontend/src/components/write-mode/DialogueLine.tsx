@@ -667,6 +667,13 @@ export const DialogueLine = memo(function DialogueLine({
           className={`relative min-h-[2.5rem] p-0 pr-7 resize-none overflow-hidden bg-transparent border-0 outline-none focus-visible:outline-none focus-visible:ring-0 font-light tracking-normal leading-8 placeholder:text-muted-foreground/50 ${
             isStacked ? "w-full" : "flex-1"
           }`}
+          aria-label={
+            isChoice
+              ? "Choice text"
+              : entry.speakerId
+                ? "Dialogue text"
+                : "Narration text"
+          }
           style={{
             fontSize: "var(--prose-editor-font-size, 16px)",
             fontFamily: "var(--prose-editor-font-family, var(--font-sans))",

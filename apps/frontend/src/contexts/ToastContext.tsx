@@ -1,4 +1,11 @@
-import { createContext, use, useState, useCallback, ReactNode } from "react";
+import {
+  createContext,
+  use,
+  useState,
+  useCallback,
+  useMemo,
+  ReactNode,
+} from "react";
 
 type ToastVariant = "default" | "success" | "destructive";
 
@@ -75,8 +82,13 @@ export function ToastProvider({ children }: ToastProviderProps) {
     [removeToast]
   );
 
+  const contextValue = useMemo(
+    () => ({ toasts, showToast, removeToast }),
+    [toasts, showToast, removeToast]
+  );
+
   return (
-    <ToastContext.Provider value={{ toasts, showToast, removeToast }}>
+    <ToastContext.Provider value={contextValue}>
       {children}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
     </ToastContext.Provider>

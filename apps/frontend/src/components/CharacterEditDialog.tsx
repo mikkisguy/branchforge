@@ -569,6 +569,7 @@ export function CharacterEditDialog({
                 }
                 disabled={isSaving}
                 className="size-4"
+                aria-label="Love Interest"
               />
               <Label
                 htmlFor="edit-char-love"

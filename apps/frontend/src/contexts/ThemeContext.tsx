@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { ThemeContext, type ThemePalette, type ThemeColors } from "./useTheme";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 
@@ -63,8 +63,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.style.setProperty("--theme-draft-color", STATUS_COLORS.draft);
   }, [theme, colors]);
 
+  const contextValue = useMemo(
+    () => ({ theme, setTheme: setThemeState, colors }),
+    [theme, setThemeState, colors]
+  );
+
   return (
-    <ThemeContext.Provider value={{ theme, setTheme: setThemeState, colors }}>
+    <ThemeContext.Provider value={contextValue}>
       {children}
     </ThemeContext.Provider>
   );

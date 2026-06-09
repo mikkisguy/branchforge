@@ -155,6 +155,7 @@ export function useEntriesUndo(
         present: entries,
         future: [],
       };
+      // react-doctor-disable-next-line react-doctor/no-derived-state
       commitState(nextState);
     }
   }, [entries, commitState]);
