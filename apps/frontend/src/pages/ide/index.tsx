@@ -14,8 +14,8 @@ import {
   useLocalStorage,
   useLocalStorageBoolean,
 } from "@/hooks/useLocalStorage";
-import type { Tab } from "@/components/ide-shared/SettingsModal";
-import { SETTINGS_TABS } from "@/components/ide-shared/SettingsModal";
+import type { Tab } from "@/components/ide-shared/settings-types";
+import { SETTINGS_TABS } from "@/components/ide-shared/settings-types";
 
 const ScriptMode = lazy(() =>
   import("./ScriptMode").then((m) => ({ default: m.ScriptMode }))

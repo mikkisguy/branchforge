@@ -20,15 +20,7 @@ import { WritingGoalSettings } from "@/components/write-mode/WritingGoalSettings
 import { cn } from "@/lib/utils";
 import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 import { APP_NAME, APP_VERSION } from "@/lib/version";
-
-export type Tab = "user" | "projects" | "integrations" | "system";
-
-export const SETTINGS_TABS = [
-  "user",
-  "projects",
-  "integrations",
-  "system",
-] as const;
+import type { Tab } from "./settings-types";
 
 interface TabOption {
   id: Tab;

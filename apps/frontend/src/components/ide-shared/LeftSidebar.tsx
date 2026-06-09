@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import type { ThemePalette } from "@/contexts/ThemeContext";
 import type { Project, UpdateProjectBody } from "@/lib/api/projects";
-import type { Tab } from "./SettingsModal";
+import type { Tab } from "./settings-types";
 import { SettingsModal } from "./SettingsModal";
 import { RouteSettingsDialog } from "./RouteSettingsDialog";
 import { CharacterDialog } from "@/components/CharacterDialog";
