@@ -199,15 +199,14 @@ export function CharacterEditDialog({
   // Initialize form state when dialog opens/closes
   useEffect(() => {
     if (!open) {
-      if (hasInitializedRef.current) {
-        dispatch({ type: "RESET_NEW" });
-        if (previewUrlRef.current) {
-          URL.revokeObjectURL(previewUrlRef.current);
-          previewUrlRef.current = null;
-        }
-        initializedForCharacterIdRef.current = null;
-        hasInitializedRef.current = false;
+      // Always clear form state and cleanup on close, regardless of mode
+      dispatch({ type: "RESET_NEW" });
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
       }
+      initializedForCharacterIdRef.current = null;
+      hasInitializedRef.current = false;
     } else if (!isLoadingCharacters) {
       if (characterId && characterId !== initializedForCharacterIdRef.current) {
         hasInitializedRef.current = false;

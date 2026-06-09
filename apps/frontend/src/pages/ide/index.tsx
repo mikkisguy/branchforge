@@ -61,13 +61,18 @@ export function HomePageIDE() {
   const { setActiveLabelId } = useLabels();
   const { error: showErrorToast } = useToast();
 
-  // Clear active label when project changes (render-time check)
-  const previousProjectId = previousProjectIdRef.current;
-  const nextProjectId = currentProject?.id;
-  if (previousProjectId !== undefined && previousProjectId !== nextProjectId) {
-    setActiveLabelId(null);
-  }
-  previousProjectIdRef.current = nextProjectId;
+  // Clear active label when project changes
+  useEffect(() => {
+    const previousProjectId = previousProjectIdRef.current;
+    const nextProjectId = currentProject?.id;
+    if (
+      previousProjectId !== undefined &&
+      previousProjectId !== nextProjectId
+    ) {
+      setActiveLabelId(null);
+    }
+    previousProjectIdRef.current = nextProjectId;
+  }, [currentProject?.id, setActiveLabelId]);
 
   // Wrapped setter that resets tab state when closing
   const handleSetIsSettingsOpen = (open: boolean) => {

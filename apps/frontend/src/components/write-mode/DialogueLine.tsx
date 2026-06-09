@@ -99,7 +99,7 @@ export const DialogueLine = memo(function DialogueLine({
     "conditions" | "jump" | "visuals" | "menu" | null
   >(null);
   const [showRemoveHint, setShowRemoveHint] = useState(false);
-  const removeHintTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const removeHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const dropdownMenuRef = useRef<HTMLDivElement>(null);
