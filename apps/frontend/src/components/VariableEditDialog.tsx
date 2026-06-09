@@ -4,7 +4,7 @@
  * Modal for creating or editing a single variable.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -67,6 +67,136 @@ function validateVariable(form: VariableFormState): VariableFormErrors {
   return errors;
 }
 
+interface VariableFormContentProps {
+  variableId: string | undefined;
+  variables: Variable[];
+  isSaving: boolean;
+  onSave: (
+    variableId: string | undefined,
+    form: VariableFormState
+  ) => Promise<void>;
+  onClose: () => void;
+}
+
+function VariableFormContent({
+  variableId,
+  variables,
+  isSaving,
+  onSave,
+  onClose,
+}: VariableFormContentProps) {
+  const [form, setForm] = useState<VariableFormState>(() => {
+    if (!variableId) return INITIAL_FORM;
+    const variable = variables.find((item: Variable) => item.id === variableId);
+    if (!variable) return INITIAL_FORM;
+    return {
+      key: variable.key,
+      description: variable.description ?? "",
+      category: variable.category ?? "",
+    };
+  });
+  const [errors, setErrors] = useState<VariableFormErrors>({});
+
+  const isEditMode = !!variableId;
+
+  const handleChange = (field: keyof VariableFormState, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setErrors({});
+  };
+
+  const handleSave = async () => {
+    const validationErrors = validateVariable(form);
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
+    try {
+      await onSave(variableId, form);
+      onClose();
+    } catch {
+      // Error handled by hook toast
+    }
+  };
+
+  return (
+    <div className="space-y-4 mt-4">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label htmlFor="variable-key" className="text-xs">
+            Variable Key *
+          </Label>
+          <Input
+            id="variable-key"
+            type="text"
+            placeholder="met_alex"
+            value={form.key}
+            onChange={(event) => handleChange("key", event.target.value)}
+            disabled={isSaving || isEditMode}
+          />
+          <p className="text-xs text-muted-foreground">
+            {isEditMode
+              ? "Key cannot be changed after creation"
+              : "Unique identifier (letters, numbers, underscores)"}
+          </p>
+          {errors.key && (
+            <p className="text-xs text-destructive">{errors.key}</p>
+          )}
+        </div>
+
+        <div className="space-y-1">
+          <Label htmlFor="variable-category" className="text-xs">
+            Category
+          </Label>
+          <Input
+            id="variable-category"
+            type="text"
+            placeholder="Relationships"
+            value={form.category}
+            onChange={(event) => handleChange("category", event.target.value)}
+            disabled={isSaving}
+          />
+          {errors.category && (
+            <p className="text-xs text-destructive">{errors.category}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="variable-description" className="text-xs">
+          Description
+        </Label>
+        <Input
+          id="variable-description"
+          type="text"
+          placeholder="Player has met Alex"
+          value={form.description}
+          onChange={(event) => handleChange("description", event.target.value)}
+          disabled={isSaving}
+        />
+        {errors.description && (
+          <p className="text-xs text-destructive">{errors.description}</p>
+        )}
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onClose}
+          disabled={isSaving}
+        >
+          Cancel
+        </Button>
+        <Button type="button" onClick={handleSave} disabled={isSaving}>
+          {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
+          Save
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function VariableEditDialog({
   open,
   onOpenChange,
@@ -82,87 +212,29 @@ export function VariableEditDialog({
     isUpdatingVariable,
   } = useVariables(projectId);
 
-  const [form, setForm] = useState<VariableFormState>(INITIAL_FORM);
-  const [errors, setErrors] = useState<VariableFormErrors>({});
-  const initializedForVariableIdRef = useRef<string | null>(null);
-
   const isSaving = isCreatingVariable || isUpdatingVariable;
   const isEditMode = !!variableId;
 
-  const resetForm = () => {
-    setForm(INITIAL_FORM);
-    setErrors({});
-    initializedForVariableIdRef.current = null;
-  };
-
-  // Initialize form via useEffect when dialog opens with variable data
-  useEffect(() => {
-    if (
-      open &&
-      !isLoadingVariables &&
-      variableId !== initializedForVariableIdRef.current
-    ) {
-      if (variableId) {
-        const variable = variables.find(
-          (item: Variable) => item.id === variableId
-        );
-        if (variable) {
-          setForm({
-            key: variable.key,
-            description: variable.description ?? "",
-            category: variable.category ?? "",
-          });
-          initializedForVariableIdRef.current = variableId;
-        }
-      } else {
-        setForm(INITIAL_FORM);
-        initializedForVariableIdRef.current = null;
-      }
-      setErrors({});
-    }
-  }, [open, isLoadingVariables, variableId, variables]);
-
-  const handleChange = (field: keyof VariableFormState, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-    setErrors({});
-  };
-
-  const handleSave = async () => {
-    const validationErrors = validateVariable(form);
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
-      return;
-    }
-
-    try {
-      if (variableId) {
-        await updateVariable(variableId, {
-          description: form.description.trim() || undefined,
-          category: form.category.trim() || undefined,
-        });
-      } else {
-        await createVariable({
-          key: form.key.trim(),
-          description: form.description.trim() || undefined,
-          category: form.category.trim() || undefined,
-        });
-      }
-
-      resetForm();
-      onOpenChange(false);
-    } catch {
-      // Error handled by hook toast
+  const handleSave = async (
+    id: string | undefined,
+    form: VariableFormState
+  ) => {
+    if (id) {
+      await updateVariable(id, {
+        description: form.description.trim() || undefined,
+        category: form.category.trim() || undefined,
+      });
+    } else {
+      await createVariable({
+        key: form.key.trim(),
+        description: form.description.trim() || undefined,
+        category: form.category.trim() || undefined,
+      });
     }
   };
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(newOpen) => {
-        if (!newOpen) resetForm();
-        onOpenChange(newOpen);
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl w-full">
         <DialogHeader>
           <DialogTitle>
@@ -175,87 +247,20 @@ export function VariableEditDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 mt-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="variable-key" className="text-xs">
-                Variable Key *
-              </Label>
-              <Input
-                id="variable-key"
-                type="text"
-                placeholder="met_alex"
-                value={form.key}
-                onChange={(event) => handleChange("key", event.target.value)}
-                disabled={isSaving || isEditMode}
-              />
-              <p className="text-xs text-muted-foreground">
-                {isEditMode
-                  ? "Key cannot be changed after creation"
-                  : "Unique identifier (letters, numbers, underscores)"}
-              </p>
-              {errors.key && (
-                <p className="text-xs text-destructive">{errors.key}</p>
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="variable-category" className="text-xs">
-                Category
-              </Label>
-              <Input
-                id="variable-category"
-                type="text"
-                placeholder="Relationships"
-                value={form.category}
-                onChange={(event) =>
-                  handleChange("category", event.target.value)
-                }
-                disabled={isSaving}
-              />
-              {errors.category && (
-                <p className="text-xs text-destructive">{errors.category}</p>
-              )}
-            </div>
+        {isEditMode && isLoadingVariables ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="size-6 animate-spin" />
           </div>
-
-          <div className="space-y-1">
-            <Label htmlFor="variable-description" className="text-xs">
-              Description
-            </Label>
-            <Input
-              id="variable-description"
-              type="text"
-              placeholder="Player has met Alex"
-              value={form.description}
-              onChange={(event) =>
-                handleChange("description", event.target.value)
-              }
-              disabled={isSaving}
-            />
-            {errors.description && (
-              <p className="text-xs text-destructive">{errors.description}</p>
-            )}
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                resetForm();
-                onOpenChange(false);
-              }}
-              disabled={isSaving}
-            >
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleSave} disabled={isSaving}>
-              {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
-              Save
-            </Button>
-          </div>
-        </div>
+        ) : (
+          <VariableFormContent
+            key={variableId ?? "new"}
+            variableId={variableId}
+            variables={variables}
+            isSaving={isSaving}
+            onSave={handleSave}
+            onClose={() => onOpenChange(false)}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

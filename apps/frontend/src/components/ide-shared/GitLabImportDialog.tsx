@@ -5,7 +5,7 @@
  * Checks integration status, allows repository selection, and creates projects.
  */
 
-import { useState, useEffect, useRef, useCallback, useReducer } from "react";
+import { useEffect, useRef, useCallback, useReducer } from "react";
 import {
   Loader2,
   GitFork,
@@ -67,6 +67,7 @@ interface DialogState {
   searchQuery: string;
   importState: ImportState;
   repositories: GitLabRepository[];
+  isLoadingRepos: boolean;
   showCharacterWizard: boolean;
   detectedCharacters: DetectCharactersResponse | null;
   importedProject: { id: string } | null;
@@ -80,6 +81,7 @@ type DialogAction =
   | { type: "SET_SEARCH_QUERY"; payload: string }
   | { type: "SET_IMPORT_STATE"; payload: ImportState }
   | { type: "SET_REPOSITORIES"; payload: GitLabRepository[] }
+  | { type: "SET_IS_LOADING_REPOS"; payload: boolean }
   | { type: "SET_SHOW_CHARACTER_WIZARD"; payload: boolean }
   | {
       type: "SET_DETECTED_CHARACTERS";
@@ -96,6 +98,7 @@ const initialDialogState: DialogState = {
   searchQuery: "",
   importState: { status: "idle", message: "" },
   repositories: [],
+  isLoadingRepos: false,
   showCharacterWizard: false,
   detectedCharacters: null,
   importedProject: null,
@@ -117,6 +120,8 @@ function dialogReducer(state: DialogState, action: DialogAction): DialogState {
       return { ...state, importState: action.payload };
     case "SET_REPOSITORIES":
       return { ...state, repositories: action.payload };
+    case "SET_IS_LOADING_REPOS":
+      return { ...state, isLoadingRepos: action.payload };
     case "SET_SHOW_CHARACTER_WIZARD":
       return { ...state, showCharacterWizard: action.payload };
     case "SET_DETECTED_CHARACTERS":
@@ -141,9 +146,6 @@ export function GitLabImportDialog({
 }: GitLabImportDialogProps) {
   // Combined dialog state managed by reducer
   const [state, dispatch] = useReducer(dialogReducer, initialDialogState);
-
-  // Separate loading state (different lifecycle)
-  const [isLoadingRepos, setIsLoadingRepos] = useState(false);
 
   // Guard to prevent calling onSuccess/onOpenChange(false) twice
   const didCallOnSuccessRef = useRef(false);
@@ -196,7 +198,7 @@ export function GitLabImportDialog({
         // Load repositories (only once per dialog session)
         if (!hasLoadedReposRef.current) {
           const requestId = ++loadReposRequestIdRef.current;
-          setIsLoadingRepos(true);
+          dispatch({ type: "SET_IS_LOADING_REPOS", payload: true });
           listRepositories()
             .then((repos) => {
               // Only update if this is still the current request and dialog is open
@@ -221,7 +223,7 @@ export function GitLabImportDialog({
             .finally(() => {
               // Only clear loading if this is still the current request
               if (requestId === loadReposRequestIdRef.current) {
-                setIsLoadingRepos(false);
+                dispatch({ type: "SET_IS_LOADING_REPOS", payload: false });
               }
             });
         }
@@ -496,7 +498,7 @@ export function GitLabImportDialog({
                 />
               </div>
 
-              {isLoadingRepos ? (
+              {state.isLoadingRepos ? (
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="size-5 animate-spin" />
                   <span className="ml-2 text-sm text-muted-foreground">

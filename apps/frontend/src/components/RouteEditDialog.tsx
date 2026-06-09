@@ -4,7 +4,7 @@
  * Modal for creating or editing a single route configuration.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -71,61 +71,33 @@ function validateRoute(form: RouteFormState): RouteFormErrors {
   return errors;
 }
 
-export function RouteEditDialog({
-  open,
-  onOpenChange,
-  projectId,
+function RouteFormContent({
   routeId,
-}: RouteEditDialogProps) {
-  const {
-    routeConfigs,
-    isLoadingRouteConfigs,
-    createRouteConfig,
-    updateRouteConfig,
-    isCreatingRouteConfig,
-    isUpdatingRouteConfig,
-  } = useRouteConfigs(projectId);
-
-  const [form, setForm] = useState<RouteFormState>(INITIAL_FORM);
+  routeConfigs,
+  isSaving,
+  onSave,
+  onClose,
+}: {
+  routeId: string | undefined;
+  routeConfigs: RouteConfig[];
+  isSaving: boolean;
+  onSave: (routeId: string | undefined, form: RouteFormState) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState<RouteFormState>(() => {
+    if (!routeId) return INITIAL_FORM;
+    const route = routeConfigs.find((item: RouteConfig) => item.id === routeId);
+    if (!route) return INITIAL_FORM;
+    return {
+      routeKey: route.routeKey,
+      routeName: route.routeName,
+      jumpPrefix: route.jumpPrefix,
+      isShared: route.isShared,
+    };
+  });
   const [errors, setErrors] = useState<RouteFormErrors>({});
-  const initializedForRouteIdRef = useRef<string | null>(null);
 
-  const isSaving = isCreatingRouteConfig || isUpdatingRouteConfig;
   const isEditMode = !!routeId;
-
-  const resetForm = () => {
-    setForm(INITIAL_FORM);
-    setErrors({});
-    initializedForRouteIdRef.current = null;
-  };
-
-  // Initialize form via useEffect when dialog opens with route data
-  useEffect(() => {
-    if (
-      open &&
-      !isLoadingRouteConfigs &&
-      routeId !== initializedForRouteIdRef.current
-    ) {
-      if (routeId) {
-        const route = routeConfigs.find(
-          (item: RouteConfig) => item.id === routeId
-        );
-        if (route) {
-          setForm({
-            routeKey: route.routeKey,
-            routeName: route.routeName,
-            jumpPrefix: route.jumpPrefix,
-            isShared: route.isShared,
-          });
-          initializedForRouteIdRef.current = routeId;
-        }
-      } else {
-        setForm(INITIAL_FORM);
-        initializedForRouteIdRef.current = null;
-      }
-      setErrors({});
-    }
-  }, [open, isLoadingRouteConfigs, routeId, routeConfigs]);
 
   const handleChange = (
     field: keyof RouteFormState,
@@ -143,152 +115,188 @@ export function RouteEditDialog({
     }
 
     try {
-      if (routeId) {
-        await updateRouteConfig(routeId, {
-          routeName: form.routeName.trim(),
-          jumpPrefix: form.jumpPrefix.trim(),
-          isShared: form.isShared,
-        });
-      } else {
-        await createRouteConfig({
-          routeKey: form.routeKey.trim(),
-          routeName: form.routeName.trim(),
-          jumpPrefix: form.jumpPrefix.trim(),
-          isShared: form.isShared,
-        });
-      }
-
-      resetForm();
-      onOpenChange(false);
+      await onSave(routeId, form);
+      onClose();
     } catch {
       // Error handled by hook toast
     }
   };
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(newOpen) => {
-        if (!newOpen) resetForm();
-        onOpenChange(newOpen);
-      }}
-    >
-      <DialogContent className="max-w-xl w-full">
-        <DialogHeader>
-          <DialogTitle>{isEditMode ? "Edit Route" : "Add Route"}</DialogTitle>
-          <DialogDescription>
-            {isEditMode
-              ? "Update the route settings."
-              : "Create a new route for your project."}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <DialogHeader>
+        <DialogTitle>{isEditMode ? "Edit Route" : "Add Route"}</DialogTitle>
+        <DialogDescription>
+          {isEditMode
+            ? "Update the route settings."
+            : "Create a new route for your project."}
+        </DialogDescription>
+      </DialogHeader>
 
-        <div className="space-y-4 mt-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="route-key" className="text-xs">
-                Route Key *
-              </Label>
-              <Input
-                id="route-key"
-                type="text"
-                placeholder="hero"
-                value={form.routeKey}
-                onChange={(event) =>
-                  handleChange("routeKey", event.target.value)
-                }
-                disabled={isSaving || isEditMode}
-              />
-              <p className="text-xs text-muted-foreground">
-                {isEditMode
-                  ? "Route key cannot be changed after creation"
-                  : "Unique identifier (letters, numbers, underscores, hyphens)"}
-              </p>
-              {errors.routeKey && (
-                <p className="text-xs text-destructive">{errors.routeKey}</p>
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="route-name" className="text-xs">
-                Route Name *
-              </Label>
-              <Input
-                id="route-name"
-                type="text"
-                placeholder="Hero's Route"
-                value={form.routeName}
-                onChange={(event) =>
-                  handleChange("routeName", event.target.value)
-                }
-                disabled={isSaving}
-              />
-              {errors.routeName && (
-                <p className="text-xs text-destructive">{errors.routeName}</p>
-              )}
-            </div>
+      <div className="space-y-4 mt-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label htmlFor="route-key" className="text-xs">
+              Route Key *
+            </Label>
+            <Input
+              id="route-key"
+              type="text"
+              placeholder="hero"
+              value={form.routeKey}
+              onChange={(event) => handleChange("routeKey", event.target.value)}
+              disabled={isSaving || isEditMode}
+            />
+            <p className="text-xs text-muted-foreground">
+              {isEditMode
+                ? "Route key cannot be changed after creation"
+                : "Unique identifier (letters, numbers, underscores, hyphens)"}
+            </p>
+            {errors.routeKey && (
+              <p className="text-xs text-destructive">{errors.routeKey}</p>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="jump-prefix" className="text-xs">
-                Jump Prefix *
-              </Label>
-              <Input
-                id="jump-prefix"
-                type="text"
-                placeholder="hero_"
-                value={form.jumpPrefix}
-                onChange={(event) =>
-                  handleChange("jumpPrefix", event.target.value)
-                }
-                disabled={isSaving}
-              />
-              {errors.jumpPrefix && (
-                <p className="text-xs text-destructive">{errors.jumpPrefix}</p>
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="route-type" className="text-xs">
-                Route Type
-              </Label>
-              <select
-                id="route-type"
-                value={form.isShared ? "shared" : "exclusive"}
-                onChange={(event) =>
-                  handleChange("isShared", event.target.value === "shared")
-                }
-                disabled={isSaving}
-                className="w-full px-3 py-2 rounded-md border border-border/30 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-              >
-                <option value="exclusive">Exclusive Route</option>
-                <option value="shared">Shared/Common Route</option>
-              </select>
-              <p className="text-xs text-muted-foreground">
-                Shared routes appear in all story branches
-              </p>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                resetForm();
-                onOpenChange(false);
-              }}
+          <div className="space-y-1">
+            <Label htmlFor="route-name" className="text-xs">
+              Route Name *
+            </Label>
+            <Input
+              id="route-name"
+              type="text"
+              placeholder="Hero's Route"
+              value={form.routeName}
+              onChange={(event) =>
+                handleChange("routeName", event.target.value)
+              }
               disabled={isSaving}
-            >
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleSave} disabled={isSaving}>
-              {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
-              Save
-            </Button>
+            />
+            {errors.routeName && (
+              <p className="text-xs text-destructive">{errors.routeName}</p>
+            )}
           </div>
         </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label htmlFor="jump-prefix" className="text-xs">
+              Jump Prefix *
+            </Label>
+            <Input
+              id="jump-prefix"
+              type="text"
+              placeholder="hero_"
+              value={form.jumpPrefix}
+              onChange={(event) =>
+                handleChange("jumpPrefix", event.target.value)
+              }
+              disabled={isSaving}
+            />
+            {errors.jumpPrefix && (
+              <p className="text-xs text-destructive">{errors.jumpPrefix}</p>
+            )}
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="route-type" className="text-xs">
+              Route Type
+            </Label>
+            <select
+              id="route-type"
+              value={form.isShared ? "shared" : "exclusive"}
+              onChange={(event) =>
+                handleChange("isShared", event.target.value === "shared")
+              }
+              disabled={isSaving}
+              className="w-full px-3 py-2 rounded-md border border-border/30 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+            >
+              <option value="exclusive">Exclusive Route</option>
+              <option value="shared">Shared/Common Route</option>
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Shared routes appear in all story branches
+            </p>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={isSaving}
+          >
+            Cancel
+          </Button>
+          <Button type="button" onClick={handleSave} disabled={isSaving}>
+            {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
+            Save
+          </Button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+export function RouteEditDialog({
+  open,
+  onOpenChange,
+  projectId,
+  routeId,
+}: RouteEditDialogProps) {
+  const {
+    routeConfigs,
+    isLoadingRouteConfigs,
+    createRouteConfig,
+    updateRouteConfig,
+    isCreatingRouteConfig,
+    isUpdatingRouteConfig,
+  } = useRouteConfigs(projectId);
+
+  const isSaving = isCreatingRouteConfig || isUpdatingRouteConfig;
+
+  if (isLoadingRouteConfigs) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-xl w-full">
+          <DialogHeader>
+            <DialogTitle>{routeId ? "Edit Route" : "Add Route"}</DialogTitle>
+            <DialogDescription>Loading...</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="size-6 animate-spin" />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl w-full">
+        <RouteFormContent
+          key={routeId ?? "new"}
+          routeId={routeId}
+          routeConfigs={routeConfigs}
+          isSaving={isSaving}
+          onSave={async (id, formData) => {
+            if (id) {
+              await updateRouteConfig(id, {
+                routeName: formData.routeName.trim(),
+                jumpPrefix: formData.jumpPrefix.trim(),
+                isShared: formData.isShared,
+              });
+            } else {
+              await createRouteConfig({
+                routeKey: formData.routeKey.trim(),
+                routeName: formData.routeName.trim(),
+                jumpPrefix: formData.jumpPrefix.trim(),
+                isShared: formData.isShared,
+              });
+            }
+          }}
+          onClose={() => onOpenChange(false)}
+        />
       </DialogContent>
     </Dialog>
   );
