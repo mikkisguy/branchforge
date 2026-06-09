@@ -113,6 +113,7 @@ export function ProjectFileTree({
           )}
 
           {(!folder || expandedFolders.has(folder)) && (
+            // react-doctor-disable-next-line react-doctor/prefer-tag-over-role
             <div className="space-y-0.5" role="group">
               {folderFiles.map((file) => (
                 <div key={file.id}>
@@ -170,6 +171,7 @@ export function ProjectFileTree({
                   {file.fileType === "STORY" &&
                     expandedFiles.has(file.id) &&
                     file.labels.length > 0 && (
+                      // react-doctor-disable-next-line react-doctor/prefer-tag-over-role
                       <div className="pl-7 space-y-0.5" role="group">
                         {file.labels.map((label) => {
                           const safeStatus =

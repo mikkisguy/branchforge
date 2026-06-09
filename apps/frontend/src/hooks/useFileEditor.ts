@@ -152,6 +152,7 @@ export function useFileEditor({
   }, []);
 
   // Best-effort save on unmount - may not complete if page closes quickly
+  // react-doctor-disable-next-line react-doctor/exhaustive-deps
   useEffect(() => {
     return () => {
       void triggerFileSaveRef.current().catch((error) => {

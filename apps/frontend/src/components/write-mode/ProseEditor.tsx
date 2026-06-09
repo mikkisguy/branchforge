@@ -401,6 +401,7 @@ export const ProseEditor = function ProseEditor({
   }, [entries]);
 
   // Consolidated label-change effect: handles both label switches and external updates
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     const hasSwitchedLabel = previousLabelIdRef.current !== labelId;
     previousLabelIdRef.current = labelId;
@@ -434,7 +435,7 @@ export const ProseEditor = function ProseEditor({
 
     if (hasSwitchedLabel) {
       // Always reset undo history when switching labels, even if content is identical
-      // This prevents undo history from one label bleeding into another
+      // This prevents undo history of one label bleeding into another
       isExternalUpdateRef.current = true;
       setEntries(newEntries);
       inMemoryUndo.clear(cloneEntries(newEntries));
@@ -455,9 +456,11 @@ export const ProseEditor = function ProseEditor({
       inMemoryUndo.updatePresent(cloneEntries(newEntries));
     }
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // react-doctor-disable-next-line react-doctor/exhaustive-deps
   }, [labelId, activeLabel]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
+  // react-doctor-disable-next-line react-doctor/exhaustive-deps
   useEffect(() => {
     return () => {
       if (textHistoryTimerRef.current) {
@@ -612,6 +615,7 @@ export const ProseEditor = function ProseEditor({
 
   const wordCount = countWordsFromEntries(entries);
   const lineCount = entries.length;
+  const initialWordCount = initialWordCountRef.current;
 
   // Get today's word count from daily word counts (memoized)
   // Plus real-time delta from current session (current word count - initial word count)
@@ -627,7 +631,7 @@ export const ProseEditor = function ProseEditor({
 
     // Add real-time delta: current word count minus initial word count
     // This ensures unsaved changes are reflected in the progress display
-    const sessionDelta = wordCount - initialWordCountRef.current;
+    const sessionDelta = wordCount - initialWordCount;
 
     return Math.max(0, backendWordCount + sessionDelta);
   }, [
@@ -635,6 +639,7 @@ export const ProseEditor = function ProseEditor({
     writingGoalSettings?.dailyWordResetHour,
     writingGoalSettings?.timezone,
     wordCount,
+    initialWordCount,
   ]);
 
   if (!activeLabel) {

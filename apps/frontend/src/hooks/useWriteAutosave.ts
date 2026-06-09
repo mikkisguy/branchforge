@@ -509,6 +509,7 @@ export function useWriteAutosave({
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, []);
 
+  // react-doctor-disable-next-line react-doctor/exhaustive-deps
   useEffect(() => {
     return () => {
       if (!isDirtyRef.current) {

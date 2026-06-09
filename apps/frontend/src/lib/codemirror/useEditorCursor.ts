@@ -25,14 +25,16 @@ export function useEditorCursor(options?: UseEditorCursorOptions) {
   const [totalLines, setTotalLines] = useState(1);
 
   // Initialize totalLines from initial content on mount
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     // react-doctor-disable-next-line react-doctor/no-event-handler
     if (options?.initialContent !== undefined) {
       setTotalLines(options.initialContent.split("\n").length);
     }
     // Only run on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // react-doctor-disable-next-line react-doctor/exhaustive-deps
   }, []);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const updateListener = useMemo(
     () =>

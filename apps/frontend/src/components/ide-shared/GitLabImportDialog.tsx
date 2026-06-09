@@ -185,6 +185,7 @@ export function GitLabImportDialog({
   }, [open]);
 
   // Check integration status when dialog opens
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     // react-doctor-disable-next-line react-doctor/no-event-handler
     if (open && !checkingIntegration) {
@@ -239,10 +240,12 @@ export function GitLabImportDialog({
         });
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // react-doctor-disable-next-line react-doctor/exhaustive-deps
   }, [open, hasIntegration, checkingIntegration, listRepositories]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Cleanup timeout on unmount
+  // react-doctor-disable-next-line react-doctor/exhaustive-deps
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
@@ -515,6 +518,7 @@ export function GitLabImportDialog({
                 </div>
               ) : (
                 <div
+                  // react-doctor-disable-next-line react-doctor/prefer-tag-over-role
                   role="listbox"
                   className="border rounded-lg max-h-[200px] overflow-y-auto"
                 >

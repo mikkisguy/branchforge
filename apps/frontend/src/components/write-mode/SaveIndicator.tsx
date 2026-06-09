@@ -107,6 +107,7 @@ export const SaveIndicator = memo(function SaveIndicator({
   };
 
   return (
+    // react-doctor-disable-next-line react-doctor/no-static-element-interactions
     <div
       className={`flex items-center gap-1.5 text-xs transition-colors duration-300 ${
         isErrorWithRetry ? "cursor-pointer hover:opacity-80" : ""

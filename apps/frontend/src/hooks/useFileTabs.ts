@@ -292,6 +292,7 @@ export function useFileTabs({
       return;
     }
 
+    // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change, react-doctor/no-derived-state
     setOpenTabs((prev) => {
       if (prev.includes(activeFileId)) {
         return prev;

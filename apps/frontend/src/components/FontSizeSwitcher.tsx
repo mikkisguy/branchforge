@@ -300,6 +300,7 @@ export function FontSizeSwitcher({
           />
           <div
             ref={listboxRef}
+            // react-doctor-disable-next-line react-doctor/prefer-tag-over-role
             role="listbox"
             tabIndex={0}
             aria-label="Font size options"

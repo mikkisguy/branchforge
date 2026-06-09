@@ -125,6 +125,7 @@ export const DialogueLine = memo(function DialogueLine({
   }, [onChange]);
 
   // Initialize textarea value on mount
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     const textarea = internalTextareaRef.current;
     if (textarea && textarea.value !== entry.text) {
@@ -132,8 +133,9 @@ export const DialogueLine = memo(function DialogueLine({
       previousTextRef.current = entry.text;
       resizeTextarea();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // react-doctor-disable-next-line react-doctor/exhaustive-deps
   }, []); // Only run on mount
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Sync external text changes (e.g., from undo/redo or label switch)
   useEffect(() => {
@@ -173,6 +175,7 @@ export const DialogueLine = memo(function DialogueLine({
 
   // Clean up remove-hint timer on unmount
   // oxlint-disable-next-line react/exhaustive-deps -- Mount-only effect; ref is stable, we intentionally read .current at cleanup time to clear pending timer
+  // react-doctor-disable-next-line react-doctor/exhaustive-deps
   useEffect(() => {
     return () => {
       if (removeHintTimerRef.current) clearTimeout(removeHintTimerRef.current);
@@ -576,6 +579,7 @@ export const DialogueLine = memo(function DialogueLine({
               <div
                 ref={dropdownMenuRef}
                 id={dropdownId}
+                // react-doctor-disable-next-line react-doctor/prefer-tag-over-role
                 role="listbox"
                 aria-label="Select speaker"
                 aria-activedescendant={

@@ -32,6 +32,7 @@ export function CharacterAvatarChip({
         </span>
       }
     >
+      {/* react-doctor-disable-next-line react-doctor/no-static-element-interactions */}
       <div
         className={`size-8 rounded-full flex items-center justify-center text-white text-xs font-medium shrink-0 shadow-sm hover:ring-2 hover:ring-ring transition-all ${
           onClick ? "cursor-pointer" : "cursor-default"

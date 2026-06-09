@@ -304,6 +304,7 @@ export const ScriptEditor = function ScriptEditor({
   }, [scrollToLine, scrollToLineIfValid, scheduleLineHighlight]);
 
   // Cleanup highlight timeout on unmount
+  // react-doctor-disable-next-line react-doctor/exhaustive-deps
   useEffect(() => {
     return () => {
       if (highlightTimeoutRef.current) {

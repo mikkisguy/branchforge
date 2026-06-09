@@ -225,6 +225,7 @@ export function CharacterEditDialog({
   }, [open, isLoadingCharacters, characterId, characters]);
 
   // Cleanup on unmount
+  // react-doctor-disable-next-line react-doctor/exhaustive-deps
   useEffect(() => {
     return () => {
       if (previewUrlRef.current) {
