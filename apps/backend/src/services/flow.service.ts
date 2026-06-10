@@ -6,15 +6,10 @@
  */
 
 import { getDb } from "../db/index.js";
-import {
-  labels,
-  labelLines,
-  projects,
-  projectUsers,
-  projectFiles,
-} from "../db/schema/index.js";
-import { eq, and, asc, isNull, or, inArray } from "drizzle-orm";
+import { labels, labelLines, projectFiles } from "../db/schema/index.js";
+import { eq, and, asc, isNull, inArray } from "drizzle-orm";
 import type { FlowGraph, FlowNode, FlowEdge } from "@branchforge/shared";
+import { requireProjectAccess } from "./authz.service.js";
 
 /**
  * Regex for identifying UUIDs vs label names
@@ -45,22 +40,8 @@ export async function getFlowGraph(
 ): Promise<FlowGraph> {
   const db = getDb();
 
-  // Verify user has access to the project
-  const accessCheck = await db
-    .select({ projectId: projects.id })
-    .from(projects)
-    .leftJoin(projectUsers, eq(projectUsers.projectId, projects.id))
-    .where(
-      and(
-        eq(projects.id, projectId),
-        or(eq(projects.userId, userId), eq(projectUsers.userId, userId))
-      )
-    )
-    .limit(1);
-
-  if (accessCheck.length === 0) {
-    return { nodes: [], edges: [] };
-  }
+  // Verify the user has access
+  await requireProjectAccess(projectId, userId);
 
   // Fetch all labels for the project with file info
   const labelRows = await db
@@ -219,8 +200,17 @@ export async function getFlowGraph(
   }
 
   for (const [, fileLabels] of labelsByFile) {
-    // Sort by labelPosition
-    fileLabels.sort((a, b) => (a.labelPosition ?? 0) - (b.labelPosition ?? 0));
+    const sortKey = (r: (typeof fileLabels)[number]) =>
+      r.labelPosition ?? Number.MAX_SAFE_INTEGER;
+    fileLabels.sort((a, b) => {
+      const ka = sortKey(a);
+      const kb = sortKey(b);
+      if (ka !== kb) return ka - kb;
+      if (a.sequenceOrder !== b.sequenceOrder) {
+        return a.sequenceOrder - b.sequenceOrder;
+      }
+      return a.labelNumber - b.labelNumber;
+    });
 
     for (let i = 0; i < fileLabels.length - 1; i++) {
       const sourceId = fileLabels[i].id;

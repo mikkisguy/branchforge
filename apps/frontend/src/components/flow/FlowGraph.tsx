@@ -2,7 +2,7 @@
  * FlowGraph - ReactFlow-based flow graph visualization for label routes
  */
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   ReactFlow,
   Background,
@@ -12,12 +12,13 @@ import {
   useEdgesState,
   type Node,
   type Edge,
+  type NodeMouseHandler,
   MarkerType,
   BackgroundVariant,
 } from "@xyflow/react";
 import dagre from "dagre";
 import "@xyflow/react/dist/style.css";
-import { LabelNodeMemo } from "./LabelNode";
+import { LabelNodeMemo, type LabelNodeData } from "./LabelNode";
 import { useFlowGraph } from "@/hooks/useFlowGraph";
 import type { FlowNode, FlowEdge } from "@branchforge/shared";
 
@@ -83,7 +84,7 @@ function layoutNodes(
     marginy: 40,
   });
 
-  const nodeWidth = 280;
+  const nodeWidth = 240;
   const nodeHeight = 120;
 
   // Add nodes to dagre graph
@@ -195,15 +196,40 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
 
   const layoutEdgesResult = useMemo(() => buildEdges(flowEdges), [flowEdges]);
 
-  const [nodes, _setNodes, onNodesChange] =
-    useNodesState<Node>(layoutNodesResult);
-  const [edges, _setEdges, onEdgesChange] =
-    useEdgesState<Edge>(layoutEdgesResult);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+
+  const lastSyncedNodesKey = useRef<string>("");
+  const lastSyncedEdgesKey = useRef<string>("");
+
+  useEffect(() => {
+    const key = layoutNodesResult.map((n) => n.id).join("|");
+    if (key === lastSyncedNodesKey.current) return;
+    lastSyncedNodesKey.current = key;
+
+    setNodes((prev) => {
+      const prevById = new Map(prev.map((n) => [n.id, n]));
+      return layoutNodesResult.map((next) => {
+        const existing = prevById.get(next.id);
+        if (existing) {
+          return { ...existing, data: next.data, style: next.style };
+        }
+        return next;
+      });
+    });
+  }, [layoutNodesResult, setNodes]);
+
+  useEffect(() => {
+    const key = layoutEdgesResult.map((e) => e.id).join("|");
+    if (key === lastSyncedEdgesKey.current) return;
+    lastSyncedEdgesKey.current = key;
+    setEdges(layoutEdgesResult);
+  }, [layoutEdgesResult, setEdges]);
 
   const handleNodeClick = useCallback(
-    (_: React.MouseEvent, node: Node) => {
+    (_: React.MouseEvent, node: Node<LabelNodeData>) => {
       if (onNodeClick && node.data?.labelId) {
-        onNodeClick(node.data.labelId as string);
+        onNodeClick(node.data.labelId);
       }
     },
     [onNodeClick]
@@ -245,7 +271,7 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onNodeClick={handleNodeClick}
+        onNodeClick={handleNodeClick as NodeMouseHandler}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.2 }}

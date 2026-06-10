@@ -9,30 +9,11 @@ import type { FastifyRequest, FastifyReply } from "fastify";
 import { getFlowGraph } from "../services/flow.service.js";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { validateQuery } from "../middleware/validation.middleware.js";
-import { z } from "zod";
-import type { FlowNode, FlowEdge } from "@branchforge/shared";
-
-// ============================================================================
-// Validation Schemas
-// ============================================================================
-
-const flowGraphQuerySchema = z.object({
-  projectId: z.string().uuid(),
-});
-type FlowGraphQuery = z.infer<typeof flowGraphQuerySchema>;
-
-// ============================================================================
-// Response Types
-// ============================================================================
-
-interface FlowGraphResponse {
-  nodes: FlowNode[];
-  edges: FlowEdge[];
-}
-
-interface ErrorResponse {
-  error: string;
-}
+import type { FlowGraph } from "@branchforge/shared";
+import {
+  flowGraphQuerySchema,
+  type FlowGraphQuery,
+} from "../lib/validation.js";
 
 // ============================================================================
 // Route Handlers
@@ -51,15 +32,8 @@ async function flowGraphHandler(
   const user = request.user!;
   const { projectId } = request.query;
 
-  try {
-    const flowGraph = await getFlowGraph(projectId, user.id);
-    reply.status(200).send(flowGraph satisfies FlowGraphResponse);
-  } catch (error) {
-    request.log.error(error);
-    reply
-      .status(500)
-      .send({ error: "Internal server error" } satisfies ErrorResponse);
-  }
+  const flowGraph = await getFlowGraph(projectId, user.id);
+  reply.status(200).send(flowGraph satisfies FlowGraph);
 }
 
 // ============================================================================
