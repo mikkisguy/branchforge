@@ -59,6 +59,7 @@ type LineLayoutMode = "inline" | "stacked";
 const LINE_LAYOUT_STORAGE_KEY = "write:line-layout";
 const NEW_LINE_BOTTOM_SAFE_OFFSET = 96;
 const TEXT_HISTORY_DEBOUNCE_MS = 450;
+const EMPTY_ARRAY: { date: string; count: number }[] = [];
 
 interface TimezoneDateParts {
   year: number;
@@ -112,7 +113,18 @@ function formatDateKey(year: number, month: number, day: number): string {
   )}`;
 }
 
-const dateTimeFormatCache = new Map<string, Intl.DateTimeFormat>();
+const utcDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "UTC",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  hourCycle: "h23",
+});
+
+const dateTimeFormatCache = new Map<string, Intl.DateTimeFormat>([
+  ["UTC", utcDateFormatter],
+]);
 
 function getDatePartsInTimezone(
   date: Date,
@@ -265,7 +277,10 @@ export const ProseEditor = function ProseEditor({
     50 // Max 50 in-memory undo steps
   );
 
-  const textareaRefs = useRef<Map<number, HTMLTextAreaElement>>(new Map());
+  const textareaRefs = useRef<Map<number, HTMLTextAreaElement> | null>(null);
+  if (textareaRefs.current === null) {
+    textareaRefs.current = new Map();
+  }
 
   useImperativeHandle(
     ref,
@@ -274,7 +289,7 @@ export const ProseEditor = function ProseEditor({
         const activeElement = document.activeElement;
 
         if (activeElement instanceof HTMLTextAreaElement) {
-          for (const textarea of textareaRefs.current.values()) {
+          for (const textarea of textareaRefs.current!.values()) {
             if (textarea === activeElement) {
               textarea.focus();
               return;
@@ -282,7 +297,7 @@ export const ProseEditor = function ProseEditor({
           }
         }
 
-        const textarea = textareaRefs.current.get(0);
+        const textarea = textareaRefs.current!.get(0);
         if (textarea) {
           textarea.focus();
         }
@@ -297,7 +312,7 @@ export const ProseEditor = function ProseEditor({
       return false;
     }
 
-    for (const textarea of textareaRefs.current.values()) {
+    for (const textarea of textareaRefs.current!.values()) {
       if (textarea === activeElement) {
         return true;
       }
@@ -357,6 +372,19 @@ export const ProseEditor = function ProseEditor({
     [flushPendingTextHistory]
   );
 
+  // Handler for creating the first entry in an empty label
+  const handleCreateFirstEntry = useCallback(() => {
+    const newEntries: DialogueEntry[] = [
+      {
+        id: crypto.randomUUID(),
+        speakerId: characters.length > 0 ? characters[0].id : null,
+        text: "",
+      },
+    ];
+    recordImmediateHistorySnapshot(newEntries);
+    setEntries(newEntries);
+  }, [characters, recordImmediateHistorySnapshot]);
+
   // Process pending immediate snapshots after entries have been updated
   useEffect(() => {
     if (pendingImmediateSnapshotRef.current) {
@@ -370,7 +398,7 @@ export const ProseEditor = function ProseEditor({
     if (pendingFocusRef.current) {
       const { index, scrollIntoView } = pendingFocusRef.current;
       requestAnimationFrame(() => {
-        const textarea = textareaRefs.current.get(index);
+        const textarea = textareaRefs.current!.get(index);
         if (textarea) {
           textarea.focus({ preventScroll: true });
 
@@ -401,6 +429,7 @@ export const ProseEditor = function ProseEditor({
   }, [entries]);
 
   // Consolidated label-change effect: handles both label switches and external updates
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     const hasSwitchedLabel = previousLabelIdRef.current !== labelId;
     previousLabelIdRef.current = labelId;
@@ -434,7 +463,7 @@ export const ProseEditor = function ProseEditor({
 
     if (hasSwitchedLabel) {
       // Always reset undo history when switching labels, even if content is identical
-      // This prevents undo history from one label bleeding into another
+      // This prevents undo history of one label bleeding into another
       isExternalUpdateRef.current = true;
       setEntries(newEntries);
       inMemoryUndo.clear(cloneEntries(newEntries));
@@ -455,9 +484,11 @@ export const ProseEditor = function ProseEditor({
       inMemoryUndo.updatePresent(cloneEntries(newEntries));
     }
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // react-doctor-disable-next-line react-doctor/exhaustive-deps
   }, [labelId, activeLabel]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
+  // react-doctor-disable-next-line react-doctor/exhaustive-deps
   useEffect(() => {
     return () => {
       if (textHistoryTimerRef.current) {
@@ -483,6 +514,7 @@ export const ProseEditor = function ProseEditor({
     }
 
     // Notify if entries actually changed
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     if (!areDialogueEntriesEqual(prevEntriesRef.current, entries)) {
       scheduleTextHistorySnapshot(entries);
       onChange(entries);
@@ -611,6 +643,7 @@ export const ProseEditor = function ProseEditor({
 
   const wordCount = countWordsFromEntries(entries);
   const lineCount = entries.length;
+  const initialWordCount = initialWordCountRef.current;
 
   // Get today's word count from daily word counts (memoized)
   // Plus real-time delta from current session (current word count - initial word count)
@@ -626,7 +659,7 @@ export const ProseEditor = function ProseEditor({
 
     // Add real-time delta: current word count minus initial word count
     // This ensures unsaved changes are reflected in the progress display
-    const sessionDelta = wordCount - initialWordCountRef.current;
+    const sessionDelta = wordCount - initialWordCount;
 
     return Math.max(0, backendWordCount + sessionDelta);
   }, [
@@ -634,6 +667,7 @@ export const ProseEditor = function ProseEditor({
     writingGoalSettings?.dailyWordResetHour,
     writingGoalSettings?.timezone,
     wordCount,
+    initialWordCount,
   ]);
 
   if (!activeLabel) {
@@ -660,17 +694,8 @@ export const ProseEditor = function ProseEditor({
           <p className="text-sm opacity-70">Start writing your story</p>
         </div>
         <button
-          onClick={() => {
-            const newEntries = [
-              {
-                id: crypto.randomUUID(),
-                speakerId: characters.length > 0 ? characters[0].id : null,
-                text: "",
-              },
-            ];
-            recordImmediateHistorySnapshot(newEntries);
-            setEntries(newEntries);
-          }}
+          type="button"
+          onClick={handleCreateFirstEntry}
           className="group px-6 py-3 rounded-lg bg-[var(--theme-color)] text-white hover:bg-[var(--theme-color-hover)] transition-all duration-200 hover:shadow-lg hover:shadow-[var(--theme-color)]/20 focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)] focus:ring-offset-2 focus:ring-offset-background"
         >
           <span className="flex items-center gap-2">
@@ -751,9 +776,9 @@ export const ProseEditor = function ProseEditor({
                 showBadges={showBadges}
                 textareaRef={(el: HTMLTextAreaElement | null) => {
                   if (el) {
-                    textareaRefs.current.set(index, el);
+                    textareaRefs.current!.set(index, el);
                   } else {
-                    textareaRefs.current.delete(index);
+                    textareaRefs.current!.delete(index);
                   }
                 }}
               />
@@ -796,6 +821,7 @@ export const ProseEditor = function ProseEditor({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
+              type="button"
               onClick={() =>
                 setLayoutMode((prev) =>
                   prev === "inline" ? "stacked" : "inline"
@@ -839,7 +865,7 @@ export const ProseEditor = function ProseEditor({
           open={statsDialogOpen}
           onOpenChange={setStatsDialogOpen}
           dailyGoal={writingGoalSettings?.dailyWritingGoal ?? 500}
-          dailyWordCounts={writingGoalSettings?.dailyWordCounts ?? []}
+          dailyWordCounts={writingGoalSettings?.dailyWordCounts ?? EMPTY_ARRAY}
         />
       </Suspense>
     </div>

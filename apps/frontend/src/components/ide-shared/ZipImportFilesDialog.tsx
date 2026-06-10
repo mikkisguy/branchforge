@@ -149,6 +149,7 @@ export function ZipImportFilesDialog({
   const importIdRef = useRef(0);
   // Reset state when dialog closes
   useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     if (!open) {
       importIdRef.current += 1;
       dispatch({ type: "RESET" });
@@ -252,13 +253,16 @@ export function ZipImportFilesDialog({
           console.error("Failed to refresh cache after import:", cacheError);
         }
 
-        if (currentImportId !== importIdRef.current) return;
-
         // Detect characters from imported RPY files
         try {
+          // Fast skip: don't detect characters if this import was superseded
+          if (currentImportId !== importIdRef.current) return;
+
+          // react-doctor-disable-next-line react-doctor/async-defer-await
           const detectionResult =
             await charactersApi.detectCharacters(projectId);
 
+          // Stale check: import could have been superseded during the API call
           if (currentImportId !== importIdRef.current) return;
 
           // Filter out characters that already exist in the database
@@ -377,6 +381,7 @@ export function ZipImportFilesDialog({
             </div>
           </div>
           <Button
+            type="button"
             variant="ghost"
             size="icon"
             onClick={handleClose}
@@ -413,6 +418,7 @@ export function ZipImportFilesDialog({
                       {formatFileSize(selectedFile.size)}
                     </p>
                     <Button
+                      type="button"
                       variant="outline"
                       size="sm"
                       onClick={(e) => {
@@ -446,6 +452,7 @@ export function ZipImportFilesDialog({
                       accept=".zip,application/zip,application/x-zip-compressed"
                       onChange={handleFileChange}
                       className="hidden"
+                      aria-label="Upload zip file"
                     />
                     <p className="text-xs text-muted-foreground">
                       Maximum file size: {ZIP_IMPORT_MAX_SIZE_MB}MB
@@ -542,23 +549,28 @@ export function ZipImportFilesDialog({
         <div className="p-6 border-t border-border/30 flex justify-end gap-2">
           {importState.status === "idle" && (
             <>
-              <Button variant="outline" onClick={handleClose}>
+              <Button type="button" variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button onClick={handleImport} disabled={!selectedFile}>
+              <Button
+                type="button"
+                onClick={handleImport}
+                disabled={!selectedFile}
+              >
                 Import
               </Button>
             </>
           )}
           {(importState.status === "uploading" ||
             importState.status === "processing") && (
-            <Button variant="outline" disabled>
+            <Button type="button" variant="outline" disabled>
               Importing…
             </Button>
           )}
           {importState.status === "error" && (
             <>
               <Button
+                type="button"
                 variant="outline"
                 onClick={() => {
                   dispatch({ type: "RESET_FILE_AND_IMPORT" });
@@ -569,13 +581,15 @@ export function ZipImportFilesDialog({
               >
                 Try Again
               </Button>
-              <Button variant="outline" onClick={handleClose}>
+              <Button type="button" variant="outline" onClick={handleClose}>
                 Close
               </Button>
             </>
           )}
           {importState.status === "success" && (
-            <Button onClick={handleClose}>Close</Button>
+            <Button type="button" onClick={handleClose}>
+              Close
+            </Button>
           )}
         </div>
       </DialogContent>

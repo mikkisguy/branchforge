@@ -14,8 +14,8 @@ import {
   useLocalStorage,
   useLocalStorageBoolean,
 } from "@/hooks/useLocalStorage";
-import type { Tab } from "@/components/ide-shared/SettingsModal";
-import { SETTINGS_TABS } from "@/components/ide-shared/SettingsModal";
+import type { Tab } from "@/components/ide-shared/settings-types";
+import { SETTINGS_TABS } from "@/components/ide-shared/settings-types";
 
 const ScriptMode = lazy(() =>
   import("./ScriptMode").then((m) => ({ default: m.ScriptMode }))
@@ -65,14 +65,12 @@ export function HomePageIDE() {
   useEffect(() => {
     const previousProjectId = previousProjectIdRef.current;
     const nextProjectId = currentProject?.id;
-
     if (
       previousProjectId !== undefined &&
       previousProjectId !== nextProjectId
     ) {
       setActiveLabelId(null);
     }
-
     previousProjectIdRef.current = nextProjectId;
   }, [currentProject?.id, setActiveLabelId]);
 
@@ -251,6 +249,7 @@ export function HomePageIDE() {
                 </span>
                 <p>Failed to load editor. Please refresh or retry.</p>
                 <button
+                  type="button"
                   onClick={handleScriptModeRetry}
                   className="px-4 py-2 mt-2 text-sm text-white bg-theme-primary rounded hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-theme-primary"
                 >

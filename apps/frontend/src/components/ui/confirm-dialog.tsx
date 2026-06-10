@@ -48,20 +48,13 @@ export function ConfirmDialog({
   onError,
   className,
 }: ConfirmDialogProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const isLoadingRef = useRef(isLoading);
 
   // Keep the ref in sync with isLoading
   useEffect(() => {
     isLoadingRef.current = isLoading;
   }, [isLoading]);
-
-  const handleBackdropClick = useCallback(() => {
-    if (!isLoading) {
-      onOpenChange(false);
-    }
-  }, [isLoading, onOpenChange]);
 
   const handleCancel = useCallback(() => {
     if (!isLoading) {
@@ -86,135 +79,92 @@ export function ConfirmDialog({
 
   const handleClose = useEffectEvent(() => onOpenChange(false));
 
-  // Focus trap and restore
-  useEffect(() => {
-    if (!open || !dialogRef.current) return;
-
-    const dialog = dialogRef.current;
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-    previouslyFocusedElementRef.current = previouslyFocused;
-
-    const getFocusableElements = (): HTMLElement[] => {
-      const focusableSelectors = [
-        "button:not([disabled])",
-        "[href]",
-        "input:not([disabled])",
-        "select:not([disabled])",
-        "textarea:not([disabled])",
-        '[tabindex]:not([tabindex="-1"])',
-      ];
-      return Array.from(
-        dialog.querySelectorAll<HTMLElement>(focusableSelectors.join(","))
-      );
-    };
-
-    const focusableElements = getFocusableElements();
-    if (focusableElements.length > 0) {
-      focusableElements[0].focus();
+  // Sync open prop with native dialog showModal/close API via ref callback
+  // (runs at commit time, same timing as event handlers)
+  const syncDialogRef = (el: HTMLDialogElement | null) => {
+    dialogRef.current = el;
+    if (!el) return;
+    if (open && !el.open) {
+      el.showModal?.();
+    } else if (!open && el.open) {
+      el.close?.();
     }
+  };
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (isLoadingRef.current) return;
+  // Listen for native close event (Escape, programmatic close)
+  // Also handle backdrop click via the native click event on the dialog element
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const onClose = () => handleClose();
+    const onClick = (e: MouseEvent) => {
+      // Backdrop click: target is the dialog element itself (not its children)
+      if (e.target === dialog && !isLoadingRef.current) {
         handleClose();
-        return;
       }
-
-      if (e.key === "Tab") {
-        const currentFocusable = getFocusableElements();
-        if (currentFocusable.length === 0) return;
-
-        const firstElement = currentFocusable[0];
-        const lastElement = currentFocusable[currentFocusable.length - 1];
-
-        if (e.shiftKey) {
-          if (document.activeElement === firstElement) {
-            e.preventDefault();
-            lastElement.focus();
-          }
-        } else {
-          if (document.activeElement === lastElement) {
-            e.preventDefault();
-            firstElement.focus();
-          }
-        }
+    };
+    const onCancel = (e: Event) => {
+      if (isLoadingRef.current) {
+        e.preventDefault();
       }
     };
 
-    document.addEventListener("keydown", handleKeyDown);
-
+    dialog.addEventListener("close", onClose);
+    dialog.addEventListener("click", onClick);
+    dialog.addEventListener("cancel", onCancel);
     return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      if (previouslyFocusedElementRef.current) {
-        previouslyFocusedElementRef.current.focus();
-      }
+      dialog.removeEventListener("close", onClose);
+      dialog.removeEventListener("click", onClick);
+      dialog.removeEventListener("cancel", onCancel);
     };
-  }, [open]);
-
-  if (!open) return null;
+  }, [dialogRef, isLoadingRef]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
+    <dialog
+      ref={syncDialogRef}
+      className="backdrop:bg-black/50 m-auto border-0 p-0 bg-transparent text-[hsl(var(--foreground))]"
+    >
       <div
-        className="fixed inset-0 bg-black/50"
-        aria-hidden="true"
-        onClick={handleBackdropClick}
-      />
-      {/* Content */}
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirm-dialog-title"
-        aria-describedby="confirm-dialog-description"
-        className="relative"
+        className={cn(
+          "bg-background rounded-lg shadow-lg max-w-md w-full",
+          className
+        )}
       >
-        <div
-          className={cn(
-            "bg-background rounded-lg shadow-lg max-w-md w-full",
-            className
-          )}
-        >
-          {/* Header */}
-          <div className="p-6 border-b border-border/30">
-            <h2 id="confirm-dialog-title" className="text-lg font-medium">
-              {title}
-            </h2>
-            <p
-              id="confirm-dialog-description"
-              className="text-sm text-muted-foreground mt-2"
-            >
-              {description}
-            </p>
-          </div>
+        {/* Header */}
+        <div className="p-6 border-b border-border/30">
+          <h2 id="confirm-dialog-title" className="text-lg font-medium">
+            {title}
+          </h2>
+          <p
+            id="confirm-dialog-description"
+            className="text-sm text-muted-foreground mt-2"
+          >
+            {description}
+          </p>
+        </div>
 
-          {/* Footer */}
-          <div className="p-6 border-t border-border/30 flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={handleCancel}
-              disabled={isLoading}
-            >
-              {cancelLabel}
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleConfirm}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="size-4 animate-spin mr-2" />
-                  {loadingLabel}
-                </>
-              ) : (
-                confirmLabel
-              )}
-            </Button>
-          </div>
+        {/* Footer */}
+        <div className="p-6 border-t border-border/30 flex justify-end gap-2">
+          <Button variant="outline" onClick={handleCancel} disabled={isLoading}>
+            {cancelLabel}
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleConfirm}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="size-4 animate-spin mr-2" />
+                {loadingLabel}
+              </>
+            ) : (
+              confirmLabel
+            )}
+          </Button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

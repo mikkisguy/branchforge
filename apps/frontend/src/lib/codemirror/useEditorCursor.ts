@@ -1,4 +1,5 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
+// react-doctor-disable-next-line react-doctor/prefer-dynamic-import
 import { EditorView } from "@codemirror/view";
 import { updateSearchPanel } from "./search-panel";
 
@@ -22,16 +23,9 @@ export function useEditorCursor(options?: UseEditorCursorOptions) {
     col: 1,
   });
   const [selectionInfo, setSelectionInfo] = useState<string | null>(null);
-  const [totalLines, setTotalLines] = useState(1);
-
-  // Initialize totalLines from initial content on mount
-  useEffect(() => {
-    if (options?.initialContent !== undefined) {
-      setTotalLines(options.initialContent.split("\n").length);
-    }
-    // Only run on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const [totalLines, setTotalLines] = useState(
+    () => options?.initialContent?.split("\n").length ?? 1
+  );
 
   const updateListener = useMemo(
     () =>

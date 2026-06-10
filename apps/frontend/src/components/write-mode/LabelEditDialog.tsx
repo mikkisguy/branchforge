@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -124,13 +124,12 @@ export function LabelEditDialog({
     labelNameError: "",
   });
 
-  const [initializedForOpen, setInitializedForOpen] = useState(false);
+  const initializedForOpenRef = useRef(false);
 
-  // Initialize form when dialog opens. Limited to [open] to prevent
-  // re-initialization while user is editing, even if props change.
+  // Initialize form state when dialog opens
   useEffect(() => {
-    if (open && !initializedForOpen) {
-      setInitializedForOpen(true);
+    if (open && !initializedForOpenRef.current) {
+      initializedForOpenRef.current = true;
       dispatch({
         type: "RESET",
         title: currentTitle,
@@ -140,10 +139,14 @@ export function LabelEditDialog({
         visibility: currentVisibility ?? "EXCLUSIVE",
       });
     }
-    if (!open) {
-      setInitializedForOpen(false);
-    }
-  }, [open]);
+  }, [
+    open,
+    currentTitle,
+    currentLabelName,
+    currentRoute,
+    currentStatus,
+    currentVisibility,
+  ]);
 
   const handleSave = async () => {
     if (!form.title.trim()) {
@@ -215,15 +218,23 @@ export function LabelEditDialog({
     }
 
     if (Object.keys(changes).length === 0) {
+      initializedForOpenRef.current = false;
       onOpenChange(false);
       return;
     }
 
     await onSave(changes);
+    initializedForOpenRef.current = false;
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(newOpen) => {
+        if (!newOpen) initializedForOpenRef.current = false;
+        onOpenChange(newOpen);
+      }}
+    >
       <DialogContent className="w-[560px] max-w-[95vw] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Label</DialogTitle>
@@ -381,13 +392,22 @@ export function LabelEditDialog({
           {/* Footer Buttons */}
           <div className="flex justify-end gap-2 mt-6">
             <Button
+              type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => {
+                initializedForOpenRef.current = false;
+                onOpenChange(false);
+              }}
               disabled={isSaving}
             >
               Cancel
             </Button>
-            <Button variant="default" onClick={handleSave} disabled={isSaving}>
+            <Button
+              type="button"
+              variant="default"
+              onClick={handleSave}
+              disabled={isSaving}
+            >
               {isSaving ? (
                 <>
                   <Loader2 className="mr-2 size-4 animate-spin" />

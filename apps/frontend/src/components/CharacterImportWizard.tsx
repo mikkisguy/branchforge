@@ -434,6 +434,7 @@ export function CharacterImportWizard({
             </div>
           </div>
           <button
+            type="button"
             onClick={handleClose}
             className="text-muted-foreground hover:text-foreground transition-colors"
             disabled={state.isImporting}
@@ -688,6 +689,7 @@ export function CharacterImportWizard({
                             }
                             className="size-4 rounded"
                             disabled={state.isImporting}
+                            aria-label={`Include ${char.tag}`}
                           />
                           <span className="font-mono text-sm font-medium">
                             {char.tag}
@@ -856,6 +858,7 @@ export function CharacterImportWizard({
                           }
                           className="size-4 rounded"
                           disabled={state.isImporting}
+                          aria-label={`Include ${char.tag}`}
                         />
                         <span className="font-mono text-sm">{char.tag}</span>
                         <span className="text-xs text-muted-foreground">
@@ -908,6 +911,7 @@ export function CharacterImportWizard({
           </span>
           <div className="flex gap-2">
             <Button
+              type="button"
               variant="outline"
               onClick={handleClose}
               disabled={state.isImporting}
@@ -915,6 +919,7 @@ export function CharacterImportWizard({
               Cancel
             </Button>
             <Button
+              type="button"
               onClick={handleImport}
               disabled={state.isImporting || selectedCount === 0}
             >

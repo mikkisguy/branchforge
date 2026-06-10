@@ -8,7 +8,9 @@ import {
   useImperativeHandle,
 } from "react";
 import type React from "react";
+// react-doctor-disable-next-line react-doctor/prefer-dynamic-import
 import { EditorView, Decoration, DecorationSet } from "@codemirror/view";
+// react-doctor-disable-next-line react-doctor/prefer-dynamic-import
 import { StateField, StateEffect } from "@codemirror/state";
 import { highlightSelectionMatches, search } from "@codemirror/search";
 import { renPy } from "../../lib/codemirror/renpy";
@@ -304,6 +306,7 @@ export const ScriptEditor = function ScriptEditor({
   }, [scrollToLine, scrollToLineIfValid, scheduleLineHighlight]);
 
   // Cleanup highlight timeout on unmount
+  // react-doctor-disable-next-line react-doctor/exhaustive-deps
   useEffect(() => {
     return () => {
       if (highlightTimeoutRef.current) {

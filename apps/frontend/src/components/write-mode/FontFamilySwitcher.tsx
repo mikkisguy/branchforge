@@ -67,7 +67,6 @@ export function FontFamilySwitcher({
     isOpen: false,
     focusedIndex: -1,
     isKeyboardNav: false,
-    closeReason: "keyboard" as "keyboard" | "mouse",
   });
 
   const listboxRef = useRef<HTMLDivElement>(null);
@@ -92,43 +91,7 @@ export function FontFamilySwitcher({
     );
   }, [fontFamily]);
 
-  // Set focused index to current option when dropdown opens
-  useEffect(() => {
-    if (dropdownState.isOpen) {
-      const currentIndex = FONT_FAMILY_OPTIONS.findIndex(
-        (opt) => opt.value === fontFamily
-      );
-      const newFocusedIndex = currentIndex >= 0 ? currentIndex : 0;
-      if (dropdownState.isKeyboardNav) {
-        if (
-          dropdownState.focusedIndex !== newFocusedIndex ||
-          dropdownState.closeReason !== "keyboard"
-        ) {
-          updateDropdownState({
-            focusedIndex: newFocusedIndex,
-            closeReason: "keyboard",
-          });
-        }
-      } else if (dropdownState.closeReason !== "keyboard") {
-        updateDropdownState({ closeReason: "keyboard" });
-      }
-      listboxRef.current?.focus();
-    } else {
-      if (dropdownState.focusedIndex !== -1) {
-        updateDropdownState({ focusedIndex: -1 });
-      }
-      if (dropdownState.closeReason === "keyboard") {
-        buttonRef.current?.focus();
-      }
-    }
-  }, [
-    dropdownState.isOpen,
-    dropdownState.closeReason,
-    dropdownState.isKeyboardNav,
-    fontFamily,
-    updateDropdownState,
-    dropdownState.focusedIndex,
-  ]);
+  // Focus is managed directly in each event handler (no useEffect needed)
 
   const handleSelect = (value: string) => {
     setFontFamily(value);
@@ -147,6 +110,7 @@ export function FontFamilySwitcher({
       ) {
         e.preventDefault();
         updateDropdownState({ isOpen: true });
+        requestAnimationFrame(() => listboxRef.current?.focus());
       }
       return;
     }
@@ -154,10 +118,8 @@ export function FontFamilySwitcher({
     switch (e.key) {
       case "Escape":
         e.preventDefault();
-        updateDropdownState({
-          isOpen: false,
-          closeReason: "keyboard",
-        });
+        updateDropdownState({ isOpen: false });
+        buttonRef.current?.focus();
         break;
       case "ArrowDown":
         e.preventDefault();
@@ -181,8 +143,8 @@ export function FontFamilySwitcher({
           dropdownState.focusedIndex >= 0 &&
           dropdownState.focusedIndex < FONT_FAMILY_OPTIONS.length
         ) {
-          updateDropdownState({ closeReason: "keyboard" });
           handleSelect(FONT_FAMILY_OPTIONS[dropdownState.focusedIndex].value);
+          buttonRef.current?.focus();
         }
         break;
       case "Home":
@@ -202,10 +164,7 @@ export function FontFamilySwitcher({
 
   const closeOnFocusLeave = (e: React.FocusEvent) => {
     if (!e.currentTarget.contains(e.relatedTarget)) {
-      updateDropdownState({
-        isOpen: false,
-        closeReason: "mouse",
-      });
+      updateDropdownState({ isOpen: false });
     }
   };
 
@@ -225,9 +184,13 @@ export function FontFamilySwitcher({
       <button
         ref={buttonRef}
         type="button"
-        onClick={() =>
-          setDropdownState((prev) => ({ ...prev, isOpen: !prev.isOpen }))
-        }
+        onClick={() => {
+          const nextOpen = !dropdownState.isOpen;
+          setDropdownState((prev) => ({ ...prev, isOpen: nextOpen }));
+          if (nextOpen) {
+            requestAnimationFrame(() => listboxRef.current?.focus());
+          }
+        }}
         onKeyDown={handleKeyDown}
         onMouseDown={handleMouseDown}
         aria-expanded={dropdownState.isOpen}
@@ -284,14 +247,12 @@ export function FontFamilySwitcher({
             className="fixed inset-0 z-40"
             aria-hidden="true"
             onClick={() => {
-              updateDropdownState({
-                isOpen: false,
-                closeReason: "mouse",
-              });
+              updateDropdownState({ isOpen: false });
             }}
           />
           <div
             ref={listboxRef}
+            // react-doctor-disable-next-line react-doctor/prefer-tag-over-role
             role="listbox"
             tabIndex={0}
             aria-label="Font family options"
@@ -311,7 +272,6 @@ export function FontFamilySwitcher({
                 role="option"
                 aria-selected={option.value === fontFamily}
                 onClick={() => {
-                  updateDropdownState({ closeReason: "mouse" });
                   handleSelect(option.value);
                 }}
                 tabIndex={-1}

@@ -73,7 +73,7 @@ export function ScriptReferencePanel({
 
   const sortedCharacters = useMemo(
     () =>
-      [...projectCharacters].sort((a, b) =>
+      projectCharacters.toSorted((a, b) =>
         a.displayName.localeCompare(b.displayName)
       ),
     [projectCharacters]

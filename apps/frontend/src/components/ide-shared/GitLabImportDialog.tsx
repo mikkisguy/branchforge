@@ -5,7 +5,7 @@
  * Checks integration status, allows repository selection, and creates projects.
  */
 
-import { useState, useEffect, useRef, useCallback, useReducer } from "react";
+import { useEffect, useRef, useCallback, useReducer } from "react";
 import {
   Loader2,
   GitFork,
@@ -67,6 +67,7 @@ interface DialogState {
   searchQuery: string;
   importState: ImportState;
   repositories: GitLabRepository[];
+  isLoadingRepos: boolean;
   showCharacterWizard: boolean;
   detectedCharacters: DetectCharactersResponse | null;
   importedProject: { id: string } | null;
@@ -80,6 +81,7 @@ type DialogAction =
   | { type: "SET_SEARCH_QUERY"; payload: string }
   | { type: "SET_IMPORT_STATE"; payload: ImportState }
   | { type: "SET_REPOSITORIES"; payload: GitLabRepository[] }
+  | { type: "SET_IS_LOADING_REPOS"; payload: boolean }
   | { type: "SET_SHOW_CHARACTER_WIZARD"; payload: boolean }
   | {
       type: "SET_DETECTED_CHARACTERS";
@@ -96,6 +98,7 @@ const initialDialogState: DialogState = {
   searchQuery: "",
   importState: { status: "idle", message: "" },
   repositories: [],
+  isLoadingRepos: false,
   showCharacterWizard: false,
   detectedCharacters: null,
   importedProject: null,
@@ -117,6 +120,8 @@ function dialogReducer(state: DialogState, action: DialogAction): DialogState {
       return { ...state, importState: action.payload };
     case "SET_REPOSITORIES":
       return { ...state, repositories: action.payload };
+    case "SET_IS_LOADING_REPOS":
+      return { ...state, isLoadingRepos: action.payload };
     case "SET_SHOW_CHARACTER_WIZARD":
       return { ...state, showCharacterWizard: action.payload };
     case "SET_DETECTED_CHARACTERS":
@@ -142,9 +147,6 @@ export function GitLabImportDialog({
   // Combined dialog state managed by reducer
   const [state, dispatch] = useReducer(dialogReducer, initialDialogState);
 
-  // Separate loading state (different lifecycle)
-  const [isLoadingRepos, setIsLoadingRepos] = useState(false);
-
   // Guard to prevent calling onSuccess/onOpenChange(false) twice
   const didCallOnSuccessRef = useRef(false);
 
@@ -165,6 +167,7 @@ export function GitLabImportDialog({
 
   // Reset state when dialog opens/closes
   useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     if (!open) {
       // Clear pending success timeout
       if (timeoutRef.current) {
@@ -182,7 +185,9 @@ export function GitLabImportDialog({
   }, [open]);
 
   // Check integration status when dialog opens
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     if (open && !checkingIntegration) {
       if (hasIntegration) {
         // Only set state if we haven't already
@@ -196,7 +201,7 @@ export function GitLabImportDialog({
         // Load repositories (only once per dialog session)
         if (!hasLoadedReposRef.current) {
           const requestId = ++loadReposRequestIdRef.current;
-          setIsLoadingRepos(true);
+          dispatch({ type: "SET_IS_LOADING_REPOS", payload: true });
           listRepositories()
             .then((repos) => {
               // Only update if this is still the current request and dialog is open
@@ -221,7 +226,7 @@ export function GitLabImportDialog({
             .finally(() => {
               // Only clear loading if this is still the current request
               if (requestId === loadReposRequestIdRef.current) {
-                setIsLoadingRepos(false);
+                dispatch({ type: "SET_IS_LOADING_REPOS", payload: false });
               }
             });
         }
@@ -235,10 +240,12 @@ export function GitLabImportDialog({
         });
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // react-doctor-disable-next-line react-doctor/exhaustive-deps
   }, [open, hasIntegration, checkingIntegration, listRepositories]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Cleanup timeout on unmount
+  // react-doctor-disable-next-line react-doctor/exhaustive-deps
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
@@ -271,26 +278,27 @@ export function GitLabImportDialog({
       // Store imported project immediately so all success paths can access it
       dispatch({ type: "SET_IMPORTED_PROJECT", payload: result.project });
 
-      // Invalidate projects and GitLab linked repos cache
-      await queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
-      await queryClient.invalidateQueries({
-        queryKey: gitlabKeys.repositories(),
-      });
-
-      // Invalidate label queries for the new project to ensure fresh data
-      // (including incomingJumps computed during sync).
-      await queryClient.invalidateQueries({
-        queryKey: labelKeys.scoped(result.project.id),
-      });
+      // Invalidate projects, GitLab repos, and label caches in parallel
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: projectKeys.lists() }),
+        queryClient.invalidateQueries({
+          queryKey: gitlabKeys.repositories(),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: labelKeys.scoped(result.project.id),
+        }),
+      ]);
 
       const currentImportId = importIdRef.current;
 
       // Detect characters from imported RPY files
       try {
+        // react-doctor-disable-next-line react-doctor/async-defer-await
         const detectionResult = await charactersApi.detectCharacters(
           result.project.id
         );
 
+        // Stale check: import could have been superseded during the API call
         if (currentImportId !== importIdRef.current) return;
 
         // Filter out characters that already exist in the database
@@ -377,7 +385,7 @@ export function GitLabImportDialog({
       }
       onOpenChange(nextOpen);
     },
-    [state.importState.status, onSuccess, onOpenChange]
+    [onOpenChange, state.importState.status, state.importedProject, onSuccess]
   );
 
   // ============================================================================
@@ -409,6 +417,7 @@ export function GitLabImportDialog({
                     access token first.
                   </p>
                   <Button
+                    type="button"
                     size="sm"
                     variant="outline"
                     onClick={() => {
@@ -496,7 +505,7 @@ export function GitLabImportDialog({
                 />
               </div>
 
-              {isLoadingRepos ? (
+              {state.isLoadingRepos ? (
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="size-5 animate-spin" />
                   <span className="ml-2 text-sm text-muted-foreground">
@@ -511,6 +520,7 @@ export function GitLabImportDialog({
                 </div>
               ) : (
                 <div
+                  // react-doctor-disable-next-line react-doctor/prefer-tag-over-role
                   role="listbox"
                   className="border rounded-lg max-h-[200px] overflow-y-auto"
                 >
@@ -563,6 +573,7 @@ export function GitLabImportDialog({
 
               {/* Import button */}
               <Button
+                type="button"
                 onClick={handleImport}
                 disabled={
                   !state.selectedRepository || !state.projectName.trim()
@@ -618,6 +629,7 @@ export function GitLabImportDialog({
                     {state.importState.message}
                   </p>
                   <Button
+                    type="button"
                     size="sm"
                     variant="outline"
                     onClick={() =>

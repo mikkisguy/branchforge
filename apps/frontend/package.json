@@ -13,7 +13,9 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "doctor": "pnpx react-doctor@0.4.2 --verbose",
+    "doctor:empty": "rm -rf node_modules/.cache/react-doctor"
   },
   "dependencies": {
     "@branchforge/shared": "workspace:*",

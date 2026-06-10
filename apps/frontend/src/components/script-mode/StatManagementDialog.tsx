@@ -6,7 +6,7 @@
  * - Right panel: progression view for the selected stat
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { DialogShell } from "@/components/ui/DialogShell";
 import { StatProgression } from "@/components/StatProgression";
 import { StatList } from "@/components/StatList";
@@ -49,24 +49,14 @@ export function StatManagementDialog({
 
   const isSaving = isCreatingStat || isUpdatingStat || isDeletingStat;
 
-  const selectedProgression = selectedStatKey
-    ? (progression.find((p) => p.statKey === selectedStatKey) ?? null)
+  const effectiveStatKey =
+    selectedStatKey && stats.some((s) => s.key === selectedStatKey)
+      ? selectedStatKey
+      : (stats[0]?.key ?? null);
+
+  const selectedProgression = effectiveStatKey
+    ? (progression.find((p) => p.statKey === effectiveStatKey) ?? null)
     : null;
-
-  useEffect(() => {
-    if (stats.length === 0) {
-      setSelectedStatKey(null);
-      return;
-    }
-
-    const stillExists = selectedStatKey
-      ? stats.some((stat) => stat.key === selectedStatKey)
-      : false;
-
-    if (!stillExists) {
-      setSelectedStatKey(stats[0]?.key ?? null);
-    }
-  }, [stats, selectedStatKey]);
 
   const handleDelete = async (statId: string) => {
     try {
@@ -122,7 +112,7 @@ export function StatManagementDialog({
               </Button>
               <StatList
                 stats={stats}
-                selectedStatKey={selectedStatKey}
+                selectedStatKey={effectiveStatKey}
                 isSaving={isSaving}
                 onSelect={setSelectedStatKey}
                 onEdit={setEditingStatId}
@@ -135,7 +125,7 @@ export function StatManagementDialog({
         <div className="flex-1 overflow-y-auto p-6">
           <StatProgression
             progression={selectedProgression}
-            isLoading={!selectedStatKey ? false : isLoadingProgression}
+            isLoading={!effectiveStatKey ? false : isLoadingProgression}
             error={progressionError}
           />
         </div>

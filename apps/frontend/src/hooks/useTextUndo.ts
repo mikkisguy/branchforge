@@ -124,6 +124,7 @@ export function useTextUndo(
     [commitState]
   );
 
+  // Sync internal state with content prop when it changes from external sources
   useEffect(() => {
     if (content !== lastSyncedContentRef.current) {
       const nextState: UndoState = {
@@ -131,6 +132,7 @@ export function useTextUndo(
         present: content,
         future: [],
       };
+      // react-doctor-disable-next-line react-doctor/no-derived-state
       commitState(nextState);
       lastSyncedContentRef.current = content;
     }

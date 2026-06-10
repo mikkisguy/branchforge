@@ -147,7 +147,9 @@ export function useLocalStorage<T>(
     readStorageValue(prefixedKey, defaultValue, deserializer, validate, ssrSafe)
   );
 
+  // Re-read from localStorage when key changes
   useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-derived-state
     setState(
       readStorageValue(
         prefixedKey,

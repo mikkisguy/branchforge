@@ -134,6 +134,7 @@ export function ZipImportProjectDialog({
 
   // Reset state when dialog closes
   useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     if (!open) {
       importIdRef.current += 1;
       dispatch({ type: "RESET" });
@@ -239,10 +240,12 @@ export function ZipImportProjectDialog({
 
       // Detect characters from imported RPY files
       try {
+        // react-doctor-disable-next-line react-doctor/async-defer-await
         const detectionResult = await charactersApi.detectCharacters(
           data.project.id
         );
 
+        // Stale check: import could have been superseded during the API call
         if (currentImportId !== importIdRef.current) return;
 
         // Filter out characters that already exist in the database
@@ -334,6 +337,7 @@ export function ZipImportProjectDialog({
                   </div>
                 </div>
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon"
                   onClick={() => onOpenChange(false)}
@@ -444,6 +448,7 @@ export function ZipImportProjectDialog({
                         accept=".zip,application/zip,application/x-zip-compressed"
                         onChange={handleFileChange}
                         className="hidden"
+                        aria-label="Upload project zip file"
                       />
                       <p className="text-xs text-muted-foreground">
                         Maximum file size: {ZIP_IMPORT_MAX_SIZE_MB}MB
@@ -463,6 +468,7 @@ export function ZipImportProjectDialog({
 
                 {/* Import button */}
                 <Button
+                  type="button"
                   onClick={handleImport}
                   disabled={!state.selectedFile || !state.projectName.trim()}
                   className="w-full"
@@ -493,6 +499,7 @@ export function ZipImportProjectDialog({
                   {state.importState.result?.labelsCreated} labels created
                 </p>
                 <Button
+                  type="button"
                   onClick={() => {
                     if (!didCallOnSuccessRef.current) {
                       didCallOnSuccessRef.current = true;
@@ -518,6 +525,7 @@ export function ZipImportProjectDialog({
                 </p>
                 <div className="flex gap-2">
                   <Button
+                    type="button"
                     variant="outline"
                     onClick={() =>
                       dispatch({
@@ -528,7 +536,11 @@ export function ZipImportProjectDialog({
                   >
                     Try Again
                   </Button>
-                  <Button variant="outline" onClick={() => onOpenChange(false)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => onOpenChange(false)}
+                  >
                     Cancel
                   </Button>
                 </div>

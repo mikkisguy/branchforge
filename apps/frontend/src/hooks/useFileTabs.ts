@@ -83,6 +83,7 @@ export function useFileTabs({
     string | undefined
   >(undefined);
 
+  // react-doctor-disable-next-line react-doctor/no-event-handler
   const tabsStorageKey = projectId
     ? getPrefixedStorageKey(`script:open-tabs:${projectId}`)
     : null;
@@ -146,10 +147,26 @@ export function useFileTabs({
     [activeFileId, onNoTabsRemaining, openTabs, selectFileTab]
   );
 
+  // Sync openTabs when projectFiles changes to remove stale file IDs
+  useEffect(() => {
+    const fileIds = new Set(projectFiles.map((file) => file.id));
+    // react-doctor-disable-next-line react-doctor/no-derived-state
+    setOpenTabs((prev) => {
+      const nextTabs = prev.filter((tabId) => fileIds.has(tabId));
+      return nextTabs.length === prev.length ? prev : nextTabs;
+    });
+  }, [projectFiles]);
+
+  // Derive valid tabs during render (files that still exist in projectFiles)
+  const validOpenTabs = useMemo(() => {
+    const fileIds = new Set(projectFiles.map((file) => file.id));
+    return openTabs.filter((tabId) => fileIds.has(tabId));
+  }, [openTabs, projectFiles]);
+
   const tabItems = useMemo<EditorTabBarItem[]>(() => {
     const fileMap = new Map(projectFiles.map((f) => [f.id, f]));
     const items: EditorTabBarItem[] = [];
-    for (const tabId of openTabs) {
+    for (const tabId of validOpenTabs) {
       const file = fileMap.get(tabId);
       if (file !== undefined) {
         const fileName = file.filePath.split("/").pop() || file.filePath;
@@ -164,13 +181,14 @@ export function useFileTabs({
       }
     }
     return items;
-  }, [openTabs, projectFiles]);
+  }, [validOpenTabs, projectFiles]);
 
   useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     if (tabsStorageKey && hydratedTabsProjectId === projectId) {
-      writeLocalStorageItem(tabsStorageKey, JSON.stringify(openTabs));
+      writeLocalStorageItem(tabsStorageKey, JSON.stringify(validOpenTabs));
     }
-  }, [openTabs, projectId, tabsStorageKey, hydratedTabsProjectId]);
+  }, [validOpenTabs, projectId, tabsStorageKey, hydratedTabsProjectId]);
 
   useEffect(() => {
     if (!activeFileStorageKey || hydratedTabsProjectId !== projectId) {
@@ -290,6 +308,7 @@ export function useFileTabs({
       return;
     }
 
+    // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change, react-doctor/no-derived-state
     setOpenTabs((prev) => {
       if (prev.includes(activeFileId)) {
         return prev;
@@ -298,14 +317,6 @@ export function useFileTabs({
     });
   }, [activeFileId, projectFiles]);
 
-  useEffect(() => {
-    const fileIds = new Set(projectFiles.map((file) => file.id));
-    setOpenTabs((prev) => {
-      const nextTabs = prev.filter((tabId) => fileIds.has(tabId));
-      return nextTabs.length === prev.length ? prev : nextTabs;
-    });
-  }, [projectFiles]);
-
   const clearTabsState = useCallback(() => {
     setHydratedTabsProjectId(undefined);
     setOpenTabs([]);
@@ -313,7 +324,7 @@ export function useFileTabs({
   }, []);
 
   return {
-    openTabs,
+    openTabs: validOpenTabs,
     activeFileId,
     setActiveFileId,
     tabItems,

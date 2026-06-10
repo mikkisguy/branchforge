@@ -18,6 +18,10 @@ import { useToast } from "@/contexts/ToastContext";
 import { useGitLab } from "@/hooks/useGitLab";
 import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 
+function isProjectOwner(project: Project): boolean {
+  return project.visibility === "OWNER";
+}
+
 interface ProjectsSettingsContentProps {
   projects: Project[];
   onUpdateProject?: (
@@ -71,10 +75,6 @@ export function ProjectsSettingsContent({
     return onDeleteProject(projectId);
   };
 
-  const isProjectOwner = (project: Project) => {
-    return project.visibility === "OWNER";
-  };
-
   // Empty state
   if (projects.length === 0) {
     return (
@@ -91,6 +91,7 @@ export function ProjectsSettingsContent({
           <div className="flex gap-3">
             {onImportFromGitLab && (
               <Button
+                type="button"
                 onClick={onImportFromGitLab}
                 disabled={!hasIntegration || isLoadingIntegration}
               >
@@ -98,7 +99,7 @@ export function ProjectsSettingsContent({
               </Button>
             )}
             {onImportZip && (
-              <Button variant="outline" onClick={onImportZip}>
+              <Button type="button" variant="outline" onClick={onImportZip}>
                 <FileArchive className="size-4 mr-2" />
                 Import ZIP
               </Button>
@@ -133,6 +134,7 @@ export function ProjectsSettingsContent({
           <div className="flex flex-wrap gap-2 sm:justify-end">
             {onImportFromGitLab && (
               <Button
+                type="button"
                 size="sm"
                 onClick={onImportFromGitLab}
                 disabled={!hasIntegration || isLoadingIntegration}
@@ -141,7 +143,12 @@ export function ProjectsSettingsContent({
               </Button>
             )}
             {onImportZip && (
-              <Button size="sm" variant="outline" onClick={onImportZip}>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={onImportZip}
+              >
                 <FileArchive className="size-4 mr-2" />
                 Import ZIP
               </Button>
@@ -221,6 +228,7 @@ export function ProjectsSettingsContent({
                   <div className="flex justify-end gap-1">
                     {onUpdateProject && isProjectOwner(project) && (
                       <Button
+                        type="button"
                         variant="ghost"
                         size="sm"
                         onClick={() => handleEditClick(project)}
@@ -231,6 +239,7 @@ export function ProjectsSettingsContent({
                     )}
                     {isProjectOwner(project) && onDeleteProject && (
                       <Button
+                        type="button"
                         variant="ghost"
                         size="sm"
                         className="text-destructive hover:bg-destructive/10 hover:text-destructive"

@@ -95,6 +95,7 @@ export function ProjectFileTree({
         <div key={folder} className="mb-2">
           {folder && (
             <button
+              type="button"
               onClick={() => toggleFolder(folder)}
               role="treeitem"
               aria-expanded={expandedFolders.has(folder)}
@@ -112,6 +113,7 @@ export function ProjectFileTree({
           )}
 
           {(!folder || expandedFolders.has(folder)) && (
+            // react-doctor-disable-next-line react-doctor/prefer-tag-over-role
             <div className="space-y-0.5" role="group">
               {folderFiles.map((file) => (
                 <div key={file.id}>
@@ -131,6 +133,7 @@ export function ProjectFileTree({
                   >
                     {file.fileType === "STORY" && file.labels.length > 0 ? (
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           toggleFile(file.id);
@@ -149,6 +152,7 @@ export function ProjectFileTree({
                       <span className="w-3" />
                     )}
                     <button
+                      type="button"
                       onClick={() => onFileSelect(file.id)}
                       className="flex-1 text-left flex items-center gap-2 py-0.5 px-1 -my-0.5 rounded transition-colors"
                     >
@@ -167,6 +171,7 @@ export function ProjectFileTree({
                   {file.fileType === "STORY" &&
                     expandedFiles.has(file.id) &&
                     file.labels.length > 0 && (
+                      // react-doctor-disable-next-line react-doctor/prefer-tag-over-role
                       <div className="pl-7 space-y-0.5" role="group">
                         {file.labels.map((label) => {
                           const safeStatus =
@@ -178,6 +183,7 @@ export function ProjectFileTree({
 
                           return (
                             <button
+                              type="button"
                               key={label.id}
                               onClick={() => onSceneSelect(label.id)}
                               role="treeitem"

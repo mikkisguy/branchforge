@@ -27,6 +27,7 @@ export const WritingGoalPill = memo(function WritingGoalPill({
   const isComplete = progress >= 1;
 
   return (
+    // react-doctor-disable-next-line react-doctor/no-static-element-interactions
     <div
       className={`flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3 py-1.5 transition-all duration-200 outline-none ${
         onClick

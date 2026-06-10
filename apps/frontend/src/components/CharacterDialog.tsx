@@ -83,6 +83,7 @@ export function CharacterDialog({
               </p>
             </div>
             <button
+              type="button"
               onClick={() => onOpenChange(false)}
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
@@ -95,10 +96,9 @@ export function CharacterDialog({
             <div className="space-y-4">
               {isLoadingCharacters ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2
-                    className="size-6 animate-spin text-muted-foreground"
-                    role="status"
-                  />
+                  <output>
+                    <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                  </output>
                 </div>
               ) : charactersError ? (
                 <InlineMessage variant="error">
@@ -146,7 +146,11 @@ export function CharacterDialog({
 
           {/* Footer */}
           <div className="p-6 border-t border-border/30 flex justify-end">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Close
             </Button>
           </div>

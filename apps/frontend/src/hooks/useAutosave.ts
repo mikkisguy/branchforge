@@ -228,6 +228,7 @@ export function useAutosave<T>({
   /**
    * Initialize saved hash on mount
    */
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (!didMountRef.current) {
       // First mount - initialize saved hash to current data
@@ -235,18 +236,21 @@ export function useAutosave<T>({
       lastSavedDataRef.current = data;
       didMountRef.current = true;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // react-doctor-disable-next-line react-doctor/exhaustive-deps
   }, []); // Only run on mount
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   /**
    * Schedule a debounced save when data changes
    */
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     const currentHash = hashFn(data);
 
     if (currentHash !== savedHashRef.current) {
       // Reset discard flag when new changes are detected after discard
       isDiscardedRef.current = false;
+      // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change
       setIsDirty(true);
       pendingDataRef.current = data;
 
@@ -255,7 +259,9 @@ export function useAutosave<T>({
         pendingHashRef.current = null;
         pendingDataRef.current = null;
         savePromiseRef.current = null;
+        // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change
         setSaveStatus("saved");
+        // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change
         setIsDirty(false);
       } else if (isSavingRef.current) {
         // Keep the latest unsaved payload available for a manual flush while
@@ -274,8 +280,10 @@ export function useAutosave<T>({
         }, debounceMs);
       }
     } else if (currentHash === savedHashRef.current && !isSavingRef.current) {
+      // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change
       setIsDirty(false);
       if (saveStatus !== "saved") {
+        // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change
         setSaveStatus("saved");
       }
     }
@@ -289,8 +297,9 @@ export function useAutosave<T>({
       // Reset so the next effect run knows it may need to reschedule
       pendingHashRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // react-doctor-disable-next-line react-doctor/exhaustive-deps
   }, [data, hashFn, debounceMs, performSave, clearSaveTimeout, saveStatus]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   return {
     saveStatus,

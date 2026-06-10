@@ -583,7 +583,7 @@ export const gitlabApi = {
       });
     };
 
-    while (true) {
+    const pollOnce = async (): Promise<SyncOperation> => {
       // Check if aborted before doing any work
       if (signal?.aborted) {
         throw new DOMException("Polling was cancelled", "AbortError");
@@ -604,6 +604,9 @@ export const gitlabApi = {
 
       // Wait before next poll (abortable)
       await abortableDelay(interval, signal);
-    }
+      return pollOnce();
+    };
+
+    return pollOnce();
   },
 };

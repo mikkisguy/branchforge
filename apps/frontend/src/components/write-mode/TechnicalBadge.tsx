@@ -3,6 +3,13 @@ import { type StatCondition } from "@branchforge/shared";
 
 type BadgeType = "conditions" | "jump" | "visuals" | "menu";
 
+const ICONS: Record<BadgeType, React.ComponentType<{ className?: string }>> = {
+  conditions: BadgeQuestionMark,
+  jump: ArrowUpRight,
+  visuals: Image,
+  menu: Split,
+};
+
 interface ConditionsData {
   stats?: Record<string, StatCondition>;
   variables?: string[];
@@ -41,14 +48,7 @@ export function TechnicalBadge({
   isLineHovered = false,
   className = "",
 }: TechnicalBadgeProps) {
-  const icons = {
-    conditions: BadgeQuestionMark,
-    jump: ArrowUpRight,
-    visuals: Image,
-    menu: Split,
-  };
-
-  const Icon = icons[type];
+  const Icon = ICONS[type];
 
   // Generate display text based on type and data
   const getBadgeText = (): string => {

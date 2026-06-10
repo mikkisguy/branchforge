@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Pencil, Settings2, Trash2 } from "lucide-react";
 
@@ -59,11 +59,10 @@ export function LabelContextMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   const [focusedIndex, setFocusedIndex] = useState(0);
-  const [position, setPosition] = useState({ x, y });
   const [mounted] = useState(typeof document !== "undefined");
 
   // Calculate position to avoid viewport overflow
-  useEffect(() => {
+  const position = useMemo(() => {
     const menuWidth = 180;
     const menuHeight = 120;
 
@@ -80,7 +79,7 @@ export function LabelContextMenu({
       adjustedY = y - menuHeight;
     }
 
-    setPosition({ x: adjustedX, y: adjustedY });
+    return { x: adjustedX, y: adjustedY };
   }, [x, y]);
 
   // Focus first item when menu opens

@@ -98,6 +98,8 @@ export const DialogueLine = memo(function DialogueLine({
   const [popoverType, setPopoverType] = useState<
     "conditions" | "jump" | "visuals" | "menu" | null
   >(null);
+  const [showRemoveHint, setShowRemoveHint] = useState(false);
+  const removeHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const dropdownMenuRef = useRef<HTMLDivElement>(null);
@@ -107,6 +109,7 @@ export const DialogueLine = memo(function DialogueLine({
   const textOnChangeRef = useRef(onChange);
   const previousTextRef = useRef(entry.text);
   const measureRef = useRef<HTMLSpanElement>(null);
+  const isChoice = entry.contentType === "CHOICE";
 
   const resizeTextarea = useCallback(() => {
     const textarea = internalTextareaRef.current;
@@ -122,6 +125,7 @@ export const DialogueLine = memo(function DialogueLine({
   }, [onChange]);
 
   // Initialize textarea value on mount
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     const textarea = internalTextareaRef.current;
     if (textarea && textarea.value !== entry.text) {
@@ -129,8 +133,9 @@ export const DialogueLine = memo(function DialogueLine({
       previousTextRef.current = entry.text;
       resizeTextarea();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // react-doctor-disable-next-line react-doctor/exhaustive-deps
   }, []); // Only run on mount
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Sync external text changes (e.g., from undo/redo or label switch)
   useEffect(() => {
@@ -151,6 +156,7 @@ export const DialogueLine = memo(function DialogueLine({
     }
   }, [entry.id, entry.text, resizeTextarea]); // Also depend on entry.id to detect label switches
 
+  // react-doctor-disable-next-line react-doctor/advanced-event-handler-refs
   useEffect(() => {
     window.addEventListener("resize", resizeTextarea);
     return () => window.removeEventListener("resize", resizeTextarea);
@@ -166,6 +172,15 @@ export const DialogueLine = memo(function DialogueLine({
     observer.observe(measure);
     return () => observer.disconnect();
   }, [resizeTextarea]);
+
+  // Clean up remove-hint timer on unmount
+  // oxlint-disable-next-line react/exhaustive-deps -- Mount-only effect; ref is stable, we intentionally read .current at cleanup time to clear pending timer
+  // react-doctor-disable-next-line react-doctor/exhaustive-deps
+  useEffect(() => {
+    return () => {
+      if (removeHintTimerRef.current) clearTimeout(removeHintTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -257,6 +272,7 @@ export const DialogueLine = memo(function DialogueLine({
     characters,
   ]);
 
+  // react-doctor-disable-next-line react-doctor/advanced-event-handler-refs
   useEffect(() => {
     if (!isDropdownOpen) return;
 
@@ -279,6 +295,7 @@ export const DialogueLine = memo(function DialogueLine({
   }, [isDropdownOpen, updateDropdownDirection]);
 
   useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     if (isDropdownOpen && focusedOptionIndex >= 0) {
       const option = document.getElementById(
         `${dropdownId}-option-${focusedOptionIndex}`
@@ -323,6 +340,18 @@ export const DialogueLine = memo(function DialogueLine({
 
   const handleTextChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      // CHOICE entries must not have empty text — parser requires it
+      if (entry.contentType === "CHOICE" && e.target.value === "") {
+        e.target.value = previousTextRef.current;
+        if (removeHintTimerRef.current)
+          clearTimeout(removeHintTimerRef.current);
+        setShowRemoveHint(true);
+        removeHintTimerRef.current = setTimeout(
+          () => setShowRemoveHint(false),
+          2500
+        );
+        return;
+      }
       // Update the ref so we know this change came from user input
       previousTextRef.current = e.target.value;
       // Call onChange with updated entry (using ref to avoid stale closure)
@@ -356,7 +385,8 @@ export const DialogueLine = memo(function DialogueLine({
       if (
         e.key === "Backspace" &&
         internalTextareaRef.current?.value === "" &&
-        totalEntries > 1
+        totalEntries > 1 &&
+        !isChoice
       ) {
         e.preventDefault();
         onDelete();
@@ -375,7 +405,7 @@ export const DialogueLine = memo(function DialogueLine({
         onMoveDown();
       }
     },
-    [index, totalEntries, onDelete, onMoveUp, onMoveDown, onAddLine]
+    [totalEntries, isChoice, index, onAddLine, onDelete, onMoveUp, onMoveDown]
   );
 
   const handleDropdownKeyDown = useCallback(
@@ -451,7 +481,6 @@ export const DialogueLine = memo(function DialogueLine({
   const isStacked = layoutMode === "stacked";
   const isSpeakerInteractive = isHovered || isDropdownOpen;
   const hasSpeaker = Boolean(entry.speakerId);
-  const isChoice = entry.contentType === "CHOICE";
   const choiceTargetName = entry.choiceData?.targetLabelName;
   const showDelete =
     (isHovered || entry.text === "") && totalEntries > 1 && !isChoice;
@@ -550,6 +579,7 @@ export const DialogueLine = memo(function DialogueLine({
               <div
                 ref={dropdownMenuRef}
                 id={dropdownId}
+                // react-doctor-disable-next-line react-doctor/prefer-tag-over-role
                 role="listbox"
                 aria-label="Select speaker"
                 aria-activedescendant={
@@ -583,7 +613,7 @@ export const DialogueLine = memo(function DialogueLine({
                   Narration
                 </button>
 
-                <div className="my-1 border-t border-border" role="separator" />
+                <hr className="my-1 border-t border-border" />
 
                 {characters.map((char, idx) => (
                   <button
@@ -637,6 +667,13 @@ export const DialogueLine = memo(function DialogueLine({
           className={`relative min-h-[2.5rem] p-0 pr-7 resize-none overflow-hidden bg-transparent border-0 outline-none focus-visible:outline-none focus-visible:ring-0 font-light tracking-normal leading-8 placeholder:text-muted-foreground/50 ${
             isStacked ? "w-full" : "flex-1"
           }`}
+          aria-label={
+            isChoice
+              ? "Choice text"
+              : entry.speakerId
+                ? "Dialogue text"
+                : "Narration text"
+          }
           style={{
             fontSize: "var(--prose-editor-font-size, 16px)",
             fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
@@ -648,6 +685,7 @@ export const DialogueLine = memo(function DialogueLine({
         {/* Delete Button */}
         {showDelete && (
           <button
+            type="button"
             onClick={onDelete}
             className="z-10 absolute right-0 top-0.5 p-1 rounded text-muted-foreground/70 hover:text-destructive bg-background/90 hover:bg-destructive/10 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             title="Delete line (Backspace)"
@@ -666,6 +704,17 @@ export const DialogueLine = memo(function DialogueLine({
         >
           <ArrowUpRight className="size-3" />
           {choiceTargetName}
+        </span>
+      )}
+
+      {/* Hint shown when user tries to empty a CHOICE */}
+      {showRemoveHint && (
+        <span
+          className={`text-xs text-muted-foreground/70 animate-in fade-in-0 slide-in-from-top-1 duration-200 ${
+            isStacked ? "" : "ml-[172px]"
+          }`}
+        >
+          Remove choices in Script mode
         </span>
       )}
 

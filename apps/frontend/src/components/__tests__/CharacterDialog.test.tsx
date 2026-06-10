@@ -193,7 +193,7 @@ describe("CharacterDialog", () => {
         { wrapper }
       );
 
-      await user.click(screen.getByText(/add character/i));
+      await user.click(screen.getByRole("button", { name: /add character/i }));
 
       // CharacterEditDialog should render with "Add Character" title
       expect(

@@ -145,6 +145,7 @@ export function useEntriesUndo(
   // We detect external changes by comparing with lastSyncedEntriesRef
   useEffect(() => {
     // Check if this is an external change (entries prop changed but we didn't record it)
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     if (!areDialogueEntriesEqual(entries, lastSyncedEntriesRef.current)) {
       // External change detected - update present and clear future
       // NOTE: Don't update lastSyncedEntriesRef here - let recordChange do that
@@ -154,6 +155,7 @@ export function useEntriesUndo(
         present: entries,
         future: [],
       };
+      // react-doctor-disable-next-line react-doctor/no-derived-state
       commitState(nextState);
     }
   }, [entries, commitState]);

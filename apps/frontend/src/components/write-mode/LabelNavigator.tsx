@@ -31,6 +31,13 @@ const STATUS_COLORS: Record<LabelStatus, string> = {
   DRAFT: "var(--theme-draft-color)",
 };
 
+function compareByUpdatedAt(a: PublicLabel, b: PublicLabel): number {
+  const timeDiff =
+    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  if (timeDiff !== 0) return timeDiff;
+  return b.labelNumber - a.labelNumber;
+}
+
 // ============================================================================
 // Inline Rename Input Component
 // ============================================================================
@@ -93,6 +100,7 @@ function InlineRenameInput({
         className="flex-1 min-w-0 px-2 py-0.5 border rounded text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30"
         disabled={isSaving}
         maxLength={255}
+        aria-label="Rename label"
       />
       {isSaving && (
         <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
@@ -509,13 +517,6 @@ export function LabelNavigator({
     );
   }, [labels, searchQuery]);
 
-  const compareByUpdatedAt = (a: PublicLabel, b: PublicLabel): number => {
-    const timeDiff =
-      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-    if (timeDiff !== 0) return timeDiff;
-    return b.labelNumber - a.labelNumber;
-  };
-
   const groupedLabels = useMemo(() => {
     // Short-circuit: "lastUpdated" mode only needs the flat list
     if (sortMode === "lastUpdated") {
@@ -593,6 +594,7 @@ export function LabelNavigator({
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Filter..."
               className="w-full pl-7 pr-7 py-1.5 text-xs border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30"
+              aria-label="Filter labels"
             />
             {searchQuery && (
               <button

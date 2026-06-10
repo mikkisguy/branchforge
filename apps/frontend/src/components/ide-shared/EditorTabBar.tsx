@@ -59,7 +59,9 @@ export function EditorTabBar({
 
   useEffect(() => {
     if (hidden) {
+      // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change
       setShowLeftScrollIndicator(false);
+      // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change
       setShowRightScrollIndicator(false);
       return;
     }
