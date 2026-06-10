@@ -148,3 +148,12 @@ export const statKeys = {
   progression: (projectId: string) =>
     ["stats", projectId, "progression"] as const,
 } as const;
+
+// ============================================================================
+// Flow Graph Keys
+// ============================================================================
+
+export const flowKeys = {
+  all: ["flow"] as const,
+  graph: (projectId: string) => ["flow", projectId, "graph"] as const,
+} as const;

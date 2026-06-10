@@ -869,3 +869,46 @@ export interface ImportProjectFailure {
  * POST /projects/import/zip
  */
 export type ImportProjectResponse = ImportProjectSuccess | ImportProjectFailure;
+
+// ============================================================================
+// Flow Graph Types (Route Visualization)
+// ============================================================================
+
+/**
+ * Edge type in the flow graph
+ */
+export type FlowEdgeType = "JUMP" | "CHOICE" | "NATURAL";
+
+/**
+ * Node in the flow graph representing a label
+ */
+export interface FlowNode {
+  id: string;
+  labelId: string;
+  title: string;
+  labelName: string | null;
+  routeKey: string | null;
+  status: LabelStatus | null;
+  fileName: string;
+  sequenceOrder: number;
+  labelNumber: number;
+}
+
+/**
+ * Edge in the flow graph representing a connection between labels
+ */
+export interface FlowEdge {
+  id: string;
+  source: string;
+  target: string;
+  type: FlowEdgeType;
+  label?: string;
+}
+
+/**
+ * Complete flow graph data for a project
+ */
+export interface FlowGraph {
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+}

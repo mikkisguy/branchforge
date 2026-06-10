@@ -10,6 +10,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   FolderOpen,
+  Network,
 } from "lucide-react";
 import type { ThemePalette } from "@/contexts/ThemeContext";
 import type { Project, UpdateProjectBody } from "@/lib/api/projects";
@@ -19,6 +20,7 @@ import { RouteSettingsDialog } from "./RouteSettingsDialog";
 import { CharacterDialog } from "@/components/CharacterDialog";
 import { GitLabImportDialog } from "./GitLabImportDialog";
 import { ZipImportProjectDialog } from "./ZipImportProjectDialog";
+import { FlowDialog } from "@/components/flow/FlowDialog";
 import { Logo } from "@/components/ui/logo";
 
 interface ThemePaletteOption {
@@ -71,7 +73,8 @@ type ModalKey =
   | "characters"
   | "projectPopover"
   | "gitLabImport"
-  | "zipImport";
+  | "zipImport"
+  | "flow";
 
 interface ModalState {
   themeDropdown: boolean;
@@ -81,6 +84,7 @@ interface ModalState {
   projectPopover: boolean;
   gitLabImport: boolean;
   zipImport: boolean;
+  flow: boolean;
 }
 
 type ModalAction =
@@ -96,6 +100,7 @@ const initialModalState: ModalState = {
   projectPopover: false,
   gitLabImport: false,
   zipImport: false,
+  flow: false,
 };
 
 function modalReducer(state: ModalState, action: ModalAction): ModalState {
@@ -405,6 +410,24 @@ export function LeftSidebar(props: LeftSidebarProps) {
               <Users className="size-4 flex-shrink-0" />
               {showLabel && <span>Characters</span>}
             </button>
+
+            {/* Flow Graph */}
+            <button
+              type="button"
+              onClick={() => dispatchModal({ type: "OPEN", key: "flow" })}
+              disabled={!projectId}
+              className={`flex items-center ${
+                isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
+              } rounded-md text-sm font-medium transition-colors ${
+                !projectId
+                  ? "text-muted-foreground/50 cursor-not-allowed"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+              title="Flow Graph"
+            >
+              <Network className="size-4 flex-shrink-0" />
+              {showLabel && <span>Flow</span>}
+            </button>
           </nav>
         </div>
 
@@ -587,6 +610,17 @@ export function LeftSidebar(props: LeftSidebarProps) {
         }
         onSuccess={handleImportSuccess}
       />
+
+      {/* Flow Graph Dialog */}
+      {projectId && (
+        <FlowDialog
+          open={modals.flow}
+          onOpenChange={(open: boolean) =>
+            dispatchModal({ type: open ? "OPEN" : "CLOSE", key: "flow" })
+          }
+          projectId={projectId}
+        />
+      )}
     </>
   );
 }
