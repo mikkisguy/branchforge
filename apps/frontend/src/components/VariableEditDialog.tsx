@@ -262,7 +262,7 @@ export function VariableEditDialog({
           </div>
         ) : (
           <VariableFormContent
-            key={variableId ?? "new"}
+            key={`${variableId ?? "new"}-${open}`}
             variableId={variableId}
             variables={variables}
             isSaving={isSaving}

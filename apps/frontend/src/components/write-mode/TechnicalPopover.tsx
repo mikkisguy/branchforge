@@ -182,9 +182,9 @@ export function TechnicalPopover({
                 <span className="text-sm font-medium">Visuals</span>
               </div>
               <ul className="text-xs text-muted-foreground space-y-1.5">
-                {visualsData.map((visual) => (
+                {visualsData.map((visual, index) => (
                   <li
-                    key={`${visual.type}_${visual.target}`}
+                    key={`${visual.type}_${visual.target}_${index}`}
                     className="flex items-center gap-1.5"
                   >
                     <span className="font-medium">{visual.type}</span>

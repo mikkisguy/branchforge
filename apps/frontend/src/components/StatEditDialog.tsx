@@ -324,7 +324,7 @@ export function StatEditDialog({
           </div>
         ) : (
           <StatFormContent
-            key={statId ?? "new"}
+            key={`${statId ?? "new"}-${open}`}
             statId={statId}
             stats={stats}
             isSaving={isSaving}

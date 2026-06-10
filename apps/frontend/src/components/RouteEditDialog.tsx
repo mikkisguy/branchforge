@@ -284,7 +284,7 @@ export function RouteEditDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl w-full">
         <RouteFormContent
-          key={routeId ?? "new"}
+          key={`${routeId ?? "new"}-${open}`}
           routeId={routeId}
           routeConfigs={routeConfigs}
           isSaving={isSaving}
