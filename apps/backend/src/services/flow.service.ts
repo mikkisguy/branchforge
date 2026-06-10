@@ -6,8 +6,13 @@
  */
 
 import { getDb } from "../db/index.js";
-import { labels, labelLines, projectFiles } from "../db/schema/index.js";
-import { eq, and, asc, isNull, inArray } from "drizzle-orm";
+import {
+  labels,
+  labelLines,
+  projectFiles,
+  flowGraphLayouts,
+} from "../db/schema/index.js";
+import { eq, and, asc, isNull, inArray, sql } from "drizzle-orm";
 import type { FlowGraph, FlowNode, FlowEdge } from "@branchforge/shared";
 import { requireProjectAccess } from "./authz.service.js";
 
@@ -231,6 +236,100 @@ export async function getFlowGraph(
   }
 
   return { nodes, edges };
+}
+
+/**
+ * Get saved flow graph layout positions for a project
+ *
+ * @param projectId - The project ID
+ * @param userId - The user ID making the request
+ * @returns The saved positions map, or empty object if none saved
+ */
+export async function getFlowGraphLayout(
+  projectId: string,
+  userId: string
+): Promise<Record<string, { x: number; y: number }>> {
+  const db = getDb();
+
+  // Verify the user has access
+  await requireProjectAccess(projectId, userId);
+
+  const layout = await db
+    .select({ positions: flowGraphLayouts.positions })
+    .from(flowGraphLayouts)
+    .where(
+      and(
+        eq(flowGraphLayouts.projectId, projectId),
+        eq(flowGraphLayouts.userId, userId)
+      )
+    )
+    .limit(1);
+
+  if (layout.length === 0) {
+    return {};
+  }
+
+  return layout[0].positions;
+}
+
+/**
+ * Save flow graph layout positions for a project
+ *
+ * Uses upsert to save or replace any existing layout for this project/user pair.
+ *
+ * @param projectId - The project ID
+ * @param userId - The user ID making the request
+ * @param positions - Map of labelId → { x, y }
+ */
+export async function saveFlowGraphLayout(
+  projectId: string,
+  userId: string,
+  positions: Record<string, { x: number; y: number }>
+): Promise<void> {
+  const db = getDb();
+
+  // Verify the user has access
+  await requireProjectAccess(projectId, userId);
+
+  await db
+    .insert(flowGraphLayouts)
+    .values({
+      projectId,
+      userId,
+      positions,
+    })
+    .onConflictDoUpdate({
+      target: [flowGraphLayouts.projectId, flowGraphLayouts.userId],
+      set: {
+        positions,
+        updatedAt: sql`now()`,
+      },
+    });
+}
+
+/**
+ * Delete (reset) flow graph layout positions for a project
+ *
+ * @param projectId - The project ID
+ * @param userId - The user ID making the request
+ */
+export async function deleteFlowGraphLayout(
+  projectId: string,
+  userId: string
+): Promise<void> {
+  const db = getDb();
+
+  // Verify the user has access
+  await requireProjectAccess(projectId, userId);
+
+  await db
+    .delete(flowGraphLayouts)
+    .where(
+      and(
+        eq(flowGraphLayouts.projectId, projectId),
+        eq(flowGraphLayouts.userId, userId)
+      )
+    );
 }
 
 /**

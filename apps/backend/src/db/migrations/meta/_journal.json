@@ -302,6 +302,13 @@
       "when": 1780468214901,
       "tag": "0042_right_fabian_cortez",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1781115266787,
+      "tag": "0043_abandoned_blue_shield",
+      "breakpoints": true
     }
   ]
 }

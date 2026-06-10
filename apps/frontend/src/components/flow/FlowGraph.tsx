@@ -18,8 +18,10 @@ import {
 } from "@xyflow/react";
 import dagre from "dagre";
 import "@xyflow/react/dist/style.css";
+import { RotateCcw } from "lucide-react";
 import { LabelNodeMemo, type LabelNodeData } from "./LabelNode";
 import { useFlowGraph } from "@/hooks/useFlowGraph";
+import { useFlowGraphLayout } from "@/hooks/useFlowGraphLayout";
 import type { FlowNode, FlowEdge } from "@branchforge/shared";
 
 interface FlowGraphProps {
@@ -70,7 +72,8 @@ function buildRouteColorMap(nodes: FlowNode[]): Map<string, string> {
 function layoutNodes(
   flowNodes: FlowNode[],
   flowEdges: FlowEdge[],
-  routeColorMap: Map<string, string>
+  routeColorMap: Map<string, string>,
+  savedPositions: Record<string, { x: number; y: number }>
 ): Node[] {
   const g = new dagre.graphlib.Graph();
 
@@ -102,16 +105,25 @@ function layoutNodes(
 
   // Convert dagre positions to ReactFlow nodes
   return flowNodes.map((node) => {
-    const dagreNode = g.node(node.id);
     const routeColor = getRouteColor(node.routeKey, routeColorMap);
+
+    // Use saved position if available, otherwise use dagre position
+    const savedPos = savedPositions[node.id];
+    let position: { x: number; y: number };
+    if (savedPos) {
+      position = savedPos;
+    } else {
+      const dagreNode = g.node(node.id);
+      position = {
+        x: dagreNode.x - nodeWidth / 2,
+        y: dagreNode.y - nodeHeight / 2,
+      };
+    }
 
     return {
       id: node.id,
       type: "label",
-      position: {
-        x: dagreNode.x - nodeWidth / 2,
-        y: dagreNode.y - nodeHeight / 2,
-      },
+      position,
       data: {
         labelId: node.labelId,
         title: node.title,
@@ -176,6 +188,32 @@ function getEdgeWidth(type: string): number {
   }
 }
 
+function sameData(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || !a || !b) return false;
+  const ak = a as Record<string, unknown>;
+  const bk = b as Record<string, unknown>;
+  const aKeys = Object.keys(ak);
+  if (aKeys.length !== Object.keys(bk).length) return false;
+  for (const k of aKeys) {
+    if (ak[k] !== bk[k]) return false;
+  }
+  return true;
+}
+
+function sameStyle(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || !a || !b) return false;
+  const ak = a as Record<string, unknown>;
+  const bk = b as Record<string, unknown>;
+  const aKeys = Object.keys(ak);
+  if (aKeys.length !== Object.keys(bk).length) return false;
+  for (const k of aKeys) {
+    if (ak[k] !== bk[k]) return false;
+  }
+  return true;
+}
+
 export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
   const {
     nodes: flowNodes,
@@ -189,9 +227,16 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
     [flowNodes]
   );
 
+  const {
+    positions: savedPositions,
+    handleNodeDragStop: handleLayoutDragStop,
+    handleResetLayout,
+    isResetting,
+  } = useFlowGraphLayout(projectId);
+
   const layoutNodesResult = useMemo(
-    () => layoutNodes(flowNodes, flowEdges, routeColorMap),
-    [flowNodes, flowEdges, routeColorMap]
+    () => layoutNodes(flowNodes, flowEdges, routeColorMap, savedPositions),
+    [flowNodes, flowEdges, routeColorMap, savedPositions]
   );
 
   const layoutEdgesResult = useMemo(() => buildEdges(flowEdges), [flowEdges]);
@@ -199,23 +244,44 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
-  const lastSyncedNodesKey = useRef<string>("");
+  const nodesRef = useRef(nodes);
+  useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
+
   const lastSyncedEdgesKey = useRef<string>("");
 
   useEffect(() => {
-    const key = layoutNodesResult.map((n) => n.id).join("|");
-    if (key === lastSyncedNodesKey.current) return;
-    lastSyncedNodesKey.current = key;
-
     setNodes((prev) => {
       const prevById = new Map(prev.map((n) => [n.id, n]));
-      return layoutNodesResult.map((next) => {
-        const existing = prevById.get(next.id);
-        if (existing) {
-          return { ...existing, data: next.data, style: next.style };
+      let changed = false;
+      const next = layoutNodesResult.map((layoutNode) => {
+        const existing = prevById.get(layoutNode.id);
+        if (!existing) {
+          changed = true;
+          return layoutNode;
         }
-        return next;
+
+        const posChanged =
+          existing.position.x !== layoutNode.position.x ||
+          existing.position.y !== layoutNode.position.y;
+        const dataChanged = !sameData(existing.data, layoutNode.data);
+        const styleChanged = !sameStyle(existing.style, layoutNode.style);
+
+        if (!posChanged && !dataChanged && !styleChanged) {
+          return existing;
+        }
+        changed = true;
+        return {
+          ...existing,
+          position: layoutNode.position,
+          data: layoutNode.data,
+          style: layoutNode.style,
+        };
       });
+
+      if (!changed) return prev;
+      return next;
     });
   }, [layoutNodesResult, setNodes]);
 
@@ -234,6 +300,14 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
     },
     [onNodeClick]
   );
+
+  const onNodeDragStop = useCallback(() => {
+    const nodePositions: Record<string, { x: number; y: number }> = {};
+    for (const node of nodesRef.current) {
+      nodePositions[node.id] = { x: node.position.x, y: node.position.y };
+    }
+    handleLayoutDragStop(nodePositions);
+  }, [handleLayoutDragStop]);
 
   if (isLoading) {
     return (
@@ -272,6 +346,7 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick as NodeMouseHandler}
+        onNodeDragStop={onNodeDragStop}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.2 }}
@@ -294,6 +369,17 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
             return data.routeColor ?? "#64748b";
           }}
         />
+        <div className="absolute top-4 right-4 z-10">
+          <button
+            onClick={handleResetLayout}
+            disabled={isResetting}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 border border-slate-600 rounded-lg hover:bg-slate-700 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Reset layout to auto-arrange"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Reset Layout
+          </button>
+        </div>
       </ReactFlow>
     </div>
   );
