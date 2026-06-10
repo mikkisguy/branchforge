@@ -317,6 +317,15 @@ export const projectFilesQuerySchema = z.object({
 export type ProjectFilesQuery = z.infer<typeof projectFilesQuerySchema>;
 
 /**
+ * Flow graph query validation
+ */
+export const flowGraphQuerySchema = z.object({
+  projectId: uuidSchema,
+});
+
+export type FlowGraphQuery = z.infer<typeof flowGraphQuerySchema>;
+
+/**
  * File ID params validation
  */
 export const fileIdParamsSchema = z.object({

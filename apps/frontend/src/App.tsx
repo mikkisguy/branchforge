@@ -15,7 +15,6 @@ const LoginPage = lazy(() =>
 const RegisterPage = lazy(() =>
   import("./pages/auth/register").then((m) => ({ default: m.RegisterPage }))
 );
-
 function App() {
   return (
     <ThemeProvider>
