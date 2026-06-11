@@ -912,3 +912,16 @@ export interface FlowGraph {
   nodes: FlowNode[];
   edges: FlowEdge[];
 }
+
+/**
+ * Saved position for a single node in the flow graph
+ */
+export interface FlowNodePosition {
+  x: number;
+  y: number;
+}
+
+/**
+ * Map of label IDs to their saved positions
+ */
+export type FlowGraphPositions = Record<string, FlowNodePosition>;

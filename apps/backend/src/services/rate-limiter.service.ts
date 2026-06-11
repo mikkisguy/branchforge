@@ -52,17 +52,32 @@ function startCleanup(): void {
 // Start cleanup on module load
 startCleanup();
 
+export interface RateLimitOptions {
+  maxAttempts?: number;
+  windowMs?: number;
+}
+
+const DEFAULT_MAX_ATTEMPTS = MAX_ATTEMPTS;
+const DEFAULT_WINDOW_MS = WINDOW_MS;
+
 /**
  * Check if a request from the given IP should be rate limited
  *
  * @param identifier - IP address or other identifier to rate limit by
+ * @param options - Optional override of max attempts and window size
  * @returns Object with { allowed: boolean, remainingAttempts: number }
  */
-export function checkRateLimit(identifier: string): {
+export function checkRateLimit(
+  identifier: string,
+  options: RateLimitOptions = {}
+): {
   allowed: boolean;
   remainingAttempts: number;
   retryAfter?: number;
 } {
+  const maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+  const windowMs = options.windowMs ?? DEFAULT_WINDOW_MS;
+
   const now = Date.now();
   const entry = rateLimitStore.get(identifier);
 
@@ -70,16 +85,16 @@ export function checkRateLimit(identifier: string): {
   if (!entry || now > entry.resetTime) {
     rateLimitStore.set(identifier, {
       count: 1,
-      resetTime: now + WINDOW_MS,
+      resetTime: now + windowMs,
     });
     return {
       allowed: true,
-      remainingAttempts: MAX_ATTEMPTS - 1,
+      remainingAttempts: maxAttempts - 1,
     };
   }
 
   // Within the window, check if limit exceeded
-  if (entry.count >= MAX_ATTEMPTS) {
+  if (entry.count >= maxAttempts) {
     const retryAfter = Math.ceil((entry.resetTime - now) / 1000);
     return {
       allowed: false,
@@ -92,7 +107,7 @@ export function checkRateLimit(identifier: string): {
   entry.count++;
   return {
     allowed: true,
-    remainingAttempts: MAX_ATTEMPTS - entry.count,
+    remainingAttempts: maxAttempts - entry.count,
   };
 }
 

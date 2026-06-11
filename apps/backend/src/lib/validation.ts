@@ -326,6 +326,28 @@ export const flowGraphQuerySchema = z.object({
 export type FlowGraphQuery = z.infer<typeof flowGraphQuerySchema>;
 
 /**
+ * Flow graph layout position schema
+ */
+const nodePositionSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+});
+
+/**
+ * Save flow graph layout request validation
+ */
+export const saveFlowGraphLayoutSchema = z
+  .object({
+    projectId: uuidSchema,
+    positions: z.record(z.string().uuid(), nodePositionSchema),
+  })
+  .strict();
+
+export type SaveFlowGraphLayoutInput = z.infer<
+  typeof saveFlowGraphLayoutSchema
+>;
+
+/**
  * File ID params validation
  */
 export const fileIdParamsSchema = z.object({

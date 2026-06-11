@@ -26,6 +26,7 @@ export * from "./tables/admin-settings.js";
 // Project tables
 export * from "./tables/projects.js";
 export * from "./tables/project-settings.js";
+export * from "./tables/flow-graph-layouts.js";
 
 // Project Files (unified for all sources)
 export * from "./tables/project-files.js";
