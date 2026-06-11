@@ -7,11 +7,13 @@ import type {
   LabelDetail,
   Stat,
   RouteConfig,
-  StatCondition,
-  ComparisonOperator,
 } from "@branchforge/shared";
 import { cva } from "class-variance-authority";
-import { formatVariableCondition } from "@/lib/format-conditions";
+import {
+  formatVariableCondition,
+  formatStatCondition,
+} from "@/lib/format-conditions";
+import { FormattedCondition } from "@/components/write-mode/FormattedCondition";
 
 const panelVariants = cva(
   "min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3 transition-all duration-300 ease-out",
@@ -30,22 +32,6 @@ const STATUS_COLORS = {
   REVIEW: "var(--theme-review-color)",
   DRAFT: "var(--theme-draft-color)",
 } as const;
-
-const OPERATOR_SYMBOLS: Record<ComparisonOperator, string> = {
-  ">=": "≥",
-  "<=": "≤",
-  "==": "=",
-  "!=": "≠",
-  ">": ">",
-  "<": "<",
-};
-
-function formatStatCondition(value: number | StatCondition): string {
-  if (typeof value === "number") {
-    return `${OPERATOR_SYMBOLS[">="]} ${value}`;
-  }
-  return `${OPERATOR_SYMBOLS[value.operator]} ${value.value}`;
-}
 
 interface LabelPropertiesPanelProps {
   activeLabel: LabelDetail | undefined;
@@ -364,9 +350,14 @@ export function LabelPropertiesPanel({
                             ([varName, condition]) => (
                               <span
                                 key={varName}
-                                className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/80 border border-border/50 text-xs font-mono text-foreground"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted/80 border border-border/50 text-xs text-foreground"
                               >
-                                {formatVariableCondition(varName, condition)}
+                                <FormattedCondition
+                                  parts={formatVariableCondition(
+                                    varName,
+                                    condition
+                                  )}
+                                />
                               </span>
                             )
                           )
@@ -383,15 +374,22 @@ export function LabelPropertiesPanel({
                           Object.entries(activeLabel.conditions.stats).map(
                             ([statKey, value]) => {
                               const stat = statByKey.get(statKey);
+                              const displayName = stat?.name ?? statKey;
+                              const condition =
+                                typeof value === "number"
+                                  ? { value, operator: ">=" as const }
+                                  : value;
                               return (
                                 <span
                                   key={statKey}
-                                  className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/80 border border-border/50 text-xs font-mono text-foreground"
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted/80 border border-border/50 text-xs text-foreground"
                                 >
-                                  {stat?.name ?? statKey}{" "}
-                                  {formatStatCondition(
-                                    value as number | StatCondition
-                                  )}
+                                  <FormattedCondition
+                                    parts={formatStatCondition(
+                                      displayName,
+                                      condition
+                                    )}
+                                  />
                                 </span>
                               );
                             }
@@ -536,12 +534,14 @@ export function LabelPropertiesPanel({
                                 ([varName, condition]) => (
                                   <span
                                     key={varName}
-                                    className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted/80 border border-border/50 font-mono text-muted-foreground"
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted/80 border border-border/50 text-muted-foreground"
                                   >
-                                    {formatVariableCondition(
-                                      varName,
-                                      condition
-                                    )}
+                                    <FormattedCondition
+                                      parts={formatVariableCondition(
+                                        varName,
+                                        condition
+                                      )}
+                                    />
                                   </span>
                                 )
                               )}
@@ -549,13 +549,18 @@ export function LabelPropertiesPanel({
                               Object.entries(jump.conditions.stats).map(
                                 ([statKey, condition]) => {
                                   const stat = statByKey.get(statKey);
+                                  const displayName = stat?.name ?? statKey;
                                   return (
                                     <span
                                       key={statKey}
-                                      className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted/80 border border-border/50 font-mono text-foreground"
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted/80 border border-border/50 text-foreground"
                                     >
-                                      {stat?.name ?? statKey}{" "}
-                                      {formatStatCondition(condition)}
+                                      <FormattedCondition
+                                        parts={formatStatCondition(
+                                          displayName,
+                                          condition
+                                        )}
+                                      />
                                     </span>
                                   );
                                 }

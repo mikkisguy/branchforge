@@ -6,12 +6,12 @@ import {
   useState,
   useCallback,
 } from "react";
-import type {
-  ComparisonOperator,
-  StatCondition,
-  VariableCondition,
-} from "@branchforge/shared";
-import { formatVariableCondition } from "@/lib/format-conditions";
+import type { StatCondition, VariableCondition } from "@branchforge/shared";
+import {
+  formatVariableCondition,
+  formatStatCondition,
+} from "@/lib/format-conditions";
+import { FormattedCondition } from "@/components/write-mode/FormattedCondition";
 
 interface ConditionsData {
   stats?: Record<string, StatCondition>;
@@ -40,19 +40,6 @@ interface TechnicalPopoverProps {
   type: "conditions" | "jump" | "visuals" | "menu";
   data: ConditionsData | JumpData | VisualData[] | MenuChoiceData[] | null;
   onClose: () => void;
-}
-
-const OPERATOR_SYMBOLS: Record<ComparisonOperator, string> = {
-  ">=": "≥",
-  "<=": "≤",
-  "==": "=",
-  "!=": "≠",
-  ">": ">",
-  "<": "<",
-};
-
-function formatStatCondition(condition: StatCondition): string {
-  return `${OPERATOR_SYMBOLS[condition.operator]} ${condition.value}`;
 }
 
 export function TechnicalPopover({
@@ -143,7 +130,10 @@ export function TechnicalPopover({
                       <span className="text-muted-foreground/60 w-2 flex-shrink-0 select-none">
                         -
                       </span>
-                      {key}: {formatStatCondition(value)}
+                      <FormattedCondition
+                        parts={formatStatCondition(key, value)}
+                        valueClassName="font-mono text-foreground"
+                      />
                     </li>
                   ))}
                 {hasVars &&
@@ -153,7 +143,10 @@ export function TechnicalPopover({
                         <span className="text-muted-foreground/60 w-2 flex-shrink-0 select-none">
                           -
                         </span>
-                        {formatVariableCondition(varName, condition)}
+                        <FormattedCondition
+                          parts={formatVariableCondition(varName, condition)}
+                          valueClassName="font-mono text-foreground"
+                        />
                       </li>
                     )
                   )}
@@ -195,14 +188,11 @@ export function TechnicalPopover({
                     key={`${visual.type}_${visual.target}_${index}`}
                     className="flex items-center gap-1.5"
                   >
-                    <span className="font-medium">{visual.type}</span>
+                    <span>{visual.type}</span>
                     {visual.target && (
-                      <>
-                        <span className="text-muted-foreground/60 select-none">
-                          :
-                        </span>
-                        <span>{visual.target}</span>
-                      </>
+                      <span className="font-mono text-foreground">
+                        {visual.target}
+                      </span>
                     )}
                   </li>
                 ))}
