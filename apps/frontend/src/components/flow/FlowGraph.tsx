@@ -102,7 +102,7 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
   useEffect(() => {
     setNodes((prev) => {
       const prevById = new Map(prev.map((n) => [n.id, n]));
-      let changed = false;
+      let changed = prevById.size !== layoutNodesResult.length;
       const next = layoutNodesResult.map((layoutNode) => {
         const existing = prevById.get(layoutNode.id);
         if (!existing) {
@@ -134,7 +134,12 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
   }, [layoutNodesResult, setNodes]);
 
   useEffect(() => {
-    const key = layoutEdgesResult.map((e) => e.id).join("|");
+    const key = layoutEdgesResult
+      .map(
+        (e) =>
+          `${e.id}:${e.source}:${e.target}:${e.sourceHandle ?? ""}:${e.targetHandle ?? ""}:${JSON.stringify(e.style ?? {})}:${JSON.stringify(e.data ?? {})}`
+      )
+      .join("|");
     if (key === lastSyncedEdgesKey.current) return;
     lastSyncedEdgesKey.current = key;
     setEdges(layoutEdgesResult);
