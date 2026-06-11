@@ -19,7 +19,7 @@ import { contentTypeEnum, visualTypeEnum } from "../enums.js";
 import { labels } from "./labels.js";
 import { characters } from "./characters.js";
 import { projectFiles } from "./project-files.js";
-import type { StatCondition } from "@branchforge/shared";
+import type { StatCondition, VariableCondition } from "@branchforge/shared";
 
 export const labelLines = pgTable(
   "label_lines",
@@ -52,7 +52,7 @@ export const labelLines = pgTable(
     // Line-level conditions (from issue #160)
     conditions: jsonb("conditions").$type<{
       stats?: Record<string, StatCondition | number>;
-      variables?: string[];
+      variables?: Record<string, VariableCondition>;
     }>(),
 
     // Scene/show/hide statements

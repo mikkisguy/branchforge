@@ -9,7 +9,11 @@ import { calculateContentHash } from "../lib/hash.js";
 import type { NewLabelLine } from "../db/schema/index.js";
 import { ValidationError } from "../middleware/error-handler.middleware.js";
 import { logError, LogEventType } from "../lib/logger.js";
-import type { ComparisonOperator, StatCondition } from "@branchforge/shared";
+import type {
+  ComparisonOperator,
+  StatCondition,
+  VariableCondition,
+} from "@branchforge/shared";
 
 // ============================================================================
 // Type Definitions
@@ -32,7 +36,7 @@ export type ContentType =
  */
 export type LineConditions = {
   stats?: Record<string, number | StatCondition>;
-  variables?: string[];
+  variables?: Record<string, VariableCondition>;
   statDeltas?: Record<string, number>;
 };
 

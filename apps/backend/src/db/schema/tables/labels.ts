@@ -25,7 +25,7 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import type { IncomingJump } from "@branchforge/shared";
+import type { IncomingJump, VariableCondition } from "@branchforge/shared";
 import {
   labelStatusEnum,
   labelVisibilityEnum,
@@ -54,10 +54,10 @@ export const labels = pgTable(
       onDelete: "set null",
     }),
     status: labelStatusEnum("status").default("DRAFT"),
-    conditions: jsonb("conditions")
-      .notNull()
-      .default({})
-      .$type<{ variables?: string[]; stats?: Record<string, number> }>(), // {variables: [], stats: {}}
+    conditions: jsonb("conditions").notNull().default({}).$type<{
+      variables?: Record<string, VariableCondition>;
+      stats?: Record<string, number>;
+    }>(), // {variables: {}, stats: {}}
     incomingJumps: jsonb("incoming_jumps").$type<IncomingJump[] | null>(),
     effects: jsonb("effects").notNull().default({}).$type<{
       variablesSet?: string[];

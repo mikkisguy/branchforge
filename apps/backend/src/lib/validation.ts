@@ -432,7 +432,15 @@ export const updateLabelSchema = z
     conditions: z
       .object({
         stats: z.record(z.string(), z.number().finite()).optional(),
-        variables: z.array(z.string()).optional(),
+        variables: z
+          .record(
+            z.string(),
+            z.object({
+              value: z.union([z.string(), z.boolean()]),
+              operator: z.enum(["==", "!=", "truthy", "falsy"]),
+            })
+          )
+          .optional(),
       })
       .optional()
       .nullable(),

@@ -6,11 +6,16 @@ import {
   useState,
   useCallback,
 } from "react";
-import type { ComparisonOperator, StatCondition } from "@branchforge/shared";
+import type {
+  ComparisonOperator,
+  StatCondition,
+  VariableCondition,
+} from "@branchforge/shared";
+import { formatVariableCondition } from "@/lib/format-conditions";
 
 interface ConditionsData {
   stats?: Record<string, StatCondition>;
-  variables?: string[];
+  variables?: Record<string, VariableCondition>;
 }
 
 interface JumpData {
@@ -123,7 +128,8 @@ export function TechnicalPopover({
             conditionsData.stats &&
             Object.keys(conditionsData.stats).length > 0;
           const hasVars =
-            conditionsData.variables && conditionsData.variables.length > 0;
+            conditionsData.variables &&
+            Object.keys(conditionsData.variables).length > 0;
           return (
             <div className="space-y-3">
               <div className="flex items-center gap-1.5">
@@ -141,14 +147,16 @@ export function TechnicalPopover({
                     </li>
                   ))}
                 {hasVars &&
-                  conditionsData.variables!.map((variable: string) => (
-                    <li key={variable} className="flex items-center gap-1.5">
-                      <span className="text-muted-foreground/60 w-2 flex-shrink-0 select-none">
-                        -
-                      </span>
-                      {variable}
-                    </li>
-                  ))}
+                  Object.entries(conditionsData.variables!).map(
+                    ([varName, condition]) => (
+                      <li key={varName} className="flex items-center gap-1.5">
+                        <span className="text-muted-foreground/60 w-2 flex-shrink-0 select-none">
+                          -
+                        </span>
+                        {formatVariableCondition(varName, condition)}
+                      </li>
+                    )
+                  )}
               </ul>
             </div>
           );

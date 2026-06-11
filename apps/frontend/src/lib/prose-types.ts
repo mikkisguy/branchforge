@@ -4,7 +4,7 @@
  * Types for the WriteMode prose editor interface.
  */
 
-import type { StatCondition } from "@branchforge/shared";
+import type { StatCondition, VariableCondition } from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -55,7 +55,7 @@ export interface DialogueEntry {
     };
     conditions?: {
       stats?: Record<string, StatCondition>;
-      variables?: string[];
+      variables?: Record<string, VariableCondition>;
     };
     visuals?: Array<{
       type: "SCENE" | "SHOW" | "HIDE";

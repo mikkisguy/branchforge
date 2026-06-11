@@ -11,6 +11,7 @@ import type {
   ComparisonOperator,
 } from "@branchforge/shared";
 import { cva } from "class-variance-authority";
+import { formatVariableCondition } from "@/lib/format-conditions";
 
 const panelVariants = cva(
   "min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3 transition-all duration-300 ease-out",
@@ -357,14 +358,15 @@ export function LabelPropertiesPanel({
                       <p className="text-muted-foreground mb-1.5">Variables</p>
                       <div className="flex flex-wrap gap-1">
                         {activeLabel.conditions.variables &&
-                        activeLabel.conditions.variables.length > 0 ? (
-                          activeLabel.conditions.variables.map(
-                            (variableKey) => (
+                        Object.keys(activeLabel.conditions.variables).length >
+                          0 ? (
+                          Object.entries(activeLabel.conditions.variables).map(
+                            ([varName, condition]) => (
                               <span
-                                key={variableKey}
+                                key={varName}
                                 className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/80 border border-border/50 text-xs font-mono text-foreground"
                               >
-                                {variableKey}
+                                {formatVariableCondition(varName, condition)}
                               </span>
                             )
                           )
@@ -529,14 +531,20 @@ export function LabelPropertiesPanel({
                         </div>
                         {jump.conditions && (
                           <div className="mt-1.5 flex flex-wrap gap-1">
-                            {jump.conditions.variables?.map((variable) => (
-                              <span
-                                key={variable}
-                                className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted/80 border border-border/50 font-mono text-muted-foreground"
-                              >
-                                {variable}
-                              </span>
-                            ))}
+                            {jump.conditions.variables &&
+                              Object.entries(jump.conditions.variables).map(
+                                ([varName, condition]) => (
+                                  <span
+                                    key={varName}
+                                    className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted/80 border border-border/50 font-mono text-muted-foreground"
+                                  >
+                                    {formatVariableCondition(
+                                      varName,
+                                      condition
+                                    )}
+                                  </span>
+                                )
+                              )}
                             {jump.conditions.stats &&
                               Object.entries(jump.conditions.stats).map(
                                 ([statKey, condition]) => {

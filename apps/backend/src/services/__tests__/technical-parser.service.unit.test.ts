@@ -143,7 +143,9 @@ describe("extractTechnicalConstructs - comparison operators", () => {
     expect(result.conditions?.stats).toEqual({
       strength: { value: 5, operator: ">=" },
     });
-    expect(result.conditions?.variables).toEqual(["flag_luna"]);
+    expect(result.conditions?.variables).toEqual({
+      flag_luna: { value: true, operator: "truthy" },
+    });
   });
 });
 
