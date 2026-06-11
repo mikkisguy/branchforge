@@ -12,7 +12,7 @@ import { flowKeys } from "@/lib/query-keys";
 import { useToast } from "@/contexts/ToastContext";
 import type { FlowGraphPositions } from "@branchforge/shared";
 
-const EMPTY_POSITIONS: FlowGraphPositions = {};
+const emptyPositions: FlowGraphPositions = {};
 
 export function useFlowGraphLayout(projectId: string) {
   const queryClient = useQueryClient();
@@ -27,7 +27,7 @@ export function useFlowGraphLayout(projectId: string) {
   });
 
   const positions = useMemo<FlowGraphPositions>(
-    () => query.data?.positions ?? EMPTY_POSITIONS,
+    () => query.data?.positions ?? emptyPositions,
     [query.data?.positions]
   );
 
@@ -35,11 +35,6 @@ export function useFlowGraphLayout(projectId: string) {
   const saveMutation = useMutation({
     mutationFn: ({ positions }: { positions: FlowGraphPositions }) =>
       flowApi.saveFlowGraphLayout(projectId, positions),
-    onSuccess: (_data, variables) => {
-      queryClient.setQueryData(flowKeys.layout(projectId), {
-        positions: variables.positions,
-      });
-    },
     onMutate: async ({ positions }) => {
       await queryClient.cancelQueries({ queryKey: flowKeys.layout(projectId) });
       const previous = queryClient.getQueryData<{
@@ -69,18 +64,13 @@ export function useFlowGraphLayout(projectId: string) {
   // Reset mutation
   const resetMutation = useMutation({
     mutationFn: () => flowApi.deleteFlowGraphLayout(projectId),
-    onSuccess: () => {
-      queryClient.setQueryData(flowKeys.layout(projectId), {
-        positions: EMPTY_POSITIONS,
-      });
-    },
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: flowKeys.layout(projectId) });
       const previous = queryClient.getQueryData<{
         positions: FlowGraphPositions;
       }>(flowKeys.layout(projectId));
       queryClient.setQueryData(flowKeys.layout(projectId), {
-        positions: EMPTY_POSITIONS,
+        positions: emptyPositions,
       });
       return { previousPositions: previous?.positions };
     },
