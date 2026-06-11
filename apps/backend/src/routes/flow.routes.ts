@@ -97,7 +97,7 @@ async function saveLayoutHandler(
   reply: FastifyReply
 ): Promise<void> {
   const clientIp = getClientIp(request);
-  const rateLimit = checkRateLimit(clientIp, {
+  const rateLimit = checkRateLimit(`layoutSave:${clientIp}`, {
     maxAttempts: 60,
     windowMs: 15 * 60 * 1000,
   });

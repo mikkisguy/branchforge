@@ -231,6 +231,7 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
     positions: savedPositions,
     handleNodeDragStop: handleLayoutDragStop,
     handleResetLayout,
+    isSaving,
     isResetting,
   } = useFlowGraphLayout(projectId);
 
@@ -371,8 +372,9 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
         />
         <div className="absolute top-4 right-4 z-10">
           <button
+            type="button"
             onClick={handleResetLayout}
-            disabled={isResetting}
+            disabled={isSaving || isResetting}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 border border-slate-600 rounded-lg hover:bg-slate-700 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title="Reset layout to auto-arrange"
           >
