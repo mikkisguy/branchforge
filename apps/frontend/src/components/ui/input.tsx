@@ -1,24 +1,40 @@
 import * as React from "react";
+import type { VariantProps } from "class-variance-authority";
+import { cva } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
-function Input({
-  className,
-  type,
-  ref,
-  ...props
-}: React.ComponentProps<"input">) {
+const inputVariants = cva(
+  "flex w-full rounded-md border border-border/30 bg-popover transition-colors placeholder:text-muted-foreground focus-visible:border-[var(--theme-color)]/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--theme-color)]/20 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground disabled:cursor-not-allowed disabled:opacity-50",
+  {
+    variants: {
+      size: {
+        default: "h-9 px-3 py-1 text-base md:text-sm shadow-sm",
+        sm: "h-7 px-2 py-0.5 text-xs",
+      },
+    },
+    defaultVariants: {
+      size: "default",
+    },
+  }
+);
+
+interface InputProps
+  extends
+    Omit<React.ComponentProps<"input">, "size">,
+    VariantProps<typeof inputVariants> {
+  ref?: React.Ref<HTMLInputElement>;
+}
+
+function Input({ className, type, size, ref, ...props }: InputProps) {
   return (
     <input
       type={type}
-      className={cn(
-        "flex h-9 w-full rounded-md border border-border/30 bg-transparent px-3 py-1 text-base shadow-sm transition-colors focus-visible:border-[var(--theme-color)]/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--theme-color)]/20 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-        className
-      )}
+      className={cn(inputVariants({ size, className }))}
       ref={ref}
       {...props}
     />
   );
 }
 
-export { Input };
+export { Input, inputVariants };

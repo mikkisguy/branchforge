@@ -8,6 +8,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 
 interface LabelEditDialogProps {
   /** Whether the dialog is open */
@@ -252,7 +254,7 @@ export function LabelEditDialog({
             >
               Title
             </label>
-            <input
+            <Input
               id="label-title"
               type="text"
               value={form.title}
@@ -264,7 +266,6 @@ export function LabelEditDialog({
               disabled={isSaving}
               placeholder="Enter label title"
               maxLength={255}
-              className="w-full px-3 py-2 border border-border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
             />
             {form.titleError && (
               <p className="text-xs text-destructive mt-1">{form.titleError}</p>
@@ -280,7 +281,7 @@ export function LabelEditDialog({
               >
                 Label Name
               </label>
-              <input
+              <Input
                 id="label-name"
                 type="text"
                 value={form.labelName}
@@ -291,7 +292,7 @@ export function LabelEditDialog({
                 }}
                 disabled={isSaving}
                 placeholder={currentLabelName}
-                className="w-full px-3 py-2 border border-border rounded-md text-sm bg-background font-mono focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
+                className="font-mono"
               />
               {form.labelNameError && (
                 <p className="text-xs text-destructive mt-1">
@@ -315,22 +316,18 @@ export function LabelEditDialog({
               >
                 Route
               </label>
-              <select
-                id="label-route"
-                value={form.route}
-                onChange={(e) =>
-                  dispatch({ type: "SET_ROUTE", value: e.target.value })
-                }
+              <Select
+                value={form.route ?? ""}
+                onChange={(value) => dispatch({ type: "SET_ROUTE", value })}
                 disabled={isSaving}
-                className="w-full px-3 py-2 border border-border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
-              >
-                <option value="">No route (shared)</option>
-                {routeConfigs.map((config) => (
-                  <option key={config.id} value={config.routeKey}>
-                    {config.routeName}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: "", label: "No route (shared)" },
+                  ...routeConfigs.map((config) => ({
+                    value: config.routeKey,
+                    label: config.routeName,
+                  })),
+                ]}
+              />
             </div>
 
             {/* Status Field */}
@@ -341,22 +338,21 @@ export function LabelEditDialog({
               >
                 Status
               </label>
-              <select
-                id="label-status"
-                value={form.status}
-                onChange={(e) =>
+              <Select
+                value={form.status ?? undefined}
+                onChange={(value) =>
                   dispatch({
                     type: "SET_STATUS",
-                    value: e.target.value as "DRAFT" | "REVIEW" | "FINAL",
+                    value: value as "DRAFT" | "REVIEW" | "FINAL",
                   })
                 }
                 disabled={isSaving}
-                className="w-full px-3 py-2 border border-border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
-              >
-                <option value="DRAFT">DRAFT</option>
-                <option value="REVIEW">REVIEW</option>
-                <option value="FINAL">FINAL</option>
-              </select>
+                options={[
+                  { value: "DRAFT", label: "DRAFT" },
+                  { value: "REVIEW", label: "REVIEW" },
+                  { value: "FINAL", label: "FINAL" },
+                ]}
+              />
             </div>
 
             {/* Visibility Field */}
@@ -367,25 +363,21 @@ export function LabelEditDialog({
               >
                 Visibility
               </label>
-              <select
-                id="label-visibility"
-                value={form.visibility}
-                onChange={(e) =>
+              <Select
+                value={form.visibility ?? undefined}
+                onChange={(value) =>
                   dispatch({
                     type: "SET_VISIBILITY",
-                    value: e.target.value as
-                      | "EXCLUSIVE"
-                      | "SHARED"
-                      | "DUO_PAIR",
+                    value: value as "EXCLUSIVE" | "SHARED" | "DUO_PAIR",
                   })
                 }
                 disabled={isSaving}
-                className="w-full px-3 py-2 border border-border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30 focus:border-[var(--theme-color)] disabled:opacity-50"
-              >
-                <option value="EXCLUSIVE">EXCLUSIVE</option>
-                <option value="SHARED">SHARED</option>
-                <option value="DUO_PAIR">DUO_PAIR</option>
-              </select>
+                options={[
+                  { value: "EXCLUSIVE", label: "EXCLUSIVE" },
+                  { value: "SHARED", label: "SHARED" },
+                  { value: "DUO_PAIR", label: "DUO_PAIR" },
+                ]}
+              />
             </div>
           </div>
 

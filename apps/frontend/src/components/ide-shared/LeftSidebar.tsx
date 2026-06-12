@@ -21,6 +21,7 @@ import { CharacterDialog } from "@/components/CharacterDialog";
 import { GitLabImportDialog } from "./GitLabImportDialog";
 import { ZipImportProjectDialog } from "./ZipImportProjectDialog";
 import { FlowDialog } from "@/components/flow/FlowDialog";
+import { Select } from "@/components/ui/select";
 import { Logo } from "@/components/ui/logo";
 
 interface ThemePaletteOption {
@@ -302,7 +303,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
                 </button>
 
                 {modals.projectPopover && (
-                  <div className="absolute left-full top-0 ml-2 bg-card border border-border/30 rounded-lg shadow-xl min-w-[300px] max-w-[400px] z-50">
+                  <div className="absolute left-full top-0 ml-2 bg-popover border border-border/70 rounded-lg shadow-xl shadow-black/25 ring-1 ring-white/5 min-w-[300px] max-w-[400px] z-50">
                     <div className="p-2 max-h-[400px] overflow-y-auto">
                       {isLoadingProjects ? (
                         <div className="px-3 py-2 text-sm text-muted-foreground">
@@ -325,10 +326,10 @@ export function LeftSidebar(props: LeftSidebarProps) {
                                 key: "projectPopover",
                               });
                             }}
-                            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-left transition-colors ${
+                            className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-left transition-colors ${
                               projectId === project.id
-                                ? "bg-[var(--theme-color)]/20 text-foreground"
-                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                                ? "bg-accent text-accent-foreground font-medium"
+                                : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
                             }`}
                           >
                             {project.name}
@@ -341,31 +342,25 @@ export function LeftSidebar(props: LeftSidebarProps) {
               </>
             ) : (
               <>
-                {/* Expanded: Native select dropdown */}
-                <select
-                  value={projectId || ""}
-                  onChange={(e) => {
-                    const project = projects.find(
-                      (p) => p.id === e.target.value
-                    );
+                <Select
+                  value={projectId ?? undefined}
+                  onChange={(projectId) => {
+                    const project = projects.find((p) => p.id === projectId);
                     if (project) setCurrentProject(project);
                   }}
                   disabled={isLoadingProjects || projects.length === 0}
-                  className="w-full px-2 py-1.5 rounded-md text-sm font-medium bg-card/80 backdrop-blur border border-dashed cursor-pointer hover:bg-card transition-colors"
-                  style={{ borderColor: "var(--theme-border-subtle)" }}
-                >
-                  {isLoadingProjects ? (
-                    <option>Loading…</option>
-                  ) : projects.length === 0 ? (
-                    <option>No projects</option>
-                  ) : (
-                    projects.map((project) => (
-                      <option key={project.id} value={project.id}>
-                        {project.name}
-                      </option>
-                    ))
-                  )}
-                </select>
+                  placeholder={
+                    isLoadingProjects
+                      ? "Loading…"
+                      : projects.length === 0
+                        ? "No projects"
+                        : "Select project"
+                  }
+                  options={projects.map((p) => ({
+                    value: p.id,
+                    label: p.name,
+                  }))}
+                />
               </>
             )}
           </div>
@@ -473,7 +468,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
                 </button>
 
                 {modals.themeDropdown && (
-                  <div className="absolute left-full top-0 ml-2 bg-card border border-border/30 rounded-lg p-3 shadow-xl z-50">
+                  <div className="absolute left-full top-0 ml-2 bg-popover border border-border/70 rounded-lg p-3 shadow-xl shadow-black/25 ring-1 ring-white/5 z-50">
                     <div className="flex gap-2">
                       {themePalettes.map((palette) => (
                         <button

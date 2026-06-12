@@ -183,7 +183,7 @@ export function LabelContextMenu({
   const menuContent = (
     <div
       ref={menuRef}
-      className="bg-popover border border-border rounded-md shadow-lg py-1 min-w-[160px] z-50"
+      className="bg-popover border border-border/70 rounded-lg shadow-xl shadow-black/25 ring-1 ring-white/5 py-1 min-w-[160px] z-50"
       style={{
         position: "fixed",
         left: position.x,
