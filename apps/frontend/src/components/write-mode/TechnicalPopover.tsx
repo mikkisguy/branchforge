@@ -102,7 +102,7 @@ export function TechnicalPopover({
   return (
     <div
       ref={popoverRef}
-      className={`absolute left-0 z-50 bg-popover border border-border rounded-md shadow-lg p-3 min-w-[200px] animate-in fade-in-0 zoom-in-95 duration-200 ${
+      className={`absolute left-0 z-50 bg-popover border border-border/70 rounded-lg shadow-xl shadow-black/25 ring-1 ring-white/5 p-3 min-w-[200px] animate-in fade-in-0 zoom-in-95 duration-200 ${
         isFlipped ? "bottom-full mb-1" : "top-full mt-1"
       }`}
       style={{ maxWidth: "280px" }}

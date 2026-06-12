@@ -589,7 +589,7 @@ export const DialogueLine = memo(function DialogueLine({
                 }
                 onKeyDown={handleDropdownKeyDown}
                 tabIndex={0}
-                className={`absolute z-50 bg-popover border border-border rounded-md shadow-lg shadow-black/10 py-1 min-w-[160px] max-h-[280px] overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] animate-in fade-in-0 zoom-in-95 duration-200 ease-out ${
+                className={`absolute z-50 bg-popover border border-border/70 rounded-lg shadow-xl shadow-black/25 ring-1 ring-white/5 py-1 min-w-[160px] max-h-[280px] overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] animate-in fade-in-0 zoom-in-95 duration-200 ease-out ${
                   openUpward ? "bottom-full mb-1" : "top-full mt-1"
                 } ${
                   openUpward ? "slide-in-from-bottom-1" : "slide-in-from-top-1"

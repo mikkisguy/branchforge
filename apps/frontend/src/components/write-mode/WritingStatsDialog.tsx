@@ -42,7 +42,7 @@ function CustomTooltip({
 }) {
   if (active && payload && payload.length > 0) {
     return (
-      <div className="bg-popover border border-border rounded-lg px-3 py-2 shadow-lg">
+      <div className="bg-popover border border-border/70 rounded-lg px-3 py-2 shadow-xl shadow-black/25 ring-1 ring-white/5">
         <p className="text-sm font-medium">{payload[0].value} words</p>
       </div>
     );

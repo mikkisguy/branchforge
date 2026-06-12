@@ -37,7 +37,7 @@ function LabelNodeComponent({ data }: NodeProps<LabelNodeType>) {
     <div className="bg-slate-800 border border-slate-600 rounded-lg shadow-lg min-w-[180px] max-w-[240px]">
       <Handle
         type="target"
-        position={Position.Top}
+        position={Position.Left}
         className="!bg-slate-400 !w-2 !h-2"
       />
       <div className="px-3 py-2">
@@ -74,7 +74,7 @@ function LabelNodeComponent({ data }: NodeProps<LabelNodeType>) {
       </div>
       <Handle
         type="source"
-        position={Position.Bottom}
+        position={Position.Right}
         className="!bg-slate-400 !w-2 !h-2"
       />
     </div>

@@ -309,7 +309,7 @@ export function FontSizeSwitcher({
                 ? `font-size-option-${currentFocusedIndex}`
                 : undefined
             }
-            className={`absolute z-50 ${dropdownPositionClasses} bg-card border border-border rounded-md shadow-lg overflow-hidden min-w-[160px] animate-in fade-in-50 zoom-in-95 duration-150`}
+            className={`absolute z-50 ${dropdownPositionClasses} bg-popover border border-border/70 rounded-lg shadow-xl shadow-black/25 ring-1 ring-white/5 overflow-hidden min-w-[160px] animate-in fade-in-0 zoom-in-95 duration-150`}
             onKeyDown={handleKeyDown}
           >
             {sizeOptions.map((option, index) => (

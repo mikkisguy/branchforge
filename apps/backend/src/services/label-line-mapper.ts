@@ -29,7 +29,8 @@ export type ContentType =
   | "CHOICE"
   | "MENU"
   | "JUMP"
-  | "FLAG";
+  | "FLAG"
+  | "VISUAL";
 
 /**
  * Type for line-level conditions
@@ -294,6 +295,30 @@ export function mapEntriesToLabelLineValues(
         conditions: null,
         visualStatements: null,
         menuOptions: entry.menuOptions ?? null,
+      };
+    }
+
+    // Handle VISUAL entries (scene/show/hide statements)
+    if (entry.type === "VISUAL") {
+      const contentHash = calculateContentHash(
+        JSON.stringify(entry.visuals ?? [])
+      );
+      return {
+        labelId,
+        sequence: index + 1,
+        contentType: "VISUAL" as const,
+        content: "",
+        speakerId: null,
+        projectFileId,
+        linePosition: index,
+        contentHash,
+        lastSyncedHash: contentHash,
+        lastSyncedAt: new Date(),
+        rpyLineNumber: entry.lineNumber,
+        rpyIndentLevel: entry.indentLevel ?? 0,
+        conditions: null,
+        visualStatements: entry.visuals ?? null,
+        menuOptions: null,
       };
     }
 

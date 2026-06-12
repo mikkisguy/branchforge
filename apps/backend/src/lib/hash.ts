@@ -45,6 +45,7 @@ function normalizeToCanonicalString(
         text?: string;
         target?: string;
         menuOptions?: Array<Record<string, unknown>>;
+        visuals?: Array<Record<string, unknown>>;
       }
     | { speakerId: string | null; text: string }
 ): string {
@@ -70,6 +71,12 @@ function normalizeToCanonicalString(
         // Menu block: serialize menuOptions for consistent hashing
         if ("menuOptions" in entry && entry.menuOptions) {
           return `menu:${JSON.stringify(entry.menuOptions)}`;
+        }
+        return "";
+      case "VISUAL":
+        // Visual statements: serialize visuals array for consistent hashing
+        if ("visuals" in entry && entry.visuals) {
+          return `visual:${JSON.stringify(entry.visuals)}`;
         }
         return "";
       default:
@@ -142,6 +149,7 @@ export function calculateLinesHash(
         text?: string;
         target?: string;
         menuOptions?: Array<Record<string, unknown>>;
+        visuals?: Array<Record<string, unknown>>;
       }
     | { speakerId: string | null; text: string }
   >

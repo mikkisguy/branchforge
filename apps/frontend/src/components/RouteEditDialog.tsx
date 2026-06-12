@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useRouteConfigs } from "@/hooks/useRouteConfigs";
 import { isValidJumpPrefix, isValidRouteKey } from "@branchforge/shared";
@@ -210,18 +211,16 @@ function RouteFormContent({
             <Label htmlFor="route-type" className="text-xs">
               Route Type
             </Label>
-            <select
+            <Select
               id="route-type"
               value={form.isShared ? "shared" : "exclusive"}
-              onChange={(event) =>
-                handleChange("isShared", event.target.value === "shared")
-              }
+              onChange={(value) => handleChange("isShared", value === "shared")}
               disabled={isSaving}
-              className="w-full px-3 py-2 rounded-md border border-border/30 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-            >
-              <option value="exclusive">Exclusive Route</option>
-              <option value="shared">Shared/Common Route</option>
-            </select>
+              options={[
+                { value: "exclusive", label: "Exclusive Route" },
+                { value: "shared", label: "Shared/Common Route" },
+              ]}
+            />
             <p className="text-xs text-muted-foreground">
               Shared routes appear in all story branches
             </p>

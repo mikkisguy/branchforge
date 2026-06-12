@@ -53,7 +53,11 @@ import {
   type ParsedRPYFileWithLabels,
 } from "./rpy-parser.service.js";
 import { calculateContentHash, calculateLinesHash } from "../lib/hash.js";
-import { mapEntryToDbType, type ContentType } from "./label-line-mapper.js";
+import {
+  mapEntryToDbType,
+  type ContentType,
+  type VisualStatement,
+} from "./label-line-mapper.js";
 import { resolveLabelNames } from "./label-name-resolver.service.js";
 
 // Re-export PublicLabel from shared for route handlers
@@ -431,6 +435,7 @@ function buildLineValues(
     text?: string;
     lineNumber?: number;
     indentLevel?: number;
+    visuals?: VisualStatement[];
     menuOptions?: Array<{
       label: string;
       targetLabelId: string;
@@ -446,7 +451,7 @@ function buildLineValues(
 ): Array<{
   labelId: string;
   sequence: number;
-  contentType: "NARRATION" | "DIALOGUE" | "JUMP" | "MENU";
+  contentType: "NARRATION" | "DIALOGUE" | "JUMP" | "MENU" | "VISUAL";
   content: string;
   speakerId: string | null;
   visualType: "GENERATED";
@@ -466,6 +471,7 @@ function buildLineValues(
       stats?: Record<string, number>;
     };
   }> | null;
+  visualStatements?: VisualStatement[] | null;
 }> {
   return entries.map((entry, index) => {
     // Handle MENU entries with menuOptions
@@ -491,7 +497,30 @@ function buildLineValues(
       };
     }
 
-    // Existing logic for non-MENU entries
+    // Handle VISUAL entries (scene/show/hide statements)
+    if (entry.type === "VISUAL") {
+      const contentHash = calculateContentHash(
+        JSON.stringify(entry.visuals ?? [])
+      );
+      return {
+        labelId,
+        sequence: index + 1,
+        contentType: "VISUAL" as const,
+        content: "",
+        speakerId: null,
+        visualType: "GENERATED" as const,
+        projectFileId: sourceId,
+        linePosition: index,
+        contentHash,
+        lastSyncedHash: contentHash,
+        lastSyncedAt: new Date(),
+        rpyLineNumber: entry.lineNumber ?? null,
+        rpyIndentLevel: entry.indentLevel ?? 0,
+        visualStatements: entry.visuals ?? null,
+      };
+    }
+
+    // Existing logic for non-MENU, non-VISUAL entries
     const contentType = mapEntryToDbType(entry);
     const content = entry.target ? `jump ${entry.target}` : entry.text || "";
     const lineHash = calculateContentHash(content);
@@ -849,6 +878,11 @@ async function syncLabelsInTransaction(
             labelData.entries.map((entry) => {
               if (entry.type === "MENU" && entry.menuOptions) {
                 return calculateContentHash(JSON.stringify(entry.menuOptions));
+              }
+              if (entry.type === "VISUAL") {
+                return calculateContentHash(
+                  JSON.stringify(entry.visuals ?? [])
+                );
               }
               const content = entry.target
                 ? `jump ${entry.target}`
@@ -1475,7 +1509,7 @@ export interface LabelLineWithSpeaker extends Omit<
   speakerName: string | null; // From characters.displayName
   speakerTag: string | null; // From characters.renpyTag
   // Explicitly type enum fields to preserve literal types
-  contentType: "DIALOGUE" | "NARRATION" | "CHOICE" | "MENU" | "JUMP";
+  contentType: "DIALOGUE" | "NARRATION" | "CHOICE" | "MENU" | "JUMP" | "VISUAL";
   visualType: "GENERATED" | "BLACK" | "CUSTOM";
   // Date fields as ISO strings for JSON serialization
   createdAt: string;

@@ -309,6 +309,13 @@
       "when": 1781115266787,
       "tag": "0043_abandoned_blue_shield",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1781280264256,
+      "tag": "0044_flaky_lady_deathstrike",
+      "breakpoints": true
     }
   ]
 }

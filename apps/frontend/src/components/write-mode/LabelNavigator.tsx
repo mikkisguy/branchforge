@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { LabelContextMenu } from "@/components/write-mode/LabelContextMenu";
 import { Tooltip } from "@/components/ui/tooltip";
+import { Input } from "@/components/ui/input";
 import type { UpdateLabelInput } from "@/lib/api/labels";
 
 const STATUS_COLORS: Record<LabelStatus, string> = {
@@ -90,14 +91,15 @@ function InlineRenameInput({
 
   return (
     <div className="flex items-center gap-1.5 min-w-0 px-3 py-2.5">
-      <input
+      <Input
         ref={inputRef}
         type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={() => handleSubmit()}
-        className="flex-1 min-w-0 px-2 py-0.5 border rounded text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30"
+        size="sm"
+        className="flex-1 min-w-0"
         disabled={isSaving}
         maxLength={255}
         aria-label="Rename label"
@@ -262,7 +264,7 @@ function InlineCreateInput({
         Label title
       </label>
       <div className="flex items-center gap-2 min-w-0">
-        <input
+        <Input
           id={LABEL_INPUT_ID}
           ref={inputRef}
           type="text"
@@ -273,7 +275,7 @@ function InlineCreateInput({
           }}
           onKeyDown={handleKeyDown}
           placeholder="Label title..."
-          className="flex-1 min-w-0 px-3 py-2 border rounded-md text-sm bg-background"
+          className="flex-1 min-w-0"
           disabled={isCreating}
         />
         {isCreating ? (
@@ -588,12 +590,12 @@ export function LabelNavigator({
         <div className="mt-2.5 flex items-center gap-1">
           <div className="flex-1 relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
-            <input
+            <Input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Filter..."
-              className="w-full pl-7 pr-7 py-1.5 text-xs border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]/30"
+              className="pl-7 pr-7"
               aria-label="Filter labels"
             />
             {searchQuery && (

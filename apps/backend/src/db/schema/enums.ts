@@ -33,6 +33,7 @@ export const contentTypeEnum = pgEnum("content_type", [
   "CHOICE",
   "MENU",
   "JUMP",
+  "VISUAL",
 ]);
 
 // Visual/image handling types

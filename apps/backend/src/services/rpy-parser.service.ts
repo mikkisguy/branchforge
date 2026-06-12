@@ -15,6 +15,7 @@ import {
   RENPY_LABEL_REGEX,
   type StatCondition,
   type ComparisonOperator,
+  type VisualStatement,
   type VariableCondition,
 } from "@branchforge/shared";
 
@@ -67,7 +68,7 @@ export interface RPYCharacter {
 export interface BranchForgeScene {
   name: string;
   entries: Array<{
-    type: "DIALOGUE" | "NARRATION" | "FLAG" | "JUMP" | "MENU";
+    type: "DIALOGUE" | "NARRATION" | "FLAG" | "JUMP" | "MENU" | "VISUAL";
     speaker?: string;
     text?: string;
     target?: string;
@@ -82,6 +83,7 @@ export interface BranchForgeScene {
         stats?: Record<string, number>;
       };
     }>;
+    visuals?: VisualStatement[];
   }>;
   characters?: Array<{ tag: string; name: string }>;
 }
@@ -1612,6 +1614,34 @@ export function convertToBranchForgeFormatFromLabels(
     }
   }
 
+  // Extract visual statements (scene/show/hide) from original content
+  if (originalLines.length > 0) {
+    // Determine label's line boundaries
+    const labelStartLine = labelData.lineNumber; // 1-indexed
+    const labelIndex = parsed.labels.findIndex((l) => l.label === labelName);
+    const nextLabel = parsed.labels[labelIndex + 1];
+    const labelEndLine = nextLabel
+      ? nextLabel.lineNumber - 1
+      : originalLines.length;
+
+    // Scan lines within label boundaries for scene/show/hide
+    for (
+      let i = labelStartLine;
+      i <= labelEndLine && i <= originalLines.length;
+      i++
+    ) {
+      const constructs = extractTechnicalConstructs(originalContent!, i - 1); // 0-indexed
+      if (constructs.visuals && constructs.visuals.length > 0) {
+        entries.push({
+          type: "VISUAL",
+          lineNumber: i,
+          indentLevel: getIndentLevel(i),
+          visuals: constructs.visuals,
+        });
+      }
+    }
+  }
+
   // Extract unique characters from this label's dialogue
   const characterSet = new Set<string>();
   for (const d of labelData.dialogue) {
@@ -2101,6 +2131,28 @@ export function generateRpyFile(scene: BranchForgeScene): string {
         inMenu = false;
       }
       lines.push(`    jump ${entry.target}`);
+    } else if (entry.type === "VISUAL" && entry.visuals) {
+      if (inMenu) {
+        inMenu = false;
+      }
+      const indent = " ".repeat(entry.indentLevel ? entry.indentLevel * 4 : 4);
+      for (const v of entry.visuals) {
+        if (v.type === "SCENE") {
+          let line = `${indent}scene ${v.target}`;
+          if (v.with) line += ` with ${v.with}`;
+          lines.push(line);
+        } else if (v.type === "SHOW") {
+          let line = `${indent}show ${v.target}`;
+          if (v.at) line += ` at ${v.at}`;
+          if (v.with) line += ` with ${v.with}`;
+          if (v.zorder !== undefined) line += ` zorder ${v.zorder}`;
+          lines.push(line);
+        } else if (v.type === "HIDE") {
+          let line = `${indent}hide ${v.target}`;
+          if (v.with) line += ` with ${v.with}`;
+          lines.push(line);
+        }
+      }
     }
   }
 
@@ -2145,7 +2197,7 @@ export function extractTechnicalConstructs(
   const showMatch = trimmed.match(
     /^show\s+(.+?)(?:\s+at\s+(\S+))?(?:\s+with\s+(\S+))?(?:\s+zorder\s+(\d+))?$/
   );
-  const hideMatch = trimmed.match(/^hide\s+(\S+)/);
+  const hideMatch = trimmed.match(/^hide\s+(\S+)(?:\s+with\s+(\S+))?$/);
 
   if (sceneMatch) {
     constructs.visuals = constructs.visuals || [];
@@ -2167,7 +2219,11 @@ export function extractTechnicalConstructs(
     return constructs;
   } else if (hideMatch) {
     constructs.visuals = constructs.visuals || [];
-    constructs.visuals.push({ type: "HIDE", target: hideMatch[1] });
+    constructs.visuals.push({
+      type: "HIDE",
+      target: hideMatch[1],
+      with: hideMatch[2],
+    });
     return constructs;
   }
 

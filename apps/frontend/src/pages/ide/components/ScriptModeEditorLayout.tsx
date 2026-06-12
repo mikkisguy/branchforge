@@ -195,11 +195,11 @@ export function ScriptModeEditorLayout({
         </div>
 
         {isLeftSidebarCollapsed && !isFocusMode && (
-          <div className="min-h-0 shrink-0 mt-3 flex items-center -ml-4">
+          <div className="min-h-0 shrink-0 mt-3 flex items-start -ml-4">
             <button
               type="button"
               onClick={() => setIsLeftSidebarCollapsed(false)}
-              className="p-2 rounded-lg border border-border bg-card/50 hover:bg-muted/80 transition-colors"
+              className="size-12 rounded-lg border border-border bg-card/50 hover:bg-muted/80 transition-colors flex items-center justify-center"
               aria-label="Expand project files sidebar"
               title="Expand project files sidebar"
             >

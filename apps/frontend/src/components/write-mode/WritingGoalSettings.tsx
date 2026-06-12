@@ -8,6 +8,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Select } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { useWritingGoals } from "@/hooks/useWritingGoals";
 import { useToast } from "@/contexts/ToastContext";
 import { RotateCcw } from "lucide-react";
@@ -158,7 +160,7 @@ export function WritingGoalSettings() {
                 Daily word goal
               </label>
               <div className="flex items-center gap-2">
-                <input
+                <Input
                   id="daily-goal-input"
                   type="number"
                   min={MIN_GOAL}
@@ -167,7 +169,7 @@ export function WritingGoalSettings() {
                   value={localGoalInput ?? dailyGoal}
                   onChange={(e) => handleGoalChange(e.target.value)}
                   disabled={isDisabled}
-                  className="w-32 px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="w-32"
                 />
                 <span className="text-sm text-muted-foreground">words</span>
               </div>
@@ -186,19 +188,17 @@ export function WritingGoalSettings() {
                   Daily reset time
                 </label>
               </div>
-              <select
+              <Select
                 id="reset-hour-select"
-                value={resetHour}
-                onChange={(e) => handleResetHourChange(e.target.value)}
+                value={String(resetHour)}
+                onChange={(value) => handleResetHourChange(value)}
                 disabled={isDisabled}
-                className="px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-              >
-                {hourOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                options={hourOptions.map((opt) => ({
+                  value: String(opt.value),
+                  label: opt.label,
+                }))}
+                className="w-40"
+              />
               <p className="text-xs text-muted-foreground">
                 Your word count will reset at this time each day (currently{" "}
                 {currentTimezone})

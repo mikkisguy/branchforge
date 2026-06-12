@@ -100,7 +100,7 @@ export function layoutNodes(
 
   g.setDefaultEdgeLabel(() => ({}));
   g.setGraph({
-    rankdir: "TB", // Top to bottom
+    rankdir: "LR", // Left to right
     nodesep: 80, // Horizontal spacing between nodes
     ranksep: 120, // Vertical spacing between ranks
     edgesep: 40, // Spacing between edges

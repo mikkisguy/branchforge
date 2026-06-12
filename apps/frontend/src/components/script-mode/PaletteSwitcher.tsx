@@ -100,7 +100,7 @@ export function PaletteSwitcher({
             onClick={() => setIsOpen(false)}
           />
           <div
-            className={`absolute ${dropdownPositionClasses} bg-card border border-border rounded-md shadow-lg overflow-hidden min-w-[200px]`}
+            className={`absolute ${dropdownPositionClasses} bg-popover border border-border/70 rounded-lg shadow-xl shadow-black/25 ring-1 ring-white/5 overflow-hidden min-w-[200px] animate-in fade-in-0 zoom-in-95 duration-150`}
           >
             {Object.entries(groupedPalettes).map(([groupName, palettes]) => (
               <div key={groupName}>
