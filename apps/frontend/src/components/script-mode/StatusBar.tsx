@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Download, Upload, GitBranch, Package, Loader2 } from "lucide-react";
+import { Download, Upload, GitBranch, Loader2 } from "lucide-react";
 import {
   GitLabSyncDialog,
   SyncOperationType,
@@ -139,7 +139,7 @@ export function StatusBar({
                   title="Import from GitLab"
                 >
                   <Download className="size-3.5" />
-                  <span>Import</span>
+                  <span>Import from GitLab</span>
                 </button>
               </div>
               <div className="border-l border-border/30 pl-4">
@@ -153,7 +153,7 @@ export function StatusBar({
                   title="Export to GitLab"
                 >
                   <Upload className="size-3.5" />
-                  <span>Export</span>
+                  <span>Export to GitLab</span>
                 </button>
               </div>
             </>
@@ -161,40 +161,46 @@ export function StatusBar({
 
           {/* ZIP Controls - only show for ZIP source type when callback exists */}
           {isZipAvailable && onOpenZipImportDialog && (
-            <div className="flex items-center gap-2 border-l border-border/30 pl-4">
-              <button
-                type="button"
-                onClick={handleZipImportClick}
-                className={cn(
-                  "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
-                  "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
-                )}
-                title="Import from Zip"
-              >
-                <Package className="size-3.5" />
-                <span>Import Zip</span>
-              </button>
-              {projectId && (
+            <>
+              <div className="flex items-center gap-2 border-l border-border/30 pl-4">
                 <button
                   type="button"
-                  onClick={handleZipExportClick}
-                  disabled={isExporting}
+                  onClick={handleZipImportClick}
                   className={cn(
                     "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
-                    "hover:bg-muted/50 text-muted-foreground hover:text-foreground",
-                    isExporting && "opacity-60 cursor-not-allowed"
+                    "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
                   )}
-                  title="Export as Zip"
+                  title="Import from Zip"
                 >
-                  {isExporting ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <Download className="size-3.5" />
-                  )}
-                  <span>{isExporting ? "Exporting..." : "Export Zip"}</span>
+                  <Download className="size-3.5" />
+                  <span>Import from Zip</span>
                 </button>
+              </div>
+              {projectId && (
+                <div className="border-l border-border/30 pl-4">
+                  <button
+                    type="button"
+                    onClick={handleZipExportClick}
+                    disabled={isExporting}
+                    className={cn(
+                      "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
+                      "hover:bg-muted/50 text-muted-foreground hover:text-foreground",
+                      isExporting && "opacity-60 cursor-not-allowed"
+                    )}
+                    title="Export as Zip"
+                  >
+                    {isExporting ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="size-3.5" />
+                    )}
+                    <span>
+                      {isExporting ? "Exporting..." : "Export to Zip"}
+                    </span>
+                  </button>
+                </div>
               )}
-            </div>
+            </>
           )}
         </div>
       </div>
