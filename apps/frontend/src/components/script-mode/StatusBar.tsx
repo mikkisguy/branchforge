@@ -1,11 +1,12 @@
 import { useState, useCallback } from "react";
-import { Download, Upload, GitBranch, Package } from "lucide-react";
+import { Download, Upload, GitBranch, Package, Loader2 } from "lucide-react";
 import {
   GitLabSyncDialog,
   SyncOperationType,
 } from "@/components/script-mode/GitLabSyncDialog";
 import { ConflictReviewDialog } from "@/components/script-mode/ConflictReviewDialog";
 import { cn } from "@/lib/utils";
+import { projectFilesApi } from "@/lib/api/project-files";
 import type { SourceOrigin } from "@branchforge/shared";
 
 // Status bar styled like a storybook footer
@@ -59,6 +60,24 @@ export function StatusBar({
   const handleZipImportClick = useCallback(() => {
     onOpenZipImportDialog?.();
   }, [onOpenZipImportDialog]);
+
+  /**
+   * Handle ZIP export click - generates export and triggers download
+   */
+  const [isExporting, setIsExporting] = useState(false);
+  const handleZipExportClick = useCallback(async () => {
+    if (!projectId || isExporting) return;
+
+    setIsExporting(true);
+    try {
+      const result = await projectFilesApi.generateExport(projectId);
+      await projectFilesApi.downloadExport(projectId, result.id);
+    } catch (err) {
+      console.error("Export failed:", err);
+    } finally {
+      setIsExporting(false);
+    }
+  }, [projectId, isExporting]);
 
   /**
    * Handle conflict resolution from ConflictReviewDialog
@@ -155,6 +174,26 @@ export function StatusBar({
                 <Package className="size-3.5" />
                 <span>Import Zip</span>
               </button>
+              {projectId && (
+                <button
+                  type="button"
+                  onClick={handleZipExportClick}
+                  disabled={isExporting}
+                  className={cn(
+                    "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
+                    "hover:bg-muted/50 text-muted-foreground hover:text-foreground",
+                    isExporting && "opacity-60 cursor-not-allowed"
+                  )}
+                  title="Export as Zip"
+                >
+                  {isExporting ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Download className="size-3.5" />
+                  )}
+                  <span>{isExporting ? "Exporting..." : "Export Zip"}</span>
+                </button>
+              )}
             </div>
           )}
         </div>
