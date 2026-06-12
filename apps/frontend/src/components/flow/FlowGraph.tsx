@@ -194,6 +194,7 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
   return (
     <div className="h-full w-full absolute inset-0">
       <ReactFlow
+        colorMode="dark"
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}

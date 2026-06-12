@@ -15,7 +15,7 @@ interface FlowDialogProps {
 export function FlowDialog({ open, onOpenChange, projectId }: FlowDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-[1400px] h-[85vh] p-0 gap-0 overflow-hidden flex flex-col">
+      <DialogContent className="w-[99vw] max-w-[1900px] h-[96vh] p-0 gap-0 overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-border/30 shrink-0">
           <DialogTitle>Flow Graph</DialogTitle>
