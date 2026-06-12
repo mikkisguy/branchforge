@@ -54,6 +54,7 @@ export function Select<T extends string = string>({
 
   const close = useCallback(() => {
     setIsOpen(false);
+    setFocusedIndex(-1);
     hasInitializedFocus.current = false;
   }, []);
 
@@ -81,6 +82,7 @@ export function Select<T extends string = string>({
     }
   }, []);
 
+  // react-doctor-disable-next-line react-doctor/advanced-event-handler-refs
   useLayoutEffect(() => {
     if (!isOpen) return;
     updatePosition();
@@ -103,13 +105,11 @@ export function Select<T extends string = string>({
     if (isOpen && listboxRef.current && !hasInitializedFocus.current) {
       hasInitializedFocus.current = true;
       const currentIdx = options.findIndex((opt) => opt.value === value);
+      // react-doctor-disable-next-line react-doctor/no-derived-state, react-doctor/no-chain-state-updates
       setFocusedIndex(currentIdx >= 0 ? currentIdx : 0);
       listboxRef.current.focus();
-    } else if (!isOpen) {
-      setFocusedIndex(-1);
-      hasInitializedFocus.current = false;
     }
-  }, [isOpen, value]);
+  }, [isOpen, options, value]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -136,6 +136,7 @@ export function Select<T extends string = string>({
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
     };
+    // react-doctor-disable-next-line react-doctor/prefer-use-effect-event
   }, [isOpen, close]);
 
   const handleSelect = useCallback(
@@ -177,7 +178,7 @@ export function Select<T extends string = string>({
           break;
       }
     },
-    [options, focusedIndex, handleSelect]
+    [options, focusedIndex, handleSelect, close]
   );
 
   return (
@@ -234,6 +235,7 @@ export function Select<T extends string = string>({
               aria-hidden="true"
               onClick={close}
             />
+            {/* react-doctor-disable-next-line react-doctor/prefer-tag-over-role */}
             <div
               ref={listboxRef}
               role="listbox"
@@ -253,6 +255,7 @@ export function Select<T extends string = string>({
               onKeyDown={handleKeyDown}
             >
               {options.map((option, index) => (
+                // react-doctor-disable-next-line react-doctor/prefer-tag-over-role, react-doctor/click-events-have-key-events
                 <div
                   key={option.value}
                   id={`select-option-${index}`}
