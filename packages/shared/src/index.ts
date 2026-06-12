@@ -400,7 +400,8 @@ export type LabelLineContentType =
   | "NARRATION"
   | "CHOICE"
   | "MENU"
-  | "JUMP";
+  | "JUMP"
+  | "VISUAL";
 
 /**
  * Incoming jump information - which labels jump TO this label

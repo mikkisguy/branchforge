@@ -1474,7 +1474,7 @@ export interface LabelLineWithSpeaker extends Omit<
   speakerName: string | null; // From characters.displayName
   speakerTag: string | null; // From characters.renpyTag
   // Explicitly type enum fields to preserve literal types
-  contentType: "DIALOGUE" | "NARRATION" | "CHOICE" | "MENU" | "JUMP";
+  contentType: "DIALOGUE" | "NARRATION" | "CHOICE" | "MENU" | "JUMP" | "VISUAL";
   visualType: "GENERATED" | "BLACK" | "CUSTOM";
   // Date fields as ISO strings for JSON serialization
   createdAt: string;

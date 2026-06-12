@@ -15,6 +15,7 @@ import {
   RENPY_LABEL_REGEX,
   type StatCondition,
   type ComparisonOperator,
+  type VisualStatement,
 } from "@branchforge/shared";
 
 // Parsed RPY data structures
@@ -66,7 +67,7 @@ export interface RPYCharacter {
 export interface BranchForgeScene {
   name: string;
   entries: Array<{
-    type: "DIALOGUE" | "NARRATION" | "FLAG" | "JUMP" | "MENU";
+    type: "DIALOGUE" | "NARRATION" | "FLAG" | "JUMP" | "MENU" | "VISUAL";
     speaker?: string;
     text?: string;
     target?: string;
@@ -81,6 +82,7 @@ export interface BranchForgeScene {
         stats?: Record<string, number>;
       };
     }>;
+    visuals?: VisualStatement[];
   }>;
   characters?: Array<{ tag: string; name: string }>;
 }
@@ -1608,6 +1610,34 @@ export function convertToBranchForgeFormatFromLabels(
         lineNumber: j.lineNumber,
         indentLevel: getIndentLevel(j.lineNumber),
       });
+    }
+  }
+
+  // Extract visual statements (scene/show/hide) from original content
+  if (originalLines.length > 0) {
+    // Determine label's line boundaries
+    const labelStartLine = labelData.lineNumber; // 1-indexed
+    const labelIndex = parsed.labels.findIndex((l) => l.label === labelName);
+    const nextLabel = parsed.labels[labelIndex + 1];
+    const labelEndLine = nextLabel
+      ? nextLabel.lineNumber - 1
+      : originalLines.length;
+
+    // Scan lines within label boundaries for scene/show/hide
+    for (
+      let i = labelStartLine;
+      i <= labelEndLine && i <= originalLines.length;
+      i++
+    ) {
+      const constructs = extractTechnicalConstructs(originalContent!, i - 1); // 0-indexed
+      if (constructs.visuals && constructs.visuals.length > 0) {
+        entries.push({
+          type: "VISUAL",
+          lineNumber: i,
+          indentLevel: getIndentLevel(i),
+          visuals: constructs.visuals,
+        });
+      }
     }
   }
 
