@@ -344,8 +344,10 @@ export function LeftSidebar(props: LeftSidebarProps) {
               <>
                 <Select
                   value={projectId ?? undefined}
-                  onChange={(projectId) => {
-                    const project = projects.find((p) => p.id === projectId);
+                  onChange={(selectedProjectId) => {
+                    const project = projects.find(
+                      (p) => p.id === selectedProjectId
+                    );
                     if (project) setCurrentProject(project);
                   }}
                   disabled={isLoadingProjects || projects.length === 0}

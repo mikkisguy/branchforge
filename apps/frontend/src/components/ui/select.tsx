@@ -14,6 +14,7 @@ export interface SelectOption<T extends string = string> {
 }
 
 interface SelectProps<T extends string = string> {
+  id?: string;
   options: readonly SelectOption<T>[];
   value: T | undefined;
   onChange: (value: T) => void;
@@ -30,6 +31,7 @@ function getDefaultPortalContainer(): HTMLElement {
 }
 
 export function Select<T extends string = string>({
+  id,
   options,
   value,
   onChange,
@@ -41,14 +43,19 @@ export function Select<T extends string = string>({
   const [isOpen, setIsOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const listboxRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const hasInitializedFocus = useRef(false);
   const gap = 4;
 
   const currentOption = options.find((opt) => opt.value === value);
 
-  const close = useCallback(() => setIsOpen(false), []);
+  const close = useCallback(() => {
+    setIsOpen(false);
+    hasInitializedFocus.current = false;
+  }, []);
 
   const updatePosition = useCallback(() => {
     const trigger = triggerRef.current;
@@ -85,15 +92,24 @@ export function Select<T extends string = string>({
     };
   }, [isOpen, updatePosition]);
 
+  useLayoutEffect(() => {
+    if (isOpen) {
+      const target = portalContainer ?? getDefaultPortalContainer();
+      setPortalTarget(target);
+    }
+  }, [isOpen, portalContainer]);
+
   useEffect(() => {
-    if (isOpen && listboxRef.current) {
+    if (isOpen && listboxRef.current && !hasInitializedFocus.current) {
+      hasInitializedFocus.current = true;
       const currentIdx = options.findIndex((opt) => opt.value === value);
       setFocusedIndex(currentIdx >= 0 ? currentIdx : 0);
       listboxRef.current.focus();
-    } else {
+    } else if (!isOpen) {
       setFocusedIndex(-1);
+      hasInitializedFocus.current = false;
     }
-  }, [isOpen, options, value]);
+  }, [isOpen, value]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -156,17 +172,19 @@ export function Select<T extends string = string>({
           e.preventDefault();
           setFocusedIndex(options.length - 1);
           break;
+        case "Tab":
+          close();
+          break;
       }
     },
     [options, focusedIndex, handleSelect]
   );
 
-  const portalTarget = portalContainer ?? getDefaultPortalContainer();
-
   return (
     <div ref={containerRef} className={cn("relative", className)}>
       <button
         ref={triggerRef}
+        id={id}
         type="button"
         onClick={() => {
           if (!disabled) setIsOpen(!isOpen);
@@ -208,6 +226,7 @@ export function Select<T extends string = string>({
       </button>
 
       {isOpen &&
+        portalTarget &&
         createPortal(
           <>
             <div
@@ -234,16 +253,15 @@ export function Select<T extends string = string>({
               onKeyDown={handleKeyDown}
             >
               {options.map((option, index) => (
-                <button
+                <div
                   key={option.value}
                   id={`select-option-${index}`}
-                  type="button"
                   role="option"
                   aria-selected={option.value === value}
                   onClick={() => handleSelect(option.value)}
                   tabIndex={-1}
                   className={cn(
-                    "w-full text-left px-3 py-2 text-sm transition-colors",
+                    "w-full text-left px-3 py-2 text-sm transition-colors cursor-pointer",
                     option.value === value &&
                       "bg-accent text-accent-foreground font-medium",
                     option.value !== value && "hover:bg-accent/50",
@@ -253,7 +271,7 @@ export function Select<T extends string = string>({
                   )}
                 >
                   {option.label}
-                </button>
+                </div>
               ))}
             </div>
           </>,

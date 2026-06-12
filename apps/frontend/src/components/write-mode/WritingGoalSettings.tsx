@@ -181,11 +181,15 @@ export function WritingGoalSettings() {
             {/* Reset Hour Select */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <label className="text-sm text-muted-foreground">
+                <label
+                  htmlFor="reset-hour-select"
+                  className="text-sm text-muted-foreground"
+                >
                   Daily reset time
                 </label>
               </div>
               <Select
+                id="reset-hour-select"
                 value={String(resetHour)}
                 onChange={(value) => handleResetHourChange(value)}
                 disabled={isDisabled}

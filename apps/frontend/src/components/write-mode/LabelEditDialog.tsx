@@ -317,6 +317,7 @@ export function LabelEditDialog({
                 Route
               </label>
               <Select
+                id="label-route"
                 value={form.route ?? ""}
                 onChange={(value) => dispatch({ type: "SET_ROUTE", value })}
                 disabled={isSaving}
@@ -339,7 +340,8 @@ export function LabelEditDialog({
                 Status
               </label>
               <Select
-                value={form.status ?? undefined}
+                id="label-status"
+                value={form.status}
                 onChange={(value) =>
                   dispatch({
                     type: "SET_STATUS",
@@ -364,7 +366,8 @@ export function LabelEditDialog({
                 Visibility
               </label>
               <Select
-                value={form.visibility ?? undefined}
+                id="label-visibility"
+                value={form.visibility}
                 onChange={(value) =>
                   dispatch({
                     type: "SET_VISIBILITY",

@@ -224,7 +224,7 @@ export function Tooltip({
             role="tooltip"
             style={{ top: position.top, left: position.left }}
             className={cn(
-              "fixed z-[100] max-w-xs break-words whitespace-normal rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-lg pointer-events-none",
+              "fixed z-[100] max-w-xs break-words whitespace-normal rounded-lg border border-border/70 bg-popover px-2 py-1 text-xs text-popover-foreground shadow-xl shadow-black/25 ring-1 ring-white/5 pointer-events-none",
               className
             )}
           >

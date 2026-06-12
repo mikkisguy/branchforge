@@ -212,6 +212,7 @@ function RouteFormContent({
               Route Type
             </Label>
             <Select
+              id="route-type"
               value={form.isShared ? "shared" : "exclusive"}
               onChange={(value) => handleChange("isShared", value === "shared")}
               disabled={isSaving}
