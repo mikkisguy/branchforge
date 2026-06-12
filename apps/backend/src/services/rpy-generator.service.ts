@@ -30,6 +30,18 @@ export function isValidRenpyIdentifier(name: string): boolean {
 }
 
 /**
+ * Escape a string value for safe embedding inside a Ren'Py double-quoted
+ * string literal. Replaces backslashes, double quotes, and newlines so the
+ * generated RPY always contains a valid string literal.
+ */
+export function escapeRenpyString(value: string): string {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n");
+}
+
+/**
  * Prerequisites from label configuration
  */
 export interface Conditions {
@@ -106,7 +118,9 @@ export function generateConditionCode(
               `${varName} == ${condition.value ? "True" : "False"}`
             );
           } else {
-            conditionsList.push(`${varName} == "${condition.value}"`);
+            conditionsList.push(
+              `${varName} == "${escapeRenpyString(condition.value)}"`
+            );
           }
           break;
         case "!=":
@@ -115,7 +129,9 @@ export function generateConditionCode(
               `${varName} != ${condition.value ? "True" : "False"}`
             );
           } else {
-            conditionsList.push(`${varName} != "${condition.value}"`);
+            conditionsList.push(
+              `${varName} != "${escapeRenpyString(condition.value)}"`
+            );
           }
           break;
       }
@@ -628,9 +644,7 @@ export function generateCharacterDefinitionsFile(
   lines.push("");
 
   for (const char of characters) {
-    const escapedName = char.displayName
-      .replace(/\\/g, "\\\\")
-      .replace(/"/g, '\\"');
+    const escapedName = escapeRenpyString(char.displayName);
     lines.push(
       `define ${char.renpyTag} = Character("${escapedName}", color="${char.color}")`
     );

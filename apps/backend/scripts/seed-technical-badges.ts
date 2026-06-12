@@ -815,14 +815,17 @@ async function seedTechnicalBadgesData() {
     "  5. Click the eye icon in the top-right to toggle technical badges"
   );
   console.log(
-    "  6. Click/hover on badges on lines 3, 8, and 10 to see operator symbols"
+    "  6. Click/hover on badges on lines 3, 8, and 10 to see condition details"
   );
-  console.log("  7. Verify symbols: ≥, ≤, =, ≠ are displayed correctly");
+  console.log(
+    '  7. Verify plain-English operators: "is at least", "is at most", "is more than", "is less than", "is", "is not"'
+  );
   console.log("  8. Line 8 showcases all variable condition types:");
-  console.log("     - truthy: has_spell (displayed as just the name)");
-  console.log("     - falsy: ¬is_main_quest (displayed with ¬ prefix)");
-  console.log("     - ==: alignment = good, has_drink = True");
-  console.log("     - !=: faction ≠ evil, is_cursed ≠ False");
+  console.log("     - truthy: is has_spell");
+  console.log("     - falsy: not is_main_quest");
+  console.log('     - ==: alignment is "good", has_drink is True');
+  console.log('     - !=: faction is not "evil", is_cursed is not False');
+  console.log("     (Boolean conditions render as True/False words)");
   console.log("\n  9. Navigate to lines with menu options (lines 2, 6, 9)");
   console.log(
     " 10. Hover over the choice badges to see resolved target label IDs"

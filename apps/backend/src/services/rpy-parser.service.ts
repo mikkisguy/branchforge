@@ -2278,10 +2278,9 @@ export function extractTechnicalConstructs(
       "None",
       "else",
     ]);
-    // Split on logical operators to get individual condition parts
-    const varParts = conditionExpr
-      .split(/\s+(?:and|or|\|\||&&)\s+/)
-      .map((s) => s.trim());
+    // Split on logical connectives while respecting quoted strings,
+    // so that e.g. `var == "fire and ice"` is not broken apart.
+    const varParts = splitConditionParts(conditionExpr);
     for (const part of varParts) {
       // Skip parts already handled by stat extraction (numeric comparisons)
       if (
@@ -2417,6 +2416,67 @@ export function extractTechnicalConstructs(
   }
 
   return constructs;
+}
+
+/**
+ * Split a Ren'Py condition expression on logical connectives (and, or, &&, ||)
+ * while respecting double-quoted string literals so that connective words
+ * inside quoted values (e.g. `var == "fire and ice"`) are not treated as
+ * operators.
+ *
+ * Returns an array of trimmed individual condition strings.
+ */
+function splitConditionParts(expr: string): string[] {
+  const parts: string[] = [];
+  let current = "";
+  let inString = false;
+  let i = 0;
+
+  while (i < expr.length) {
+    const ch = expr[i];
+
+    // Handle escape sequences inside strings
+    if (inString && ch === "\\" && i + 1 < expr.length) {
+      current += ch + expr[i + 1];
+      i += 2;
+      continue;
+    }
+
+    // Toggle string mode on double quote
+    if (ch === '"') {
+      inString = !inString;
+      current += ch;
+      i++;
+      continue;
+    }
+
+    // Outside strings, check for connective operators
+    if (!inString) {
+      // Try to match a connective at this position, bounded by whitespace
+      const rest = expr.slice(i);
+      const connectiveMatch = rest.match(/^(\s+(?:and|or|&&|\|\|)\s+)/);
+      if (connectiveMatch) {
+        const trimmed = current.trim();
+        if (trimmed.length > 0) {
+          parts.push(trimmed);
+        }
+        current = "";
+        i += connectiveMatch[1].length;
+        continue;
+      }
+    }
+
+    current += ch;
+    i++;
+  }
+
+  // Push the last accumulated part
+  const trimmed = current.trim();
+  if (trimmed.length > 0) {
+    parts.push(trimmed);
+  }
+
+  return parts;
 }
 
 /**
