@@ -39,6 +39,15 @@ vi.mock("../../lib/logger.js", () => ({
   },
 }));
 
+vi.mock("jszip", () => ({
+  default: function MockJSZip() {
+    return {
+      file: vi.fn(),
+      generateAsync: vi.fn(() => Promise.resolve(Buffer.from("mock-zip-data"))),
+    };
+  },
+}));
+
 // ---------------------------------------------------------------------------
 // Imports
 // ---------------------------------------------------------------------------
@@ -85,6 +94,7 @@ function createMockDb(): Record<string, ReturnType<typeof vi.fn>> {
   const db: any = {};
   db.select = vi.fn(() => db);
   db.from = vi.fn(() => db);
+  db.innerJoin = vi.fn(() => db);
   db.where = vi.fn(() => db);
   db.orderBy = vi.fn(() => db);
   db.limit = vi.fn(() => db);

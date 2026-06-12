@@ -6,6 +6,7 @@
  * variable/condition/effect patches applied.
  */
 
+import JSZip from "jszip";
 import { getDb } from "../db/index.js";
 import {
   exportsTable,
@@ -125,7 +126,7 @@ export async function generateExport(
     throw new NotFoundError("Project files");
   }
 
-  // Fetch all labels with conditions/effects for this project
+  // Fetch all labels with conditions/effects for STORY files in this project
   const projectLabels = await db
     .select({
       id: labels.id,
@@ -136,6 +137,13 @@ export async function generateExport(
       projectFileId: labels.projectFileId,
     })
     .from(labels)
+    .innerJoin(
+      projectFiles,
+      and(
+        eq(labels.projectFileId, projectFiles.id),
+        eq(projectFiles.fileType, "STORY")
+      )
+    )
     .where(and(eq(labels.projectId, projectId), isNull(labels.deletedAt)));
 
   // Group labels by file for patching
@@ -224,9 +232,15 @@ export async function generateExport(
   }
 
   // Serialize all files into a single JSON blob for storage
-  // The route handler will convert this to a proper zip
   const content = JSON.stringify(patchedFiles);
-  const fileSize = Buffer.byteLength(content, "utf-8");
+
+  // Generate zip to compute actual download size
+  const zip = new JSZip();
+  for (const [filePath, fileContent] of Object.entries(patchedFiles)) {
+    zip.file(filePath, fileContent);
+  }
+  const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
+  const fileSize = zipBuffer.length;
 
   // Generate a file name
   const sanitizedProjectName = project.name
@@ -382,16 +396,14 @@ async function cleanupOldExports(projectId: string): Promise<void> {
 
   const idsToDelete = oldExports.map((e) => e.id);
 
-  if (idsToDelete.length > 0) {
-    await db
-      .delete(exportsTable)
-      .where(
-        and(
-          eq(exportsTable.projectId, projectId),
-          inArray(exportsTable.id, idsToDelete)
-        )
-      );
-  }
+  await db
+    .delete(exportsTable)
+    .where(
+      and(
+        eq(exportsTable.projectId, projectId),
+        inArray(exportsTable.id, idsToDelete)
+      )
+    );
 
   logInfo(LogEventType.SERVICE_START, {
     context: "cleanupOldExports",

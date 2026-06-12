@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { Download, Upload, GitBranch, Loader2 } from "lucide-react";
+import { useToast } from "@/contexts/ToastContext";
 import {
   GitLabSyncDialog,
   SyncOperationType,
@@ -65,6 +66,7 @@ export function StatusBar({
    * Handle ZIP export click - generates export and triggers download
    */
   const [isExporting, setIsExporting] = useState(false);
+  const { error: showErrorToast } = useToast();
   const handleZipExportClick = useCallback(async () => {
     if (!projectId || isExporting) return;
 
@@ -74,6 +76,7 @@ export function StatusBar({
       await projectFilesApi.downloadExport(projectId, result.id);
     } catch (err) {
       console.error("Export failed:", err);
+      showErrorToast("Export failed. Please try again.", "Export Error");
     } finally {
       setIsExporting(false);
     }
