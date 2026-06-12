@@ -32,6 +32,7 @@ import {
   RENPY_LABEL_REGEX,
   type ComparisonOperator,
   type StatCondition,
+  type VariableCondition,
 } from "@branchforge/shared";
 import type { IncomingJump } from "@branchforge/shared";
 import { createAuditFields, updateAuditFields } from "../lib/audit.js";
@@ -2290,7 +2291,7 @@ export async function updateLabel(
     visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
     labelName?: string | null;
     conditions?: {
-      variables?: string[];
+      variables?: Record<string, VariableCondition>;
       stats?: Record<string, number>;
     } | null;
   }
@@ -2452,8 +2453,9 @@ export async function updateLabel(
         ? Object.keys(data.conditions.stats)
         : [];
     const variableKeys =
-      data.conditions?.variables && data.conditions.variables.length > 0
-        ? data.conditions.variables
+      data.conditions?.variables &&
+      Object.keys(data.conditions.variables).length > 0
+        ? Object.keys(data.conditions.variables)
         : [];
 
     const [existingStats, existingVariables] = await Promise.all([
@@ -2800,7 +2802,14 @@ export async function updateIncomingJumpsForLabels(
                 jumpType: "MENU_CHOICE" as const,
                 choiceText: option.label,
                 conditions: option.conditionFlags
-                  ? { variables: option.conditionFlags }
+                  ? {
+                      variables: Object.fromEntries(
+                        option.conditionFlags.map((f) => [
+                          f,
+                          { value: true, operator: "truthy" as const },
+                        ])
+                      ),
+                    }
                   : undefined,
               });
             }

@@ -1,5 +1,8 @@
 import { BadgeQuestionMark, ArrowUpRight, Image, Split } from "lucide-react";
-import { type StatCondition } from "@branchforge/shared";
+import {
+  type StatCondition,
+  type VariableCondition,
+} from "@branchforge/shared";
 
 type BadgeType = "conditions" | "jump" | "visuals" | "menu";
 
@@ -12,7 +15,7 @@ const ICONS: Record<BadgeType, React.ComponentType<{ className?: string }>> = {
 
 interface ConditionsData {
   stats?: Record<string, StatCondition>;
-  variables?: string[];
+  variables?: Record<string, VariableCondition>;
 }
 
 interface JumpData {
@@ -59,7 +62,9 @@ export function TechnicalBadge({
         const statsCount = conditions.stats
           ? Object.keys(conditions.stats).length
           : 0;
-        const varsCount = conditions.variables?.length || 0;
+        const varsCount = conditions.variables
+          ? Object.keys(conditions.variables).length
+          : 0;
         const count = statsCount + varsCount;
         return count === 1 ? "1 condition" : `${count} conditions`;
       }

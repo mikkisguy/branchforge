@@ -5,7 +5,7 @@
  * Patches existing RPY content with conditional logic and variable assignments.
  */
 
-import { RENPY_LABEL_REGEX } from "@branchforge/shared";
+import { RENPY_LABEL_REGEX, type VariableCondition } from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -30,10 +30,22 @@ export function isValidRenpyIdentifier(name: string): boolean {
 }
 
 /**
+ * Escape a string value for safe embedding inside a Ren'Py double-quoted
+ * string literal. Replaces backslashes, double quotes, and newlines so the
+ * generated RPY always contains a valid string literal.
+ */
+export function escapeRenpyString(value: string): string {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n");
+}
+
+/**
  * Prerequisites from label configuration
  */
 export interface Conditions {
-  variables?: string[];
+  variables?: Record<string, VariableCondition>;
   stats?: Record<string, number>;
 }
 
@@ -69,8 +81,8 @@ export interface LabelWithConditions {
  * @returns Array of code lines
  *
  * @example
- * generateConditionCode({ variables: ["met_alex"] })
- * // Returns: ["    if not met_alex:", "        return"]
+ * generateConditionCode({ variables: { met_alex: { value: true, operator: "truthy" } } })
+ * // Returns: ["    if met_alex:", "        return"]
  */
 export function generateConditionCode(
   conditions: Conditions,
@@ -81,22 +93,53 @@ export function generateConditionCode(
   const nestedIndent = "    ".repeat(indentLevel + 1);
 
   // Generate variable checks
-  if (conditions.variables && conditions.variables.length > 0) {
-    // Validate each variable name and filter out invalid entries
-    const validVariables = conditions.variables.filter((sv) => {
-      if (!isValidRenpyIdentifier(sv)) {
-        process.stderr.write(
-          `Warning: Skipping invalid variable name in conditions: "${sv}"\n`
-        );
-        return false;
-      }
-      return true;
-    });
+  if (conditions.variables && Object.keys(conditions.variables).length > 0) {
+    const conditionsList: string[] = [];
 
-    if (validVariables.length > 0) {
-      // Combine multiple variables with OR logic
-      const conditionChecks = validVariables.map((sv) => `not ${sv}`);
-      lines.push(`${indent}if ${conditionChecks.join(" or ")}:`);
+    for (const [varName, condition] of Object.entries(conditions.variables)) {
+      // Validate variable name before using it
+      if (!isValidRenpyIdentifier(varName)) {
+        process.stderr.write(
+          `Warning: Skipping invalid variable name in conditions: "${varName}"\n`
+        );
+        continue;
+      }
+
+      switch (condition.operator) {
+        case "truthy":
+          conditionsList.push(varName);
+          break;
+        case "falsy":
+          conditionsList.push(`not ${varName}`);
+          break;
+        case "==":
+          if (typeof condition.value === "boolean") {
+            conditionsList.push(
+              `${varName} == ${condition.value ? "True" : "False"}`
+            );
+          } else {
+            conditionsList.push(
+              `${varName} == "${escapeRenpyString(condition.value)}"`
+            );
+          }
+          break;
+        case "!=":
+          if (typeof condition.value === "boolean") {
+            conditionsList.push(
+              `${varName} != ${condition.value ? "True" : "False"}`
+            );
+          } else {
+            conditionsList.push(
+              `${varName} != "${escapeRenpyString(condition.value)}"`
+            );
+          }
+          break;
+      }
+    }
+
+    if (conditionsList.length > 0) {
+      // Guard clause: return early if ANY condition fails (negate the combined AND)
+      lines.push(`${indent}if not (${conditionsList.join(" and ")}):`);
       lines.push(`${nestedIndent}return`);
     }
   }
@@ -333,7 +376,7 @@ export function patchRPYWithVariables(
       if (labelData?.conditions) {
         const hasConditions =
           (labelData.conditions.variables &&
-            labelData.conditions.variables.length > 0) ||
+            Object.keys(labelData.conditions.variables).length > 0) ||
           (labelData.conditions.stats &&
             Object.keys(labelData.conditions.stats).length > 0);
 
@@ -601,9 +644,7 @@ export function generateCharacterDefinitionsFile(
   lines.push("");
 
   for (const char of characters) {
-    const escapedName = char.displayName
-      .replace(/\\/g, "\\\\")
-      .replace(/"/g, '\\"');
+    const escapedName = escapeRenpyString(char.displayName);
     lines.push(
       `define ${char.renpyTag} = Character("${escapedName}", color="${char.color}")`
     );

@@ -9,6 +9,7 @@ import type {
   PublicLabel,
   LabelDetail,
   LabelCharacter,
+  VariableCondition,
 } from "@branchforge/shared";
 
 // ============================================================================
@@ -75,7 +76,7 @@ export interface UpdateLabelInput {
   visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
   labelName?: string;
   conditions?: {
-    variables?: string[];
+    variables?: Record<string, VariableCondition>;
     stats?: Record<string, number>;
   } | null;
 }
