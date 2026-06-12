@@ -2131,6 +2131,28 @@ export function generateRpyFile(scene: BranchForgeScene): string {
         inMenu = false;
       }
       lines.push(`    jump ${entry.target}`);
+    } else if (entry.type === "VISUAL" && entry.visuals) {
+      if (inMenu) {
+        inMenu = false;
+      }
+      const indent = " ".repeat(entry.indentLevel ? entry.indentLevel * 4 : 4);
+      for (const v of entry.visuals) {
+        if (v.type === "SCENE") {
+          let line = `${indent}scene ${v.target}`;
+          if (v.with) line += ` with ${v.with}`;
+          lines.push(line);
+        } else if (v.type === "SHOW") {
+          let line = `${indent}show ${v.target}`;
+          if (v.at) line += ` at ${v.at}`;
+          if (v.with) line += ` with ${v.with}`;
+          if (v.zorder !== undefined) line += ` zorder ${v.zorder}`;
+          lines.push(line);
+        } else if (v.type === "HIDE") {
+          let line = `${indent}hide ${v.target}`;
+          if (v.with) line += ` with ${v.with}`;
+          lines.push(line);
+        }
+      }
     }
   }
 
@@ -2175,7 +2197,7 @@ export function extractTechnicalConstructs(
   const showMatch = trimmed.match(
     /^show\s+(.+?)(?:\s+at\s+(\S+))?(?:\s+with\s+(\S+))?(?:\s+zorder\s+(\d+))?$/
   );
-  const hideMatch = trimmed.match(/^hide\s+(\S+)/);
+  const hideMatch = trimmed.match(/^hide\s+(\S+)(?:\s+with\s+(\S+))?$/);
 
   if (sceneMatch) {
     constructs.visuals = constructs.visuals || [];
@@ -2197,7 +2219,11 @@ export function extractTechnicalConstructs(
     return constructs;
   } else if (hideMatch) {
     constructs.visuals = constructs.visuals || [];
-    constructs.visuals.push({ type: "HIDE", target: hideMatch[1] });
+    constructs.visuals.push({
+      type: "HIDE",
+      target: hideMatch[1],
+      with: hideMatch[2],
+    });
     return constructs;
   }
 
