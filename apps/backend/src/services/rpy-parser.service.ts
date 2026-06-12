@@ -16,6 +16,7 @@ import {
   type StatCondition,
   type ComparisonOperator,
   type VisualStatement,
+  type VariableCondition,
 } from "@branchforge/shared";
 
 // Parsed RPY data structures
@@ -284,7 +285,7 @@ export interface TechnicalConstructs {
   conditions?: {
     stats?: Record<string, StatCondition>;
     statDeltas?: Record<string, number>;
-    variables?: string[];
+    variables?: Record<string, VariableCondition>;
   };
   visuals?: Array<{
     type: "SCENE" | "SHOW" | "HIDE";
@@ -2275,7 +2276,7 @@ export function extractTechnicalConstructs(
     constructs.conditions = {
       stats: {},
       statDeltas: {},
-      variables: [],
+      variables: {},
     };
 
     // Remove leading if/elif keyword and trailing colon
@@ -2295,7 +2296,7 @@ export function extractTechnicalConstructs(
       constructs.conditions.stats![statName] = { value, operator };
     }
 
-    // Extract variable names (bare identifiers used as boolean flags)
+    // Extract variable conditions (bare identifiers, not-patterns, string/boolean comparisons)
     const keywords = new Set([
       "if",
       "elif",
@@ -2307,21 +2308,91 @@ export function extractTechnicalConstructs(
       "None",
       "else",
     ]);
-    // Split on logical operators
-    const varParts = conditionExpr
-      .split(/\s+(?:and|or|\|\||&&)\s+/)
-      .map((s) => s.trim());
+    // Split on logical connectives while respecting quoted strings,
+    // so that e.g. `var == "fire and ice"` is not broken apart.
+    const varParts = splitConditionParts(conditionExpr);
     for (const part of varParts) {
-      // Skip parts that contain operators (already handled as stat checks)
-      if (/[<>=!+\-*/()]/.test(part)) continue;
+      // Skip parts already handled by stat extraction (numeric comparisons)
+      if (
+        /^[a-zA-Z_][a-zA-Z0-9_]*\s*(>=|<=|>|<|==|!=)\s*-?\d+\s*$/.test(part)
+      ) {
+        continue;
+      }
+
+      // String comparison: var == "value"
+      const strEqMatch = part.match(
+        /^([a-zA-Z_][a-zA-Z0-9_]*)\s*==\s*"([^"]*)"$/
+      );
+      if (strEqMatch && !keywords.has(strEqMatch[1])) {
+        constructs.conditions.variables![strEqMatch[1]] = {
+          value: strEqMatch[2],
+          operator: "==",
+        };
+        continue;
+      }
+
+      // String comparison: var != "value"
+      const strNeqMatch = part.match(
+        /^([a-zA-Z_][a-zA-Z0-9_]*)\s*!=\s*"([^"]*)"$/
+      );
+      if (strNeqMatch && !keywords.has(strNeqMatch[1])) {
+        constructs.conditions.variables![strNeqMatch[1]] = {
+          value: strNeqMatch[2],
+          operator: "!=",
+        };
+        continue;
+      }
+
+      // Boolean comparison: var == True/False
+      const boolEqMatch = part.match(
+        /^([a-zA-Z_][a-zA-Z0-9_]*)\s*==\s*(True|False)$/
+      );
+      if (boolEqMatch && !keywords.has(boolEqMatch[1])) {
+        constructs.conditions.variables![boolEqMatch[1]] = {
+          value: boolEqMatch[2] === "True",
+          operator: "==",
+        };
+        continue;
+      }
+
+      // Boolean comparison: var != True/False
+      const boolNeqMatch = part.match(
+        /^([a-zA-Z_][a-zA-Z0-9_]*)\s*!=\s*(True|False)$/
+      );
+      if (boolNeqMatch && !keywords.has(boolNeqMatch[1])) {
+        constructs.conditions.variables![boolNeqMatch[1]] = {
+          value: boolNeqMatch[2] === "True",
+          operator: "!=",
+        };
+        continue;
+      }
+
+      // Not pattern: not var_name
+      const notMatch = part.match(/^not\s+([a-zA-Z_][a-zA-Z0-9_]*)$/);
+      if (
+        notMatch &&
+        !keywords.has(notMatch[1]) &&
+        !constructs.conditions.variables![notMatch[1]]
+      ) {
+        constructs.conditions.variables![notMatch[1]] = {
+          value: true,
+          operator: "falsy",
+        };
+        continue;
+      }
+
+      // Bare identifier (truthy check)
       const varMatches = part.match(/([a-zA-Z_][a-zA-Z0-9_]*)/g);
       if (varMatches) {
         for (const varName of varMatches) {
           if (
             !keywords.has(varName) &&
-            !constructs.conditions.variables!.includes(varName)
+            !constructs.conditions.variables![varName]
           ) {
-            constructs.conditions.variables!.push(varName);
+            constructs.conditions.variables![varName] = {
+              value: true,
+              operator: "truthy",
+            };
           }
         }
       }
@@ -2360,7 +2431,7 @@ export function extractTechnicalConstructs(
     if (Object.keys(constructs.conditions.statDeltas!).length === 0) {
       delete constructs.conditions.statDeltas;
     }
-    if (constructs.conditions.variables!.length === 0) {
+    if (Object.keys(constructs.conditions.variables!).length === 0) {
       delete constructs.conditions.variables;
     }
     if (
@@ -2375,6 +2446,67 @@ export function extractTechnicalConstructs(
   }
 
   return constructs;
+}
+
+/**
+ * Split a Ren'Py condition expression on logical connectives (and, or, &&, ||)
+ * while respecting double-quoted string literals so that connective words
+ * inside quoted values (e.g. `var == "fire and ice"`) are not treated as
+ * operators.
+ *
+ * Returns an array of trimmed individual condition strings.
+ */
+function splitConditionParts(expr: string): string[] {
+  const parts: string[] = [];
+  let current = "";
+  let inString = false;
+  let i = 0;
+
+  while (i < expr.length) {
+    const ch = expr[i];
+
+    // Handle escape sequences inside strings
+    if (inString && ch === "\\" && i + 1 < expr.length) {
+      current += ch + expr[i + 1];
+      i += 2;
+      continue;
+    }
+
+    // Toggle string mode on double quote
+    if (ch === '"') {
+      inString = !inString;
+      current += ch;
+      i++;
+      continue;
+    }
+
+    // Outside strings, check for connective operators
+    if (!inString) {
+      // Try to match a connective at this position, bounded by whitespace
+      const rest = expr.slice(i);
+      const connectiveMatch = rest.match(/^(\s+(?:and|or|&&|\|\|)\s+)/);
+      if (connectiveMatch) {
+        const trimmed = current.trim();
+        if (trimmed.length > 0) {
+          parts.push(trimmed);
+        }
+        current = "";
+        i += connectiveMatch[1].length;
+        continue;
+      }
+    }
+
+    current += ch;
+    i++;
+  }
+
+  // Push the last accumulated part
+  const trimmed = current.trim();
+  if (trimmed.length > 0) {
+    parts.push(trimmed);
+  }
+
+  return parts;
 }
 
 /**

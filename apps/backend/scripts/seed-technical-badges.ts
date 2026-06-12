@@ -302,7 +302,7 @@ async function seedTechnicalBadgesData() {
       ],
     },
 
-    // Line 3: Conditions with different comparison operators
+    // Line 3: Conditions with different comparison operators and variable conditions
     {
       labelId,
       sequence: 3,
@@ -317,7 +317,10 @@ async function seedTechnicalBadgesData() {
           intelligence: { value: 10, operator: ">" },
           luck: { value: 2, operator: "<" },
         },
-        variables: ["has_key", "is_daytime"],
+        variables: {
+          has_key: { value: true, operator: "truthy" },
+          is_daytime: { value: true, operator: "truthy" },
+        },
       },
     },
 
@@ -420,7 +423,7 @@ async function seedTechnicalBadgesData() {
       ],
     },
 
-    // Line 8: Multiple conditions with different operators
+    // Line 8: Multiple conditions with all variable condition types
     {
       labelId,
       sequence: 8,
@@ -434,7 +437,20 @@ async function seedTechnicalBadgesData() {
           luck: { value: 5, operator: "==" },
           gold: { value: 100, operator: "!=" },
         },
-        variables: ["has_spell", "is_main_quest"],
+        variables: {
+          // Truthy: bare identifier check (if has_spell:)
+          has_spell: { value: true, operator: "truthy" },
+          // Falsy: negation check (if not is_main_quest:)
+          is_main_quest: { value: true, operator: "falsy" },
+          // String equality: (if alignment == "good":)
+          alignment: { value: "good", operator: "==" },
+          // String inequality: (if faction != "evil":)
+          faction: { value: "evil", operator: "!=" },
+          // Boolean equality: (if has_drink == True:)
+          has_drink: { value: true, operator: "==" },
+          // Boolean inequality: (if is_cursed != False:)
+          is_cursed: { value: false, operator: "!=" },
+        },
       },
     },
 
@@ -634,7 +650,9 @@ async function seedTechnicalBadgesData() {
         jumpType: "MENU_CHOICE",
         choiceText: "Run away",
         conditions: {
-          variables: ["has_stamina"],
+          variables: {
+            has_stamina: { value: true, operator: "truthy" },
+          },
         },
       },
       {
@@ -703,7 +721,9 @@ async function seedTechnicalBadgesData() {
         jumpType: "MENU_CHOICE",
         choiceText: "Magic gem",
         conditions: {
-          variables: ["has_gem"],
+          variables: {
+            has_gem: { value: true, operator: "truthy" },
+          },
         },
       },
       {
@@ -775,7 +795,9 @@ async function seedTechnicalBadgesData() {
   console.log(
     "  ✅ Conditions with all comparison operators (>=, <=, >, <, ==, !=)"
   );
-  console.log("  ✅ Variables conditions");
+  console.log(
+    "  ✅ Variable conditions (truthy, falsy, ==, != with string and boolean values)"
+  );
   console.log("  ✅ Visual statements (SCENE, SHOW, HIDE)");
   console.log("  ✅ Jump targets");
   console.log("  ✅ Incoming jumps on target labels");
@@ -784,7 +806,7 @@ async function seedTechnicalBadgesData() {
   console.log(
     `  ✅ ${createdTargetLabels.length} target labels created for testing resolution\n`
   );
-  console.log("To test comparison operators:");
+  console.log("To test comparison operators and variable conditions:");
   console.log(`  1. Open the app and login with: ${TEST_EMAIL}`);
   console.log(`  2. Password: ${TEST_PASSWORD}`);
   console.log("  3. Open the 'Technical Badges Test' project");
@@ -793,15 +815,23 @@ async function seedTechnicalBadgesData() {
     "  5. Click the eye icon in the top-right to toggle technical badges"
   );
   console.log(
-    "  6. Click/hover on badges on lines 3, 8, and 10 to see operator symbols"
-  );
-  console.log("  7. Verify symbols: ≥, ≤, =, ≠ are displayed correctly");
-  console.log("\n  8. Navigate to lines with menu options (lines 2, 6, 9)");
-  console.log(
-    "  9. Hover over the choice badges to see resolved target label IDs"
+    "  6. Click/hover on badges on lines 3, 8, and 10 to see condition details"
   );
   console.log(
-    " 10. Verify that targetLabelId is populated with actual database IDs"
+    '  7. Verify plain-English operators: "is at least", "is at most", "is more than", "is less than", "is", "is not"'
+  );
+  console.log("  8. Line 8 showcases all variable condition types:");
+  console.log("     - truthy: is has_spell");
+  console.log("     - falsy: not is_main_quest");
+  console.log('     - ==: alignment is "good", has_drink is True');
+  console.log('     - !=: faction is not "evil", is_cursed is not False');
+  console.log("     (Boolean conditions render as True/False words)");
+  console.log("\n  9. Navigate to lines with menu options (lines 2, 6, 9)");
+  console.log(
+    " 10. Hover over the choice badges to see resolved target label IDs"
+  );
+  console.log(
+    " 11. Verify that targetLabelId is populated with actual database IDs"
   );
 
   process.exit(0);

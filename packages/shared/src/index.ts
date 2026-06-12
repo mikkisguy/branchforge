@@ -334,11 +334,19 @@ export type StatCondition = {
 };
 
 /**
+ * A single variable condition with a value and operator.
+ */
+export type VariableCondition = {
+  value: string | boolean;
+  operator: "==" | "!=" | "truthy" | "falsy";
+};
+
+/**
  * Technical metadata for line-level conditions (stats and variables)
  */
 export type LineConditions = {
   stats?: Record<string, StatCondition>;
-  variables?: string[];
+  variables?: Record<string, VariableCondition>;
 };
 
 /**
@@ -385,7 +393,7 @@ export interface PublicLabel {
   fileName: string;
   /** Variable and stat conditions for this label */
   conditions: {
-    variables?: string[];
+    variables?: Record<string, VariableCondition>;
     stats?: Record<string, StatCondition>;
   } | null;
   createdAt: string;
@@ -414,7 +422,7 @@ export interface IncomingJump {
   choiceText: string | null; // Menu option label, or "Automatic jump"
   conditions?: {
     stats?: Record<string, StatCondition>;
-    variables?: string[];
+    variables?: Record<string, VariableCondition>;
   };
 }
 
