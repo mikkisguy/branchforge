@@ -934,3 +934,23 @@ export interface FlowNodePosition {
  * Map of label IDs to their saved positions
  */
 export type FlowGraphPositions = Record<string, FlowNodePosition>;
+
+/**
+ * Layout mode for the flow graph visualization.
+ *
+ * - `FLOW` — hierarchical layout (dagre left-to-right) based on connections.
+ * - `ROUTE` — group labels into vertical columns by route key, with shared
+ *   routes (and unassigned labels) in a center column.
+ * - `FILE` — group labels into vertical columns by source RPY file, ordered
+ *   by `sequenceOrder` within each column.
+ */
+export type FlowLayoutMode = "FLOW" | "ROUTE" | "FILE";
+
+/**
+ * Human-readable label for a `FlowLayoutMode` value.
+ */
+export const FLOW_LAYOUT_MODE_LABELS: Record<FlowLayoutMode, string> = {
+  FLOW: "Flow view",
+  ROUTE: "Route view",
+  FILE: "File view",
+};

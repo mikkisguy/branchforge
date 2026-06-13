@@ -7,7 +7,7 @@
  * - Predictable cache organization
  */
 
-import type { SourceOrigin } from "@branchforge/shared";
+import type { SourceOrigin, FlowLayoutMode } from "@branchforge/shared";
 
 // ============================================================================
 // Auth Keys
@@ -156,7 +156,8 @@ export const statKeys = {
 export const flowKeys = {
   all: ["flow"] as const,
   graph: (projectId: string) => ["flow", projectId, "graph"] as const,
-  layout: (projectId: string) => ["flow", projectId, "layout"] as const,
+  layout: (projectId: string, mode: FlowLayoutMode) =>
+    ["flow", projectId, "layout", mode] as const,
 } as const;
 
 // ============================================================================

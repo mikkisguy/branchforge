@@ -18,13 +18,18 @@ import {
 import "@xyflow/react/dist/style.css";
 import { RotateCcw } from "lucide-react";
 import { LabelNodeMemo, type LabelNodeData } from "./LabelNode";
+import { LayoutModeSelector } from "./LayoutModeSelector";
 import { useFlowGraph } from "@/hooks/useFlowGraph";
 import { useFlowGraphLayout } from "@/hooks/useFlowGraphLayout";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 import {
   buildRouteColorMap,
   buildEdges,
   layoutNodes,
 } from "./flow-graph-utils";
+import { LAYOUT_MODE_STORAGE_KEY, isFlowLayoutMode } from "./flow-layout-mode";
+import type { FlowLayoutMode } from "@branchforge/shared";
+import { FLOW_LAYOUT_MODE_LABELS } from "@branchforge/shared";
 
 interface FlowGraphProps {
   projectId: string;
@@ -74,17 +79,35 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
     [flowNodes]
   );
 
+  const [layoutModeRaw, setLayoutMode] = useLocalStorage<string>(
+    LAYOUT_MODE_STORAGE_KEY,
+    "FLOW",
+    {
+      validate: (value) => typeof value === "string" && isFlowLayoutMode(value),
+    }
+  );
+  const layoutMode: FlowLayoutMode = isFlowLayoutMode(layoutModeRaw)
+    ? layoutModeRaw
+    : "FLOW";
+
   const {
     positions: savedPositions,
     handleNodeDragStop: handleLayoutDragStop,
     handleResetLayout,
     isSaving,
     isResetting,
-  } = useFlowGraphLayout(projectId);
+  } = useFlowGraphLayout(projectId, layoutMode);
 
   const layoutNodesResult = useMemo(
-    () => layoutNodes(flowNodes, flowEdges, routeColorMap, savedPositions),
-    [flowNodes, flowEdges, routeColorMap, savedPositions]
+    () =>
+      layoutNodes(
+        flowNodes,
+        flowEdges,
+        routeColorMap,
+        savedPositions,
+        layoutMode
+      ),
+    [flowNodes, flowEdges, routeColorMap, savedPositions, layoutMode]
   );
 
   const layoutEdgesResult = useMemo(() => buildEdges(flowEdges), [flowEdges]);
@@ -223,16 +246,20 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
             return data.routeColor ?? "#64748b";
           }}
         />
-        <div className="absolute top-4 right-4 z-10">
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+          <LayoutModeSelector
+            disabled={isSaving || isResetting}
+            onChange={setLayoutMode}
+          />
           <button
             type="button"
             onClick={handleResetLayout}
             disabled={isSaving || isResetting}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 border border-slate-600 rounded-lg hover:bg-slate-700 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Reset layout to auto-arrange"
+            title={`Reset ${FLOW_LAYOUT_MODE_LABELS[layoutMode].toLowerCase()} positions to auto-arrange`}
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            Reset Layout
+            Reset {FLOW_LAYOUT_MODE_LABELS[layoutMode]}
           </button>
         </div>
       </ReactFlow>

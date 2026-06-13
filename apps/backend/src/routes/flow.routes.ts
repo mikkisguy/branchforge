@@ -2,10 +2,14 @@
  * Flow Graph Routes
  *
  * Routes for retrieving flow graph data and managing layout positions.
+ *
+ * Layout positions are stored per (project, user, mode) so a manual drag
+ * in one mode (e.g. FLOW) does not pollute the saved positions of another
+ * (e.g. ROUTE or FILE). All layout endpoints require a `mode` so the
+ * scope is always explicit.
  */
 
-import type { FastifyInstance } from "fastify";
-import type { FastifyRequest, FastifyReply } from "fastify";
+import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import {
   getFlowGraph,
   getFlowGraphLayout,
@@ -22,8 +26,10 @@ import { RateLimitError } from "../middleware/error-handler.middleware.js";
 import type { FlowGraph, FlowGraphPositions } from "@branchforge/shared";
 import {
   flowGraphQuerySchema,
+  flowGraphLayoutQuerySchema,
   saveFlowGraphLayoutSchema,
   type FlowGraphQuery,
+  type FlowGraphLayoutQuery,
   type SaveFlowGraphLayoutInput,
 } from "../lib/validation.js";
 
@@ -68,28 +74,29 @@ async function flowGraphHandler(
 }
 
 /**
- * Get saved layout positions for a project
+ * Get saved layout positions for a project, scoped to a layout mode.
  *
- * GET /flow-graph/layout?projectId=xxx
+ * GET /flow-graph/layout?projectId=xxx&mode=FLOW
  * Requires authentication
  */
 async function getLayoutHandler(
-  request: FastifyRequest<{ Querystring: FlowGraphQuery }>,
+  request: FastifyRequest<{ Querystring: FlowGraphLayoutQuery }>,
   reply: FastifyReply
 ): Promise<void> {
   const user = request.user!;
-  const { projectId } = request.query;
+  const { projectId, mode } = request.query;
 
-  const positions = await getFlowGraphLayout(projectId, user.id);
+  const positions = await getFlowGraphLayout(projectId, user.id, mode);
   reply
     .status(200)
     .send({ positions } satisfies { positions: FlowGraphPositions });
 }
 
 /**
- * Save layout positions for a project
+ * Save layout positions for a project, scoped to a layout mode.
  *
  * PUT /flow-graph/layout
+ * Body: { projectId, mode, positions }
  * Requires authentication
  */
 async function saveLayoutHandler(
@@ -106,26 +113,27 @@ async function saveLayoutHandler(
   }
 
   const user = request.user!;
-  const { projectId, positions } = request.body;
+  const { projectId, mode, positions } = request.body;
 
-  await saveFlowGraphLayout(projectId, user.id, positions);
+  await saveFlowGraphLayout(projectId, user.id, positions, mode);
   reply.status(204).send();
 }
 
 /**
- * Delete (reset) layout positions for a project
+ * Delete (reset) layout positions for a project, scoped to a layout mode.
+ * Resetting one mode leaves positions in other modes untouched.
  *
- * DELETE /flow-graph/layout?projectId=xxx
+ * DELETE /flow-graph/layout?projectId=xxx&mode=FLOW
  * Requires authentication
  */
 async function deleteLayoutHandler(
-  request: FastifyRequest<{ Querystring: FlowGraphQuery }>,
+  request: FastifyRequest<{ Querystring: FlowGraphLayoutQuery }>,
   reply: FastifyReply
 ): Promise<void> {
   const user = request.user!;
-  const { projectId } = request.query;
+  const { projectId, mode } = request.query;
 
-  await deleteFlowGraphLayout(projectId, user.id);
+  await deleteFlowGraphLayout(projectId, user.id, mode);
   reply.status(204).send();
 }
 
@@ -143,11 +151,11 @@ export async function flowRoutes(fastify: FastifyInstance): Promise<void> {
     flowGraphHandler
   );
 
-  fastify.get<{ Querystring: FlowGraphQuery }>(
+  fastify.get<{ Querystring: FlowGraphLayoutQuery }>(
     "/flow-graph/layout",
     {
       onRequest: authenticate,
-      preValidation: validateQuery(flowGraphQuerySchema),
+      preValidation: validateQuery(flowGraphLayoutQuerySchema),
     },
     getLayoutHandler
   );
@@ -161,11 +169,11 @@ export async function flowRoutes(fastify: FastifyInstance): Promise<void> {
     saveLayoutHandler
   );
 
-  fastify.delete<{ Querystring: FlowGraphQuery }>(
+  fastify.delete<{ Querystring: FlowGraphLayoutQuery }>(
     "/flow-graph/layout",
     {
       onRequest: authenticate,
-      preValidation: validateQuery(flowGraphQuerySchema),
+      preValidation: validateQuery(flowGraphLayoutQuerySchema),
     },
     deleteLayoutHandler
   );

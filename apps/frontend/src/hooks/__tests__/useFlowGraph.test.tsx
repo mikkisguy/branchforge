@@ -157,9 +157,12 @@ describe("useFlowGraphLayout", () => {
   });
 
   it("returns empty positions initially", () => {
-    const { result } = renderHook(() => useFlowGraphLayout("project-1"), {
-      wrapper,
-    });
+    const { result } = renderHook(
+      () => useFlowGraphLayout("project-1", "FLOW"),
+      {
+        wrapper,
+      }
+    );
 
     expect(result.current.positions).toEqual({});
   });
@@ -169,19 +172,25 @@ describe("useFlowGraphLayout", () => {
       positions: mockPositions,
     });
 
-    const { result } = renderHook(() => useFlowGraphLayout("project-1"), {
-      wrapper,
-    });
+    const { result } = renderHook(
+      () => useFlowGraphLayout("project-1", "FLOW"),
+      {
+        wrapper,
+      }
+    );
 
     await waitFor(() => {
       expect(result.current.positions).toEqual(mockPositions);
     });
 
-    expect(flowApi.getFlowGraphLayout).toHaveBeenCalledWith("project-1");
+    expect(flowApi.getFlowGraphLayout).toHaveBeenCalledWith(
+      "project-1",
+      "FLOW"
+    );
   });
 
   it("does not fetch when projectId is empty", () => {
-    renderHook(() => useFlowGraphLayout(""), { wrapper });
+    renderHook(() => useFlowGraphLayout("", "FLOW"), { wrapper });
 
     expect(flowApi.getFlowGraphLayout).not.toHaveBeenCalled();
   });
@@ -194,9 +203,12 @@ describe("useFlowGraphLayout", () => {
     });
     vi.mocked(flowApi.saveFlowGraphLayout).mockResolvedValue(undefined);
 
-    const { result } = renderHook(() => useFlowGraphLayout("project-1"), {
-      wrapper,
-    });
+    const { result } = renderHook(
+      () => useFlowGraphLayout("project-1", "FLOW"),
+      {
+        wrapper,
+      }
+    );
 
     // Wait for initial query to settle
     await act(async () => {
@@ -217,6 +229,7 @@ describe("useFlowGraphLayout", () => {
 
     expect(flowApi.saveFlowGraphLayout).toHaveBeenCalledWith(
       "project-1",
+      "FLOW",
       mockPositions
     );
 
@@ -232,9 +245,12 @@ describe("useFlowGraphLayout", () => {
     });
     vi.mocked(flowApi.deleteFlowGraphLayout).mockResolvedValue(undefined);
 
-    const { result } = renderHook(() => useFlowGraphLayout("project-1"), {
-      wrapper,
-    });
+    const { result } = renderHook(
+      () => useFlowGraphLayout("project-1", "FLOW"),
+      {
+        wrapper,
+      }
+    );
 
     await waitFor(() => {
       expect(result.current.positions).toEqual(mockPositions);
@@ -250,7 +266,10 @@ describe("useFlowGraphLayout", () => {
     });
 
     await waitFor(() => {
-      expect(flowApi.deleteFlowGraphLayout).toHaveBeenCalledWith("project-1");
+      expect(flowApi.deleteFlowGraphLayout).toHaveBeenCalledWith(
+        "project-1",
+        "FLOW"
+      );
     });
   });
 
@@ -263,9 +282,12 @@ describe("useFlowGraphLayout", () => {
     const saveError = new Error("Network error");
     vi.mocked(flowApi.saveFlowGraphLayout).mockRejectedValue(saveError);
 
-    const { result } = renderHook(() => useFlowGraphLayout("project-1"), {
-      wrapper,
-    });
+    const { result } = renderHook(
+      () => useFlowGraphLayout("project-1", "FLOW"),
+      {
+        wrapper,
+      }
+    );
 
     // Wait for initial query to settle
     await act(async () => {
@@ -289,5 +311,140 @@ describe("useFlowGraphLayout", () => {
     expect(result.current.positions).toEqual({});
 
     vi.useRealTimers();
+  });
+
+  // ==========================================================================
+  // Per-mode behaviour
+  // ==========================================================================
+
+  it("scopes reads to the active mode", async () => {
+    vi.mocked(flowApi.getFlowGraphLayout).mockResolvedValue({
+      positions: { "route-node-1": { x: 10, y: 20 } },
+    });
+
+    const { result } = renderHook(
+      () => useFlowGraphLayout("project-1", "ROUTE"),
+      { wrapper }
+    );
+
+    await waitFor(() => {
+      expect(flowApi.getFlowGraphLayout).toHaveBeenCalledWith(
+        "project-1",
+        "ROUTE"
+      );
+      expect(result.current.positions).toEqual({
+        "route-node-1": { x: 10, y: 20 },
+      });
+    });
+  });
+
+  it("uses different query keys per mode (independent caches)", async () => {
+    vi.mocked(flowApi.getFlowGraphLayout).mockImplementation(
+      async (_projectId, mode) => {
+        const positions: FlowGraphPositions =
+          mode === "FILE"
+            ? { "file-node-1": { x: 1, y: 2 } }
+            : { "flow-node-1": { x: 3, y: 4 } };
+        return { positions };
+      }
+    );
+
+    // First mount: FLOW
+    const { result: flowResult, unmount: unmountFlow } = renderHook(
+      () => useFlowGraphLayout("project-1", "FLOW"),
+      { wrapper }
+    );
+    await waitFor(() => {
+      expect(flowResult.current.positions).toEqual({
+        "flow-node-1": { x: 3, y: 4 },
+      });
+    });
+    unmountFlow();
+
+    // Second mount: FILE — should not reuse the FLOW cache
+    const { result: fileResult } = renderHook(
+      () => useFlowGraphLayout("project-1", "FILE"),
+      { wrapper }
+    );
+    await waitFor(() => {
+      expect(fileResult.current.positions).toEqual({
+        "file-node-1": { x: 1, y: 2 },
+      });
+    });
+
+    expect(flowApi.getFlowGraphLayout).toHaveBeenCalledWith(
+      "project-1",
+      "FLOW"
+    );
+    expect(flowApi.getFlowGraphLayout).toHaveBeenCalledWith(
+      "project-1",
+      "FILE"
+    );
+  });
+
+  it("handleNodeDragStop writes to the active mode's row", async () => {
+    vi.useFakeTimers();
+    vi.mocked(flowApi.getFlowGraphLayout).mockResolvedValue({
+      positions: {},
+    });
+    vi.mocked(flowApi.saveFlowGraphLayout).mockResolvedValue(undefined);
+
+    const { result } = renderHook(
+      () => useFlowGraphLayout("project-1", "FILE"),
+      { wrapper }
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    act(() => {
+      result.current.handleNodeDragStop({
+        "file-node-1": { x: 7, y: 9 },
+      });
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+
+    expect(flowApi.saveFlowGraphLayout).toHaveBeenCalledWith(
+      "project-1",
+      "FILE",
+      {
+        "file-node-1": { x: 7, y: 9 },
+      }
+    );
+
+    vi.useRealTimers();
+  });
+
+  it("handleResetLayout only clears the active mode", async () => {
+    vi.mocked(flowApi.getFlowGraphLayout).mockResolvedValue({
+      positions: { "node-1": { x: 50, y: 60 } },
+    });
+    vi.mocked(flowApi.deleteFlowGraphLayout).mockResolvedValue(undefined);
+
+    const { result } = renderHook(
+      () => useFlowGraphLayout("project-1", "ROUTE"),
+      { wrapper }
+    );
+
+    await waitFor(() => {
+      expect(result.current.positions).toEqual({
+        "node-1": { x: 50, y: 60 },
+      });
+    });
+
+    act(() => {
+      result.current.handleResetLayout();
+    });
+
+    await waitFor(() => {
+      expect(flowApi.deleteFlowGraphLayout).toHaveBeenCalledWith(
+        "project-1",
+        "ROUTE"
+      );
+    });
   });
 });

@@ -413,7 +413,7 @@ describe("FlowRoutes (Integration)", () => {
 
       const response = await fastify.inject({
         method: "GET",
-        url: `/flow-graph/layout?projectId=${testProjectId}`,
+        url: `/flow-graph/layout?projectId=${testProjectId}&mode=FLOW`,
         cookies: {
           [SESSION_COOKIE_NAME]: auth.sessionId,
         },
@@ -425,6 +425,34 @@ describe("FlowRoutes (Integration)", () => {
       expect(body).toHaveProperty("positions", {});
     });
 
+    it("returns 400 when mode is missing", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: `/flow-graph/layout?projectId=${testProjectId}`,
+        cookies: {
+          [SESSION_COOKIE_NAME]: auth.sessionId,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("returns 400 when mode is invalid", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: `/flow-graph/layout?projectId=${testProjectId}&mode=FOOBAR`,
+        cookies: {
+          [SESSION_COOKIE_NAME]: auth.sessionId,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
     it("returns saved positions after saving", async () => {
       const auth = await createAuthenticatedRequest(testUserId);
 
@@ -434,6 +462,7 @@ describe("FlowRoutes (Integration)", () => {
         url: "/flow-graph/layout",
         payload: {
           projectId: testProjectId,
+          mode: "FLOW",
           positions: {
             [testLabelId1]: { x: 100, y: 200 },
             [testLabelId2]: { x: 300, y: 400 },
@@ -447,7 +476,7 @@ describe("FlowRoutes (Integration)", () => {
       // Retrieve positions
       const response = await fastify.inject({
         method: "GET",
-        url: `/flow-graph/layout?projectId=${testProjectId}`,
+        url: `/flow-graph/layout?projectId=${testProjectId}&mode=FLOW`,
         cookies: {
           [SESSION_COOKIE_NAME]: auth.sessionId,
         },
@@ -460,6 +489,52 @@ describe("FlowRoutes (Integration)", () => {
       expect(body.positions).toHaveProperty(testLabelId1);
       expect(body.positions[testLabelId1]).toEqual({ x: 100, y: 200 });
       expect(body.positions[testLabelId2]).toEqual({ x: 300, y: 400 });
+    });
+
+    it("returns only the requested mode's positions", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+
+      // Save FLOW positions
+      await fastify.inject({
+        method: "PUT",
+        url: "/flow-graph/layout",
+        payload: {
+          projectId: testProjectId,
+          mode: "FLOW",
+          positions: { [testLabelId1]: { x: 1, y: 1 } },
+        },
+        cookies: { [SESSION_COOKIE_NAME]: auth.sessionId },
+      });
+
+      // Save ROUTE positions
+      await fastify.inject({
+        method: "PUT",
+        url: "/flow-graph/layout",
+        payload: {
+          projectId: testProjectId,
+          mode: "ROUTE",
+          positions: { [testLabelId2]: { x: 2, y: 2 } },
+        },
+        cookies: { [SESSION_COOKIE_NAME]: auth.sessionId },
+      });
+
+      const flowResponse = await fastify.inject({
+        method: "GET",
+        url: `/flow-graph/layout?projectId=${testProjectId}&mode=FLOW`,
+        cookies: { [SESSION_COOKIE_NAME]: auth.sessionId },
+      });
+      const routeResponse = await fastify.inject({
+        method: "GET",
+        url: `/flow-graph/layout?projectId=${testProjectId}&mode=ROUTE`,
+        cookies: { [SESSION_COOKIE_NAME]: auth.sessionId },
+      });
+
+      expect(flowResponse.json().positions).toEqual({
+        [testLabelId1]: { x: 1, y: 1 },
+      });
+      expect(routeResponse.json().positions).toEqual({
+        [testLabelId2]: { x: 2, y: 2 },
+      });
     });
   });
 
@@ -488,6 +563,44 @@ describe("FlowRoutes (Integration)", () => {
         method: "PUT",
         url: "/flow-graph/layout",
         payload: {
+          mode: "FLOW",
+          positions: {},
+        },
+        cookies: {
+          [SESSION_COOKIE_NAME]: auth.sessionId,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("returns 400 for invalid body (missing mode)", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: "/flow-graph/layout",
+        payload: {
+          projectId: testProjectId,
+          positions: {},
+        },
+        cookies: {
+          [SESSION_COOKIE_NAME]: auth.sessionId,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("returns 400 for invalid mode", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: "/flow-graph/layout",
+        payload: {
+          projectId: testProjectId,
+          mode: "INVALID",
           positions: {},
         },
         cookies: {
@@ -506,6 +619,7 @@ describe("FlowRoutes (Integration)", () => {
         url: "/flow-graph/layout",
         payload: {
           projectId: testProjectId,
+          mode: "FLOW",
           positions: {
             "not-a-uuid": { x: 0, y: 0 },
           },
@@ -526,6 +640,7 @@ describe("FlowRoutes (Integration)", () => {
         url: "/flow-graph/layout",
         payload: {
           projectId: testProjectId,
+          mode: "FLOW",
           positions: {
             [testLabelId1]: { x: 100, y: 200 },
           },
@@ -540,7 +655,7 @@ describe("FlowRoutes (Integration)", () => {
       // Verify the row was actually written
       const getResponse = await fastify.inject({
         method: "GET",
-        url: `/flow-graph/layout?projectId=${testProjectId}`,
+        url: `/flow-graph/layout?projectId=${testProjectId}&mode=FLOW`,
         cookies: {
           [SESSION_COOKIE_NAME]: auth.sessionId,
         },
@@ -561,6 +676,7 @@ describe("FlowRoutes (Integration)", () => {
         url: "/flow-graph/layout",
         payload: {
           projectId: testProjectId,
+          mode: "FLOW",
           positions: {
             [testLabelId1]: { x: 100, y: 200 },
           },
@@ -576,6 +692,7 @@ describe("FlowRoutes (Integration)", () => {
         url: "/flow-graph/layout",
         payload: {
           projectId: testProjectId,
+          mode: "FLOW",
           positions: {
             [testLabelId2]: { x: 500, y: 600 },
           },
@@ -590,7 +707,7 @@ describe("FlowRoutes (Integration)", () => {
       // Verify only the second set of positions exists (full replacement)
       const getResponse = await fastify.inject({
         method: "GET",
-        url: `/flow-graph/layout?projectId=${testProjectId}`,
+        url: `/flow-graph/layout?projectId=${testProjectId}&mode=FLOW`,
         cookies: {
           [SESSION_COOKIE_NAME]: auth.sessionId,
         },
@@ -600,6 +717,52 @@ describe("FlowRoutes (Integration)", () => {
       expect(body.positions).not.toHaveProperty(testLabelId1);
       expect(body.positions).toHaveProperty(testLabelId2);
       expect(body.positions[testLabelId2]).toEqual({ x: 500, y: 600 });
+    });
+
+    it("saves to one mode without affecting another", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+
+      // Save ROUTE first
+      await fastify.inject({
+        method: "PUT",
+        url: "/flow-graph/layout",
+        payload: {
+          projectId: testProjectId,
+          mode: "ROUTE",
+          positions: { [testLabelId1]: { x: 10, y: 20 } },
+        },
+        cookies: { [SESSION_COOKIE_NAME]: auth.sessionId },
+      });
+
+      // Save FLOW — must not touch the ROUTE row
+      await fastify.inject({
+        method: "PUT",
+        url: "/flow-graph/layout",
+        payload: {
+          projectId: testProjectId,
+          mode: "FLOW",
+          positions: { [testLabelId2]: { x: 30, y: 40 } },
+        },
+        cookies: { [SESSION_COOKIE_NAME]: auth.sessionId },
+      });
+
+      const routeResponse = await fastify.inject({
+        method: "GET",
+        url: `/flow-graph/layout?projectId=${testProjectId}&mode=ROUTE`,
+        cookies: { [SESSION_COOKIE_NAME]: auth.sessionId },
+      });
+      const flowResponse = await fastify.inject({
+        method: "GET",
+        url: `/flow-graph/layout?projectId=${testProjectId}&mode=FLOW`,
+        cookies: { [SESSION_COOKIE_NAME]: auth.sessionId },
+      });
+
+      expect(routeResponse.json().positions).toEqual({
+        [testLabelId1]: { x: 10, y: 20 },
+      });
+      expect(flowResponse.json().positions).toEqual({
+        [testLabelId2]: { x: 30, y: 40 },
+      });
     });
   });
 
@@ -617,6 +780,20 @@ describe("FlowRoutes (Integration)", () => {
       expect(response.statusCode).toBe(401);
     });
 
+    it("returns 400 when mode is missing", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+
+      const response = await fastify.inject({
+        method: "DELETE",
+        url: `/flow-graph/layout?projectId=${testProjectId}`,
+        cookies: {
+          [SESSION_COOKIE_NAME]: auth.sessionId,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
     it("returns 204 after deleting", async () => {
       const auth = await createAuthenticatedRequest(testUserId);
 
@@ -626,6 +803,7 @@ describe("FlowRoutes (Integration)", () => {
         url: "/flow-graph/layout",
         payload: {
           projectId: testProjectId,
+          mode: "FLOW",
           positions: {
             [testLabelId1]: { x: 100, y: 200 },
           },
@@ -638,7 +816,7 @@ describe("FlowRoutes (Integration)", () => {
       // Delete the layout
       const deleteResponse = await fastify.inject({
         method: "DELETE",
-        url: `/flow-graph/layout?projectId=${testProjectId}`,
+        url: `/flow-graph/layout?projectId=${testProjectId}&mode=FLOW`,
         cookies: {
           [SESSION_COOKIE_NAME]: auth.sessionId,
         },
@@ -656,6 +834,7 @@ describe("FlowRoutes (Integration)", () => {
         url: "/flow-graph/layout",
         payload: {
           projectId: testProjectId,
+          mode: "FLOW",
           positions: {
             [testLabelId1]: { x: 100, y: 200 },
           },
@@ -668,7 +847,7 @@ describe("FlowRoutes (Integration)", () => {
       // Delete the layout
       await fastify.inject({
         method: "DELETE",
-        url: `/flow-graph/layout?projectId=${testProjectId}`,
+        url: `/flow-graph/layout?projectId=${testProjectId}&mode=FLOW`,
         cookies: {
           [SESSION_COOKIE_NAME]: auth.sessionId,
         },
@@ -677,7 +856,7 @@ describe("FlowRoutes (Integration)", () => {
       // Verify positions are now empty
       const getResponse = await fastify.inject({
         method: "GET",
-        url: `/flow-graph/layout?projectId=${testProjectId}`,
+        url: `/flow-graph/layout?projectId=${testProjectId}&mode=FLOW`,
         cookies: {
           [SESSION_COOKIE_NAME]: auth.sessionId,
         },
@@ -685,6 +864,56 @@ describe("FlowRoutes (Integration)", () => {
 
       const body = getResponse.json();
       expect(body).toHaveProperty("positions", {});
+    });
+
+    it("only deletes the targeted mode, leaving other modes intact", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+
+      // Save positions in both FLOW and ROUTE
+      await fastify.inject({
+        method: "PUT",
+        url: "/flow-graph/layout",
+        payload: {
+          projectId: testProjectId,
+          mode: "FLOW",
+          positions: { [testLabelId1]: { x: 1, y: 1 } },
+        },
+        cookies: { [SESSION_COOKIE_NAME]: auth.sessionId },
+      });
+      await fastify.inject({
+        method: "PUT",
+        url: "/flow-graph/layout",
+        payload: {
+          projectId: testProjectId,
+          mode: "ROUTE",
+          positions: { [testLabelId2]: { x: 2, y: 2 } },
+        },
+        cookies: { [SESSION_COOKIE_NAME]: auth.sessionId },
+      });
+
+      // Delete only FLOW
+      await fastify.inject({
+        method: "DELETE",
+        url: `/flow-graph/layout?projectId=${testProjectId}&mode=FLOW`,
+        cookies: { [SESSION_COOKIE_NAME]: auth.sessionId },
+      });
+
+      // FLOW is gone, ROUTE survives
+      const flowResponse = await fastify.inject({
+        method: "GET",
+        url: `/flow-graph/layout?projectId=${testProjectId}&mode=FLOW`,
+        cookies: { [SESSION_COOKIE_NAME]: auth.sessionId },
+      });
+      const routeResponse = await fastify.inject({
+        method: "GET",
+        url: `/flow-graph/layout?projectId=${testProjectId}&mode=ROUTE`,
+        cookies: { [SESSION_COOKIE_NAME]: auth.sessionId },
+      });
+
+      expect(flowResponse.json().positions).toEqual({});
+      expect(routeResponse.json().positions).toEqual({
+        [testLabelId2]: { x: 2, y: 2 },
+      });
     });
   });
 });

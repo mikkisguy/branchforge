@@ -316,6 +316,20 @@
       "when": 1781280264256,
       "tag": "0044_flaky_lady_deathstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1781366364441,
+      "tag": "0045_steady_bloodscream",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1781374904562,
+      "tag": "0046_tricky_richard_fisk",
+      "breakpoints": true
     }
   ]
 }

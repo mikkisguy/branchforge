@@ -585,7 +585,7 @@ describe("FlowService (Integration)", () => {
 
   describe("FlowGraphLayout CRUD", () => {
     it("should return empty object when no layout is saved", async () => {
-      const result = await getFlowGraphLayout(projectId, testUserId);
+      const result = await getFlowGraphLayout(projectId, testUserId, "FLOW");
       expect(result).toEqual({});
     });
 
@@ -595,9 +595,9 @@ describe("FlowService (Integration)", () => {
         [chapter1LabelId]: { x: 300, y: 400 },
       };
 
-      await saveFlowGraphLayout(projectId, testUserId, positions);
+      await saveFlowGraphLayout(projectId, testUserId, positions, "FLOW");
 
-      const result = await getFlowGraphLayout(projectId, testUserId);
+      const result = await getFlowGraphLayout(projectId, testUserId, "FLOW");
       expect(result).toEqual(positions);
     });
 
@@ -611,10 +611,10 @@ describe("FlowService (Integration)", () => {
         [chapter1LabelId]: { x: 700, y: 800 },
       };
 
-      await saveFlowGraphLayout(projectId, testUserId, firstPositions);
-      await saveFlowGraphLayout(projectId, testUserId, secondPositions);
+      await saveFlowGraphLayout(projectId, testUserId, firstPositions, "FLOW");
+      await saveFlowGraphLayout(projectId, testUserId, secondPositions, "FLOW");
 
-      const result = await getFlowGraphLayout(projectId, testUserId);
+      const result = await getFlowGraphLayout(projectId, testUserId, "FLOW");
       expect(result).toEqual(secondPositions);
     });
 
@@ -623,10 +623,10 @@ describe("FlowService (Integration)", () => {
         [startLabelId]: { x: 100, y: 200 },
       };
 
-      await saveFlowGraphLayout(projectId, testUserId, positions);
-      await deleteFlowGraphLayout(projectId, testUserId);
+      await saveFlowGraphLayout(projectId, testUserId, positions, "FLOW");
+      await deleteFlowGraphLayout(projectId, testUserId, "FLOW");
 
-      const result = await getFlowGraphLayout(projectId, testUserId);
+      const result = await getFlowGraphLayout(projectId, testUserId, "FLOW");
       expect(result).toEqual({});
     });
 
@@ -645,23 +645,105 @@ describe("FlowService (Integration)", () => {
         [startLabelId]: { x: 300, y: 400 },
       };
 
-      await saveFlowGraphLayout(projectId, testUserId, user1Positions);
-      await saveFlowGraphLayout(projectId, otherUserId, user2Positions);
+      await saveFlowGraphLayout(projectId, testUserId, user1Positions, "FLOW");
+      await saveFlowGraphLayout(projectId, otherUserId, user2Positions, "FLOW");
 
-      const user1Result = await getFlowGraphLayout(projectId, testUserId);
-      const user2Result = await getFlowGraphLayout(projectId, otherUserId);
+      const user1Result = await getFlowGraphLayout(
+        projectId,
+        testUserId,
+        "FLOW"
+      );
+      const user2Result = await getFlowGraphLayout(
+        projectId,
+        otherUserId,
+        "FLOW"
+      );
 
       expect(user1Result).toEqual(user1Positions);
       expect(user2Result).toEqual(user2Positions);
 
       // Deleting one user's layout should not affect the other's
-      await deleteFlowGraphLayout(projectId, testUserId);
+      await deleteFlowGraphLayout(projectId, testUserId, "FLOW");
 
-      const afterDeleteUser1 = await getFlowGraphLayout(projectId, testUserId);
-      const afterDeleteUser2 = await getFlowGraphLayout(projectId, otherUserId);
+      const afterDeleteUser1 = await getFlowGraphLayout(
+        projectId,
+        testUserId,
+        "FLOW"
+      );
+      const afterDeleteUser2 = await getFlowGraphLayout(
+        projectId,
+        otherUserId,
+        "FLOW"
+      );
 
       expect(afterDeleteUser1).toEqual({});
       expect(afterDeleteUser2).toEqual(user2Positions);
+    });
+
+    // ==========================================================================
+    // Per-mode isolation
+    // ==========================================================================
+
+    it("should keep positions isolated per layout mode", async () => {
+      const flowPositions = { [startLabelId]: { x: 10, y: 20 } };
+      const routePositions = { [chapter1LabelId]: { x: 30, y: 40 } };
+      const filePositions = { [startLabelId]: { x: 50, y: 60 } };
+
+      await saveFlowGraphLayout(projectId, testUserId, flowPositions, "FLOW");
+      await saveFlowGraphLayout(projectId, testUserId, routePositions, "ROUTE");
+      await saveFlowGraphLayout(projectId, testUserId, filePositions, "FILE");
+
+      expect(await getFlowGraphLayout(projectId, testUserId, "FLOW")).toEqual(
+        flowPositions
+      );
+      expect(await getFlowGraphLayout(projectId, testUserId, "ROUTE")).toEqual(
+        routePositions
+      );
+      expect(await getFlowGraphLayout(projectId, testUserId, "FILE")).toEqual(
+        filePositions
+      );
+    });
+
+    it("should upsert within a single mode without touching other modes", async () => {
+      const initial = { [startLabelId]: { x: 0, y: 0 } };
+      const updated = { [startLabelId]: { x: 999, y: 999 } };
+      const otherMode = { [chapter1LabelId]: { x: 1, y: 2 } };
+
+      await saveFlowGraphLayout(projectId, testUserId, initial, "FLOW");
+      await saveFlowGraphLayout(projectId, testUserId, otherMode, "ROUTE");
+      await saveFlowGraphLayout(projectId, testUserId, updated, "FLOW");
+
+      expect(await getFlowGraphLayout(projectId, testUserId, "FLOW")).toEqual(
+        updated
+      );
+      // ROUTE positions are untouched by the FLOW upsert
+      expect(await getFlowGraphLayout(projectId, testUserId, "ROUTE")).toEqual(
+        otherMode
+      );
+    });
+
+    it("should only delete the targeted mode's positions", async () => {
+      await saveFlowGraphLayout(
+        projectId,
+        testUserId,
+        { [startLabelId]: { x: 1, y: 1 } },
+        "FLOW"
+      );
+      await saveFlowGraphLayout(
+        projectId,
+        testUserId,
+        { [startLabelId]: { x: 2, y: 2 } },
+        "ROUTE"
+      );
+
+      await deleteFlowGraphLayout(projectId, testUserId, "ROUTE");
+
+      expect(await getFlowGraphLayout(projectId, testUserId, "FLOW")).toEqual({
+        [startLabelId]: { x: 1, y: 1 },
+      });
+      expect(await getFlowGraphLayout(projectId, testUserId, "ROUTE")).toEqual(
+        {}
+      );
     });
   });
 });
