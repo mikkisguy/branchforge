@@ -15,7 +15,9 @@ import {
   timestamp,
   text,
   uniqueIndex,
+  check,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { projects } from "./projects.js";
 import { users } from "./users.js";
 import type { FlowLayoutMode } from "@branchforge/shared";
@@ -42,6 +44,10 @@ export const flowGraphLayouts = pgTable(
       table.projectId,
       table.userId,
       table.mode
+    ),
+    check(
+      "flow_graph_layouts_mode_check",
+      sql`${table.mode} IN ('FLOW', 'ROUTE', 'FILE')`
     ),
   ]
 );

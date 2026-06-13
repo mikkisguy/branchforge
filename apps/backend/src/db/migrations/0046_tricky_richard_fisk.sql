@@ -1,0 +1,1 @@
+ALTER TABLE "flow_graph_layouts" ADD CONSTRAINT "flow_graph_layouts_mode_check" CHECK ("flow_graph_layouts"."mode" IN ('FLOW', 'ROUTE', 'FILE'));

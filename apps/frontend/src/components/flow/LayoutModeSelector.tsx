@@ -14,24 +14,19 @@ import {
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { GitBranch, Network, Route as RouteIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  LAYOUT_MODE_STORAGE_KEY,
+  LAYOUT_MODES,
+  isFlowLayoutMode,
+} from "./flow-layout-mode";
 
-const STORAGE_KEY = "flow:layout-mode";
-
-const LAYOUT_MODES: ReadonlyArray<{
-  value: FlowLayoutMode;
-  label: string;
-  icon: typeof Network;
-}> = [
-  { value: "FLOW", label: FLOW_LAYOUT_MODE_LABELS.FLOW, icon: Network },
-  { value: "ROUTE", label: FLOW_LAYOUT_MODE_LABELS.ROUTE, icon: RouteIcon },
-  { value: "FILE", label: FLOW_LAYOUT_MODE_LABELS.FILE, icon: GitBranch },
-];
+const MODE_ICONS: Record<FlowLayoutMode, typeof Network> = {
+  FLOW: Network,
+  ROUTE: RouteIcon,
+  FILE: GitBranch,
+};
 
 const DEFAULT_MODE: FlowLayoutMode = "FLOW";
-
-function isFlowLayoutMode(value: string): value is FlowLayoutMode {
-  return LAYOUT_MODES.some((mode) => mode.value === value);
-}
 
 export interface LayoutModeSelectorProps {
   /** Disable all controls (e.g. while layout is being saved/reset). */
@@ -55,9 +50,13 @@ export function LayoutModeSelector({
   className,
   onChange,
 }: LayoutModeSelectorProps) {
-  const [mode, setMode] = useLocalStorage<string>(STORAGE_KEY, DEFAULT_MODE, {
-    validate: (value): value is FlowLayoutMode => isFlowLayoutMode(value),
-  });
+  const [mode, setMode] = useLocalStorage<string>(
+    LAYOUT_MODE_STORAGE_KEY,
+    DEFAULT_MODE,
+    {
+      validate: (value): value is FlowLayoutMode => isFlowLayoutMode(value),
+    }
+  );
 
   // `mode` is typed as string from the hook, but our validator guarantees
   // it's a valid FlowLayoutMode (or the default fell back).
@@ -80,7 +79,9 @@ export function LayoutModeSelector({
         className
       )}
     >
-      {LAYOUT_MODES.map(({ value, label, icon: Icon }) => {
+      {LAYOUT_MODES.map((value) => {
+        const Icon = MODE_ICONS[value];
+        const label = FLOW_LAYOUT_MODE_LABELS[value];
         const isActive = currentMode === value;
         return (
           <button

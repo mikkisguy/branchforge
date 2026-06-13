@@ -27,11 +27,9 @@ import {
   buildEdges,
   layoutNodes,
 } from "./flow-graph-utils";
+import { LAYOUT_MODE_STORAGE_KEY, isFlowLayoutMode } from "./flow-layout-mode";
 import type { FlowLayoutMode } from "@branchforge/shared";
 import { FLOW_LAYOUT_MODE_LABELS } from "@branchforge/shared";
-
-const LAYOUT_MODE_STORAGE_KEY = "flow:layout-mode";
-const LAYOUT_MODES: readonly FlowLayoutMode[] = ["FLOW", "ROUTE", "FILE"];
 
 interface FlowGraphProps {
   projectId: string;
@@ -85,15 +83,11 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
     LAYOUT_MODE_STORAGE_KEY,
     "FLOW",
     {
-      validate: (value) =>
-        typeof value === "string" &&
-        (LAYOUT_MODES as readonly string[]).includes(value),
+      validate: (value) => typeof value === "string" && isFlowLayoutMode(value),
     }
   );
-  const layoutMode: FlowLayoutMode = (
-    LAYOUT_MODES as readonly string[]
-  ).includes(layoutModeRaw)
-    ? (layoutModeRaw as FlowLayoutMode)
+  const layoutMode: FlowLayoutMode = isFlowLayoutMode(layoutModeRaw)
+    ? layoutModeRaw
     : "FLOW";
 
   const {

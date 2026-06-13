@@ -193,7 +193,14 @@ function layoutRows<K extends string | null>(
     byRow.set(key, []);
   }
   for (const node of flowNodes) {
-    const key = keyOf(node);
+    // Normalize the key the same way `groupNodesIntoRows` does (empty string
+    // is treated as the nullish sentinel) so a node whose raw key is ""
+    // lands in the pre-seeded nullish bucket instead of being dropped (and
+    // then silently falling back to { x: 0, y: 0 } downstream).
+    let key = keyOf(node);
+    if (key === ("" as K) || key === (null as unknown as K)) {
+      key = null as unknown as K;
+    }
     byRow.get(key)?.push(node);
   }
   for (const list of byRow.values()) {

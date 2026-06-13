@@ -414,6 +414,17 @@ describe("layoutNodes — ROUTE mode", () => {
       labelNumber: 1,
     },
     {
+      id: "n-unassigned-2",
+      labelId: "n-unassigned-2",
+      title: "Unassigned 2",
+      labelName: "unassigned_2",
+      routeKey: null,
+      status: "DRAFT",
+      fileName: "misc.rpy",
+      sequenceOrder: 2,
+      labelNumber: 2,
+    },
+    {
       id: "n-common-1",
       labelId: "n-common-1",
       title: "Common 1",
@@ -476,6 +487,22 @@ describe("layoutNodes — ROUTE mode", () => {
     expect(positionOf(nodes, "n-common-1").y).toBe(160);
     expect(positionOf(nodes, "n-heroine-a-1").y).toBe(320);
     expect(positionOf(nodes, "n-heroine-b-1").y).toBe(480);
+  });
+
+  it("places two null-routeKey nodes on the same row with distinct x", () => {
+    const nodes = layoutNodes(
+      routeNodes,
+      routeEdges,
+      routeColorMap,
+      {},
+      "ROUTE"
+    );
+
+    const u1 = positionOf(nodes, "n-unassigned");
+    const u2 = positionOf(nodes, "n-unassigned-2");
+    expect(u1.y).toBe(u2.y);
+    expect(u1.y).toBe(0);
+    expect(u1.x).not.toBe(u2.x);
   });
 
   it("orders nodes within a row by sequenceOrder ascending (left to right)", () => {
@@ -559,6 +586,17 @@ describe("layoutNodes — FILE mode", () => {
       sequenceOrder: 1,
       labelNumber: 1,
     },
+    {
+      id: "f-empty-name-2",
+      labelId: "f-empty-name-2",
+      title: "no-file-2",
+      labelName: "no_file_2",
+      routeKey: "common",
+      status: "DRAFT",
+      fileName: "",
+      sequenceOrder: 2,
+      labelNumber: 2,
+    },
   ];
 
   const positionOf = (
@@ -576,6 +614,16 @@ describe("layoutNodes — FILE mode", () => {
     expect(positionOf(nodes, "f-empty-name").y).toBe(0);
     expect(positionOf(nodes, "f-a-1").y).toBe(160);
     expect(positionOf(nodes, "f-b-1").y).toBe(320);
+  });
+
+  it("places two empty-fileName nodes on the same row with distinct x", () => {
+    const nodes = layoutNodes(fileNodes, [], routeColorMap, {}, "FILE");
+
+    const empty1 = positionOf(nodes, "f-empty-name");
+    const empty2 = positionOf(nodes, "f-empty-name-2");
+    expect(empty1.y).toBe(empty2.y);
+    expect(empty1.y).toBe(0);
+    expect(empty1.x).not.toBe(empty2.x);
   });
 
   it("orders nodes within a file by sequenceOrder ascending (left to right)", () => {
