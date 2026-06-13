@@ -354,4 +354,309 @@ describe("layoutNodes", () => {
       borderLeft: "3px solid #ef4444",
     });
   });
+
+  it("defaults to FLOW mode (backward compatible)", () => {
+    // Omitting the mode argument must produce the same positions as the
+    // explicit "FLOW" mode, preserving the previous public contract.
+    const implicit = layoutNodes(mockFlowNodes, flowEdges, routeColorMap, {});
+    const explicit = layoutNodes(
+      mockFlowNodes,
+      flowEdges,
+      routeColorMap,
+      {},
+      "FLOW"
+    );
+    expect(implicit.map((n) => n.position)).toEqual(
+      explicit.map((n) => n.position)
+    );
+  });
+});
+
+describe("layoutNodes — ROUTE mode", () => {
+  const routeColorMap = new Map<string, string>([
+    ["common", "#3b82f6"],
+    ["heroine_a", "#ef4444"],
+    ["heroine_b", "#10b981"],
+  ]);
+
+  const routeNodes: FlowNode[] = [
+    {
+      id: "n-common-2",
+      labelId: "n-common-2",
+      title: "Common 2",
+      labelName: "common_2",
+      routeKey: "common",
+      status: "DRAFT",
+      fileName: "common.rpy",
+      sequenceOrder: 2,
+      labelNumber: 2,
+    },
+    {
+      id: "n-heroine-b-1",
+      labelId: "n-heroine-b-1",
+      title: "Heroine B",
+      labelName: "heroine_b_1",
+      routeKey: "heroine_b",
+      status: "DRAFT",
+      fileName: "heroine_b.rpy",
+      sequenceOrder: 1,
+      labelNumber: 1,
+    },
+    {
+      id: "n-unassigned",
+      labelId: "n-unassigned",
+      title: "Unassigned",
+      labelName: "unassigned",
+      routeKey: null,
+      status: "DRAFT",
+      fileName: "misc.rpy",
+      sequenceOrder: 1,
+      labelNumber: 1,
+    },
+    {
+      id: "n-common-1",
+      labelId: "n-common-1",
+      title: "Common 1",
+      labelName: "common_1",
+      routeKey: "common",
+      status: "DRAFT",
+      fileName: "common.rpy",
+      sequenceOrder: 1,
+      labelNumber: 1,
+    },
+    {
+      id: "n-heroine-a-1",
+      labelId: "n-heroine-a-1",
+      title: "Heroine A",
+      labelName: "heroine_a_1",
+      routeKey: "heroine_a",
+      status: "DRAFT",
+      fileName: "heroine_a.rpy",
+      sequenceOrder: 1,
+      labelNumber: 1,
+    },
+  ];
+
+  const routeEdges: FlowEdge[] = [];
+
+  const positionOf = (
+    nodes: ReturnType<typeof layoutNodes>,
+    id: string
+  ): { x: number; y: number } => {
+    const node = nodes.find((n) => n.id === id);
+    if (!node) throw new Error(`missing node ${id}`);
+    return node.position;
+  };
+
+  it("places all nodes in the same route on the same row (y constant)", () => {
+    const nodes = layoutNodes(
+      routeNodes,
+      routeEdges,
+      routeColorMap,
+      {},
+      "ROUTE"
+    );
+    const common1 = positionOf(nodes, "n-common-1");
+    const common2 = positionOf(nodes, "n-common-2");
+    expect(common1.y).toBe(common2.y);
+  });
+
+  it("puts unassigned route (null) on the first row, then alphabetical", () => {
+    const nodes = layoutNodes(
+      routeNodes,
+      routeEdges,
+      routeColorMap,
+      {},
+      "ROUTE"
+    );
+
+    // Row y positions: row 0 = nullish (unassigned), then common,
+    // heroine_a, heroine_b.
+    expect(positionOf(nodes, "n-unassigned").y).toBe(0);
+    expect(positionOf(nodes, "n-common-1").y).toBe(160);
+    expect(positionOf(nodes, "n-heroine-a-1").y).toBe(320);
+    expect(positionOf(nodes, "n-heroine-b-1").y).toBe(480);
+  });
+
+  it("orders nodes within a row by sequenceOrder ascending (left to right)", () => {
+    const nodes = layoutNodes(
+      routeNodes,
+      routeEdges,
+      routeColorMap,
+      {},
+      "ROUTE"
+    );
+    const common1 = positionOf(nodes, "n-common-1");
+    const common2 = positionOf(nodes, "n-common-2");
+    expect(common1.y).toBe(common2.y);
+    expect(common1.x).toBeLessThan(common2.x);
+  });
+
+  it("honors saved positions over the auto ROUTE layout", () => {
+    const saved = {
+      "n-common-1": { x: 9999, y: 8888 },
+    };
+    const nodes = layoutNodes(
+      routeNodes,
+      routeEdges,
+      routeColorMap,
+      saved,
+      "ROUTE"
+    );
+    expect(positionOf(nodes, "n-common-1")).toEqual({ x: 9999, y: 8888 });
+    // Other nodes in the same row still fall back to auto positions.
+    const common2 = positionOf(nodes, "n-common-2");
+    expect(common2.y).toBe(160);
+    expect(common2.x).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("layoutNodes — FILE mode", () => {
+  const routeColorMap = new Map<string, string>([["common", "#3b82f6"]]);
+
+  const fileNodes: FlowNode[] = [
+    {
+      id: "f-a-2",
+      labelId: "f-a-2",
+      title: "act_a_2",
+      labelName: "act_a_2",
+      routeKey: "common",
+      status: "DRAFT",
+      fileName: "act_a.rpy",
+      sequenceOrder: 2,
+      labelNumber: 2,
+    },
+    {
+      id: "f-b-1",
+      labelId: "f-b-1",
+      title: "act_b_1",
+      labelName: "act_b_1",
+      routeKey: "common",
+      status: "DRAFT",
+      fileName: "act_b.rpy",
+      sequenceOrder: 1,
+      labelNumber: 1,
+    },
+    {
+      id: "f-a-1",
+      labelId: "f-a-1",
+      title: "act_a_1",
+      labelName: "act_a_1",
+      routeKey: "common",
+      status: "DRAFT",
+      fileName: "act_a.rpy",
+      sequenceOrder: 1,
+      labelNumber: 1,
+    },
+    {
+      id: "f-empty-name",
+      labelId: "f-empty-name",
+      title: "no-file",
+      labelName: "no_file",
+      routeKey: "common",
+      status: "DRAFT",
+      fileName: "",
+      sequenceOrder: 1,
+      labelNumber: 1,
+    },
+  ];
+
+  const positionOf = (
+    nodes: ReturnType<typeof layoutNodes>,
+    id: string
+  ): { x: number; y: number } => {
+    const node = nodes.find((n) => n.id === id);
+    if (!node) throw new Error(`missing node ${id}`);
+    return node.position;
+  };
+
+  it("groups nodes by fileName into rows, ordered alphabetically", () => {
+    const nodes = layoutNodes(fileNodes, [], routeColorMap, {}, "FILE");
+
+    expect(positionOf(nodes, "f-empty-name").y).toBe(0);
+    expect(positionOf(nodes, "f-a-1").y).toBe(160);
+    expect(positionOf(nodes, "f-b-1").y).toBe(320);
+  });
+
+  it("orders nodes within a file by sequenceOrder ascending (left to right)", () => {
+    const nodes = layoutNodes(fileNodes, [], routeColorMap, {}, "FILE");
+    const a1 = positionOf(nodes, "f-a-1");
+    const a2 = positionOf(nodes, "f-a-2");
+    expect(a1.y).toBe(a2.y);
+    expect(a1.x).toBeLessThan(a2.x);
+  });
+
+  it("honors saved positions over the auto FILE layout", () => {
+    const saved = { "f-b-1": { x: 1234, y: 5678 } };
+    const nodes = layoutNodes(fileNodes, [], routeColorMap, saved, "FILE");
+    expect(positionOf(nodes, "f-b-1")).toEqual({ x: 1234, y: 5678 });
+  });
+});
+
+describe("layoutNodes — mode switching", () => {
+  const routeColorMap = new Map<string, string>([
+    ["common", "#3b82f6"],
+    ["heroine_a", "#ef4444"],
+  ]);
+
+  const nodes: FlowNode[] = [
+    {
+      id: "switch-1",
+      labelId: "switch-1",
+      title: "Common",
+      labelName: "common_1",
+      routeKey: "common",
+      status: "DRAFT",
+      fileName: "act_i.rpy",
+      sequenceOrder: 1,
+      labelNumber: 1,
+    },
+    {
+      id: "switch-2",
+      labelId: "switch-2",
+      title: "Heroine A",
+      labelName: "heroine_a_1",
+      routeKey: "heroine_a",
+      status: "DRAFT",
+      fileName: "act_i.rpy",
+      sequenceOrder: 2,
+      labelNumber: 2,
+    },
+  ];
+
+  it("FLOW and ROUTE produce different positions for the same nodes", () => {
+    const flow = layoutNodes(nodes, [], routeColorMap, {}, "FLOW");
+    const route = layoutNodes(nodes, [], routeColorMap, {}, "ROUTE");
+    const flowPos = flow.find((n) => n.id === "switch-1")!.position;
+    const routePos = route.find((n) => n.id === "switch-1")!.position;
+    // Both are deterministic but use different algorithms, so positions
+    // should differ for at least one of the two nodes.
+    const flowPos2 = flow.find((n) => n.id === "switch-2")!.position;
+    const routePos2 = route.find((n) => n.id === "switch-2")!.position;
+    const allSame =
+      flowPos.x === routePos.x &&
+      flowPos.y === routePos.y &&
+      flowPos2.x === routePos2.x &&
+      flowPos2.y === routePos2.y;
+    expect(allSame).toBe(false);
+  });
+
+  it("saved position survives a mode change (user drags are sticky)", () => {
+    const saved = { "switch-1": { x: 42, y: 4242 } };
+    const flow = layoutNodes(nodes, [], routeColorMap, saved, "FLOW");
+    const route = layoutNodes(nodes, [], routeColorMap, saved, "ROUTE");
+    const file = layoutNodes(nodes, [], routeColorMap, saved, "FILE");
+    expect(flow.find((n) => n.id === "switch-1")!.position).toEqual({
+      x: 42,
+      y: 4242,
+    });
+    expect(route.find((n) => n.id === "switch-1")!.position).toEqual({
+      x: 42,
+      y: 4242,
+    });
+    expect(file.find((n) => n.id === "switch-1")!.position).toEqual({
+      x: 42,
+      y: 4242,
+    });
+  });
 });

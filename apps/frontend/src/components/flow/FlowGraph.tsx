@@ -18,13 +18,19 @@ import {
 import "@xyflow/react/dist/style.css";
 import { RotateCcw } from "lucide-react";
 import { LabelNodeMemo, type LabelNodeData } from "./LabelNode";
+import { LayoutModeSelector } from "./LayoutModeSelector";
 import { useFlowGraph } from "@/hooks/useFlowGraph";
 import { useFlowGraphLayout } from "@/hooks/useFlowGraphLayout";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 import {
   buildRouteColorMap,
   buildEdges,
   layoutNodes,
 } from "./flow-graph-utils";
+import type { FlowLayoutMode } from "@branchforge/shared";
+
+const LAYOUT_MODE_STORAGE_KEY = "flow:layout-mode";
+const LAYOUT_MODES: readonly FlowLayoutMode[] = ["FLOW", "ROUTE", "FILE"];
 
 interface FlowGraphProps {
   projectId: string;
@@ -82,9 +88,31 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
     isResetting,
   } = useFlowGraphLayout(projectId);
 
+  const [layoutModeRaw, setLayoutMode] = useLocalStorage<string>(
+    LAYOUT_MODE_STORAGE_KEY,
+    "FLOW",
+    {
+      validate: (value) =>
+        typeof value === "string" &&
+        (LAYOUT_MODES as readonly string[]).includes(value),
+    }
+  );
+  const layoutMode: FlowLayoutMode = (
+    LAYOUT_MODES as readonly string[]
+  ).includes(layoutModeRaw)
+    ? (layoutModeRaw as FlowLayoutMode)
+    : "FLOW";
+
   const layoutNodesResult = useMemo(
-    () => layoutNodes(flowNodes, flowEdges, routeColorMap, savedPositions),
-    [flowNodes, flowEdges, routeColorMap, savedPositions]
+    () =>
+      layoutNodes(
+        flowNodes,
+        flowEdges,
+        routeColorMap,
+        savedPositions,
+        layoutMode
+      ),
+    [flowNodes, flowEdges, routeColorMap, savedPositions, layoutMode]
   );
 
   const layoutEdgesResult = useMemo(() => buildEdges(flowEdges), [flowEdges]);
@@ -223,7 +251,11 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
             return data.routeColor ?? "#64748b";
           }}
         />
-        <div className="absolute top-4 right-4 z-10">
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+          <LayoutModeSelector
+            disabled={isSaving || isResetting}
+            onChange={setLayoutMode}
+          />
           <button
             type="button"
             onClick={handleResetLayout}
