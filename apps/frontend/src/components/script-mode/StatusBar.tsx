@@ -34,6 +34,7 @@ type DialogState = {
 type DialogAction =
   | { type: "openSync"; operationType: SyncOperationType }
   | { type: "closeSync" }
+  | { type: "openConflict" }
   | { type: "closeConflict" };
 
 const dialogReducer = (
@@ -49,6 +50,8 @@ const dialogReducer = (
       };
     case "closeSync":
       return { ...state, syncOpen: false };
+    case "openConflict":
+      return { ...state, conflictOpen: true };
     case "closeConflict":
       return { ...state, conflictOpen: false };
   }
