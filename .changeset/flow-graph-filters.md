@@ -4,4 +4,4 @@
 "@branchforge/backend": patch
 ---
 
-Added filtering and search to flow graph (#196)
+Added filtering and search to flow graph
