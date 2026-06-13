@@ -1,11 +1,13 @@
 import { useState, useCallback } from "react";
-import { Download, Upload, GitBranch, Package } from "lucide-react";
+import { Download, Upload, GitBranch, Loader2 } from "lucide-react";
+import { useToast } from "@/contexts/ToastContext";
 import {
   GitLabSyncDialog,
   SyncOperationType,
 } from "@/components/script-mode/GitLabSyncDialog";
 import { ConflictReviewDialog } from "@/components/script-mode/ConflictReviewDialog";
 import { cn } from "@/lib/utils";
+import { projectFilesApi } from "@/lib/api/project-files";
 import type { SourceOrigin } from "@branchforge/shared";
 
 // Status bar styled like a storybook footer
@@ -61,6 +63,26 @@ export function StatusBar({
   }, [onOpenZipImportDialog]);
 
   /**
+   * Handle ZIP export click - generates export and triggers download
+   */
+  const [isExporting, setIsExporting] = useState(false);
+  const { error: showErrorToast } = useToast();
+  const handleZipExportClick = useCallback(async () => {
+    if (!projectId || isExporting) return;
+
+    setIsExporting(true);
+    try {
+      const result = await projectFilesApi.generateExport(projectId);
+      await projectFilesApi.downloadExport(projectId, result.id);
+    } catch (err) {
+      console.error("Export failed:", err);
+      showErrorToast("Export failed. Please try again.", "Export Error");
+    } finally {
+      setIsExporting(false);
+    }
+  }, [projectId, isExporting, showErrorToast]);
+
+  /**
    * Handle conflict resolution from ConflictReviewDialog
    */
   const handleApplyResolutions = useCallback(() => {
@@ -106,7 +128,7 @@ export function StatusBar({
           )}
         </div>
         <div className="flex items-center gap-4">
-          {/* GitLab Controls - only show for GITLAB source type */}
+          {/* GitLab import - only show for GITLAB source type */}
           {isGitLabAvailable && (
             <>
               <div className="flex items-center gap-2 border-l border-border/30 pl-4">
@@ -120,7 +142,7 @@ export function StatusBar({
                   title="Import from GitLab"
                 >
                   <Download className="size-3.5" />
-                  <span>Import</span>
+                  <span>Import from GitLab</span>
                 </button>
               </div>
               <div className="border-l border-border/30 pl-4">
@@ -131,16 +153,16 @@ export function StatusBar({
                     "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
                     "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
                   )}
-                  title="Export to GitLab"
+                  title="Sync to GitLab"
                 >
                   <Upload className="size-3.5" />
-                  <span>Export</span>
+                  <span>Sync to GitLab</span>
                 </button>
               </div>
             </>
           )}
 
-          {/* ZIP Controls - only show for ZIP source type when callback exists */}
+          {/* ZIP import - only show for ZIP source type when callback exists */}
           {isZipAvailable && onOpenZipImportDialog && (
             <div className="flex items-center gap-2 border-l border-border/30 pl-4">
               <button
@@ -152,8 +174,32 @@ export function StatusBar({
                 )}
                 title="Import from Zip"
               >
-                <Package className="size-3.5" />
-                <span>Import Zip</span>
+                <Download className="size-3.5" />
+                <span>Import from Zip</span>
+              </button>
+            </div>
+          )}
+
+          {/* Export as Zip - available for ALL project types */}
+          {projectId && (
+            <div className="border-l border-border/30 pl-4">
+              <button
+                type="button"
+                onClick={handleZipExportClick}
+                disabled={isExporting}
+                className={cn(
+                  "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
+                  "hover:bg-muted/50 text-muted-foreground hover:text-foreground",
+                  isExporting && "opacity-60 cursor-not-allowed"
+                )}
+                title="Export as Zip"
+              >
+                {isExporting ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Upload className="size-3.5" />
+                )}
+                <span>{isExporting ? "Exporting..." : "Export Zip"}</span>
               </button>
             </div>
           )}

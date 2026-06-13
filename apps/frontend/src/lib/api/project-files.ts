@@ -37,6 +37,23 @@ export type UpdateFileResponse =
       };
     };
 
+export interface ExportSummary {
+  id: string;
+  projectId: string;
+  format: string;
+  fileName: string;
+  fileSize: number | null;
+  createdAt: string;
+}
+
+export interface GenerateExportResponse {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  format: string;
+  createdAt: string;
+}
+
 // ============================================================================
 // Validation Utilities
 // ============================================================================
@@ -266,5 +283,72 @@ export const projectFilesApi = {
     }
 
     return response.json();
+  },
+
+  /**
+   * List export history for a project
+   */
+  async listExports(projectId: string): Promise<ExportSummary[]> {
+    validateRequired(projectId, "Project ID");
+
+    const response = await request<{ exports: ExportSummary[] }>(
+      `/projects/${projectId}/exports`
+    );
+    return response.exports;
+  },
+
+  /**
+   * Generate a new zip export for a project.
+   * Returns the export metadata including the download ID.
+   */
+  async generateExport(projectId: string): Promise<GenerateExportResponse> {
+    validateRequired(projectId, "Project ID");
+
+    return request<GenerateExportResponse>(
+      "/projects/" + projectId + "/export",
+      {
+        method: "POST",
+      }
+    );
+  },
+
+  /**
+   * Download a generated export as a zip file.
+   * Triggers a browser download of the zip.
+   */
+  async downloadExport(projectId: string, exportId: string): Promise<void> {
+    validateRequired(projectId, "Project ID");
+    validateRequired(exportId, "Export ID");
+
+    const url = `${API_BASE}/projects/${projectId}/exports/${exportId}/download`;
+    const response = await fetch(url, { credentials: "include" });
+
+    if (!response.ok) {
+      const errorData: { error?: string; message?: string } = await response
+        .json()
+        .catch(() => ({ error: "Unknown error" }));
+      throw new Error(getApiErrorMessage(errorData, response.status));
+    }
+
+    // Extract filename from Content-Disposition header
+    const disposition = response.headers.get("Content-Disposition");
+    let fileName = "export.zip";
+    if (disposition) {
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      if (match?.[1]) {
+        fileName = match[1];
+      }
+    }
+
+    // Trigger browser download
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(blobUrl);
   },
 };

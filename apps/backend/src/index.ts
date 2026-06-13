@@ -20,6 +20,7 @@ import { variablesRoutes } from "./routes/variables.routes.js";
 import { statsRoutes } from "./routes/stats.routes.js";
 import { zipImportRoutes } from "./routes/zip-import.routes.js";
 import { flowRoutes } from "./routes/flow.routes.js";
+import { exportsRoutes } from "./routes/exports.routes.js";
 import { createDrizzleSessionStore } from "./services/session-store.service.js";
 import { setupShutdownHandlers } from "./lib/shutdown.js";
 import { globalErrorHandler } from "./middleware/error-handler.middleware.js";
@@ -113,6 +114,7 @@ await server.register(statsRoutes, { prefix: basePath });
 // Register zip import routes after multipart plugin (for file uploads)
 await server.register(zipImportRoutes, { prefix: basePath });
 await server.register(flowRoutes, { prefix: basePath });
+await server.register(exportsRoutes, { prefix: basePath });
 
 // Start server
 const start = async () => {

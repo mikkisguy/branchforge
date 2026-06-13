@@ -951,6 +951,21 @@ export const exportRequestSchema = z.object({
 });
 
 /**
+ * Export params validation (projectId in URL params)
+ */
+export const exportProjectIdParamsSchema = z.object({
+  projectId: uuidSchema,
+});
+
+/**
+ * Export download params validation (projectId + exportId in URL params)
+ */
+export const exportDownloadParamsSchema = z.object({
+  projectId: uuidSchema,
+  exportId: uuidSchema,
+});
+
+/**
  * Import request validation
  */
 export const importRequestSchema = z.object({

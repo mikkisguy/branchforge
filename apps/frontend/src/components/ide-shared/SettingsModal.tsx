@@ -1,5 +1,6 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { X } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -12,12 +13,15 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSettings } from "@/hooks/useSettings";
 import { ProjectsSettingsContent } from "@/components/ide-shared/ProjectsSettingsContent";
 import { IntegrationsSettingsContent } from "@/components/ide-shared/IntegrationsSettingsContent";
+import { ExportHistoryDialog } from "@/components/ide-shared/ExportHistoryDialog";
 import {
   SettingsRow,
   SettingsSection,
 } from "@/components/ide-shared/SettingsLayout";
 import { WritingGoalSettings } from "@/components/write-mode/WritingGoalSettings";
 import { cn } from "@/lib/utils";
+import { projectFilesApi } from "@/lib/api/project-files";
+import { exportKeys } from "@/lib/query-keys";
 import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 import { APP_NAME, APP_VERSION } from "@/lib/version";
 import type { Tab } from "./settings-types";
@@ -58,8 +62,35 @@ export function SettingsModal({
   onImportZip,
   initialTab,
 }: SettingsModalProps) {
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>(initialTab ?? "user");
   const prevOpenRef = useRef(open);
+
+  // Export history dialog state
+  const [exportHistoryProject, setExportHistoryProject] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
+  // Handle export: generate + download
+  const handleExportProject = useCallback(
+    async (projectId: string) => {
+      const result = await projectFilesApi.generateExport(projectId);
+      await projectFilesApi.downloadExport(projectId, result.id);
+      queryClient.invalidateQueries({
+        queryKey: exportKeys.lists(projectId),
+      });
+    },
+    [queryClient]
+  );
+
+  // Handle viewing export history
+  const handleViewExportHistory = useCallback(
+    (projectId: string, projectName: string) => {
+      setExportHistoryProject({ id: projectId, name: projectName });
+    },
+    []
+  );
 
   const { user } = useAuth();
   const {
@@ -105,7 +136,13 @@ export function SettingsModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(isOpen) => {
+        onOpenChange(isOpen);
+        if (!isOpen) setExportHistoryProject(null);
+      }}
+    >
       <DialogContent className="w-[800px] max-w-[95vw] p-0 gap-0">
         <DialogHeader className="p-6 pb-4 flex-row items-center justify-between border-b border-border/30">
           <DialogTitle>Settings</DialogTitle>
@@ -179,6 +216,8 @@ export function SettingsModal({
                 onDeleteProject={onDeleteProject}
                 onImportFromGitLab={onImportFromGitLab}
                 onImportZip={onImportZip}
+                onExportProject={handleExportProject}
+                onViewExportHistory={handleViewExportHistory}
               />
             )}
 
@@ -205,6 +244,18 @@ export function SettingsModal({
           </div>
         </div>
       </DialogContent>
+
+      {/* Export History Dialog — rendered outside settings modal so it stacks */}
+      {exportHistoryProject && (
+        <ExportHistoryDialog
+          open={!!exportHistoryProject}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) setExportHistoryProject(null);
+          }}
+          projectId={exportHistoryProject.id}
+          projectName={exportHistoryProject.name}
+        />
+      )}
     </Dialog>
   );
 }
