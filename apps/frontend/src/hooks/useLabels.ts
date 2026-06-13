@@ -11,6 +11,7 @@ import {
   labelKeys,
   projectFilesKeys,
   writingGoalsKeys,
+  flowKeys,
 } from "@/lib/query-keys";
 import {
   labelsApi,
@@ -190,6 +191,9 @@ export function useLabels(): UseLabelsReturn {
       // Invalidate labels list (updatedAt timestamp changed on the label)
       // Invalidate writingGoals (word count may have changed)
       // Invalidate project files (file content is reconstructed after dialogue update)
+      // Invalidate the flow graph: menu options become CHOICE edges, jump
+      // lines become JUMP edges, and speaker changes alter the label's
+      // characterIds.
       if (currentProject && variables.labelId) {
         await Promise.all([
           queryClient.invalidateQueries({
@@ -206,6 +210,9 @@ export function useLabels(): UseLabelsReturn {
             queryKey: projectFilesKeys.lists(currentProject.id),
           }),
           queryClient.invalidateQueries({ queryKey: writingGoalsKeys.all }),
+          queryClient.invalidateQueries({
+            queryKey: flowKeys.graph(currentProject.id),
+          }),
         ]);
       } else {
         await queryClient.invalidateQueries({ queryKey: writingGoalsKeys.all });
@@ -221,6 +228,7 @@ export function useLabels(): UseLabelsReturn {
     onSuccess: async () => {
       // Invalidate labels list to show new label
       // Also invalidate project files since createLabel updates the RPY file content and its contentHash
+      // Also invalidate the flow graph since the new label adds a node.
       if (currentProject) {
         await Promise.all([
           queryClient.invalidateQueries({
@@ -228,6 +236,9 @@ export function useLabels(): UseLabelsReturn {
           }),
           queryClient.refetchQueries({
             queryKey: projectFilesKeys.lists(currentProject.id),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: flowKeys.graph(currentProject.id),
           }),
         ]);
       }
@@ -256,6 +267,12 @@ export function useLabels(): UseLabelsReturn {
           }),
           queryClient.refetchQueries({
             queryKey: projectFilesKeys.lists(currentProject.id),
+          }),
+          // A title / route / status change shows up on the flow node
+          // (and may pull the node into / out of the user's current
+          // filter selection).
+          queryClient.invalidateQueries({
+            queryKey: flowKeys.graph(currentProject.id),
           }),
         ]);
       }
@@ -292,6 +309,11 @@ export function useLabels(): UseLabelsReturn {
           }),
           queryClient.refetchQueries({
             queryKey: projectFilesKeys.lists(currentProject.id),
+          }),
+          // The deleted label is a node + potentially edges that need
+          // to come out of the graph.
+          queryClient.invalidateQueries({
+            queryKey: flowKeys.graph(currentProject.id),
           }),
         ]);
       }

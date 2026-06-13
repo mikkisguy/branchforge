@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useReducer } from "react";
 import { Download, Upload, GitBranch, Loader2 } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
 import {
@@ -23,6 +23,46 @@ interface StatusBarProps {
   onOpenZipImportDialog?: () => void;
 }
 
+// Dialog state lives in a single reducer so opening / closing / switching
+// between sync + conflict dialogs commits in one render rather than
+// fanning out across separate setters.
+type DialogState = {
+  syncOpen: boolean;
+  syncOperationType: SyncOperationType;
+  conflictOpen: boolean;
+};
+type DialogAction =
+  | { type: "openSync"; operationType: SyncOperationType }
+  | { type: "closeSync" }
+  | { type: "openConflict" }
+  | { type: "closeConflict" };
+
+const dialogReducer = (
+  state: DialogState,
+  action: DialogAction
+): DialogState => {
+  switch (action.type) {
+    case "openSync":
+      return {
+        ...state,
+        syncOpen: true,
+        syncOperationType: action.operationType,
+      };
+    case "closeSync":
+      return { ...state, syncOpen: false };
+    case "openConflict":
+      return { ...state, conflictOpen: true };
+    case "closeConflict":
+      return { ...state, conflictOpen: false };
+  }
+};
+
+const initialDialogState: DialogState = {
+  syncOpen: false,
+  syncOperationType: "export",
+  conflictOpen: false,
+};
+
 export function StatusBar({
   language,
   projectId,
@@ -32,27 +72,24 @@ export function StatusBar({
   isFocusMode = false,
   onOpenZipImportDialog,
 }: StatusBarProps) {
-  // Dialog state
-  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
-  const [syncOperationType, setSyncOperationType] =
-    useState<SyncOperationType>("export");
-  const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
+  const [dialogState, dispatchDialog] = useReducer(
+    dialogReducer,
+    initialDialogState
+  );
   const [isHovered, setIsHovered] = useState(false);
 
   /**
    * Handle export click
    */
   const handleExportClick = useCallback(() => {
-    setSyncOperationType("export");
-    setSyncDialogOpen(true);
+    dispatchDialog({ type: "openSync", operationType: "export" });
   }, []);
 
   /**
    * Handle import click (GitLab)
    */
   const handleImportClick = useCallback(() => {
-    setSyncOperationType("import");
-    setSyncDialogOpen(true);
+    dispatchDialog({ type: "openSync", operationType: "import" });
   }, []);
 
   /**
@@ -88,7 +125,7 @@ export function StatusBar({
   const handleApplyResolutions = useCallback(() => {
     // TODO: This would trigger a re-import with the resolved conflicts
     // For now, just close the conflict dialog
-    setConflictDialogOpen(false);
+    dispatchDialog({ type: "closeConflict" });
   }, []);
 
   /**
@@ -209,9 +246,11 @@ export function StatusBar({
       {/* Sync Dialog */}
       {projectId !== undefined && isGitLabAvailable && (
         <GitLabSyncDialog
-          open={syncDialogOpen}
-          onOpenChange={setSyncDialogOpen}
-          operationType={syncOperationType}
+          open={dialogState.syncOpen}
+          onOpenChange={(open) => {
+            if (!open) dispatchDialog({ type: "closeSync" });
+          }}
+          operationType={dialogState.syncOperationType}
           projectId={projectId}
           projectName={projectName}
           defaultBranch={gitlabBranch}
@@ -223,8 +262,10 @@ export function StatusBar({
         gitlabBranch !== undefined &&
         isGitLabAvailable && (
           <ConflictReviewDialog
-            open={conflictDialogOpen}
-            onOpenChange={setConflictDialogOpen}
+            open={dialogState.conflictOpen}
+            onOpenChange={(open) => {
+              if (!open) dispatchDialog({ type: "closeConflict" });
+            }}
             projectId={projectId}
             branch={gitlabBranch}
             onApplyResolutions={handleApplyResolutions}

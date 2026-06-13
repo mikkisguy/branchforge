@@ -7,7 +7,6 @@ import {
   getEdgeWidth,
   getRouteColor,
   layoutNodes,
-  ROUTE_COLORS,
 } from "../flow-graph-utils";
 import type { FlowNode, FlowEdge } from "@branchforge/shared";
 
@@ -22,6 +21,7 @@ const mockFlowNodes: FlowNode[] = [
     fileName: "act_i.rpy",
     sequenceOrder: 1,
     labelNumber: 1,
+    characterIds: [],
   },
   {
     id: "node-2",
@@ -33,14 +33,9 @@ const mockFlowNodes: FlowNode[] = [
     fileName: "act_i.rpy",
     sequenceOrder: 2,
     labelNumber: 2,
+    characterIds: [],
   },
 ];
-
-describe("ROUTE_COLORS", () => {
-  it("has 8 colors in the palette", () => {
-    expect(ROUTE_COLORS).toHaveLength(8);
-  });
-});
 
 describe("buildRouteColorMap", () => {
   it("returns empty map for empty nodes array", () => {
@@ -53,8 +48,12 @@ describe("buildRouteColorMap", () => {
     expect(map.size).toBe(2);
     expect(map.has("common")).toBe(true);
     expect(map.has("heroine_a")).toBe(true);
-    expect(map.get("common")).toBe(ROUTE_COLORS[0]);
-    expect(map.get("heroine_a")).toBe(ROUTE_COLORS[1]);
+    // Colors are generated deterministically via HSL
+    const commonColor = map.get("common");
+    const heroineAColor = map.get("heroine_a");
+    expect(commonColor).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(heroineAColor).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(commonColor).not.toBe(heroineAColor);
   });
 
   it("nodes with null routeKey are not included in the map", () => {
@@ -70,6 +69,7 @@ describe("buildRouteColorMap", () => {
         fileName: "act_i.rpy",
         sequenceOrder: 3,
         labelNumber: 3,
+        characterIds: [],
       },
     ];
     const map = buildRouteColorMap(nodes);
@@ -78,7 +78,7 @@ describe("buildRouteColorMap", () => {
     expect(map.has("heroine_a")).toBe(true);
   });
 
-  it("cycles through ROUTE_COLORS when there are more routes than colors", () => {
+  it("generates distinct HSL colors for each route (no collisions)", () => {
     const nodes: FlowNode[] = Array.from({ length: 10 }, (_, i) => ({
       id: `node-${i + 1}`,
       labelId: `node-${i + 1}`,
@@ -89,12 +89,21 @@ describe("buildRouteColorMap", () => {
       fileName: "act_i.rpy",
       sequenceOrder: i + 1,
       labelNumber: i + 1,
+      characterIds: [],
     }));
     const map = buildRouteColorMap(nodes);
     expect(map.size).toBe(10);
-    // route_1 gets index 0; route_9 wraps to index 0: (9-1) % 8 = 0
-    expect(map.get("route_1")).toBe(ROUTE_COLORS[0]);
-    expect(map.get("route_9")).toBe(ROUTE_COLORS[0]);
+    // All generated colors should be valid 6-digit hex strings
+    for (let i = 1; i <= 10; i++) {
+      const color = map.get(`route_${i}`);
+      expect(color).toMatch(/^#[0-9a-f]{6}$/i);
+    }
+    // All 10 colors should be distinct (no collisions)
+    const colors = Array.from(map.values());
+    const uniqueColors = new Set(colors);
+    expect(uniqueColors.size).toBe(10);
+    // First color should be a valid hex (hue 0° -> reddish with s=70%, l=55%)
+    expect(map.get("route_1")).toMatch(/^#[0-9a-f]{6}$/i);
   });
 
   it("same routeKey always gets same color", () => {
@@ -109,8 +118,12 @@ describe("buildRouteColorMap", () => {
     ];
     const map = buildRouteColorMap(nodes);
     expect(map.size).toBe(2);
-    expect(map.get("common")).toBe(ROUTE_COLORS[0]);
-    expect(map.get("heroine_a")).toBe(ROUTE_COLORS[1]);
+    // Colors are deterministic based on the order routes are first encountered
+    const commonColor = map.get("common");
+    const heroineAColor = map.get("heroine_a");
+    expect(commonColor).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(heroineAColor).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(commonColor).not.toBe(heroineAColor);
   });
 });
 
@@ -390,6 +403,7 @@ describe("layoutNodes — ROUTE mode", () => {
       fileName: "common.rpy",
       sequenceOrder: 2,
       labelNumber: 2,
+      characterIds: [],
     },
     {
       id: "n-heroine-b-1",
@@ -401,6 +415,7 @@ describe("layoutNodes — ROUTE mode", () => {
       fileName: "heroine_b.rpy",
       sequenceOrder: 1,
       labelNumber: 1,
+      characterIds: [],
     },
     {
       id: "n-unassigned",
@@ -412,6 +427,7 @@ describe("layoutNodes — ROUTE mode", () => {
       fileName: "misc.rpy",
       sequenceOrder: 1,
       labelNumber: 1,
+      characterIds: [],
     },
     {
       id: "n-unassigned-2",
@@ -423,6 +439,7 @@ describe("layoutNodes — ROUTE mode", () => {
       fileName: "misc.rpy",
       sequenceOrder: 2,
       labelNumber: 2,
+      characterIds: [],
     },
     {
       id: "n-common-1",
@@ -434,6 +451,7 @@ describe("layoutNodes — ROUTE mode", () => {
       fileName: "common.rpy",
       sequenceOrder: 1,
       labelNumber: 1,
+      characterIds: [],
     },
     {
       id: "n-heroine-a-1",
@@ -445,6 +463,7 @@ describe("layoutNodes — ROUTE mode", () => {
       fileName: "heroine_a.rpy",
       sequenceOrder: 1,
       labelNumber: 1,
+      characterIds: [],
     },
   ];
 
@@ -552,6 +571,7 @@ describe("layoutNodes — FILE mode", () => {
       fileName: "act_a.rpy",
       sequenceOrder: 2,
       labelNumber: 2,
+      characterIds: [],
     },
     {
       id: "f-b-1",
@@ -563,6 +583,7 @@ describe("layoutNodes — FILE mode", () => {
       fileName: "act_b.rpy",
       sequenceOrder: 1,
       labelNumber: 1,
+      characterIds: [],
     },
     {
       id: "f-a-1",
@@ -574,6 +595,7 @@ describe("layoutNodes — FILE mode", () => {
       fileName: "act_a.rpy",
       sequenceOrder: 1,
       labelNumber: 1,
+      characterIds: [],
     },
     {
       id: "f-empty-name",
@@ -585,6 +607,7 @@ describe("layoutNodes — FILE mode", () => {
       fileName: "",
       sequenceOrder: 1,
       labelNumber: 1,
+      characterIds: [],
     },
     {
       id: "f-empty-name-2",
@@ -596,6 +619,7 @@ describe("layoutNodes — FILE mode", () => {
       fileName: "",
       sequenceOrder: 2,
       labelNumber: 2,
+      characterIds: [],
     },
   ];
 
@@ -658,6 +682,7 @@ describe("layoutNodes — mode switching", () => {
       fileName: "act_i.rpy",
       sequenceOrder: 1,
       labelNumber: 1,
+      characterIds: [],
     },
     {
       id: "switch-2",
@@ -669,6 +694,7 @@ describe("layoutNodes — mode switching", () => {
       fileName: "act_i.rpy",
       sequenceOrder: 2,
       labelNumber: 2,
+      characterIds: [],
     },
   ];
 

@@ -85,7 +85,8 @@ export async function getFlowGraph(
   }
   const labelIdSet = new Set(labelRows.map((row) => row.id));
 
-  // Build nodes
+  // Build nodes with empty character lists; populated below once we know
+  // which characters speak in each label.
   const nodes: FlowNode[] = labelRows.map((row) => ({
     id: row.id,
     labelId: row.id,
@@ -96,6 +97,7 @@ export async function getFlowGraph(
     fileName: extractFileName(row.filePath),
     sequenceOrder: row.sequenceOrder,
     labelNumber: row.labelNumber,
+    characterIds: [],
   }));
 
   // Fetch all label_lines for this project's labels
@@ -106,6 +108,7 @@ export async function getFlowGraph(
     labelId: string;
     contentType: string;
     content: string;
+    speakerId: string | null;
     menuOptions: Array<{
       label: string;
       targetLabelId: string;
@@ -124,6 +127,7 @@ export async function getFlowGraph(
         labelId: labelLines.labelId,
         contentType: labelLines.contentType,
         content: labelLines.content,
+        speakerId: labelLines.speakerId,
         menuOptions: labelLines.menuOptions,
       })
       .from(labelLines)
@@ -237,6 +241,25 @@ export async function getFlowGraph(
         });
         existingEdgeKeys.add(key);
       }
+    }
+  }
+
+  // Aggregate speaker characters per label (deduplicated, stable order).
+  // Drives the character-appears filter in the flow graph UI.
+  const speakersByLabel = new Map<string, Set<string>>();
+  for (const line of linesRows) {
+    if (!line.speakerId) continue;
+    let set = speakersByLabel.get(line.labelId);
+    if (!set) {
+      set = new Set();
+      speakersByLabel.set(line.labelId, set);
+    }
+    set.add(line.speakerId);
+  }
+  for (const node of nodes) {
+    const set = speakersByLabel.get(node.id);
+    if (set) {
+      node.characterIds = Array.from(set).sort();
     }
   }
 

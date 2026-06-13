@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useReducer, useState } from "react";
 import {
   FileArchive,
   Edit,
@@ -42,6 +42,34 @@ interface ProjectsSettingsContentProps {
   onViewExportHistory?: (projectId: string, projectName: string) => void;
 }
 
+// One reducer per project being edited/deleted so a single "open edit
+// for X" or "open delete for X" commit lands all related state at once
+// (selected project + open flag). The per-row "currently exporting"
+// spinner is unrelated and stays on its own useState.
+type DialogState =
+  | { kind: "idle" }
+  | { kind: "edit"; project: Project }
+  | { kind: "delete"; project: Project };
+
+type DialogAction =
+  | { type: "openEdit"; project: Project }
+  | { type: "openDelete"; project: Project }
+  | { type: "close" };
+
+const dialogReducer = (
+  _state: DialogState,
+  action: DialogAction
+): DialogState => {
+  switch (action.type) {
+    case "openEdit":
+      return { kind: "edit", project: action.project };
+    case "openDelete":
+      return { kind: "delete", project: action.project };
+    case "close":
+      return { kind: "idle" };
+  }
+};
+
 export function ProjectsSettingsContent({
   projects,
   onUpdateProject,
@@ -51,10 +79,7 @@ export function ProjectsSettingsContent({
   onExportProject,
   onViewExportHistory,
 }: ProjectsSettingsContentProps) {
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [deletingProject, setDeletingProject] = useState<Project | null>(null);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [dialog, dispatchDialog] = useReducer(dialogReducer, { kind: "idle" });
   const [exportingProjectId, setExportingProjectId] = useState<string | null>(
     null
   );
@@ -63,13 +88,11 @@ export function ProjectsSettingsContent({
   const { hasIntegration, isLoadingIntegration } = useGitLab();
 
   const handleEditClick = (project: Project) => {
-    setEditingProject(project);
-    setIsEditOpen(true);
+    dispatchDialog({ type: "openEdit", project });
   };
 
   const handleDeleteClick = (project: Project) => {
-    setDeletingProject(project);
-    setIsDeleteOpen(true);
+    dispatchDialog({ type: "openDelete", project });
   };
 
   const handleUpdateProject = async (
@@ -315,24 +338,28 @@ export function ProjectsSettingsContent({
       </div>
 
       {/* Edit dialog */}
-      {editingProject && (
+      {dialog.kind === "edit" && (
         <ProjectEditDialog
-          open={isEditOpen}
-          onOpenChange={setIsEditOpen}
-          project={editingProject}
+          open
+          onOpenChange={(open) => {
+            if (!open) dispatchDialog({ type: "close" });
+          }}
+          project={dialog.project}
           onUpdate={handleUpdateProject}
-          isProjectOwner={isProjectOwner(editingProject)}
+          isProjectOwner={isProjectOwner(dialog.project)}
           onSuccess={() => toastSuccess("Project updated successfully")}
           onError={(err) => toastError(err.message, "Update failed")}
         />
       )}
 
       {/* Delete dialog */}
-      {deletingProject && onDeleteProject && (
+      {dialog.kind === "delete" && onDeleteProject && (
         <ProjectDeleteDialog
-          open={isDeleteOpen}
-          onOpenChange={setIsDeleteOpen}
-          project={deletingProject}
+          open
+          onOpenChange={(open) => {
+            if (!open) dispatchDialog({ type: "close" });
+          }}
+          project={dialog.project}
           onDelete={handleDeleteProject}
           onError={(err) => toastError(err.message)}
         />

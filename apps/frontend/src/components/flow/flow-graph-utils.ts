@@ -11,18 +11,6 @@ import type {
   FlowGraphPositions,
 } from "@branchforge/shared";
 
-// Route color palette for node borders
-export const ROUTE_COLORS = [
-  "#3b82f6", // blue
-  "#ef4444", // red
-  "#10b981", // green
-  "#f59e0b", // amber
-  "#8b5cf6", // violet
-  "#ec4899", // pink
-  "#06b6d4", // cyan
-  "#f97316", // orange
-];
-
 // Node dimensions used by all layout algorithms. Kept in sync with the
 // `LabelNode` component's intrinsic size.
 const NODE_WIDTH = 240;
@@ -47,16 +35,60 @@ export function getRouteColor(
   return color ?? "#64748b";
 }
 
+/**
+ * Convert HSL color to hex string.
+ * @param h - Hue in degrees (0-360)
+ * @param s - Saturation as percentage (0-100)
+ * @param l - Lightness as percentage (0-100)
+ * @returns 6-digit hex color string (e.g., "#a1b2c3")
+ */
+function hslToHex(h: number, s: number, l: number): string {
+  s /= 100;
+  l /= 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number): number => {
+    const k = (n + h / 30) % 12;
+    return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+  };
+  const toHex = (n: number): string => {
+    const hex = Math.round(n * 255).toString(16);
+    return hex.length === 1 ? `0${hex}` : hex;
+  };
+  return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
+}
+
+/**
+ * djb2 string hash. Stable, fast, and good enough distribution to spread
+ * route keys across the 360-bucket hue space without clustering.
+ */
+function hashRouteKey(routeKey: string): number {
+  let hash = 5381;
+  for (let i = 0; i < routeKey.length; i++) {
+    hash = ((hash << 5) + hash + routeKey.charCodeAt(i)) | 0;
+  }
+  return hash;
+}
+
+/**
+ * Generate a deterministic color for a given hue (0-360) using HSL.
+ * @param hue - Hue in degrees (0-360)
+ * @returns 6-digit hex color string
+ */
+function generateHslColor(hue: number): string {
+  const saturation = 70;
+  const lightness = 55;
+  return hslToHex(hue, saturation, lightness);
+}
+
 export function buildRouteColorMap(nodes: FlowNode[]): Map<string, string> {
   const routes = new Set<string>();
   for (const node of nodes) {
     if (node.routeKey) routes.add(node.routeKey);
   }
   const map = new Map<string, string>();
-  let i = 0;
   for (const route of routes) {
-    map.set(route, ROUTE_COLORS[i % ROUTE_COLORS.length]);
-    i++;
+    const hue = Math.abs(hashRouteKey(route)) % 360;
+    map.set(route, generateHslColor(hue));
   }
   return map;
 }

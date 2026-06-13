@@ -7,7 +7,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { routeConfigsApi } from "@/lib/api/route-configs";
-import { routeConfigKeys } from "@/lib/query-keys";
+import { routeConfigKeys, flowKeys } from "@/lib/query-keys";
 import { useToast } from "@/contexts/ToastContext";
 import type { RouteConfig } from "@branchforge/shared";
 
@@ -81,8 +81,13 @@ export function useRouteConfigs(projectId: string): UseRouteConfigsReturn {
     },
     onSuccess: () => {
       // Invalidate and refetch route configs list
+      // Also invalidate the flow graph: the new route becomes a filter
+      // option and may recolour node borders.
       queryClient.invalidateQueries({
         queryKey: routeConfigKeys.lists(projectId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: flowKeys.graph(projectId),
       });
       toast.success("Route configuration created successfully", "Success");
     },
@@ -107,8 +112,13 @@ export function useRouteConfigs(projectId: string): UseRouteConfigsReturn {
     },
     onSuccess: () => {
       // Invalidate and refetch route configs list
+      // Also invalidate the flow graph: rename / re-prefix shows up on
+      // the route filter row and the node border badge.
       queryClient.invalidateQueries({
         queryKey: routeConfigKeys.lists(projectId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: flowKeys.graph(projectId),
       });
       toast.success("Route configuration updated successfully", "Success");
     },
@@ -127,8 +137,13 @@ export function useRouteConfigs(projectId: string): UseRouteConfigsReturn {
     },
     onSuccess: () => {
       // Invalidate and refetch route configs list
+      // Also invalidate the flow graph: the route is gone from the
+      // filter and the cached node data may reference its key.
       queryClient.invalidateQueries({
         queryKey: routeConfigKeys.lists(projectId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: flowKeys.graph(projectId),
       });
       toast.success("Route configuration deleted successfully", "Success");
     },

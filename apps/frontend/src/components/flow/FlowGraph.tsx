@@ -2,7 +2,7 @@
  * FlowGraph - ReactFlow-based flow graph visualization for label routes
  */
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   Background,
@@ -17,11 +17,14 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { RotateCcw } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { LabelNodeMemo, type LabelNodeData } from "./LabelNode";
 import { LayoutModeSelector } from "./LayoutModeSelector";
 import { useFlowGraph } from "@/hooks/useFlowGraph";
 import { useFlowGraphLayout } from "@/hooks/useFlowGraphLayout";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useRouteConfigs } from "@/hooks/useRouteConfigs";
+import { useCharacters } from "@/hooks/useCharacters";
 import {
   buildRouteColorMap,
   buildEdges,
@@ -30,6 +33,13 @@ import {
 import { LAYOUT_MODE_STORAGE_KEY, isFlowLayoutMode } from "./flow-layout-mode";
 import type { FlowLayoutMode } from "@branchforge/shared";
 import { FLOW_LAYOUT_MODE_LABELS } from "@branchforge/shared";
+import {
+  EMPTY_FLOW_FILTERS,
+  filterFlowNodes,
+  isFlowFilterEmpty,
+  type FlowGraphFilters,
+} from "@/components/flow/flow-filters";
+import { FlowGraphFiltersPanel } from "@/components/flow/FlowGraphFiltersPanel";
 
 interface FlowGraphProps {
   projectId: string;
@@ -74,6 +84,14 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
     error,
   } = useFlowGraph(projectId);
 
+  const { routeConfigs } = useRouteConfigs(projectId);
+  const { characters } = useCharacters(projectId);
+
+  // Filter state (search + multi-select filters). Lives here, not in
+  // localStorage, so each dialog open session starts clean — filters
+  // are an in-context "what am I looking at right now" tool.
+  const [filters, setFilters] = useState<FlowGraphFilters>(EMPTY_FLOW_FILTERS);
+
   const routeColorMap = useMemo(
     () => buildRouteColorMap(flowNodes),
     [flowNodes]
@@ -98,6 +116,117 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
     isResetting,
   } = useFlowGraphLayout(projectId, layoutMode);
 
+  // Routes available in the project. Always include an "Unassigned" bucket
+  // so users can find labels without a routeKey.
+  const routeOptions = useMemo(() => {
+    const presentKeys = new Set<string>();
+    let hasUnassigned = false;
+    for (const node of flowNodes) {
+      if (node.routeKey) {
+        presentKeys.add(node.routeKey);
+      } else {
+        hasUnassigned = true;
+      }
+    }
+    const fromConfigs: Array<{ key: string; label: string }> = [];
+    for (const c of routeConfigs) {
+      if (presentKeys.has(c.routeKey)) {
+        fromConfigs.push({ key: c.routeKey, label: c.routeName });
+      }
+    }
+    // Add any present routes that don't have a config (defensive — labels
+    // can have routeKey values not present in route_configs).
+    const known = new Set(fromConfigs.map((r) => r.key));
+    for (const k of presentKeys) {
+      if (!known.has(k)) fromConfigs.push({ key: k, label: k });
+    }
+    fromConfigs.sort((a, b) => a.label.localeCompare(b.label));
+    const options: Array<{ key: string | null; label: string }> = [
+      ...fromConfigs,
+    ];
+    if (hasUnassigned) {
+      options.push({ key: null, label: "Unassigned" });
+    }
+    return options;
+  }, [flowNodes, routeConfigs]);
+
+  // Apply the active filter set. The filter is purely a *view* on the data:
+  // the layout, edges, and saved positions all still reference the
+  // original (unfiltered) node set so re-running the predicate is cheap
+  // and doesn't disturb the user's drag positions.
+  const filteredNodes = useMemo(
+    () => filterFlowNodes(flowNodes, filters),
+    [flowNodes, filters]
+  );
+
+  // Prune any selected filter keys that no longer exist after a refetch —
+  // e.g. a route that was deleted server-side, or a character that was
+  // removed. The filter UI only offers the current options, so leaving
+  // stale entries in `filters` would silently filter against nothing
+  // (a Set containing only non-existent keys matches no nodes, which is
+  // indistinguishable to the user from a "real" empty result).
+  useEffect(() => {
+    const validRouteKeys = new Set<string | null>();
+    for (const opt of routeOptions) validRouteKeys.add(opt.key);
+    const validCharacterIds = new Set(characters.map((c) => c.id));
+    setFilters((prev) => {
+      const nextRouteKeys = new Set<string | null>();
+      for (const k of prev.routeKeys) {
+        if (validRouteKeys.has(k)) nextRouteKeys.add(k);
+      }
+      const nextCharacterIds = new Set<string>();
+      for (const id of prev.characterIds) {
+        if (validCharacterIds.has(id)) nextCharacterIds.add(id);
+      }
+      if (
+        nextRouteKeys.size === prev.routeKeys.size &&
+        nextCharacterIds.size === prev.characterIds.size
+      ) {
+        return prev;
+      }
+      return {
+        ...prev,
+        routeKeys: nextRouteKeys,
+        characterIds: nextCharacterIds,
+      };
+    });
+  }, [routeOptions, characters, setFilters]);
+  const filteredNodeIds = useMemo(
+    () => new Set(filteredNodes.map((n) => n.id)),
+    [filteredNodes]
+  );
+
+  // We render every node, but mark the ones that failed the filter as
+  // `dimmed` so the user retains spatial context. A node with a matching
+  // search query is also `highlighted` (additive on top of `dimmed`).
+  const trimmedQuery = filters.searchQuery.trim();
+  const nodeViewState = useMemo(() => {
+    const filtersActive = !isFlowFilterEmpty(filters);
+    const trimmed = trimmedQuery.toLowerCase();
+    const map = new Map<string, { dimmed: boolean; highlighted: boolean }>();
+    for (const node of flowNodes) {
+      const passes = filteredNodeIds.has(node.id);
+      let matchesQuery = false;
+      if (trimmed.length > 0) {
+        const title = node.title.toLowerCase();
+        const labelName = node.labelName?.toLowerCase() ?? "";
+        // Substring searches against a bounded label set — not array
+        // membership checks. The js-set-map-lookups rule fires on any
+        // `.includes` inside a loop, but the alternative (a Set of
+        // n-grams) is over-engineering for short title strings.
+        // react-doctor-disable-next-line react-doctor/js-set-map-lookups
+        matchesQuery =
+          // react-doctor-disable-next-line react-doctor/js-set-map-lookups
+          title.includes(trimmed) || labelName.includes(trimmed);
+      }
+      map.set(node.id, {
+        dimmed: filtersActive && !passes,
+        highlighted: matchesQuery,
+      });
+    }
+    return map;
+  }, [flowNodes, filteredNodeIds, filters, trimmedQuery]);
+
   const layoutNodesResult = useMemo(
     () =>
       layoutNodes(
@@ -109,6 +238,28 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
       ),
     [flowNodes, flowEdges, routeColorMap, savedPositions, layoutMode]
   );
+
+  // Decorate each layout node with the view-state flags so LabelNode can
+  // render dimmed/highlighted styles. Done as a separate pass so the
+  // position-comparison effect downstream can short-circuit on the
+  // (cheap) data-shape equality check.
+  const decoratedNodes = useMemo(() => {
+    return layoutNodesResult.map((n) => {
+      const view = nodeViewState.get(n.id);
+      if (!view) return n;
+      const data = n.data as LabelNodeData;
+      if (
+        data.dimmed === view.dimmed &&
+        data.highlighted === view.highlighted
+      ) {
+        return n;
+      }
+      return {
+        ...n,
+        data: { ...data, dimmed: view.dimmed, highlighted: view.highlighted },
+      };
+    });
+  }, [layoutNodesResult, nodeViewState]);
 
   const layoutEdgesResult = useMemo(() => buildEdges(flowEdges), [flowEdges]);
 
@@ -125,8 +276,8 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
   useEffect(() => {
     setNodes((prev) => {
       const prevById = new Map(prev.map((n) => [n.id, n]));
-      let changed = prevById.size !== layoutNodesResult.length;
-      const next = layoutNodesResult.map((layoutNode) => {
+      let changed = prevById.size !== decoratedNodes.length;
+      const next = decoratedNodes.map((layoutNode) => {
         const existing = prevById.get(layoutNode.id);
         if (!existing) {
           changed = true;
@@ -154,7 +305,7 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
       if (!changed) return prev;
       return next;
     });
-  }, [layoutNodesResult, setNodes]);
+  }, [decoratedNodes, setNodes]);
 
   useEffect(() => {
     const key = layoutEdgesResult
@@ -186,32 +337,19 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
   }, [handleLayoutDragStop]);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full text-slate-400">
-        Loading flow graph...
-      </div>
-    );
+    return <FlowGraphStatus>Loading flow graph...</FlowGraphStatus>;
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full text-red-400">
+      <FlowGraphStatus tone="error">
         Failed to load flow graph: {error.message}
-      </div>
+      </FlowGraphStatus>
     );
   }
 
   if (flowNodes.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full text-slate-400">
-        <div className="text-center">
-          <p className="text-lg font-medium mb-2">No labels found</p>
-          <p className="text-sm">
-            Add labels to your project to see the flow visualization.
-          </p>
-        </div>
-      </div>
-    );
+    return <FlowGraphEmpty />;
   }
 
   return (
@@ -246,23 +384,86 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
             return data.routeColor ?? "#64748b";
           }}
         />
-        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-          <LayoutModeSelector
-            disabled={isSaving || isResetting}
-            onChange={setLayoutMode}
+        <div className="absolute top-4 left-4 z-10">
+          <FlowGraphFiltersPanel
+            filters={filters}
+            onChange={setFilters}
+            routes={routeOptions}
+            routeColors={routeColorMap}
+            characters={characters}
           />
-          <button
-            type="button"
-            onClick={handleResetLayout}
-            disabled={isSaving || isResetting}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 border border-slate-600 rounded-lg hover:bg-slate-700 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title={`Reset ${FLOW_LAYOUT_MODE_LABELS[layoutMode].toLowerCase()} positions to auto-arrange`}
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Reset {FLOW_LAYOUT_MODE_LABELS[layoutMode]}
-          </button>
+        </div>
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+          <FlowGraphToolbar
+            layoutMode={layoutMode}
+            isBusy={isSaving || isResetting}
+            onLayoutModeChange={setLayoutMode}
+            onResetLayout={handleResetLayout}
+          />
         </div>
       </ReactFlow>
     </div>
+  );
+}
+
+function FlowGraphStatus({
+  tone = "muted",
+  children,
+}: {
+  tone?: "muted" | "error";
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-center h-full",
+        tone === "error" ? "text-red-400" : "text-slate-400"
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+function FlowGraphEmpty() {
+  return (
+    <FlowGraphStatus>
+      <div className="text-center">
+        <p className="text-lg font-medium mb-2">No labels found</p>
+        <p className="text-sm">
+          Add labels to your project to see the flow visualization.
+        </p>
+      </div>
+    </FlowGraphStatus>
+  );
+}
+
+interface FlowGraphToolbarProps {
+  layoutMode: FlowLayoutMode;
+  isBusy: boolean;
+  onLayoutModeChange: (mode: FlowLayoutMode) => void;
+  onResetLayout: () => void;
+}
+
+function FlowGraphToolbar({
+  layoutMode,
+  isBusy,
+  onLayoutModeChange,
+  onResetLayout,
+}: FlowGraphToolbarProps) {
+  return (
+    <>
+      <LayoutModeSelector disabled={isBusy} onChange={onLayoutModeChange} />
+      <button
+        type="button"
+        onClick={onResetLayout}
+        disabled={isBusy}
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 border border-slate-600 rounded-lg hover:bg-slate-700 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        title={`Reset ${FLOW_LAYOUT_MODE_LABELS[layoutMode].toLowerCase()} positions to auto-arrange`}
+      >
+        <RotateCcw className="w-3.5 h-3.5" />
+        Reset {FLOW_LAYOUT_MODE_LABELS[layoutMode]}
+      </button>
+    </>
   );
 }
