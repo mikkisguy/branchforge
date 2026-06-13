@@ -4,6 +4,18 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.10.0 - 2026-06-13
+
+- Added flow graph visualization feature
+- Added Zip export feature
+- Fixed visual statement support, enhanced flow graph and tweaked UI
+- Renamed prerequisites to conditions, state variables to variables and meters to stats for clarity
+- Added support for editing menu choice texts in write mode
+- Replaced character reference panel with properties panel that displays detailed info about selected label
+- Added line-level conditions and metadata badges to write mode
+- Implemented incoming jumps section to write mode
+- Added collapsible reference panel in script mode and simplified left sidebar and write mode
+
 ## v0.9.2 - 2026-05-22
 
 - Fixed Docker builds by updating build permission configs
