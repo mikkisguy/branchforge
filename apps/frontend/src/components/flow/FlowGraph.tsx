@@ -17,6 +17,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { RotateCcw } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { LabelNodeMemo, type LabelNodeData } from "./LabelNode";
 import { LayoutModeSelector } from "./LayoutModeSelector";
 import { useFlowGraph } from "@/hooks/useFlowGraph";
@@ -119,22 +120,30 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
   // so users can find labels without a routeKey.
   const routeOptions = useMemo(() => {
     const presentKeys = new Set<string>();
+    let hasUnassigned = false;
     for (const node of flowNodes) {
-      if (node.routeKey) presentKeys.add(node.routeKey);
+      if (node.routeKey) {
+        presentKeys.add(node.routeKey);
+      } else {
+        hasUnassigned = true;
+      }
     }
-    const fromConfigs = routeConfigs
-      .filter((c) => presentKeys.has(c.routeKey))
-      .map((c) => ({ key: c.routeKey, label: c.routeName }));
+    const fromConfigs: Array<{ key: string; label: string }> = [];
+    for (const c of routeConfigs) {
+      if (presentKeys.has(c.routeKey)) {
+        fromConfigs.push({ key: c.routeKey, label: c.routeName });
+      }
+    }
     // Add any present routes that don't have a config (defensive — labels
     // can have routeKey values not present in route_configs).
     const known = new Set(fromConfigs.map((r) => r.key));
     for (const k of presentKeys) {
       if (!known.has(k)) fromConfigs.push({ key: k, label: k });
     }
+    fromConfigs.sort((a, b) => a.label.localeCompare(b.label));
     const options: Array<{ key: string | null; label: string }> = [
-      ...fromConfigs.sort((a, b) => a.label.localeCompare(b.label)),
+      ...fromConfigs,
     ];
-    const hasUnassigned = flowNodes.some((n) => !n.routeKey);
     if (hasUnassigned) {
       options.push({ key: null, label: "Unassigned" });
     }
@@ -168,7 +177,14 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
       if (trimmed.length > 0) {
         const title = node.title.toLowerCase();
         const labelName = node.labelName?.toLowerCase() ?? "";
-        matchesQuery = title.includes(trimmed) || labelName.includes(trimmed);
+        // Substring searches against a bounded label set — not array
+        // membership checks. The js-set-map-lookups rule fires on any
+        // `.includes` inside a loop, but the alternative (a Set of
+        // n-grams) is over-engineering for short title strings.
+        // react-doctor-disable-next-line react-doctor/js-set-map-lookups
+        matchesQuery =
+          // react-doctor-disable-next-line react-doctor/js-set-map-lookups
+          title.includes(trimmed) || labelName.includes(trimmed);
       }
       map.set(node.id, {
         dimmed: filtersActive && !passes,
@@ -288,32 +304,19 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
   }, [handleLayoutDragStop]);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full text-slate-400">
-        Loading flow graph...
-      </div>
-    );
+    return <FlowGraphStatus>Loading flow graph...</FlowGraphStatus>;
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full text-red-400">
+      <FlowGraphStatus tone="error">
         Failed to load flow graph: {error.message}
-      </div>
+      </FlowGraphStatus>
     );
   }
 
   if (flowNodes.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full text-slate-400">
-        <div className="text-center">
-          <p className="text-lg font-medium mb-2">No labels found</p>
-          <p className="text-sm">
-            Add labels to your project to see the flow visualization.
-          </p>
-        </div>
-      </div>
-    );
+    return <FlowGraphEmpty />;
   }
 
   return (
@@ -358,22 +361,76 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
           />
         </div>
         <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-          <LayoutModeSelector
-            disabled={isSaving || isResetting}
-            onChange={setLayoutMode}
+          <FlowGraphToolbar
+            layoutMode={layoutMode}
+            isBusy={isSaving || isResetting}
+            onLayoutModeChange={setLayoutMode}
+            onResetLayout={handleResetLayout}
           />
-          <button
-            type="button"
-            onClick={handleResetLayout}
-            disabled={isSaving || isResetting}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 border border-slate-600 rounded-lg hover:bg-slate-700 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title={`Reset ${FLOW_LAYOUT_MODE_LABELS[layoutMode].toLowerCase()} positions to auto-arrange`}
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Reset {FLOW_LAYOUT_MODE_LABELS[layoutMode]}
-          </button>
         </div>
       </ReactFlow>
     </div>
+  );
+}
+
+function FlowGraphStatus({
+  tone = "muted",
+  children,
+}: {
+  tone?: "muted" | "error";
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-center h-full",
+        tone === "error" ? "text-red-400" : "text-slate-400"
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+function FlowGraphEmpty() {
+  return (
+    <FlowGraphStatus>
+      <div className="text-center">
+        <p className="text-lg font-medium mb-2">No labels found</p>
+        <p className="text-sm">
+          Add labels to your project to see the flow visualization.
+        </p>
+      </div>
+    </FlowGraphStatus>
+  );
+}
+
+interface FlowGraphToolbarProps {
+  layoutMode: FlowLayoutMode;
+  isBusy: boolean;
+  onLayoutModeChange: (mode: FlowLayoutMode) => void;
+  onResetLayout: () => void;
+}
+
+function FlowGraphToolbar({
+  layoutMode,
+  isBusy,
+  onLayoutModeChange,
+  onResetLayout,
+}: FlowGraphToolbarProps) {
+  return (
+    <>
+      <LayoutModeSelector disabled={isBusy} onChange={onLayoutModeChange} />
+      <button
+        type="button"
+        onClick={onResetLayout}
+        disabled={isBusy}
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 border border-slate-600 rounded-lg hover:bg-slate-700 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        title={`Reset ${FLOW_LAYOUT_MODE_LABELS[layoutMode].toLowerCase()} positions to auto-arrange`}
+      >
+        <RotateCcw className="w-3.5 h-3.5" />
+        Reset {FLOW_LAYOUT_MODE_LABELS[layoutMode]}
+      </button>
+    </>
   );
 }

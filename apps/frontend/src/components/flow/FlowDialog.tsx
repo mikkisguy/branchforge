@@ -7,6 +7,12 @@
  * The mutation hooks (useLabels, useRouteConfigs, useCharacters) also
  * invalidate the flow keys eagerly — this is the backstop for cases
  * the mutation layer can't predict (e.g. external sync, navigation).
+ *
+ * The refetch is intentionally triggered on the `open` prop transition
+ * (not from the Dialog's onOpenChange) because the parent can open the
+ * dialog programmatically — e.g. `dispatchModal({ type: "OPEN", key: "flow" })`
+ * in LeftSidebar — without going through onOpenChange. An effect is the
+ * correct primitive for "respond to an externally controlled prop".
  */
 
 import { useEffect, useRef } from "react";
@@ -30,6 +36,7 @@ export function FlowDialog({ open, onOpenChange, projectId }: FlowDialogProps) {
   const wasOpen = useRef(false);
 
   useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-event-handler
     if (open && !wasOpen.current) {
       // Fire-and-forget: the queries will refetch in the background
       // and the FlowGraph component will pick up the fresh data via

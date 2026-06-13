@@ -15,7 +15,7 @@
  * persisted by the surrounding FlowGraph if needed.
  */
 
-import { useCallback, useMemo, useRef, useState, useEffect } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Search, X, Filter, ChevronDown, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -150,13 +150,12 @@ export function FlowGraphFiltersPanel({
   }
 
   return (
-    <div
+    <section
       className={cn(
         "w-64 max-h-full flex flex-col rounded-lg border border-slate-600 bg-slate-900/95 backdrop-blur-sm shadow-xl",
         "text-slate-200 text-sm",
         className
       )}
-      role="region"
       aria-label="Flow graph filters"
     >
       {/* Header. The collapse toggle lives in the top-left of the panel
@@ -289,7 +288,7 @@ export function FlowGraphFiltersPanel({
           />
         </FilterSection>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -332,29 +331,21 @@ function MultiSelectList<V extends string | null>({
   onToggle,
   emptyText,
 }: MultiSelectListProps<V>) {
+  // Expansion is only meaningful while the list is long enough to have
+  // hidden items; once `options.length <= visibleLimit` the full list is
+  // shown regardless, so the toggle is rendered exactly when it can
+  // change behavior. Tracking the boolean in state is enough — the prop
+  // shrink is already handled by the `hiddenCount > 0` guard.
   const [isExpanded, setIsExpanded] = useState(false);
   const visibleLimit = 6;
+  const hiddenCount = Math.max(0, options.length - visibleLimit);
   const visible = useMemo(
     () =>
-      isExpanded || options.length <= visibleLimit
+      isExpanded || hiddenCount === 0
         ? options
         : options.slice(0, visibleLimit),
-    [isExpanded, options]
+    [isExpanded, hiddenCount, options]
   );
-  const hiddenCount = options.length - visible.length;
-
-  // Reset expansion when the option list shrinks below the threshold so
-  // toggling items in a small list doesn't leave it collapsed.
-  const lastOptionsLen = useRef(options.length);
-  useEffect(() => {
-    if (
-      lastOptionsLen.current > visibleLimit &&
-      options.length <= visibleLimit
-    ) {
-      setIsExpanded(false);
-    }
-    lastOptionsLen.current = options.length;
-  }, [options.length]);
 
   if (options.length === 0) {
     return <div className="text-xs text-slate-500 italic">{emptyText}</div>;
