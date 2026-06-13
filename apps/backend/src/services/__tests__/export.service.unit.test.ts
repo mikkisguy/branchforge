@@ -32,6 +32,7 @@ vi.mock("../rpy-generator.service.js", () => ({
 
 vi.mock("../../lib/logger.js", () => ({
   logInfo: vi.fn(),
+  logWarn: vi.fn(),
   logError: vi.fn(),
   LogEventType: {
     SERVICE_START: "SERVICE_START",
@@ -52,7 +53,7 @@ vi.mock("jszip", () => ({
 // Imports
 // ---------------------------------------------------------------------------
 
-import { getDb } from "../../db/index.js";
+import { getDb, type Db } from "../../db/index.js";
 import {
   generateExport,
   listExports,
@@ -83,6 +84,27 @@ import type { GenerateExportResult, ExportSummary } from "../export.service.js";
  */
 let resolveQueue: unknown[] = [];
 
+type MockFn = ReturnType<typeof vi.fn>;
+
+/**
+ * Typed shape of the mock database object used in tests.
+ * Mirrors the chainable, thenable query builder pattern.
+ */
+interface MockDb {
+  select: MockFn;
+  from: MockFn;
+  innerJoin: MockFn;
+  where: MockFn;
+  orderBy: MockFn;
+  limit: MockFn;
+  offset: MockFn;
+  insert: MockFn;
+  values: MockFn;
+  returning: MockFn;
+  delete: MockFn;
+  then: MockFn;
+}
+
 /**
  * Create a mock database object where every chain method returns the object
  * itself, and the object is thenable (resolves via the global resolveQueue).
@@ -90,8 +112,8 @@ let resolveQueue: unknown[] = [];
  * Terminal methods that need specific return values (.limit, .returning)
  * are overridden with mockResolvedValueOnce in each test.
  */
-function createMockDb(): Record<string, ReturnType<typeof vi.fn>> {
-  const db: any = {};
+function createMockDb(): MockDb {
+  const db = {} as MockDb;
   db.select = vi.fn(() => db);
   db.from = vi.fn(() => db);
   db.innerJoin = vi.fn(() => db);
@@ -123,13 +145,13 @@ const EXPORT_ID = "test-export-id";
 // ---------------------------------------------------------------------------
 
 describe("ExportService", () => {
-  let mockDb: ReturnType<typeof createMockDb>;
+  let mockDb: MockDb;
 
   beforeEach(() => {
     vi.clearAllMocks();
     resolveQueue = [];
     mockDb = createMockDb();
-    vi.mocked(getDb).mockReturnValue(mockDb as any);
+    vi.mocked(getDb).mockReturnValue(mockDb as unknown as Db);
   });
 
   // =========================================================================
@@ -250,10 +272,16 @@ describe("ExportService", () => {
 
       const result = await generateExport(PROJECT_ID, USER_ID);
 
-      // The non-story file should have been included as-is (no patching)
-      const content = JSON.parse(mockExportRecord.content);
-      expect(content["game/gui.rpy"]).toBe("screen navigation():");
-      expect(content["game/script.rpy"]).toContain("# patched");
+      // Verify the service passed the correct content to the DB insert.
+      // The non-story file should be included as-is (no patching).
+      expect(mockDb.values).toHaveBeenCalledTimes(1);
+      const insertPayload = mockDb.values.mock.calls[0][0] as {
+        content: string;
+      };
+      const savedContent = JSON.parse(insertPayload.content);
+      expect(savedContent["game/gui.rpy"]).toBe("screen navigation():");
+      // No labels queued, so the story file is also included as-is
+      expect(savedContent["game/script.rpy"]).toBe("label start:");
       expect(result.id).toBe(EXPORT_ID);
     });
 
@@ -392,20 +420,22 @@ describe("ExportService", () => {
 
       // Intercept .values() to capture the fileName the service computed
       // so we can seed the returning() mock with it
-      mockDb.values.mockImplementationOnce((vals: any) => {
-        mockDb.returning.mockResolvedValueOnce([
-          {
-            id: EXPORT_ID,
-            projectId: PROJECT_ID,
-            format: "RENPY",
-            fileName: vals.fileName,
-            content: vals.content,
-            fileSize: vals.fileSize,
-            createdAt: new Date(),
-          },
-        ]);
-        return mockDb;
-      });
+      mockDb.values.mockImplementationOnce(
+        (vals: { fileName: string; content: string; fileSize: number }) => {
+          mockDb.returning.mockResolvedValueOnce([
+            {
+              id: EXPORT_ID,
+              projectId: PROJECT_ID,
+              format: "RENPY",
+              fileName: vals.fileName,
+              content: vals.content,
+              fileSize: vals.fileSize,
+              createdAt: new Date(),
+            },
+          ]);
+          return mockDb;
+        }
+      );
 
       const result = await generateExport(PROJECT_ID, USER_ID);
 

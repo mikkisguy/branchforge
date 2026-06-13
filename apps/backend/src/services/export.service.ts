@@ -7,6 +7,7 @@
  */
 
 import JSZip from "jszip";
+import path from "node:path";
 import { getDb } from "../db/index.js";
 import {
   exportsTable,
@@ -31,7 +32,7 @@ import {
   type LabelWithConditions,
 } from "./rpy-generator.service.js";
 import { checkRateLimit } from "./rate-limiter.service.js";
-import { logInfo, logError, LogEventType } from "../lib/logger.js";
+import { logInfo, logError, logWarn, LogEventType } from "../lib/logger.js";
 
 // ============================================================================
 // Types
@@ -52,6 +53,32 @@ export interface GenerateExportResult {
   fileSize: number;
   format: string;
   createdAt: string;
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/**
+ * Sanitize a file path for safe use as a ZIP entry name.
+ *
+ * Prevents path traversal and absolute-path attacks by normalizing
+ * and rejecting entries that escape the archive root.
+ *
+ * @returns The sanitized relative path, or null if the path is unsafe.
+ */
+function sanitizeZipEntryPath(filePath: string): string | null {
+  const normalized = path.posix.normalize(filePath);
+  if (
+    normalized.length === 0 ||
+    normalized === "." ||
+    normalized === ".." ||
+    normalized.startsWith("/") ||
+    normalized.includes("../")
+  ) {
+    return null;
+  }
+  return normalized;
 }
 
 // ============================================================================
@@ -168,19 +195,28 @@ export async function generateExport(
   // Patch STORY files with conditions/effects
   const patchedFiles: Record<string, string> = {};
   for (const file of files) {
+    const safePath = sanitizeZipEntryPath(file.filePath);
+    if (!safePath) {
+      logWarn(LogEventType.SERVICE_ERROR, {
+        context: "generateExport",
+        filePath: file.filePath,
+        reason: "Unsafe file path skipped",
+      });
+      continue;
+    }
     if (file.fileType === "STORY") {
       const fileLabels = labelsByFileId.get(file.id) ?? [];
       if (fileLabels.length > 0) {
-        patchedFiles[file.filePath] = patchRPYWithVariables(
+        patchedFiles[safePath] = patchRPYWithVariables(
           file.content,
           fileLabels
         );
       } else {
-        patchedFiles[file.filePath] = file.content;
+        patchedFiles[safePath] = file.content;
       }
     } else {
       // Non-story files (settings, gui, etc.) — include as-is
-      patchedFiles[file.filePath] = file.content;
+      patchedFiles[safePath] = file.content;
     }
   }
 
@@ -364,9 +400,13 @@ export async function getExportForDownload(
     throw new NotFoundError("Export");
   }
 
+  if (row.content == null) {
+    throw new NotFoundError("Export content");
+  }
+
   return {
     fileName: row.fileName,
-    content: row.content!,
+    content: row.content,
   };
 }
 

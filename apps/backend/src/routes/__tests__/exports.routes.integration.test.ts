@@ -20,11 +20,20 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, {
+  type FastifyInstance,
+  type FastifyRequest,
+  type FastifyReply,
+} from "fastify";
 import cookie from "@fastify/cookie";
 import session from "@fastify/session";
+import type { PublicUser } from "@branchforge/shared";
 import { exportsRoutes } from "../exports.routes.js";
 import * as exportService from "../../services/export.service.js";
+import type {
+  GenerateExportResult,
+  ExportSummary,
+} from "../../services/export.service.js";
 import {
   NotFoundError,
   RateLimitError,
@@ -44,17 +53,17 @@ vi.mock("../../services/authz.service.js", () => ({
 
 // Mock the authenticate middleware
 vi.mock("../../middleware/auth.middleware.js", () => ({
-  authenticate: vi.fn(async (request: any, _reply) => {
+  authenticate: vi.fn(async (request: FastifyRequest, _reply: FastifyReply) => {
     // Simulate authenticated user
-    request.session = {
-      user: {
-        id: "123e4567-e89b-12d3-a456-426614174000",
-        email: "test@example.com",
-        role: "OWNER" as const,
-      },
+    const user: PublicUser = {
+      id: "123e4567-e89b-12d3-a456-426614174000",
+      email: "test@example.com",
+      role: "OWNER",
     };
-    request.user = request.session.user;
-    request.userId = request.session.user.id;
+    request.session.user = user;
+    request.user = user;
+    // userId is set by auth middleware but not part of FastifyRequest type
+    (request as FastifyRequest & { userId: string }).userId = user.id;
   }),
 }));
 
@@ -63,7 +72,7 @@ const testUserId = "123e4567-e89b-12d3-a456-426614174000";
 const testProjectId = "123e4567-e89b-12d3-a456-426614174001";
 const testExportId = "123e4567-e89b-12d3-a456-426614174002";
 
-const mockExportResult = {
+const mockExportResult: GenerateExportResult = {
   id: testExportId,
   fileName: "my_project_2026-06-13T00-00-00-000Z.zip",
   fileSize: 1024,
@@ -76,7 +85,7 @@ const mockExportContent = JSON.stringify({
   "game/gui.rpy": "# GUI config",
 });
 
-const mockExportListResult = [
+const mockExportListResult: ExportSummary[] = [
   {
     id: testExportId,
     projectId: testProjectId,
@@ -119,7 +128,7 @@ describe("Export Routes (Integration)", () => {
   describe("POST /projects/:projectId/export", () => {
     it("should generate export and return 201 with export metadata", async () => {
       vi.spyOn(exportService, "generateExport").mockResolvedValue(
-        mockExportResult as any
+        mockExportResult
       );
 
       const response = await fastify.inject({
@@ -195,7 +204,7 @@ describe("Export Routes (Integration)", () => {
   describe("GET /projects/:projectId/exports", () => {
     it("should list exports and return 200", async () => {
       vi.spyOn(exportService, "listExports").mockResolvedValue(
-        mockExportListResult as any
+        mockExportListResult
       );
 
       const response = await fastify.inject({

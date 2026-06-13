@@ -21,6 +21,7 @@ import {
 } from "../lib/validation.js";
 import {
   NotFoundError,
+  ForbiddenError,
   RateLimitError,
 } from "../middleware/error-handler.middleware.js";
 
@@ -76,6 +77,10 @@ async function generateExportHandler(
       }`
     );
 
+    if (error instanceof ForbiddenError) {
+      reply.status(403).send({ error: error.userMessage });
+      return;
+    }
     if (error instanceof NotFoundError) {
       reply.status(404).send({ error: error.userMessage });
       return;
@@ -116,6 +121,10 @@ async function listExportsHandler(
       }`
     );
 
+    if (error instanceof ForbiddenError) {
+      reply.status(403).send({ error: error.userMessage });
+      return;
+    }
     if (error instanceof NotFoundError) {
       reply.status(404).send({ error: error.userMessage });
       return;
@@ -168,6 +177,10 @@ async function downloadExportHandler(
       }`
     );
 
+    if (error instanceof ForbiddenError) {
+      reply.status(403).send({ error: error.userMessage });
+      return;
+    }
     if (error instanceof NotFoundError) {
       reply.status(404).send({ error: error.userMessage });
       return;
