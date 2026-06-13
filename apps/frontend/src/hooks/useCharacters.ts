@@ -7,7 +7,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { charactersApi } from "@/lib/api/characters";
-import { characterKeys } from "@/lib/query-keys";
+import { characterKeys, flowKeys } from "@/lib/query-keys";
 import { useToast } from "@/contexts/ToastContext";
 import type { Character } from "@branchforge/shared";
 import {
@@ -105,8 +105,13 @@ export function useCharacters(
     },
     onSuccess: () => {
       // Invalidate and refetch characters list
+      // Also invalidate the flow graph: the new character becomes an
+      // option in the Character filter.
       queryClient.invalidateQueries({
         queryKey: characterKeys.lists(projectId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: flowKeys.graph(projectId),
       });
       toast.success("Character created successfully", "Success");
     },
@@ -128,8 +133,13 @@ export function useCharacters(
     },
     onSuccess: () => {
       // Invalidate and refetch characters list
+      // Also invalidate the flow graph: rename / recolour shows up on
+      // the filter row and the speaker chip inside the node.
       queryClient.invalidateQueries({
         queryKey: characterKeys.lists(projectId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: flowKeys.graph(projectId),
       });
       toast.success("Character updated successfully", "Success");
     },
@@ -145,8 +155,14 @@ export function useCharacters(
     },
     onSuccess: () => {
       // Invalidate and refetch characters list
+      // Also invalidate the flow graph: the character is no longer
+      // available as a filter, and the speaker-derived characterIds
+      // baked into cached nodes now reference a deleted character.
       queryClient.invalidateQueries({
         queryKey: characterKeys.lists(projectId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: flowKeys.graph(projectId),
       });
       toast.success("Character deleted successfully", "Success");
     },

@@ -901,6 +901,11 @@ export interface FlowNode {
   fileName: string;
   sequenceOrder: number;
   labelNumber: number;
+  /**
+   * Character IDs that speak in this label (deduplicated across all
+   * `label_lines` rows for the label). Used by the flow-graph filters.
+   */
+  characterIds: string[];
 }
 
 /**

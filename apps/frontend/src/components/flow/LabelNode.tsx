@@ -4,6 +4,7 @@
 
 import { memo } from "react";
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
+import { cn } from "@/lib/utils";
 
 export interface LabelNodeData {
   labelId: string;
@@ -12,6 +13,17 @@ export interface LabelNodeData {
   routeKey: string | null;
   status: string | null;
   fileName: string;
+  /**
+   * `true` when this node does not satisfy the active filter set. The
+   * component renders at reduced opacity to keep matching nodes visually
+   * prominent (dim/highlight pattern).
+   */
+  dimmed?: boolean;
+  /**
+   * `true` when a search query is active AND this node matches it. Adds
+   * a subtle ring so the user can spot hits at a glance.
+   */
+  highlighted?: boolean;
   [key: string]: unknown;
 }
 
@@ -34,7 +46,13 @@ function LabelNodeComponent({ data }: NodeProps<LabelNodeType>) {
   const dotClass = data.status ? (statusDotColors[data.status] ?? "") : "";
 
   return (
-    <div className="bg-slate-800 border border-slate-600 rounded-lg shadow-lg min-w-[180px] max-w-[240px]">
+    <div
+      className={cn(
+        "bg-slate-800 border border-slate-600 rounded-lg shadow-lg min-w-[180px] max-w-[240px] transition-opacity duration-150",
+        data.dimmed && "opacity-25",
+        data.highlighted && "ring-2 ring-[var(--theme-color)]/70"
+      )}
+    >
       <Handle
         type="target"
         position={Position.Left}

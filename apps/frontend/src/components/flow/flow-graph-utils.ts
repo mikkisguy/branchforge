@@ -11,18 +11,6 @@ import type {
   FlowGraphPositions,
 } from "@branchforge/shared";
 
-// Route color palette for node borders
-export const ROUTE_COLORS = [
-  "#3b82f6", // blue
-  "#ef4444", // red
-  "#10b981", // green
-  "#f59e0b", // amber
-  "#8b5cf6", // violet
-  "#ec4899", // pink
-  "#06b6d4", // cyan
-  "#f97316", // orange
-];
-
 // Node dimensions used by all layout algorithms. Kept in sync with the
 // `LabelNode` component's intrinsic size.
 const NODE_WIDTH = 240;
@@ -47,6 +35,41 @@ export function getRouteColor(
   return color ?? "#64748b";
 }
 
+/**
+ * Convert HSL color to hex string.
+ * @param h - Hue in degrees (0-360)
+ * @param s - Saturation as percentage (0-100)
+ * @param l - Lightness as percentage (0-100)
+ * @returns 6-digit hex color string (e.g., "#a1b2c3")
+ */
+function hslToHex(h: number, s: number, l: number): string {
+  s /= 100;
+  l /= 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number): number => {
+    const k = (n + h / 30) % 12;
+    return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+  };
+  const toHex = (n: number): string => {
+    const hex = Math.round(n * 255).toString(16);
+    return hex.length === 1 ? `0${hex}` : hex;
+  };
+  return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
+}
+
+/**
+ * Generate a deterministic color for a given index using HSL.
+ * Uses golden-ratio conjugate (137.508°) for hue distribution.
+ * @param i - Zero-based index
+ * @returns 6-digit hex color string
+ */
+function generateHslColor(i: number): string {
+  const hue = (i * 137.508) % 360;
+  const saturation = 70;
+  const lightness = 55;
+  return hslToHex(hue, saturation, lightness);
+}
+
 export function buildRouteColorMap(nodes: FlowNode[]): Map<string, string> {
   const routes = new Set<string>();
   for (const node of nodes) {
@@ -55,7 +78,7 @@ export function buildRouteColorMap(nodes: FlowNode[]): Map<string, string> {
   const map = new Map<string, string>();
   let i = 0;
   for (const route of routes) {
-    map.set(route, ROUTE_COLORS[i % ROUTE_COLORS.length]);
+    map.set(route, generateHslColor(i));
     i++;
   }
   return map;

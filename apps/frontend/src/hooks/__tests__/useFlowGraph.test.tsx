@@ -51,6 +51,7 @@ const mockNodes: FlowNode[] = [
     fileName: "act_i.rpy",
     sequenceOrder: 1,
     labelNumber: 1,
+    characterIds: [],
   },
 ];
 
