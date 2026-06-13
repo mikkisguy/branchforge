@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { FileArchive, Edit, Trash2, Info } from "lucide-react";
+import {
+  FileArchive,
+  Edit,
+  Trash2,
+  Info,
+  Download,
+  History,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils";
@@ -31,6 +38,8 @@ interface ProjectsSettingsContentProps {
   onDeleteProject?: (projectId: string) => Promise<void>;
   onImportFromGitLab?: () => void;
   onImportZip?: () => void;
+  onExportProject?: (projectId: string) => Promise<void>;
+  onViewExportHistory?: (projectId: string, projectName: string) => void;
 }
 
 export function ProjectsSettingsContent({
@@ -39,11 +48,16 @@ export function ProjectsSettingsContent({
   onDeleteProject,
   onImportFromGitLab,
   onImportZip,
+  onExportProject,
+  onViewExportHistory,
 }: ProjectsSettingsContentProps) {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [exportingProjectId, setExportingProjectId] = useState<string | null>(
+    null
+  );
 
   const { success: toastSuccess, error: toastError } = useToast();
   const { hasIntegration, isLoadingIntegration } = useGitLab();
@@ -73,6 +87,26 @@ export function ProjectsSettingsContent({
       throw new Error("Delete project handler not provided");
     }
     return onDeleteProject(projectId);
+  };
+
+  const handleExportClick = async (project: Project) => {
+    if (!onExportProject) return;
+    setExportingProjectId(project.id);
+    try {
+      await onExportProject(project.id);
+      toastSuccess(`Export started for "${project.name}"`);
+    } catch (err) {
+      toastError(
+        err instanceof Error ? err.message : "Export failed",
+        "Export Error"
+      );
+    } finally {
+      setExportingProjectId(null);
+    }
+  };
+
+  const handleViewHistory = (project: Project) => {
+    onViewExportHistory?.(project.id, project.name);
   };
 
   // Empty state
@@ -175,7 +209,7 @@ export function ProjectsSettingsContent({
               <TableHead className="h-11 w-[9rem] whitespace-nowrap">
                 Updated
               </TableHead>
-              <TableHead className="h-11 w-24 whitespace-nowrap text-right">
+              <TableHead className="h-11 w-[11rem] whitespace-nowrap text-right">
                 Actions
               </TableHead>
             </TableRow>
@@ -224,8 +258,31 @@ export function ProjectsSettingsContent({
                 <TableCell className="whitespace-nowrap py-4 text-sm text-muted-foreground">
                   {formatDate(project.updatedAt)}
                 </TableCell>
-                <TableCell className="w-24 py-4 text-right">
+                <TableCell className="w-36 py-4 text-right">
                   <div className="flex justify-end gap-1">
+                    {onExportProject && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={exportingProjectId === project.id}
+                        onClick={() => handleExportClick(project)}
+                        aria-label={`Export ${project.name}`}
+                      >
+                        <Download className="size-4" />
+                      </Button>
+                    )}
+                    {onViewExportHistory && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewHistory(project)}
+                        aria-label={`Export history for ${project.name}`}
+                      >
+                        <History className="size-4" />
+                      </Button>
+                    )}
                     {onUpdateProject && isProjectOwner(project) && (
                       <Button
                         type="button"

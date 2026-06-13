@@ -37,6 +37,23 @@ export type UpdateFileResponse =
       };
     };
 
+export interface ExportSummary {
+  id: string;
+  projectId: string;
+  format: string;
+  fileName: string;
+  fileSize: number | null;
+  createdAt: string;
+}
+
+export interface GenerateExportResponse {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  format: string;
+  createdAt: string;
+}
+
 // ============================================================================
 // Validation Utilities
 // ============================================================================
@@ -269,27 +286,30 @@ export const projectFilesApi = {
   },
 
   /**
+   * List export history for a project
+   */
+  async listExports(projectId: string): Promise<ExportSummary[]> {
+    validateRequired(projectId, "Project ID");
+
+    const response = await request<{ exports: ExportSummary[] }>(
+      `/projects/${projectId}/exports`
+    );
+    return response.exports;
+  },
+
+  /**
    * Generate a new zip export for a project.
    * Returns the export metadata including the download ID.
    */
-  async generateExport(projectId: string): Promise<{
-    id: string;
-    fileName: string;
-    fileSize: number;
-    format: string;
-    createdAt: string;
-  }> {
+  async generateExport(projectId: string): Promise<GenerateExportResponse> {
     validateRequired(projectId, "Project ID");
 
-    return request<{
-      id: string;
-      fileName: string;
-      fileSize: number;
-      format: string;
-      createdAt: string;
-    }>("/projects/" + projectId + "/export", {
-      method: "POST",
-    });
+    return request<GenerateExportResponse>(
+      "/projects/" + projectId + "/export",
+      {
+        method: "POST",
+      }
+    );
   },
 
   /**

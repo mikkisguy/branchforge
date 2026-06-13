@@ -80,7 +80,7 @@ export function StatusBar({
     } finally {
       setIsExporting(false);
     }
-  }, [projectId, isExporting]);
+  }, [projectId, isExporting, showErrorToast]);
 
   /**
    * Handle conflict resolution from ConflictReviewDialog
@@ -128,7 +128,7 @@ export function StatusBar({
           )}
         </div>
         <div className="flex items-center gap-4">
-          {/* GitLab Controls - only show for GITLAB source type */}
+          {/* GitLab import - only show for GITLAB source type */}
           {isGitLabAvailable && (
             <>
               <div className="flex items-center gap-2 border-l border-border/30 pl-4">
@@ -153,57 +153,55 @@ export function StatusBar({
                     "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
                     "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
                   )}
-                  title="Export to GitLab"
+                  title="Sync to GitLab"
                 >
                   <Upload className="size-3.5" />
-                  <span>Export to GitLab</span>
+                  <span>Sync to GitLab</span>
                 </button>
               </div>
             </>
           )}
 
-          {/* ZIP Controls - only show for ZIP source type when callback exists */}
+          {/* ZIP import - only show for ZIP source type when callback exists */}
           {isZipAvailable && onOpenZipImportDialog && (
-            <>
-              <div className="flex items-center gap-2 border-l border-border/30 pl-4">
-                <button
-                  type="button"
-                  onClick={handleZipImportClick}
-                  className={cn(
-                    "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
-                    "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
-                  )}
-                  title="Import from Zip"
-                >
-                  <Download className="size-3.5" />
-                  <span>Import from Zip</span>
-                </button>
-              </div>
-              {projectId && (
-                <div className="border-l border-border/30 pl-4">
-                  <button
-                    type="button"
-                    onClick={handleZipExportClick}
-                    disabled={isExporting}
-                    className={cn(
-                      "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
-                      "hover:bg-muted/50 text-muted-foreground hover:text-foreground",
-                      isExporting && "opacity-60 cursor-not-allowed"
-                    )}
-                    title="Export as Zip"
-                  >
-                    {isExporting ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <Upload className="size-3.5" />
-                    )}
-                    <span>
-                      {isExporting ? "Exporting..." : "Export to Zip"}
-                    </span>
-                  </button>
-                </div>
-              )}
-            </>
+            <div className="flex items-center gap-2 border-l border-border/30 pl-4">
+              <button
+                type="button"
+                onClick={handleZipImportClick}
+                className={cn(
+                  "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
+                  "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+                )}
+                title="Import from Zip"
+              >
+                <Download className="size-3.5" />
+                <span>Import from Zip</span>
+              </button>
+            </div>
+          )}
+
+          {/* Export as Zip - available for ALL project types */}
+          {projectId && (
+            <div className="border-l border-border/30 pl-4">
+              <button
+                type="button"
+                onClick={handleZipExportClick}
+                disabled={isExporting}
+                className={cn(
+                  "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
+                  "hover:bg-muted/50 text-muted-foreground hover:text-foreground",
+                  isExporting && "opacity-60 cursor-not-allowed"
+                )}
+                title="Export as Zip"
+              >
+                {isExporting ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Upload className="size-3.5" />
+                )}
+                <span>{isExporting ? "Exporting..." : "Export Zip"}</span>
+              </button>
+            </div>
           )}
         </div>
       </div>
