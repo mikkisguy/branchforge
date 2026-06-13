@@ -25,7 +25,7 @@ import {
   countActiveFilters,
   FILTER_STATUS_OPTIONS,
   type FlowGraphFilters,
-} from "./flow-filters";
+} from "@/components/flow/flow-filters";
 
 export interface FlowGraphFiltersPanelProps {
   filters: FlowGraphFilters;

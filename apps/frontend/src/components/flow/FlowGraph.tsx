@@ -38,8 +38,8 @@ import {
   filterFlowNodes,
   isFlowFilterEmpty,
   type FlowGraphFilters,
-} from "./flow-filters";
-import { FlowGraphFiltersPanel } from "./FlowGraphFiltersPanel";
+} from "@/components/flow/flow-filters";
+import { FlowGraphFiltersPanel } from "@/components/flow/FlowGraphFiltersPanel";
 
 interface FlowGraphProps {
   projectId: string;
@@ -158,6 +158,39 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
     () => filterFlowNodes(flowNodes, filters),
     [flowNodes, filters]
   );
+
+  // Prune any selected filter keys that no longer exist after a refetch —
+  // e.g. a route that was deleted server-side, or a character that was
+  // removed. The filter UI only offers the current options, so leaving
+  // stale entries in `filters` would silently filter against nothing
+  // (a Set containing only non-existent keys matches no nodes, which is
+  // indistinguishable to the user from a "real" empty result).
+  useEffect(() => {
+    const validRouteKeys = new Set<string | null>();
+    for (const opt of routeOptions) validRouteKeys.add(opt.key);
+    const validCharacterIds = new Set(characters.map((c) => c.id));
+    setFilters((prev) => {
+      const nextRouteKeys = new Set<string | null>();
+      for (const k of prev.routeKeys) {
+        if (validRouteKeys.has(k)) nextRouteKeys.add(k);
+      }
+      const nextCharacterIds = new Set<string>();
+      for (const id of prev.characterIds) {
+        if (validCharacterIds.has(id)) nextCharacterIds.add(id);
+      }
+      if (
+        nextRouteKeys.size === prev.routeKeys.size &&
+        nextCharacterIds.size === prev.characterIds.size
+      ) {
+        return prev;
+      }
+      return {
+        ...prev,
+        routeKeys: nextRouteKeys,
+        characterIds: nextCharacterIds,
+      };
+    });
+  }, [routeOptions, characters, setFilters]);
   const filteredNodeIds = useMemo(
     () => new Set(filteredNodes.map((n) => n.id)),
     [filteredNodes]

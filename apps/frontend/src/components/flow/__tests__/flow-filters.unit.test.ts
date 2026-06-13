@@ -5,7 +5,7 @@ import {
   filterFlowNodes,
   isFlowFilterEmpty,
   type FlowGraphFilters,
-} from "../flow-filters";
+} from "@/components/flow/flow-filters";
 import type { FlowNode } from "@branchforge/shared";
 
 const baseNode: FlowNode = {

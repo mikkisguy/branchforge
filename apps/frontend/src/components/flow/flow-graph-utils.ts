@@ -58,13 +58,23 @@ function hslToHex(h: number, s: number, l: number): string {
 }
 
 /**
- * Generate a deterministic color for a given index using HSL.
- * Uses golden-ratio conjugate (137.508°) for hue distribution.
- * @param i - Zero-based index
+ * djb2 string hash. Stable, fast, and good enough distribution to spread
+ * route keys across the 360-bucket hue space without clustering.
+ */
+function hashRouteKey(routeKey: string): number {
+  let hash = 5381;
+  for (let i = 0; i < routeKey.length; i++) {
+    hash = ((hash << 5) + hash + routeKey.charCodeAt(i)) | 0;
+  }
+  return hash;
+}
+
+/**
+ * Generate a deterministic color for a given hue (0-360) using HSL.
+ * @param hue - Hue in degrees (0-360)
  * @returns 6-digit hex color string
  */
-function generateHslColor(i: number): string {
-  const hue = (i * 137.508) % 360;
+function generateHslColor(hue: number): string {
   const saturation = 70;
   const lightness = 55;
   return hslToHex(hue, saturation, lightness);
@@ -76,10 +86,9 @@ export function buildRouteColorMap(nodes: FlowNode[]): Map<string, string> {
     if (node.routeKey) routes.add(node.routeKey);
   }
   const map = new Map<string, string>();
-  let i = 0;
   for (const route of routes) {
-    map.set(route, generateHslColor(i));
-    i++;
+    const hue = Math.abs(hashRouteKey(route)) % 360;
+    map.set(route, generateHslColor(hue));
   }
   return map;
 }
