@@ -317,6 +317,12 @@ export const projectFilesQuerySchema = z.object({
 export type ProjectFilesQuery = z.infer<typeof projectFilesQuerySchema>;
 
 /**
+ * Layout mode validation — accepts the values emitted by the frontend
+ * segmented control. Rejects unknown values.
+ */
+export const flowLayoutModeSchema = z.enum(["FLOW", "ROUTE", "FILE"]);
+
+/**
  * Flow graph query validation
  */
 export const flowGraphQuerySchema = z.object({
@@ -324,6 +330,19 @@ export const flowGraphQuerySchema = z.object({
 });
 
 export type FlowGraphQuery = z.infer<typeof flowGraphQuerySchema>;
+
+/**
+ * Flow graph layout query validation
+ *
+ * Used by GET and DELETE on /flow-graph/layout, which both need a
+ * project + mode to scope the operation.
+ */
+export const flowGraphLayoutQuerySchema = z.object({
+  projectId: uuidSchema,
+  mode: flowLayoutModeSchema,
+});
+
+export type FlowGraphLayoutQuery = z.infer<typeof flowGraphLayoutQuerySchema>;
 
 /**
  * Flow graph layout position schema
@@ -339,6 +358,7 @@ const nodePositionSchema = z.object({
 export const saveFlowGraphLayoutSchema = z
   .object({
     projectId: uuidSchema,
+    mode: flowLayoutModeSchema,
     positions: z.record(z.string().uuid(), nodePositionSchema),
   })
   .strict();

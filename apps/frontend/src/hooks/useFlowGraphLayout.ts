@@ -1,8 +1,13 @@
 /**
  * useFlowGraphLayout Hook
  *
- * Manages flow graph layout persistence: loading saved positions,
- * saving on drag, and resetting to dagre layout.
+ * Manages flow graph layout persistence for a single layout mode (FLOW /
+ * ROUTE / FILE): loading saved positions, saving on drag, and resetting.
+ *
+ * Positions are stored per-mode on the backend, so a save in one mode
+ * never clobbers another. The active mode is passed in by the caller;
+ * switching modes in the UI automatically swaps the cache and the next
+ * drag is saved to the new mode's row.
  */
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
@@ -10,18 +15,18 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { flowApi } from "@/lib/api/flow";
 import { flowKeys } from "@/lib/query-keys";
 import { useToast } from "@/contexts/ToastContext";
-import type { FlowGraphPositions } from "@branchforge/shared";
+import type { FlowGraphPositions, FlowLayoutMode } from "@branchforge/shared";
 
 const emptyPositions: FlowGraphPositions = {};
 
-export function useFlowGraphLayout(projectId: string) {
+export function useFlowGraphLayout(projectId: string, mode: FlowLayoutMode) {
   const queryClient = useQueryClient();
   const toast = useToast();
 
-  // Load saved positions
+  // Load saved positions for the active mode
   const query = useQuery({
-    queryKey: flowKeys.layout(projectId),
-    queryFn: () => flowApi.getFlowGraphLayout(projectId),
+    queryKey: flowKeys.layout(projectId, mode),
+    queryFn: () => flowApi.getFlowGraphLayout(projectId, mode),
     enabled: !!projectId,
     staleTime: 60_000, // 1 minute
   });
@@ -31,16 +36,20 @@ export function useFlowGraphLayout(projectId: string) {
     [query.data?.positions]
   );
 
-  // Save mutation
+  // Save mutation — targets only the active mode's row
   const saveMutation = useMutation({
     mutationFn: ({ positions }: { positions: FlowGraphPositions }) =>
-      flowApi.saveFlowGraphLayout(projectId, positions),
+      flowApi.saveFlowGraphLayout(projectId, mode, positions),
     onMutate: async ({ positions }) => {
-      await queryClient.cancelQueries({ queryKey: flowKeys.layout(projectId) });
+      await queryClient.cancelQueries({
+        queryKey: flowKeys.layout(projectId, mode),
+      });
       const previous = queryClient.getQueryData<{
         positions: FlowGraphPositions;
-      }>(flowKeys.layout(projectId));
-      queryClient.setQueryData(flowKeys.layout(projectId), { positions });
+      }>(flowKeys.layout(projectId, mode));
+      queryClient.setQueryData(flowKeys.layout(projectId, mode), {
+        positions,
+      });
       return { previousPositions: previous?.positions };
     },
     onError: (error: Error, _variables, context) => {
@@ -49,7 +58,7 @@ export function useFlowGraphLayout(projectId: string) {
       // Roll back to previous positions
       if (context) {
         queryClient.setQueryData(
-          flowKeys.layout(projectId),
+          flowKeys.layout(projectId, mode),
           context.previousPositions
             ? { positions: context.previousPositions }
             : undefined
@@ -57,19 +66,23 @@ export function useFlowGraphLayout(projectId: string) {
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: flowKeys.layout(projectId) });
+      queryClient.invalidateQueries({
+        queryKey: flowKeys.layout(projectId, mode),
+      });
     },
   });
 
-  // Reset mutation
+  // Reset mutation — only clears the active mode's row
   const resetMutation = useMutation({
-    mutationFn: () => flowApi.deleteFlowGraphLayout(projectId),
+    mutationFn: () => flowApi.deleteFlowGraphLayout(projectId, mode),
     onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: flowKeys.layout(projectId) });
+      await queryClient.cancelQueries({
+        queryKey: flowKeys.layout(projectId, mode),
+      });
       const previous = queryClient.getQueryData<{
         positions: FlowGraphPositions;
-      }>(flowKeys.layout(projectId));
-      queryClient.setQueryData(flowKeys.layout(projectId), {
+      }>(flowKeys.layout(projectId, mode));
+      queryClient.setQueryData(flowKeys.layout(projectId, mode), {
         positions: emptyPositions,
       });
       return { previousPositions: previous?.positions };
@@ -80,7 +93,7 @@ export function useFlowGraphLayout(projectId: string) {
       // Roll back to previous positions
       if (context) {
         queryClient.setQueryData(
-          flowKeys.layout(projectId),
+          flowKeys.layout(projectId, mode),
           context.previousPositions
             ? { positions: context.previousPositions }
             : undefined
@@ -88,7 +101,9 @@ export function useFlowGraphLayout(projectId: string) {
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: flowKeys.layout(projectId) });
+      queryClient.invalidateQueries({
+        queryKey: flowKeys.layout(projectId, mode),
+      });
     },
   });
 

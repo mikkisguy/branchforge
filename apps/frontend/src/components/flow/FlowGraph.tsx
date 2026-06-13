@@ -28,6 +28,7 @@ import {
   layoutNodes,
 } from "./flow-graph-utils";
 import type { FlowLayoutMode } from "@branchforge/shared";
+import { FLOW_LAYOUT_MODE_LABELS } from "@branchforge/shared";
 
 const LAYOUT_MODE_STORAGE_KEY = "flow:layout-mode";
 const LAYOUT_MODES: readonly FlowLayoutMode[] = ["FLOW", "ROUTE", "FILE"];
@@ -80,14 +81,6 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
     [flowNodes]
   );
 
-  const {
-    positions: savedPositions,
-    handleNodeDragStop: handleLayoutDragStop,
-    handleResetLayout,
-    isSaving,
-    isResetting,
-  } = useFlowGraphLayout(projectId);
-
   const [layoutModeRaw, setLayoutMode] = useLocalStorage<string>(
     LAYOUT_MODE_STORAGE_KEY,
     "FLOW",
@@ -102,6 +95,14 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
   ).includes(layoutModeRaw)
     ? (layoutModeRaw as FlowLayoutMode)
     : "FLOW";
+
+  const {
+    positions: savedPositions,
+    handleNodeDragStop: handleLayoutDragStop,
+    handleResetLayout,
+    isSaving,
+    isResetting,
+  } = useFlowGraphLayout(projectId, layoutMode);
 
   const layoutNodesResult = useMemo(
     () =>
@@ -261,10 +262,10 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
             onClick={handleResetLayout}
             disabled={isSaving || isResetting}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 border border-slate-600 rounded-lg hover:bg-slate-700 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Reset layout to auto-arrange"
+            title={`Reset ${FLOW_LAYOUT_MODE_LABELS[layoutMode].toLowerCase()} positions to auto-arrange`}
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            Reset Layout
+            Reset {FLOW_LAYOUT_MODE_LABELS[layoutMode]}
           </button>
         </div>
       </ReactFlow>

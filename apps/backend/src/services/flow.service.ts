@@ -13,7 +13,12 @@ import {
   flowGraphLayouts,
 } from "../db/schema/index.js";
 import { eq, and, asc, isNull, inArray, sql } from "drizzle-orm";
-import type { FlowGraph, FlowNode, FlowEdge } from "@branchforge/shared";
+import type {
+  FlowGraph,
+  FlowNode,
+  FlowEdge,
+  FlowLayoutMode,
+} from "@branchforge/shared";
 import { requireProjectAccess } from "./authz.service.js";
 
 /**
@@ -239,15 +244,19 @@ export async function getFlowGraph(
 }
 
 /**
- * Get saved flow graph layout positions for a project
+ * Get saved flow graph layout positions for a project, scoped to a single
+ * layout mode (FLOW / ROUTE / FILE). Positions saved in one mode are not
+ * returned when viewing another — users get clean per-mode storage.
  *
  * @param projectId - The project ID
  * @param userId - The user ID making the request
+ * @param mode - The layout mode whose positions to load
  * @returns The saved positions map, or empty object if none saved
  */
 export async function getFlowGraphLayout(
   projectId: string,
-  userId: string
+  userId: string,
+  mode: FlowLayoutMode
 ): Promise<Record<string, { x: number; y: number }>> {
   const db = getDb();
 
@@ -260,7 +269,8 @@ export async function getFlowGraphLayout(
     .where(
       and(
         eq(flowGraphLayouts.projectId, projectId),
-        eq(flowGraphLayouts.userId, userId)
+        eq(flowGraphLayouts.userId, userId),
+        eq(flowGraphLayouts.mode, mode)
       )
     )
     .limit(1);
@@ -273,18 +283,20 @@ export async function getFlowGraphLayout(
 }
 
 /**
- * Save flow graph layout positions for a project
- *
- * Uses upsert to save or replace any existing layout for this project/user pair.
+ * Save flow graph layout positions for a project, scoped to a single
+ * layout mode. Uses upsert against the (project, user, mode) unique
+ * index, so a save in one mode never clobbers positions in another.
  *
  * @param projectId - The project ID
  * @param userId - The user ID making the request
  * @param positions - Map of labelId → { x, y }
+ * @param mode - The layout mode these positions belong to
  */
 export async function saveFlowGraphLayout(
   projectId: string,
   userId: string,
-  positions: Record<string, { x: number; y: number }>
+  positions: Record<string, { x: number; y: number }>,
+  mode: FlowLayoutMode
 ): Promise<void> {
   const db = getDb();
 
@@ -296,10 +308,15 @@ export async function saveFlowGraphLayout(
     .values({
       projectId,
       userId,
+      mode,
       positions,
     })
     .onConflictDoUpdate({
-      target: [flowGraphLayouts.projectId, flowGraphLayouts.userId],
+      target: [
+        flowGraphLayouts.projectId,
+        flowGraphLayouts.userId,
+        flowGraphLayouts.mode,
+      ],
       set: {
         positions,
         updatedAt: sql`now()`,
@@ -308,14 +325,17 @@ export async function saveFlowGraphLayout(
 }
 
 /**
- * Delete (reset) flow graph layout positions for a project
+ * Delete (reset) flow graph layout positions for a project, scoped to a
+ * single layout mode. Resetting ROUTE does not affect FLOW/FILE positions.
  *
  * @param projectId - The project ID
  * @param userId - The user ID making the request
+ * @param mode - The layout mode to reset
  */
 export async function deleteFlowGraphLayout(
   projectId: string,
-  userId: string
+  userId: string,
+  mode: FlowLayoutMode
 ): Promise<void> {
   const db = getDb();
 
@@ -327,7 +347,8 @@ export async function deleteFlowGraphLayout(
     .where(
       and(
         eq(flowGraphLayouts.projectId, projectId),
-        eq(flowGraphLayouts.userId, userId)
+        eq(flowGraphLayouts.userId, userId),
+        eq(flowGraphLayouts.mode, mode)
       )
     );
 }
