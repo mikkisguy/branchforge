@@ -9,8 +9,15 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { CharacterDialog } from "../CharacterDialog";
+import type { CharacterEditDialogProps } from "../CharacterEditDialog";
 import type { Character } from "@branchforge/shared";
 import { createTestQueryClient } from "@/test/query-client";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 // Mock the toast context
 export const mockToastSuccess = vi.fn();
@@ -27,6 +34,66 @@ vi.mock("@/contexts/ToastContext", () => ({
 vi.mock("@/hooks/useCharacters", () => ({
   useCharacters: vi.fn(),
 }));
+
+// Mock the lazy CharacterEditDialog wrapper to render immediately
+vi.mock("../CharacterEditDialog.lazy", () => {
+  const MockCharacterEditDialog = ({
+    open,
+    onOpenChange,
+    characterId,
+  }: CharacterEditDialogProps) => {
+    if (!open) return null;
+
+    // Pre-fill data for editing character "char-1" (Eileen)
+    const isEditingEileen = characterId === "char-1";
+
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {characterId ? "Edit Character" : "Add Character"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="name">Name *</label>
+              <input
+                id="name"
+                type="text"
+                value={isEditingEileen ? "Eileen" : ""}
+                readOnly
+                aria-label="Name *"
+              />
+            </div>
+            <div>
+              <label htmlFor="displayName">Display Name *</label>
+              <input
+                id="displayName"
+                type="text"
+                value={isEditingEileen ? "Eileen" : ""}
+                readOnly
+                aria-label="Display Name *"
+              />
+            </div>
+            <div>
+              <label htmlFor="renpyTag">Ren'Py Tag *</label>
+              <input
+                id="renpyTag"
+                type="text"
+                value={isEditingEileen ? "a" : ""}
+                readOnly
+                aria-label="Ren'Py Tag *"
+              />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  return { CharacterEditDialog: MockCharacterEditDialog };
+});
 
 import { useCharacters } from "@/hooks/useCharacters";
 

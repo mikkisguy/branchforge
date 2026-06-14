@@ -13,9 +13,9 @@ import {
   LabelPropertiesPanel,
 } from "@/components/write-mode";
 import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
-import { LabelEditDialog } from "@/components/write-mode/LabelEditDialog";
+import { LabelEditDialog } from "@/components/write-mode/LabelEditDialog.lazy";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { CharacterEditDialog } from "@/components/CharacterEditDialog";
+import { CharacterEditDialog } from "@/components/CharacterEditDialog.lazy";
 import { ChevronRight, FileText, Loader2 } from "lucide-react";
 import { EditorTabBar } from "@/components/ide-shared";
 import { Button } from "@/components/ui/button";

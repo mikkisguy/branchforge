@@ -17,7 +17,7 @@ import { useGitLabSync } from "@/hooks/useGitLabSync";
 import { useToast } from "@/contexts/ToastContext";
 import { useLabels } from "@/hooks/useLabels";
 import { characterKeys, projectFilesKeys } from "@/lib/query-keys";
-import { CharacterImportWizard } from "@/components/CharacterImportWizard";
+import { CharacterImportWizard } from "@/components/CharacterImportWizard.lazy";
 import {
   charactersApi,
   type DetectCharactersResponse,

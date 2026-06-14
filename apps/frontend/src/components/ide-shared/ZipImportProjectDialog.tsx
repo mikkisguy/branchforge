@@ -22,7 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/contexts/ToastContext";
 import { useImportZipProject } from "@/hooks/useImportZipProject";
-import { CharacterImportWizard } from "@/components/CharacterImportWizard";
+import { CharacterImportWizard } from "@/components/CharacterImportWizard.lazy";
 import type { DetectCharactersResponse } from "@/lib/api/characters";
 import { charactersApi } from "@/lib/api/characters";
 import { validateZipFile } from "@/lib/zip-validation";
@@ -33,7 +33,7 @@ import { ZIP_IMPORT_MAX_SIZE_MB } from "@branchforge/shared";
 // Types
 // ============================================================================
 
-interface ZipImportProjectDialogProps {
+export interface ZipImportProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: (importedProject?: { id: string }) => void;

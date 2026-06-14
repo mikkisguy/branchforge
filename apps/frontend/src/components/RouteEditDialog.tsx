@@ -21,7 +21,7 @@ import { useRouteConfigs } from "@/hooks/useRouteConfigs";
 import { isValidJumpPrefix, isValidRouteKey } from "@branchforge/shared";
 import type { RouteConfig } from "@branchforge/shared";
 
-interface RouteEditDialogProps {
+export interface RouteEditDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;

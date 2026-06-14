@@ -29,7 +29,7 @@ import { gitlabApi } from "@/lib/api/gitlab";
 import { projectKeys, gitlabKeys, labelKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
 import type { GitLabRepository } from "@/lib/api/gitlab";
-import { CharacterImportWizard } from "@/components/CharacterImportWizard";
+import { CharacterImportWizard } from "@/components/CharacterImportWizard.lazy";
 import type { DetectCharactersResponse } from "@branchforge/shared";
 import { charactersApi } from "@/lib/api/characters";
 
@@ -37,7 +37,7 @@ import { charactersApi } from "@/lib/api/characters";
 // Types
 // ============================================================================
 
-interface GitLabImportDialogProps {
+export interface GitLabImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: (importedProject?: { id: string }) => void;

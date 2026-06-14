@@ -21,7 +21,7 @@ import { useToast } from "@/contexts/ToastContext";
 import { useLabels } from "@/hooks/useLabels";
 import { projectFilesKeys, characterKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
-import { CharacterImportWizard } from "@/components/CharacterImportWizard";
+import { CharacterImportWizard } from "@/components/CharacterImportWizard.lazy";
 import type { DetectCharactersResponse } from "@branchforge/shared";
 import { charactersApi } from "@/lib/api/characters";
 import { validateZipFile } from "@/lib/zip-validation";
