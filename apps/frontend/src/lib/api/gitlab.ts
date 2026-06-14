@@ -7,6 +7,8 @@
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
+import { getCsrfHeader } from "./csrf";
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -163,6 +165,13 @@ function buildHeaders(options: RequestInit): Record<string, string> {
   });
   if (options.body && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
+  }
+  // Inject CSRF token for unsafe methods.
+  const csrfHeader = getCsrfHeader(options.method ?? "GET", options.body);
+  if (csrfHeader) {
+    for (const [k, v] of Object.entries(csrfHeader)) {
+      headers[k] = v;
+    }
   }
   return headers;
 }

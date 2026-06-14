@@ -12,7 +12,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { InlineMessage } from "@/components/ui/inline-error";
 import { CharacterList } from "./CharacterList";
-import { CharacterEditDialog } from "./CharacterEditDialog";
+import { CharacterEditDialog } from "./CharacterEditDialog.lazy";
 import { useCharacters } from "@/hooks/useCharacters";
 
 interface CharacterDialogProps {

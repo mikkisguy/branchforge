@@ -117,10 +117,10 @@ vi.mock("../../middleware/auth.middleware.js", () => ({
 
 // Test fixtures
 const testUserId = "user-123";
-const testProjectId = "project-123";
+const testProjectId = "550e8400-e29b-41d4-a716-446655440000";
 const testGitlabProjectId = 12345;
 const testBranch = "main";
-const testOperationId = "operation-123";
+const testOperationId = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
 
 describe("GitLab Routes (Integration)", () => {
   let fastify: Fastify.FastifyInstance;
@@ -206,8 +206,8 @@ describe("GitLab Routes (Integration)", () => {
         method: "POST",
         url: "/api/gitlab/validate",
         payload: {
-          token: "glpat-test123",
-          gitlabUrl: "https://gitlab.test",
+          token: "glpat-test12345678901234",
+          gitlabUrl: "https://gitlab.com",
         },
       });
 
@@ -223,7 +223,7 @@ describe("GitLab Routes (Integration)", () => {
         method: "POST",
         url: "/api/gitlab/validate",
         payload: {
-          gitlabUrl: "https://gitlab.test",
+          gitlabUrl: "https://gitlab.com",
         },
       });
 
@@ -237,7 +237,7 @@ describe("GitLab Routes (Integration)", () => {
         method: "POST",
         url: "/api/gitlab/validate",
         payload: {
-          token: "invalid-token",
+          token: "glpat-invalid12345678901",
         },
       });
 
@@ -258,7 +258,7 @@ describe("GitLab Routes (Integration)", () => {
         method: "POST",
         url: "/api/gitlab/validate",
         payload: {
-          token: "glpat-test123",
+          token: "glpat-test12345678901234",
         },
       });
 
@@ -283,8 +283,8 @@ describe("GitLab Routes (Integration)", () => {
         method: "POST",
         url: "/api/gitlab/integration",
         payload: {
-          token: "glpat-test123",
-          gitlabUrl: "https://gitlab.test",
+          token: "glpat-test12345678901234",
+          gitlabUrl: "https://gitlab.com",
         },
       });
 
@@ -299,7 +299,7 @@ describe("GitLab Routes (Integration)", () => {
         method: "POST",
         url: "/api/gitlab/integration",
         payload: {
-          gitlabUrl: "https://gitlab.test",
+          gitlabUrl: "https://gitlab.com",
         },
       });
 
@@ -398,6 +398,9 @@ describe("GitLab Routes (Integration)", () => {
       });
 
       expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        message: "Invalid request data",
+      });
     });
   });
 
@@ -546,6 +549,9 @@ describe("GitLab Routes (Integration)", () => {
       });
 
       expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        message: "Invalid request data",
+      });
     });
   });
 
@@ -579,9 +585,10 @@ describe("GitLab Routes (Integration)", () => {
       // the handler-level 404 when getSyncOperation returns null
       vi.spyOn(gitlabSyncService, "getSyncOperation").mockResolvedValue(null);
 
+      const nonExistentOperationId = "550e8400-e29b-41d4-a716-446655440001";
       const response = await fastify.inject({
         method: "GET",
-        url: `/api/gitlab/operations/non-existent`,
+        url: `/api/gitlab/operations/${nonExistentOperationId}`,
       });
 
       expect(response.statusCode).toBe(404);

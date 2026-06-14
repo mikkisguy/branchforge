@@ -1,9 +1,16 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 import type { PublicUser } from "@branchforge/shared";
+import { getCsrfHeader } from "./csrf";
 
 export interface AuthResponse {
   user: PublicUser | null;
+  /**
+   * CSRF token issued by the backend on login. The client caches this
+   * and sends it back on every state-changing request as the
+   * `x-csrf-token` header. See GitHub issue #206.
+   */
+  csrfToken?: string;
 }
 
 export type { PublicUser };
@@ -129,11 +136,13 @@ async function request<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
+  const csrfHeader = getCsrfHeader(options.method ?? "GET", options.body);
   const response = await fetch(url, {
     ...options,
     credentials: "include",
     headers: {
-      "Content-Type": "application/json",
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(csrfHeader ?? {}),
       ...options.headers,
     },
   });

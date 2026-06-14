@@ -26,7 +26,7 @@ import {
   isValidAvatarMimeType,
 } from "@branchforge/shared";
 
-interface CharacterEditDialogProps {
+export interface CharacterEditDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;

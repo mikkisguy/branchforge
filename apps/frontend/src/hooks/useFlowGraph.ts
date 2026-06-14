@@ -9,7 +9,7 @@ import { flowApi } from "@/lib/api/flow";
 import { flowKeys } from "@/lib/query-keys";
 
 export function useFlowGraph(projectId: string) {
-  const query = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: flowKeys.graph(projectId),
     queryFn: () => flowApi.getFlowGraph(projectId),
     enabled: !!projectId,
@@ -17,10 +17,10 @@ export function useFlowGraph(projectId: string) {
   });
 
   return {
-    nodes: query.data?.nodes ?? [],
-    edges: query.data?.edges ?? [],
-    isLoading: query.isLoading,
-    error: query.error,
-    refetch: query.refetch,
+    nodes: data?.nodes ?? [],
+    edges: data?.edges ?? [],
+    isLoading,
+    error,
+    refetch,
   };
 }

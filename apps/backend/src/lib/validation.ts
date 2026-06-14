@@ -13,13 +13,16 @@
 
 import { z } from "zod";
 import { ValidationError } from "../middleware/error-handler.middleware.js";
-import { isIP } from "node:net";
 import {
   LabelStatus,
   UserRole,
   ROUTE_KEY_REGEX,
   JUMP_PREFIX_REGEX,
 } from "@branchforge/shared";
+import {
+  isPrivateOrLocalHostname,
+  isAllowedGitlabHost,
+} from "./ip-validation.js";
 
 // ============================================================================
 // Common Schemas
@@ -834,41 +837,12 @@ export function isValidConflictResolution(
 }
 
 /**
- * Check if a hostname is a private/local IP address
- * Uses proper IP parsing to detect numeric IPs and various formats
- */
-function isPrivateOrLocalHostname(hostname: string): boolean {
-  const lower = hostname.toLowerCase();
-
-  // Block localhost and common local patterns
-  const blockedPatterns = [
-    "localhost",
-    "127.",
-    "0.0.0.0",
-    "169.254.", // IPv4 link-local
-    "10.",
-    "172.16.",
-    "192.168.",
-    "::1",
-    "::ffff:", // IPv4-mapped IPv6
-    "fc00:", // IPv6 ULA prefix
-    "fd00:", // IPv6 ULA prefix
-  ];
-  for (const pattern of blockedPatterns) {
-    if (lower.includes(pattern)) return true;
-  }
-
-  // Check if hostname is a numeric IP (handles IPv4 and IPv6)
-  if (isIP(lower) !== 0) {
-    // Reject any numeric IP - only allow named hosts
-    return true;
-  }
-
-  return false;
-}
-
-/**
  * GitLab URL validation (with SSRF protection)
+ *
+ * The `isPrivateOrLocalHostname` helper (imported from
+ * ./ip-validation.js) uses ipaddr.js to correctly block all of
+ * 172.16.0.0/12, 100.64.0.0/10, IPv6 link-local, IPv4-mapped IPv6,
+ * etc. — the prior substring-based filter missed most of these.
  */
 export const gitlabUrlSchema = z
   .string()
@@ -887,12 +861,8 @@ export const gitlabUrlSchema = z
   .refine(
     (url) => {
       const parsed = new URL(url);
-      // Require HTTPS AND one of the allowed hostnames
       const isHttps = parsed.protocol === "https:";
-      const isAllowedHost =
-        parsed.hostname === "gitlab.com" ||
-        parsed.hostname.endsWith(".gitlab.io") ||
-        parsed.hostname.endsWith(".gitlab.com");
+      const isAllowedHost = isAllowedGitlabHost(parsed.hostname);
       return isHttps && isAllowedHost;
     },
     {
@@ -954,6 +924,142 @@ export const importProjectSchema = z
     conflictResolution: conflictResolutionSchema,
   })
   .strict();
+
+/**
+ * GitLab file content update request validation (Script Mode editing)
+ * Mirrors updateFileContentSchema but without expectedContentHash, because
+ * the GitLab sync path tracks conflicts via a separate in-flight mechanism
+ * (see updateGitLabFileContent service).
+ */
+export const updateGitLabFileContentSchema = z
+  .object({
+    content: z
+      .string()
+      .min(1, "File content is required")
+      .max(10_000_000, "File content too large (max 10MB)"),
+  })
+  .strict();
+
+export type UpdateGitLabFileContentInput = z.infer<
+  typeof updateGitLabFileContentSchema
+>;
+
+/**
+ * GitLab export request validation
+ */
+export const exportToGitlabSchema = z
+  .object({
+    projectId: uuidSchema,
+    branch: z
+      .string()
+      .min(1, "Branch is required")
+      .max(255, "Branch name is too long")
+      .regex(/^[a-zA-Z0-9_/$.-]+$/, "Branch name contains invalid characters")
+      .refine(
+        (name) =>
+          !name.startsWith("-") &&
+          !name.startsWith("/") &&
+          !name.endsWith("/") &&
+          !name.includes(".."),
+        "Branch name cannot start with '-' or '/', end with '/', or contain '..'"
+      )
+      .optional(),
+    commitMessage: z
+      .string()
+      .min(1, "Commit message is required")
+      .max(500, "Commit message is too long"),
+  })
+  .strict();
+
+export type ExportToGitlabInput = z.infer<typeof exportToGitlabSchema>;
+
+// ============================================================================
+// Additional GitLab Schemas (Wave 2 — VULN-003)
+// ============================================================================
+
+/**
+ * Shared branch-name validation. Mirrors the rules in
+ * createGitLabIntegrationSchema.branchName: only the characters
+ * /^[a-zA-Z0-9_/$.-]+$/, no leading `-` or `/`, no trailing `/`, no `..`.
+ */
+const gitBranchNameSchema = z
+  .string()
+  .min(1, "Branch is required")
+  .max(255, "Branch name is too long")
+  .regex(/^[a-zA-Z0-9_/$.-]+$/, "Branch name contains invalid characters")
+  .refine(
+    (name) =>
+      !name.startsWith("-") &&
+      !name.startsWith("/") &&
+      !name.endsWith("/") &&
+      !name.includes(".."),
+    "Branch name cannot start with '-' or '/', end with '/', or contain '..'"
+  );
+
+/** Validate a GitLab token + optional URL. Reuse for /gitlab/validate and /gitlab/integration. */
+export const validateGitlabTokenSchema = z
+  .object({
+    token: nonEmptyStringSchema.min(20, "Access token is too short").max(100),
+    gitlabUrl: gitlabUrlSchema.optional(),
+  })
+  .strict();
+
+export type ValidateGitlabTokenInput = z.infer<
+  typeof validateGitlabTokenSchema
+>;
+
+/** GET /gitlab/files/:projectId query: branch required. */
+export const gitLabFileListQuerySchema = z
+  .object({
+    branch: gitBranchNameSchema,
+  })
+  .strict();
+
+export type GitLabFileListQuery = z.infer<typeof gitLabFileListQuerySchema>;
+
+/** POST /gitlab/link body. */
+export const linkRepositorySchema = z
+  .object({
+    projectId: uuidSchema,
+    gitlabProjectId: z
+      .number()
+      .int()
+      .positive("GitLab project ID must be positive"),
+    branch: gitBranchNameSchema.optional(),
+  })
+  .strict();
+
+export type LinkRepositoryInput = z.infer<typeof linkRepositorySchema>;
+
+/** POST /gitlab/import body. */
+export const importFromGitlabSchema = z
+  .object({
+    projectId: uuidSchema,
+    branch: gitBranchNameSchema,
+    conflictResolution: conflictResolutionSchema,
+  })
+  .strict();
+
+export type ImportFromGitlabInput = z.infer<typeof importFromGitlabSchema>;
+
+/** POST /gitlab/detect-conflicts body. */
+export const detectConflictsSchema = z
+  .object({
+    projectId: uuidSchema,
+    branch: gitBranchNameSchema,
+  })
+  .strict();
+
+export type DetectConflictsInput = z.infer<typeof detectConflictsSchema>;
+
+/** GET /gitlab/operations/:operationId params. */
+export const operationIdParamsSchema = z
+  .object({
+    operationId: uuidSchema,
+  })
+  .strict();
+
+export type OperationIdParams = z.infer<typeof operationIdParamsSchema>;
 
 // ============================================================================
 // Export/Import Schemas
@@ -1173,9 +1279,14 @@ export function validateData<T extends z.ZodTypeAny>(
  * Session data validation
  * Sanitizes and validates session data with whitelisted keys and size limits
  */
+// CSRF double-submit token support: the `csrfToken` key is whitelisted
+// here so the session-store Zod schema accepts it. The token itself is
+// minted by `generateCsrfToken` in `middleware/csrf.middleware.ts` on
+// login and validated globally by `validateCsrfToken` (registered as a
+// preValidation hook in `index.ts`). See GitHub issue #206.
 export const ALLOWED_SESSION_KEYS = [
   "user",
-  "csrfToken",
+  "csrfToken", // issued on login, sent back as x-csrf-token on state-changing requests
   "flash",
   "returnTo",
 ] as const;

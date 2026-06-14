@@ -161,6 +161,9 @@ export async function storeGitlabIntegration(
     throw new Error("Invalid GitLab token");
   }
 
+  // Sanitize the GitLab URL before storing
+  const sanitizedGitlabUrl = validateGitLabUrl(gitlabUrl);
+
   // Encrypt the token
   const encryptedToken = encryptPAT(token);
 
@@ -170,7 +173,7 @@ export async function storeGitlabIntegration(
     .values({
       userId,
       encryptedToken,
-      gitlabUrl,
+      gitlabUrl: sanitizedGitlabUrl,
       username,
       updatedAt: new Date(),
     })
@@ -178,7 +181,7 @@ export async function storeGitlabIntegration(
       target: gitlabIntegrations.userId,
       set: {
         encryptedToken,
-        gitlabUrl,
+        gitlabUrl: sanitizedGitlabUrl,
         username,
         updatedAt: new Date(),
       },

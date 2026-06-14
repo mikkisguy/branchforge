@@ -31,7 +31,7 @@ import { labelKeys, characterKeys } from "@/lib/query-keys";
 // Types
 // ============================================================================
 
-interface CharacterImportWizardProps {
+export interface CharacterImportWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;

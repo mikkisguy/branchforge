@@ -5,9 +5,11 @@
  * Replaces the AuthContext with a more efficient query-based approach.
  */
 
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authApi, type PublicUser } from "@/lib/api/auth";
 import { authKeys } from "@/lib/query-keys";
+import { setCsrfToken, clearCsrfToken, loadCsrfToken } from "@/lib/api/csrf";
 
 // ============================================================================
 // Query Options
@@ -21,6 +23,9 @@ function getCurrentUserQueryOptions() {
     queryKey: authKeys.user(),
     queryFn: async () => {
       const response = await authApi.getMe();
+      if (response.csrfToken) {
+        setCsrfToken(response.csrfToken);
+      }
       return response.user;
     },
     retry: false, // Don't retry auth failures
@@ -48,6 +53,17 @@ export function useAuth(): UseAuthReturn {
   // Query for current user
   const { data: user, isLoading } = useQuery(getCurrentUserQueryOptions());
 
+  // If the user query resolves successfully (i.e. the browser already
+  // has a valid session cookie), eagerly fetch the CSRF token so the
+  // first state-changing request can include it. We do not block on
+  // this: state-changing callers can fall back to `loadCsrfToken` on
+  // a 403 response if needed.
+  useEffect(() => {
+    if (user) {
+      void loadCsrfToken();
+    }
+  }, [user]);
+
   // Login mutation
   const loginMutation = useMutation({
     mutationFn: async ({
@@ -58,6 +74,13 @@ export function useAuth(): UseAuthReturn {
       password: string;
     }) => {
       const response = await authApi.login({ email, password });
+      // Cache the CSRF token issued at login. The backend puts the
+      // token in both the response body and the session; the body
+      // value is preferred so the client can start using it
+      // immediately without a round-trip to /csrf-token.
+      if (response.csrfToken) {
+        setCsrfToken(response.csrfToken);
+      }
       return response.user;
     },
     onSuccess: (data) => {
@@ -87,11 +110,21 @@ export function useAuth(): UseAuthReturn {
   // Logout mutation
   const logoutMutation = useMutation({
     mutationFn: async () => {
+      // Ensure the CSRF token is cached before sending the logout
+      // request. If the eager fetch in the useEffect below hasn't
+      // completed yet (e.g. user clicks logout immediately after page
+      // load on a slow network), the POST /logout would get a 403.
+      // loadCsrfToken is a no-op when the token is already cached and
+      // coalesces concurrent calls, so this is cheap.
+      await loadCsrfToken();
       await authApi.logout();
     },
     onSuccess: () => {
       // Clear all queries on logout
       queryClient.clear();
+      // Drop the in-memory CSRF token so subsequent requests don't
+      // carry a stale one.
+      clearCsrfToken();
     },
   });
 

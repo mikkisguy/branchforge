@@ -24,7 +24,7 @@ export function useFlowGraphLayout(projectId: string, mode: FlowLayoutMode) {
   const toast = useToast();
 
   // Load saved positions for the active mode
-  const query = useQuery({
+  const { data } = useQuery({
     queryKey: flowKeys.layout(projectId, mode),
     queryFn: () => flowApi.getFlowGraphLayout(projectId, mode),
     enabled: !!projectId,
@@ -32,8 +32,8 @@ export function useFlowGraphLayout(projectId: string, mode: FlowLayoutMode) {
   });
 
   const positions = useMemo<FlowGraphPositions>(
-    () => query.data?.positions ?? emptyPositions,
-    [query.data?.positions]
+    () => data?.positions ?? emptyPositions,
+    [data?.positions]
   );
 
   // Save mutation — targets only the active mode's row

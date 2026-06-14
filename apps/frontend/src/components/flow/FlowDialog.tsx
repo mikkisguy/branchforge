@@ -15,12 +15,15 @@
  * correct primitive for "respond to an externally controlled prop".
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, lazy, Suspense } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { FlowGraph } from "./FlowGraph";
 import { X } from "lucide-react";
 import { flowKeys, routeConfigKeys, characterKeys } from "@/lib/query-keys";
+
+const LazyFlowGraph = lazy(() =>
+  import("./FlowGraph").then((m) => ({ default: m.FlowGraph }))
+);
 
 interface FlowDialogProps {
   open: boolean;
@@ -74,7 +77,17 @@ export function FlowDialog({ open, onOpenChange, projectId }: FlowDialogProps) {
 
         {/* Graph area - explicit min-height to ensure ReactFlow renders */}
         <div className="flex-1 min-h-0 relative" style={{ minHeight: "500px" }}>
-          {open && <FlowGraph projectId={projectId} />}
+          {open && (
+            <Suspense
+              fallback={
+                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                  Loading graph…
+                </div>
+              }
+            >
+              <LazyFlowGraph projectId={projectId} />
+            </Suspense>
+          )}
         </div>
       </DialogContent>
     </Dialog>

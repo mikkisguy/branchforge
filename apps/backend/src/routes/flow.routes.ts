@@ -33,25 +33,6 @@ import {
   type SaveFlowGraphLayoutInput,
 } from "../lib/validation.js";
 
-function getClientIp(request: FastifyRequest): string {
-  const forwarded = request.headers["x-forwarded-for"];
-  if (typeof forwarded === "string") {
-    return forwarded.split(",")[0].trim();
-  }
-  if (Array.isArray(forwarded)) {
-    return forwarded[0].trim();
-  }
-  const cfConnectingIp = request.headers["cf-connecting-ip"];
-  if (typeof cfConnectingIp === "string") {
-    return cfConnectingIp;
-  }
-  const xRealIp = request.headers["x-real-ip"];
-  if (typeof xRealIp === "string") {
-    return xRealIp;
-  }
-  return request.ip;
-}
-
 // ============================================================================
 // Route Handlers
 // ============================================================================
@@ -103,8 +84,7 @@ async function saveLayoutHandler(
   request: FastifyRequest<{ Body: SaveFlowGraphLayoutInput }>,
   reply: FastifyReply
 ): Promise<void> {
-  const clientIp = getClientIp(request);
-  const rateLimit = checkRateLimit(`layoutSave:${clientIp}`, {
+  const rateLimit = checkRateLimit(`layoutSave:${request.ip}`, {
     maxAttempts: 60,
     windowMs: 15 * 60 * 1000,
   });

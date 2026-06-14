@@ -132,6 +132,8 @@ function getDatePartsInTimezone(
 ): TimezoneDateParts {
   let formatter = dateTimeFormatCache.get(timezone);
   if (!formatter) {
+    // FP: formatter is cached in dateTimeFormatCache above — built once per timezone
+    // react-doctor-disable-next-line react-doctor/js-hoist-intl
     formatter = new Intl.DateTimeFormat("en-CA", {
       timeZone: timezone,
       year: "numeric",
@@ -250,7 +252,7 @@ export const ProseEditor = function ProseEditor({
   const isInitialMountRef = useRef(true);
 
   // Track initial word count for the current label to calculate real-time progress
-  const initialWordCountRef = useRef<number>(0);
+  const [initialWordCount, setInitialWordCount] = useState<number>(0);
 
   useEffect(() => {
     entriesRef.current = entries;
@@ -450,13 +452,13 @@ export const ProseEditor = function ProseEditor({
 
     // Calculate initial word count for this label (only on first load, not on subsequent updates)
     if (hasSwitchedLabel) {
-      initialWordCountRef.current = countWordsFromEntries(newEntries);
+      setInitialWordCount(countWordsFromEntries(newEntries));
     } else {
       const newWordCount = countWordsFromEntries(newEntries);
 
       // Update baseline to latest persisted content from server.
-      // Any unsaved local edits remain represented by (wordCount - initialWordCountRef).
-      initialWordCountRef.current = newWordCount;
+      // Any unsaved local edits remain represented by (wordCount - initialWordCount).
+      setInitialWordCount(newWordCount);
     }
 
     flushPendingTextHistory();
@@ -643,7 +645,6 @@ export const ProseEditor = function ProseEditor({
 
   const wordCount = countWordsFromEntries(entries);
   const lineCount = entries.length;
-  const initialWordCount = initialWordCountRef.current;
 
   // Get today's word count from daily word counts (memoized)
   // Plus real-time delta from current session (current word count - initial word count)

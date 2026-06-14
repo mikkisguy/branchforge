@@ -4,7 +4,7 @@ import { DialogShell } from "@/components/ui/DialogShell";
 import { InlineMessage } from "@/components/ui/inline-error";
 import { Button } from "@/components/ui/button";
 import { RouteList } from "@/components/RouteList";
-import { RouteEditDialog } from "@/components/RouteEditDialog";
+import { RouteEditDialog } from "@/components/RouteEditDialog.lazy";
 import { useRouteConfigs } from "@/hooks/useRouteConfigs";
 
 interface RouteSettingsDialogProps {

@@ -24,6 +24,7 @@ import { exportsRoutes } from "./routes/exports.routes.js";
 import { createDrizzleSessionStore } from "./services/session-store.service.js";
 import { setupShutdownHandlers } from "./lib/shutdown.js";
 import { globalErrorHandler } from "./middleware/error-handler.middleware.js";
+import { validateCsrfToken } from "./middleware/csrf.middleware.js";
 import { SESSION_COOKIE_NAME } from "./lib/session.js";
 import { getBasePath } from "./lib/config.js";
 import {
@@ -32,8 +33,18 @@ import {
   getUploadsDirPath,
 } from "./lib/storage.js";
 
+// Fastify instance with explicit body limit for JSON/text bodies.
+// Note: multipart plugin has its own `fileSize` limit that overrides per-part.
 const server = Fastify({
   logger: true,
+  bodyLimit: 5 * 1024 * 1024, // 5 MB; align with multipart limits
+  // Trust only loopback addresses when reading X-Forwarded-For.
+  // This makes `request.ip` return the real client IP behind a single
+  // reverse proxy on the same host, while preventing clients from
+  // spoofing their IP via headers when no trusted proxy is present.
+  // Operators deploying behind multiple proxy hops should override
+  // this via the TRUST_PROXY environment variable or Fastify config.
+  trustProxy: "loopback",
 });
 
 // Plugins
@@ -80,6 +91,14 @@ const sessionStore = createDrizzleSessionStore({
   cleanupInterval: 60 * 60 * 1000,
 });
 
+// Require an explicit SESSION_SECRET in production. The hardcoded fallback
+// would otherwise make sessions forgeable to anyone with source access.
+if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+  throw new Error(
+    "SESSION_SECRET environment variable must be set in production"
+  );
+}
+
 await server.register(session, {
   secret:
     process.env.SESSION_SECRET ?? "dev-secret-please-change-in-production",
@@ -115,6 +134,13 @@ await server.register(statsRoutes, { prefix: basePath });
 await server.register(zipImportRoutes, { prefix: basePath });
 await server.register(flowRoutes, { prefix: basePath });
 await server.register(exportsRoutes, { prefix: basePath });
+
+// Register a global preValidation hook that enforces double-submit
+// CSRF protection on every state-changing request. The hook itself
+// is a no-op for safe methods, exempt content types, and the login
+// / register routes, so it is safe to install globally.
+// See GitHub issue #206.
+server.addHook("preValidation", validateCsrfToken);
 
 // Start server
 const start = async () => {

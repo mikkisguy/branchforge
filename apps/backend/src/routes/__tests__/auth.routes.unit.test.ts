@@ -37,6 +37,9 @@ describe("Auth Routes (Unit)", () => {
     await fastify.register(cookie);
     await fastify.register(session, {
       secret: "a".repeat(32),
+      saveUninitialized: true,
+      cookieName: "branchforge_session",
+      cookie: { secure: false, path: "/" },
     });
 
     // Register auth routes
@@ -208,8 +211,10 @@ describe("Auth Routes (Unit)", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      expect(JSON.parse(response.payload)).toEqual({
+      const body = JSON.parse(response.payload);
+      expect(body).toEqual({
         user: mockUser,
+        csrfToken: expect.stringMatching(/^[0-9a-f]{64}$/),
       });
       expect(authService.validateCredentials).toHaveBeenCalledWith(
         "test@example.com",
@@ -339,4 +344,64 @@ describe("Auth Routes (Unit)", () => {
       });
     });
   });
+
+  describe("GET /csrf-token", () => {
+    it("should return 401 when not authenticated", async () => {
+      const response = await fastify.inject({
+        method: "GET",
+        url: "/csrf-token",
+      });
+
+      expect(response.statusCode).toBe(401);
+    });
+
+    it("should return a CSRF token when authenticated", async () => {
+      // First, log in to get a session with a CSRF token.
+      vi.mocked(authService.validateCredentials).mockResolvedValue({
+        id: "123",
+        email: "test@example.com",
+        role: "OWNER",
+      });
+      const loginRes = await fastify.inject({
+        method: "POST",
+        url: "/login",
+        payload: {
+          email: "test@example.com",
+          password: "password123",
+        },
+      });
+      expect(loginRes.statusCode).toBe(200);
+      const loginBody = JSON.parse(loginRes.payload) as {
+        csrfToken: string;
+      };
+      expect(loginBody.csrfToken).toMatch(/^[0-9a-f]{64}$/);
+
+      // Now fetch /csrf-token and verify it returns the same value.
+      const csrfRes = await fastify.inject({
+        method: "GET",
+        url: "/csrf-token",
+        cookies: extractSessionCookie(loginRes),
+      });
+      expect(csrfRes.statusCode).toBe(200);
+      expect(JSON.parse(csrfRes.payload)).toEqual({
+        csrfToken: loginBody.csrfToken,
+      });
+    });
+  });
 });
+
+/**
+ * Extract the session cookie from a login response. Different
+ * @fastify/session configurations use different cookie names; we try
+ * the common ones in order.
+ */
+function extractSessionCookie(response: {
+  cookies: { name: string; value: string }[];
+}): Record<string, string> {
+  const cookieNames = ["branchforge_session", "sessionId", "connect.sid"];
+  for (const name of cookieNames) {
+    const c = response.cookies.find((x) => x.name === name);
+    if (c) return { [c.name]: c.value };
+  }
+  return {};
+}
