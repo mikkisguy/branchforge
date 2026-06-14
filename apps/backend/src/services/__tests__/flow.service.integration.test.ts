@@ -213,6 +213,8 @@ describe("FlowService (Integration)", () => {
   const menuLineId = testUuid("24000000", 1);
   const jumpLineId = testUuid("24000000", 2);
   const jumpLine2Id = testUuid("24000000", 3);
+  const dialogueLineId = testUuid("24000000", 4);
+  const narrationLineId = testUuid("24000000", 5);
 
   function buildLabelLines(): NewLabelLine[] {
     return [
@@ -232,11 +234,27 @@ describe("FlowService (Integration)", () => {
         ],
       },
       {
+        id: narrationLineId,
+        labelId: menuLabelId,
+        sequence: 2,
+        content: "The hero stands before a choice",
+        contentType: "NARRATION",
+        visualType: "GENERATED",
+      },
+      {
         id: jumpLineId,
         labelId: targetLabelId,
         sequence: 1,
         content: "jump jump_target",
         contentType: "JUMP",
+        visualType: "GENERATED",
+      },
+      {
+        id: dialogueLineId,
+        labelId: targetLabelId,
+        sequence: 2,
+        content: "I will find the truth",
+        contentType: "DIALOGUE",
         visualType: "GENERATED",
       },
       {
@@ -351,6 +369,7 @@ describe("FlowService (Integration)", () => {
         fileName: "file_a.rpy",
         sequenceOrder: 0,
         labelNumber: 1,
+        wordCount: 0, // start label has no label_lines
       });
 
       const ch1Node = result.nodes.find((n) => n.labelName === "chapter1");
@@ -365,6 +384,7 @@ describe("FlowService (Integration)", () => {
         fileName: "file_a.rpy",
         sequenceOrder: 0,
         labelNumber: 2,
+        wordCount: 0, // chapter1 label has no label_lines
       });
 
       const jumpTargetNode = result.nodes.find(
@@ -375,7 +395,20 @@ describe("FlowService (Integration)", () => {
         id: jumpTargetLabelId,
         labelId: jumpTargetLabelId,
         fileName: "file_b.rpy",
+        wordCount: 0, // jump_target has only a JUMP line — not counted
       });
+
+      // Verify wordCount from DIALOGUE and NARRATION content
+      // (JUMP/MENU/VISUAL lines are excluded from word counting).
+      const menuNode = result.nodes.find((n) => n.labelName === "menu_label");
+      expect(menuNode).toBeDefined();
+      expect(menuNode?.wordCount).toBe(6); // NARRATION "The hero stands before a choice" = 6 words
+
+      const targetNode = result.nodes.find(
+        (n) => n.labelName === "target_label"
+      );
+      expect(targetNode).toBeDefined();
+      expect(targetNode?.wordCount).toBe(5); // DIALOGUE "I will find the truth" = 5 words
     });
 
     it("should create CHOICE edges from MENU lines with menuOptions", async () => {

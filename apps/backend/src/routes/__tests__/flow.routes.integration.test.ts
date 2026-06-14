@@ -391,6 +391,29 @@ describe("FlowRoutes (Integration)", () => {
       const edgeTypes = body.edges.map((e: { type: string }) => e.type);
       expect(edgeTypes).toContain("NATURAL");
       expect(edgeTypes).toContain("JUMP");
+
+      // Verify wordCount aggregation on nodes (computed from DIALOGUE
+      // and NARRATION content only; JUMP/MENU lines excluded).
+      // intro: NARRATION "Intro text" = 2 words; JUMP line excluded.
+      const introNode = body.nodes.find(
+        (n: { id: string }) => n.id === testLabelId1
+      );
+      expect(introNode).toBeDefined();
+      expect(introNode.wordCount).toBe(2);
+
+      // scene_two: NARRATION "Scene two text" = 3 words; MENU excluded.
+      const sceneTwoNode = body.nodes.find(
+        (n: { id: string }) => n.id === testLabelId2
+      );
+      expect(sceneTwoNode).toBeDefined();
+      expect(sceneTwoNode.wordCount).toBe(3);
+
+      // scene_three: NARRATION "Scene three text" = 3 words.
+      const sceneThreeNode = body.nodes.find(
+        (n: { id: string }) => n.id === testLabelId3
+      );
+      expect(sceneThreeNode).toBeDefined();
+      expect(sceneThreeNode.wordCount).toBe(3);
     });
   });
 

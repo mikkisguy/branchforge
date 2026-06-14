@@ -1,0 +1,1 @@
+ALTER TABLE "label_lines" DROP COLUMN "word_count";

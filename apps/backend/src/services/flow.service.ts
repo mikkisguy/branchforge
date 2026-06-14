@@ -98,6 +98,7 @@ export async function getFlowGraph(
     sequenceOrder: row.sequenceOrder,
     labelNumber: row.labelNumber,
     characterIds: [],
+    wordCount: 0,
   }));
 
   // Fetch all label_lines for this project's labels
@@ -246,21 +247,36 @@ export async function getFlowGraph(
 
   // Aggregate speaker characters per label (deduplicated, stable order).
   // Drives the character-appears filter in the flow graph UI.
+  // Also aggregate word counts per label for the node tooltip.
   const speakersByLabel = new Map<string, Set<string>>();
+  const wordCountByLabel = new Map<string, number>();
   for (const line of linesRows) {
-    if (!line.speakerId) continue;
-    let set = speakersByLabel.get(line.labelId);
-    if (!set) {
-      set = new Set();
-      speakersByLabel.set(line.labelId, set);
+    if (line.speakerId) {
+      let set = speakersByLabel.get(line.labelId);
+      if (!set) {
+        set = new Set();
+        speakersByLabel.set(line.labelId, set);
+      }
+      set.add(line.speakerId);
     }
-    set.add(line.speakerId);
+    // Count words from text-bearing line types. The `word_count` column
+    // on label_lines has no database trigger to populate it, so we compute
+    // from the `content` field at query time.
+    if (line.contentType === "DIALOGUE" || line.contentType === "NARRATION") {
+      const trimmed = line.content?.trim();
+      const words = trimmed ? trimmed.split(/\s+/).length : 0;
+      wordCountByLabel.set(
+        line.labelId,
+        (wordCountByLabel.get(line.labelId) ?? 0) + words
+      );
+    }
   }
   for (const node of nodes) {
     const set = speakersByLabel.get(node.id);
     if (set) {
       node.characterIds = Array.from(set).sort();
     }
+    node.wordCount = wordCountByLabel.get(node.id) ?? 0;
   }
 
   return { nodes, edges };

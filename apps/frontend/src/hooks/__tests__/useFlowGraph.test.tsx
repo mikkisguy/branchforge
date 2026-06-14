@@ -52,6 +52,7 @@ const mockNodes: FlowNode[] = [
     sequenceOrder: 1,
     labelNumber: 1,
     characterIds: [],
+    wordCount: 0,
   },
 ];
 

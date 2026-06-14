@@ -22,6 +22,7 @@ const mockFlowNodes: FlowNode[] = [
     sequenceOrder: 1,
     labelNumber: 1,
     characterIds: [],
+    wordCount: 0,
   },
   {
     id: "node-2",
@@ -34,6 +35,7 @@ const mockFlowNodes: FlowNode[] = [
     sequenceOrder: 2,
     labelNumber: 2,
     characterIds: [],
+    wordCount: 0,
   },
 ];
 
@@ -70,6 +72,7 @@ describe("buildRouteColorMap", () => {
         sequenceOrder: 3,
         labelNumber: 3,
         characterIds: [],
+        wordCount: 0,
       },
     ];
     const map = buildRouteColorMap(nodes);
@@ -90,6 +93,7 @@ describe("buildRouteColorMap", () => {
       sequenceOrder: i + 1,
       labelNumber: i + 1,
       characterIds: [],
+      wordCount: 0,
     }));
     const map = buildRouteColorMap(nodes);
     expect(map.size).toBe(10);
@@ -344,6 +348,8 @@ describe("layoutNodes", () => {
       status: "DRAFT",
       fileName: "act_i.rpy",
       routeColor: "#3b82f6",
+      wordCount: 0,
+      characterIds: [],
     });
 
     expect(nodes[1].data).toEqual({
@@ -354,6 +360,8 @@ describe("layoutNodes", () => {
       status: "REVIEW",
       fileName: "act_i.rpy",
       routeColor: "#ef4444",
+      wordCount: 0,
+      characterIds: [],
     });
   });
 
@@ -404,6 +412,7 @@ describe("layoutNodes — ROUTE mode", () => {
       sequenceOrder: 2,
       labelNumber: 2,
       characterIds: [],
+      wordCount: 0,
     },
     {
       id: "n-heroine-b-1",
@@ -416,6 +425,7 @@ describe("layoutNodes — ROUTE mode", () => {
       sequenceOrder: 1,
       labelNumber: 1,
       characterIds: [],
+      wordCount: 0,
     },
     {
       id: "n-unassigned",
@@ -428,6 +438,7 @@ describe("layoutNodes — ROUTE mode", () => {
       sequenceOrder: 1,
       labelNumber: 1,
       characterIds: [],
+      wordCount: 0,
     },
     {
       id: "n-unassigned-2",
@@ -440,6 +451,7 @@ describe("layoutNodes — ROUTE mode", () => {
       sequenceOrder: 2,
       labelNumber: 2,
       characterIds: [],
+      wordCount: 0,
     },
     {
       id: "n-common-1",
@@ -452,6 +464,7 @@ describe("layoutNodes — ROUTE mode", () => {
       sequenceOrder: 1,
       labelNumber: 1,
       characterIds: [],
+      wordCount: 0,
     },
     {
       id: "n-heroine-a-1",
@@ -464,6 +477,7 @@ describe("layoutNodes — ROUTE mode", () => {
       sequenceOrder: 1,
       labelNumber: 1,
       characterIds: [],
+      wordCount: 0,
     },
   ];
 
@@ -572,6 +586,7 @@ describe("layoutNodes — FILE mode", () => {
       sequenceOrder: 2,
       labelNumber: 2,
       characterIds: [],
+      wordCount: 0,
     },
     {
       id: "f-b-1",
@@ -584,6 +599,7 @@ describe("layoutNodes — FILE mode", () => {
       sequenceOrder: 1,
       labelNumber: 1,
       characterIds: [],
+      wordCount: 0,
     },
     {
       id: "f-a-1",
@@ -596,6 +612,7 @@ describe("layoutNodes — FILE mode", () => {
       sequenceOrder: 1,
       labelNumber: 1,
       characterIds: [],
+      wordCount: 0,
     },
     {
       id: "f-empty-name",
@@ -608,6 +625,7 @@ describe("layoutNodes — FILE mode", () => {
       sequenceOrder: 1,
       labelNumber: 1,
       characterIds: [],
+      wordCount: 0,
     },
     {
       id: "f-empty-name-2",
@@ -620,6 +638,7 @@ describe("layoutNodes — FILE mode", () => {
       sequenceOrder: 2,
       labelNumber: 2,
       characterIds: [],
+      wordCount: 0,
     },
   ];
 
@@ -683,6 +702,7 @@ describe("layoutNodes — mode switching", () => {
       sequenceOrder: 1,
       labelNumber: 1,
       characterIds: [],
+      wordCount: 0,
     },
     {
       id: "switch-2",
@@ -695,6 +715,7 @@ describe("layoutNodes — mode switching", () => {
       sequenceOrder: 2,
       labelNumber: 2,
       characterIds: [],
+      wordCount: 0,
     },
   ];
 

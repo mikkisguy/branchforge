@@ -330,6 +330,13 @@
       "when": 1781374904562,
       "tag": "0046_tricky_richard_fisk",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1781454763360,
+      "tag": "0047_slimy_gargoyle",
+      "breakpoints": true
     }
   ]
 }

@@ -18,7 +18,11 @@ import {
 import "@xyflow/react/dist/style.css";
 import { RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { LabelNodeMemo, type LabelNodeData } from "./LabelNode";
+import {
+  LabelNodeMemo,
+  type LabelNodeData,
+  type CharacterAppearance,
+} from "./LabelNode";
 import { LayoutModeSelector } from "./LayoutModeSelector";
 import { useFlowGraph } from "@/hooks/useFlowGraph";
 import { useFlowGraphLayout } from "@/hooks/useFlowGraphLayout";
@@ -49,6 +53,10 @@ interface FlowGraphProps {
 const nodeTypes = {
   label: LabelNodeMemo,
 };
+
+// Stable empty array for nodes with no character appearances, so the
+// `sameData` reference check doesn't thrash on re-renders.
+const EMPTY_CHARACTERS: CharacterAppearance[] = [];
 
 function sameData(a: unknown, b: unknown): boolean {
   if (a === b) return true;
@@ -239,27 +247,56 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
     [flowNodes, flowEdges, routeColorMap, savedPositions, layoutMode]
   );
 
-  // Decorate each layout node with the view-state flags so LabelNode can
-  // render dimmed/highlighted styles. Done as a separate pass so the
-  // position-comparison effect downstream can short-circuit on the
-  // (cheap) data-shape equality check.
+  // Resolve character IDs to display info for each node's tooltip. The
+  // arrays are memoized per-node so the `sameData` equality check in the
+  // sync effect doesn't flag a change on every render.
+  const charactersByNodeId = useMemo(() => {
+    const charMap = new Map(characters.map((c) => [c.id, c]));
+    const result = new Map<string, CharacterAppearance[]>();
+    for (const node of flowNodes) {
+      const resolved: CharacterAppearance[] = [];
+      for (const id of node.characterIds) {
+        const c = charMap.get(id);
+        if (c) {
+          resolved.push({
+            id: c.id,
+            name: c.displayName || c.name,
+            color: c.color,
+            avatarUrl: c.avatarUrl,
+          });
+        }
+      }
+      result.set(node.id, resolved.length > 0 ? resolved : EMPTY_CHARACTERS);
+    }
+    return result;
+  }, [flowNodes, characters]);
+
+  // Decorate each layout node with the view-state flags and resolved
+  // character info so LabelNode can render dimmed/highlighted styles and
+  // the hover tooltip. Done as a separate pass so the position-comparison
+  // effect downstream can short-circuit on the (cheap) data-shape equality
+  // check.
   const decoratedNodes = useMemo(() => {
     return layoutNodesResult.map((n) => {
-      const view = nodeViewState.get(n.id);
-      if (!view) return n;
       const data = n.data as LabelNodeData;
+      const view = nodeViewState.get(n.id);
+      const dimmed = view?.dimmed ?? false;
+      const highlighted = view?.highlighted ?? false;
+      const nodeCharacters = charactersByNodeId.get(n.id)!;
+
       if (
-        data.dimmed === view.dimmed &&
-        data.highlighted === view.highlighted
+        data.dimmed === dimmed &&
+        data.highlighted === highlighted &&
+        data.characters === nodeCharacters
       ) {
         return n;
       }
       return {
         ...n,
-        data: { ...data, dimmed: view.dimmed, highlighted: view.highlighted },
+        data: { ...data, dimmed, highlighted, characters: nodeCharacters },
       };
     });
-  }, [layoutNodesResult, nodeViewState]);
+  }, [layoutNodesResult, nodeViewState, charactersByNodeId]);
 
   const layoutEdgesResult = useMemo(() => buildEdges(flowEdges), [flowEdges]);
 
