@@ -12,82 +12,16 @@
  */
 
 import crypto from "node:crypto";
-import ipaddr from "ipaddr.js";
+import {
+  isPrivateOrLocalHostname,
+  isAllowedGitlabHost,
+} from "../lib/ip-validation.js";
 
 // GitLab PAT format: glpat- followed by alphanumeric characters, hyphens, underscores, and dots
 const GITLAB_PAT_REGEX = /^glpat-[a-zA-Z0-9_.-]+$/;
 
 // Default GitLab URL
 const DEFAULT_GITLAB_URL = "https://gitlab.com";
-
-// Allowed GitLab hostnames (can be extended with environment variable)
-const ALLOWED_GITLAB_HOSTS = new Set([
-  "gitlab.com",
-  ...(process.env.ALLOWED_GITLAB_HOSTS?.split(",").map((h) =>
-    h.trim().toLowerCase()
-  ) || []),
-]);
-
-/**
- * Check if an IP address is within a private/internal range using ipaddr.js
- * Handles both IPv4 and IPv6, including IPv4-mapped IPv6 addresses
- */
-function isPrivateIP(ip: string): boolean {
-  try {
-    const addr = ipaddr.parse(ip);
-    let range = addr.range();
-
-    // Handle IPv4-mapped IPv6 addresses (::ffff:x.x.x.x)
-    // These need to be converted to IPv4 and checked
-    if (range === "ipv4Mapped" && addr instanceof ipaddr.IPv6) {
-      const ipv4 = addr.toIPv4Address();
-      range = ipv4.range();
-    }
-
-    // Check for private/reserved ranges
-    return (
-      range === "loopback" ||
-      range === "private" ||
-      range === "linkLocal" ||
-      range === "reserved" ||
-      range === "broadcast" ||
-      range === "carrierGradeNat"
-    );
-  } catch {
-    // Not a valid IP address
-    return false;
-  }
-}
-
-/**
- * Check if a hostname is an IP address and whether it's private/internal
- * Handles IPv4 and IPv6 (including bracketed format like [::1])
- */
-function isPrivateOrLocalHostname(hostname: string): boolean {
-  // Check for IPv6 addresses in URL format (bracketed)
-  // URL.hostname returns [::1] for IPv6 addresses
-  const ipv6InBrackets = hostname.match(/^\[([:0-9a-fA-F]+)\]$/);
-  if (ipv6InBrackets) {
-    return isPrivateIP(ipv6InBrackets[1]);
-  }
-
-  // Check for literal IP addresses (both IPv4 and unbracketed IPv6)
-  if (ipaddr.isValid(hostname)) {
-    return isPrivateIP(hostname);
-  }
-
-  // Check for localhost or local domain names
-  const lowerHostname = hostname.toLowerCase();
-  if (
-    lowerHostname === "localhost" ||
-    lowerHostname.endsWith(".local") ||
-    lowerHostname.endsWith(".localhost")
-  ) {
-    return true;
-  }
-
-  return false;
-}
 
 /**
  * Validate and sanitize a GitLab URL to prevent SSRF attacks
@@ -100,8 +34,8 @@ export function validateGitLabUrl(gitlabUrl?: string): string {
   try {
     const parsedUrl = new URL(urlToCheck);
 
-    // Only allow http and https schemes
-    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+    // Only allow HTTPS
+    if (parsedUrl.protocol !== "https:") {
       return DEFAULT_GITLAB_URL;
     }
 
@@ -113,14 +47,11 @@ export function validateGitLabUrl(gitlabUrl?: string): string {
     }
 
     // Check if hostname is in the allowlist
-    if (!ALLOWED_GITLAB_HOSTS.has(hostname)) {
-      // Not in allowlist - reject to prevent SSRF
-      // Users can add trusted self-hosted domains via ALLOWED_GITLAB_HOSTS env var
+    if (!isAllowedGitlabHost(hostname)) {
       return DEFAULT_GITLAB_URL;
     }
 
-    // Remove username, password, port, and path from URL
-    // Return only protocol + hostname (port 80/443 is implied by protocol)
+    // Return only protocol + hostname
     return `${parsedUrl.protocol}//${parsedUrl.hostname}`;
   } catch {
     // For URL parsing errors, fall back to default

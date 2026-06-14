@@ -32,8 +32,11 @@ import {
   getUploadsDirPath,
 } from "./lib/storage.js";
 
+// Fastify instance with explicit body limit for JSON/text bodies.
+// Note: multipart plugin has its own `fileSize` limit that overrides per-part.
 const server = Fastify({
   logger: true,
+  bodyLimit: 5 * 1024 * 1024, // 5 MB; align with multipart limits
 });
 
 // Plugins
@@ -79,6 +82,14 @@ const sessionStore = createDrizzleSessionStore({
   // Clean up expired sessions every hour
   cleanupInterval: 60 * 60 * 1000,
 });
+
+// Require an explicit SESSION_SECRET in production. The hardcoded fallback
+// would otherwise make sessions forgeable to anyone with source access.
+if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+  throw new Error(
+    "SESSION_SECRET environment variable must be set in production"
+  );
+}
 
 await server.register(session, {
   secret:

@@ -42,6 +42,10 @@ import {
 } from "../services/gitlab-sync.service.js";
 import {
   importProjectSchema,
+  updateGitLabFileContentSchema,
+  exportToGitlabSchema,
+  type UpdateGitLabFileContentInput,
+  type ExportToGitlabInput,
   type ImportProjectInput,
   isValidConflictResolution,
 } from "../lib/validation.js";
@@ -114,20 +118,14 @@ interface ImportBody {
   conflictResolution: ConflictResolution;
 }
 
-interface ExportBody {
-  projectId: string;
-  branch?: string;
-  commitMessage?: string;
-}
+// ExportBody replaced by ExportToGitlabInput from validation.ts
 
 interface DetectConflictsBody {
   projectId: string;
   branch: string;
 }
 
-interface UpdateFileContentBody {
-  content: string;
-}
+// UpdateFileContentBody replaced by UpdateGitLabFileContentInput from validation.ts
 
 // ============================================================================
 // Route Handlers
@@ -589,21 +587,16 @@ async function listFilesHandler(
  * Export to GitLab
  *
  * POST /api/gitlab/export
- * Body: { projectId: string, branch?: string, commitMessage?: string }
+ * Body: { projectId: string, branch?: string, commitMessage: string }
  *
  * Exports BranchForge scenes to GitLab as RPY files.
  */
 async function exportHandler(
-  request: FastifyRequest<{ Body: ExportBody }>,
+  request: FastifyRequest<{ Body: ExportToGitlabInput }>,
   reply: FastifyReply
 ): Promise<void> {
   const userId = getAuthenticatedUserId(request);
   const { projectId, branch, commitMessage } = request.body;
-
-  if (!projectId) {
-    reply.status(400).send({ error: "projectId is required" });
-    return;
-  }
 
   try {
     const operation = await exportToGitlab(
@@ -920,7 +913,7 @@ async function getGitLabFilesHandler(
 async function updateGitLabFileHandler(
   request: FastifyRequest<{
     Params: { fileId: string };
-    Body: UpdateFileContentBody;
+    Body: UpdateGitLabFileContentInput;
   }>,
   reply: FastifyReply
 ): Promise<void> {
@@ -1045,10 +1038,11 @@ export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
   );
 
   // Sync operations (require auth)
-  fastify.post<{ Body: ExportBody }>(
+  fastify.post<{ Body: ExportToGitlabInput }>(
     "/gitlab/export",
     {
       onRequest: [authenticate],
+      preValidation: validateBody(exportToGitlabSchema),
     },
     exportHandler
   );
@@ -1104,10 +1098,14 @@ export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
     getGitLabFilesHandler
   );
 
-  fastify.put<{ Params: { fileId: string }; Body: UpdateFileContentBody }>(
+  fastify.put<{
+    Params: { fileId: string };
+    Body: UpdateGitLabFileContentInput;
+  }>(
     "/gitlab/files/:fileId",
     {
       onRequest: [authenticate],
+      preValidation: validateBody(updateGitLabFileContentSchema),
     },
     updateGitLabFileHandler
   );
