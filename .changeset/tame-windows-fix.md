@@ -4,4 +4,4 @@
 "@branchforge/backend": minor
 ---
 
-Updated packages and enhanced security including an added CSRF protection
+Enhanced security with CSRF protection and other improvements.
