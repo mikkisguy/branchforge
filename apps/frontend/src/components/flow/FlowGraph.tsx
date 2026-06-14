@@ -18,7 +18,11 @@ import {
 import "@xyflow/react/dist/style.css";
 import { RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { LabelNodeMemo, type LabelNodeData } from "./LabelNode";
+import {
+  LabelNodeMemo,
+  type LabelNodeData,
+  type CharacterAppearance,
+} from "./LabelNode";
 import { LayoutModeSelector } from "./LayoutModeSelector";
 import { useFlowGraph } from "@/hooks/useFlowGraph";
 import { useFlowGraphLayout } from "@/hooks/useFlowGraphLayout";
@@ -49,6 +53,10 @@ interface FlowGraphProps {
 const nodeTypes = {
   label: LabelNodeMemo,
 };
+
+// Stable empty array for nodes with no character appearances, so the
+// `sameData` reference check doesn't thrash on re-renders.
+const EMPTY_CHARACTERS: CharacterAppearance[] = [];
 
 function sameData(a: unknown, b: unknown): boolean {
   if (a === b) return true;
@@ -150,47 +158,45 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
     return options;
   }, [flowNodes, routeConfigs]);
 
+  // Prune any selected filter keys that no longer exist after a refetch —
+  // e.g. a route that was deleted server-side, or a character that was
+  // removed. Derived during render (not via a useEffect + setState) to
+  // avoid an extra render cascade.
+  const validFilters = useMemo(() => {
+    const validRouteKeys = new Set<string | null>();
+    for (const opt of routeOptions) validRouteKeys.add(opt.key);
+    const validCharacterIds = new Set(characters.map((c) => c.id));
+
+    const nextRouteKeys = new Set<string | null>();
+    for (const k of filters.routeKeys) {
+      if (validRouteKeys.has(k)) nextRouteKeys.add(k);
+    }
+    const nextCharacterIds = new Set<string>();
+    for (const id of filters.characterIds) {
+      if (validCharacterIds.has(id)) nextCharacterIds.add(id);
+    }
+
+    if (
+      nextRouteKeys.size === filters.routeKeys.size &&
+      nextCharacterIds.size === filters.characterIds.size
+    ) {
+      return filters;
+    }
+    return {
+      ...filters,
+      routeKeys: nextRouteKeys,
+      characterIds: nextCharacterIds,
+    };
+  }, [filters, routeOptions, characters]);
+
   // Apply the active filter set. The filter is purely a *view* on the data:
   // the layout, edges, and saved positions all still reference the
   // original (unfiltered) node set so re-running the predicate is cheap
   // and doesn't disturb the user's drag positions.
   const filteredNodes = useMemo(
-    () => filterFlowNodes(flowNodes, filters),
-    [flowNodes, filters]
+    () => filterFlowNodes(flowNodes, validFilters),
+    [flowNodes, validFilters]
   );
-
-  // Prune any selected filter keys that no longer exist after a refetch —
-  // e.g. a route that was deleted server-side, or a character that was
-  // removed. The filter UI only offers the current options, so leaving
-  // stale entries in `filters` would silently filter against nothing
-  // (a Set containing only non-existent keys matches no nodes, which is
-  // indistinguishable to the user from a "real" empty result).
-  useEffect(() => {
-    const validRouteKeys = new Set<string | null>();
-    for (const opt of routeOptions) validRouteKeys.add(opt.key);
-    const validCharacterIds = new Set(characters.map((c) => c.id));
-    setFilters((prev) => {
-      const nextRouteKeys = new Set<string | null>();
-      for (const k of prev.routeKeys) {
-        if (validRouteKeys.has(k)) nextRouteKeys.add(k);
-      }
-      const nextCharacterIds = new Set<string>();
-      for (const id of prev.characterIds) {
-        if (validCharacterIds.has(id)) nextCharacterIds.add(id);
-      }
-      if (
-        nextRouteKeys.size === prev.routeKeys.size &&
-        nextCharacterIds.size === prev.characterIds.size
-      ) {
-        return prev;
-      }
-      return {
-        ...prev,
-        routeKeys: nextRouteKeys,
-        characterIds: nextCharacterIds,
-      };
-    });
-  }, [routeOptions, characters, setFilters]);
   const filteredNodeIds = useMemo(
     () => new Set(filteredNodes.map((n) => n.id)),
     [filteredNodes]
@@ -201,7 +207,7 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
   // search query is also `highlighted` (additive on top of `dimmed`).
   const trimmedQuery = filters.searchQuery.trim();
   const nodeViewState = useMemo(() => {
-    const filtersActive = !isFlowFilterEmpty(filters);
+    const filtersActive = !isFlowFilterEmpty(validFilters);
     const trimmed = trimmedQuery.toLowerCase();
     const map = new Map<string, { dimmed: boolean; highlighted: boolean }>();
     for (const node of flowNodes) {
@@ -225,7 +231,7 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
       });
     }
     return map;
-  }, [flowNodes, filteredNodeIds, filters, trimmedQuery]);
+  }, [flowNodes, filteredNodeIds, validFilters, trimmedQuery]);
 
   const layoutNodesResult = useMemo(
     () =>
@@ -239,27 +245,56 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
     [flowNodes, flowEdges, routeColorMap, savedPositions, layoutMode]
   );
 
-  // Decorate each layout node with the view-state flags so LabelNode can
-  // render dimmed/highlighted styles. Done as a separate pass so the
-  // position-comparison effect downstream can short-circuit on the
-  // (cheap) data-shape equality check.
+  // Resolve character IDs to display info for each node's tooltip. The
+  // arrays are memoized per-node so the `sameData` equality check in the
+  // sync effect doesn't flag a change on every render.
+  const charactersByNodeId = useMemo(() => {
+    const charMap = new Map(characters.map((c) => [c.id, c]));
+    const result = new Map<string, CharacterAppearance[]>();
+    for (const node of flowNodes) {
+      const resolved: CharacterAppearance[] = [];
+      for (const id of node.characterIds) {
+        const c = charMap.get(id);
+        if (c) {
+          resolved.push({
+            id: c.id,
+            name: c.displayName || c.name,
+            color: c.color,
+            avatarUrl: c.avatarUrl,
+          });
+        }
+      }
+      result.set(node.id, resolved.length > 0 ? resolved : EMPTY_CHARACTERS);
+    }
+    return result;
+  }, [flowNodes, characters]);
+
+  // Decorate each layout node with the view-state flags and resolved
+  // character info so LabelNode can render dimmed/highlighted styles and
+  // the hover tooltip. Done as a separate pass so the position-comparison
+  // effect downstream can short-circuit on the (cheap) data-shape equality
+  // check.
   const decoratedNodes = useMemo(() => {
     return layoutNodesResult.map((n) => {
-      const view = nodeViewState.get(n.id);
-      if (!view) return n;
       const data = n.data as LabelNodeData;
+      const view = nodeViewState.get(n.id);
+      const dimmed = view?.dimmed ?? false;
+      const highlighted = view?.highlighted ?? false;
+      const nodeCharacters = charactersByNodeId.get(n.id)!;
+
       if (
-        data.dimmed === view.dimmed &&
-        data.highlighted === view.highlighted
+        data.dimmed === dimmed &&
+        data.highlighted === highlighted &&
+        data.characters === nodeCharacters
       ) {
         return n;
       }
       return {
         ...n,
-        data: { ...data, dimmed: view.dimmed, highlighted: view.highlighted },
+        data: { ...data, dimmed, highlighted, characters: nodeCharacters },
       };
     });
-  }, [layoutNodesResult, nodeViewState]);
+  }, [layoutNodesResult, nodeViewState, charactersByNodeId]);
 
   const layoutEdgesResult = useMemo(() => buildEdges(flowEdges), [flowEdges]);
 
@@ -386,7 +421,7 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
         />
         <div className="absolute top-4 left-4 z-10">
           <FlowGraphFiltersPanel
-            filters={filters}
+            filters={validFilters}
             onChange={setFilters}
             routes={routeOptions}
             routeColors={routeColorMap}

@@ -114,13 +114,14 @@ export function useFlowGraphLayout(projectId: string, mode: FlowLayoutMode) {
   // Debounced save on node drag stop
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // react-doctor-disable-next-line react-doctor/exhaustive-deps
   useEffect(() => {
     return () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, []);
+  }, [debounceTimerRef]);
 
   const handleNodeDragStop = useCallback(
     (nodePositions: FlowGraphPositions) => {

@@ -19,6 +19,7 @@ const baseNode: FlowNode = {
   sequenceOrder: 1,
   labelNumber: 1,
   characterIds: [],
+  wordCount: 0,
 };
 
 const nodes: FlowNode[] = [

@@ -161,6 +161,8 @@ function buildReactFlowNode(
       routeKey: flowNode.routeKey,
       status: flowNode.status,
       fileName: flowNode.fileName,
+      characterIds: flowNode.characterIds,
+      wordCount: flowNode.wordCount,
       routeColor,
     },
     style: {

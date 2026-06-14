@@ -66,7 +66,6 @@ export const labelLines = pgTable(
       }>
     >(),
 
-    wordCount: integer("word_count"), // Computed on insert/update via trigger
     demoPlaceholderColor: text("demo_placeholder_color"), // Black screen fallback hex
     demoNotes: text("demo_notes"), // "Character enters from left"
 

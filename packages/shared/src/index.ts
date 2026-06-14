@@ -906,6 +906,11 @@ export interface FlowNode {
    * `label_lines` rows for the label). Used by the flow-graph filters.
    */
   characterIds: string[];
+  /**
+   * Total word count across all `label_lines` for this label. Used by
+   * the flow-graph node tooltip.
+   */
+  wordCount: number;
 }
 
 /**
