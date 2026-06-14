@@ -44,38 +44,6 @@ interface RateLimitResponse extends ErrorResponse {
 }
 
 // ============================================================================
-// Helpers
-// ============================================================================
-
-/**
- * Extract client IP from request, handling various proxy configurations
- */
-function getClientIp(request: FastifyRequest): string {
-  // Check for forwarded IP (behind proxy/load balancer)
-  const forwarded = request.headers["x-forwarded-for"];
-  if (typeof forwarded === "string") {
-    return forwarded.split(",")[0].trim();
-  }
-  if (Array.isArray(forwarded)) {
-    return forwarded[0].trim();
-  }
-
-  // Check for other common headers
-  const cfConnectingIp = request.headers["cf-connecting-ip"];
-  if (typeof cfConnectingIp === "string") {
-    return cfConnectingIp;
-  }
-
-  const realIp = request.headers["x-real-ip"];
-  if (typeof realIp === "string") {
-    return realIp;
-  }
-
-  // Fall back to direct connection IP
-  return request.ip;
-}
-
-// ============================================================================
 // Error Handling
 // ============================================================================
 
@@ -153,10 +121,10 @@ async function loginHandler(
   request: FastifyRequest<{ Body: LoginBody }>,
   reply: FastifyReply
 ): Promise<void> {
-  const clientIp = getClientIp(request);
+  const clientIp = request.ip;
 
   // Check rate limit
-  const rateLimit = checkRateLimit(clientIp);
+  const rateLimit = checkRateLimit(`login:${clientIp}`);
   if (!rateLimit.allowed) {
     reply.status(429).send({
       error: "Too many login attempts. Please try again later.",
@@ -188,7 +156,7 @@ async function loginHandler(
   }
 
   // Successful login - clear rate limit for this IP
-  clearRateLimit(clientIp);
+  clearRateLimit(`login:${clientIp}`);
 
   // Log successful login
   logInfo(LogEventType.AUTH_LOGIN_SUCCESS, {

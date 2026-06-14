@@ -974,6 +974,94 @@ export const exportToGitlabSchema = z
 export type ExportToGitlabInput = z.infer<typeof exportToGitlabSchema>;
 
 // ============================================================================
+// Additional GitLab Schemas (Wave 2 — VULN-003)
+// ============================================================================
+
+/**
+ * Shared branch-name validation. Mirrors the rules in
+ * createGitLabIntegrationSchema.branchName: only the characters
+ * /^[a-zA-Z0-9_/$.-]+$/, no leading `-` or `/`, no trailing `/`, no `..`.
+ */
+const gitBranchNameSchema = z
+  .string()
+  .min(1, "Branch is required")
+  .max(255, "Branch name is too long")
+  .regex(/^[a-zA-Z0-9_/$.-]+$/, "Branch name contains invalid characters")
+  .refine(
+    (name) =>
+      !name.startsWith("-") &&
+      !name.startsWith("/") &&
+      !name.endsWith("/") &&
+      !name.includes(".."),
+    "Branch name cannot start with '-' or '/', end with '/', or contain '..'"
+  );
+
+/** Validate a GitLab token + optional URL. Reuse for /gitlab/validate and /gitlab/integration. */
+export const validateGitlabTokenSchema = z
+  .object({
+    token: nonEmptyStringSchema.min(20, "Access token is too short").max(100),
+    gitlabUrl: z.string().url().optional(),
+  })
+  .strict();
+
+export type ValidateGitlabTokenInput = z.infer<
+  typeof validateGitlabTokenSchema
+>;
+
+/** GET /gitlab/files/:projectId query: branch required. */
+export const gitLabFileListQuerySchema = z
+  .object({
+    branch: gitBranchNameSchema,
+  })
+  .strict();
+
+export type GitLabFileListQuery = z.infer<typeof gitLabFileListQuerySchema>;
+
+/** POST /gitlab/link body. */
+export const linkRepositorySchema = z
+  .object({
+    projectId: uuidSchema,
+    gitlabProjectId: z
+      .number()
+      .int()
+      .positive("GitLab project ID must be positive"),
+    branch: gitBranchNameSchema.optional(),
+  })
+  .strict();
+
+export type LinkRepositoryInput = z.infer<typeof linkRepositorySchema>;
+
+/** POST /gitlab/import body. */
+export const importFromGitlabSchema = z
+  .object({
+    projectId: uuidSchema,
+    branch: gitBranchNameSchema,
+    conflictResolution: conflictResolutionSchema,
+  })
+  .strict();
+
+export type ImportFromGitlabInput = z.infer<typeof importFromGitlabSchema>;
+
+/** POST /gitlab/detect-conflicts body. */
+export const detectConflictsSchema = z
+  .object({
+    projectId: uuidSchema,
+    branch: gitBranchNameSchema,
+  })
+  .strict();
+
+export type DetectConflictsInput = z.infer<typeof detectConflictsSchema>;
+
+/** GET /gitlab/operations/:operationId params. */
+export const operationIdParamsSchema = z
+  .object({
+    operationId: uuidSchema,
+  })
+  .strict();
+
+export type OperationIdParams = z.infer<typeof operationIdParamsSchema>;
+
+// ============================================================================
 // Export/Import Schemas
 // ============================================================================
 

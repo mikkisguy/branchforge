@@ -7,7 +7,11 @@
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { authenticate } from "../middleware/auth.middleware.js";
-import { validateBody } from "../middleware/validation.middleware.js";
+import {
+  validateBody,
+  validateQuery,
+  validateParams,
+} from "../middleware/validation.middleware.js";
 import {
   NotFoundError,
   ConflictError,
@@ -38,16 +42,27 @@ import {
   getSyncOperation,
   listSyncOperations,
   detectConflicts,
-  type ConflictResolution,
 } from "../services/gitlab-sync.service.js";
 import {
   importProjectSchema,
   updateGitLabFileContentSchema,
   exportToGitlabSchema,
+  validateGitlabTokenSchema,
+  gitLabFileListQuerySchema,
+  linkRepositorySchema,
+  importFromGitlabSchema,
+  detectConflictsSchema,
+  operationIdParamsSchema,
+  projectIdParamsSchema,
   type UpdateGitLabFileContentInput,
   type ExportToGitlabInput,
   type ImportProjectInput,
-  isValidConflictResolution,
+  type ValidateGitlabTokenInput,
+  type GitLabFileListQuery,
+  type LinkRepositoryInput,
+  type ImportFromGitlabInput,
+  type DetectConflictsInput,
+  type OperationIdParams,
 } from "../lib/validation.js";
 
 /**
@@ -60,34 +75,6 @@ function getAuthenticatedUserId(request: FastifyRequest): string {
   return request.user!.id;
 }
 
-/**
- * Extract client IP from request, handling various proxy configurations
- */
-function getClientIp(request: FastifyRequest): string {
-  // Check for forwarded IP (behind proxy/load balancer)
-  const forwarded = request.headers["x-forwarded-for"];
-  if (typeof forwarded === "string") {
-    return forwarded.split(",")[0].trim();
-  }
-  if (Array.isArray(forwarded)) {
-    return forwarded[0].trim();
-  }
-
-  // Check for other common headers
-  const cfConnectingIp = request.headers["cf-connecting-ip"];
-  if (typeof cfConnectingIp === "string") {
-    return cfConnectingIp;
-  }
-
-  const xRealIp = request.headers["x-real-ip"];
-  if (typeof xRealIp === "string") {
-    return xRealIp;
-  }
-
-  // Fall back to socket address
-  return request.ip;
-}
-
 // ============================================================================
 // Constants
 // ============================================================================
@@ -96,35 +83,12 @@ function getClientIp(request: FastifyRequest): string {
 // Types
 // ============================================================================
 
-interface ValidateTokenBody {
-  token: string;
-  gitlabUrl?: string;
-}
-
-interface StoreIntegrationBody {
-  token: string;
-  gitlabUrl?: string;
-}
-
-interface LinkRepositoryBody {
-  projectId: string;
-  gitlabProjectId: number;
-  branch?: string;
-}
-
-interface ImportBody {
-  projectId: string;
-  branch: string;
-  conflictResolution: ConflictResolution;
-}
-
+// ValidateTokenBody replaced by ValidateGitlabTokenInput from validation.ts
+// StoreIntegrationBody replaced by ValidateGitlabTokenInput from validation.ts
+// LinkRepositoryBody replaced by LinkRepositoryInput from validation.ts
+// ImportBody replaced by ImportFromGitlabInput from validation.ts
 // ExportBody replaced by ExportToGitlabInput from validation.ts
-
-interface DetectConflictsBody {
-  projectId: string;
-  branch: string;
-}
-
+// DetectConflictsBody replaced by DetectConflictsInput from validation.ts
 // UpdateFileContentBody replaced by UpdateGitLabFileContentInput from validation.ts
 
 // ============================================================================
@@ -140,13 +104,13 @@ interface DetectConflictsBody {
  * Validates a GitLab Personal Access Token before storing it.
  */
 async function validateTokenHandler(
-  request: FastifyRequest<{ Body: ValidateTokenBody }>,
+  request: FastifyRequest<{ Body: ValidateGitlabTokenInput }>,
   reply: FastifyReply
 ): Promise<void> {
-  const clientIp = getClientIp(request);
+  const clientIp = request.ip;
 
   // Check rate limit to prevent brute-force/DoS attacks
-  const rateLimit = checkRateLimit(clientIp);
+  const rateLimit = checkRateLimit(`gitlabValidate:${clientIp}`);
   if (!rateLimit.allowed) {
     request.log.warn(
       { ip: clientIp, retryAfter: rateLimit.retryAfter },
@@ -160,11 +124,6 @@ async function validateTokenHandler(
   }
 
   const { token, gitlabUrl } = request.body;
-
-  if (!token) {
-    reply.status(400).send({ error: "Token is required" });
-    return;
-  }
 
   try {
     const username = await validateGitlabPAT(token, gitlabUrl);
@@ -196,16 +155,11 @@ async function validateTokenHandler(
  * Encrypts and stores the user's GitLab PAT.
  */
 async function storeIntegrationHandler(
-  request: FastifyRequest<{ Body: StoreIntegrationBody }>,
+  request: FastifyRequest<{ Body: ValidateGitlabTokenInput }>,
   reply: FastifyReply
 ): Promise<void> {
   const userId = getAuthenticatedUserId(request);
   const { token, gitlabUrl } = request.body;
-
-  if (!token) {
-    reply.status(400).send({ error: "Token is required" });
-    return;
-  }
 
   try {
     // Validate token before storing
@@ -346,18 +300,11 @@ async function listProjectsHandler(
  * Links a BranchForge project to a GitLab repository.
  */
 async function linkRepositoryHandler(
-  request: FastifyRequest<{ Body: LinkRepositoryBody }>,
+  request: FastifyRequest<{ Body: LinkRepositoryInput }>,
   reply: FastifyReply
 ): Promise<void> {
   const userId = getAuthenticatedUserId(request);
   const { projectId, gitlabProjectId, branch = "main" } = request.body;
-
-  if (!projectId || !gitlabProjectId) {
-    reply
-      .status(400)
-      .send({ error: "projectId and gitlabProjectId are required" });
-    return;
-  }
 
   try {
     // Fetch GitLab project details to get the repository name
@@ -533,18 +480,13 @@ async function listBranchesHandler(
 async function listFilesHandler(
   request: FastifyRequest<{
     Params: { projectId: string };
-    Querystring: { branch?: string };
+    Querystring: GitLabFileListQuery;
   }>,
   reply: FastifyReply
 ): Promise<void> {
   const userId = getAuthenticatedUserId(request);
   const { projectId } = request.params;
   const { branch } = request.query;
-
-  if (!branch) {
-    reply.status(400).send({ error: "Branch is required" });
-    return;
-  }
 
   try {
     const files = await listRpyFiles(projectId, branch, userId);
@@ -633,21 +575,11 @@ async function exportHandler(
  * Imports RPY files from GitLab to BranchForge.
  */
 async function importHandler(
-  request: FastifyRequest<{ Body: ImportBody }>,
+  request: FastifyRequest<{ Body: ImportFromGitlabInput }>,
   reply: FastifyReply
 ): Promise<void> {
   const userId = getAuthenticatedUserId(request);
   const { projectId, branch, conflictResolution } = request.body;
-
-  if (!projectId || !branch) {
-    reply.status(400).send({ error: "projectId and branch are required" });
-    return;
-  }
-
-  if (!isValidConflictResolution(conflictResolution)) {
-    reply.status(400).send({ error: "Invalid conflictResolution" });
-    return;
-  }
 
   try {
     const operation = await importFromGitlab(
@@ -687,10 +619,10 @@ async function importProjectHandler(
   request: FastifyRequest<{ Body: ImportProjectInput }>,
   reply: FastifyReply
 ): Promise<void> {
-  const clientIp = getClientIp(request);
+  const clientIp = request.ip;
 
   // Check rate limit to prevent abuse
-  const rateLimit = checkRateLimit(clientIp);
+  const rateLimit = checkRateLimit(`gitlabImportProject:${clientIp}`);
   if (!rateLimit.allowed) {
     request.log.warn(
       { ip: clientIp, retryAfter: rateLimit.retryAfter },
@@ -754,7 +686,7 @@ async function importProjectHandler(
  * Returns the status of a sync operation.
  */
 async function getOperationHandler(
-  request: FastifyRequest<{ Params: { operationId: string } }>,
+  request: FastifyRequest<{ Params: OperationIdParams }>,
   reply: FastifyReply
 ): Promise<void> {
   const userId = getAuthenticatedUserId(request);
@@ -833,16 +765,11 @@ async function listOperationsHandler(
  * Detects conflicts between local and remote versions.
  */
 async function detectConflictsHandler(
-  request: FastifyRequest<{ Body: DetectConflictsBody }>,
+  request: FastifyRequest<{ Body: DetectConflictsInput }>,
   reply: FastifyReply
 ): Promise<void> {
   const userId = getAuthenticatedUserId(request);
   const { projectId, branch } = request.body;
-
-  if (!projectId || !branch) {
-    reply.status(400).send({ error: "projectId and branch are required" });
-    return;
-  }
 
   try {
     const result = await detectConflicts(projectId, userId, branch);
@@ -958,7 +885,13 @@ async function updateGitLabFileHandler(
 
 export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
   // Token validation (no auth required)
-  fastify.post("/gitlab/validate", validateTokenHandler);
+  fastify.post<{ Body: ValidateGitlabTokenInput }>(
+    "/gitlab/validate",
+    {
+      preValidation: validateBody(validateGitlabTokenSchema),
+    },
+    validateTokenHandler
+  );
 
   // Integration management (require auth)
   fastify.get(
@@ -969,10 +902,11 @@ export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
     getIntegrationHandler
   );
 
-  fastify.post<{ Body: StoreIntegrationBody }>(
+  fastify.post<{ Body: ValidateGitlabTokenInput }>(
     "/gitlab/integration",
     {
       onRequest: [authenticate],
+      preValidation: validateBody(validateGitlabTokenSchema),
     },
     storeIntegrationHandler
   );
@@ -994,10 +928,11 @@ export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
   );
 
   // Repository linking (require auth)
-  fastify.post<{ Body: LinkRepositoryBody }>(
+  fastify.post<{ Body: LinkRepositoryInput }>(
     "/gitlab/link",
     {
       onRequest: [authenticate],
+      preValidation: validateBody(linkRepositorySchema),
     },
     linkRepositoryHandler
   );
@@ -1006,6 +941,7 @@ export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
     "/gitlab/unlink/:projectId",
     {
       onRequest: [authenticate],
+      preValidation: validateParams(projectIdParamsSchema),
     },
     unlinkRepositoryHandler
   );
@@ -1022,17 +958,22 @@ export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
     "/gitlab/branches/:projectId",
     {
       onRequest: [authenticate],
+      preValidation: validateParams(projectIdParamsSchema),
     },
     listBranchesHandler
   );
 
   fastify.get<{
     Params: { projectId: string };
-    Querystring: { branch?: string };
+    Querystring: GitLabFileListQuery;
   }>(
     "/gitlab/files/:projectId",
     {
       onRequest: [authenticate],
+      preValidation: [
+        validateParams(projectIdParamsSchema),
+        validateQuery(gitLabFileListQuerySchema),
+      ],
     },
     listFilesHandler
   );
@@ -1047,10 +988,11 @@ export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
     exportHandler
   );
 
-  fastify.post<{ Body: ImportBody }>(
+  fastify.post<{ Body: ImportFromGitlabInput }>(
     "/gitlab/import",
     {
       onRequest: [authenticate],
+      preValidation: validateBody(importFromGitlabSchema),
     },
     importHandler
   );
@@ -1064,10 +1006,11 @@ export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
     importProjectHandler
   );
 
-  fastify.get<{ Params: { operationId: string } }>(
+  fastify.get<{ Params: OperationIdParams }>(
     "/gitlab/operations/:operationId",
     {
       onRequest: [authenticate],
+      preValidation: validateParams(operationIdParamsSchema),
     },
     getOperationHandler
   );
@@ -1076,14 +1019,16 @@ export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
     "/gitlab/projects/:projectId/operations",
     {
       onRequest: [authenticate],
+      preValidation: validateParams(projectIdParamsSchema),
     },
     listOperationsHandler
   );
 
-  fastify.post<{ Body: DetectConflictsBody }>(
+  fastify.post<{ Body: DetectConflictsInput }>(
     "/gitlab/detect-conflicts",
     {
       onRequest: [authenticate],
+      preValidation: validateBody(detectConflictsSchema),
     },
     detectConflictsHandler
   );
@@ -1094,6 +1039,7 @@ export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
     "/gitlab/files/stored/:projectId",
     {
       onRequest: [authenticate],
+      preValidation: validateParams(projectIdParamsSchema),
     },
     getGitLabFilesHandler
   );

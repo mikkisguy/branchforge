@@ -37,6 +37,13 @@ import {
 const server = Fastify({
   logger: true,
   bodyLimit: 5 * 1024 * 1024, // 5 MB; align with multipart limits
+  // Trust only loopback addresses when reading X-Forwarded-For.
+  // This makes `request.ip` return the real client IP behind a single
+  // reverse proxy on the same host, while preventing clients from
+  // spoofing their IP via headers when no trusted proxy is present.
+  // Operators deploying behind multiple proxy hops should override
+  // this via the TRUST_PROXY environment variable or Fastify config.
+  trustProxy: "loopback",
 });
 
 // Plugins
