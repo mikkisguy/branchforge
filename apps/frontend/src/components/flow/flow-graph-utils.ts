@@ -305,7 +305,7 @@ function isNullishRowKey<K>(key: K): boolean {
 }
 
 function sortRowsNullishFirst<K>(keys: K[]): K[] {
-  return [...keys].sort((a, b) => {
+  return keys.toSorted((a, b) => {
     const aNull = isNullishRowKey(a);
     const bNull = isNullishRowKey(b);
     if (aNull && !bNull) return -1;

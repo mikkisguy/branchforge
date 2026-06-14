@@ -69,7 +69,8 @@ export function useExports(projectId: string | undefined): UseExportsReturn {
     },
   });
 
-  // Download export mutation
+  // Download export mutation (side-effect only; no list query to invalidate)
+  // react-doctor-disable-next-line react-doctor/query-mutation-missing-invalidation
   const downloadExportMutation = useMutation({
     mutationFn: async (exportId: string) => {
       if (!projectId) throw new Error("Project ID is required");
