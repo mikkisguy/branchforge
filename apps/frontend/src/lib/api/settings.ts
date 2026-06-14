@@ -1,5 +1,7 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
+import { getCsrfHeader } from "./csrf";
+
 interface ApiError {
   error: string;
 }
@@ -13,11 +15,13 @@ async function request<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
+  const csrfHeader = getCsrfHeader(options.method ?? "GET", options.body);
   const response = await fetch(url, {
     ...options,
     credentials: "include",
     headers: {
-      "Content-Type": "application/json",
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(csrfHeader ?? {}),
       ...options.headers,
     },
   });

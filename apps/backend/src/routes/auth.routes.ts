@@ -15,6 +15,7 @@ import {
 } from "../services/rate-limiter.service.js";
 import { authenticate } from "../middleware/auth.middleware.js";
 import type { PublicUser } from "../middleware/auth.middleware.js";
+import { generateCsrfToken } from "../middleware/csrf.middleware.js";
 import { logSecurityEvent, logInfo, LogEventType } from "../lib/logger.js";
 
 // ============================================================================
@@ -33,6 +34,17 @@ interface LoginBody {
 
 interface SuccessResponse {
   user: PublicUser;
+  /**
+   * CSRF token issued at login time. The client should send this back
+   * as the `x-csrf-token` header on subsequent state-changing requests.
+   * For convenience, the same value is also available via
+   * `GET /csrf-token` for clients that prefer lazy loading.
+   *
+   * MAY be absent when the endpoint doesn't create or reference a
+   * session (e.g. /register does not create a session, /me may not
+   * have a token yet in upgrade scenarios).
+   */
+  csrfToken?: string;
 }
 
 interface ErrorResponse {
@@ -172,10 +184,17 @@ async function loginHandler(
   // Store user in the new session
   request.session.user = user;
 
+  // Mint a fresh CSRF token bound to this session. Returned in the
+  // response body so the client can start using it immediately, and
+  // persisted in the session so it survives across requests and is
+  // available via GET /csrf-token.
+  const csrfToken = generateCsrfToken();
+  request.session.csrfToken = csrfToken;
+
   // Add rate limit headers
   reply.header("X-RateLimit-Remaining", rateLimit.remainingAttempts.toString());
 
-  reply.status(200).send({ user } as SuccessResponse);
+  reply.status(200).send({ user, csrfToken } as SuccessResponse);
 }
 
 /**
@@ -206,10 +225,52 @@ async function getMeHandler(
   request: FastifyRequest,
   reply: FastifyReply
 ): Promise<void> {
-  // User is attached to request by authenticate middleware
   const user = request.user!;
 
-  reply.status(200).send({ user } as SuccessResponse);
+  // Return the session's CSRF token alongside the user so the client
+  // can cache it immediately. This eliminates the race condition where
+  // a state-changing request (e.g. logout) fires before the eager
+  // loadCsrfToken() call in the useAuth useEffect completes.
+  // Defensive: mint a token if the session doesn't have one yet.
+  if (
+    !request.session.csrfToken ||
+    typeof request.session.csrfToken !== "string"
+  ) {
+    request.session.csrfToken = generateCsrfToken();
+  }
+
+  reply
+    .status(200)
+    .send({ user, csrfToken: request.session.csrfToken } as SuccessResponse);
+}
+
+/**
+ * Get the current session's CSRF token.
+ *
+ * GET /csrf-token
+ * Requires authentication.
+ *
+ * The token is generated on login and persisted in the session. This
+ * endpoint exists so clients can lazily fetch the token after the page
+ * has loaded (e.g. when restoring a session from a cookie) without
+ * having to log in again. The token is the same value issued at login
+ * and is also returned in the login response body.
+ */
+async function getCsrfTokenHandler(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  // Defensive: if for some reason the session was created without a
+  // CSRF token (e.g. an upgrade scenario where a pre-CSRF session is
+  // still active), mint one now.
+  if (
+    !request.session.csrfToken ||
+    typeof request.session.csrfToken !== "string"
+  ) {
+    request.session.csrfToken = generateCsrfToken();
+  }
+
+  reply.status(200).send({ csrfToken: request.session.csrfToken });
 }
 
 // ============================================================================
@@ -217,11 +278,17 @@ async function getMeHandler(
 // ============================================================================
 
 export async function authRoutes(fastify: FastifyInstance): Promise<void> {
-  // Public routes
+  // Public routes - /register and /login do NOT require a CSRF token
+  // (the user has no session yet). /register does not currently create
+  // a session; the client must /login to obtain a CSRF token.
   fastify.post("/register", registerHandler);
   fastify.post("/login", loginHandler);
 
-  // Protected routes
+  // Protected routes. Logout is a state-changing request and the
+  // global CSRF preValidation hook (registered in index.ts) requires
+  // a valid x-csrf-token header on it.
   fastify.post("/logout", { onRequest: authenticate }, logoutHandler);
   fastify.get("/me", { onRequest: authenticate }, getMeHandler);
+  // GET /csrf-token is a safe method, no CSRF check required.
+  fastify.get("/csrf-token", { onRequest: authenticate }, getCsrfTokenHandler);
 }

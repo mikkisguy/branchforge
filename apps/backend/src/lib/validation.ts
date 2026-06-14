@@ -1279,17 +1279,14 @@ export function validateData<T extends z.ZodTypeAny>(
  * Session data validation
  * Sanitizes and validates session data with whitelisted keys and size limits
  */
-// TODO(security): Implement a CSRF double-submit token middleware. Today
-// the app relies solely on SameSite=Lax cookies for CSRF defense, which
-// is acceptable in modern browsers but does not cover sub-domain
-// cookie-tossing or non-browser clients. When implementing, add a
-// `csrfToken` field to the session on login/registration, expose a
-// /csrf-token endpoint, and require an `x-csrf-token` header on
-// state-changing requests from non-safe content types. See GitHub
-// issue #206 for tracking.
+// CSRF double-submit token support: the `csrfToken` key is whitelisted
+// here so the session-store Zod schema accepts it. The token itself is
+// minted by `generateCsrfToken` in `middleware/csrf.middleware.ts` on
+// login and validated globally by `validateCsrfToken` (registered as a
+// preValidation hook in `index.ts`). See GitHub issue #206.
 export const ALLOWED_SESSION_KEYS = [
   "user",
-  "csrfToken", // reserved for future CSRF middleware (see TODO above)
+  "csrfToken", // issued on login, sent back as x-csrf-token on state-changing requests
   "flash",
   "returnTo",
 ] as const;

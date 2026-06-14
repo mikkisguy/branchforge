@@ -5,6 +5,8 @@
  * credentials management, and response type safety.
  */
 
+import { getCsrfHeader } from "./csrf";
+
 export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 export interface ApiError {
@@ -180,6 +182,33 @@ async function fetchInternal(
       headers = hasContentType
         ? headers
         : { "Content-Type": "application/json", ...(headers ?? {}) };
+    }
+  }
+
+  // CSRF: append x-csrf-token for unsafe methods when a token is cached.
+  // See lib/api/csrf.ts and GitHub issue #206.
+  const csrfHeader = getCsrfHeader(options.method ?? "GET", options.body);
+  if (csrfHeader) {
+    if (headers instanceof Headers) {
+      if (!headers.has("x-csrf-token")) {
+        Object.entries(csrfHeader).forEach(([k, v]) => {
+          (headers as Headers).set(k, v);
+        });
+      }
+    } else if (Array.isArray(headers)) {
+      const hasCsrf = headers.some(
+        ([key]) => key.toLowerCase() === "x-csrf-token"
+      );
+      if (!hasCsrf) {
+        headers = [...headers, ...Object.entries(csrfHeader)];
+      }
+    } else {
+      const hasCsrf =
+        headers &&
+        Object.keys(headers).some(
+          (key) => key.toLowerCase() === "x-csrf-token"
+        );
+      headers = hasCsrf ? headers : { ...(headers ?? {}), ...csrfHeader };
     }
   }
 
