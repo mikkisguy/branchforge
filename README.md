@@ -101,7 +101,7 @@ Recharts       - Charts and visualizations
 
 ### Backend
 
-```
+```text
 Fastify 5      - Fast, low-overhead web framework
 TypeScript     - Full stack type safety
 PostgreSQL 16  - Robust relational database
@@ -115,7 +115,7 @@ Vitest         - Fast, modern testing
 
 ### Shared
 
-```
+```text
 Zod schemas    - Runtime validation shared with frontend
 TypeScript     - Type-safe contracts across the stack
 ```

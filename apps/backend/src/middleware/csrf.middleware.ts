@@ -209,10 +209,10 @@ export async function validateCsrfToken(
  */
 function safeEqualStrings(expected: string, provided: string): boolean {
   const expectedBuf = Buffer.from(expected, "utf8");
+  const providedBuf = Buffer.from(provided, "utf8");
   // If lengths differ, run timingSafeEqual against a same-length buffer
   // so the work done is independent of the caller's input length.
-  if (expectedBuf.length !== provided.length) {
-    const providedBuf = Buffer.from(provided, "utf8");
+  if (expectedBuf.length !== providedBuf.length) {
     // Force same-length comparison by padding/truncating the provided
     // buffer to the expected length. The result is discarded; this is
     // purely to consume a constant amount of time.
@@ -221,5 +221,5 @@ function safeEqualStrings(expected: string, provided: string): boolean {
     timingSafeEqual(expectedBuf, padded);
     return false;
   }
-  return timingSafeEqual(expectedBuf, Buffer.from(provided, "utf8"));
+  return timingSafeEqual(expectedBuf, providedBuf);
 }

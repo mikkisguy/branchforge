@@ -23,8 +23,6 @@
  * See GitHub issue #206 for the design.
  */
 
-import { API_BASE } from "./client";
-
 /**
  * Methods that mutate server state and therefore require a CSRF header.
  * Listed explicitly to match the backend hook in `csrf.middleware.ts`.
@@ -38,10 +36,17 @@ const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 export const CSRF_HEADER = "x-csrf-token";
 
 /**
- * Endpoint that returns the session's current CSRF token. Must be
- * auth-required; the backend route is at `${API_BASE}/csrf-token`.
+ * Construct the CSRF token endpoint URL.
+ *
+ * Computed lazily to avoid a circular import with `client.ts`:
+ * `client.ts` imports `getCsrfHeader` from this module, so importing
+ * `API_BASE` here at module-evaluation time creates a temporal-dead-zone
+ * cycle. Reading `import.meta.env` inline breaks that cycle.
  */
-const CSRF_TOKEN_ENDPOINT = `${API_BASE}/csrf-token`;
+function getCsrfTokenEndpoint(): string {
+  const apiBase = import.meta.env.VITE_API_BASE_URL ?? "/api";
+  return `${apiBase}/csrf-token`;
+}
 
 // ============================================================================
 // Token Storage
@@ -90,12 +95,17 @@ export function clearCsrfToken(): void {
 export async function loadCsrfToken(
   fetchImpl: typeof fetch = fetch
 ): Promise<string | null> {
+  // Short-circuit: if a valid token is already cached, return it
+  // immediately to avoid a redundant GET /csrf-token request.
+  if (currentToken) {
+    return currentToken;
+  }
   if (inflightFetch) {
     return inflightFetch;
   }
   inflightFetch = (async () => {
     try {
-      const response = await fetchImpl(CSRF_TOKEN_ENDPOINT, {
+      const response = await fetchImpl(getCsrfTokenEndpoint(), {
         method: "GET",
         credentials: "include",
       });

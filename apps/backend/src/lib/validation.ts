@@ -1000,7 +1000,7 @@ const gitBranchNameSchema = z
 export const validateGitlabTokenSchema = z
   .object({
     token: nonEmptyStringSchema.min(20, "Access token is too short").max(100),
-    gitlabUrl: z.string().url().optional(),
+    gitlabUrl: gitlabUrlSchema.optional(),
   })
   .strict();
 

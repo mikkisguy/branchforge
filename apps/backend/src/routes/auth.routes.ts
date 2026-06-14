@@ -241,6 +241,7 @@ async function getMeHandler(
 
   reply
     .status(200)
+    .header("Cache-Control", "no-store")
     .send({ user, csrfToken: request.session.csrfToken } as SuccessResponse);
 }
 
@@ -270,7 +271,10 @@ async function getCsrfTokenHandler(
     request.session.csrfToken = generateCsrfToken();
   }
 
-  reply.status(200).send({ csrfToken: request.session.csrfToken });
+  reply
+    .status(200)
+    .header("Cache-Control", "no-store")
+    .send({ csrfToken: request.session.csrfToken });
 }
 
 // ============================================================================

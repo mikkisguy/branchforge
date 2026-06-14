@@ -51,8 +51,10 @@ export function validateGitLabUrl(gitlabUrl?: string): string {
       return DEFAULT_GITLAB_URL;
     }
 
-    // Return only protocol + hostname
-    return `${parsedUrl.protocol}//${parsedUrl.hostname}`;
+    // Return protocol + hostname, preserving the port if specified
+    return parsedUrl.port
+      ? `${parsedUrl.protocol}//${parsedUrl.hostname}:${parsedUrl.port}`
+      : `${parsedUrl.protocol}//${parsedUrl.hostname}`;
   } catch {
     // For URL parsing errors, fall back to default
     return DEFAULT_GITLAB_URL;

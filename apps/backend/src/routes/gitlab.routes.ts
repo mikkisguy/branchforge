@@ -54,6 +54,7 @@ import {
   detectConflictsSchema,
   operationIdParamsSchema,
   projectIdParamsSchema,
+  fileIdParamsSchema,
   type UpdateGitLabFileContentInput,
   type ExportToGitlabInput,
   type ImportProjectInput,
@@ -1051,7 +1052,10 @@ export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
     "/gitlab/files/:fileId",
     {
       onRequest: [authenticate],
-      preValidation: validateBody(updateGitLabFileContentSchema),
+      preValidation: [
+        validateParams(fileIdParamsSchema),
+        validateBody(updateGitLabFileContentSchema),
+      ],
     },
     updateGitLabFileHandler
   );
