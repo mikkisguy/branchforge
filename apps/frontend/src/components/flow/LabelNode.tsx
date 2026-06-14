@@ -242,9 +242,12 @@ function LabelNodeTooltip({ data }: NodeProps<LabelNodeType>) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    const dialog = nodeRef.current?.closest("dialog");
-    if (dialog) setPortalContainer(dialog);
+  const setNodeRef = useCallback((el: HTMLDivElement | null) => {
+    nodeRef.current = el;
+    if (el) {
+      const dialog = el.closest("dialog");
+      if (dialog) setPortalContainer(dialog);
+    }
   }, []);
 
   // Continuously sync the tooltip's screen position to the node's bounding
@@ -269,10 +272,15 @@ function LabelNodeTooltip({ data }: NodeProps<LabelNodeType>) {
       top = Math.max(VIEWPORT_PADDING, rect.top - TOOLTIP_GAP - 220);
     }
 
-    setPosition({ top, left });
+    setPosition((prev) => {
+      if (prev.top === top && prev.left === left) return prev;
+      return { top, left };
+    });
   }, []);
 
   // rAF loop — only active while visible — keeps position in sync.
+  // react-doctor-disable-next-line react-doctor/prefer-use-effect-event
+  // react-doctor-disable-next-line react-doctor/no-cascading-set-state
   useEffect(() => {
     if (!visible) return;
     let rafId: number;
@@ -302,17 +310,25 @@ function LabelNodeTooltip({ data }: NodeProps<LabelNodeType>) {
     setVisible(false);
   }, []);
 
-  // Clean up timer on unmount.
+  // react-doctor-disable-next-line react-doctor/exhaustive-deps
   useEffect(() => {
     return () => {
       if (timerRef.current !== null) clearTimeout(timerRef.current);
     };
-  }, []);
+  }, [timerRef]);
 
   return (
     <>
+      {/* This is a ReactFlow custom node — a <button> would break Handle
+           composition. The role conveys the interactive nature (tooltip on
+           focus/hover). */}
+      {/* react-doctor-disable-next-line react-doctor/prefer-tag-over-role */}
       <div
-        ref={nodeRef}
+        ref={setNodeRef}
+        role="button"
+        tabIndex={0}
+        onFocus={handleMouseEnter}
+        onBlur={handleMouseLeave}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         className={cn(

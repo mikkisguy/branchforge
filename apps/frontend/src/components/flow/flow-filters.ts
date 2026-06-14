@@ -103,9 +103,10 @@ export function filterFlowNodes(
 
     if (filters.characterIds.size > 0) {
       if (node.characterIds.length === 0) return false;
+      const nodeCharSet = new Set(node.characterIds);
       let matched = false;
       for (const id of filters.characterIds) {
-        if (node.characterIds.includes(id)) {
+        if (nodeCharSet.has(id)) {
           matched = true;
           break;
         }

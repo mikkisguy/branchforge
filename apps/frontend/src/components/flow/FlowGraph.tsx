@@ -158,47 +158,45 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
     return options;
   }, [flowNodes, routeConfigs]);
 
+  // Prune any selected filter keys that no longer exist after a refetch —
+  // e.g. a route that was deleted server-side, or a character that was
+  // removed. Derived during render (not via a useEffect + setState) to
+  // avoid an extra render cascade.
+  const validFilters = useMemo(() => {
+    const validRouteKeys = new Set<string | null>();
+    for (const opt of routeOptions) validRouteKeys.add(opt.key);
+    const validCharacterIds = new Set(characters.map((c) => c.id));
+
+    const nextRouteKeys = new Set<string | null>();
+    for (const k of filters.routeKeys) {
+      if (validRouteKeys.has(k)) nextRouteKeys.add(k);
+    }
+    const nextCharacterIds = new Set<string>();
+    for (const id of filters.characterIds) {
+      if (validCharacterIds.has(id)) nextCharacterIds.add(id);
+    }
+
+    if (
+      nextRouteKeys.size === filters.routeKeys.size &&
+      nextCharacterIds.size === filters.characterIds.size
+    ) {
+      return filters;
+    }
+    return {
+      ...filters,
+      routeKeys: nextRouteKeys,
+      characterIds: nextCharacterIds,
+    };
+  }, [filters, routeOptions, characters]);
+
   // Apply the active filter set. The filter is purely a *view* on the data:
   // the layout, edges, and saved positions all still reference the
   // original (unfiltered) node set so re-running the predicate is cheap
   // and doesn't disturb the user's drag positions.
   const filteredNodes = useMemo(
-    () => filterFlowNodes(flowNodes, filters),
-    [flowNodes, filters]
+    () => filterFlowNodes(flowNodes, validFilters),
+    [flowNodes, validFilters]
   );
-
-  // Prune any selected filter keys that no longer exist after a refetch —
-  // e.g. a route that was deleted server-side, or a character that was
-  // removed. The filter UI only offers the current options, so leaving
-  // stale entries in `filters` would silently filter against nothing
-  // (a Set containing only non-existent keys matches no nodes, which is
-  // indistinguishable to the user from a "real" empty result).
-  useEffect(() => {
-    const validRouteKeys = new Set<string | null>();
-    for (const opt of routeOptions) validRouteKeys.add(opt.key);
-    const validCharacterIds = new Set(characters.map((c) => c.id));
-    setFilters((prev) => {
-      const nextRouteKeys = new Set<string | null>();
-      for (const k of prev.routeKeys) {
-        if (validRouteKeys.has(k)) nextRouteKeys.add(k);
-      }
-      const nextCharacterIds = new Set<string>();
-      for (const id of prev.characterIds) {
-        if (validCharacterIds.has(id)) nextCharacterIds.add(id);
-      }
-      if (
-        nextRouteKeys.size === prev.routeKeys.size &&
-        nextCharacterIds.size === prev.characterIds.size
-      ) {
-        return prev;
-      }
-      return {
-        ...prev,
-        routeKeys: nextRouteKeys,
-        characterIds: nextCharacterIds,
-      };
-    });
-  }, [routeOptions, characters, setFilters]);
   const filteredNodeIds = useMemo(
     () => new Set(filteredNodes.map((n) => n.id)),
     [filteredNodes]
@@ -209,7 +207,7 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
   // search query is also `highlighted` (additive on top of `dimmed`).
   const trimmedQuery = filters.searchQuery.trim();
   const nodeViewState = useMemo(() => {
-    const filtersActive = !isFlowFilterEmpty(filters);
+    const filtersActive = !isFlowFilterEmpty(validFilters);
     const trimmed = trimmedQuery.toLowerCase();
     const map = new Map<string, { dimmed: boolean; highlighted: boolean }>();
     for (const node of flowNodes) {
@@ -233,7 +231,7 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
       });
     }
     return map;
-  }, [flowNodes, filteredNodeIds, filters, trimmedQuery]);
+  }, [flowNodes, filteredNodeIds, validFilters, trimmedQuery]);
 
   const layoutNodesResult = useMemo(
     () =>
@@ -423,7 +421,7 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
         />
         <div className="absolute top-4 left-4 z-10">
           <FlowGraphFiltersPanel
-            filters={filters}
+            filters={validFilters}
             onChange={setFilters}
             routes={routeOptions}
             routeColors={routeColorMap}
