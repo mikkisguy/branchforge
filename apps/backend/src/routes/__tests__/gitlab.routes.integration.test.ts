@@ -207,7 +207,7 @@ describe("GitLab Routes (Integration)", () => {
         url: "/api/gitlab/validate",
         payload: {
           token: "glpat-test12345678901234",
-          gitlabUrl: "https://gitlab.test",
+          gitlabUrl: "https://gitlab.com",
         },
       });
 
@@ -223,7 +223,7 @@ describe("GitLab Routes (Integration)", () => {
         method: "POST",
         url: "/api/gitlab/validate",
         payload: {
-          gitlabUrl: "https://gitlab.test",
+          gitlabUrl: "https://gitlab.com",
         },
       });
 
@@ -284,7 +284,7 @@ describe("GitLab Routes (Integration)", () => {
         url: "/api/gitlab/integration",
         payload: {
           token: "glpat-test12345678901234",
-          gitlabUrl: "https://gitlab.test",
+          gitlabUrl: "https://gitlab.com",
         },
       });
 
@@ -299,7 +299,7 @@ describe("GitLab Routes (Integration)", () => {
         method: "POST",
         url: "/api/gitlab/integration",
         payload: {
-          gitlabUrl: "https://gitlab.test",
+          gitlabUrl: "https://gitlab.com",
         },
       });
 

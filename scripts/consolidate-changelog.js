@@ -154,6 +154,18 @@ function consolidateChangelogs() {
 
   fs.writeFileSync(rootChangelogPath, rootChangelog);
   console.log(`✅ Consolidated changelog for v${version}`);
+
+  // Update the version badge in README.md to match the new version
+  const readmePath = "README.md";
+  if (fs.existsSync(readmePath)) {
+    let readme = fs.readFileSync(readmePath, "utf-8");
+    readme = readme.replace(
+      /version-\d+\.\d+\.\d+-yellow/,
+      `version-${version}-yellow`
+    );
+    fs.writeFileSync(readmePath, readme);
+    console.log(`✅ Updated README.md version badge to v${version}`);
+  }
 }
 
 consolidateChangelogs();
