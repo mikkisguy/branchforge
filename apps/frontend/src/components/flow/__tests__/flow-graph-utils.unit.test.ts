@@ -190,7 +190,7 @@ describe("buildEdges", () => {
     expect(choiceEdge.animated).toBe(false);
   });
 
-  it("NATURAL edges get slate color, width 1, and animated: true", () => {
+  it("NATURAL edges get slate color, width 1, and are not animated", () => {
     const edges = buildEdges(mockFlowEdges);
     const naturalEdge = edges[2];
     expect(naturalEdge.style).toEqual(
@@ -200,7 +200,7 @@ describe("buildEdges", () => {
       })
     );
     expect((naturalEdge.markerEnd as { color: string }).color).toBe("#475569");
-    expect(naturalEdge.animated).toBe(true);
+    expect(naturalEdge.animated).toBe(false);
   });
 
   it("edge label is preserved (for CHOICE edges)", () => {

@@ -147,39 +147,45 @@ export function useAutosave<T>({
   const triggerSave = useCallback(async () => {
     clearSaveTimeout();
 
-    const dataToSave = pendingDataRef.current ?? data;
-    const currentHash = hashFn(dataToSave);
+    let dataToSave = pendingDataRef.current ?? data;
+    let currentHash = hashFn(dataToSave);
 
-    if (currentHash === savedHashRef.current) {
-      setSaveStatus("saved");
-      setIsDirty(false);
-      return true;
-    }
-
-    if (isSavingRef.current) {
-      const localPendingHash = currentHash;
-      const localPendingData = dataToSave;
-      const priorSavedHash = savedHashRef.current;
-      pendingHashRef.current = localPendingHash;
-      pendingDataRef.current = localPendingData;
-      // Only await when a save is actually in-flight; skip unnecessary
-      // microtask when the ref is null (defensive edge-case).
-      if (savePromiseRef.current) {
-        await savePromiseRef.current;
+    while (true) {
+      if (currentHash === savedHashRef.current) {
+        setSaveStatus("saved");
+        setIsDirty(false);
+        return true;
       }
-      if (savedHashRef.current !== priorSavedHash) {
+
+      if (isSavingRef.current) {
+        const localPendingHash = currentHash;
+        const localPendingData = dataToSave;
+        const priorSavedHash = savedHashRef.current;
         pendingHashRef.current = localPendingHash;
         pendingDataRef.current = localPendingData;
-        return triggerSave();
+        // Only await when a save is actually in-flight; skip unnecessary
+        // microtask when the ref is null (defensive edge-case).
+        if (savePromiseRef.current) {
+          await savePromiseRef.current;
+        }
+        if (savedHashRef.current !== priorSavedHash) {
+          // A concurrent save landed with newer data — re-stamp our pending
+          // refs and loop so the user-requested flush still happens.
+          pendingHashRef.current = localPendingHash;
+          pendingDataRef.current = localPendingData;
+          dataToSave = localPendingData;
+          currentHash = localPendingHash;
+          continue;
+        }
+        return true;
       }
-      return true;
-    }
 
-    pendingHashRef.current = currentHash;
-    const savePromise = performSave(dataToSave);
-    savePromiseRef.current = savePromise;
-    isSavingRef.current = true;
-    return await savePromise;
+      pendingHashRef.current = currentHash;
+      const savePromise = performSave(dataToSave);
+      savePromiseRef.current = savePromise;
+      isSavingRef.current = true;
+      return await savePromise;
+    }
   }, [data, hashFn, performSave, clearSaveTimeout]);
 
   /**
