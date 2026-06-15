@@ -98,7 +98,9 @@ export function getEdgeColor(type: string): string {
     case "JUMP":
       return "#f59e0b"; // amber
     case "CHOICE":
-      return "#3b82f6"; // blue
+      // The primary branching action — follow the active theme so the
+      // graph's main interaction color matches the rest of the app.
+      return "var(--theme-color)";
     case "NATURAL":
       return "#475569"; // slate-600
     default:

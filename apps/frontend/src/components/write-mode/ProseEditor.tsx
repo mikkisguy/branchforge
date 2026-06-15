@@ -722,7 +722,7 @@ export const ProseEditor = function ProseEditor({
             <span
               className={`px-2 py-0.4 rounded-full text-xs font-medium border shrink-0 ${
                 activeLabel.status === "FINAL"
-                  ? "bg-[var(--theme-color)]/20 text-[var(--theme-color)] border-[var(--theme-border)]"
+                  ? "bg-[var(--theme-final-color)]/20 text-[var(--theme-final-color)] border-[var(--theme-final-color)]/30"
                   : activeLabel.status === "REVIEW"
                     ? "bg-[var(--theme-review-color)]/20 text-[var(--theme-review-color)] border-[var(--theme-review-color)]/30"
                     : "bg-[var(--theme-draft-color)]/20 text-[var(--theme-draft-color)] border-[var(--theme-draft-color)]/30"

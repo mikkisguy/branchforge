@@ -58,16 +58,25 @@ export interface LabelNodeData {
 
 export type LabelNodeType = Node<LabelNodeData, "label">;
 
+// Status chips use a fixed vivid slate/amber/green palette instead of
+// tints of the theme CSS vars. On the dark slate-800 node those tints
+// wash out and make the statuses look near-identical (an earlier pass
+// with /30 tints left DRAFT and FINAL indistinguishable). Solid fills
+// keep DRAFT (grey), REVIEW (amber) and FINAL (green) instantly
+// distinguishable; each text color is tuned for contrast against its
+// fill. FINAL green is the app-wide convention (--theme-final-color,
+// set in ThemeContext); the dot references that var directly, while the
+// badge uses a darker emerald-600 fill so light chip text stays legible.
 const statusColors: Record<string, string> = {
-  DRAFT: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  REVIEW: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  FINAL: "bg-green-500/20 text-green-400 border-green-500/30",
+  DRAFT: "bg-slate-500 text-slate-50 border-slate-400",
+  REVIEW: "bg-amber-500 text-slate-950 border-amber-400",
+  FINAL: "bg-emerald-600 text-slate-50 border-emerald-500",
 };
 
 const statusDotColors: Record<string, string> = {
-  DRAFT: "bg-yellow-400",
-  REVIEW: "bg-blue-400",
-  FINAL: "bg-green-400",
+  DRAFT: "bg-slate-400",
+  REVIEW: "bg-amber-500",
+  FINAL: "bg-[var(--theme-final-color)]",
 };
 
 // ─── Tooltip constants ────────────────────────────────────────────────────

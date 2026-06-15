@@ -175,16 +175,18 @@ describe("buildEdges", () => {
     expect(jumpEdge.animated).toBe(false);
   });
 
-  it("CHOICE edges get blue color and width 2", () => {
+  it("CHOICE edges get the theme color and width 2", () => {
     const edges = buildEdges(mockFlowEdges);
     const choiceEdge = edges[1];
     expect(choiceEdge.style).toEqual(
       expect.objectContaining({
-        stroke: "#3b82f6",
+        stroke: "var(--theme-color)",
         strokeWidth: 2,
       })
     );
-    expect((choiceEdge.markerEnd as { color: string }).color).toBe("#3b82f6");
+    expect((choiceEdge.markerEnd as { color: string }).color).toBe(
+      "var(--theme-color)"
+    );
     expect(choiceEdge.animated).toBe(false);
   });
 
@@ -222,8 +224,8 @@ describe("getEdgeColor", () => {
     expect(getEdgeColor("JUMP")).toBe("#f59e0b");
   });
 
-  it('CHOICE returns "#3b82f6"', () => {
-    expect(getEdgeColor("CHOICE")).toBe("#3b82f6");
+  it('CHOICE returns "var(--theme-color)"', () => {
+    expect(getEdgeColor("CHOICE")).toBe("var(--theme-color)");
   });
 
   it('NATURAL returns "#475569"', () => {

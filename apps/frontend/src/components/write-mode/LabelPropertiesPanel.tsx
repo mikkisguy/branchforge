@@ -28,7 +28,7 @@ const panelVariants = cva(
 );
 
 const STATUS_COLORS = {
-  FINAL: "var(--theme-color)",
+  FINAL: "var(--theme-final-color)",
   REVIEW: "var(--theme-review-color)",
   DRAFT: "var(--theme-draft-color)",
 } as const;

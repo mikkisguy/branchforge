@@ -4,7 +4,7 @@ import type { ProjectFileNode } from "@/hooks/useProjectFiles";
 import type { LabelStatus } from "@branchforge/shared";
 
 const STATUS_COLORS: Record<LabelStatus, string> = {
-  FINAL: "var(--theme-color)",
+  FINAL: "var(--theme-final-color)",
   REVIEW: "var(--theme-review-color)",
   DRAFT: "var(--theme-draft-color)",
 };

@@ -13,6 +13,7 @@ export const themeConfigs: Record<ThemePalette, ThemeColors> = {
 const STATUS_COLORS = {
   review: "#f59e0b", // amber for review needed
   draft: "#64748b", // slate for draft/pending
+  final: "#10b981", // emerald for final/complete
 } as const;
 
 // Type guard to validate if a string is a valid ThemePalette
@@ -61,6 +62,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // Status colors for scene navigation
     root.style.setProperty("--theme-review-color", STATUS_COLORS.review);
     root.style.setProperty("--theme-draft-color", STATUS_COLORS.draft);
+    root.style.setProperty("--theme-final-color", STATUS_COLORS.final);
   }, [theme, colors]);
 
   const contextValue = useMemo(
