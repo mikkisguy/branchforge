@@ -20,6 +20,14 @@ import {
   type FlowCharacterLookup,
 } from "./flow-character-context";
 
+// Shared constant returned when no character IDs resolve, avoiding a
+// fresh empty-array allocation on every call. Frozen so any caller that
+// accidentally mutates the result (push/sort/etc.) throws immediately
+// rather than corrupting state across all consumers.
+const EMPTY_APPEARANCES: readonly CharacterAppearance[] = Object.freeze(
+  []
+) as readonly CharacterAppearance[];
+
 export function FlowCharacterProvider({
   characters,
   children,
@@ -31,7 +39,7 @@ export function FlowCharacterProvider({
     const map = new Map<string, Character>();
     for (const c of characters) map.set(c.id, c);
     return {
-      resolve(characterIds: readonly string[]): CharacterAppearance[] {
+      resolve(characterIds: readonly string[]): readonly CharacterAppearance[] {
         const resolved: CharacterAppearance[] = [];
         for (const id of characterIds) {
           const c = map.get(id);
@@ -44,7 +52,9 @@ export function FlowCharacterProvider({
             });
           }
         }
-        return resolved;
+        return resolved.length > 0
+          ? (resolved as readonly CharacterAppearance[])
+          : EMPTY_APPEARANCES;
       },
     };
   }, [characters]);

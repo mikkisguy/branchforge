@@ -177,7 +177,11 @@ export function useAutosave<T>({
           currentHash = localPendingHash;
           continue;
         }
-        return true;
+        // The concurrent save did not advance savedHashRef — it failed or
+        // saved identical data. Loop so our pending data is re-evaluated
+        // and (if still dirty) re-attempted instead of being silently
+        // dropped.
+        continue;
       }
 
       pendingHashRef.current = currentHash;

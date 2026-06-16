@@ -64,4 +64,53 @@ describe("useAutosave", () => {
     expect(result.current.saveStatus).toBe("saved");
     expect(result.current.isDirty).toBe(false);
   });
+
+  it("retries triggerSave when an in-flight save fails", async () => {
+    vi.useFakeTimers();
+
+    let rejectFirstSave: (() => void) | undefined;
+    const onSave = vi.fn().mockImplementation((value: string) => {
+      if (value === "first") {
+        return new Promise<void>((_, reject) => {
+          rejectFirstSave = () => reject(new Error("transient failure"));
+        });
+      }
+      return Promise.resolve();
+    });
+
+    const { result, rerender } = renderHook(
+      ({ value }) =>
+        useAutosave({
+          data: value,
+          hashFn: (text: string) => text,
+          debounceMs: 100,
+          onSave,
+        }),
+      { initialProps: { value: "initial" } }
+    );
+
+    rerender({ value: "first" });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave).toHaveBeenNthCalledWith(1, "first");
+
+    rerender({ value: "second" });
+
+    let manualFlushResult: boolean | undefined;
+    await act(async () => {
+      const flush = result.current.triggerSave();
+      rejectFirstSave?.();
+      manualFlushResult = await flush;
+    });
+
+    expect(manualFlushResult).toBe(true);
+    expect(onSave).toHaveBeenCalledTimes(2);
+    expect(onSave).toHaveBeenNthCalledWith(2, "second");
+    expect(result.current.saveStatus).toBe("saved");
+    expect(result.current.isDirty).toBe(false);
+  });
 });

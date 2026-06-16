@@ -34,7 +34,8 @@ import {
   characters,
   routeConfigs,
 } from "../src/db/schema/index.js";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
+import { z } from "zod";
 import { calculateContentHash } from "../src/lib/hash.js";
 import { hashPassword } from "../src/services/auth.service.js";
 
@@ -43,7 +44,16 @@ import { hashPassword } from "../src/services/auth.service.js";
 const TEST_EMAIL = "flow-perf-test@example.com";
 const TEST_PASSWORD = "flowtest123";
 const TEST_PROJECT_NAME = "Flow Performance Test";
-const LABEL_COUNT = parseInt(process.env.LABEL_COUNT ?? "120", 10);
+const labelCountSchema = z.number().int().positive();
+const parsedLabelCount = labelCountSchema.safeParse(
+  parseInt(process.env.LABEL_COUNT ?? "120", 10)
+);
+if (!parsedLabelCount.success) {
+  throw new Error(
+    `LABEL_COUNT must be a positive integer (got: "${process.env.LABEL_COUNT ?? ""}")`
+  );
+}
+const LABEL_COUNT = parsedLabelCount.data;
 
 const ROUTES = [
   { key: "common", name: "Common Route", color: "#64748b" },
@@ -68,6 +78,14 @@ const FILES = ["act1.rpy", "act2.rpy", "act3.rpy"];
 // ─── Seed ───────────────────────────────────────────────────────────────────
 
 async function seedFlowPerf() {
+  const nodeEnv = process.env.NODE_ENV ?? "development";
+  if (nodeEnv === "production" || nodeEnv === "staging") {
+    throw new Error(
+      `Refusing to seed in "${nodeEnv}" — this script creates a test OWNER ` +
+        "account with known credentials. Only run in development/local."
+    );
+  }
+
   const db = getDb();
   console.log(
     `🌱 Seeding flow graph performance data (${LABEL_COUNT} labels)...\n`
@@ -95,7 +113,12 @@ async function seedFlowPerf() {
   let [testProject] = await db
     .select()
     .from(projects)
-    .where(eq(projects.name, TEST_PROJECT_NAME))
+    .where(
+      and(
+        eq(projects.name, TEST_PROJECT_NAME),
+        eq(projects.userId, testUser.id)
+      )
+    )
     .limit(1);
 
   if (!testProject) {

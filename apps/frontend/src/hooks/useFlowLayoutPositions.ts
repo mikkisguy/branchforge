@@ -210,11 +210,11 @@ export function useFlowLayoutPositions(
     const jobId = ++jobIdRef.current;
 
     const handler = (e: MessageEvent) => {
-      if (jobId !== jobIdRef.current) return; // superseded — discard
-      const { positions } = e.data as {
+      const { jobId: responseJobId, positions } = e.data as {
         jobId: number;
         positions: PositionRecord;
       };
+      if (responseJobId !== jobIdRef.current) return; // superseded — discard
       setCached(cacheKey, positions);
       setWorkerPositions(recordToMap(positions));
       setIsComputing(false);

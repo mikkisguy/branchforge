@@ -18,7 +18,7 @@ export interface FlowCharacterLookup {
    * Unknown IDs are silently skipped. Returns a stable empty array when no
    * IDs resolve (so callers can use it without null-checks).
    */
-  resolve: (characterIds: readonly string[]) => CharacterAppearance[];
+  resolve: (characterIds: readonly string[]) => readonly CharacterAppearance[];
 }
 
 const noopLookup: FlowCharacterLookup = {
