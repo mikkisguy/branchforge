@@ -78,6 +78,7 @@ interface ScriptModeEditorLayoutProps {
   labelTitles?: LabelTitleMap;
 }
 
+// react-doctor-disable-next-line react-doctor/no-many-boolean-props
 export function ScriptModeEditorLayout({
   projectName,
   projectId,

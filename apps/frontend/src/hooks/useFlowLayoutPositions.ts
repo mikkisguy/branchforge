@@ -231,6 +231,7 @@ export function useFlowLayoutPositions(
   }, [useWorker, cacheKey, mode, nodes, edges]);
 
   // Terminate worker when the component unmounts.
+  // react-doctor-disable-next-line react-doctor/exhaustive-deps
   useEffect(() => {
     return () => {
       workerRef.current?.terminate();

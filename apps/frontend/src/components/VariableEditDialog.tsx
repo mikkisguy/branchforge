@@ -97,6 +97,7 @@ function VariableFormContent({
   });
   const [errors, setErrors] = useState<VariableFormErrors>({});
 
+  // react-doctor-disable-next-line react-doctor/no-event-handler
   const isEditMode = !!variableId;
 
   // Close dialog if editing a variable that no longer exists

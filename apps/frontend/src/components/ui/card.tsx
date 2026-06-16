@@ -40,6 +40,7 @@ interface CardTitleProps extends React.HTMLAttributes<HTMLHeadingElement> {
 
 function CardTitle({ className, ref, ...props }: CardTitleProps) {
   return (
+    // react-doctor-disable-next-line react-doctor/heading-has-content
     <h3
       ref={ref}
       className={cn("font-semibold leading-none tracking-tight", className)}

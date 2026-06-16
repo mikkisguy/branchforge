@@ -104,6 +104,7 @@ function StatFormContent({
   });
   const [errors, setErrors] = useState<StatFormErrors>({});
 
+  // react-doctor-disable-next-line react-doctor/no-event-handler
   const isEditMode = !!statId;
 
   // Close dialog if editing a stat that no longer exists

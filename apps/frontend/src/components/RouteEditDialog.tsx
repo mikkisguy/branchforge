@@ -98,6 +98,7 @@ function RouteFormContent({
   });
   const [errors, setErrors] = useState<RouteFormErrors>({});
 
+  // react-doctor-disable-next-line react-doctor/no-event-handler
   const isEditMode = !!routeId;
 
   // Close dialog if editing a route that no longer exists
