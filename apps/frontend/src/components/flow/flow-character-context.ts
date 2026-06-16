@@ -21,8 +21,12 @@ export interface FlowCharacterLookup {
   resolve: (characterIds: readonly string[]) => readonly CharacterAppearance[];
 }
 
+// Single stable empty array so the noop lookup honours the documented
+// "stable empty array" contract (no per-call allocation / reference churn).
+const EMPTY_ARRAY: readonly CharacterAppearance[] = [];
+
 const noopLookup: FlowCharacterLookup = {
-  resolve: () => [],
+  resolve: () => EMPTY_ARRAY,
 };
 
 export const FlowCharacterContext =

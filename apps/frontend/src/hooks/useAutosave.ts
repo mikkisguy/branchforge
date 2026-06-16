@@ -168,6 +168,13 @@ export function useAutosave<T>({
         if (savePromiseRef.current) {
           await savePromiseRef.current;
         }
+        // Defensive guard: a save is still flagged as in-flight but its
+        // promise was cleared elsewhere (e.g. discardChanges /
+        // resetSavedHash). Awaiting is impossible, so continuing would
+        // busy-spin and lock the main thread. Break out and yield control.
+        if (isSavingRef.current && !savePromiseRef.current) {
+          break;
+        }
         if (savedHashRef.current !== priorSavedHash) {
           // A concurrent save landed with newer data — re-stamp our pending
           // refs and loop so the user-requested flush still happens.
@@ -190,6 +197,11 @@ export function useAutosave<T>({
       isSavingRef.current = true;
       return await savePromise;
     }
+
+    // Reached only when the loop breaks due to an interrupted save state
+    // (save flagged in-flight but its promise cleared). The requested save
+    // did not complete, so report that to the caller.
+    return false;
   }, [data, hashFn, performSave, clearSaveTimeout]);
 
   /**
