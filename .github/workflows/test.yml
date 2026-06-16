@@ -104,3 +104,5 @@ jobs:
 
       - name: Run frontend tests
         run: cd apps/frontend && pnpm test
+        # Note: the docs site build is covered by build-verification, since
+        # `pnpm build` now includes @branchforge/docs via the apps/* filter.

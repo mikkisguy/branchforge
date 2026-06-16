@@ -1,0 +1,20 @@
+{
+  "name": "@branchforge/docs",
+  "version": "0.11.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync": "node scripts/sync-source-docs.js",
+    "dev": "node scripts/sync-source-docs.js && vitepress dev",
+    "build": "node scripts/sync-source-docs.js && vitepress build",
+    "preview": "node scripts/sync-source-docs.js && vitepress preview",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.8.4",
+    "typescript": "^5.9.3",
+    "vitepress": "^1.6.3"
+  }
+}
