@@ -3,7 +3,7 @@
  *
  * All UI strings (labels, tooltips, empty states, error messages) should live
  * here, keyed by feature domain. Components import from "@/copy" — e.g.
- * `import { writeModeCopy } from "@/copy"`.
+ * `import { WRITE_MODE_COPY } from "@/copy"`.
  *
  * Keeping copy centralized means:
  * - The docs site can quote the same strings, so they never drift
@@ -16,6 +16,6 @@
  * are scaffolding and will silently drift from what users see. Track the
  * remaining work and wire up components feature-by-feature.
  */
-export { commonCopy } from "./common";
-export { projectsCopy } from "./projects";
-export { writeModeCopy } from "./write-mode";
+export { COMMON_COPY } from "./common";
+export { PROJECTS_COPY } from "./projects";
+export { WRITE_MODE_COPY } from "./write-mode";

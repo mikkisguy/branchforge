@@ -4,7 +4,7 @@
  * Projects are created via import (zip or GitLab), not via a "New Project"
  * button. The user must have an existing Ren'Py project to import.
  */
-export const projectsCopy = {
+export const PROJECTS_COPY = {
   list: {
     title: "Projects",
     emptyTitle: "No projects yet",

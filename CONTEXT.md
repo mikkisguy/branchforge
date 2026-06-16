@@ -32,7 +32,7 @@ Visual representation of how labels connect via jumps and choices. Three layout 
 
 ### Stat
 
-Numeric value tracked across the story (e.g., affection, trust, health). Has `minValue`/`maxValue` bounds. Can be character-scoped or global. Stats gate lines via conditions using comparison operators (`>=`, `<=`, `>`, `<`, `==`, `!=`).
+A numeric value tracked across the story (e.g., affection, trust, health). Stats have `minValue` and `maxValue` bounds and can be character-scoped or global. They gate lines via conditions using comparison operators (`>=`, `<=`, `>`, `<`, `==`, `!=`).
 
 ### Variable
 

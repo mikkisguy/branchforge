@@ -4,7 +4,7 @@
  * Technical badges (conditions, stats, variables) are display-only here.
  * Editing those happens in Script Mode.
  */
-export const writeModeCopy = {
+export const WRITE_MODE_COPY = {
   empty: {
     title: "No labels yet",
     description: "Import an RPY file to start writing.",

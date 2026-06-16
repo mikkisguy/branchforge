@@ -1,7 +1,7 @@
 /**
  * Shared/universal strings used across many components.
  */
-export const commonCopy = {
+export const COMMON_COPY = {
   actions: {
     save: "Save",
     cancel: "Cancel",
