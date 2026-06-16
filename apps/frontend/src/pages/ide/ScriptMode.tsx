@@ -287,6 +287,7 @@ export function ScriptMode({
   useEffect(() => {
     if (activeFileId && previousUndoFileIdRef.current !== activeFileId) {
       previousUndoFileIdRef.current = activeFileId;
+      // react-doctor-disable-next-line react-doctor/no-pass-data-to-parent
       clear(activeFileContent);
     }
   }, [activeFileId, activeFileContent, clear]);

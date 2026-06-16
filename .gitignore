@@ -10,6 +10,14 @@ dist-schema/
 build/
 *.log
 
+# VitePress (apps/docs build cache/output) — anchored to avoid matching
+# a future .vitepress/ directory anywhere else in the tree.
+/apps/docs/.vitepress/cache/
+/apps/docs/.vitepress/dist/
+
+# Generated docs (synced from docs/ by sync-source-docs.js)
+apps/docs/dev/architecture.md
+
 # Environment
 .env
 .env.local

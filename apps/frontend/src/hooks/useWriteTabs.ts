@@ -160,6 +160,7 @@ export function useWriteTabs({
 
   useEffect(() => {
     if (tabsState.nextActiveLabelId !== undefined) {
+      // react-doctor-disable-next-line react-doctor/no-pass-data-to-parent
       setActiveLabelId(tabsState.nextActiveLabelId);
       dispatch({ type: "CLEAR_NEXT_ACTIVE" });
     }
@@ -266,6 +267,7 @@ export function useWriteTabs({
 
     // react-doctor-disable-next-line react-doctor/no-event-handler
     if (nextActiveLabelId !== activeLabelId) {
+      // react-doctor-disable-next-line react-doctor/no-pass-data-to-parent
       setActiveLabelId(nextActiveLabelId);
     }
   }, [

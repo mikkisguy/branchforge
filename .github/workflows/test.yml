@@ -15,6 +15,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Install git (for VitePress lastUpdated)
+        run: apk add --no-cache git
+
       - name: Install pnpm
         run: npm install -g pnpm@9
 
@@ -104,3 +107,5 @@ jobs:
 
       - name: Run frontend tests
         run: cd apps/frontend && pnpm test
+        # Note: the docs site build is covered by build-verification, since
+        # `pnpm build` now includes @branchforge/docs via the apps/* filter.

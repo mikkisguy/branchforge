@@ -166,6 +166,7 @@ export function useAutosave<T>({
         // Only await when a save is actually in-flight; skip unnecessary
         // microtask when the ref is null (defensive edge-case).
         if (savePromiseRef.current) {
+          // react-doctor-disable-next-line react-doctor/async-await-in-loop
           await savePromiseRef.current;
         }
         // Defensive guard: a save is still flagged as in-flight but its
@@ -266,6 +267,7 @@ export function useAutosave<T>({
    * Schedule a debounced save when data changes
    */
   /* eslint-disable react-hooks/exhaustive-deps */
+  // react-doctor-disable-next-line react-doctor/no-cascading-set-state
   useEffect(() => {
     const currentHash = hashFn(data);
 

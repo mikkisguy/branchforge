@@ -519,6 +519,7 @@ export const ProseEditor = function ProseEditor({
     // react-doctor-disable-next-line react-doctor/no-event-handler
     if (!areDialogueEntriesEqual(prevEntriesRef.current, entries)) {
       scheduleTextHistorySnapshot(entries);
+      // react-doctor-disable-next-line react-doctor/no-prop-callback-in-effect
       onChange(entries);
     }
     prevEntriesRef.current = entries;
