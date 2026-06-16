@@ -43,9 +43,9 @@ export interface FlowGraphFiltersPanelProps {
 }
 
 const statusDotClass: Record<LabelStatus, string> = {
-  DRAFT: "bg-yellow-400",
-  REVIEW: "bg-blue-400",
-  FINAL: "bg-green-400",
+  DRAFT: "bg-slate-400",
+  REVIEW: "bg-amber-500",
+  FINAL: "bg-[var(--theme-final-color)]",
 };
 
 export function FlowGraphFiltersPanel({

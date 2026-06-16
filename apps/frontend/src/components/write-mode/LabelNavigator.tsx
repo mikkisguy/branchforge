@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import type { UpdateLabelInput } from "@/lib/api/labels";
 
 const STATUS_COLORS: Record<LabelStatus, string> = {
-  FINAL: "var(--theme-color)",
+  FINAL: "var(--theme-final-color)",
   REVIEW: "var(--theme-review-color)",
   DRAFT: "var(--theme-draft-color)",
 };

@@ -28,11 +28,13 @@ export function useProjectReset({
   const setSkipSaveRef = useRef(setSkipSave);
   const onResetRef = useRef(onReset);
 
-  triggerSaveRef.current = triggerSave;
-  hasPendingSaveRef.current = hasPendingSave;
-  showErrorToastRef.current = showErrorToast;
-  setSkipSaveRef.current = setSkipSave;
-  onResetRef.current = onReset;
+  useEffect(() => {
+    triggerSaveRef.current = triggerSave;
+    hasPendingSaveRef.current = hasPendingSave;
+    showErrorToastRef.current = showErrorToast;
+    setSkipSaveRef.current = setSkipSave;
+    onResetRef.current = onReset;
+  }, [triggerSave, hasPendingSave, showErrorToast, setSkipSave, onReset]);
 
   useEffect(() => {
     const resetId = ++currentResetIdRef.current;

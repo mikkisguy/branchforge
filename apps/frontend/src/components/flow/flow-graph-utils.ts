@@ -98,7 +98,9 @@ export function getEdgeColor(type: string): string {
     case "JUMP":
       return "#f59e0b"; // amber
     case "CHOICE":
-      return "#3b82f6"; // blue
+      // The primary branching action — follow the active theme so the
+      // graph's main interaction color matches the rest of the app.
+      return "var(--theme-color)";
     case "NATURAL":
       return "#475569"; // slate-600
     default:
@@ -135,7 +137,7 @@ export function buildEdges(flowEdges: FlowEdge[]): Edge[] {
         strokeWidth: getEdgeWidth(edge.type),
       },
       labelStyle: { fill: "#94a3b8", fontSize: 11 },
-      animated: edge.type === "NATURAL",
+      animated: false,
     };
     return edgeStyle;
   });
@@ -272,6 +274,7 @@ function layoutFlow(
   g.setDefaultEdgeLabel(() => ({}));
   g.setGraph({
     rankdir: "LR", // Left to right
+    ranker: "tight-tree", // ~3-4x faster than default network-simplex
     nodesep: 80, // Horizontal spacing between nodes
     ranksep: 120, // Vertical spacing between ranks
     edgesep: 40, // Spacing between edges
@@ -317,7 +320,7 @@ function sortRowsNullishFirst<K>(keys: K[]): K[] {
   });
 }
 
-function computeAutoLayout(
+export function computeAutoLayout(
   mode: FlowLayoutMode,
   flowNodes: FlowNode[],
   flowEdges: FlowEdge[]
@@ -347,7 +350,36 @@ function computeAutoLayout(
 }
 
 /**
+ * Build ReactFlow nodes by overlaying saved positions on top of a
+ * pre-computed auto-layout. This is the cheap O(n) step — it does NOT run
+ * the layout algorithm. Callers should memoize `autoLayout` separately
+ * (via {@link computeAutoLayout}) so that saving a drag position doesn't
+ * re-run dagre for the entire graph.
+ */
+export function buildLayoutNodes(
+  flowNodes: FlowNode[],
+  autoLayout: Map<string, { x: number; y: number }>,
+  routeColorMap: Map<string, string>,
+  savedPositions: FlowGraphPositions
+): Node[] {
+  return flowNodes.map((node) => {
+    const routeColor = getRouteColor(node.routeKey, routeColorMap);
+    const saved = savedPositions[node.id];
+    const auto = autoLayout.get(node.id) ?? { x: 0, y: 0 };
+    const position = saved ?? auto;
+
+    return buildReactFlowNode(node, position, routeColor);
+  });
+}
+
+/**
  * Build ReactFlow nodes for the requested layout mode.
+ *
+ * Convenience wrapper that runs the auto-layout AND applies saved positions
+ * in one call. Prefer {@link computeAutoLayout} + {@link buildLayoutNodes}
+ * separately when you need to memoize the expensive layout independently
+ * from the cheap saved-positions overlay (i.e. in the live FlowGraph
+ * component, where a drag-save must not re-trigger dagre).
  *
  * The active mode decides how auto-layout positions are computed (dagre for
  * `FLOW`, column-grouped for `ROUTE` and `FILE`). Saved positions — i.e. the
@@ -364,13 +396,5 @@ export function layoutNodes(
   mode: FlowLayoutMode = "FLOW"
 ): Node[] {
   const autoLayout = computeAutoLayout(mode, flowNodes, flowEdges);
-
-  return flowNodes.map((node) => {
-    const routeColor = getRouteColor(node.routeKey, routeColorMap);
-    const saved = savedPositions[node.id];
-    const auto = autoLayout.get(node.id) ?? { x: 0, y: 0 };
-    const position = saved ?? auto;
-
-    return buildReactFlowNode(node, position, routeColor);
-  });
+  return buildLayoutNodes(flowNodes, autoLayout, routeColorMap, savedPositions);
 }

@@ -147,39 +147,61 @@ export function useAutosave<T>({
   const triggerSave = useCallback(async () => {
     clearSaveTimeout();
 
-    const dataToSave = pendingDataRef.current ?? data;
-    const currentHash = hashFn(dataToSave);
+    let dataToSave = pendingDataRef.current ?? data;
+    let currentHash = hashFn(dataToSave);
 
-    if (currentHash === savedHashRef.current) {
-      setSaveStatus("saved");
-      setIsDirty(false);
-      return true;
-    }
-
-    if (isSavingRef.current) {
-      const localPendingHash = currentHash;
-      const localPendingData = dataToSave;
-      const priorSavedHash = savedHashRef.current;
-      pendingHashRef.current = localPendingHash;
-      pendingDataRef.current = localPendingData;
-      // Only await when a save is actually in-flight; skip unnecessary
-      // microtask when the ref is null (defensive edge-case).
-      if (savePromiseRef.current) {
-        await savePromiseRef.current;
+    while (true) {
+      if (currentHash === savedHashRef.current) {
+        setSaveStatus("saved");
+        setIsDirty(false);
+        return true;
       }
-      if (savedHashRef.current !== priorSavedHash) {
+
+      if (isSavingRef.current) {
+        const localPendingHash = currentHash;
+        const localPendingData = dataToSave;
+        const priorSavedHash = savedHashRef.current;
         pendingHashRef.current = localPendingHash;
         pendingDataRef.current = localPendingData;
-        return triggerSave();
+        // Only await when a save is actually in-flight; skip unnecessary
+        // microtask when the ref is null (defensive edge-case).
+        if (savePromiseRef.current) {
+          await savePromiseRef.current;
+        }
+        // Defensive guard: a save is still flagged as in-flight but its
+        // promise was cleared elsewhere (e.g. discardChanges /
+        // resetSavedHash). Awaiting is impossible, so continuing would
+        // busy-spin and lock the main thread. Break out and yield control.
+        if (isSavingRef.current && !savePromiseRef.current) {
+          break;
+        }
+        if (savedHashRef.current !== priorSavedHash) {
+          // A concurrent save landed with newer data — re-stamp our pending
+          // refs and loop so the user-requested flush still happens.
+          pendingHashRef.current = localPendingHash;
+          pendingDataRef.current = localPendingData;
+          dataToSave = localPendingData;
+          currentHash = localPendingHash;
+          continue;
+        }
+        // The concurrent save did not advance savedHashRef — it failed or
+        // saved identical data. Loop so our pending data is re-evaluated
+        // and (if still dirty) re-attempted instead of being silently
+        // dropped.
+        continue;
       }
-      return true;
+
+      pendingHashRef.current = currentHash;
+      const savePromise = performSave(dataToSave);
+      savePromiseRef.current = savePromise;
+      isSavingRef.current = true;
+      return await savePromise;
     }
 
-    pendingHashRef.current = currentHash;
-    const savePromise = performSave(dataToSave);
-    savePromiseRef.current = savePromise;
-    isSavingRef.current = true;
-    return await savePromise;
+    // Reached only when the loop breaks due to an interrupted save state
+    // (save flagged in-flight but its promise cleared). The requested save
+    // did not complete, so report that to the caller.
+    return false;
   }, [data, hashFn, performSave, clearSaveTimeout]);
 
   /**

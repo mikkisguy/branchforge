@@ -16,24 +16,22 @@ import {
   BackgroundVariant,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  LabelNodeMemo,
-  type LabelNodeData,
-  type CharacterAppearance,
-} from "./LabelNode";
+import { LabelNodeMemo, type LabelNodeData } from "./LabelNode";
 import { LayoutModeSelector } from "./LayoutModeSelector";
 import { useFlowGraph } from "@/hooks/useFlowGraph";
 import { useFlowGraphLayout } from "@/hooks/useFlowGraphLayout";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useRouteConfigs } from "@/hooks/useRouteConfigs";
 import { useCharacters } from "@/hooks/useCharacters";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
   buildRouteColorMap,
   buildEdges,
-  layoutNodes,
+  buildLayoutNodes,
 } from "./flow-graph-utils";
+import { useFlowLayoutPositions } from "@/hooks/useFlowLayoutPositions";
 import { LAYOUT_MODE_STORAGE_KEY, isFlowLayoutMode } from "./flow-layout-mode";
 import type { FlowLayoutMode } from "@branchforge/shared";
 import { FLOW_LAYOUT_MODE_LABELS } from "@branchforge/shared";
@@ -44,6 +42,12 @@ import {
   type FlowGraphFilters,
 } from "@/components/flow/flow-filters";
 import { FlowGraphFiltersPanel } from "@/components/flow/FlowGraphFiltersPanel";
+import { FlowCharacterProvider } from "./flow-character-provider";
+import {
+  FLOW_MINIMAP_HIDE_THRESHOLD,
+  FLOW_SEARCH_DEBOUNCE_MS,
+  FLOW_VIRTUALIZATION_THRESHOLD,
+} from "@/lib/constants";
 
 interface FlowGraphProps {
   projectId: string;
@@ -53,10 +57,6 @@ interface FlowGraphProps {
 const nodeTypes = {
   label: LabelNodeMemo,
 };
-
-// Stable empty array for nodes with no character appearances, so the
-// `sameData` reference check doesn't thrash on re-renders.
-const EMPTY_CHARACTERS: CharacterAppearance[] = [];
 
 function sameData(a: unknown, b: unknown): boolean {
   if (a === b) return true;
@@ -99,6 +99,14 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
   // localStorage, so each dialog open session starts clean — filters
   // are an in-context "what am I looking at right now" tool.
   const [filters, setFilters] = useState<FlowGraphFilters>(EMPTY_FLOW_FILTERS);
+
+  // Debounce the search query so the O(n) filter + view-state passes run
+  // once after the user stops typing, not on every keystroke. The text
+  // field stays responsive (bound to the immediate `filters` state).
+  const debouncedSearchQuery = useDebouncedValue(
+    filters.searchQuery,
+    FLOW_SEARCH_DEBOUNCE_MS
+  );
 
   const routeColorMap = useMemo(
     () => buildRouteColorMap(flowNodes),
@@ -193,9 +201,16 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
   // the layout, edges, and saved positions all still reference the
   // original (unfiltered) node set so re-running the predicate is cheap
   // and doesn't disturb the user's drag positions.
+  //
+  // `effectiveFilters` substitutes the debounced search query so the O(n)
+  // predicate runs once after the user stops typing, not on every keystroke.
+  const effectiveFilters = useMemo(
+    () => ({ ...validFilters, searchQuery: debouncedSearchQuery }),
+    [validFilters, debouncedSearchQuery]
+  );
   const filteredNodes = useMemo(
-    () => filterFlowNodes(flowNodes, validFilters),
-    [flowNodes, validFilters]
+    () => filterFlowNodes(flowNodes, effectiveFilters),
+    [flowNodes, effectiveFilters]
   );
   const filteredNodeIds = useMemo(
     () => new Set(filteredNodes.map((n) => n.id)),
@@ -205,9 +220,9 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
   // We render every node, but mark the ones that failed the filter as
   // `dimmed` so the user retains spatial context. A node with a matching
   // search query is also `highlighted` (additive on top of `dimmed`).
-  const trimmedQuery = filters.searchQuery.trim();
+  const trimmedQuery = debouncedSearchQuery.trim();
   const nodeViewState = useMemo(() => {
-    const filtersActive = !isFlowFilterEmpty(validFilters);
+    const filtersActive = !isFlowFilterEmpty(effectiveFilters);
     const trimmed = trimmedQuery.toLowerCase();
     const map = new Map<string, { dimmed: boolean; highlighted: boolean }>();
     for (const node of flowNodes) {
@@ -231,70 +246,44 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
       });
     }
     return map;
-  }, [flowNodes, filteredNodeIds, validFilters, trimmedQuery]);
+  }, [flowNodes, filteredNodeIds, effectiveFilters, trimmedQuery]);
 
+  // Auto-layout (dagre for FLOW, row grouping for ROUTE/FILE) depends only
+  // on the graph topology and mode — NOT on saved positions. For large
+  // graphs the layout runs in a Web Worker so dagre's multi-second
+  // computation doesn't block the main thread.
+  const { positions: autoLayout, isComputing: layoutComputing } =
+    useFlowLayoutPositions(layoutMode, flowNodes, flowEdges);
+
+  // Overlay saved positions on top of the auto-layout — cheap O(n) map that
+  // only allocates new node objects, no layout algorithm involved.
   const layoutNodesResult = useMemo(
     () =>
-      layoutNodes(
-        flowNodes,
-        flowEdges,
-        routeColorMap,
-        savedPositions,
-        layoutMode
-      ),
-    [flowNodes, flowEdges, routeColorMap, savedPositions, layoutMode]
+      buildLayoutNodes(flowNodes, autoLayout, routeColorMap, savedPositions),
+    [flowNodes, autoLayout, routeColorMap, savedPositions]
   );
 
-  // Resolve character IDs to display info for each node's tooltip. The
-  // arrays are memoized per-node so the `sameData` equality check in the
-  // sync effect doesn't flag a change on every render.
-  const charactersByNodeId = useMemo(() => {
-    const charMap = new Map(characters.map((c) => [c.id, c]));
-    const result = new Map<string, CharacterAppearance[]>();
-    for (const node of flowNodes) {
-      const resolved: CharacterAppearance[] = [];
-      for (const id of node.characterIds) {
-        const c = charMap.get(id);
-        if (c) {
-          resolved.push({
-            id: c.id,
-            name: c.displayName || c.name,
-            color: c.color,
-            avatarUrl: c.avatarUrl,
-          });
-        }
-      }
-      result.set(node.id, resolved.length > 0 ? resolved : EMPTY_CHARACTERS);
-    }
-    return result;
-  }, [flowNodes, characters]);
-
-  // Decorate each layout node with the view-state flags and resolved
-  // character info so LabelNode can render dimmed/highlighted styles and
-  // the hover tooltip. Done as a separate pass so the position-comparison
-  // effect downstream can short-circuit on the (cheap) data-shape equality
-  // check.
+  // Decorate each layout node with the view-state flags (dimmed /
+  // highlighted) so LabelNode can render the correct styles. Character
+  // appearances are now resolved lazily by the tooltip via context, so they
+  // no longer need to be pre-computed and injected here — this removes an
+  // O(n) pass and a per-node array allocation from every data refresh.
   const decoratedNodes = useMemo(() => {
     return layoutNodesResult.map((n) => {
       const data = n.data as LabelNodeData;
       const view = nodeViewState.get(n.id);
       const dimmed = view?.dimmed ?? false;
       const highlighted = view?.highlighted ?? false;
-      const nodeCharacters = charactersByNodeId.get(n.id)!;
 
-      if (
-        data.dimmed === dimmed &&
-        data.highlighted === highlighted &&
-        data.characters === nodeCharacters
-      ) {
+      if (data.dimmed === dimmed && data.highlighted === highlighted) {
         return n;
       }
       return {
         ...n,
-        data: { ...data, dimmed, highlighted, characters: nodeCharacters },
+        data: { ...data, dimmed, highlighted },
       };
     });
-  }, [layoutNodesResult, nodeViewState, charactersByNodeId]);
+  }, [layoutNodesResult, nodeViewState]);
 
   const layoutEdgesResult = useMemo(() => buildEdges(flowEdges), [flowEdges]);
 
@@ -372,7 +361,7 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
   }, [handleLayoutDragStop]);
 
   if (isLoading) {
-    return <FlowGraphStatus>Loading flow graph...</FlowGraphStatus>;
+    return <FlowGraphStatus loading>Loading flow graph...</FlowGraphStatus>;
   }
 
   if (error) {
@@ -387,75 +376,122 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
     return <FlowGraphEmpty />;
   }
 
+  if (layoutComputing) {
+    return (
+      <FlowGraphStatus
+        loading
+        subtitle="This one-time layout is cached — reopening will be instant."
+      >
+        Arranging {flowNodes.length} nodes...
+      </FlowGraphStatus>
+    );
+  }
+
   return (
     <div className="h-full w-full absolute inset-0">
-      <ReactFlow
-        colorMode="dark"
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeClick={handleNodeClick as NodeMouseHandler}
-        onNodeDragStop={onNodeDragStop}
-        nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
-        minZoom={0.1}
-        maxZoom={2}
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background
-          variant={BackgroundVariant.Dots}
-          gap={20}
-          size={1}
-          color="#334155"
-        />
-        <Controls className="!bg-slate-800 !border-slate-600 !rounded-lg" />
-        <MiniMap
-          className="!bg-slate-800 !border-slate-600 !rounded-lg"
-          maskColor="rgba(15, 23, 42, 0.7)"
-          nodeColor={(node) => {
-            const data = node.data as { routeColor?: string };
-            return data.routeColor ?? "#64748b";
+      <FlowCharacterProvider characters={characters}>
+        <ReactFlow
+          colorMode="dark"
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={handleNodeClick as NodeMouseHandler}
+          onNodeDragStop={onNodeDragStop}
+          nodeTypes={nodeTypes}
+          fitView
+          fitViewOptions={{
+            padding: 0.2,
+            // For large graphs, cap how far fitView zooms out. Without
+            // this, 500 nodes zoom out to ~0.1, making every node "visible"
+            // and defeating virtualization — all 500 mount as DOM at once.
+            // At 0.3 the user sees a meaningful region of the graph and
+            // can zoom out manually for the full overview.
+            ...(flowNodes.length > FLOW_VIRTUALIZATION_THRESHOLD && {
+              minZoom: 0.3,
+            }),
           }}
-        />
-        <div className="absolute top-4 left-4 z-10">
-          <FlowGraphFiltersPanel
-            filters={validFilters}
-            onChange={setFilters}
-            routes={routeOptions}
-            routeColors={routeColorMap}
-            characters={characters}
+          minZoom={0.1}
+          maxZoom={2}
+          proOptions={{ hideAttribution: true }}
+          // Only render nodes/edges inside the viewport for large graphs.
+          // Below the threshold, keeping all nodes mounted is cheaper than
+          // the mount/unmount churn that virtualization triggers when nodes
+          // cross the viewport boundary during panning (which causes a
+          // noticeable stutter with the heavyweight LabelNode component).
+          onlyRenderVisibleElements={
+            flowNodes.length > FLOW_VIRTUALIZATION_THRESHOLD
+          }
+        >
+          <Background
+            variant={BackgroundVariant.Dots}
+            gap={20}
+            size={1}
+            color="#334155"
           />
-        </div>
-        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-          <FlowGraphToolbar
-            layoutMode={layoutMode}
-            isBusy={isSaving || isResetting}
-            onLayoutModeChange={setLayoutMode}
-            onResetLayout={handleResetLayout}
-          />
-        </div>
-      </ReactFlow>
+          <Controls className="!bg-slate-800 !border-slate-600 !rounded-lg" />
+          {flowNodes.length <= FLOW_MINIMAP_HIDE_THRESHOLD && (
+            <MiniMap
+              className="!bg-slate-800 !border-slate-600 !rounded-lg"
+              maskColor="rgba(15, 23, 42, 0.7)"
+              nodeColor={(node) => {
+                const data = node.data as { routeColor?: string };
+                return data.routeColor ?? "#64748b";
+              }}
+            />
+          )}
+          <div className="absolute top-4 left-4 z-10">
+            <FlowGraphFiltersPanel
+              filters={validFilters}
+              onChange={setFilters}
+              routes={routeOptions}
+              routeColors={routeColorMap}
+              characters={characters}
+            />
+          </div>
+          <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+            <FlowGraphToolbar
+              layoutMode={layoutMode}
+              isBusy={isSaving || isResetting}
+              onLayoutModeChange={setLayoutMode}
+              onResetLayout={handleResetLayout}
+            />
+          </div>
+        </ReactFlow>
+      </FlowCharacterProvider>
     </div>
   );
 }
 
 function FlowGraphStatus({
   tone = "muted",
+  loading = false,
+  subtitle,
   children,
 }: {
   tone?: "muted" | "error";
+  loading?: boolean;
+  subtitle?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div
-      className={cn(
-        "flex items-center justify-center h-full",
-        tone === "error" ? "text-red-400" : "text-slate-400"
-      )}
-    >
-      {children}
+    <div className="flex items-center justify-center h-full">
+      <div className="flex flex-col items-center gap-1.5">
+        <div
+          className={cn(
+            "flex items-center gap-2.5",
+            tone === "error" ? "text-red-400" : "text-slate-400"
+          )}
+        >
+          {loading && (
+            <Loader2 className="size-4 animate-spin text-[var(--theme-color)]" />
+          )}
+          <span className={loading ? "animate-pulse" : undefined}>
+            {children}
+          </span>
+        </div>
+        {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
+      </div>
     </div>
   );
 }
