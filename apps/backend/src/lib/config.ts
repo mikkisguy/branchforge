@@ -51,7 +51,10 @@ export function getSessionMaxAge(): number {
   if (raw === undefined || raw.trim() === "") {
     return DEFAULT_SESSION_MAX_AGE_MS;
   }
-  const parsed = Number.parseInt(raw, 10);
+  // Use Number() instead of parseInt: parseInt silently truncates partially
+  // numeric values (e.g. "123abc" -> 123), whereas Number() returns NaN for
+  // any non-fully-numeric input, falling through to the default below.
+  const parsed = Number(raw);
   if (!Number.isFinite(parsed) || parsed <= 0) {
     return DEFAULT_SESSION_MAX_AGE_MS;
   }

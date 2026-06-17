@@ -93,7 +93,10 @@ const sessionStore = createDrizzleSessionStore({
 
 // Require an explicit SESSION_SECRET in production. The hardcoded fallback
 // would otherwise make sessions forgeable to anyone with source access.
-if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+if (
+  process.env.NODE_ENV === "production" &&
+  !process.env.SESSION_SECRET?.trim()
+) {
   throw new Error(
     "SESSION_SECRET environment variable must be set in production"
   );
@@ -103,7 +106,10 @@ if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
 // PATs at rest (AES-256-GCM); without it the app fails at first encrypt
 // anyway, so we fail fast at boot for a clearer signal and to avoid
 // silently shipping unencryptable integrations.
-if (process.env.NODE_ENV === "production" && !process.env.ENCRYPTION_KEY) {
+if (
+  process.env.NODE_ENV === "production" &&
+  !process.env.ENCRYPTION_KEY?.trim()
+) {
   throw new Error(
     "ENCRYPTION_KEY environment variable must be set in production"
   );

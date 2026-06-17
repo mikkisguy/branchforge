@@ -66,6 +66,12 @@ describe("getSessionMaxAge", () => {
     expect(getSessionMaxAge()).toBe(ONE_DAY_MS);
   });
 
+  it("falls back to the default for partially numeric input", () => {
+    // parseInt("123abc", 10) would silently return 123; Number() returns NaN.
+    process.env.SESSION_MAX_AGE = "123abc";
+    expect(getSessionMaxAge()).toBe(ONE_DAY_MS);
+  });
+
   it("falls back to the default for zero or negative values", () => {
     process.env.SESSION_MAX_AGE = "0";
     expect(getSessionMaxAge()).toBe(ONE_DAY_MS);

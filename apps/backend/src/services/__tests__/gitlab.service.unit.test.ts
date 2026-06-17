@@ -30,6 +30,21 @@ vi.mock("../authz.service.js", () => ({
   requireProjectOwnership: vi.fn(),
 }));
 
+// Mock SSRF guards so the test fixture host (gitlab.test) is treated as an
+// allowlisted GitLab host. Production validation lives in
+// validateGitLabUrl + ip-validation.ts, which is exercised by its own unit
+// tests. This mock only loosens the allowlist for the test environment;
+// tests that need to assert SSRF rejection override these per-test.
+vi.mock("../../lib/ip-validation.js", () => ({
+  isPrivateIP: vi.fn(() => false),
+  isPrivateOrLocalHostname: vi.fn(() => false),
+  isAllowedGitlabHost: vi.fn(() => true),
+}));
+
+// Wire the mocked allowlist to the imported namespace so per-test overrides
+// via `vi.mocked(ipValidation.isAllowedGitlabHost).mockReturnValue(...)` work.
+import * as ipValidation from "../../lib/ip-validation.js";
+
 // Mock encryption service
 vi.mock("../encryption.service.js", () => ({
   validateAndGetUsername: vi.fn(),
@@ -736,6 +751,63 @@ describe("GitLabService (HTTP Operations)", () => {
           testGitlabUrl
         )
       ).rejects.toThrow();
+    });
+  });
+
+  // ============================================================================
+  // SSRF defense-in-depth
+  // fetchWithTimeout must reject URLs that bypass the allowlist, even if a
+  // caller forgets to call validateGitLabUrl. This guards against the
+  // CodeQL js/request-forgery finding at gitlab.service.ts:fetch().
+  // ============================================================================
+
+  describe("SSRF guard on initial fetch URL", () => {
+    it("should refuse to fetch when isAllowedGitlabHost returns false", async () => {
+      // Simulate a host that passes validateGitLabUrl (mocked as passthrough)
+      // but would be rejected by the SSRF allowlist. With the in-function
+      // re-validation, the fetch must never reach the network.
+      vi.mocked(ipValidation.isAllowedGitlabHost).mockReturnValue(false);
+      vi.mocked(ipValidation.isPrivateOrLocalHostname).mockReturnValue(false);
+
+      mockLimit.mockResolvedValueOnce([
+        {
+          id: "integration-123",
+          userId: testUserId,
+          encryptedToken: "encrypted_token",
+          gitlabUrl: "https://gitlab.test",
+          username: "testuser",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ]);
+
+      // No nock interceptor set up — if the fetch goes out, the test will
+      // hang or throw a network error. The expectation is the SSRF guard
+      // short-circuits before fetch.
+      await expect(listGitlabRepositories(testUserId)).rejects.toThrow(
+        /non-allowlisted or internal host/
+      );
+    });
+
+    it("should refuse to fetch when isPrivateOrLocalHostname returns true", async () => {
+      vi.mocked(ipValidation.isAllowedGitlabHost).mockReturnValue(true);
+      vi.mocked(ipValidation.isPrivateOrLocalHostname).mockReturnValue(true);
+
+      mockLimit.mockResolvedValueOnce([
+        {
+          id: "integration-123",
+          userId: testUserId,
+          encryptedToken: "encrypted_token",
+          gitlabUrl: "https://gitlab.test",
+          username: "testuser",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ]);
+
+      await expect(listGitlabRepositories(testUserId)).rejects.toThrow(
+        /non-allowlisted or internal host/
+      );
     });
   });
 });

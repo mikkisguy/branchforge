@@ -76,22 +76,33 @@ function isApprovedGitlabUrl(url: string): boolean {
 /**
  * Fetch with timeout helper using AbortController.
  *
- * Redirects are followed MANUALLY (never automatically): every
- * `Location` is re-validated against the GitLab SSRF allowlist before
- * being followed, so the request — and its `PRIVATE-TOKEN` header —
- * can never be diverted to a non-allowlisted or internal host.
+ * The initial URL AND every redirect `Location` are re-validated against
+ * the GitLab SSRF allowlist (HTTPS, not private/local, allowlisted host)
+ * before being fetched, so the request — and its `PRIVATE-TOKEN` header —
+ * can never be diverted to a non-allowlisted or internal host. Redirects
+ * are followed MANUALLY (never automatically).
+ *
+ * The initial-URL check is defense-in-depth: callers are expected to
+ * pre-validate via `validateGitLabUrl`, but enforcing it at the fetch sink
+ * ensures a future caller that skips validation still cannot exfiltrate
+ * the token or pivot to an internal service.
  * @param url - The URL to fetch
  * @param options - Fetch options
  * @param timeoutMs - Timeout in milliseconds (default: 30000)
  * @returns The fetch response
- * @throws Error if timeout occurs, too many redirects, or a redirect
- *   targets a non-allowlisted host.
+ * @throws Error if timeout occurs, too many redirects, or the URL or a
+ *   redirect targets a non-allowlisted host.
  */
 async function fetchWithTimeout(
   url: string,
   options: RequestInit = {},
   timeoutMs: number = DEFAULT_TIMEOUT_MS
 ): Promise<Response> {
+  if (!isApprovedGitlabUrl(url)) {
+    throw new Error(
+      "Refused GitLab fetch to a non-allowlisted or internal host"
+    );
+  }
   let currentUrl = url;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const controller = new AbortController();

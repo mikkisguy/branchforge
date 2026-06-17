@@ -135,6 +135,115 @@ describe("Session Operations", () => {
       expect(diff).toBeGreaterThan(86300000);
       expect(diff).toBeLessThan(86500000);
     });
+
+    it("should recompute expiresAt from a real Cookie instance (sliding expiry)", async () => {
+      // Faithfully reproduces @fastify/session's Cookie class: maxAge is a
+      // getter that returns `expires - Date.now()` (time remaining), not the
+      // configured lifetime. After touch() updates `expires` to
+      // `now + originalMaxAge`, the getter should return that new lifetime
+      // and the DB expiresAt should reflect the slid value.
+      const ONE_HOUR = 3600000;
+      const createdAt = Date.now() - 23 * 60 * 60 * 1000;
+      const originalExpires = new Date(createdAt + ONE_HOUR);
+      const cookie = {
+        originalMaxAge: ONE_HOUR,
+        _expires: originalExpires,
+        get expires() {
+          return this._expires;
+        },
+        set expires(d: Date) {
+          this._expires = d;
+        },
+        get maxAge() {
+          return this._expires instanceof Date
+            ? this._expires.valueOf() - Date.now()
+            : null;
+        },
+      };
+
+      const mockSession = {
+        user: { id: "user-123" },
+        cookie,
+      } as unknown as Session;
+      vi.mocked(sessionToDbData).mockReturnValue({
+        userId: "user-123",
+        data: {},
+      });
+
+      const mockInsert = {
+        values: vi.fn().mockReturnThis(),
+        onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+      };
+      mockDb.insert.mockReturnValue(mockInsert as never);
+
+      // Simulate what session-store-factory does: call touch() before setSession.
+      // touch() updates cookie.expires = now + originalMaxAge.
+      (mockSession as unknown as { touch: () => void }).touch = function () {
+        if (cookie.originalMaxAge) {
+          cookie.expires = new Date(Date.now() + cookie.originalMaxAge);
+        }
+      };
+      (mockSession as unknown as { touch: () => void }).touch();
+
+      await setSession("session-123", mockSession);
+
+      const valuesCall = mockInsert.values.mock.calls[0][0];
+      const expiresAt: Date = valuesCall.expiresAt;
+      const now = Date.now();
+      const diff = expiresAt.getTime() - now;
+      // After touch(), expiresAt should be ~1h from now (not the original
+      // creation+1h which would be ~1h in the past).
+      expect(diff).toBeGreaterThan(ONE_HOUR - 5000);
+      expect(diff).toBeLessThan(ONE_HOUR + 5000);
+    });
+
+    it("should produce stale expiresAt when touch() is not called", async () => {
+      // Documents the pre-fix bug: without touch(), Cookie.maxAge is a getter
+      // returning time-remaining, so Date.now() + maxAge reproduces the
+      // original expiry (un-slid). This test pins the buggy behavior so the
+      // regression is visible if the fix in session-store-factory is removed.
+      const ONE_HOUR = 3600000;
+      const createdAt = Date.now() - 23 * 60 * 60 * 1000;
+      const originalExpires = new Date(createdAt + ONE_HOUR);
+      const cookie = {
+        originalMaxAge: ONE_HOUR,
+        _expires: originalExpires,
+        get expires() {
+          return this._expires;
+        },
+        set expires(d: Date) {
+          this._expires = d;
+        },
+        get maxAge() {
+          return this._expires instanceof Date
+            ? this._expires.valueOf() - Date.now()
+            : null;
+        },
+      };
+
+      const mockSession = {
+        user: { id: "user-123" },
+        cookie,
+      } as unknown as Session;
+      vi.mocked(sessionToDbData).mockReturnValue({
+        userId: "user-123",
+        data: {},
+      });
+
+      const mockInsert = {
+        values: vi.fn().mockReturnThis(),
+        onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+      };
+      mockDb.insert.mockReturnValue(mockInsert as never);
+
+      // No touch() call.
+      await setSession("session-123", mockSession);
+
+      const valuesCall = mockInsert.values.mock.calls[0][0];
+      const expiresAt: Date = valuesCall.expiresAt;
+      // expiresAt should equal the original expiry (unchanged).
+      expect(expiresAt.getTime()).toBe(originalExpires.getTime());
+    });
   });
 
   describe("getSession", () => {
