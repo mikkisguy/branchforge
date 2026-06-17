@@ -121,6 +121,12 @@ async function fetchWithTimeout(
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
+      // `currentUrl` is validated against the GitLab SSRF allowlist
+      // (approveGitlabUrl: HTTPS-only, non-private host, allowlisted
+      // GitLab host) on every hop, including redirect targets. This is a
+      // CodeQL false positive — the allowlist check is the security control,
+      // but the analyzer does not model URL round-tripping as a sanitizer.
+      // codeql[js/request-forgery]
       const response = await fetch(currentUrl, {
         ...options,
         redirect: "manual",
