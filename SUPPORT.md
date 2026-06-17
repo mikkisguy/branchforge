@@ -81,7 +81,7 @@ Yes! It's open source (GPL v3).
 #### Issue: "Session expired"
 
 - Check `SESSION_SECRET` is set
-- Verify `SESSION_MAX_AGE` (default: 24 hours)
+- Verify `SESSION_MAX_AGE` (default: 24 hours; must be within 1h–30d). Note: sliding expiry is enabled, so this is an inactivity timeout — users active within the window stay logged in
 - Clear browser cookies
 
 #### Issue: "Avatar upload failed"

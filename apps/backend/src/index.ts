@@ -26,7 +26,7 @@ import { setupShutdownHandlers } from "./lib/shutdown.js";
 import { globalErrorHandler } from "./middleware/error-handler.middleware.js";
 import { validateCsrfToken } from "./middleware/csrf.middleware.js";
 import { SESSION_COOKIE_NAME } from "./lib/session.js";
-import { getBasePath } from "./lib/config.js";
+import { getBasePath, getSessionMaxAge } from "./lib/config.js";
 import {
   ensureAvatarDir,
   UPLOADS_DIR,
@@ -118,13 +118,20 @@ await server.register(session, {
     secure: process.env.NODE_ENV === "production",
     httpOnly: true,
     sameSite: "lax",
-    maxAge: 86400000, // 24 hours
+    // Configurable absolute session lifetime (1h–30d, default 24h) via
+    // SESSION_MAX_AGE. Sliding expiry (rolling, below) makes this act as
+    // an inactivity timeout rather than a fixed-from-login cap.
+    maxAge: getSessionMaxAge(),
     // Add additional security headers for production
     path: basePath,
   },
   // Save session on every request to ensure session data is up-to-date
   saveUninitialized: false,
-  rolling: false,
+  // Slide session expiry on activity: with rolling enabled, @fastify/session
+  // calls store.set on each response, and setSession refreshes expiresAt to
+  // now + maxAge — so maxAge acts as an inactivity timeout rather than a
+  // fixed-from-login cap.
+  rolling: true,
 });
 
 // Routes

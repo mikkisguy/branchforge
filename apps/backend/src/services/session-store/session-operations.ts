@@ -3,6 +3,7 @@ import { getDb } from "../../db/index.js";
 import { userSessions } from "../../db/schema/index.js";
 import { eq, lt } from "drizzle-orm";
 import { sessionToDbData, dbDataToSession } from "../session-store.service.js";
+import { getSessionMaxAge } from "../../lib/config.js";
 
 /**
  * Set a session in the database
@@ -22,7 +23,7 @@ export async function setSession(
     return;
   }
 
-  const maxAge = session.cookie?.maxAge ?? 86400000;
+  const maxAge = session.cookie?.maxAge ?? getSessionMaxAge();
   const expiresAt = new Date(Date.now() + maxAge);
 
   await db
