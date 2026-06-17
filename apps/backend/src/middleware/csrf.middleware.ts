@@ -30,6 +30,7 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { ForbiddenError } from "./error-handler.middleware.js";
 import { logSecurityEvent, LogEventType } from "../lib/logger.js";
+import { getBasePath } from "../lib/config.js";
 
 /**
  * Length of the CSRF token in bytes. 32 bytes (256 bits) is the same
@@ -69,27 +70,33 @@ export const CSRF_HEADER = "x-csrf-token";
  * `request.routeOptions.url` (the route definition) and `request.url`
  * (the request URL with the registered base path stripped).
  */
-const EXEMPT_PATHS = new Set(["/login", "/register"]);
-
 /**
  * Check whether the given request URL is exempt from CSRF validation.
- * Matches against the request pathname with the base path stripped
- * (Fastify registers all routes under a basePath prefix in this app).
+ *
+ * Matches the login/register routes EXACTLY (under the configured base
+ * path) rather than by suffix. A blind suffix match would let any future
+ * route ending in `/login` or `/register` (e.g. `/admin/users/login`)
+ * silently inherit the CSRF exemption, so we compare normalized pathnames
+ * for equality instead.
  */
 function isExemptPath(url: string): boolean {
-  // url typically looks like "/api/login" or "/login" depending on
-  // where the matcher runs. We only care about the last segment(s).
-  // Strip query string first.
-  const pathname = url.split("?")[0] ?? url;
-  // Walk back through path segments to find a match.
-  // We accept any suffix, but for our use case the exempt paths are
-  // the trailing /login and /register segments of the URL.
-  for (const exempt of EXEMPT_PATHS) {
-    if (pathname === exempt || pathname.endsWith(exempt)) {
-      return true;
-    }
+  // Strip query string and any trailing slashes for a stable comparison.
+  const pathname = (url.split("?")[0] ?? url).replace(/\/+$/, "") || "/";
+
+  // Bare paths (no base path configured, or base path already stripped).
+  if (pathname === "/login" || pathname === "/register") {
+    return true;
   }
-  return false;
+
+  // Full paths under the configured base path (e.g. "/api/login").
+  try {
+    const base = getBasePath(); // includes a trailing slash, e.g. "/api/"
+    return pathname === `${base}login` || pathname === `${base}register`;
+  } catch {
+    // BASE_PATH not configured (e.g. some test contexts); the bare paths
+    // above already cover the no-base-path case.
+    return false;
+  }
 }
 
 // ============================================================================

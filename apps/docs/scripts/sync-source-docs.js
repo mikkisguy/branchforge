@@ -25,10 +25,7 @@ const architectureSrc = resolve(docsSrc, "ARCHITECTURE.md");
 try {
   writeFileSync(
     resolve(docsDst, "dev/architecture.md"),
-    `---\ntitle: Architecture\n---\n\n${readFileSync(
-      architectureSrc,
-      "utf-8"
-    )}`
+    `---\ntitle: Architecture\n---\n\n${readFileSync(architectureSrc, "utf-8")}`
   );
 } catch (err) {
   if (err && err.code === "ENOENT") {

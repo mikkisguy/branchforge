@@ -885,10 +885,13 @@ async function updateGitLabFileHandler(
 // ============================================================================
 
 export async function gitlabRoutes(fastify: FastifyInstance): Promise<void> {
-  // Token validation (no auth required)
+  // Token validation — requires auth like every other /gitlab/* route.
+  // Leaving it unauthenticated turned the server into an open
+  // token-validation / amplification oracle (see security audit).
   fastify.post<{ Body: ValidateGitlabTokenInput }>(
     "/gitlab/validate",
     {
+      onRequest: [authenticate],
       preValidation: validateBody(validateGitlabTokenSchema),
     },
     validateTokenHandler

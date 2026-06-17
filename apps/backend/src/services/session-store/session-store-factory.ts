@@ -72,6 +72,21 @@ export function createSessionStore(
 
   return {
     set(sessionId: string, session: Session, callback: Callback): void {
+      // @fastify/session with `rolling: true` calls store.set on every request
+      // but does NOT call session.touch() itself. Without this, cookie.expires
+      // (and therefore the DB expiresAt written below) stays at the original
+      // creation time, defeating sliding expiry. touch() must run BEFORE
+      // callback() because @fastify/session snapshots cookie.expires inside
+      // the callback to produce the Set-Cookie response header.
+      // touch() updates cookie.expires to now + cookie.originalMaxAge, which
+      // setSession then writes to the DB.
+      const fastifySession = session as Session & {
+        touch?: () => void;
+      };
+      if (typeof fastifySession.touch === "function") {
+        fastifySession.touch();
+      }
+
       callback();
 
       retryWithBackoff(
