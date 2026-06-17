@@ -50,26 +50,38 @@ const DEFAULT_TIMEOUT_MS = 30000;
 const MAX_REDIRECTS = 5;
 
 /**
- * Returns true if `url` passes the same SSRF checks applied to the
- * initial GitLab URL (HTTPS, not a private/local host, and on the
- * allowlisted GitLab hosts). Used to re-validate every redirect target
- * before following it, so an attacker-controlled host in the allowlist
- * cannot redirect a PAT-bearing request to an internal address or the
- * cloud-metadata endpoint.
+ * Validates a URL against the GitLab SSRF allowlist and returns a sanitized
+ * URL string derived from the parsed `URL` object, or null if rejected.
+ *
+ * Returns the RECONSTRUCTED URL (`parsed.toString()`) rather than the raw
+ * input for two reasons:
+ *   1. Defense in depth — downstream consumers (fetch) operate on a value
+ *      provably built from validated components: HTTPS scheme, non-private
+ *      host, and an allowlisted GitLab host.
+ *   2. It breaks the data-flow taint chain so static analysis (CodeQL
+ *      `js/request-forgery`) recognizes the host check as a sanitizer,
+ *      rather than seeing the user-provided string flow straight to fetch.
+ *
+ * Used to validate both the initial request URL and every redirect target,
+ * so an attacker-controlled host in the allowlist cannot redirect a
+ * PAT-bearing request to an internal address or the cloud-metadata endpoint.
  */
-function isApprovedGitlabUrl(url: string): boolean {
+function approveGitlabUrl(url: string): string | null {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "https:") {
-      return false;
+      return null;
     }
     const hostname = parsed.hostname.toLowerCase();
     if (isPrivateOrLocalHostname(hostname)) {
-      return false;
+      return null;
     }
-    return isAllowedGitlabHost(hostname);
+    if (!isAllowedGitlabHost(hostname)) {
+      return null;
+    }
+    return parsed.toString();
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -98,12 +110,13 @@ async function fetchWithTimeout(
   options: RequestInit = {},
   timeoutMs: number = DEFAULT_TIMEOUT_MS
 ): Promise<Response> {
-  if (!isApprovedGitlabUrl(url)) {
+  const initialUrl = approveGitlabUrl(url);
+  if (!initialUrl) {
     throw new Error(
       "Refused GitLab fetch to a non-allowlisted or internal host"
     );
   }
-  let currentUrl = url;
+  let currentUrl = initialUrl;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -127,8 +140,10 @@ async function fetchWithTimeout(
         if (!location) {
           return response;
         }
-        const nextUrl = new URL(location, currentUrl).toString();
-        if (!isApprovedGitlabUrl(nextUrl)) {
+        const nextUrl = approveGitlabUrl(
+          new URL(location, currentUrl).toString()
+        );
+        if (!nextUrl) {
           throw new Error(
             "Refused to follow GitLab redirect to a non-allowlisted or internal host"
           );
