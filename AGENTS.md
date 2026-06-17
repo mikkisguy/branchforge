@@ -65,6 +65,40 @@ pnpm db:validate
 pnpm db:studio
 ```
 
+### Security Scanning (CodeQL)
+
+**Policy:** When fixing a CodeQL / code-scanning alert (taint-flow queries like `request-forgery`, `sql-injection`, `prototype-pollution`, etc.), **verify the fix with the local CodeQL analyzer** before claiming success. Do not reason about what the analyzer models as a sanitizer/sink — run the query and get ground truth. For ordinary bugs, lint, typecheck, or feature work, use `pnpm test`/`typecheck`/`lint` instead — CodeQL is heavy (~30 s DB build + query eval) and wasteful for non-CodeQL problems.
+
+**Usage:**
+
+```bash
+# Default: run js/request-forgery query
+./scripts/codeql-scan.sh
+
+# Explicit rule alias
+./scripts/codeql-scan.sh request-forgery
+
+# Full javascript-code-scanning suite (87 queries, what GitHub Actions runs)
+./scripts/codeql-scan.sh full
+
+# Arbitrary query/suite file
+./scripts/codeql-scan.sh path/to/Query.ql
+```
+
+**Exit codes:** `0` = no alerts (clean) · `2` = alerts found · `1` = setup/usage error.
+
+**Bootstrap install** (one-time, if `~/.local/share/codeql-cli/codeql` is missing):
+
+```bash
+mkdir -p ~/.local/share/codeql-cli
+curl -sL -o /tmp/codeql.tar.gz \
+  https://github.com/github/codeql-action/releases/latest/download/codeql-bundle-linux64.tar.gz
+tar xzf /tmp/codeql.tar.gz -C ~/.local/share/codeql-cli
+# -> creates ~/.local/share/codeql-cli/codeql/codeql
+```
+
+The script prints these instructions automatically if the CLI is absent.
+
 ## Code Style Guidelines
 
 ### Imports

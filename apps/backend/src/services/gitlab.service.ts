@@ -121,12 +121,6 @@ async function fetchWithTimeout(
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      // `currentUrl` is validated against the GitLab SSRF allowlist
-      // (approveGitlabUrl: HTTPS-only, non-private host, allowlisted
-      // GitLab host) on every hop, including redirect targets. This is a
-      // CodeQL false positive — the allowlist check is the security control,
-      // but the analyzer does not model URL round-tripping as a sanitizer.
-      // codeql[js/request-forgery]
       const response = await fetch(currentUrl, {
         ...options,
         redirect: "manual",
@@ -390,7 +384,17 @@ export async function getGitlabProject(
     gitlabUrl || integration.gitlabUrl || undefined
   );
 
-  const apiUrl = new URL(`/api/v4/projects/${gitlabProjectId}`, url);
+  // Coerce to a validated safe integer before interpolating into the URL.
+  // This defends against path injection via a non-numeric gitlabProjectId and
+  // breaks the data-flow taint chain from user input to the outgoing request
+  // URL (CodeQL `js/request-forgery`): numeric coercion is modeled as a
+  // sanitizer because a number cannot carry URL-special characters.
+  const safeProjectId = Math.trunc(Number(gitlabProjectId));
+  if (!Number.isSafeInteger(safeProjectId) || safeProjectId <= 0) {
+    return null;
+  }
+
+  const apiUrl = new URL(`/api/v4/projects/${safeProjectId}`, url);
 
   const response = await fetchWithTimeout(apiUrl.toString(), {
     headers: {
