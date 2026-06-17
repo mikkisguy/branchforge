@@ -4,7 +4,7 @@
 
 **Do NOT open a public issue for security vulnerabilities.**
 
-Please use GitHub's [private vulnerability reporting](https://github.com/mikkisguy/branchforge/security/advisories).
+Email details privately to **branchforgereporting.clang219@passmail.net**. Please include a description, steps to reproduce, and the affected version.
 
 ## Security Best Practices for Deployments
 
@@ -19,7 +19,7 @@ When deploying BranchForge in production:
 
 ## Known Security Considerations
 
-- **Session tokens**: Stored as HTTP-only cookies with `SESSION_MAX_AGE` config
+- **Session tokens**: HTTP-only cookies (`secure` + `SameSite=Lax` in production); configurable lifetime via `SESSION_MAX_AGE` (default 24h, clamped to 1h–30d) with sliding expiry (rolling sessions), so the value acts as an inactivity timeout
 - **Password storage**: Hashed with bcrypt (see package.json for version; work factor: 10+)
 - **API rate limiting**: Configurable via rate-limiter service
 - **Database**: Uses parameterized queries via Drizzle ORM (SQL injection protection)

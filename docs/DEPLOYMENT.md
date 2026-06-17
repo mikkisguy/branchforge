@@ -54,7 +54,10 @@ BASE_PATH=/api/
 
 # Session Auth (CRITICAL: Change these!)
 SESSION_SECRET=generate-a-long-random-string-at-least-32-chars
-SESSION_MAX_AGE=86400000
+# Optional. Session maxAge in milliseconds (default: 86400000 = 24h,
+# clamped to 3600000–2592000000 = 1h–30d). With sliding expiry enabled,
+# this is the inactivity timeout, not a fixed-from-login cap.
+# SESSION_MAX_AGE=86400000
 
 # Docker (prod)
 POSTGRES_USER=branchforge
@@ -369,7 +372,7 @@ For high traffic, consider:
 ### "Session expires immediately"
 
 - Check SESSION_SECRET is set and stable
-- Verify SESSION_MAX_AGE (milliseconds)
+- Verify SESSION_MAX_AGE (milliseconds) is within bounds (1h–30d; defaults to 24h). Note: with sliding expiry, this is an inactivity timeout, so very short values log users out quickly
 - Check browser cookie settings
 
 ### "File upload fails"

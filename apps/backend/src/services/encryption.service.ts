@@ -192,6 +192,12 @@ export async function validateAndGetUsername(
       headers: {
         "PRIVATE-TOKEN": token,
       },
+      // Never follow redirects automatically: a 3xx could point to an
+      // internal host or cloud-metadata endpoint and would carry the
+      // PAT header. A redirect on /api/v4/user is treated as a
+      // validation failure (response.ok is false for 3xx) rather than
+      // risking token leakage off the allowlisted host.
+      redirect: "manual",
       signal: controller.signal,
     });
 

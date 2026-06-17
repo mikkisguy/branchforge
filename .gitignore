@@ -54,5 +54,11 @@ plans/
 tmp/
 create-issues.sh
 
+# Security audit notes — PRIVATE, never commit/publish
+docs/security/audit-*.md
+
 tsconfig.tsbuildinfo
 tsconfig.schema.tsbuildinfo
+
+# CodeQL local verification tooling (CLI lives in $HOME, not the repo)
+.codeql/

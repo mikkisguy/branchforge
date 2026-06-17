@@ -26,7 +26,7 @@ import { setupShutdownHandlers } from "./lib/shutdown.js";
 import { globalErrorHandler } from "./middleware/error-handler.middleware.js";
 import { validateCsrfToken } from "./middleware/csrf.middleware.js";
 import { SESSION_COOKIE_NAME } from "./lib/session.js";
-import { getBasePath } from "./lib/config.js";
+import { getBasePath, getSessionMaxAge } from "./lib/config.js";
 import {
   ensureAvatarDir,
   UPLOADS_DIR,
@@ -93,9 +93,25 @@ const sessionStore = createDrizzleSessionStore({
 
 // Require an explicit SESSION_SECRET in production. The hardcoded fallback
 // would otherwise make sessions forgeable to anyone with source access.
-if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+if (
+  process.env.NODE_ENV === "production" &&
+  !process.env.SESSION_SECRET?.trim()
+) {
   throw new Error(
     "SESSION_SECRET environment variable must be set in production"
+  );
+}
+
+// Require an explicit ENCRYPTION_KEY in production. It protects GitLab
+// PATs at rest (AES-256-GCM); without it the app fails at first encrypt
+// anyway, so we fail fast at boot for a clearer signal and to avoid
+// silently shipping unencryptable integrations.
+if (
+  process.env.NODE_ENV === "production" &&
+  !process.env.ENCRYPTION_KEY?.trim()
+) {
+  throw new Error(
+    "ENCRYPTION_KEY environment variable must be set in production"
   );
 }
 
@@ -108,13 +124,20 @@ await server.register(session, {
     secure: process.env.NODE_ENV === "production",
     httpOnly: true,
     sameSite: "lax",
-    maxAge: 86400000, // 24 hours
+    // Configurable absolute session lifetime (1h–30d, default 24h) via
+    // SESSION_MAX_AGE. Sliding expiry (rolling, below) makes this act as
+    // an inactivity timeout rather than a fixed-from-login cap.
+    maxAge: getSessionMaxAge(),
     // Add additional security headers for production
     path: basePath,
   },
   // Save session on every request to ensure session data is up-to-date
   saveUninitialized: false,
-  rolling: false,
+  // Slide session expiry on activity: with rolling enabled, @fastify/session
+  // calls store.set on each response, and setSession refreshes expiresAt to
+  // now + maxAge — so maxAge acts as an inactivity timeout rather than a
+  // fixed-from-login cap.
+  rolling: true,
 });
 
 // Routes

@@ -178,6 +178,28 @@ describe("Session Store Factory", () => {
         );
       });
     });
+
+    it("should call session.touch() before callback", async () => {
+      const callback = vi.fn();
+      const mockSessionWithTouch = {
+        user: { id: "user-123" },
+        csrfToken: "token-123",
+        touch: vi.fn(),
+      } as Session & { touch: ReturnType<typeof vi.fn> };
+      vi.mocked(retryWithBackoff).mockResolvedValue(undefined);
+
+      store.set("session-123", mockSessionWithTouch, callback);
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(mockSessionWithTouch.touch).toHaveBeenCalled();
+      expect(callback).toHaveBeenCalled();
+
+      const touchCallOrder =
+        mockSessionWithTouch.touch.mock.invocationCallOrder[0];
+      const callbackCallOrder = callback.mock.invocationCallOrder[0];
+      expect(touchCallOrder).toBeLessThan(callbackCallOrder);
+    });
   });
 
   describe("get", () => {
