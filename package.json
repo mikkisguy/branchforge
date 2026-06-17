@@ -13,7 +13,6 @@
     "test": "pnpm run test:unit && pnpm run test:integration",
     "test:unit": "pnpm -r --filter './packages/*' --filter './apps/*' test:unit",
     "test:integration": "pnpm -r --filter './apps/*' test:integration",
-    "test:e2e": "echo \"E2E tests not yet implemented\"",
     "dev": "VITE_API_ENV=development pnpm --parallel -r --filter './apps/*' dev",
     "docs:dev": "pnpm --filter @branchforge/docs dev",
     "docs:build": "pnpm --filter @branchforge/docs build",
