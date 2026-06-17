@@ -20,6 +20,20 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
 
 /**
+ * Precomputed bcrypt hash used to keep the response time of a failed
+ * login constant regardless of whether the supplied email exists.
+ * Without it, a non-existent user returns in ~1ms while a valid user
+ * pays the full ~100ms bcrypt cost, which enables timing-based user
+ * enumeration despite the generic "Invalid credentials" error.
+ * Comparing against this dummy hash on a miss consumes the same work.
+ * (OWASP ASVS V3.2.2 — user enumeration prevention.)
+ */
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync(
+  "branchforge-dummy-constant-time-miss",
+  10
+);
+
+/**
  * Hash a password using bcrypt
  */
 export async function hashPassword(password: string): Promise<string> {
@@ -118,6 +132,9 @@ export async function validateCredentials(
     .where(eq(users.email, email));
 
   if (result.length === 0) {
+    // No matching user — still pay the bcrypt cost so a miss takes the
+    // same time as a hit, preventing timing-based user enumeration.
+    await validatePassword(password, DUMMY_PASSWORD_HASH);
     return null;
   }
 

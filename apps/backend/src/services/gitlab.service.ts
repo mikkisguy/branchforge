@@ -26,6 +26,10 @@ import {
   RepositoryNotLinkedError,
 } from "../middleware/error-handler.middleware.js";
 import { isPostgresError } from "../lib/db.js";
+import {
+  isPrivateOrLocalHostname,
+  isAllowedGitlabHost,
+} from "../lib/ip-validation.js";
 import { createProject, deleteProject } from "./projects.service.js";
 import { importFromGitlab } from "./gitlab-sync.service.js";
 import { requireProjectOwnership } from "./authz.service.js";
@@ -40,30 +44,94 @@ import type {
 const DEFAULT_TIMEOUT_MS = 30000;
 
 /**
- * Fetch with timeout helper using AbortController
+ * Maximum number of HTTP redirects to follow manually. Caps redirect
+ * chains to bound latency and avoid loops.
+ */
+const MAX_REDIRECTS = 5;
+
+/**
+ * Returns true if `url` passes the same SSRF checks applied to the
+ * initial GitLab URL (HTTPS, not a private/local host, and on the
+ * allowlisted GitLab hosts). Used to re-validate every redirect target
+ * before following it, so an attacker-controlled host in the allowlist
+ * cannot redirect a PAT-bearing request to an internal address or the
+ * cloud-metadata endpoint.
+ */
+function isApprovedGitlabUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") {
+      return false;
+    }
+    const hostname = parsed.hostname.toLowerCase();
+    if (isPrivateOrLocalHostname(hostname)) {
+      return false;
+    }
+    return isAllowedGitlabHost(hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Fetch with timeout helper using AbortController.
+ *
+ * Redirects are followed MANUALLY (never automatically): every
+ * `Location` is re-validated against the GitLab SSRF allowlist before
+ * being followed, so the request — and its `PRIVATE-TOKEN` header —
+ * can never be diverted to a non-allowlisted or internal host.
  * @param url - The URL to fetch
  * @param options - Fetch options
  * @param timeoutMs - Timeout in milliseconds (default: 30000)
  * @returns The fetch response
- * @throws Error if timeout occurs or fetch fails
+ * @throws Error if timeout occurs, too many redirects, or a redirect
+ *   targets a non-allowlisted host.
  */
 async function fetchWithTimeout(
   url: string,
   options: RequestInit = {},
   timeoutMs: number = DEFAULT_TIMEOUT_MS
 ): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  let currentUrl = url;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(currentUrl, {
+        ...options,
+        redirect: "manual",
+        signal: controller.signal,
+      });
 
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-    return response;
-  } finally {
-    clearTimeout(timeoutId);
+      // Only follow real redirects (300-399 excluding 304 Not Modified
+      // and 305 Use Proxy). If there is no Location header, surface the
+      // response to the caller as-is.
+      if (
+        response.status >= 300 &&
+        response.status < 400 &&
+        response.status !== 304 &&
+        response.status !== 305
+      ) {
+        const location = response.headers.get("location");
+        if (!location) {
+          return response;
+        }
+        const nextUrl = new URL(location, currentUrl).toString();
+        if (!isApprovedGitlabUrl(nextUrl)) {
+          throw new Error(
+            "Refused to follow GitLab redirect to a non-allowlisted or internal host"
+          );
+        }
+        currentUrl = nextUrl;
+        continue;
+      }
+
+      return response;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
+  throw new Error("Too many GitLab redirects");
 }
 
 // GitLab API response types

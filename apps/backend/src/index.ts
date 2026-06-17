@@ -99,6 +99,16 @@ if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
   );
 }
 
+// Require an explicit ENCRYPTION_KEY in production. It protects GitLab
+// PATs at rest (AES-256-GCM); without it the app fails at first encrypt
+// anyway, so we fail fast at boot for a clearer signal and to avoid
+// silently shipping unencryptable integrations.
+if (process.env.NODE_ENV === "production" && !process.env.ENCRYPTION_KEY) {
+  throw new Error(
+    "ENCRYPTION_KEY environment variable must be set in production"
+  );
+}
+
 await server.register(session, {
   secret:
     process.env.SESSION_SECRET ?? "dev-secret-please-change-in-production",
