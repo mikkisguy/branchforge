@@ -4,6 +4,11 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.11.1 - 2026-06-17
+
+- Improved safety with security fixes
+- Added tooltips with label details in flow graph
+
 ## v0.11.0 - 2026-06-14
 
 - Enhanced security with CSRF protection and improved GitLab-related validations
