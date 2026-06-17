@@ -6,10 +6,6 @@
     {
       "matchUpdateTypes": ["patch"],
       "automerge": true
-    },
-    {
-      "matchPackageNames": ["@branchforge/*"],
-      "groupName": "branchforge monorepo packages"
     }
   ]
 }
