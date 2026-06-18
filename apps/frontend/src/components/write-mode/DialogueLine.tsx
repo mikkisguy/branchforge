@@ -5,13 +5,97 @@
  * Matches app design system with theme colors and simple styling.
  */
 
-import { memo, useState, useCallback, useRef, useEffect, useId } from "react";
+import {
+  memo,
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  useId,
+  useMemo,
+} from "react";
 import { X, ChevronDown, Split, ArrowUpRight } from "lucide-react";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { Character } from "@branchforge/shared";
 import { withAlpha } from "@/lib/utils";
 import { TechnicalBadge } from "./TechnicalBadge";
 import { TechnicalPopover } from "./TechnicalPopover";
+import { RenderedLine } from "./RenderedLine";
+import { tokenize } from "@/lib/renpy-tags";
+
+// ---------------------------------------------------------------------------
+// Click → raw-text offset mapping
+// ---------------------------------------------------------------------------
+
+/**
+ * Given pixel coordinates (e.g. from a mouse click on the rendered overlay),
+ * find the equivalent character offset in the RAW textarea text.
+ *
+ * Uses `caretRangeFromPoint` / `caretPositionFromPoint` to locate the text
+ * node under the cursor, then reads `data-raw-start` and `data-raw-len` from
+ * the enclosing rendered span to map back to raw-text coordinates.
+ *
+ * Returns `null` if the position can't be determined (e.g. clicked on empty
+ * space, or the API is unavailable). Caller should fall back to default focus.
+ */
+function getRawOffsetFromPoint(x: number, y: number): number | null {
+  let container: Node | null = null;
+  let offset = 0;
+
+  // Firefox: caretPositionFromPoint (standard)
+  const doc = document as Document & {
+    caretPositionFromPoint?: (
+      x: number,
+      y: number
+    ) => { offsetNode: Node; offset: number } | null;
+  };
+  if (typeof doc.caretPositionFromPoint === "function") {
+    const pos = doc.caretPositionFromPoint(x, y);
+    if (pos) {
+      container = pos.offsetNode;
+      offset = pos.offset;
+    }
+  }
+
+  // Chrome / Safari / Edge: caretRangeFromPoint (de-facto standard)
+  if (
+    container === null &&
+    typeof document.caretRangeFromPoint === "function"
+  ) {
+    const range = document.caretRangeFromPoint(x, y);
+    if (range) {
+      container = range.startContainer;
+      offset = range.startOffset;
+    }
+  }
+
+  if (container === null) return null;
+
+  // When the click lands on padding or an element node (rather than a text
+  // node), `startOffset` is a *child index*, not a character offset. There's
+  // no reliable way to map that back to a raw-text caret position, so bail
+  // out and let the caller fall back to default focus.
+  if (container.nodeType !== Node.TEXT_NODE) return null;
+
+  // Walk up to the nearest rendered span with position metadata.
+  const element = container.parentElement;
+  const span = element?.closest("[data-raw-start]");
+  if (!span) return null;
+
+  const rawStart = parseInt(span.getAttribute("data-raw-start") || "0", 10);
+  const rawLen = parseInt(span.getAttribute("data-raw-len") || "0", 10);
+  const renderedLen = span.textContent?.length ?? 0;
+
+  if (renderedLen === 0 || rawLen === renderedLen) {
+    // Normal tokens (text, interpolation, malformed): 1:1 mapping.
+    return rawStart + offset;
+  }
+
+  // Newline tokens: raw is 2 chars ("\n"), rendered is 1 char.
+  // Scale proportionally and clamp to [rawStart, rawStart + rawLen].
+  const scaled = Math.round((offset / renderedLen) * rawLen);
+  return rawStart + Math.min(scaled, rawLen);
+}
 
 interface DialogueLineProps {
   entry: DialogueEntry;
@@ -99,12 +183,14 @@ export const DialogueLine = memo(function DialogueLine({
     "conditions" | "jump" | "visuals" | "menu" | null
   >(null);
   const [showRemoveHint, setShowRemoveHint] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const removeHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const dropdownMenuRef = useRef<HTMLDivElement>(null);
   const speakerButtonRef = useRef<HTMLButtonElement>(null);
   const wasDropdownOpenRef = useRef(false);
+
   const dropdownId = useId();
   const textOnChangeRef = useRef(onChange);
   const previousTextRef = useRef(entry.text);
@@ -460,6 +546,41 @@ export const DialogueLine = memo(function DialogueLine({
     [characters, focusedOptionIndex, handleSpeakerSelect]
   );
 
+  // -- Rendered-line click → caret position mapping -------------------------
+  // The rendered overlay hides formatting tags ({b}, {/b}, etc.), so its text
+  // layout differs from the textarea's raw text. When the user clicks the
+  // overlay, we use caretRangeFromPoint to find WHERE in the rendered text they
+  // clicked, then map that to the equivalent position in the RAW text using
+  // the data-raw-start / data-raw-len attributes on each rendered span.
+
+  const handleRenderedLineClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const textarea = internalTextareaRef.current;
+      if (!textarea) return;
+
+      // Find the rendered text node at the click point.
+      const rawPos = getRawOffsetFromPoint(e.clientX, e.clientY);
+
+      // Focus first so the textarea is ready, then position the caret.
+      textarea.focus();
+
+      if (rawPos !== null) {
+        textarea.setSelectionRange(rawPos, rawPos);
+      }
+    },
+    []
+  );
+
+  const handleRenderedLineKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        internalTextareaRef.current?.focus();
+      }
+    },
+    []
+  );
+
   const handleDropdownBlur = useCallback(
     (e: React.FocusEvent<HTMLDivElement>) => {
       if (!e.currentTarget.contains(e.relatedTarget)) {
@@ -492,6 +613,12 @@ export const DialogueLine = memo(function DialogueLine({
     : `group relative transition-colors ${
         isStacked ? "flex flex-col gap-1.5 py-2" : "flex flex-col gap-1 py-1.5"
       }`;
+
+  // Tokenize the raw text once per change. The tokenizer is O(n) and the
+  // overlay is only mounted when the textarea is blurred, but we still
+  // memoize to avoid re-tokenizing on every keystroke when the parent
+  // re-renders for unrelated reasons (e.g. speaker hover state).
+  const renderedTokens = useMemo(() => tokenize(entry.text), [entry.text]);
 
   return (
     <div
@@ -648,39 +775,80 @@ export const DialogueLine = memo(function DialogueLine({
           </div>
         )}
 
-        {/* Text Content */}
-        <textarea
-          ref={(el) => {
-            internalTextareaRef.current = el;
-            if (textareaRef) textareaRef(el);
-          }}
-          defaultValue={entry.text}
-          onChange={handleTextChange}
-          onKeyDown={handleKeyDown}
-          placeholder={
-            isChoice
-              ? "Choice text..."
-              : entry.speakerId
-                ? "Dialogue..."
-                : "Narration..."
-          }
-          className={`relative min-h-[2.5rem] p-0 pr-7 resize-none overflow-hidden bg-transparent border-0 outline-none focus-visible:outline-none focus-visible:ring-0 font-light tracking-normal leading-8 placeholder:text-muted-foreground/50 ${
-            isStacked ? "w-full" : "flex-1"
-          }`}
-          aria-label={
-            isChoice
-              ? "Choice text"
-              : entry.speakerId
-                ? "Dialogue text"
-                : "Narration text"
-          }
-          style={{
-            fontSize: "var(--prose-editor-font-size, 16px)",
-            fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
-            fontStyle: !entry.speakerId ? "italic" : "normal",
-            color: "hsl(var(--foreground))",
-          }}
-        />
+        {/* Text Content — textarea is always mounted to prevent height shift.
+            When blurred: textarea is opacity-0 + pointer-events-none (invisible,
+            not clickable). The rendered overlay sits on top with
+            pointer-events-auto, intercepting clicks. On click, we map the
+            rendered position to the raw-text position via caretRangeFromPoint,
+            then focus the textarea and set the caret precisely. */}
+        <div className={`relative ${isStacked ? "w-full" : "flex-1"}`}>
+          <textarea
+            ref={(el) => {
+              internalTextareaRef.current = el;
+              if (textareaRef) textareaRef(el);
+            }}
+            defaultValue={entry.text}
+            onChange={handleTextChange}
+            onKeyDown={handleKeyDown}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            placeholder={
+              isChoice
+                ? "Choice text..."
+                : entry.speakerId
+                  ? "Dialogue..."
+                  : "Narration..."
+            }
+            className={`min-h-[2.5rem] w-full p-0 pr-7 resize-none overflow-hidden bg-transparent border-0 outline-none focus-visible:outline-none focus-visible:ring-0 font-light tracking-normal leading-8 placeholder:text-muted-foreground/50 ${
+              isFocused
+                ? "opacity-100 pointer-events-auto"
+                : "opacity-0 pointer-events-none"
+            }`}
+            aria-label={
+              isChoice
+                ? "Choice text"
+                : entry.speakerId
+                  ? "Dialogue text"
+                  : "Narration text"
+            }
+            aria-hidden={!isFocused}
+            tabIndex={isFocused ? 0 : -1}
+            style={{
+              fontSize: "var(--prose-editor-font-size, 16px)",
+              fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
+              fontStyle: !entry.speakerId ? "italic" : "normal",
+              color: "hsl(var(--foreground))",
+            }}
+          />
+          {!isFocused && (
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={handleRenderedLineClick}
+              onKeyDown={handleRenderedLineKeyDown}
+              data-rendered-line-wrapper="true"
+              aria-label={
+                isChoice
+                  ? "Edit choice text"
+                  : entry.speakerId
+                    ? "Edit dialogue text"
+                    : "Edit narration text"
+              }
+              className="absolute inset-0 pr-7 cursor-text leading-8 outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm overflow-hidden"
+              style={{
+                fontSize: "var(--prose-editor-font-size, 16px)",
+                fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
+                fontStyle: !entry.speakerId ? "italic" : "normal",
+                color: "hsl(var(--foreground))",
+              }}
+            >
+              <RenderedLine
+                tokens={renderedTokens}
+                className="font-light tracking-normal leading-8"
+              />
+            </div>
+          )}
+        </div>
 
         {/* Delete Button */}
         {showDelete && (
