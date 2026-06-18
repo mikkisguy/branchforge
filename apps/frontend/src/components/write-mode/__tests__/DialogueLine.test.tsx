@@ -106,12 +106,22 @@ describe("DialogueLine", () => {
     await user.click(container.querySelector("[data-rendered-line-wrapper]")!);
 
     // Textarea is now visible and accessible.
-    expect(screen.getByRole("textbox")).toBeInTheDocument();
+    const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
+    expect(textarea).toBeInTheDocument();
 
     // Rendered line overlay is gone.
     expect(
       container.querySelector("[data-rendered-line]")
     ).not.toBeInTheDocument();
+
+    // The polyfill in test/setup.ts makes caretPositionFromPoint return the
+    // end of the first text node under the rendered-line overlay. For the
+    // 11-char "Hello world" text token (rawLen === renderedLen), the
+    // 1:1 mapping in getRawOffsetFromPoint translates that to raw offset 11,
+    // which handleRenderedLineClick then sets as a collapsed caret via
+    // setSelectionRange(11, 11).
+    expect(textarea.selectionStart).toBe(11);
+    expect(textarea.selectionEnd).toBe(11);
   });
 
   it("hides the textarea visually when blurred again", async () => {
