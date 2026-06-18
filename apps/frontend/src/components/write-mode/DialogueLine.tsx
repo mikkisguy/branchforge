@@ -554,7 +554,7 @@ export const DialogueLine = memo(function DialogueLine({
   // the data-raw-start / data-raw-len attributes on each rendered span.
 
   const handleRenderedLineClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
+    (e: React.MouseEvent<HTMLElement>) => {
       const textarea = internalTextareaRef.current;
       if (!textarea) return;
 
@@ -566,16 +566,6 @@ export const DialogueLine = memo(function DialogueLine({
 
       if (rawPos !== null) {
         textarea.setSelectionRange(rawPos, rawPos);
-      }
-    },
-    []
-  );
-
-  const handleRenderedLineKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLDivElement>) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        internalTextareaRef.current?.focus();
       }
     },
     []
@@ -811,6 +801,11 @@ export const DialogueLine = memo(function DialogueLine({
                   ? "Dialogue text"
                   : "Narration text"
             }
+            // aria-hidden and tabIndex are coordinated: when not focused the
+            // textarea is hidden from AT AND removed from tab order (tabIndex=-1),
+            // yet must stay programmatically focusable so the rendered-line
+            // overlay's click handler can call .focus() to enter edit mode.
+            // react-doctor-disable-next-line react-doctor/no-aria-hidden-on-focusable
             aria-hidden={!isFocused}
             tabIndex={isFocused ? 0 : -1}
             style={{
@@ -821,11 +816,9 @@ export const DialogueLine = memo(function DialogueLine({
             }}
           />
           {!isFocused && (
-            <div
-              role="button"
-              tabIndex={0}
+            <button
+              type="button"
               onClick={handleRenderedLineClick}
-              onKeyDown={handleRenderedLineKeyDown}
               data-rendered-line-wrapper="true"
               aria-label={
                 isChoice
@@ -834,7 +827,7 @@ export const DialogueLine = memo(function DialogueLine({
                     ? "Edit dialogue text"
                     : "Edit narration text"
               }
-              className="absolute inset-0 pr-7 cursor-text leading-8 outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm overflow-hidden"
+              className="absolute inset-0 pr-7 cursor-text leading-8 text-left bg-transparent border-0 p-0 outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm overflow-hidden"
               style={{
                 fontSize: "var(--prose-editor-font-size, 16px)",
                 fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
@@ -846,7 +839,7 @@ export const DialogueLine = memo(function DialogueLine({
                 tokens={renderedTokens}
                 className="font-light tracking-normal leading-8"
               />
-            </div>
+            </button>
           )}
         </div>
 
