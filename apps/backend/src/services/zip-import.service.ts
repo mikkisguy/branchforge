@@ -8,17 +8,27 @@
 
 import JSZip from "jszip";
 import { getDb } from "../db/index.js";
-import { projectFiles } from "../db/schema/index.js";
+import {
+  projectFiles,
+  characters,
+  variables,
+  stats,
+  labels,
+} from "../db/schema/index.js";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { calculateContentHash } from "../lib/hash.js";
 import { parseRPYFileWithLabels } from "./rpy-parser.service.js";
+import {
+  extractAndStripRpySymbols,
+  type DetectedCharacterStatement,
+  type DetectedDefaultStatement,
+} from "./rpy-statements.service.js";
 import { logError, LogEventType } from "../lib/logger.js";
 import {
   syncLabelsFromFile,
   updateIncomingJumpsForLabels,
 } from "./labels.service.js";
 import { createProject, deleteProject } from "./projects.service.js";
-import { labels } from "../db/schema/index.js";
 
 // ============================================================================
 // Import Guardrails
@@ -64,6 +74,41 @@ export type ImportZipResult = ImportZipSuccess | ImportZipFailure;
 // ============================================================================
 // File Extraction
 // ============================================================================
+
+/**
+ * Aggregate a successfully imported file's extracted symbols into
+ * the running cross-file maps. The first occurrence of a given
+ * tag/key wins so symbol metadata is stable when the same name
+ * appears in multiple files.
+ *
+ * Only files that have been successfully inserted/updated (i.e.
+ * survived their per-file savepoint) should be passed in here —
+ * otherwise symbols from failed files would be promoted with no
+ * matching `project_files` row, leaving the database in an
+ * inconsistent state.
+ */
+function accumulateSymbols(
+  entry: {
+    symbols: {
+      characters: DetectedCharacterStatement[];
+      variables: DetectedDefaultStatement[];
+      stats: DetectedDefaultStatement[];
+    };
+  },
+  charactersByTag: Map<string, DetectedCharacterStatement>,
+  variablesByKey: Map<string, DetectedDefaultStatement>,
+  statsByKey: Map<string, DetectedDefaultStatement>
+): void {
+  for (const c of entry.symbols.characters) {
+    if (!charactersByTag.has(c.tag)) charactersByTag.set(c.tag, c);
+  }
+  for (const v of entry.symbols.variables) {
+    if (!variablesByKey.has(v.key)) variablesByKey.set(v.key, v);
+  }
+  for (const s of entry.symbols.stats) {
+    if (!statsByKey.has(s.key)) statsByKey.set(s.key, s);
+  }
+}
 
 /**
  * Extract all .rpy files from a JSZip object.
@@ -219,14 +264,34 @@ export async function importZipFile(
       return success;
     }
 
-    // Step 3: Pre-process all files (parse and hash) - outside transaction
-    // This is fast and doesn't need DB access, so failures don't roll back DB work
+    // Step 3: Pre-process all files (parse, hash, strip symbols) - outside
+    // transaction. This is fast and doesn't need DB access, so failures
+    // don't roll back DB work.
+    //
+    // We extract `define <tag> = Character(...)` and
+    // `default <key> = ...` statements and remove them from the
+    // stored file content. The DB becomes the single source of truth
+    // for those symbols, so re-exporting the project cannot produce
+    // duplicate `define`/`default` lines that would crash Ren'Py with
+    // `NameError: name 'X' is already defined`. See issue #244.
     const preProcessedFiles = extractedFiles.map((file) => {
       const parsed = parseRPYFileWithLabels(file.content, file.filePath);
+      const stripped = extractAndStripRpySymbols(file.content);
       return {
-        file,
+        filePath: file.filePath,
         fileType: parsed.fileType,
-        contentHash: calculateContentHash(file.content),
+        cleanedContent: stripped.cleanedContent,
+        originalContent: file.content,
+        symbols: {
+          characters: stripped.characters,
+          variables: stripped.variables,
+          stats: stripped.stats,
+        },
+        // Hash the cleaned content because that's what we store in
+        // `project_files.content`; identical inputs produce identical
+        // cleaned output, so re-imports of the same source file are
+        // correctly detected as no-ops.
+        contentHash: calculateContentHash(stripped.cleanedContent),
       };
     });
 
@@ -237,30 +302,24 @@ export async function importZipFile(
     let filesFailed = 0;
     let labelsCreated = 0;
 
-    // Step 4: Process all files in a single transaction with savepoints
-    const syncStoryLabels = async (
-      projectId: string,
-      file: ExtractedFile,
-      fileType: string,
-      fileId: string,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      tx: any
-    ) => {
-      if (fileType === "STORY") {
-        const syncResult = await syncLabelsFromFile(
-          projectId,
-          { filePath: file.filePath, fileType },
-          file.content,
-          fileId,
-          { skipCleanup: false, tx }
-        );
-        labelsCreated += syncResult.labelsCreated;
-      }
-    };
+    // Cross-file symbol aggregation. We populate this as files are
+    // successfully inserted/updated in Step 4 below (NOT from the
+    // raw preProcessedFiles list), so that files whose savepoint
+    // rolls back do not contribute characters / variables / stats
+    // to the database. The first occurrence of a given tag/key
+    // wins so symbol metadata is stable across files.
+    const charactersByTag = new Map<string, DetectedCharacterStatement>();
+    const variablesByKey = new Map<string, DetectedDefaultStatement>();
+    const statsByKey = new Map<string, DetectedDefaultStatement>();
 
+    // Step 4: Process all files in a single transaction with savepoints.
+    // Each file's savepoint isolates per-file failures, so one bad
+    // file doesn't abort the whole import. We use the cleaned content
+    // for `project_files.content` and preserve the original
+    // (pre-strip) text in `originalContent` for round-tripping.
     await db.transaction(async (tx) => {
       let fileIndex = 0;
-      for (const { file, fileType, contentHash } of preProcessedFiles) {
+      for (const entry of preProcessedFiles) {
         const savepointName = `sp_${fileIndex}`;
 
         try {
@@ -275,59 +334,101 @@ export async function importZipFile(
               and(
                 eq(projectFiles.projectId, projectId),
                 eq(projectFiles.source, "ZIP"),
-                eq(projectFiles.filePath, file.filePath)
+                eq(projectFiles.filePath, entry.filePath)
               )
             )
             .limit(1);
 
           if (existing) {
             // Check if content has changed
-            if (existing.contentHash === contentHash) {
+            if (existing.contentHash === entry.contentHash) {
               filesSkipped++;
               await tx.execute(`RELEASE SAVEPOINT ${savepointName}`);
               continue;
             }
 
-            // Update existing file
+            // Update existing file with cleaned content
             await tx
               .update(projectFiles)
               .set({
-                content: file.content,
-                // Only set originalContent if it's null (preserve original on re-imports)
-                originalContent: sql`COALESCE(${projectFiles.originalContent}, ${file.content})`,
-                contentHash,
-                fileType,
+                content: entry.cleanedContent,
+                // Only set originalContent if it's null (preserve the
+                // originally imported file even after re-imports that
+                // strip the same lines again).
+                originalContent: sql`COALESCE(${projectFiles.originalContent}, ${entry.originalContent})`,
+                contentHash: entry.contentHash,
+                fileType: entry.fileType,
                 updatedAt: new Date(),
               })
               .where(eq(projectFiles.id, existing.id));
 
             filesUpdated++;
+            // Aggregate symbols from this successfully processed
+            // file. Skipped files (unchanged hash) don't contribute
+            // because their DB row already has whatever symbols
+            // were extracted on the prior import.
+            accumulateSymbols(
+              entry,
+              charactersByTag,
+              variablesByKey,
+              statsByKey
+            );
 
             // Sync labels for STORY files to create/update labels in database
-            await syncStoryLabels(projectId, file, fileType, existing.id, tx);
+            if (entry.fileType === "STORY") {
+              const syncResult = await syncLabelsFromFile(
+                projectId,
+                { filePath: entry.filePath, fileType: entry.fileType },
+                entry.originalContent, // Pass original content to parser
+                existing.id,
+                { skipCleanup: false, tx }
+              );
+              labelsCreated += syncResult.labelsCreated;
+            }
           } else {
-            // Insert new file
+            // Insert new file with cleaned content
             const [newFile] = await tx
               .insert(projectFiles)
               .values({
                 projectId,
                 source: "ZIP",
-                filePath: file.filePath,
-                fileType,
-                content: file.content,
-                originalContent: file.content, // Store original imported content for reconstruction
-                contentHash,
+                filePath: entry.filePath,
+                fileType: entry.fileType,
+                content: entry.cleanedContent,
+                originalContent: entry.originalContent, // Preserve the original
+                contentHash: entry.contentHash,
               })
               .returning();
 
             if (!newFile) {
-              throw new Error(`Failed to insert file: ${file.filePath}`);
+              throw new Error(`Failed to insert file: ${entry.filePath}`);
             }
 
             filesImported++;
+            // Aggregate symbols from this successfully processed
+            // file. Only files that survive the savepoint contribute
+            // to the symbol promotion that follows, so a malformed
+            // or failing file does not leave its characters /
+            // variables / stats stranded in the database with no
+            // matching `project_files` row.
+            accumulateSymbols(
+              entry,
+              charactersByTag,
+              variablesByKey,
+              statsByKey
+            );
 
             // Sync labels for STORY files to create labels in database
-            await syncStoryLabels(projectId, file, fileType, newFile.id, tx);
+            if (entry.fileType === "STORY") {
+              const syncResult = await syncLabelsFromFile(
+                projectId,
+                { filePath: entry.filePath, fileType: entry.fileType },
+                entry.originalContent, // Pass original content to parser
+                newFile.id,
+                { skipCleanup: false, tx }
+              );
+              labelsCreated += syncResult.labelsCreated;
+            }
           }
 
           // Release savepoint on success
@@ -350,7 +451,7 @@ export async function importZipFile(
           logError(LogEventType.SERVICE_ERROR, {
             event: "zip_file_import_failed",
             projectId,
-            filePath: file.filePath,
+            filePath: entry.filePath,
             error: error instanceof Error ? error.message : "Unknown error",
           });
 
@@ -358,6 +459,69 @@ export async function importZipFile(
         }
 
         fileIndex++;
+      }
+
+      // Step 5: Promote extracted `define`/`default` symbols into
+      // the database. This runs inside the same transaction as the
+      // per-file savepoint loop so the file inserts and the symbol
+      // promotion are atomic: either both commit or neither does.
+      // We use `onConflictDoNothing` so re-imports of the same RPY
+      // files are no-ops and the user's later UI edits to the DB
+      // rows are preserved.
+      const allCharacters = Array.from(charactersByTag.values());
+      const allVariables = Array.from(variablesByKey.values());
+      const allStats = Array.from(statsByKey.values());
+      if (
+        allCharacters.length > 0 ||
+        allVariables.length > 0 ||
+        allStats.length > 0
+      ) {
+        for (const c of allCharacters) {
+          await tx
+            .insert(characters)
+            .values({
+              projectId,
+              name: c.name ?? c.tag,
+              displayName: c.name ?? c.tag,
+              renpyTag: c.tag,
+              color: c.color || "#cfcfcf",
+              updatedAt: new Date(),
+            })
+            .onConflictDoNothing({
+              target: [characters.projectId, characters.renpyTag],
+            });
+        }
+        for (const v of allVariables) {
+          await tx
+            .insert(variables)
+            .values({
+              projectId,
+              key: v.key,
+            })
+            .onConflictDoNothing({
+              target: [variables.projectId, variables.key],
+            });
+        }
+        for (const s of allStats) {
+          // `default x = 0` becomes a stat with minValue=0 and the
+          // default maxValue of 100; users can adjust in the UI.
+          // Use parseFloat + round so that float values like 3.5
+          // are preserved (parseInt would silently truncate to 3).
+          const minValue = Math.round(Number.parseFloat(s.value)) || 0;
+          await tx
+            .insert(stats)
+            .values({
+              projectId,
+              key: s.key,
+              name: s.key,
+              minValue,
+              maxValue: 100,
+              updatedAt: new Date(),
+            })
+            .onConflictDoNothing({
+              target: [stats.projectId, stats.key],
+            });
+        }
       }
     });
 

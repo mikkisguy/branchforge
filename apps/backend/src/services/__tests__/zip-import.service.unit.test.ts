@@ -261,6 +261,11 @@ describe("ZipImportService", () => {
       insert: vi.fn().mockReturnThis(),
       values: vi.fn().mockReturnThis(),
       onConflictDoUpdate: vi.fn().mockReturnThis(),
+      // onConflictDoNothing is used by the symbol-promotion
+      // transaction (issue #244) to upsert characters / variables /
+      // stats idempotently. It needs to return `this` like the
+      // other chain methods.
+      onConflictDoNothing: vi.fn().mockReturnThis(),
       set: vi.fn().mockReturnThis(),
       returning: vi.fn().mockResolvedValue([{ id: "test-file-id" }]),
       select: vi.fn().mockReturnThis(),
@@ -283,6 +288,7 @@ describe("ZipImportService", () => {
       insert: vi.fn().mockReturnThis(),
       values: vi.fn().mockReturnThis(),
       onConflictDoUpdate: vi.fn().mockReturnThis(),
+      onConflictDoNothing: vi.fn().mockReturnThis(),
       set: vi.fn().mockReturnThis(),
       returning: vi.fn().mockResolvedValue([{ id: "test-file-id" }]),
       select: vi.fn().mockReturnThis(),
@@ -301,6 +307,7 @@ describe("ZipImportService", () => {
       mockTx.insert.mockReturnThis();
       mockTx.values.mockReturnThis();
       mockTx.onConflictDoUpdate?.mockReturnThis?.();
+      mockTx.onConflictDoNothing?.mockReturnThis?.();
       mockTx.set.mockReturnThis();
       mockTx.select.mockReturnThis();
       mockTx.from.mockReturnThis();
@@ -465,6 +472,163 @@ describe("ZipImportService", () => {
         success: true,
         filesImported: 2,
       });
+    });
+
+    // ====================================================================
+    // issue #244: `define` / `default` symbols are stripped from the
+    // stored file content and promoted into the characters / variables /
+    // stats tables so that re-exporting the project cannot produce
+    // duplicate `define` statements that would crash Ren'Py with
+    // `NameError: name 'X' is already defined`.
+    // ====================================================================
+
+    it("strips define Character() and default lines from the content passed to the project_files insert", async () => {
+      // The RPY file a user would drop into Ren'Py typically declares
+      // its characters and any custom stat defaults at the top. The
+      // importer must remove those lines from the stored content and
+      // surface them to the database tables instead.
+      const fileContent = [
+        'define e = Character("Eileen", color="#c8ffc8")',
+        'define s = Character("Sylvie", color="#ff0000")',
+        "",
+        "default affection = 0",
+        "default has_met_alex = False",
+        "",
+        "label start:",
+        '    e "Hello."',
+        "    return",
+      ].join("\n");
+
+      const mockBuffer = Buffer.from("mock zip");
+      const mockZip = {
+        files: {
+          "game/characters.rpy": createMockFile(
+            "game/characters.rpy",
+            fileContent
+          ),
+        },
+      };
+      vi.mocked(JSZip.loadAsync).mockResolvedValue(mockZip as any);
+
+      await importZipFile(mockProjectId, mockBuffer);
+
+      // Find the .values() call for the projectFiles insert. The
+      // mock chain is permissive, so the chain is `insert -> values`
+      // with `values` receiving the row payload.
+      const valuesCalls = mockTx.values.mock.calls;
+      const projectFileRow = valuesCalls
+        .map((c) => c[0] as Record<string, unknown>)
+        .find((row) => row && typeof row.filePath === "string");
+
+      expect(projectFileRow).toBeDefined();
+      // The stored `content` no longer contains the symbols, but it
+      // does contain the label and dialogue that follow.
+      const storedContent = projectFileRow!.content as string;
+      expect(storedContent).not.toContain("define e = Character");
+      expect(storedContent).not.toContain("define s = Character");
+      expect(storedContent).not.toContain("default affection");
+      expect(storedContent).not.toContain("default has_met_alex");
+      expect(storedContent).toContain("label start:");
+      expect(storedContent).toContain('e "Hello."');
+
+      // The original (un-stripped) content is preserved for
+      // round-tripping / reconstruction.
+      expect(projectFileRow!.originalContent).toBe(fileContent);
+    });
+
+    it("promotes extracted characters, variables and stats into the database", async () => {
+      // End-to-end check: after importing a file that defines an
+      // `e` character, an `affection` stat, and a `has_met_alex`
+      // variable, those rows should be inserted into the
+      // `characters`, `stats`, and `variables` tables.
+      const fileContent = [
+        'define e = Character("Eileen", color="#c8ffc8")',
+        "",
+        "default affection = 0",
+        "default has_met_alex = False",
+        "",
+        "label start:",
+        "    return",
+      ].join("\n");
+
+      const mockBuffer = Buffer.from("mock zip");
+      const mockZip = {
+        files: {
+          "game/script.rpy": createMockFile("game/script.rpy", fileContent),
+        },
+      };
+      vi.mocked(JSZip.loadAsync).mockResolvedValue(mockZip as any);
+
+      await importZipFile(mockProjectId, mockBuffer);
+
+      // Collect every row that was passed to `tx.values(...)` across
+      // both the per-file savepoint transaction and the symbol-
+      // promotion transaction. The mock chain is shared by both
+      // transactions (they both run via the same `mockTx`), so this
+      // captures inserts into all relevant tables.
+      const allRows = mockTx.values.mock.calls.map(
+        (c) => c[0] as Record<string, unknown>
+      );
+
+      // The character row was inserted with the right tag and color.
+      const characterRow = allRows.find((r) => "renpyTag" in r);
+      expect(characterRow).toMatchObject({
+        projectId: mockProjectId,
+        renpyTag: "e",
+        name: "Eileen",
+        displayName: "Eileen",
+        color: "#c8ffc8",
+      });
+
+      // The variable row (True/False) was inserted.
+      const variableRow = allRows.find(
+        (r) => "key" in r && !("minValue" in r) && !("maxValue" in r)
+      );
+      expect(variableRow).toMatchObject({
+        projectId: mockProjectId,
+        key: "has_met_alex",
+      });
+
+      // The stat row (numeric) was inserted with the parsed minValue.
+      const statRow = allRows.find((r) => "minValue" in r && "maxValue" in r);
+      expect(statRow).toMatchObject({
+        projectId: mockProjectId,
+        key: "affection",
+        minValue: 0,
+        maxValue: 100,
+      });
+
+      // The `onConflictDoNothing` upsert path was used for all three
+      // symbol inserts.
+      expect(mockTx.onConflictDoNothing).toHaveBeenCalled();
+    });
+
+    it("is idempotent: re-importing the same RPY files does not duplicate symbols", async () => {
+      // Same RPY content, two imports. The second one must not
+      // fail (the unique constraint on (projectId, renpyTag) and
+      // (projectId, key) is handled via onConflictDoNothing).
+      const fileContent = [
+        'define e = Character("Eileen", color="#c8ffc8")',
+        "",
+        "default has_met_alex = False",
+        "",
+        "label start:",
+        "    return",
+      ].join("\n");
+
+      const mockBuffer = Buffer.from("mock zip");
+      const mockZip = {
+        files: {
+          "game/script.rpy": createMockFile("game/script.rpy", fileContent),
+        },
+      };
+      vi.mocked(JSZip.loadAsync).mockResolvedValue(mockZip as any);
+
+      const first = await importZipFile(mockProjectId, mockBuffer);
+      const second = await importZipFile(mockProjectId, mockBuffer);
+
+      expect(first.success).toBe(true);
+      expect(second.success).toBe(true);
     });
 
     it("should return statistics about imported files", async () => {

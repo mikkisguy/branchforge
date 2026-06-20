@@ -358,6 +358,330 @@ describe("ExportService", () => {
       expect(generateCharacterDefinitionsFile).toHaveBeenCalledWith(mockChars);
     });
 
+    it("should place generated branchforge_*.rpy files under the common directory prefix", async () => {
+      // Reproduces the regression in issue #244: the three generated
+      // supporting files used to be written at the archive root, so
+      // Ren'Py silently ignored them. The fix is to compute the
+      // shared top-level directory from the project file paths and
+      // place the generated files under it.
+      const mockProject = { name: "Prefixed" };
+      const mockFiles = [
+        {
+          id: "file-1",
+          projectId: PROJECT_ID,
+          filePath: "game/script.rpy",
+          fileType: "STORY",
+          content: "label start:",
+          contentHash: "abc",
+          source: "manual",
+        },
+        {
+          id: "file-2",
+          projectId: PROJECT_ID,
+          filePath: "game/gui.rpy",
+          fileType: "SETTINGS",
+          content: "screen navigation():",
+          contentHash: "def",
+          source: "manual",
+        },
+      ];
+      const mockExportRecord = {
+        id: EXPORT_ID,
+        projectId: PROJECT_ID,
+        format: "RENPY",
+        fileName: "prefixed.zip",
+        content: "",
+        fileSize: 0,
+        createdAt: new Date("2024-01-01T00:00:00Z"),
+      };
+
+      resolveQueue.push(mockFiles); // files
+      resolveQueue.push([]); // labels
+      resolveQueue.push([{ key: "v", description: null, category: null }]);
+      resolveQueue.push([
+        { key: "s", name: "S", minValue: 0, maxValue: 1, description: null },
+      ]);
+      resolveQueue.push([
+        { renpyTag: "e", displayName: "Eileen", color: "#c8ffc8" },
+      ]);
+      resolveQueue.push([]); // cleanup
+
+      mockDb.limit.mockResolvedValueOnce([mockProject]);
+      mockDb.returning.mockResolvedValueOnce([mockExportRecord]);
+
+      // Capture the JSON content the service hands to the DB.
+      mockDb.values.mockImplementationOnce(
+        (vals: { fileName: string; content: string; fileSize: number }) => {
+          mockDb.returning.mockResolvedValueOnce([
+            {
+              id: EXPORT_ID,
+              projectId: PROJECT_ID,
+              format: "RENPY",
+              fileName: vals.fileName,
+              content: vals.content,
+              fileSize: vals.fileSize,
+              createdAt: new Date(),
+            },
+          ]);
+          return mockDb;
+        }
+      );
+
+      await generateExport(PROJECT_ID, USER_ID);
+
+      const insertPayload = mockDb.values.mock.calls[0][0] as {
+        content: string;
+      };
+      const savedContent = JSON.parse(insertPayload.content);
+
+      // The supporting files must live under `game/`, not at the
+      // archive root.
+      expect(savedContent).toHaveProperty("game/branchforge_variables.rpy");
+      expect(savedContent).toHaveProperty("game/branchforge_stats.rpy");
+      expect(savedContent).toHaveProperty("game/branchforge_definitions.rpy");
+      expect(savedContent).not.toHaveProperty("branchforge_variables.rpy");
+      expect(savedContent).not.toHaveProperty("branchforge_stats.rpy");
+      expect(savedContent).not.toHaveProperty("branchforge_definitions.rpy");
+    });
+
+    it("strips define/default lines from project files at export time as a defensive safety net", async () => {
+      // Simulates a project that was imported before issue #244
+      // shipped and therefore still has `define <tag> = Character(...)`
+      // and `default <key> = ...` lines in its stored `content`.
+      // The export must strip them on the way out, otherwise the
+      // generated `branchforge_*.rpy` files would collide with the
+      // user-authored lines and crash Ren'Py with
+      // `NameError: name 'X' is already defined`.
+      const mockProject = { name: "Legacy" };
+      const mockFiles = [
+        {
+          id: "file-1",
+          projectId: PROJECT_ID,
+          filePath: "game/characters.rpy",
+          fileType: "STORY",
+          // Pre-fix style: characters and stat defaults live in
+          // the project files, not in the DB.
+          content: [
+            'define e = Character("Eileen", color="#c8ffc8")',
+            "default affection = 0",
+            "",
+            "label start:",
+            "    return",
+          ].join("\n"),
+          contentHash: "legacy-hash",
+          source: "manual",
+        },
+      ];
+      const mockExportRecord = {
+        id: EXPORT_ID,
+        projectId: PROJECT_ID,
+        format: "RENPY",
+        fileName: "legacy.zip",
+        content: "",
+        fileSize: 0,
+        createdAt: new Date("2024-01-01T00:00:00Z"),
+      };
+
+      resolveQueue.push(mockFiles); // files
+      resolveQueue.push([]); // labels
+      resolveQueue.push([]); // variables
+      resolveQueue.push([]); // stats
+      resolveQueue.push([]); // characters (DB-side, not in the file)
+      resolveQueue.push([]); // cleanup
+
+      mockDb.limit.mockResolvedValueOnce([mockProject]);
+      mockDb.returning.mockResolvedValueOnce([mockExportRecord]);
+
+      mockDb.values.mockImplementationOnce(
+        (vals: { fileName: string; content: string; fileSize: number }) => {
+          mockDb.returning.mockResolvedValueOnce([
+            {
+              id: EXPORT_ID,
+              projectId: PROJECT_ID,
+              format: "RENPY",
+              fileName: vals.fileName,
+              content: vals.content,
+              fileSize: vals.fileSize,
+              createdAt: new Date(),
+            },
+          ]);
+          return mockDb;
+        }
+      );
+
+      await generateExport(PROJECT_ID, USER_ID);
+
+      const insertPayload = mockDb.values.mock.calls[0][0] as {
+        content: string;
+      };
+      const savedContent = JSON.parse(insertPayload.content);
+      // The user file in the zip is clean of `define`/`default`
+      // lines even though the DB has no characters / variables /
+      // stats to generate a branchforge_*.rpy for.
+      expect(savedContent["game/characters.rpy"]).not.toContain(
+        "define e = Character"
+      );
+      expect(savedContent["game/characters.rpy"]).not.toContain(
+        "default affection"
+      );
+      expect(savedContent["game/characters.rpy"]).toContain("label start:");
+    });
+
+    it("ignores unsafe file paths when computing the generated-file directory prefix", async () => {
+      // A file whose `file_path` fails `sanitizeZipEntryPath` (e.g.
+      // contains `..`) must not drag the directory-prefix
+      // calculation off the real project layout. Before the fix,
+      // such a stray entry would force the prefix to "" and place
+      // `branchforge_*.rpy` at the archive root — silently
+      // disabling them in Ren'Py. See issue #244.
+      const mockProject = { name: "Unsafe" };
+      const mockFiles = [
+        {
+          id: "file-1",
+          projectId: PROJECT_ID,
+          filePath: "game/script.rpy",
+          fileType: "STORY",
+          content: "label start:",
+          contentHash: "abc",
+          source: "manual",
+        },
+        {
+          id: "file-2",
+          projectId: PROJECT_ID,
+          // Path-traversal — `sanitizeZipEntryPath` rejects it.
+          filePath: "evil/../escape.rpy",
+          fileType: "STORY",
+          content: "label evil:",
+          contentHash: "def",
+          source: "manual",
+        },
+      ];
+      const mockExportRecord = {
+        id: EXPORT_ID,
+        projectId: PROJECT_ID,
+        format: "RENPY",
+        fileName: "unsafe.zip",
+        content: "",
+        fileSize: 0,
+        createdAt: new Date("2024-01-01T00:00:00Z"),
+      };
+
+      resolveQueue.push(mockFiles); // files
+      resolveQueue.push([]); // labels
+      resolveQueue.push([{ key: "v", description: null, category: null }]);
+      resolveQueue.push([]); // stats
+      resolveQueue.push([]); // characters
+      resolveQueue.push([]); // cleanup
+
+      mockDb.limit.mockResolvedValueOnce([mockProject]);
+      mockDb.returning.mockResolvedValueOnce([mockExportRecord]);
+
+      mockDb.values.mockImplementationOnce(
+        (vals: { fileName: string; content: string; fileSize: number }) => {
+          mockDb.returning.mockResolvedValueOnce([
+            {
+              id: EXPORT_ID,
+              projectId: PROJECT_ID,
+              format: "RENPY",
+              fileName: vals.fileName,
+              content: vals.content,
+              fileSize: vals.fileSize,
+              createdAt: new Date(),
+            },
+          ]);
+          return mockDb;
+        }
+      );
+
+      await generateExport(PROJECT_ID, USER_ID);
+
+      const insertPayload = mockDb.values.mock.calls[0][0] as {
+        content: string;
+      };
+      const savedContent = JSON.parse(insertPayload.content);
+      // The unsafe path was filtered out, so the prefix is `game/`
+      // (not ""), and the generated file lives where Ren'Py will find it.
+      expect(savedContent).toHaveProperty("game/branchforge_variables.rpy");
+      expect(savedContent).not.toHaveProperty("branchforge_variables.rpy");
+      // The unsafe path itself is not in the archive.
+      expect(savedContent).not.toHaveProperty("evil/../escape.rpy");
+    });
+
+    it("should fall back to no prefix when project files have mixed top-level directories", async () => {
+      // If the project mixes top-level directories (e.g. `game/`
+      // and `docs/`) and they disagree, the helper returns "" so we
+      // place the generated files at the archive root. This matches
+      // the GitLab export behaviour.
+      const mockProject = { name: "Mixed" };
+      const mockFiles = [
+        {
+          id: "file-1",
+          projectId: PROJECT_ID,
+          filePath: "game/script.rpy",
+          fileType: "STORY",
+          content: "label start:",
+          contentHash: "abc",
+          source: "manual",
+        },
+        {
+          id: "file-2",
+          projectId: PROJECT_ID,
+          filePath: "docs/readme.rpy",
+          fileType: "SETTINGS",
+          content: "screen about():",
+          contentHash: "def",
+          source: "manual",
+        },
+      ];
+      const mockExportRecord = {
+        id: EXPORT_ID,
+        projectId: PROJECT_ID,
+        format: "RENPY",
+        fileName: "mixed.zip",
+        content: "",
+        fileSize: 0,
+        createdAt: new Date("2024-01-01T00:00:00Z"),
+      };
+
+      resolveQueue.push(mockFiles); // files
+      resolveQueue.push([]); // labels
+      resolveQueue.push([{ key: "v", description: null, category: null }]);
+      resolveQueue.push([]); // stats
+      resolveQueue.push([]); // characters
+      resolveQueue.push([]); // cleanup
+
+      mockDb.limit.mockResolvedValueOnce([mockProject]);
+      mockDb.returning.mockResolvedValueOnce([mockExportRecord]);
+
+      mockDb.values.mockImplementationOnce(
+        (vals: { fileName: string; content: string; fileSize: number }) => {
+          mockDb.returning.mockResolvedValueOnce([
+            {
+              id: EXPORT_ID,
+              projectId: PROJECT_ID,
+              format: "RENPY",
+              fileName: vals.fileName,
+              content: vals.content,
+              fileSize: vals.fileSize,
+              createdAt: new Date(),
+            },
+          ]);
+          return mockDb;
+        }
+      );
+
+      await generateExport(PROJECT_ID, USER_ID);
+
+      const insertPayload = mockDb.values.mock.calls[0][0] as {
+        content: string;
+      };
+      const savedContent = JSON.parse(insertPayload.content);
+      // Variables is the only generated file in this test; with no
+      // common top-level directory it should be at the root.
+      expect(savedContent).toHaveProperty("branchforge_variables.rpy");
+      expect(savedContent).not.toHaveProperty("game/branchforge_variables.rpy");
+    });
+
     it("should throw RateLimitError when rate limited", async () => {
       vi.mocked(checkRateLimit).mockReturnValueOnce({
         allowed: false,
