@@ -31,6 +31,10 @@ import {
   generateCharacterDefinitionsFile,
   type LabelWithConditions,
 } from "./rpy-generator.service.js";
+import {
+  computeCommonDirectoryPrefix,
+  extractAndStripRpySymbols,
+} from "./rpy-statements.service.js";
 import { checkRateLimit } from "./rate-limiter.service.js";
 import { logInfo, logError, logWarn, LogEventType } from "../lib/logger.js";
 
@@ -204,19 +208,30 @@ export async function generateExport(
       });
       continue;
     }
+    // Defensive strip: remove any `define <tag> = Character(...)` /
+    // `default <key> = ...` lines that might still be present in
+    // the stored `content`. The import path strips them at
+    // ingestion (issue #244), but projects imported before that
+    // fix shipped could still carry those lines. The strip is
+    // idempotent on already-clean content. We deliberately do
+    // NOT touch `originalContent` — that field is preserved for
+    // round-tripping and reconstruction.
+    const strippedContent = extractAndStripRpySymbols(
+      file.content
+    ).cleanedContent;
     if (file.fileType === "STORY") {
       const fileLabels = labelsByFileId.get(file.id) ?? [];
       if (fileLabels.length > 0) {
         patchedFiles[safePath] = patchRPYWithVariables(
-          file.content,
+          strippedContent,
           fileLabels
         );
       } else {
-        patchedFiles[safePath] = file.content;
+        patchedFiles[safePath] = strippedContent;
       }
     } else {
       // Non-story files (settings, gui, etc.) — include as-is
-      patchedFiles[safePath] = file.content;
+      patchedFiles[safePath] = strippedContent;
     }
   }
 
@@ -252,18 +267,28 @@ export async function generateExport(
     ]
   );
 
+  // Determine the directory prefix for generated files (e.g. "game/")
+  // by computing a shared top-level directory segment from project file
+  // paths. Generated branchforge_*.rpy files must be placed alongside
+  // the project files so Ren'Py picks them up at launch — placing them
+  // at the archive root is silently ignored. See issue #244.
+  const fileDirPrefix = computeCommonDirectoryPrefix(
+    files.map((f) => f.filePath)
+  );
+
   // Generate additional RPY files
   if (projectVariables.length > 0) {
-    patchedFiles["branchforge_variables.rpy"] =
+    patchedFiles[`${fileDirPrefix}branchforge_variables.rpy`] =
       generateVariablesFile(projectVariables);
   }
 
   if (projectStats.length > 0) {
-    patchedFiles["branchforge_stats.rpy"] = generateStatsFile(projectStats);
+    patchedFiles[`${fileDirPrefix}branchforge_stats.rpy`] =
+      generateStatsFile(projectStats);
   }
 
   if (projectCharacters.length > 0) {
-    patchedFiles["branchforge_definitions.rpy"] =
+    patchedFiles[`${fileDirPrefix}branchforge_definitions.rpy`] =
       generateCharacterDefinitionsFile(projectCharacters);
   }
 

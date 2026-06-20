@@ -37,6 +37,12 @@ import {
 } from "./rpy-generator.service.js";
 import { calculateLinesHash, calculateContentHash } from "../lib/hash.js";
 import { type DetectedCharacter } from "./character-parser.service.js";
+import {
+  computeCommonDirectoryPrefix,
+  extractAndStripRpySymbols,
+  type DetectedCharacterStatement,
+  type DetectedDefaultStatement,
+} from "./rpy-statements.service.js";
 import { projectSettings } from "../db/schema/index.js";
 import { mapEntriesToLabelLineValues } from "./label-line-mapper.js";
 import { logError, logWarn } from "../lib/logger.js";
@@ -141,37 +147,10 @@ async function updateSyncOperation(
     .where(eq(gitlabSyncOperations.id, operationId));
 }
 
-/**
- * Compute the top-level directory prefix from a list of file paths.
- * Extracts the first directory segment from each path with a "/",
- * and returns it with trailing "/" if all such paths share the same
- * top-level directory. Returns "" otherwise.
- *
- * Example: ["game/ch1/script.rpy", "game/ch2/scene.rpy"] → "game/"
- *          ["game/script.rpy", "README.md"] → "game/"
- *          ["src/a.ts", "tests/b.ts"] → ""
- *          ["README.md", "LICENSE"] → ""
- */
-export function computeCommonDirectoryPrefix(filePaths: string[]): string {
-  const topDirs: string[] = [];
-  for (const p of filePaths) {
-    const firstSlash = p.indexOf("/");
-    if (firstSlash !== -1) {
-      topDirs.push(p.slice(0, firstSlash));
-    }
-  }
-
-  if (topDirs.length === 0) {
-    return "";
-  }
-
-  const first = topDirs[0];
-  if (topDirs.every((d) => d === first)) {
-    return first + "/";
-  }
-
-  return "";
-}
+// Re-export the shared directory-prefix helper so existing tests and
+// downstream importers keep working. The implementation lives in
+// `rpy-statements.service.ts` so the zip exporter can share it.
+export { computeCommonDirectoryPrefix } from "./rpy-statements.service.js";
 
 /**
  * Export scenes from BranchForge to GitLab
@@ -245,12 +224,21 @@ export async function exportToGitlab(
     // Export each project file - Script Mode uses stored content directly
     for (const file of files) {
       if (file.content) {
-        let contentToExport = file.content;
+        // Defensive strip: remove any `define <tag> = Character(...)` /
+        // `default <key> = ...` lines that might still be present in
+        // the stored `content`. The import path strips them at
+        // ingestion (issue #244), but projects imported before that
+        // fix shipped could still carry those lines. The strip is
+        // idempotent on already-clean content.
+        const baseContent = extractAndStripRpySymbols(
+          file.content
+        ).cleanedContent;
+        let contentToExport = baseContent;
 
         // Patch content with variables if this file has labels with conditions
         const fileLabels = labelsByFile.get(file.id);
         if (fileLabels && fileLabels.length > 0) {
-          contentToExport = patchRPYWithVariables(file.content, fileLabels);
+          contentToExport = patchRPYWithVariables(baseContent, fileLabels);
         }
 
         filesToExport.push({
@@ -485,8 +473,10 @@ export async function importFromGitlab(
     const parsedFiles: Array<{
       file: (typeof rpyFiles)[0];
       content: string;
+      cleanedContent: string;
       parsed: ParsedRPYFileWithLabels;
       projectFile: ProjectFile;
+      symbols: ReturnType<typeof extractAndStripRpySymbols>;
     }> = [];
 
     for (const result of fileFetchResults) {
@@ -511,8 +501,18 @@ export async function importFromGitlab(
       // Parse with new label-aware parser, passing filename for better detection
       const parsed = parseRPYFileWithLabels(content, file.path);
 
-      // Create or update project_files record with full content for Script Mode
-      const contentHash = calculateContentHash(content);
+      // Strip BranchForge-managed `define`/`default` statements from
+      // the stored content. The DB is the single source of truth for
+      // those symbols, so re-exporting the project cannot produce
+      // duplicate lines that would crash Ren'Py with
+      // `NameError: name 'X' is already defined`. See issue #244.
+      const symbols = extractAndStripRpySymbols(content);
+
+      // Hash the cleaned content because that's what we store in
+      // `project_files.content`; identical source files produce
+      // identical cleaned output, so re-syncs of unchanged files are
+      // correctly detected as no-ops.
+      const contentHash = calculateContentHash(symbols.cleanedContent);
       const [projectFile] = await db
         .insert(projectFiles)
         .values({
@@ -520,8 +520,8 @@ export async function importFromGitlab(
           source: "GITLAB",
           filePath: file.path,
           fileType: parsed.fileType,
-          content: content, // Store full RPY content for Script Mode
-          originalContent: content, // Store original imported content for reconstruction
+          content: symbols.cleanedContent, // Store cleaned content (no define/default)
+          originalContent: content, // Preserve original for reconstruction
           contentHash,
           lastSyncedAt: new Date(),
           lastCommitSha: importCommitSha,
@@ -533,7 +533,7 @@ export async function importFromGitlab(
             projectFiles.filePath,
           ],
           set: {
-            content: content, // Update full content on sync
+            content: symbols.cleanedContent, // Update cleaned content on sync
             // Only set originalContent if it's null (preserve original on subsequent syncs)
             originalContent: sql`COALESCE(${projectFiles.originalContent}, ${content})`,
             contentHash,
@@ -544,7 +544,98 @@ export async function importFromGitlab(
         })
         .returning();
 
-      parsedFiles.push({ file, content, parsed, projectFile });
+      parsedFiles.push({
+        file,
+        content,
+        cleanedContent: symbols.cleanedContent,
+        parsed,
+        projectFile,
+        symbols,
+      });
+    }
+
+    // Phase 1.5: Promote extracted `define`/`default` symbols into the
+    // database. The DB is the single source of truth for those
+    // symbols, so re-exporting the project cannot produce duplicate
+    // lines that would crash Ren'Py with
+    // `NameError: name 'X' is already defined`. We use
+    // `onConflictDoNothing` so re-syncs of unchanged files are
+    // no-ops and the user's later UI edits to the DB rows are
+    // preserved. See issue #244.
+    if (parsedFiles.length > 0) {
+      // Dedupe across files (the strip step de-dupes per file).
+      const charactersByTag = new Map<string, DetectedCharacterStatement>();
+      const variablesByKey = new Map<string, DetectedDefaultStatement>();
+      const statsByKey = new Map<string, DetectedDefaultStatement>();
+      for (const f of parsedFiles) {
+        for (const c of f.symbols.characters) {
+          if (!charactersByTag.has(c.tag)) charactersByTag.set(c.tag, c);
+        }
+        for (const v of f.symbols.variables) {
+          if (!variablesByKey.has(v.key)) variablesByKey.set(v.key, v);
+        }
+        for (const s of f.symbols.stats) {
+          if (!statsByKey.has(s.key)) statsByKey.set(s.key, s);
+        }
+      }
+      const dedupedCharacters = Array.from(charactersByTag.values());
+      const dedupedVariables = Array.from(variablesByKey.values());
+      const dedupedStats = Array.from(statsByKey.values());
+
+      if (
+        dedupedCharacters.length > 0 ||
+        dedupedVariables.length > 0 ||
+        dedupedStats.length > 0
+      ) {
+        await db.transaction(async (tx) => {
+          for (const c of dedupedCharacters) {
+            await tx
+              .insert(characters)
+              .values({
+                projectId,
+                name: c.name ?? c.tag,
+                displayName: c.name ?? c.tag,
+                renpyTag: c.tag,
+                color: c.color || "#cfcfcf",
+                updatedAt: new Date(),
+              })
+              .onConflictDoNothing({
+                target: [characters.projectId, characters.renpyTag],
+              });
+          }
+          for (const v of dedupedVariables) {
+            await tx
+              .insert(variables)
+              .values({
+                projectId,
+                key: v.key,
+              })
+              .onConflictDoNothing({
+                target: [variables.projectId, variables.key],
+              });
+          }
+          for (const s of dedupedStats) {
+            // `default x = 0` becomes a stat with minValue=0 and the
+            // default maxValue of 100; users can adjust in the UI.
+            // Use parseFloat + round so that float values like 3.5
+            // are preserved (parseInt would silently truncate to 3).
+            const minValue = Math.round(Number.parseFloat(s.value)) || 0;
+            await tx
+              .insert(stats)
+              .values({
+                projectId,
+                key: s.key,
+                name: s.key,
+                minValue,
+                maxValue: 100,
+                updatedAt: new Date(),
+              })
+              .onConflictDoNothing({
+                target: [stats.projectId, stats.key],
+              });
+          }
+        });
+      }
     }
 
     // Phase 2: Collect detected characters for return value

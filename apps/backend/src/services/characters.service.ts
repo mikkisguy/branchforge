@@ -267,9 +267,17 @@ export class CharactersService {
 
     const allDetected: DetectedCharacter[] = [];
     for (const file of allProjectFiles) {
-      if (file.content) {
+      // The import path (issue #244) strips `define` / `default`
+      // statements from `content` and stores them in the database
+      // (the single source of truth). For the import wizard we
+      // still need to surface what *was* in the source file, so we
+      // read from `originalContent` when available and fall back
+      // to `content` for files created entirely from scratch (e.g.
+      // a brand-new BranchForge project).
+      const sourceContent = file.originalContent ?? file.content;
+      if (sourceContent) {
         const fileCharacters = characterParserService.parseWithExclusions(
-          file.content,
+          sourceContent,
           file.filePath,
           excludedTags
         );
