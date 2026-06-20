@@ -793,6 +793,98 @@ export const projectSettingsSchema = z
   .partial();
 
 /**
+ * Padding value for zero-padded number fields in visual system config.
+ * Matches the `1 | 2` union declared in VisualSystemConfig.
+ */
+const paddingSchema = z.union([z.literal(1), z.literal(2)], {
+  message: "Padding must be 1 or 2",
+});
+
+/**
+ * Group prefix entry: maps a group value (e.g. "I", "1") to a short
+ * filename prefix (e.g. "ai", "ch1"). Keys are non-empty trimmed strings.
+ */
+const groupPrefixEntrySchema = z.record(
+  z.string().trim().min(1),
+  z
+    .string()
+    .trim()
+    .min(1, "Group prefix cannot be empty")
+    .max(50, "Group prefix is too long")
+);
+
+/**
+ * Visual system config validation.
+ *
+ * The wire shape matches the shared `VisualSystemConfig` interface so
+ * frontend and backend stay in lockstep. All fields are optional in
+ * the update schema (`.partial()`) so clients can PATCH a subset.
+ *
+ * Clearing semantics: `defaultGroupType: ""` and `placeholderBaseUrl: ""`
+ * are explicitly accepted so clients can send an empty string to clear
+ * a previously-set value back to NULL. `groupPrefixes: {}` clears the
+ * stored map back to NULL too. The service layer converts these
+ * sentinels into `null` on write.
+ */
+export const visualSystemConfigSchema = z
+  .object({
+    namingTemplate: z
+      .string()
+      .trim()
+      .min(1, "Naming template is required")
+      .max(500, "Naming template is too long"),
+    groupPrefixes: z
+      .record(z.string().trim().min(1), groupPrefixEntrySchema)
+      .optional(),
+    defaultGroupType: z
+      .string()
+      .trim()
+      .max(50, "Default group type is too long")
+      .optional()
+      .or(z.literal("")),
+    labelPadding: paddingSchema,
+    counterPadding: paddingSchema,
+    jumpPrefixShared: z
+      .string()
+      .trim()
+      .min(1, "Shared jump prefix is required")
+      .max(100, "Shared jump prefix is too long"),
+    placeholderBaseUrl: z
+      .string()
+      .trim()
+      .max(2000, "Placeholder base URL is too long")
+      .refine(
+        (value) => {
+          if (value === "") return true;
+          try {
+            const url = new URL(value);
+            return url.protocol === "http:" || url.protocol === "https:";
+          } catch {
+            return false;
+          }
+        },
+        { message: "Placeholder base URL must be an http or https URL" }
+      )
+      .optional()
+      .or(z.literal("")),
+  })
+  .strict()
+  .partial();
+
+/**
+ * Visual system config defaults — applied when a project has no row in
+ * `visual_systems` yet (or when the client sends only a partial update).
+ *
+ * Kept in sync with the column defaults in `db/schema/tables/visual-systems.ts`.
+ */
+export const VISUAL_SYSTEM_CONFIG_DEFAULTS = {
+  namingTemplate: "{route}{group}_{label}_{counter}_{slug}",
+  labelPadding: 2,
+  counterPadding: 2,
+  jumpPrefixShared: "",
+} as const;
+
+/**
  * Character ID params validation
  */
 export const characterIdParamsSchema = z.object({
@@ -1133,6 +1225,7 @@ export type CreateCharacterInput = z.infer<typeof createCharacterSchema>;
 export type UpdateCharacterInput = z.infer<typeof updateCharacterSchema>;
 export type ImportCharactersInput = z.infer<typeof importCharactersSchema>;
 export type ProjectSettingsInput = z.infer<typeof projectSettingsSchema>;
+export type VisualSystemConfigInput = z.infer<typeof visualSystemConfigSchema>;
 export type DetectedCharacterInput = z.infer<typeof detectedCharacterSchema>;
 export type CreateGitLabIntegrationInput = z.infer<
   typeof createGitLabIntegrationSchema

@@ -21,6 +21,7 @@ import { statsRoutes } from "./routes/stats.routes.js";
 import { zipImportRoutes } from "./routes/zip-import.routes.js";
 import { flowRoutes } from "./routes/flow.routes.js";
 import { exportsRoutes } from "./routes/exports.routes.js";
+import { visualSystemsRoutes } from "./routes/visual-systems.routes.js";
 import { createDrizzleSessionStore } from "./services/session-store.service.js";
 import { setupShutdownHandlers } from "./lib/shutdown.js";
 import { globalErrorHandler } from "./middleware/error-handler.middleware.js";
@@ -157,6 +158,7 @@ await server.register(statsRoutes, { prefix: basePath });
 await server.register(zipImportRoutes, { prefix: basePath });
 await server.register(flowRoutes, { prefix: basePath });
 await server.register(exportsRoutes, { prefix: basePath });
+await server.register(visualSystemsRoutes, { prefix: basePath });
 
 // Register a global preValidation hook that enforces double-submit
 // CSRF protection on every state-changing request. The hook itself
