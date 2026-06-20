@@ -13,7 +13,7 @@ jobs:
     container: node:24-alpine
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install git (for VitePress lastUpdated)
         run: apk add --no-cache git
@@ -34,7 +34,7 @@ jobs:
     container: node:24-alpine
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install pnpm
         run: npm install -g pnpm@9
@@ -70,7 +70,7 @@ jobs:
       NODE_ENV: test
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install pnpm
         run: npm install -g pnpm@9
@@ -94,7 +94,7 @@ jobs:
     container: node:24-alpine
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install pnpm
         run: npm install -g pnpm@9
