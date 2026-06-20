@@ -527,6 +527,86 @@ describe("ExportService", () => {
       expect(savedContent["game/characters.rpy"]).toContain("label start:");
     });
 
+    it("ignores unsafe file paths when computing the generated-file directory prefix", async () => {
+      // A file whose `file_path` fails `sanitizeZipEntryPath` (e.g.
+      // contains `..`) must not drag the directory-prefix
+      // calculation off the real project layout. Before the fix,
+      // such a stray entry would force the prefix to "" and place
+      // `branchforge_*.rpy` at the archive root — silently
+      // disabling them in Ren'Py. See issue #244.
+      const mockProject = { name: "Unsafe" };
+      const mockFiles = [
+        {
+          id: "file-1",
+          projectId: PROJECT_ID,
+          filePath: "game/script.rpy",
+          fileType: "STORY",
+          content: "label start:",
+          contentHash: "abc",
+          source: "manual",
+        },
+        {
+          id: "file-2",
+          projectId: PROJECT_ID,
+          // Path-traversal — `sanitizeZipEntryPath` rejects it.
+          filePath: "evil/../escape.rpy",
+          fileType: "STORY",
+          content: "label evil:",
+          contentHash: "def",
+          source: "manual",
+        },
+      ];
+      const mockExportRecord = {
+        id: EXPORT_ID,
+        projectId: PROJECT_ID,
+        format: "RENPY",
+        fileName: "unsafe.zip",
+        content: "",
+        fileSize: 0,
+        createdAt: new Date("2024-01-01T00:00:00Z"),
+      };
+
+      resolveQueue.push(mockFiles); // files
+      resolveQueue.push([]); // labels
+      resolveQueue.push([{ key: "v", description: null, category: null }]);
+      resolveQueue.push([]); // stats
+      resolveQueue.push([]); // characters
+      resolveQueue.push([]); // cleanup
+
+      mockDb.limit.mockResolvedValueOnce([mockProject]);
+      mockDb.returning.mockResolvedValueOnce([mockExportRecord]);
+
+      mockDb.values.mockImplementationOnce(
+        (vals: { fileName: string; content: string; fileSize: number }) => {
+          mockDb.returning.mockResolvedValueOnce([
+            {
+              id: EXPORT_ID,
+              projectId: PROJECT_ID,
+              format: "RENPY",
+              fileName: vals.fileName,
+              content: vals.content,
+              fileSize: vals.fileSize,
+              createdAt: new Date(),
+            },
+          ]);
+          return mockDb;
+        }
+      );
+
+      await generateExport(PROJECT_ID, USER_ID);
+
+      const insertPayload = mockDb.values.mock.calls[0][0] as {
+        content: string;
+      };
+      const savedContent = JSON.parse(insertPayload.content);
+      // The unsafe path was filtered out, so the prefix is `game/`
+      // (not ""), and the generated file lives where Ren'Py will find it.
+      expect(savedContent).toHaveProperty("game/branchforge_variables.rpy");
+      expect(savedContent).not.toHaveProperty("branchforge_variables.rpy");
+      // The unsafe path itself is not in the archive.
+      expect(savedContent).not.toHaveProperty("evil/../escape.rpy");
+    });
+
     it("should fall back to no prefix when project files have mixed top-level directories", async () => {
       // If the project mixes top-level directories (e.g. `game/`
       // and `docs/`) and they disagree, the helper returns "" so we

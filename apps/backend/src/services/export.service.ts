@@ -198,6 +198,16 @@ export async function generateExport(
 
   // Patch STORY files with conditions/effects
   const patchedFiles: Record<string, string> = {};
+  // Track the sanitized paths we actually emitted so the
+  // directory-prefix calculation below only sees paths that will
+  // make it into the zip. A bad path that we silently skip
+  // (`sanitizeZipEntryPath` rejects path-traversal / absolute
+  // entries) must not influence where the generated
+  // `branchforge_*.rpy` files land — otherwise a single stray
+  // entry like `evil/../x.rpy` would force the prefix to "" and
+  // place the generated files at the archive root, silently
+  // disabling them in Ren'Py. See issue #244.
+  const sanitizedPaths: string[] = [];
   for (const file of files) {
     const safePath = sanitizeZipEntryPath(file.filePath);
     if (!safePath) {
@@ -208,6 +218,7 @@ export async function generateExport(
       });
       continue;
     }
+    sanitizedPaths.push(safePath);
     // Defensive strip: remove any `define <tag> = Character(...)` /
     // `default <key> = ...` lines that might still be present in
     // the stored `content`. The import path strips them at
@@ -268,13 +279,13 @@ export async function generateExport(
   );
 
   // Determine the directory prefix for generated files (e.g. "game/")
-  // by computing a shared top-level directory segment from project file
-  // paths. Generated branchforge_*.rpy files must be placed alongside
-  // the project files so Ren'Py picks them up at launch — placing them
-  // at the archive root is silently ignored. See issue #244.
-  const fileDirPrefix = computeCommonDirectoryPrefix(
-    files.map((f) => f.filePath)
-  );
+  // by computing a shared top-level directory segment from the
+  // sanitized project file paths (not the raw `file.filePath`
+  // values — see the loop above for the rationale). Generated
+  // branchforge_*.rpy files must be placed alongside the project
+  // files so Ren'Py picks them up at launch — placing them at
+  // the archive root is silently ignored. See issue #244.
+  const fileDirPrefix = computeCommonDirectoryPrefix(sanitizedPaths);
 
   // Generate additional RPY files
   if (projectVariables.length > 0) {

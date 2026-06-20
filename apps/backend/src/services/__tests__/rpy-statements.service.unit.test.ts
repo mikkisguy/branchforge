@@ -179,6 +179,46 @@ describe("rpy-statements.service", () => {
       expect(result.cleanedContent).not.toMatch(/^define\s/m);
     });
 
+    it("handles a space between Character and the opening parenthesis", () => {
+      // Ren'Py accepts `Character (` (with a space) just as readily
+      // as `Character(`. The regex permits both via `\s*`; the body
+      // extraction must match the same whitespace tolerance, or
+      // such lines would be silently dropped because the body
+      // slice starts at `indexOf("Character(")`.
+      const content = [
+        'define e = Character ("Eileen", color="#c8ffc8")',
+        "",
+        "label start:",
+        '    e "Hello."',
+        "    return",
+      ].join("\n");
+
+      const result = extractAndStripRpySymbols(content);
+      expect(result.characters).toEqual([
+        { tag: "e", name: "Eileen", color: "#c8ffc8" },
+      ]);
+      expect(result.cleanedContent).not.toContain("define e = Character");
+      expect(result.cleanedContent).toContain("label start:");
+
+      // Same expectation for the multi-line form: whitespace between
+      // `Character` and `(` is allowed.
+      const multiLine = [
+        "define s = Character (",
+        '    "Sylvie",',
+        '    color="#ff0000"',
+        ")",
+        "",
+        "label start:",
+        "    return",
+      ].join("\n");
+
+      const multi = extractAndStripRpySymbols(multiLine);
+      expect(multi.characters).toEqual([
+        { tag: "s", name: "Sylvie", color: "#ff0000" },
+      ]);
+      expect(multi.cleanedContent).not.toContain("define s = Character");
+    });
+
     it("classifies default True/False as variables", () => {
       const content = [
         "default met_alex = False",

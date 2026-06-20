@@ -467,7 +467,11 @@ export async function importFromGitlab(
 
     // Track if any file fetch succeeded and capture first error
     let anySuccess = false;
-    let firstError: Error | null = null;
+    // We narrow `firstError` to its eventual assignment site below;
+    // the type annotation is broader than the inferred type so that
+    // the closure that captures it (the db.transaction callback)
+    // doesn't narrow it to `never`.
+    let firstError: Error | null = null as Error | null;
 
     // Phase 1: Parse all files and detect characters
     const parsedFiles: Array<{
@@ -479,164 +483,186 @@ export async function importFromGitlab(
       symbols: ReturnType<typeof extractAndStripRpySymbols>;
     }> = [];
 
-    for (const result of fileFetchResults) {
-      if (result.status === "rejected") {
-        // Capture the first error for reporting
-        if (!firstError) {
-          firstError =
-            result.reason instanceof Error
-              ? result.reason
-              : new Error(String(result.reason));
+    // Cross-file symbol aggregation. We populate this inside the
+    // transaction below as files are successfully processed, so a
+    // mid-import rollback leaves no orphan symbols behind. The
+    // `extracted` prefix disambiguates from the existing
+    // `charactersByTag` map in Phase 3 that maps `renpyTag -> id`
+    // for speaker linking.
+    const extractedCharactersByTag = new Map<
+      string,
+      DetectedCharacterStatement
+    >();
+    const extractedVariablesByKey = new Map<string, DetectedDefaultStatement>();
+    const extractedStatsByKey = new Map<string, DetectedDefaultStatement>();
+
+    // Phase 1 + Phase 1.5 are wrapped in a single transaction so
+    // that the file inserts (which strip `define`/`default` from
+    // the stored content) and the symbol promotion (which puts
+    // those statements into the database) commit or roll back
+    // together. Without this, a partial failure could leave the
+    // project with cleaned `project_files.content` but no matching
+    // `characters` / `variables` / `stats` rows, which the
+    // export-time defensive strip still keeps Ren'Py-safe but
+    // would be confusing for the user. See issue #244.
+    await db.transaction(async (tx) => {
+      for (const result of fileFetchResults) {
+        if (result.status === "rejected") {
+          // Capture the first error for reporting
+          if (!firstError) {
+            firstError =
+              result.reason instanceof Error
+                ? result.reason
+                : new Error(String(result.reason));
+          }
+          continue;
         }
-        continue;
-      }
-      if (!result.value.content) {
-        // Skip files with no content
-        continue;
-      }
-      anySuccess = true;
+        if (!result.value.content) {
+          // Skip files with no content
+          continue;
+        }
+        anySuccess = true;
 
-      const { file, content } = result.value;
+        const { file, content } = result.value;
 
-      // Parse with new label-aware parser, passing filename for better detection
-      const parsed = parseRPYFileWithLabels(content, file.path);
+        // Parse with new label-aware parser, passing filename for better detection
+        const parsed = parseRPYFileWithLabels(content, file.path);
 
-      // Strip BranchForge-managed `define`/`default` statements from
-      // the stored content. The DB is the single source of truth for
-      // those symbols, so re-exporting the project cannot produce
-      // duplicate lines that would crash Ren'Py with
-      // `NameError: name 'X' is already defined`. See issue #244.
-      const symbols = extractAndStripRpySymbols(content);
+        // Strip BranchForge-managed `define`/`default` statements from
+        // the stored content. The DB is the single source of truth for
+        // those symbols, so re-exporting the project cannot produce
+        // duplicate lines that would crash Ren'Py with
+        // `NameError: name 'X' is already defined`. See issue #244.
+        const symbols = extractAndStripRpySymbols(content);
 
-      // Hash the cleaned content because that's what we store in
-      // `project_files.content`; identical source files produce
-      // identical cleaned output, so re-syncs of unchanged files are
-      // correctly detected as no-ops.
-      const contentHash = calculateContentHash(symbols.cleanedContent);
-      const [projectFile] = await db
-        .insert(projectFiles)
-        .values({
-          projectId,
-          source: "GITLAB",
-          filePath: file.path,
-          fileType: parsed.fileType,
-          content: symbols.cleanedContent, // Store cleaned content (no define/default)
-          originalContent: content, // Preserve original for reconstruction
-          contentHash,
-          lastSyncedAt: new Date(),
-          lastCommitSha: importCommitSha,
-        })
-        .onConflictDoUpdate({
-          target: [
-            projectFiles.projectId,
-            projectFiles.source,
-            projectFiles.filePath,
-          ],
-          set: {
-            content: symbols.cleanedContent, // Update cleaned content on sync
-            // Only set originalContent if it's null (preserve original on subsequent syncs)
-            originalContent: sql`COALESCE(${projectFiles.originalContent}, ${content})`,
+        // Hash the cleaned content because that's what we store in
+        // `project_files.content`; identical source files produce
+        // identical cleaned output, so re-syncs of unchanged files are
+        // correctly detected as no-ops.
+        const contentHash = calculateContentHash(symbols.cleanedContent);
+        const [projectFile] = await tx
+          .insert(projectFiles)
+          .values({
+            projectId,
+            source: "GITLAB",
+            filePath: file.path,
+            fileType: parsed.fileType,
+            content: symbols.cleanedContent, // Store cleaned content (no define/default)
+            originalContent: content, // Preserve original for reconstruction
             contentHash,
             lastSyncedAt: new Date(),
             lastCommitSha: importCommitSha,
-            updatedAt: new Date(),
-          },
-        })
-        .returning();
+          })
+          .onConflictDoUpdate({
+            target: [
+              projectFiles.projectId,
+              projectFiles.source,
+              projectFiles.filePath,
+            ],
+            set: {
+              content: symbols.cleanedContent, // Update cleaned content on sync
+              // Only set originalContent if it's null (preserve original on subsequent syncs)
+              originalContent: sql`COALESCE(${projectFiles.originalContent}, ${content})`,
+              contentHash,
+              lastSyncedAt: new Date(),
+              lastCommitSha: importCommitSha,
+              updatedAt: new Date(),
+            },
+          })
+          .returning();
 
-      parsedFiles.push({
-        file,
-        content,
-        cleanedContent: symbols.cleanedContent,
-        parsed,
-        projectFile,
-        symbols,
-      });
-    }
+        parsedFiles.push({
+          file,
+          content,
+          cleanedContent: symbols.cleanedContent,
+          parsed,
+          projectFile,
+          symbols,
+        });
 
-    // Phase 1.5: Promote extracted `define`/`default` symbols into the
-    // database. The DB is the single source of truth for those
-    // symbols, so re-exporting the project cannot produce duplicate
-    // lines that would crash Ren'Py with
-    // `NameError: name 'X' is already defined`. We use
-    // `onConflictDoNothing` so re-syncs of unchanged files are
-    // no-ops and the user's later UI edits to the DB rows are
-    // preserved. See issue #244.
-    if (parsedFiles.length > 0) {
-      // Dedupe across files (the strip step de-dupes per file).
-      const charactersByTag = new Map<string, DetectedCharacterStatement>();
-      const variablesByKey = new Map<string, DetectedDefaultStatement>();
-      const statsByKey = new Map<string, DetectedDefaultStatement>();
-      for (const f of parsedFiles) {
-        for (const c of f.symbols.characters) {
-          if (!charactersByTag.has(c.tag)) charactersByTag.set(c.tag, c);
+        // Aggregate this file's symbols into the cross-file maps.
+        // We do this here (not in a pre-pass) so that any rollback
+        // of the surrounding transaction discards partial symbol
+        // accumulations along with the file insert.
+        for (const c of symbols.characters) {
+          if (!extractedCharactersByTag.has(c.tag))
+            extractedCharactersByTag.set(c.tag, c);
         }
-        for (const v of f.symbols.variables) {
-          if (!variablesByKey.has(v.key)) variablesByKey.set(v.key, v);
+        for (const v of symbols.variables) {
+          if (!extractedVariablesByKey.has(v.key))
+            extractedVariablesByKey.set(v.key, v);
         }
-        for (const s of f.symbols.stats) {
-          if (!statsByKey.has(s.key)) statsByKey.set(s.key, s);
+        for (const s of symbols.stats) {
+          if (!extractedStatsByKey.has(s.key))
+            extractedStatsByKey.set(s.key, s);
         }
       }
-      const dedupedCharacters = Array.from(charactersByTag.values());
-      const dedupedVariables = Array.from(variablesByKey.values());
-      const dedupedStats = Array.from(statsByKey.values());
+
+      // Phase 1.5: Promote extracted `define`/`default` symbols
+      // into the database. The DB is the single source of truth
+      // for those symbols, so re-exporting the project cannot
+      // produce duplicate lines that would crash Ren'Py with
+      // `NameError: name 'X' is already defined`. We use
+      // `onConflictDoNothing` so re-syncs of unchanged files are
+      // no-ops and the user's later UI edits to the DB rows are
+      // preserved. See issue #244.
+      const dedupedCharacters = Array.from(extractedCharactersByTag.values());
+      const dedupedVariables = Array.from(extractedVariablesByKey.values());
+      const dedupedStats = Array.from(extractedStatsByKey.values());
 
       if (
         dedupedCharacters.length > 0 ||
         dedupedVariables.length > 0 ||
         dedupedStats.length > 0
       ) {
-        await db.transaction(async (tx) => {
-          for (const c of dedupedCharacters) {
-            await tx
-              .insert(characters)
-              .values({
-                projectId,
-                name: c.name ?? c.tag,
-                displayName: c.name ?? c.tag,
-                renpyTag: c.tag,
-                color: c.color || "#cfcfcf",
-                updatedAt: new Date(),
-              })
-              .onConflictDoNothing({
-                target: [characters.projectId, characters.renpyTag],
-              });
-          }
-          for (const v of dedupedVariables) {
-            await tx
-              .insert(variables)
-              .values({
-                projectId,
-                key: v.key,
-              })
-              .onConflictDoNothing({
-                target: [variables.projectId, variables.key],
-              });
-          }
-          for (const s of dedupedStats) {
-            // `default x = 0` becomes a stat with minValue=0 and the
-            // default maxValue of 100; users can adjust in the UI.
-            // Use parseFloat + round so that float values like 3.5
-            // are preserved (parseInt would silently truncate to 3).
-            const minValue = Math.round(Number.parseFloat(s.value)) || 0;
-            await tx
-              .insert(stats)
-              .values({
-                projectId,
-                key: s.key,
-                name: s.key,
-                minValue,
-                maxValue: 100,
-                updatedAt: new Date(),
-              })
-              .onConflictDoNothing({
-                target: [stats.projectId, stats.key],
-              });
-          }
-        });
+        for (const c of dedupedCharacters) {
+          await tx
+            .insert(characters)
+            .values({
+              projectId,
+              name: c.name ?? c.tag,
+              displayName: c.name ?? c.tag,
+              renpyTag: c.tag,
+              color: c.color || "#cfcfcf",
+              updatedAt: new Date(),
+            })
+            .onConflictDoNothing({
+              target: [characters.projectId, characters.renpyTag],
+            });
+        }
+        for (const v of dedupedVariables) {
+          await tx
+            .insert(variables)
+            .values({
+              projectId,
+              key: v.key,
+            })
+            .onConflictDoNothing({
+              target: [variables.projectId, variables.key],
+            });
+        }
+        for (const s of dedupedStats) {
+          // `default x = 0` becomes a stat with minValue=0 and the
+          // default maxValue of 100; users can adjust in the UI.
+          // Use parseFloat + round so that float values like 3.5
+          // are preserved (parseInt would silently truncate to 3).
+          const minValue = Math.round(Number.parseFloat(s.value)) || 0;
+          await tx
+            .insert(stats)
+            .values({
+              projectId,
+              key: s.key,
+              name: s.key,
+              minValue,
+              maxValue: 100,
+              updatedAt: new Date(),
+            })
+            .onConflictDoNothing({
+              target: [stats.projectId, stats.key],
+            });
+        }
       }
-    }
+    });
 
     // Phase 2: Collect detected characters for return value
     // Note: We don't import them here - let the frontend call detectCharacters

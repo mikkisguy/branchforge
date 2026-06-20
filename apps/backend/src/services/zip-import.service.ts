@@ -76,6 +76,41 @@ export type ImportZipResult = ImportZipSuccess | ImportZipFailure;
 // ============================================================================
 
 /**
+ * Aggregate a successfully imported file's extracted symbols into
+ * the running cross-file maps. The first occurrence of a given
+ * tag/key wins so symbol metadata is stable when the same name
+ * appears in multiple files.
+ *
+ * Only files that have been successfully inserted/updated (i.e.
+ * survived their per-file savepoint) should be passed in here —
+ * otherwise symbols from failed files would be promoted with no
+ * matching `project_files` row, leaving the database in an
+ * inconsistent state.
+ */
+function accumulateSymbols(
+  entry: {
+    symbols: {
+      characters: DetectedCharacterStatement[];
+      variables: DetectedDefaultStatement[];
+      stats: DetectedDefaultStatement[];
+    };
+  },
+  charactersByTag: Map<string, DetectedCharacterStatement>,
+  variablesByKey: Map<string, DetectedDefaultStatement>,
+  statsByKey: Map<string, DetectedDefaultStatement>
+): void {
+  for (const c of entry.symbols.characters) {
+    if (!charactersByTag.has(c.tag)) charactersByTag.set(c.tag, c);
+  }
+  for (const v of entry.symbols.variables) {
+    if (!variablesByKey.has(v.key)) variablesByKey.set(v.key, v);
+  }
+  for (const s of entry.symbols.stats) {
+    if (!statsByKey.has(s.key)) statsByKey.set(s.key, s);
+  }
+}
+
+/**
  * Extract all .rpy files from a JSZip object.
  * Skips:
  * - .rpyc files (compiled Ren'Py files)
@@ -260,34 +295,22 @@ export async function importZipFile(
       };
     });
 
-    // Dedupe symbols across files. The strip step de-dupes within a
-    // single file, but the same character tag can appear in multiple
-    // files (e.g. `game/characters.rpy` and `game/script.rpy`). We
-    // keep the first occurrence so symbol metadata is stable.
-    const charactersByTag = new Map<string, DetectedCharacterStatement>();
-    const variablesByKey = new Map<string, DetectedDefaultStatement>();
-    const statsByKey = new Map<string, DetectedDefaultStatement>();
-    for (const f of preProcessedFiles) {
-      for (const c of f.symbols.characters) {
-        if (!charactersByTag.has(c.tag)) charactersByTag.set(c.tag, c);
-      }
-      for (const v of f.symbols.variables) {
-        if (!variablesByKey.has(v.key)) variablesByKey.set(v.key, v);
-      }
-      for (const s of f.symbols.stats) {
-        if (!statsByKey.has(s.key)) statsByKey.set(s.key, s);
-      }
-    }
-    const allCharacters = Array.from(charactersByTag.values());
-    const allVariables = Array.from(variablesByKey.values());
-    const allStats = Array.from(statsByKey.values());
-
     // Counters for tracking import statistics
     let filesImported = 0;
     let filesUpdated = 0;
     let filesSkipped = 0;
     let filesFailed = 0;
     let labelsCreated = 0;
+
+    // Cross-file symbol aggregation. We populate this as files are
+    // successfully inserted/updated in Step 4 below (NOT from the
+    // raw preProcessedFiles list), so that files whose savepoint
+    // rolls back do not contribute characters / variables / stats
+    // to the database. The first occurrence of a given tag/key
+    // wins so symbol metadata is stable across files.
+    const charactersByTag = new Map<string, DetectedCharacterStatement>();
+    const variablesByKey = new Map<string, DetectedDefaultStatement>();
+    const statsByKey = new Map<string, DetectedDefaultStatement>();
 
     // Step 4: Process all files in a single transaction with savepoints.
     // Each file's savepoint isolates per-file failures, so one bad
@@ -340,6 +363,16 @@ export async function importZipFile(
               .where(eq(projectFiles.id, existing.id));
 
             filesUpdated++;
+            // Aggregate symbols from this successfully processed
+            // file. Skipped files (unchanged hash) don't contribute
+            // because their DB row already has whatever symbols
+            // were extracted on the prior import.
+            accumulateSymbols(
+              entry,
+              charactersByTag,
+              variablesByKey,
+              statsByKey
+            );
 
             // Sync labels for STORY files to create/update labels in database
             if (entry.fileType === "STORY") {
@@ -372,6 +405,18 @@ export async function importZipFile(
             }
 
             filesImported++;
+            // Aggregate symbols from this successfully processed
+            // file. Only files that survive the savepoint contribute
+            // to the symbol promotion that follows, so a malformed
+            // or failing file does not leave its characters /
+            // variables / stats stranded in the database with no
+            // matching `project_files` row.
+            accumulateSymbols(
+              entry,
+              charactersByTag,
+              variablesByKey,
+              statsByKey
+            );
 
             // Sync labels for STORY files to create labels in database
             if (entry.fileType === "STORY") {
@@ -423,6 +468,9 @@ export async function importZipFile(
       // We use `onConflictDoNothing` so re-imports of the same RPY
       // files are no-ops and the user's later UI edits to the DB
       // rows are preserved.
+      const allCharacters = Array.from(charactersByTag.values());
+      const allVariables = Array.from(variablesByKey.values());
+      const allStats = Array.from(statsByKey.values());
       if (
         allCharacters.length > 0 ||
         allVariables.length > 0 ||

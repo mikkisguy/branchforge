@@ -161,11 +161,15 @@ export function extractAndStripRpySymbols(
     );
     if (characterStart) {
       const tag = characterStart[1];
-      // Capture the slice from the opening `Character(` to the end
-      // of the first line so the parser can find the display name
-      // and options even on a single-line definition. The opening
-      // `(` is part of this body so the paren depth starts at 0.
-      const firstOpenIdx = line.indexOf("Character(");
+      // Capture the slice from the opening `Character\s*(` to the
+      // end of the first line so the parser can find the display
+      // name and options even on a single-line definition. The
+      // opening `(` is part of this body so the paren depth starts
+      // at 0. We must honour the same `\s*` the regex matched,
+      // otherwise lines written with `Character (` (a space before
+      // the open paren) would be silently dropped because a plain
+      // `indexOf("Character(")` would not find the substring.
+      const firstOpenIdx = line.search(/Character\s*\(/);
       let body = firstOpenIdx === -1 ? "" : line.slice(firstOpenIdx);
       let parenDepth = countChar(body, "(") - countChar(body, ")");
       let j = i;
