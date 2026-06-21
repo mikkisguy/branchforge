@@ -49,6 +49,7 @@ export function CharacterDialog({
             type="button"
             onClick={() => onOpenChange(false)}
             className="text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Close character dialog"
           >
             <X className="size-5" />
           </button>

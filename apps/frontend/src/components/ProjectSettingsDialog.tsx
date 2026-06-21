@@ -17,7 +17,14 @@
  */
 
 import { useState } from "react";
-import { Loader2, Users, Route as RouteIcon, Wand2, X } from "lucide-react";
+import {
+  AlertCircle,
+  Loader2,
+  Users,
+  Route as RouteIcon,
+  Wand2,
+  X,
+} from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsPanel } from "@/components/ui/tabs";
@@ -188,7 +195,7 @@ interface VisualSystemTabContentProps {
 }
 
 function VisualSystemTabContent({ projectId }: VisualSystemTabContentProps) {
-  const { config, isLoading, isSaving, updateConfig } =
+  const { config, isLoading, isError, isSaving, updateConfig, refetch } =
     useVisualSystem(projectId);
 
   const handleSave = async (form: VisualSystemFormState) => {
@@ -211,6 +218,31 @@ function VisualSystemTabContent({ projectId }: VisualSystemTabContentProps) {
       groupPrefixes: parsed.value ?? {},
     });
   };
+
+  // Three states: loading (spinner), error (retry UI), ready (form).
+  // Previously the dialog showed the spinner whenever `config` was
+  // undefined, which also fires on a failed fetch — leaving the
+  // user with no recovery path.
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+        <AlertCircle className="size-8 text-destructive" aria-hidden="true" />
+        <div className="space-y-1">
+          <p className="text-sm font-medium">Failed to load visual system</p>
+          <p className="text-xs text-muted-foreground">
+            Check your connection and try again.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          className="text-sm font-medium text-[var(--theme-color)] hover:underline"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   if (isLoading || !config) {
     return (

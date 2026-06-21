@@ -335,7 +335,7 @@ function NavButtons({
         title="Project settings"
       >
         <SlidersHorizontal className="size-4 flex-shrink-0" />
-        {showLabel && <span>Settings</span>}
+        {showLabel && <span>Project Settings</span>}
       </button>
       <button
         type="button"
@@ -351,7 +351,7 @@ function NavButtons({
         title="Flow Graph"
       >
         <Network className="size-4 flex-shrink-0" />
-        {showLabel && <span>Flow</span>}
+        {showLabel && <span>Flow Graph</span>}
       </button>
     </nav>
   );

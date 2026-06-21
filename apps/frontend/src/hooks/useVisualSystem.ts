@@ -25,6 +25,7 @@ import type { VisualSystemConfig } from "@branchforge/shared";
 export interface UseVisualSystemReturn {
   config: VisualSystemConfig | null;
   isLoading: boolean;
+  isError: boolean;
   isSaving: boolean;
   updateConfig: (
     patch: UpdateVisualSystemConfigBody
@@ -49,6 +50,7 @@ export function useVisualSystem(projectId: string): UseVisualSystemReturn {
   const {
     data: config = null,
     isLoading,
+    isError,
     refetch,
   } = useQuery({
     queryKey: visualSystemKeys.config(projectId),
@@ -106,6 +108,7 @@ export function useVisualSystem(projectId: string): UseVisualSystemReturn {
   return {
     config,
     isLoading,
+    isError,
     isSaving: updateMutation.isPending,
     updateConfig: (patch) => updateMutation.mutateAsync(patch),
     refetch: () => {

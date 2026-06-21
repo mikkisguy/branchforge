@@ -326,7 +326,7 @@ describe("CharacterDialog", () => {
         { wrapper }
       );
 
-      await user.click(screen.getByRole("button", { name: /Close/i }));
+      await user.click(screen.getByRole("button", { name: "Close" }));
 
       expect(onOpenChange).toHaveBeenCalledWith(false);
     });

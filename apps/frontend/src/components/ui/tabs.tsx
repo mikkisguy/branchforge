@@ -17,14 +17,21 @@
  *
  * State is owned by the parent so consumers can reset the active
  * tab when the modal opens (see ProjectSettingsDialog).
+ *
+ * Keyboard navigation follows the WAI-ARIA tabs pattern:
+ *   - ArrowRight / ArrowLeft: move between tabs (wrap around)
+ *   - Home / End: jump to first / last tab
  */
 
 import {
   createContext,
   useCallback,
-  use,
+  useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
 import { cn } from "@/lib/utils";
@@ -36,12 +43,20 @@ import { cn } from "@/lib/utils";
 interface TabsContextValue {
   value: string;
   setValue: (next: string) => void;
+  /**
+   * Register/unregister a tab value. Each `TabsTrigger` registers
+   * itself on mount so the TabsList can compute next/prev for
+   * arrow-key navigation. Stored in insertion order.
+   */
+  registerTab: (value: string) => () => void;
+  /** Snapshot of the currently-registered tab values, in order. */
+  tabValues: string[];
 }
 
 const TabsContext = createContext<TabsContextValue | null>(null);
 
 function useTabsContext(component: string): TabsContextValue {
-  const ctx = use(TabsContext);
+  const ctx = useContext(TabsContext);
   if (!ctx) {
     throw new Error(`<${component}> must be rendered inside <Tabs>.`);
   }
@@ -89,12 +104,35 @@ export function Tabs({
     [isControlled, onValueChange]
   );
 
+  // Tab values in insertion order. We use a ref + state pair so
+  // registration is O(1) and re-renders only happen when the set
+  // of values actually changes.
+  const tabOrderRef = useRef<string[]>([]);
+  const [tabOrder, setTabOrder] = useState<string[]>([]);
+  const tabSetRef = useRef<Set<string>>(new Set());
+
+  const registerTab = useCallback((value: string) => {
+    if (tabSetRef.current.has(value)) {
+      return () => undefined;
+    }
+    tabSetRef.current.add(value);
+    tabOrderRef.current = [...tabOrderRef.current, value];
+    setTabOrder(tabOrderRef.current);
+    return () => {
+      tabSetRef.current.delete(value);
+      tabOrderRef.current = tabOrderRef.current.filter((v) => v !== value);
+      setTabOrder(tabOrderRef.current);
+    };
+  }, []);
+
   const ctx = useMemo<TabsContextValue>(
     () => ({
       value: isControlled ? (value as string) : internalValue,
       setValue,
+      registerTab,
+      tabValues: tabOrder,
     }),
-    [isControlled, value, internalValue, setValue]
+    [isControlled, value, internalValue, setValue, registerTab, tabOrder]
   );
 
   return (
@@ -147,20 +185,74 @@ export function TabsTrigger({
   className,
   disabled,
 }: TabsTriggerProps) {
-  const { value: active, setValue } = useTabsContext("TabsTrigger");
+  const {
+    value: active,
+    setValue,
+    registerTab,
+    tabValues,
+  } = useTabsContext("TabsTrigger");
   const isActive = active === value;
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+
+  // Register this tab on mount so the TabsList can compute next/prev
+  // for arrow-key navigation. The returned cleanup unregisters on
+  // unmount.
+  useEffect(() => registerTab(value), [registerTab, value]);
+
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (disabled) return;
+
+    const currentIndex = tabValues.indexOf(value);
+    if (currentIndex === -1) return;
+
+    const computeNextIndex = (): number => {
+      switch (event.key) {
+        case "ArrowRight":
+          return (currentIndex + 1) % tabValues.length;
+        case "ArrowLeft":
+          return (currentIndex - 1 + tabValues.length) % tabValues.length;
+        case "Home":
+          return 0;
+        case "End":
+          return tabValues.length - 1;
+        default:
+          return -1;
+      }
+    };
+
+    const nextIndex = computeNextIndex();
+    if (nextIndex === -1) return;
+
+    event.preventDefault();
+    const nextValue = tabValues[nextIndex];
+    if (nextValue !== undefined) {
+      setValue(nextValue);
+      // Move focus to the newly-active tab so screen readers and
+      // keyboard users follow the selection.
+      requestAnimationFrame(() => {
+        const el = document.querySelector<HTMLButtonElement>(
+          `[role="tab"][data-tab-value="${CSS.escape(nextValue)}"]`
+        );
+        el?.focus();
+      });
+    }
+  };
+
   return (
     <button
+      ref={buttonRef}
       type="button"
       role="tab"
       aria-selected={isActive}
       aria-controls={`tabpanel-${value}`}
       id={`tab-${value}`}
+      data-tab-value={value}
       tabIndex={isActive ? 0 : -1}
       disabled={disabled}
       onClick={() => {
         if (!isActive) setValue(value);
       }}
+      onKeyDown={handleKeyDown}
       className={cn(
         "px-3 py-2 text-sm font-medium transition-colors relative",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
