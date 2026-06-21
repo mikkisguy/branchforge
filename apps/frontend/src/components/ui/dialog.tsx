@@ -7,6 +7,13 @@ interface DialogProps {
   onOpenChange?: (open: boolean) => void;
   children: React.ReactNode;
   closeOnBackdropClick?: boolean;
+  /**
+   * Accessible name for the dialog. Screen readers announce this
+   * when the dialog opens. Provide either `aria-label` or
+   * `aria-labelledby` (pointing at a heading inside the dialog).
+   */
+  "aria-label"?: string;
+  "aria-labelledby"?: string;
 }
 
 export function Dialog({
@@ -14,6 +21,8 @@ export function Dialog({
   onOpenChange,
   children,
   closeOnBackdropClick = true,
+  "aria-label": ariaLabel,
+  "aria-labelledby": ariaLabelledBy,
 }: DialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -56,7 +65,17 @@ export function Dialog({
   return (
     <dialog
       ref={syncDialogRef}
-      className="backdrop:bg-black/30 backdrop:backdrop-blur-sm m-auto border-0 p-0 bg-transparent text-[hsl(var(--foreground))]"
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
+      // Position the dialog at the viewport center, then pull it back
+      // by half its own size. This is the standard pattern for
+      // centering a fixed-positioned element whose size is determined
+      // by content. The earlier `m-auto` approach failed because
+      // `m-auto` only centers when the element has a constrained
+      // size; with `bg-transparent` and no explicit width, the
+      // dialog's intrinsic size wasn't being computed reliably,
+      // especially when opened on top of another open dialog.
+      className="backdrop:bg-black/30 backdrop:backdrop-blur-sm top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 m-0 border-0 p-0 bg-transparent text-[hsl(var(--foreground))]"
     >
       {children}
     </dialog>

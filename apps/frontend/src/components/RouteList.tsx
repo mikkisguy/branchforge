@@ -15,6 +15,13 @@ interface RouteListProps {
   isSaving: boolean;
   onEdit: (routeId: string) => void;
   onDelete: (routeId: string) => void | Promise<void>;
+  /**
+   * Number of columns in the route card grid. Defaults to 1
+   * (single-column stack). Pass 2 to render in a 2-column grid —
+   * used by the `ProjectSettingsDialog` tab to keep the dialog
+   * frame height stable.
+   */
+  columns?: 1 | 2;
 }
 
 export function RouteList({
@@ -22,6 +29,7 @@ export function RouteList({
   isSaving,
   onEdit,
   onDelete,
+  columns = 1,
 }: RouteListProps) {
   const [deleteTarget, setDeleteTarget] = useState<RouteConfig | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -44,7 +52,11 @@ export function RouteList({
 
   return (
     <>
-      <div className="space-y-2">
+      <div
+        className={
+          columns === 2 ? "grid grid-cols-1 sm:grid-cols-2 gap-3" : "space-y-2"
+        }
+      >
         {routes.map((route) => (
           <div
             key={route.id}

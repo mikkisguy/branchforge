@@ -117,6 +117,16 @@ export const routeConfigKeys = {
 } as const;
 
 // ============================================================================
+// Visual System Keys
+// ============================================================================
+
+export const visualSystemKeys = {
+  all: ["visualSystems"] as const,
+  config: (projectId: string) =>
+    ["visualSystems", projectId, "config"] as const,
+} as const;
+
+// ============================================================================
 // Variable Keys
 // ============================================================================
 
