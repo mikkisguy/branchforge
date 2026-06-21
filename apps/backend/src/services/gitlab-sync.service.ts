@@ -668,6 +668,10 @@ export async function importFromGitlab(
     // Note: We don't import them here - let the frontend call detectCharacters
     // after the sync, which will parse from project_files.content and show
     // the import wizard for NEW characters only.
+    //
+    // The rpy-parser only extracts a narrow {tag, name, color} shape; we
+    // don't have the form info to classify, so we default to "literal" —
+    // the wizard's "new characters" view lets the user override anyway.
     const allDetected: DetectedCharacter[] = [];
     for (const { parsed } of parsedFiles) {
       allDetected.push(
@@ -679,6 +683,7 @@ export async function importFromGitlab(
           isSpecial: false,
           sourceFile: "",
           confidence: 1,
+          nameType: "literal" as const,
         }))
       );
     }

@@ -10,6 +10,7 @@
  * - Dynamic names: define ne = Character("[persistent.pl_nickname]", ...)
  * - Variable names: define ne = Character(voice_name, ...) or Character([voice_name], ...)
  * - who_color parameter: who_color="#..." instead of color="#..."
+ * - Formatted names: define mystery = Character("{color=#f00}Stranger{/color}")
  */
 
 // Default excluded character tags (special Ren'Py characters)
@@ -21,8 +22,13 @@ export type DefaultExcludedTag = (typeof DEFAULT_EXCLUDED_TAGS)[number];
  *
  * Field explanations:
  * - tag: The dialogue tag used in RPY files (e.g., "s" for `s "Hello!"`)
- * - name: The variable reference from Character() definition (e.g., "s_first", "Name", None)
- * - displayName: The human-readable name shown in BranchForge UI (Writer Mode, Character menu)
+ * - name: The raw name as it appeared in the source Character() call.
+ *   For round-tripping back to RPY (export uses this, not displayName).
+ * - displayName: The human-readable name suggested for use in BranchForge
+ *   UI. Tags stripped (e.g., "{color=...}Stranger{/color}" → "Stranger"),
+ *   variable names preserved as-is. Empty when the source is None/"";
+ *   callers should derive a fallback (the tag, or "(unnamed)") for display.
+ * - nameType: How the name was specified — drives import-wizard warnings.
  * - color: Hex color for dialogue display
  * - isSpecial: Whether this is a system character (narration, unknown speaker)
  * - sourceFile: Which RPY file this was detected in
@@ -32,6 +38,7 @@ export interface DetectedCharacter {
   tag: string;
   name: string | null;
   displayName: string;
+  nameType: CharacterNameType;
   color: string;
   isSpecial: boolean; // narration, unknown, etc.
   sourceFile: string;
@@ -59,13 +66,123 @@ export interface CharacterParseResult {
 }
 
 /**
+ * Internal form discriminator for how the name was specified in the source.
+ * - `quoted` — `Character("Sarah", ...)` or `Character("???", ...)`
+ * - `bracketed` — `Character([e_name], ...)` (with square brackets)
+ * - `identifier` — `Character(boss_name, ...)` (bare Python identifier)
+ */
+type NameForm = "quoted" | "bracketed" | "identifier";
+
+/**
  * Pattern match result for character definitions
  */
 interface CharacterPatternMatch {
   tag: string;
   name: string | null;
+  /**
+   * The raw name as written in the source, including any surrounding brackets
+   * (for the `bracketed` form) but excluding the quotes (for the `quoted`
+   * form). Preserved verbatim for round-tripping.
+   */
+  rawName: string | null;
+  nameForm: NameForm | null;
   color?: string;
   isMultiLine: boolean;
+}
+
+/**
+ * Re-export for callers that need the shared type but import from the
+ * service module. Re-exporting keeps the parser's public surface stable
+ * while still using the single source of truth.
+ */
+export type { CharacterNameType } from "@branchforge/shared";
+import { CharacterNameType, stripRenpyTextTags } from "@branchforge/shared";
+
+/**
+ * Classify a raw extracted name and compute the suggested display name.
+ *
+ * - `quoted` form:
+ *   - `""` → `empty`
+ *   - `"???"` → `unknown` (kept verbatim — intentional author choice)
+ *   - contains Ren'Py inline tags → `tagged` (displayName = tags stripped)
+ *   - contains a `[identifier]` interpolation expression → `interpolated`
+ *     (low confidence; Ren'Py resolves the value at runtime)
+ *   - otherwise → `literal`
+ * - `bracketed` form (`[e_name]`) → `interpolated` (low confidence)
+ * - `identifier` form (`boss_name`) → `variable` (low confidence)
+ *
+ * Known limitation: `INTERPOLATION_REGEX` cannot tell the difference
+ * between a Ren'Py variable interpolation (`"[player_name]"`) and a
+ * decorative bracket pair in a literal string (`"[END]"`). Both are
+ * classified as `interpolated`. The wizard's badge is informational;
+ * authors can override the display name on import.
+ */
+const INTERPOLATION_REGEX =
+  /\[[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*\]/;
+
+function classifyName(
+  rawName: string | null,
+  form: NameForm | null
+): { displayName: string; nameType: CharacterNameType; confidence: number } {
+  if (form === null || rawName === null) {
+    return { displayName: "", nameType: "none", confidence: 0.5 };
+  }
+
+  if (form === "quoted") {
+    if (rawName === "") {
+      return { displayName: "", nameType: "empty", confidence: 1.0 };
+    }
+    if (rawName === "???") {
+      return { displayName: "???", nameType: "unknown", confidence: 1.0 };
+    }
+    if (/\{[^{}]*\}/.test(rawName)) {
+      return {
+        displayName: stripRenpyTextTags(rawName),
+        nameType: "tagged",
+        confidence: 1.0,
+      };
+    }
+    if (INTERPOLATION_REGEX.test(rawName)) {
+      return {
+        displayName: rawName,
+        nameType: "interpolated",
+        confidence: 0.5,
+      };
+    }
+    return { displayName: rawName, nameType: "literal", confidence: 1.0 };
+  }
+
+  if (form === "bracketed") {
+    return { displayName: rawName, nameType: "interpolated", confidence: 0.5 };
+  }
+
+  // form === "identifier"
+  return { displayName: rawName, nameType: "variable", confidence: 0.5 };
+}
+
+/**
+ * Build a DetectedCharacter from a pattern match, deriving nameType and
+ * displayName via `classifyName`.
+ */
+function buildDetectedCharacter(
+  match: CharacterPatternMatch,
+  filename: string,
+  isSpecial: boolean
+): DetectedCharacter {
+  const { displayName, nameType, confidence } = classifyName(
+    match.rawName,
+    match.nameForm
+  );
+  return {
+    tag: match.tag,
+    name: match.name,
+    displayName,
+    nameType,
+    color: match.color || "#cfcfcf",
+    isSpecial,
+    sourceFile: filename,
+    confidence,
+  };
 }
 
 /**
@@ -114,6 +231,18 @@ class CharacterParserService {
   }
 
   /**
+   * Extract color (who_color first, then color) from an options string.
+   */
+  private extractColor(options: string | undefined): string | undefined {
+    if (!options) return undefined;
+    const whoColorMatch = options.match(/who_color\s*=\s*["']?([^"')\s]+)/);
+    if (whoColorMatch) return whoColorMatch[1];
+    const colorMatch = options.match(/color\s*=\s*["']?([^"')\s]+)/);
+    if (colorMatch) return colorMatch[1];
+    return undefined;
+  }
+
+  /**
    * Parse a single character definition line
    */
   private parseCharacterLine(line: string): CharacterPatternMatch | null {
@@ -135,43 +264,10 @@ class CharacterParserService {
       return null;
     }
 
-    // Standard single-line pattern: define tag = Character("name", options...)
-    // Also supports: default tag = Character("name", options...)
-    // Also supports variable names: Character(variable_name, ...) or Character([variable_name], ...)
-    const standardMatch = trimmed.match(
-      /(?:define|default)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\(\s*(?:"([^"]+)"|(\[?[a-zA-Z_][a-zA-Z0-9_[\]*.]*\]?))(\s*,\s*([^)]*))?\s*\)/
-    );
-    if (standardMatch) {
-      const tag = standardMatch[1];
-      // Name can be in capture group 2 (quoted) or 3 (variable/bracketed)
-      const name = standardMatch[2] || standardMatch[3] || null;
-      // Options are in capture group 5 (the content after the comma)
-      const options = standardMatch[5];
-
-      let color: string | undefined = undefined;
-      if (options) {
-        // Try various color parameter names (who_color is commonly used in Ren'Py)
-        const whoColorMatch = options.match(/who_color\s*=\s*["']?([^"')\s]+)/);
-        if (whoColorMatch) {
-          color = whoColorMatch[1];
-        } else {
-          const colorMatch = options.match(/color\s*=\s*["']?([^"')\s]+)/);
-          if (colorMatch) {
-            color = colorMatch[1];
-          }
-        }
-      }
-
-      return {
-        tag,
-        name,
-        color: this.normalizeColor(color),
-        isMultiLine: false,
-      };
-    }
-
     // Null name pattern: define n = Character(None, options...)
     // Also supports: default n = Character(None, options...)
+    // Check this BEFORE the standard pattern because `None` would otherwise
+    // match the identifier group of the standard pattern.
     const nullNameMatch = trimmed.match(
       /(?:define|default)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\(\s*None(\s*,\s*([^)]*))?\s*\)/
     );
@@ -179,23 +275,57 @@ class CharacterParserService {
       const tag = nullNameMatch[1];
       const options = nullNameMatch[2];
 
-      let color: string | undefined = undefined;
-      if (options) {
-        // who_color is commonly used for null-narrator characters
-        const whoColorMatch = options.match(/who_color\s*=\s*["']?([^"')\s]+)/);
-        if (whoColorMatch) {
-          color = whoColorMatch[1];
-        } else {
-          const colorMatch = options.match(/color\s*=\s*["']?([^"')\s]+)/);
-          if (colorMatch) {
-            color = colorMatch[1];
-          }
-        }
-      }
+      const color = this.extractColor(options);
 
       return {
         tag,
         name: null,
+        rawName: null,
+        nameForm: null,
+        color: this.normalizeColor(color),
+        isMultiLine: false,
+      };
+    }
+
+    // Standard single-line pattern: define tag = Character("name", options...)
+    // Also supports: default tag = Character("name", options...)
+    // Also supports variable names: Character(variable_name, ...) or Character([variable_name], ...)
+    const standardMatch = trimmed.match(
+      /(?:define|default)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\(\s*(?:"([^"]*)"|(\[([a-zA-Z_][a-zA-Z0-9_.]*)\])|([a-zA-Z_][a-zA-Z0-9_.]*))(\s*,\s*([^)]*))?\s*\)/
+    );
+    if (standardMatch) {
+      const tag = standardMatch[1];
+      // Groups: 2=quoted, 3=bracketed-full (e.g., "[e_name]"), 4=bracketed-inner,
+      // 5=identifier, 6=options-after-comma, 7=options-content
+      let name: string | null = null;
+      let rawName: string | null = null;
+      let nameForm: NameForm | null = null;
+      if (standardMatch[2] !== undefined) {
+        name = standardMatch[2];
+        rawName = standardMatch[2];
+        nameForm = "quoted";
+      } else if (standardMatch[3] !== undefined) {
+        // Both `name` and `rawName` keep the brackets for round-trip
+        // fidelity. This keeps the bracketed arg form consistent with
+        // the quoted form `"[e_name]"` (where the brackets appear in
+        // the string content).
+        name = standardMatch[3]; // includes brackets, e.g. "[e_name]"
+        rawName = standardMatch[3];
+        nameForm = "bracketed";
+      } else if (standardMatch[5] !== undefined) {
+        rawName = standardMatch[5];
+        name = standardMatch[5];
+        nameForm = "identifier";
+      }
+      const options = standardMatch[7];
+
+      const color = this.extractColor(options);
+
+      return {
+        tag,
+        name,
+        rawName,
+        nameForm,
         color: this.normalizeColor(color),
         isMultiLine: false,
       };
@@ -210,39 +340,46 @@ class CharacterParserService {
       const tag = multiLineStartMatch[1];
       const rest = multiLineStartMatch[2];
 
-      // Check if name is on the same line (quoted string, variable, or bracketed variable)
+      // Check if name is on the same line (quoted string, bracketed, or identifier)
+      let name: string | null = null;
+      let rawName: string | null = null;
+      let nameForm: NameForm | null = null;
+
       const quotedNameMatch = rest.match(/"([^"]*)"/);
-      const bracketedNameMatch =
-        !quotedNameMatch && rest.match(/\[([a-zA-Z_][a-zA-Z0-9_[\]*.]*)\]/);
-      const variableNameMatch =
-        !quotedNameMatch &&
-        !bracketedNameMatch &&
-        rest.match(/([a-zA-Z_][a-zA-Z0-9_.]*)/);
-      const name = quotedNameMatch
-        ? quotedNameMatch[1]
-        : bracketedNameMatch
-          ? bracketedNameMatch[1]
-          : variableNameMatch
-            ? variableNameMatch[1]
-            : null;
+      if (quotedNameMatch) {
+        name = quotedNameMatch[1];
+        rawName = quotedNameMatch[1];
+        nameForm = "quoted";
+      } else {
+        const bracketedNameMatch = rest.match(/\[([a-zA-Z_][a-zA-Z0-9_.]*)\]/);
+        if (bracketedNameMatch) {
+          // Both `name` and `rawName` keep the brackets for round-trip
+          // fidelity (matches the single-line `Character([e_name], ...)`
+          // case).
+          name = `[${bracketedNameMatch[1]}]`;
+          rawName = `[${bracketedNameMatch[1]}]`;
+          nameForm = "bracketed";
+        } else {
+          const variableNameMatch = rest.match(/([a-zA-Z_][a-zA-Z0-9_.]*)/);
+          if (variableNameMatch) {
+            rawName = variableNameMatch[1];
+            name = variableNameMatch[1];
+            nameForm = "identifier";
+          }
+        }
+      }
 
       // Try to extract color from rest of line (who_color first, then color)
       let color: string | undefined = undefined;
       if (rest.trim()) {
-        const whoColorMatch = rest.match(/who_color\s*=\s*["']?([^"')\s]+)/);
-        if (whoColorMatch) {
-          color = whoColorMatch[1];
-        } else {
-          const colorMatch = rest.match(/color\s*=\s*["']?([^"')\s]+)/);
-          if (colorMatch) {
-            color = colorMatch[1];
-          }
-        }
+        color = this.extractColor(rest);
       }
 
       return {
         tag,
         name,
+        rawName,
+        nameForm,
         color: this.normalizeColor(color),
         isMultiLine: true,
       };
@@ -262,9 +399,17 @@ class CharacterParserService {
     let pendingCharacter: {
       tag: string;
       name: string | null;
+      rawName: string | null;
+      nameForm: NameForm | null;
       color: string | undefined;
       options: string[];
       startLine: number;
+      /**
+       * True once the name has been resolved (or explicitly set to
+       * null for `None`). Prevents subsequent option lines like
+       * `color="#cfcfcf"` from re-matching as the character name.
+       */
+      nameResolved: boolean;
     } | null = null;
     let parenDepth = 0;
 
@@ -286,18 +431,47 @@ class CharacterParserService {
         // Capture options
         if (trimmed && !trimmed.startsWith("#")) {
           // Check if this line contains the name (if not already found)
-          if (!pendingCharacter.name) {
+          if (!pendingCharacter.nameResolved) {
             // Try quoted name
             const quotedNameMatch = trimmed.match(/"([^"]+)"/);
             if (quotedNameMatch) {
               pendingCharacter.name = quotedNameMatch[1];
+              pendingCharacter.rawName = quotedNameMatch[1];
+              pendingCharacter.nameForm = "quoted";
+              pendingCharacter.nameResolved = true;
+            } else if (
+              /^None\b/.test(trimmed) ||
+              /^\s*None\s*[,)]/.test(trimmed)
+            ) {
+              // Explicit `None` token: the character has no display name.
+              // (Ren'Py treats `Character(None, ...)` as the narrator.)
+              pendingCharacter.name = null;
+              pendingCharacter.rawName = null;
+              pendingCharacter.nameForm = null;
+              pendingCharacter.nameResolved = true;
             } else {
-              // Try variable name
-              const variableNameMatch = trimmed.match(
-                /([a-zA-Z_][a-zA-Z0-9_.]*)/
+              // Try bracketed name
+              const bracketedNameMatch = trimmed.match(
+                /\[([a-zA-Z_][a-zA-Z0-9_.]*)\]/
               );
-              if (variableNameMatch) {
-                pendingCharacter.name = variableNameMatch[1];
+              if (bracketedNameMatch) {
+                // Both name and rawName keep the brackets for
+                // round-trip fidelity.
+                pendingCharacter.rawName = `[${bracketedNameMatch[1]}]`;
+                pendingCharacter.name = `[${bracketedNameMatch[1]}]`;
+                pendingCharacter.nameForm = "bracketed";
+                pendingCharacter.nameResolved = true;
+              } else {
+                // Try variable name
+                const variableNameMatch = trimmed.match(
+                  /([a-zA-Z_][a-zA-Z0-9_.]*)/
+                );
+                if (variableNameMatch) {
+                  pendingCharacter.rawName = variableNameMatch[1];
+                  pendingCharacter.name = variableNameMatch[1];
+                  pendingCharacter.nameForm = "identifier";
+                  pendingCharacter.nameResolved = true;
+                }
               }
             }
           }
@@ -310,34 +484,19 @@ class CharacterParserService {
           let color = pendingCharacter.color;
           if (!color) {
             const optionsText = pendingCharacter.options.join(" ");
-            const whoColorMatch = optionsText.match(
-              /who_color\s*=\s*["']?([^"')\s]+)/
-            );
-            if (whoColorMatch) {
-              color = whoColorMatch[1];
-            } else {
-              const colorMatch = optionsText.match(
-                /color\s*=\s*["']?([^"')\s]+)/
-              );
-              if (colorMatch) {
-                color = colorMatch[1];
-              }
-            }
+            color = this.extractColor(optionsText);
           }
 
-          // Create detected character
           const isSpecial = this.isSpecialTag(pendingCharacter.tag);
-          const displayName = pendingCharacter.name || pendingCharacter.tag;
-
-          characters.push({
+          const match: CharacterPatternMatch = {
             tag: pendingCharacter.tag,
             name: pendingCharacter.name,
-            displayName,
+            rawName: pendingCharacter.rawName,
+            nameForm: pendingCharacter.nameForm,
             color: this.normalizeColor(color),
-            isSpecial,
-            sourceFile: filename,
-            confidence: pendingCharacter.name ? 1.0 : 0.5,
-          });
+            isMultiLine: true,
+          };
+          characters.push(buildDetectedCharacter(match, filename, isSpecial));
 
           pendingCharacter = null;
           parenDepth = 0;
@@ -355,24 +514,21 @@ class CharacterParserService {
           pendingCharacter = {
             tag: match.tag,
             name: match.name,
+            rawName: match.rawName,
+            nameForm: match.nameForm,
             color: match.color,
             options: [],
             startLine: i,
+            // The start line only resolves the name when it
+            // identified a form (quoted/bracketed/identifier) OR
+            // found `None`. A bare `define tag = Character(` start
+            // leaves the name unresolved; the next line(s) carry it.
+            nameResolved: match.nameForm !== null,
           };
         } else {
           // Single-line definition
           const isSpecial = this.isSpecialTag(match.tag);
-          const displayName = match.name || match.tag;
-
-          characters.push({
-            tag: match.tag,
-            name: match.name,
-            displayName,
-            color: match.color || "#cfcfcf",
-            isSpecial,
-            sourceFile: filename,
-            confidence: match.name ? 1.0 : 0.5,
-          });
+          characters.push(buildDetectedCharacter(match, filename, isSpecial));
         }
       }
     }
