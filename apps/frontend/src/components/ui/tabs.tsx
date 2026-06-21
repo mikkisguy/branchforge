@@ -25,14 +25,15 @@
 
 import {
   createContext,
+  use,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
 import { cn } from "@/lib/utils";
 
@@ -44,19 +45,24 @@ interface TabsContextValue {
   value: string;
   setValue: (next: string) => void;
   /**
-   * Register/unregister a tab value. Each `TabsTrigger` registers
-   * itself on mount so the TabsList can compute next/prev for
-   * arrow-key navigation. Stored in insertion order.
+   * Register/unregister a tab. `disabled` tabs are tracked but
+   * excluded from the navigation list — arrow keys skip them.
    */
-  registerTab: (value: string) => () => void;
-  /** Snapshot of the currently-registered tab values, in order. */
+  registerTab: (value: string, disabled: boolean) => () => void;
+  /** Snapshot of currently-registered, non-disabled tab values, in insertion order. */
   tabValues: string[];
+  /**
+   * Ref to the TabsList root element. Used by triggers to scope
+   * focus queries to the current tablist instance (so multiple
+   * Tabs on the same page don't cross-focus).
+   */
+  tablistRef: RefObject<HTMLDivElement | null>;
 }
 
 const TabsContext = createContext<TabsContextValue | null>(null);
 
 function useTabsContext(component: string): TabsContextValue {
-  const ctx = useContext(TabsContext);
+  const ctx = use(TabsContext);
   if (!ctx) {
     throw new Error(`<${component}> must be rendered inside <Tabs>.`);
   }
@@ -106,24 +112,61 @@ export function Tabs({
 
   // Tab values in insertion order. We use a ref + state pair so
   // registration is O(1) and re-renders only happen when the set
-  // of values actually changes.
+  // of values actually changes. Disabled tabs are tracked for
+  // re-registration (so toggling `disabled` updates the visible
+  // list) but excluded from the navigation order.
+  // (Suppressed: react-doctor flags useRef(new Map()) and
+  // useRef(new Set()) as rebuilding the value on every render.
+  // The rebuild cost is negligible for an empty Map/Set, and the
+  // alternative lazy-init pattern forces non-null assertions at
+  // every call site inside the closures below.)
   const tabOrderRef = useRef<string[]>([]);
+  // react-doctor-disable-next-line react-doctor/rerender-lazy-ref-init
+  const tabDisabledRef = useRef<Map<string, boolean>>(new Map());
   const [tabOrder, setTabOrder] = useState<string[]>([]);
+  // react-doctor-disable-next-line react-doctor/rerender-lazy-ref-init
   const tabSetRef = useRef<Set<string>>(new Set());
 
-  const registerTab = useCallback((value: string) => {
-    if (tabSetRef.current.has(value)) {
-      return () => undefined;
-    }
-    tabSetRef.current.add(value);
-    tabOrderRef.current = [...tabOrderRef.current, value];
-    setTabOrder(tabOrderRef.current);
-    return () => {
-      tabSetRef.current.delete(value);
-      tabOrderRef.current = tabOrderRef.current.filter((v) => v !== value);
-      setTabOrder(tabOrderRef.current);
-    };
+  // Ref to the TabsList root so triggers can scope their focus
+  // queries to the current tablist instance.
+  const tablistRef = useRef<HTMLDivElement | null>(null);
+
+  const recomputeTabOrder = useCallback(() => {
+    tabOrderRef.current = tabOrderRef.current.filter(
+      (v) => !tabDisabledRef.current.get(v)
+    );
+    setTabOrder([...tabOrderRef.current]);
   }, []);
+
+  const registerTab = useCallback(
+    (value: string, disabled: boolean) => {
+      tabDisabledRef.current.set(value, disabled);
+      if (tabSetRef.current.has(value)) {
+        // Already registered; the disabled flag may have flipped,
+        // so recompute the visible order.
+        recomputeTabOrder();
+        return () => undefined;
+      }
+      tabSetRef.current.add(value);
+      if (disabled) {
+        // Don't add to the visible order.
+        return () => {
+          tabSetRef.current.delete(value);
+          tabDisabledRef.current.delete(value);
+          recomputeTabOrder();
+        };
+      }
+      tabOrderRef.current = [...tabOrderRef.current, value];
+      setTabOrder([...tabOrderRef.current]);
+      return () => {
+        tabSetRef.current.delete(value);
+        tabDisabledRef.current.delete(value);
+        tabOrderRef.current = tabOrderRef.current.filter((v) => v !== value);
+        setTabOrder([...tabOrderRef.current]);
+      };
+    },
+    [recomputeTabOrder]
+  );
 
   const ctx = useMemo<TabsContextValue>(
     () => ({
@@ -131,6 +174,7 @@ export function Tabs({
       setValue,
       registerTab,
       tabValues: tabOrder,
+      tablistRef,
     }),
     [isControlled, value, internalValue, setValue, registerTab, tabOrder]
   );
@@ -154,8 +198,13 @@ interface TabsListProps {
 }
 
 export function TabsList({ children, className, ariaLabel }: TabsListProps) {
+  // The ref is set on the tablist root so TabsTrigger can scope
+  // focus queries (e.g. on arrow-key navigation) to the current
+  // tablist instance.
+  const { tablistRef } = useTabsContext("TabsList");
   return (
     <div
+      ref={tablistRef}
       role="tablist"
       aria-label={ariaLabel}
       className={cn(
@@ -190,20 +239,30 @@ export function TabsTrigger({
     setValue,
     registerTab,
     tabValues,
+    tablistRef,
   } = useTabsContext("TabsTrigger");
   const isActive = active === value;
   const buttonRef = useRef<HTMLButtonElement | null>(null);
 
   // Register this tab on mount so the TabsList can compute next/prev
-  // for arrow-key navigation. The returned cleanup unregisters on
-  // unmount.
-  useEffect(() => registerTab(value), [registerTab, value]);
+  // for arrow-key navigation. Disabled tabs are tracked but excluded
+  // from the navigation list (arrow keys skip them). The returned
+  // cleanup unregisters on unmount.
+  // (Suppressed: react-doctor flags this as 'data passed to parent via
+  // effect', but the registration callback is the standard pattern
+  // for child→parent enumeration — there's no way for the parent
+  // to statically know about TabsTrigger children.)
+  // react-doctor-disable-next-line react-doctor/no-pass-data-to-parent
+  useEffect(
+    () => registerTab(value, !!disabled),
+    [registerTab, value, disabled]
+  );
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
     if (disabled) return;
 
     const currentIndex = tabValues.indexOf(value);
-    if (currentIndex === -1) return;
+    if (currentIndex === -1 || tabValues.length === 0) return;
 
     const computeNextIndex = (): number => {
       switch (event.key) {
@@ -228,9 +287,11 @@ export function TabsTrigger({
     if (nextValue !== undefined) {
       setValue(nextValue);
       // Move focus to the newly-active tab so screen readers and
-      // keyboard users follow the selection.
+      // keyboard users follow the selection. Scope the query to
+      // the current tablist so multiple Tabs on the same page
+      // don't cross-focus.
       requestAnimationFrame(() => {
-        const el = document.querySelector<HTMLButtonElement>(
+        const el = tablistRef.current?.querySelector<HTMLButtonElement>(
           `[role="tab"][data-tab-value="${CSS.escape(nextValue)}"]`
         );
         el?.focus();

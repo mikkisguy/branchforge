@@ -211,7 +211,13 @@ function ProjectSelector({
   const onCloseEffect = useEffectEvent(onClose);
 
   useEffect(() => {
-    if (!isOpen || isCollapsed) return;
+    // The popover is only rendered in the collapsed branch below;
+    // expanded mode shows a native <Select> which manages its own
+    // open/close state. So we only need the click-outside handler
+    // when `isOpen` is true — the `isCollapsed` check is unnecessary
+    // (it was inverted, registering the handler only in the mode
+    // that has no popover to dismiss).
+    if (!isOpen) return;
     function handleClickOutside(event: MouseEvent) {
       if (
         containerRef.current &&
@@ -222,7 +228,7 @@ function ProjectSelector({
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen, isCollapsed]);
+  }, [isOpen]);
 
   if (isCollapsed) {
     return (
@@ -386,7 +392,11 @@ function ThemeSwitcher({
   const onCloseEffect = useEffectEvent(onClose);
 
   useEffect(() => {
-    if (!isOpen || isCollapsed) return;
+    // The theme popover is only rendered in the collapsed branch
+    // below. Expanded mode renders the palettes inline and doesn't
+    // need a click-outside handler. See the matching comment in
+    // `ProjectSelector` for context.
+    if (!isOpen) return;
     function handleClickOutside(event: MouseEvent) {
       if (
         containerRef.current &&
@@ -397,7 +407,7 @@ function ThemeSwitcher({
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen, isCollapsed]);
+  }, [isOpen]);
 
   if (isCollapsed) {
     return (
