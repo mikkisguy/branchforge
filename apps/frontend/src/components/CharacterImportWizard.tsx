@@ -43,6 +43,13 @@ export interface CharacterImportWizardProps {
   detectedCharacters: DetectedCharacter[];
   conflicts: CharacterConflict[];
   excludedTags: string[];
+  /**
+   * Tags of characters already in the database. When a detected
+   * character is in this set, the wizard shows an "Already imported"
+   * indicator. The wizard's import is idempotent (upsert) so these
+   * can be re-confirmed without producing duplicates.
+   */
+  existingTags?: string[];
   onComplete?: () => void;
 }
 
@@ -269,6 +276,7 @@ export function CharacterImportWizard({
   detectedCharacters,
   conflicts,
   excludedTags,
+  existingTags = [],
   onComplete,
 }: CharacterImportWizardProps) {
   // Generate unique ID for checkbox to prevent collisions when multiple wizards are mounted
@@ -754,6 +762,15 @@ export function CharacterImportWizard({
                             <span className="font-mono text-sm font-medium">
                               {char.tag}
                             </span>
+                            {existingTags.includes(char.tag) && (
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-muted text-muted-foreground border border-border/30"
+                                title="This character is already in the database. Re-confirming will update it (idempotent upsert)."
+                                data-testid={`already-imported-badge-${char.tag}`}
+                              >
+                                Already imported
+                              </span>
+                            )}
                             {badge && (
                               <span
                                 className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800"

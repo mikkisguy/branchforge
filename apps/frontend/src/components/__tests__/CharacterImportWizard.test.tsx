@@ -57,7 +57,10 @@ function makeChar(
   };
 }
 
-function renderWizard(detectedCharacters: DetectedCharacter[]) {
+function renderWizard(
+  detectedCharacters: DetectedCharacter[],
+  existingTags: string[] = []
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -76,6 +79,7 @@ function renderWizard(detectedCharacters: DetectedCharacter[]) {
           detectedCharacters={detectedCharacters}
           conflicts={[]}
           excludedTags={[]}
+          existingTags={existingTags}
           onComplete={onComplete}
         />
       </QueryClientProvider>
@@ -349,6 +353,42 @@ describe("CharacterImportWizard — excluded state", () => {
 
     expect(
       screen.queryByTestId("name-type-helper-boss")
+    ).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Regression for the wizard-not-showing bug introduced by PR #245.
+ *
+ * PR #245 promotes extracted characters into the `characters` table
+ * during import, so by the time `detectCharacters` runs, all
+ * detected tags are in `existingTags`. The wizard's "Already
+ * imported" badge gives the user a clear signal that confirming the
+ * import is a no-op for those rows.
+ */
+describe("CharacterImportWizard — already-imported indicator", () => {
+  it("shows an 'Already imported' badge for characters that are in the DB", () => {
+    const chars: DetectedCharacter[] = [
+      makeChar({
+        tag: "s",
+        name: "Sarah",
+        displayName: "Sarah",
+        nameType: "literal",
+      }),
+      makeChar({
+        tag: "boss",
+        name: "boss_name",
+        displayName: "boss_name",
+        nameType: "variable",
+      }),
+    ];
+
+    // "s" was inserted by PR #245's auto-promote; "boss" is brand new.
+    renderWizard(chars, ["s"]);
+
+    expect(screen.getByTestId("already-imported-badge-s")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("already-imported-badge-boss")
     ).not.toBeInTheDocument();
   });
 });
