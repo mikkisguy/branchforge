@@ -28,6 +28,12 @@ import {
   generateVisualName,
   type VisualSystemConfig,
 } from "@branchforge/shared";
+import {
+  INITIAL_VISUAL_SYSTEM_FORM,
+  parseGroupPrefixes,
+  toVisualSystemFormState,
+  type VisualSystemFormState,
+} from "@/components/visual-system.helpers";
 
 // ============================================================================
 // Types
@@ -39,16 +45,7 @@ export interface VisualSystemDialogProps {
   projectId: string;
 }
 
-interface VisualSystemFormState {
-  namingTemplate: string;
-  defaultGroupType: string;
-  labelPadding: 1 | 2;
-  counterPadding: 1 | 2;
-  jumpPrefixShared: string;
-  placeholderBaseUrl: string;
-  // Stringified JSON for editing; the dialog shows a textarea.
-  groupPrefixesJson: string;
-}
+export type { VisualSystemFormState };
 
 interface VisualSystemFormErrors {
   namingTemplate?: string;
@@ -62,93 +59,10 @@ interface VisualSystemFormErrors {
 // ============================================================================
 // Helpers
 // ============================================================================
-
-/** Build the form state from a server config. */
-function toFormState(config: VisualSystemConfig): VisualSystemFormState {
-  return {
-    namingTemplate: config.namingTemplate,
-    defaultGroupType: config.defaultGroupType ?? "",
-    labelPadding: config.labelPadding,
-    counterPadding: config.counterPadding,
-    jumpPrefixShared: config.jumpPrefixShared,
-    placeholderBaseUrl: config.placeholderBaseUrl ?? "",
-    groupPrefixesJson: config.groupPrefixes
-      ? JSON.stringify(config.groupPrefixes, null, 2)
-      : "{}",
-  };
-}
-
-const INITIAL_FORM: VisualSystemFormState = {
-  namingTemplate: "{route}{group}_{label}_{counter}_{slug}",
-  defaultGroupType: "",
-  labelPadding: 2,
-  counterPadding: 2,
-  jumpPrefixShared: "",
-  placeholderBaseUrl: "",
-  groupPrefixesJson: "{}",
-};
-
-/** Parse the groupPrefixes JSON textarea into a valid object, or null. */
-function parseGroupPrefixes(raw: string): {
-  value: Record<string, Record<string, string>> | null;
-  error?: string;
-} {
-  const trimmed = raw.trim();
-  if (trimmed === "" || trimmed === "{}") {
-    return { value: null };
-  }
-  try {
-    const parsed: unknown = JSON.parse(trimmed);
-    if (
-      typeof parsed !== "object" ||
-      parsed === null ||
-      Array.isArray(parsed)
-    ) {
-      return { value: null, error: "Group prefixes must be a JSON object" };
-    }
-    for (const [groupType, entries] of Object.entries(parsed)) {
-      if (typeof groupType !== "string" || groupType.length === 0) {
-        return {
-          value: null,
-          error: "Group type keys must be non-empty strings",
-        };
-      }
-      if (
-        typeof entries !== "object" ||
-        entries === null ||
-        Array.isArray(entries)
-      ) {
-        return {
-          value: null,
-          error: `Group "${groupType}" must map to an object of prefix entries`,
-        };
-      }
-      for (const [k, v] of Object.entries(entries as Record<string, unknown>)) {
-        // Trim before length check to match the server-side
-        // `.trim().min(1)` validation in visualSystemConfigSchema;
-        // a whitespace-only key/value would otherwise pass client-side
-        // validation and only fail at the API.
-        if (typeof k !== "string" || k.trim().length === 0) {
-          return {
-            value: null,
-            error: `Group "${groupType}" has an empty key`,
-          };
-        }
-        if (typeof v !== "string" || v.trim().length === 0) {
-          return {
-            value: null,
-            error: `Group "${groupType}" entry "${k}" must be a non-empty string`,
-          };
-        }
-      }
-    }
-    return {
-      value: parsed as Record<string, Record<string, string>>,
-    };
-  } catch {
-    return { value: null, error: "Group prefixes JSON is not valid" };
-  }
-}
+//
+// `toVisualSystemFormState`, `parseGroupPrefixes`, and
+// `INITIAL_VISUAL_SYSTEM_FORM` live in `./visual-system.helpers` so
+// both this dialog and the project-settings tab can share them.
 
 /** Validate the form and return a flat error object. */
 function validateForm(form: VisualSystemFormState): VisualSystemFormErrors {
@@ -198,21 +112,28 @@ interface VisualSystemFormContentProps {
   onClose: () => void;
 }
 
-function VisualSystemFormContent({
+/**
+ * The form body of the visual-system settings, with no dialog chrome
+ * around it. Used by `VisualSystemDialog` (standalone) and by
+ * `ProjectSettingsDialog` (as a tab panel).
+ */
+export function VisualSystemFormContent({
   initialConfig,
   isSaving,
   onSave,
   onClose,
 }: VisualSystemFormContentProps) {
   const [form, setForm] = useState<VisualSystemFormState>(
-    initialConfig ? toFormState(initialConfig) : INITIAL_FORM
+    initialConfig
+      ? toVisualSystemFormState(initialConfig)
+      : INITIAL_VISUAL_SYSTEM_FORM
   );
   const [errors, setErrors] = useState<VisualSystemFormErrors>({});
 
   // When the server config first arrives, hydrate the form.
   useEffect(() => {
     if (initialConfig) {
-      setForm(toFormState(initialConfig));
+      setForm(toVisualSystemFormState(initialConfig));
     }
   }, [initialConfig]);
 
@@ -274,203 +195,182 @@ function VisualSystemFormContent({
   }, [previewConfig, form.defaultGroupType]);
 
   return (
-    <>
-      <DialogHeader>
-        <DialogTitle>Visual System</DialogTitle>
-        <DialogDescription>
-          Configure how generated Ren'Py visual filenames are produced.
-        </DialogDescription>
-      </DialogHeader>
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <Label htmlFor="vs-naming-template" className="text-xs">
+          Naming Template *
+        </Label>
+        <Input
+          id="vs-naming-template"
+          type="text"
+          placeholder="{route}{group}_{label}_{counter}_{slug}"
+          value={form.namingTemplate}
+          onChange={(event) =>
+            handleChange("namingTemplate", event.target.value)
+          }
+          disabled={isSaving}
+        />
+        <p className="text-xs text-muted-foreground">
+          Tokens: <code>{`{route}`}</code>, <code>{`{group}`}</code>,{" "}
+          <code>{`{label}`}</code> (or legacy <code>{`{scene}`}</code>),{" "}
+          <code>{`{counter}`}</code>, <code>{`{slug}`}</code>
+        </p>
+        {errors.namingTemplate && (
+          <p className="text-xs text-destructive">{errors.namingTemplate}</p>
+        )}
+      </div>
 
-      <div className="space-y-4 mt-4">
+      <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <Label htmlFor="vs-naming-template" className="text-xs">
-            Naming Template *
+          <Label htmlFor="vs-label-padding" className="text-xs">
+            Label Padding *
           </Label>
-          <Input
-            id="vs-naming-template"
-            type="text"
-            placeholder="{route}{group}_{label}_{counter}_{slug}"
-            value={form.namingTemplate}
-            onChange={(event) =>
-              handleChange("namingTemplate", event.target.value)
+          <Select
+            id="vs-label-padding"
+            value={String(form.labelPadding) as "1" | "2"}
+            onChange={(value) =>
+              handleChange("labelPadding", Number(value) as 1 | 2)
             }
             disabled={isSaving}
+            options={[
+              { value: "1", label: "1 (e.g. 1, 2, 3)" },
+              { value: "2", label: "2 (e.g. 01, 02, 03)" },
+            ]}
           />
-          <p className="text-xs text-muted-foreground">
-            Tokens: <code>{`{route}`}</code>, <code>{`{group}`}</code>,{" "}
-            <code>{`{label}`}</code> (or legacy <code>{`{scene}`}</code>),{" "}
-            <code>{`{counter}`}</code>, <code>{`{slug}`}</code>
-          </p>
-          {errors.namingTemplate && (
-            <p className="text-xs text-destructive">{errors.namingTemplate}</p>
+          {errors.labelPadding && (
+            <p className="text-xs text-destructive">{errors.labelPadding}</p>
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label htmlFor="vs-label-padding" className="text-xs">
-              Label Padding *
-            </Label>
-            <Select
-              id="vs-label-padding"
-              value={String(form.labelPadding) as "1" | "2"}
-              onChange={(value) =>
-                handleChange("labelPadding", Number(value) as 1 | 2)
-              }
-              disabled={isSaving}
-              options={[
-                { value: "1", label: "1 (e.g. 1, 2, 3)" },
-                { value: "2", label: "2 (e.g. 01, 02, 03)" },
-              ]}
-            />
-            {errors.labelPadding && (
-              <p className="text-xs text-destructive">{errors.labelPadding}</p>
-            )}
-          </div>
-
-          <div className="space-y-1">
-            <Label htmlFor="vs-counter-padding" className="text-xs">
-              Counter Padding *
-            </Label>
-            <Select
-              id="vs-counter-padding"
-              value={String(form.counterPadding) as "1" | "2"}
-              onChange={(value) =>
-                handleChange("counterPadding", Number(value) as 1 | 2)
-              }
-              disabled={isSaving}
-              options={[
-                { value: "1", label: "1 (e.g. 1, 2, 3)" },
-                { value: "2", label: "2 (e.g. 01, 02, 03)" },
-              ]}
-            />
-            {errors.counterPadding && (
-              <p className="text-xs text-destructive">
-                {errors.counterPadding}
-              </p>
-            )}
-          </div>
-        </div>
-
         <div className="space-y-1">
-          <Label htmlFor="vs-jump-prefix" className="text-xs">
-            Shared Jump Prefix *
+          <Label htmlFor="vs-counter-padding" className="text-xs">
+            Counter Padding *
           </Label>
-          <Input
-            id="vs-jump-prefix"
-            type="text"
-            placeholder="shared_"
-            value={form.jumpPrefixShared}
-            onChange={(event) =>
-              handleChange("jumpPrefixShared", event.target.value)
+          <Select
+            id="vs-counter-padding"
+            value={String(form.counterPadding) as "1" | "2"}
+            onChange={(value) =>
+              handleChange("counterPadding", Number(value) as 1 | 2)
             }
             disabled={isSaving}
+            options={[
+              { value: "1", label: "1 (e.g. 1, 2, 3)" },
+              { value: "2", label: "2 (e.g. 01, 02, 03)" },
+            ]}
           />
-          {errors.jumpPrefixShared && (
-            <p className="text-xs text-destructive">
-              {errors.jumpPrefixShared}
-            </p>
+          {errors.counterPadding && (
+            <p className="text-xs text-destructive">{errors.counterPadding}</p>
           )}
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label htmlFor="vs-default-group" className="text-xs">
-              Default Group Type
-            </Label>
-            <Input
-              id="vs-default-group"
-              type="text"
-              placeholder="act"
-              value={form.defaultGroupType}
-              onChange={(event) =>
-                handleChange("defaultGroupType", event.target.value)
-              }
-              disabled={isSaving}
-            />
-            <p className="text-xs text-muted-foreground">
-              Optional. e.g. <code>act</code>, <code>chapter</code>
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <Label htmlFor="vs-placeholder" className="text-xs">
-              Placeholder Base URL
-            </Label>
-            <Input
-              id="vs-placeholder"
-              type="text"
-              placeholder="https://example.com/img/"
-              value={form.placeholderBaseUrl}
-              onChange={(event) =>
-                handleChange("placeholderBaseUrl", event.target.value)
-              }
-              disabled={isSaving}
-            />
-            {errors.placeholderBaseUrl && (
-              <p className="text-xs text-destructive">
-                {errors.placeholderBaseUrl}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          <Label htmlFor="vs-group-prefixes" className="text-xs">
-            Group Prefixes (JSON)
-          </Label>
-          <textarea
-            id="vs-group-prefixes"
-            className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            placeholder='{ "act": { "I": "ai" }, "chapter": { "1": "ch1" } }'
-            value={form.groupPrefixesJson}
-            onChange={(event) =>
-              handleChange("groupPrefixesJson", event.target.value)
-            }
-            disabled={isSaving}
-            rows={4}
-          />
-          <p className="text-xs text-muted-foreground">
-            Map of group type to value→prefix. Empty or <code>{`{}`}</code> for
-            none.
-          </p>
-          {errors.groupPrefixesJson && (
-            <p className="text-xs text-destructive">
-              {errors.groupPrefixesJson}
-            </p>
-          )}
-        </div>
-
-        <div className="rounded-md border border-border/50 bg-muted/40 p-3 text-xs">
-          <div className="flex items-center gap-1.5 font-medium text-foreground">
-            <Wand2 className="size-3.5" />
-            Preview
-          </div>
-          <p className="mt-1 text-muted-foreground">
-            Sample generated name (route <code>hero</code>, group <code>I</code>
-            , label <code>1</code>, counter <code>1</code>, slug{" "}
-            <code>cafe</code>):
-          </p>
-          <p className="mt-1 font-mono text-foreground">{samplePreview}</p>
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            disabled={isSaving}
-          >
-            Cancel
-          </Button>
-          <Button type="button" onClick={handleSave} disabled={isSaving}>
-            {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
-            Save
-          </Button>
         </div>
       </div>
-    </>
+
+      <div className="space-y-1">
+        <Label htmlFor="vs-jump-prefix" className="text-xs">
+          Shared Jump Prefix *
+        </Label>
+        <Input
+          id="vs-jump-prefix"
+          type="text"
+          placeholder="shared_"
+          value={form.jumpPrefixShared}
+          onChange={(event) =>
+            handleChange("jumpPrefixShared", event.target.value)
+          }
+          disabled={isSaving}
+        />
+        {errors.jumpPrefixShared && (
+          <p className="text-xs text-destructive">{errors.jumpPrefixShared}</p>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label htmlFor="vs-default-group" className="text-xs">
+            Default Group Type
+          </Label>
+          <Input
+            id="vs-default-group"
+            type="text"
+            placeholder="act"
+            value={form.defaultGroupType}
+            onChange={(event) =>
+              handleChange("defaultGroupType", event.target.value)
+            }
+            disabled={isSaving}
+          />
+          <p className="text-xs text-muted-foreground">
+            Optional. e.g. <code>act</code>, <code>chapter</code>
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <Label htmlFor="vs-placeholder" className="text-xs">
+            Placeholder Base URL
+          </Label>
+          <Input
+            id="vs-placeholder"
+            type="text"
+            placeholder="https://example.com/img/"
+            value={form.placeholderBaseUrl}
+            onChange={(event) =>
+              handleChange("placeholderBaseUrl", event.target.value)
+            }
+            disabled={isSaving}
+          />
+          {errors.placeholderBaseUrl && (
+            <p className="text-xs text-destructive">
+              {errors.placeholderBaseUrl}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="vs-group-prefixes" className="text-xs">
+          Group Prefixes (JSON)
+        </Label>
+        <textarea
+          id="vs-group-prefixes"
+          className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          placeholder='{ "act": { "I": "ai" }, "chapter": { "1": "ch1" } }'
+          value={form.groupPrefixesJson}
+          onChange={(event) =>
+            handleChange("groupPrefixesJson", event.target.value)
+          }
+          disabled={isSaving}
+          rows={4}
+        />
+        <p className="text-xs text-muted-foreground">
+          Map of group type to value→prefix. Empty or <code>{`{}`}</code> for
+          none.
+        </p>
+        {errors.groupPrefixesJson && (
+          <p className="text-xs text-destructive">{errors.groupPrefixesJson}</p>
+        )}
+      </div>
+
+      <div className="rounded-md border border-border/50 bg-muted/40 p-3 text-xs">
+        <div className="flex items-center gap-1.5 font-medium text-foreground">
+          <Wand2 className="size-3.5" />
+          Preview
+        </div>
+        <p className="mt-1 text-muted-foreground">
+          Sample generated name (route <code>hero</code>, group <code>I</code>,
+          label <code>1</code>, counter <code>1</code>, slug <code>cafe</code>):
+        </p>
+        <p className="mt-1 font-mono text-foreground">{samplePreview}</p>
+      </div>
+
+      <div className="flex justify-end gap-2">
+        {/* No Cancel button — the dialog's X / the outer Close
+            button (in `ProjectSettingsDialog`) is the equivalent.
+            Save persists; close discards unsaved changes. */}
+        <Button type="button" onClick={handleSave} disabled={isSaving}>
+          {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
+          Save
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -510,16 +410,16 @@ export function VisualSystemDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl w-full">
+        <DialogHeader>
+          <DialogTitle>Visual System</DialogTitle>
+          <DialogDescription>
+            Configure how generated Ren'Py visual filenames are produced.
+          </DialogDescription>
+        </DialogHeader>
         {isLoading || !config ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>Visual System</DialogTitle>
-              <DialogDescription>Loading...</DialogDescription>
-            </DialogHeader>
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="size-6 animate-spin" />
-            </div>
-          </>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="size-6 animate-spin" />
+          </div>
         ) : (
           <VisualSystemFormContent
             key={`visual-system-${open}`}

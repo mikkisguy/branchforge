@@ -16,6 +16,13 @@ interface CharacterListProps {
   isSaving: boolean;
   onEdit: (characterId: string) => void;
   onDelete: (characterId: string) => void | Promise<void>;
+  /**
+   * Number of columns in the card grid. Defaults to 1
+   * (single-column stack). Pass 2 to render in a 2-column grid —
+   * used by the `ProjectSettingsDialog` tab to keep the dialog
+   * frame height stable.
+   */
+  columns?: 1 | 2;
 }
 
 export function CharacterList({
@@ -23,6 +30,7 @@ export function CharacterList({
   isSaving,
   onEdit,
   onDelete,
+  columns = 1,
 }: CharacterListProps) {
   const [deleteTarget, setDeleteTarget] = useState<Character | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -45,7 +53,11 @@ export function CharacterList({
 
   return (
     <>
-      <div className="space-y-4">
+      <div
+        className={
+          columns === 2 ? "grid grid-cols-1 sm:grid-cols-2 gap-3" : "space-y-4"
+        }
+      >
         {characters.map((character) => (
           <div
             key={character.id}

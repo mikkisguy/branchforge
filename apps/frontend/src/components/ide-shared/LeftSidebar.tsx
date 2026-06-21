@@ -2,8 +2,6 @@ import { useReducer, useEffect, useRef, useCallback } from "react";
 import {
   BookOpen,
   SquarePen,
-  Route,
-  Users,
   Palette,
   Settings,
   LogOut,
@@ -11,13 +9,13 @@ import {
   ChevronsRight,
   FolderOpen,
   Network,
+  SlidersHorizontal,
 } from "lucide-react";
 import type { ThemePalette } from "@/contexts/ThemeContext";
 import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 import type { Tab } from "./settings-types";
 import { SettingsModal } from "./SettingsModal";
-import { RouteSettingsDialog } from "./RouteSettingsDialog";
-import { CharacterDialog } from "@/components/CharacterDialog";
+import { ProjectSettingsDialog } from "@/components/ProjectSettingsDialog";
 import { GitLabImportDialog } from "./GitLabImportDialog.lazy";
 import { ZipImportProjectDialog } from "./ZipImportProjectDialog.lazy";
 import { FlowDialog } from "@/components/flow/FlowDialog";
@@ -70,8 +68,7 @@ export type LeftSidebarProps =
 type ModalKey =
   | "themeDropdown"
   | "settings"
-  | "routes"
-  | "characters"
+  | "projectSettings"
   | "projectPopover"
   | "gitLabImport"
   | "zipImport"
@@ -80,8 +77,7 @@ type ModalKey =
 interface ModalState {
   themeDropdown: boolean;
   settings: boolean;
-  routes: boolean;
-  characters: boolean;
+  projectSettings: boolean;
   projectPopover: boolean;
   gitLabImport: boolean;
   zipImport: boolean;
@@ -96,8 +92,7 @@ type ModalAction =
 const initialModalState: ModalState = {
   themeDropdown: false,
   settings: false,
-  routes: false,
-  characters: false,
+  projectSettings: false,
   projectPopover: false,
   gitLabImport: false,
   zipImport: false,
@@ -372,10 +367,12 @@ export function LeftSidebar(props: LeftSidebarProps) {
 
           {/* Navigation Items */}
           <nav className="flex flex-col gap-1">
-            {/* Routes */}
+            {/* Project Settings (Characters, Routes, Visual System) */}
             <button
               type="button"
-              onClick={() => dispatchModal({ type: "OPEN", key: "routes" })}
+              onClick={() =>
+                dispatchModal({ type: "OPEN", key: "projectSettings" })
+              }
               disabled={!projectId}
               className={`flex items-center ${
                 isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
@@ -384,28 +381,10 @@ export function LeftSidebar(props: LeftSidebarProps) {
                   ? "text-muted-foreground/50 cursor-not-allowed"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               }`}
-              title="Routes"
+              title="Project settings"
             >
-              <Route className="size-4 flex-shrink-0" />
-              {showLabel && <span>Routes</span>}
-            </button>
-
-            {/* Characters */}
-            <button
-              type="button"
-              onClick={() => dispatchModal({ type: "OPEN", key: "characters" })}
-              disabled={!projectId}
-              className={`flex items-center ${
-                isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
-              } rounded-md text-sm font-medium transition-colors ${
-                !projectId
-                  ? "text-muted-foreground/50 cursor-not-allowed"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              }`}
-              title="Characters"
-            >
-              <Users className="size-4 flex-shrink-0" />
-              {showLabel && <span>Characters</span>}
+              <SlidersHorizontal className="size-4 flex-shrink-0" />
+              {showLabel && <span>Settings</span>}
             </button>
 
             {/* Flow Graph */}
@@ -569,25 +548,16 @@ export function LeftSidebar(props: LeftSidebarProps) {
         initialTab={initialSettingsTab}
       />
       {projectId && (
-        <>
-          <RouteSettingsDialog
-            open={modals.routes}
-            onOpenChange={(open) =>
-              dispatchModal({ type: open ? "OPEN" : "CLOSE", key: "routes" })
-            }
-            projectId={projectId}
-          />
-          <CharacterDialog
-            open={modals.characters}
-            onOpenChange={(open: boolean) =>
-              dispatchModal({
-                type: open ? "OPEN" : "CLOSE",
-                key: "characters",
-              })
-            }
-            projectId={projectId}
-          />
-        </>
+        <ProjectSettingsDialog
+          open={modals.projectSettings}
+          onOpenChange={(open) =>
+            dispatchModal({
+              type: open ? "OPEN" : "CLOSE",
+              key: "projectSettings",
+            })
+          }
+          projectId={projectId}
+        />
       )}
 
       {/* GitLab Import Dialog */}
