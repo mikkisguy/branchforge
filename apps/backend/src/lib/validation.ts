@@ -848,7 +848,12 @@ export const visualSystemConfigSchema = z
       .string()
       .trim()
       .min(1, "Shared jump prefix is required")
-      .max(100, "Shared jump prefix is too long"),
+      .max(100, "Shared jump prefix is too long")
+      // Empty string is the default value (see
+      // VISUAL_SYSTEM_CONFIG_DEFAULTS) and the clearing sentinel; the
+      // service stores it as-is since the column is NOT NULL and the
+      // shared `VisualSystemConfig` type declares the field as required.
+      .or(z.literal("")),
     placeholderBaseUrl: z
       .string()
       .trim()

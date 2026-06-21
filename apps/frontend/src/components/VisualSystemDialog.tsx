@@ -124,13 +124,17 @@ function parseGroupPrefixes(raw: string): {
         };
       }
       for (const [k, v] of Object.entries(entries as Record<string, unknown>)) {
-        if (typeof k !== "string" || k.length === 0) {
+        // Trim before length check to match the server-side
+        // `.trim().min(1)` validation in visualSystemConfigSchema;
+        // a whitespace-only key/value would otherwise pass client-side
+        // validation and only fail at the API.
+        if (typeof k !== "string" || k.trim().length === 0) {
           return {
             value: null,
             error: `Group "${groupType}" has an empty key`,
           };
         }
-        if (typeof v !== "string" || v.length === 0) {
+        if (typeof v !== "string" || v.trim().length === 0) {
           return {
             value: null,
             error: `Group "${groupType}" entry "${k}" must be a non-empty string`,
@@ -164,8 +168,12 @@ function validateForm(form: VisualSystemFormState): VisualSystemFormErrors {
   if (form.placeholderBaseUrl.trim()) {
     try {
       // URL constructor is permissive; ensure it has a protocol.
+      // Match the server's exact `===` check (`url.protocol === "http:"
+      // || url.protocol === "https:"`) so client validation rejects the
+      // same set of inputs — `startsWith("http")` would let `httpa:`
+      // and similar bogus schemes through.
       const url = new URL(form.placeholderBaseUrl.trim());
-      if (!url.protocol.startsWith("http")) {
+      if (url.protocol !== "http:" && url.protocol !== "https:") {
         errors.placeholderBaseUrl = "Placeholder URL must use http or https";
       }
     } catch {

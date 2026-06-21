@@ -529,6 +529,54 @@ describe("VisualSystemsRoutes (Integration)", () => {
       expect(row!.groupPrefixes).toBeNull();
     });
 
+    it("accepts an empty string for jumpPrefixShared and round-trips it", async () => {
+      // Regression: jumpPrefixShared is NOT NULL in the DB and is
+      // required by the shared VisualSystemConfig type, so empty
+      // string is the natural default/cleared value. The schema
+      // must accept it (no 400), the service must store it as-is
+      // (not NULL), and a subsequent GET must return "" unchanged.
+      const auth = await createAuthenticatedRequest(testUserId);
+
+      // Seed with a non-empty value first so we can verify the
+      // empty-string write actually overwrites it.
+      await db.insert(visualSystems).values({
+        projectId: testProject.id!,
+        namingTemplate: "{label}_{slug}",
+        groupPrefixes: null,
+        defaultGroupType: null,
+        scenePadding: 2,
+        counterPadding: 2,
+        jumpPrefixShared: "shared_",
+        placeholderBaseUrl: null,
+      });
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/${testProject.id}/visual-system`,
+        payload: { jumpPrefixShared: "" },
+        cookies: { [SESSION_COOKIE_NAME]: auth.sessionId },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().jumpPrefixShared).toBe("");
+
+      const [row] = await db
+        .select({ jumpPrefixShared: visualSystems.jumpPrefixShared })
+        .from(visualSystems)
+        .where(eq(visualSystems.projectId, testProject.id!))
+        .limit(1);
+      expect(row!.jumpPrefixShared).toBe("");
+
+      // Round-trip: a subsequent GET should reflect the empty value.
+      const getResponse = await fastify.inject({
+        method: "GET",
+        url: `/projects/${testProject.id}/visual-system`,
+        cookies: { [SESSION_COOKIE_NAME]: auth.sessionId },
+      });
+      expect(getResponse.statusCode).toBe(200);
+      expect(getResponse.json().jumpPrefixShared).toBe("");
+    });
+
     it("returns 400 when placeholderBaseUrl uses a non-http(s) protocol", async () => {
       const auth = await createAuthenticatedRequest(testUserId);
 
