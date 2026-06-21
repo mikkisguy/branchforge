@@ -1,4 +1,10 @@
-import { useReducer, useEffect, useRef, useCallback } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useReducer,
+  useRef,
+} from "react";
 import {
   BookOpen,
   SquarePen,
@@ -21,6 +27,10 @@ import { ZipImportProjectDialog } from "./ZipImportProjectDialog.lazy";
 import { FlowDialog } from "@/components/flow/FlowDialog";
 import { Select } from "@/components/ui/select";
 import { Logo } from "@/components/ui/logo";
+
+// ============================================================================
+// Types
+// ============================================================================
 
 interface ThemePaletteOption {
   name: string;
@@ -112,6 +122,423 @@ function modalReducer(state: ModalState, action: ModalAction): ModalState {
   }
 }
 
+// ============================================================================
+// Sub-components
+// ============================================================================
+
+interface ModeSwitcherProps {
+  mode: "write" | "script";
+  setMode: (mode: "write" | "script") => void;
+  isCollapsed: boolean;
+  showLabel: boolean;
+}
+
+/** Write / Script mode toggle. Vertical when collapsed, horizontal when expanded. */
+function ModeSwitcher({
+  mode,
+  setMode,
+  isCollapsed,
+  showLabel,
+}: ModeSwitcherProps) {
+  return (
+    <div
+      className={`${
+        isCollapsed ? "flex-col gap-1" : "flex"
+      } bg-muted/50 rounded-md p-0.5`}
+    >
+      <button
+        type="button"
+        onClick={() => setMode("write")}
+        className={`flex ${
+          isCollapsed ? "w-full p-2.5" : "flex-1 px-2 py-1.5"
+        } items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-all ${
+          mode === "write"
+            ? "text-white bg-[var(--theme-color)]"
+            : "text-muted-foreground hover:text-foreground"
+        }`}
+        title="Write Mode"
+      >
+        <BookOpen className="size-4 flex-shrink-0" />
+        {showLabel && <span>Write</span>}
+      </button>
+      <button
+        type="button"
+        onClick={() => setMode("script")}
+        className={`flex ${
+          isCollapsed ? "w-full p-2.5" : "flex-1 px-2 py-1.5"
+        } items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-all ${
+          mode === "script"
+            ? "text-white bg-[var(--theme-color)]"
+            : "text-muted-foreground hover:text-foreground"
+        }`}
+        title="Script Mode"
+      >
+        <SquarePen className="size-4 flex-shrink-0" />
+        {showLabel && <span>Script</span>}
+      </button>
+    </div>
+  );
+}
+
+interface ProjectSelectorProps {
+  projectId?: string;
+  projects: Project[];
+  isLoadingProjects?: boolean;
+  setCurrentProject: (project: Project | null) => void;
+  isCollapsed: boolean;
+  isOpen: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+}
+
+/** Project picker. When collapsed, a button that opens a popover.
+ *  When expanded, a native Select. Click-outside dismisses the popover. */
+function ProjectSelector({
+  projectId,
+  projects,
+  isLoadingProjects,
+  setCurrentProject,
+  isCollapsed,
+  isOpen,
+  onToggle,
+  onClose,
+}: ProjectSelectorProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  // `onClose` is read inside the click-outside handler but isn't
+  // part of the effect's subscription surface — wrap it in
+  // `useEffectEvent` so the listener isn't re-bound on every
+  // parent render (React 19+).
+  const onCloseEffect = useEffectEvent(onClose);
+
+  useEffect(() => {
+    if (!isOpen || isCollapsed) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        onCloseEffect();
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen, isCollapsed]);
+
+  if (isCollapsed) {
+    return (
+      <div className="relative" ref={containerRef}>
+        <button
+          type="button"
+          onClick={onToggle}
+          disabled={isLoadingProjects}
+          className={`flex items-center justify-center p-2.5 rounded-md text-sm font-medium transition-colors ${
+            isOpen
+              ? "text-foreground bg-muted/50"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+          }`}
+          title="Select Project"
+        >
+          <FolderOpen className="size-4 flex-shrink-0" />
+        </button>
+        {isOpen && (
+          <div className="absolute left-full top-0 ml-2 bg-popover border border-border/70 rounded-lg shadow-xl shadow-black/25 ring-1 ring-white/5 min-w-[300px] max-w-[400px] z-50">
+            <div className="p-2 max-h-[400px] overflow-y-auto">
+              {isLoadingProjects ? (
+                <div className="px-3 py-2 text-sm text-muted-foreground">
+                  Loading…
+                </div>
+              ) : projects.length === 0 ? (
+                <div className="px-3 py-2 text-sm text-muted-foreground">
+                  No projects found. Create a new project to get started.
+                </div>
+              ) : (
+                projects.map((project) => (
+                  <button
+                    type="button"
+                    key={project.id}
+                    onClick={() => {
+                      setCurrentProject(project);
+                      onClose();
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-left transition-colors ${
+                      projectId === project.id
+                        ? "bg-accent text-accent-foreground font-medium"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                    }`}
+                  >
+                    {project.name}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <Select
+        value={projectId ?? undefined}
+        onChange={(selectedProjectId) => {
+          const project = projects.find((p) => p.id === selectedProjectId);
+          if (project) setCurrentProject(project);
+        }}
+        disabled={isLoadingProjects || projects.length === 0}
+        placeholder={
+          isLoadingProjects
+            ? "Loading…"
+            : projects.length === 0
+              ? "No projects"
+              : "Select project"
+        }
+        options={projects.map((p) => ({
+          value: p.id,
+          label: p.name,
+        }))}
+      />
+    </div>
+  );
+}
+
+interface NavButtonsProps {
+  projectId?: string;
+  isCollapsed: boolean;
+  showLabel: boolean;
+  onOpenProjectSettings: () => void;
+  onOpenFlow: () => void;
+}
+
+/** Project Settings + Flow navigation entries. */
+function NavButtons({
+  projectId,
+  isCollapsed,
+  showLabel,
+  onOpenProjectSettings,
+  onOpenFlow,
+}: NavButtonsProps) {
+  const disabled = !projectId;
+  return (
+    <nav className="flex flex-col gap-1">
+      <button
+        type="button"
+        onClick={onOpenProjectSettings}
+        disabled={disabled}
+        className={`flex items-center ${
+          isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
+        } rounded-md text-sm font-medium transition-colors ${
+          disabled
+            ? "text-muted-foreground/50 cursor-not-allowed"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+        }`}
+        title="Project settings"
+      >
+        <SlidersHorizontal className="size-4 flex-shrink-0" />
+        {showLabel && <span>Settings</span>}
+      </button>
+      <button
+        type="button"
+        onClick={onOpenFlow}
+        disabled={disabled}
+        className={`flex items-center ${
+          isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
+        } rounded-md text-sm font-medium transition-colors ${
+          disabled
+            ? "text-muted-foreground/50 cursor-not-allowed"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+        }`}
+        title="Flow Graph"
+      >
+        <Network className="size-4 flex-shrink-0" />
+        {showLabel && <span>Flow</span>}
+      </button>
+    </nav>
+  );
+}
+
+interface ThemeSwitcherProps {
+  theme: string;
+  setTheme: (theme: ThemePalette) => void;
+  themePalettes: ThemePaletteOption[];
+  isCollapsed: boolean;
+  isOpen: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+}
+
+/** Theme palette picker. When collapsed, a button that opens a popover.
+ *  When expanded, the palettes render inline. Click-outside dismisses the popover. */
+function ThemeSwitcher({
+  theme,
+  setTheme,
+  themePalettes,
+  isCollapsed,
+  isOpen,
+  onToggle,
+  onClose,
+}: ThemeSwitcherProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  // `onClose` is read inside the click-outside handler but isn't
+  // part of the effect's subscription surface — wrap it in
+  // `useEffectEvent` so the listener isn't re-bound on every
+  // parent render (React 19+).
+  const onCloseEffect = useEffectEvent(onClose);
+
+  useEffect(() => {
+    if (!isOpen || isCollapsed) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        onCloseEffect();
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen, isCollapsed]);
+
+  if (isCollapsed) {
+    return (
+      <div className="relative" ref={containerRef}>
+        <button
+          type="button"
+          onClick={onToggle}
+          className={`flex items-center justify-center p-2.5 rounded-md text-sm font-medium transition-colors ${
+            isOpen
+              ? "text-foreground bg-muted/50"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+          }`}
+          title="Theme"
+        >
+          <Palette className="size-4 flex-shrink-0" />
+        </button>
+        {isOpen && (
+          <div className="absolute left-full top-0 ml-2 bg-popover border border-border/70 rounded-lg p-3 shadow-xl shadow-black/25 ring-1 ring-white/5 z-50">
+            <div className="flex gap-2">
+              {themePalettes.map((palette) => (
+                <button
+                  type="button"
+                  key={palette.key}
+                  onClick={() => {
+                    setTheme(palette.key);
+                    onClose();
+                  }}
+                  className={`size-7 rounded transition-all ${
+                    theme === palette.key
+                      ? "scale-110 ring-2 ring-white ring-offset-2 ring-offset-card"
+                      : "opacity-60 hover:opacity-100 hover:scale-105"
+                  }`}
+                  style={{ background: palette.color }}
+                  title={palette.name}
+                  aria-label={palette.name}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center p-2">
+      <div className="flex gap-1.5 flex-1">
+        {themePalettes.map((palette) => (
+          <button
+            type="button"
+            key={palette.key}
+            onClick={() => setTheme(palette.key)}
+            className={`flex-1 h-7 rounded transition-all ${
+              theme === palette.key
+                ? "scale-110 ring-2 ring-white ring-offset-2 ring-offset-card"
+                : "opacity-60 hover:opacity-100 hover:scale-105"
+            }`}
+            style={{ background: palette.color }}
+            title={palette.name}
+            aria-label={palette.name}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface CollapseButtonProps {
+  isCollapsed: boolean;
+  onToggle: () => void;
+}
+
+/** Sidebar expand/collapse toggle. */
+function CollapseButton({ isCollapsed, onToggle }: CollapseButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`flex items-center ${
+        isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
+      } rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors`}
+      title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+    >
+      {isCollapsed ? (
+        <ChevronsRight className="size-4 flex-shrink-0" />
+      ) : (
+        <>
+          <ChevronsLeft className="size-4 flex-shrink-0" />
+          {!isCollapsed && <span>Collapse</span>}
+        </>
+      )}
+    </button>
+  );
+}
+
+interface UserActionsProps {
+  isCollapsed: boolean;
+  showLabel: boolean;
+  onOpenSettings: () => void;
+  onLogout: () => void;
+}
+
+/** App-level settings + logout buttons. */
+function UserActions({
+  isCollapsed,
+  showLabel,
+  onOpenSettings,
+  onLogout,
+}: UserActionsProps) {
+  return (
+    <>
+      <button
+        type="button"
+        onClick={onOpenSettings}
+        className={`flex items-center ${
+          isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
+        } rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors`}
+        title="Settings"
+      >
+        <Settings className="size-4 flex-shrink-0" />
+        {showLabel && <span>Settings</span>}
+      </button>
+      <button
+        type="button"
+        onClick={onLogout}
+        className={`flex items-center ${
+          isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
+        } rounded-md text-sm font-medium text-muted-foreground hover:text-destructive-muted hover:bg-destructive/10 transition-colors`}
+        title="Logout"
+      >
+        <LogOut className="size-4 flex-shrink-0" />
+        {showLabel && <span>Logout</span>}
+      </button>
+    </>
+  );
+}
+
+// ============================================================================
+// Main component
+// ============================================================================
+
 export function LeftSidebar(props: LeftSidebarProps) {
   const {
     mode,
@@ -135,8 +562,6 @@ export function LeftSidebar(props: LeftSidebarProps) {
   const isSettingsOpenExternally = props.isSettingsOpenExternally;
   const onSettingsOpenChangeExternally = props.onSettingsOpenChangeExternally;
   const [modals, dispatchModal] = useReducer(modalReducer, initialModalState);
-  const themeDropdownRef = useRef<HTMLDivElement>(null);
-  const projectPopoverRef = useRef<HTMLDivElement>(null);
   const projectsRef = useRef(projects);
 
   const isSettingsOpen = isSettingsOpenExternally ?? modals.settings;
@@ -152,43 +577,13 @@ export function LeftSidebar(props: LeftSidebarProps) {
   );
 
   const handleToggleCollapse = () => {
-    const newState = !isCollapsed;
-    onCollapsedChange(newState);
+    onCollapsedChange(!isCollapsed);
   };
 
   // Keep projectsRef in sync with projects
   useEffect(() => {
     projectsRef.current = projects;
   }, [projects]);
-
-  // Close theme dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        themeDropdownRef.current &&
-        !themeDropdownRef.current.contains(event.target as Node)
-      ) {
-        dispatchModal({ type: "CLOSE", key: "themeDropdown" });
-      }
-      if (
-        projectPopoverRef.current &&
-        !projectPopoverRef.current.contains(event.target as Node)
-      ) {
-        dispatchModal({ type: "CLOSE", key: "projectPopover" });
-      }
-    }
-
-    if (modals.themeDropdown || modals.projectPopover) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [modals.themeDropdown, modals.projectPopover]);
-
-  const width = isCollapsed ? "w-14" : "w-56";
-  const showLabel = !isCollapsed;
 
   // Helper for handling successful project imports
   const handleImportSuccess = useCallback(
@@ -226,6 +621,9 @@ export function LeftSidebar(props: LeftSidebarProps) {
     [refetchProjects, setCurrentProject]
   );
 
+  const width = isCollapsed ? "w-14" : "w-56";
+  const showLabel = !isCollapsed;
+
   return (
     <>
       <div
@@ -238,295 +636,69 @@ export function LeftSidebar(props: LeftSidebarProps) {
             <Logo compact={isCollapsed} size="sm" />
           </div>
 
-          {/* Mode Switcher - vertical when collapsed, horizontal when expanded */}
-          <div
-            className={`${
-              isCollapsed ? "flex-col gap-1" : "flex"
-            } bg-muted/50 rounded-md p-0.5`}
-          >
-            <button
-              type="button"
-              onClick={() => setMode("write")}
-              className={`flex ${
-                isCollapsed ? "w-full p-2.5" : "flex-1 px-2 py-1.5"
-              } items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-all ${
-                mode === "write"
-                  ? "text-white bg-[var(--theme-color)]"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              title="Write Mode"
-            >
-              <BookOpen className="size-4 flex-shrink-0" />
-              {showLabel && <span>Write</span>}
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("script")}
-              className={`flex ${
-                isCollapsed ? "w-full p-2.5" : "flex-1 px-2 py-1.5"
-              } items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-all ${
-                mode === "script"
-                  ? "text-white bg-[var(--theme-color)]"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              title="Script Mode"
-            >
-              <SquarePen className="size-4 flex-shrink-0" />
-              {showLabel && <span>Script</span>}
-            </button>
-          </div>
+          <ModeSwitcher
+            mode={mode}
+            setMode={setMode}
+            isCollapsed={isCollapsed}
+            showLabel={showLabel}
+          />
 
-          {/* Project Selector (only in script mode) */}
-          <div className="relative" ref={projectPopoverRef}>
-            {isCollapsed ? (
-              <>
-                {/* Collapsed: Icon button with popover */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    dispatchModal({ type: "TOGGLE", key: "projectPopover" })
-                  }
-                  disabled={isLoadingProjects}
-                  className={`flex items-center justify-center p-2.5 rounded-md text-sm font-medium transition-colors ${
-                    modals.projectPopover
-                      ? "text-foreground bg-muted/50"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                  }`}
-                  title="Select Project"
-                >
-                  <FolderOpen className="size-4 flex-shrink-0" />
-                </button>
-
-                {modals.projectPopover && (
-                  <div className="absolute left-full top-0 ml-2 bg-popover border border-border/70 rounded-lg shadow-xl shadow-black/25 ring-1 ring-white/5 min-w-[300px] max-w-[400px] z-50">
-                    <div className="p-2 max-h-[400px] overflow-y-auto">
-                      {isLoadingProjects ? (
-                        <div className="px-3 py-2 text-sm text-muted-foreground">
-                          Loading…
-                        </div>
-                      ) : projects.length === 0 ? (
-                        <div className="px-3 py-2 text-sm text-muted-foreground">
-                          No projects found. Create a new project to get
-                          started.
-                        </div>
-                      ) : (
-                        projects.map((project) => (
-                          <button
-                            type="button"
-                            key={project.id}
-                            onClick={() => {
-                              setCurrentProject(project);
-                              dispatchModal({
-                                type: "CLOSE",
-                                key: "projectPopover",
-                              });
-                            }}
-                            className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-left transition-colors ${
-                              projectId === project.id
-                                ? "bg-accent text-accent-foreground font-medium"
-                                : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                            }`}
-                          >
-                            {project.name}
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                <Select
-                  value={projectId ?? undefined}
-                  onChange={(selectedProjectId) => {
-                    const project = projects.find(
-                      (p) => p.id === selectedProjectId
-                    );
-                    if (project) setCurrentProject(project);
-                  }}
-                  disabled={isLoadingProjects || projects.length === 0}
-                  placeholder={
-                    isLoadingProjects
-                      ? "Loading…"
-                      : projects.length === 0
-                        ? "No projects"
-                        : "Select project"
-                  }
-                  options={projects.map((p) => ({
-                    value: p.id,
-                    label: p.name,
-                  }))}
-                />
-              </>
-            )}
-          </div>
+          <ProjectSelector
+            projectId={projectId}
+            projects={projects}
+            isLoadingProjects={isLoadingProjects}
+            setCurrentProject={setCurrentProject}
+            isCollapsed={isCollapsed}
+            isOpen={modals.projectPopover}
+            onToggle={() =>
+              dispatchModal({ type: "TOGGLE", key: "projectPopover" })
+            }
+            onClose={() =>
+              dispatchModal({ type: "CLOSE", key: "projectPopover" })
+            }
+          />
 
           {/* Divider */}
           <div className="h-px bg-border/30 my-1" />
 
-          {/* Navigation Items */}
-          <nav className="flex flex-col gap-1">
-            {/* Project Settings (Characters, Routes, Visual System) */}
-            <button
-              type="button"
-              onClick={() =>
-                dispatchModal({ type: "OPEN", key: "projectSettings" })
-              }
-              disabled={!projectId}
-              className={`flex items-center ${
-                isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
-              } rounded-md text-sm font-medium transition-colors ${
-                !projectId
-                  ? "text-muted-foreground/50 cursor-not-allowed"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              }`}
-              title="Project settings"
-            >
-              <SlidersHorizontal className="size-4 flex-shrink-0" />
-              {showLabel && <span>Settings</span>}
-            </button>
-
-            {/* Flow Graph */}
-            <button
-              type="button"
-              onClick={() => dispatchModal({ type: "OPEN", key: "flow" })}
-              disabled={!projectId}
-              className={`flex items-center ${
-                isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
-              } rounded-md text-sm font-medium transition-colors ${
-                !projectId
-                  ? "text-muted-foreground/50 cursor-not-allowed"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              }`}
-              title="Flow Graph"
-            >
-              <Network className="size-4 flex-shrink-0" />
-              {showLabel && <span>Flow</span>}
-            </button>
-          </nav>
+          <NavButtons
+            projectId={projectId}
+            isCollapsed={isCollapsed}
+            showLabel={showLabel}
+            onOpenProjectSettings={() =>
+              dispatchModal({ type: "OPEN", key: "projectSettings" })
+            }
+            onOpenFlow={() => dispatchModal({ type: "OPEN", key: "flow" })}
+          />
         </div>
 
         {/* Bottom Section */}
         <div className="flex flex-col p-2 gap-1 border-t border-border/30">
-          {/* Collapse/Expand Toggle */}
-          <button
-            type="button"
-            onClick={handleToggleCollapse}
-            className={`flex items-center ${
-              isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
-            } rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors`}
-            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {isCollapsed ? (
-              <ChevronsRight className="size-4 flex-shrink-0" />
-            ) : (
-              <>
-                <ChevronsLeft className="size-4 flex-shrink-0" />
-                {showLabel && <span>Collapse</span>}
-              </>
-            )}
-          </button>
+          <CollapseButton
+            isCollapsed={isCollapsed}
+            onToggle={handleToggleCollapse}
+          />
 
-          {/* Theme */}
-          <div className="relative" ref={themeDropdownRef}>
-            {isCollapsed ? (
-              <>
-                {/* Collapsed: Icon button with popover */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    dispatchModal({ type: "TOGGLE", key: "themeDropdown" })
-                  }
-                  className={`flex items-center justify-center p-2.5 rounded-md text-sm font-medium transition-colors ${
-                    modals.themeDropdown
-                      ? "text-foreground bg-muted/50"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                  }`}
-                  title="Theme"
-                >
-                  <Palette className="size-4 flex-shrink-0" />
-                </button>
+          <ThemeSwitcher
+            theme={theme}
+            setTheme={setTheme}
+            themePalettes={themePalettes}
+            isCollapsed={isCollapsed}
+            isOpen={modals.themeDropdown}
+            onToggle={() =>
+              dispatchModal({ type: "TOGGLE", key: "themeDropdown" })
+            }
+            onClose={() =>
+              dispatchModal({ type: "CLOSE", key: "themeDropdown" })
+            }
+          />
 
-                {modals.themeDropdown && (
-                  <div className="absolute left-full top-0 ml-2 bg-popover border border-border/70 rounded-lg p-3 shadow-xl shadow-black/25 ring-1 ring-white/5 z-50">
-                    <div className="flex gap-2">
-                      {themePalettes.map((palette) => (
-                        <button
-                          type="button"
-                          key={palette.key}
-                          onClick={() => {
-                            setTheme(palette.key);
-                            dispatchModal({
-                              type: "CLOSE",
-                              key: "themeDropdown",
-                            });
-                          }}
-                          className={`size-7 rounded transition-all ${
-                            theme === palette.key
-                              ? "scale-110 ring-2 ring-white ring-offset-2 ring-offset-card"
-                              : "opacity-60 hover:opacity-100 hover:scale-105"
-                          }`}
-                          style={{ background: palette.color }}
-                          title={palette.name}
-                          aria-label={palette.name}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                {/* Expanded: Inline theme colors (no icon) */}
-                <div className="flex items-center p-2">
-                  <div className="flex gap-1.5 flex-1">
-                    {themePalettes.map((palette) => (
-                      <button
-                        type="button"
-                        key={palette.key}
-                        onClick={() => setTheme(palette.key)}
-                        className={`flex-1 h-7 rounded transition-all ${
-                          theme === palette.key
-                            ? "scale-110 ring-2 ring-white ring-offset-2 ring-offset-card"
-                            : "opacity-60 hover:opacity-100 hover:scale-105"
-                        }`}
-                        style={{ background: palette.color }}
-                        title={palette.name}
-                        aria-label={palette.name}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Settings */}
-          <button
-            type="button"
-            onClick={() => setSettingsOpen(true)}
-            className={`flex items-center ${
-              isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
-            } rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors`}
-            title="Settings"
-          >
-            <Settings className="size-4 flex-shrink-0" />
-            {showLabel && <span>Settings</span>}
-          </button>
-
-          {/* Logout */}
-          <button
-            type="button"
-            onClick={onLogout}
-            className={`flex items-center ${
-              isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
-            } rounded-md text-sm font-medium text-muted-foreground hover:text-destructive-muted hover:bg-destructive/10 transition-colors`}
-            title="Logout"
-          >
-            <LogOut className="size-4 flex-shrink-0" />
-            {showLabel && <span>Logout</span>}
-          </button>
+          <UserActions
+            isCollapsed={isCollapsed}
+            showLabel={showLabel}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onLogout={onLogout}
+          />
         </div>
       </div>
 

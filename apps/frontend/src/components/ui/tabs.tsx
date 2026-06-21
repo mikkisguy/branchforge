@@ -22,7 +22,7 @@
 import {
   createContext,
   useCallback,
-  useContext,
+  use,
   useMemo,
   useState,
   type ReactNode,
@@ -41,7 +41,7 @@ interface TabsContextValue {
 const TabsContext = createContext<TabsContextValue | null>(null);
 
 function useTabsContext(component: string): TabsContextValue {
-  const ctx = useContext(TabsContext);
+  const ctx = use(TabsContext);
   if (!ctx) {
     throw new Error(`<${component}> must be rendered inside <Tabs>.`);
   }

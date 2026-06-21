@@ -10,7 +10,7 @@
  * so the user gets immediate feedback on their template edits.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Loader2, Wand2 } from "lucide-react";
 import {
   Dialog,
@@ -130,12 +130,21 @@ export function VisualSystemFormContent({
   );
   const [errors, setErrors] = useState<VisualSystemFormErrors>({});
 
-  // When the server config first arrives, hydrate the form.
-  useEffect(() => {
+  // When the server config first arrives (or changes after a save),
+  // re-hydrate the form. Done during render — not in an effect — so
+  // the form is in sync with `initialConfig` from the same commit,
+  // avoiding a one-frame flash of stale values.
+  // (The previous-value tracker must be `useState` rather than
+  // `useRef` because the `react-hooks/refs` rule forbids reading
+  // and writing refs during render.)
+  // react-doctor-disable-next-line react-doctor/rerender-state-only-in-handlers
+  const [hydratedConfig, setHydratedConfig] = useState(initialConfig);
+  if (initialConfig !== hydratedConfig) {
+    setHydratedConfig(initialConfig);
     if (initialConfig) {
       setForm(toVisualSystemFormState(initialConfig));
     }
-  }, [initialConfig]);
+  }
 
   const handleChange = <K extends keyof VisualSystemFormState>(
     field: K,
@@ -331,6 +340,7 @@ export function VisualSystemFormContent({
         </Label>
         <textarea
           id="vs-group-prefixes"
+          aria-label="Group Prefixes JSON"
           className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           placeholder='{ "act": { "I": "ai" }, "chapter": { "1": "ch1" } }'
           value={form.groupPrefixesJson}
@@ -408,7 +418,7 @@ export function VisualSystemDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} aria-label="Visual System">
       <DialogContent className="max-w-2xl w-full">
         <DialogHeader>
           <DialogTitle>Visual System</DialogTitle>

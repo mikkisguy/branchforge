@@ -16,7 +16,7 @@
  * the left sidebar.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Loader2, Users, Route as RouteIcon, Wand2, X } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -78,21 +78,32 @@ export function ProjectSettingsDialog({
   // Reset to the default tab each time the modal opens. This way a
   // user who closes the dialog while on "Visual" comes back to
   // "Characters" (the most-edited tab) rather than landing on a
-  // config screen they were last fiddling with.
+  // config screen they were last fiddling with. The reset is done
+  // during render (not in an effect) so there's no flash of the
+  // previous tab on reopen — React's "storing information from
+  // previous renders" pattern.
+  // (The previous-value tracker must be `useState` rather than
+  // `useRef` because the `react-hooks/refs` rule forbids reading
+  // and writing refs during render. The extra render that the
+  // tracker produces is the cost of this pattern.)
   const [activeTab, setActiveTab] = useState<SettingsTab>(defaultTab);
-  useEffect(() => {
+  // react-doctor-disable-next-line react-doctor/no-derived-useState, react-doctor/rerender-state-only-in-handlers
+  const [prevOpen, setPrevOpen] = useState(open);
+  // react-doctor-disable-next-line react-doctor/no-derived-useState, react-doctor/rerender-state-only-in-handlers
+  const [prevDefaultTab, setPrevDefaultTab] = useState(defaultTab);
+  if (open !== prevOpen || defaultTab !== prevDefaultTab) {
+    setPrevOpen(open);
+    setPrevDefaultTab(defaultTab);
     if (open) {
       setActiveTab(defaultTab);
     }
-  }, [open, defaultTab]);
+  }
 
   return (
     <Dialog
       open={open}
-      onOpenChange={(next) => {
-        if (!next) setActiveTab(defaultTab);
-        onOpenChange(next);
-      }}
+      onOpenChange={onOpenChange}
+      aria-label="Project Settings"
     >
       <DialogContent className="max-w-3xl w-full h-[80vh] min-h-[500px] p-0 gap-0 flex flex-col overflow-hidden">
         {/* Header */}
