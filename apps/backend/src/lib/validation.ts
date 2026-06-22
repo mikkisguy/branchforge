@@ -714,6 +714,17 @@ export const detectedCharacterSchema = z.object({
   tag: renpyTagSchema,
   name: z.string().nullable().optional(),
   displayName: z.string().min(1, "Display name is required").max(200),
+  nameType: z
+    .enum([
+      "literal",
+      "variable",
+      "interpolated",
+      "tagged",
+      "none",
+      "empty",
+      "unknown",
+    ])
+    .default("literal"),
   color: colorHexSchema,
   isSpecial: z.boolean().default(false),
   sourceFile: z.string().optional(),

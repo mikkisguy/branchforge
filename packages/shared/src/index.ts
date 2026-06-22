@@ -660,6 +660,76 @@ export interface Character {
 }
 
 // ============================================================================
+// Ren'Py Text Tag Handling
+// ============================================================================
+
+/**
+ * Strips Ren'Py text tags from a string.
+ *
+ * Ren'Py supports inline formatting via curly-brace tags like `{b}`,
+ * `{/b}`, `{color=#f00}`, `{/color}`, `{i}`, `{size=20}`, etc.
+ * The full grammar is defined by Ren'Py and includes nested, self-closing,
+ * and parameterized tags. This function removes the tag delimiters but
+ * preserves their inner text content (since some tags — notably `{color=...}`
+ * and `{size=...}` — wrap content).
+ *
+ * Unclosed/malformed tags are removed as-is. Unknown tag forms (e.g.,
+ * `{fast}` where `fast` is not a real Ren'Py tag) are also stripped, which
+ * matches Ren'Py's own behavior of ignoring unknown tags.
+ *
+ * @example
+ * stripRenpyTextTags("Hello {b}world{/b}") // "Hello world"
+ * stripRenpyTextTags("{color=#f00}Stranger{/color}") // "Stranger"
+ * stripRenpyTextTags("エイリーン") // "エイリーン" (no tags)
+ *
+ * @param input - The raw text that may contain Ren'Py tags
+ * @returns The text with all `{...}` tags removed
+ */
+export function stripRenpyTextTags(input: string): string {
+  if (!input) return input;
+  // Match balanced simple tag forms: {tag}, {/tag}, {tag=value}, {tag=value=value}
+  // Ren'Py tag grammar: identifier, optionally followed by `=value` (one or more)
+  // Greedy match of the entire tag block including nested brackets handled by
+  // repeated application of the regex.
+  // Ren'Py tags can also be nested, so we loop until no more tags are found.
+  let result = input;
+  let previous: string;
+  do {
+    previous = result;
+    result = result.replace(/\{[^{}]*\}/g, "");
+  } while (result !== previous);
+  return result;
+}
+
+/**
+ * Classification of how a Character's display name was specified in the
+ * source RPY file. Drives the import wizard's warning indicators.
+ *
+ * - `literal` — A plain quoted string with no Ren'Py tags (e.g., `"Sarah"`)
+ * - `variable` — A bare Python identifier (e.g., `boss_name`); the actual
+ *   name can only be known at runtime, so the import wizard must prompt
+ *   the user to provide a placeholder.
+ * - `interpolated` — A bracketed Python expression (e.g., `"[e_name]"`);
+ *   the value depends on a runtime variable, so the wizard must warn.
+ * - `tagged` — A quoted string containing Ren'Py inline tags (e.g.,
+ *   `"{color=#f00}Stranger{/color}"`). The raw form is preserved; the
+ *   display name strips tags for readability.
+ * - `none` — `Character(None, ...)`; the narrator. Already excluded from
+ *   import by default but the wizard may surface it for confirmation.
+ * - `empty` — `Character("", ...)`; the wizard should show "(unnamed)".
+ * - `unknown` — A non-standard value such as `"???"`; usually intentional
+ *   by the author, so the wizard keeps it as-is.
+ */
+export type CharacterNameType =
+  | "literal"
+  | "variable"
+  | "interpolated"
+  | "tagged"
+  | "none"
+  | "empty"
+  | "unknown";
+
+// ============================================================================
 // Character Detection Types
 // ============================================================================
 
@@ -668,8 +738,32 @@ export interface Character {
  */
 export interface DetectedCharacter {
   tag: string;
+  /**
+   * Raw name as it appeared in the `Character(...)` call, before any
+   * classification. For quoted forms this is the string content
+   * (without quotes); for bracketed forms it preserves the brackets
+   * (e.g. `[e_name]`); for bare identifiers it is the variable name
+   * (e.g. `boss_name`); `null` for `None`/narrator.
+   *
+   * NOTE: BranchForge's current RPY export does NOT yet consume this
+   * field — it emits `displayName` instead. This field is preserved
+   * for a future round-tripping pass and for diagnostic/debugging
+   * purposes. Until that pass lands, callers should treat `name` as
+   * informational and not rely on it for export fidelity.
+   */
   name: string | null;
+  /**
+   * Human-readable name suggested for use in BranchForge UI. Tags stripped
+   * (e.g., `{color=...}Stranger{/color}` → `Stranger`), variable names
+   * preserved as-is. Empty when the source is `None`/`""` — callers should
+   * derive a fallback (the `tag`, or `"(unnamed)"`) for display.
+   */
   displayName: string;
+  /**
+   * How the `name` was specified in the source. Drives import-wizard
+   * warnings and tooling hints.
+   */
+  nameType: CharacterNameType;
   color: string;
   isSpecial: boolean;
   sourceFile: string;

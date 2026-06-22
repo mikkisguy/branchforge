@@ -207,28 +207,24 @@ export function GitLabSyncDialog({
         });
       }
 
-      // For import operations, show the character wizard only if characters detected
+      // For import operations, show the character wizard if any
+      // characters were detected. Issue #244 (PR #245) promotes
+      // extracted characters into the `characters` table during
+      // import, so on a fresh import `existingTags` is no longer
+      // empty. Filtering to "new only" would suppress the wizard
+      // entirely. The wizard's import endpoint is idempotent
+      // (upsert), so re-confirming already-stored characters is a
+      // safe no-op for unchanged rows.
       if (operationType === "import") {
         try {
           const detectionResult =
             await charactersApi.detectCharacters(projectId);
 
-          // Filter out characters that already exist in the database
-          const existingTagsSet = new Set(detectionResult.existingTags);
-          const newCharacters = detectionResult.characters.filter(
-            (char) => !existingTagsSet.has(char.tag)
-          );
-
-          if (newCharacters.length > 0) {
+          if (detectionResult.characters.length > 0) {
             dispatch({
               type: "SET_CHARACTER_WIZARD",
               show: true,
-              characters: {
-                characters: newCharacters,
-                conflicts: detectionResult.conflicts,
-                excludedTags: detectionResult.excludedTags,
-                existingTags: detectionResult.existingTags,
-              },
+              characters: detectionResult,
             });
             return;
           }
@@ -546,6 +542,7 @@ export function GitLabSyncDialog({
           detectedCharacters={formState.detectedCharacters.characters}
           conflicts={formState.detectedCharacters.conflicts}
           excludedTags={formState.detectedCharacters.excludedTags}
+          existingTags={formState.detectedCharacters.existingTags}
           onComplete={() => {
             // Refresh labels and characters after character import/linking
             void invalidateLabels();

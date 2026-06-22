@@ -301,20 +301,19 @@ export function GitLabImportDialog({
         // Stale check: import could have been superseded during the API call
         if (currentImportId !== importIdRef.current) return;
 
-        // Filter out characters that already exist in the database
-        // For a newly created project, existingTags will be empty
-        const existingTagsSet = new Set(detectionResult.existingTags);
-        const newCharacters = detectionResult.characters.filter(
-          (char) => !existingTagsSet.has(char.tag)
-        );
-
-        if (newCharacters.length > 0) {
+        // Show the wizard if any characters were detected, regardless
+        // of whether they are already in the DB. Issue #244
+        // (PR #245) promotes extracted characters into the
+        // `characters` table during import, so on a fresh import
+        // `existingTags` is no longer empty. Filtering to "new only"
+        // would suppress the wizard entirely. The wizard's import
+        // endpoint is idempotent (upsert), so re-confirming
+        // already-stored characters is a safe no-op for unchanged
+        // rows.
+        if (detectionResult.characters.length > 0) {
           dispatch({
             type: "SET_DETECTED_CHARACTERS",
-            payload: {
-              ...detectionResult,
-              characters: newCharacters,
-            },
+            payload: detectionResult,
           });
           dispatch({ type: "SET_SHOW_CHARACTER_WIZARD", payload: true });
           return;
@@ -668,6 +667,12 @@ export function GitLabImportDialog({
             detectedCharacters={state.detectedCharacters.characters}
             conflicts={state.detectedCharacters.conflicts}
             excludedTags={state.detectedCharacters.excludedTags}
+            // Fresh project: PR #245 already promoted the
+            // characters into the DB so existingTags is non-empty,
+            // but the user hasn't reviewed them yet. Treat all as
+            // "new" — the import endpoint's upsert is a no-op for
+            // already-stored rows.
+            existingTags={[]}
             onComplete={() => {
               dispatch({ type: "SET_SHOW_CHARACTER_WIZARD", payload: false });
               // Set flag to prevent duplicate onSuccess calls

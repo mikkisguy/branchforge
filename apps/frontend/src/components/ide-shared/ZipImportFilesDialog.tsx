@@ -265,19 +265,22 @@ export function ZipImportFilesDialog({
           // Stale check: import could have been superseded during the API call
           if (currentImportId !== importIdRef.current) return;
 
-          // Filter out characters that already exist in the database
-          const existingTagsSet = new Set(detectionResult.existingTags);
-          const newCharacters = detectionResult.characters.filter(
-            (char) => !existingTagsSet.has(char.tag)
-          );
-
-          if (newCharacters.length > 0) {
+          // Show the wizard if any characters were detected. Issue
+          // #244 (PR #245) promotes extracted characters into the
+          // `characters` table during import, so on file-merge
+          // imports `existingTags` may already contain every
+          // detected tag. Filtering to "new only" would suppress
+          // the wizard for the merged-in characters and skip the
+          // user review step. The wizard's import endpoint is
+          // idempotent (upsert), so re-confirming already-stored
+          // characters is a safe no-op for unchanged rows.
+          if (detectionResult.characters.length > 0) {
             dispatch({
               type: "CHARACTERS_DETECTED",
               characters: {
-                characters: newCharacters,
+                characters: detectionResult.characters,
                 excludedTags: detectionResult.excludedTags,
-                conflicts: [],
+                conflicts: detectionResult.conflicts,
                 existingTags: detectionResult.existingTags,
               },
             });
@@ -609,6 +612,7 @@ export function ZipImportFilesDialog({
           detectedCharacters={detectedCharacters.characters}
           conflicts={detectedCharacters.conflicts}
           excludedTags={detectedCharacters.excludedTags}
+          existingTags={detectedCharacters.existingTags}
           onComplete={() => {
             onOpenChange(false);
           }}

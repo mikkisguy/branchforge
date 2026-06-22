@@ -11,6 +11,7 @@ import {
   User,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Ban,
   Settings,
   ChevronDown,
@@ -22,7 +23,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { charactersApi, type ImportCharacter } from "@/lib/api/characters";
-import type { DetectedCharacter, CharacterConflict } from "@branchforge/shared";
+import type {
+  DetectedCharacter,
+  CharacterConflict,
+  CharacterNameType,
+} from "@branchforge/shared";
 import { useToast } from "@/contexts/ToastContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { labelKeys, characterKeys } from "@/lib/query-keys";
@@ -38,6 +43,13 @@ export interface CharacterImportWizardProps {
   detectedCharacters: DetectedCharacter[];
   conflicts: CharacterConflict[];
   excludedTags: string[];
+  /**
+   * Tags of characters already in the database. When a detected
+   * character is in this set, the wizard shows an "Already imported"
+   * indicator. The wizard's import is idempotent (upsert) so these
+   * can be re-confirmed without producing duplicates.
+   */
+  existingTags?: string[];
   onComplete?: () => void;
 }
 
@@ -136,6 +148,56 @@ function randomColor(): string {
   );
 }
 
+/**
+ * User-facing label + helper text for a CharacterNameType.
+ * Drives the warning badge and helper text below the display name field
+ * in the import wizard. `null` means no badge is shown.
+ */
+interface NameTypeBadgeInfo {
+  label: string;
+  helper: string;
+}
+
+function getNameTypeBadge(
+  nameType: CharacterNameType
+): NameTypeBadgeInfo | null {
+  switch (nameType) {
+    case "variable":
+      return {
+        label: "Variable name",
+        helper:
+          "The source references a variable whose value is only known at runtime. Enter a placeholder display name for use in BranchForge; export will keep the variable reference.",
+      };
+    case "interpolated":
+      return {
+        label: "Interpolated name",
+        helper:
+          "The source uses Ren'Py interpolation (e.g. [var]). The displayed name will vary at runtime. You can override it for BranchForge; export keeps the original.",
+      };
+    case "tagged":
+      return {
+        label: "Formatting stripped",
+        helper:
+          "Ren'Py inline tags (e.g. {color}, {b}) were stripped from the display name. The raw form is preserved for export.",
+      };
+    case "empty":
+      return {
+        label: "Empty name",
+        helper:
+          "The source has an empty display name. Enter a display name to use in BranchForge.",
+      };
+    case "unknown":
+      return {
+        label: "Unknown speaker",
+        helper: 'The source uses "???" — typically intentional. Kept as-is.',
+      };
+    case "none":
+    case "literal":
+    default:
+      return null;
+  }
+}
+
 function createInitialWizardState(
   detectedCharacters: DetectedCharacter[],
   conflicts: CharacterConflict[],
@@ -214,6 +276,7 @@ export function CharacterImportWizard({
   detectedCharacters,
   conflicts,
   excludedTags,
+  existingTags = [],
   onComplete,
 }: CharacterImportWizardProps) {
   // Generate unique ID for checkbox to prevent collisions when multiple wizards are mounted
@@ -272,6 +335,7 @@ export function CharacterImportWizard({
             isSpecial: false,
             sourceFile: "",
             confidence: 1,
+            nameType: "literal",
             isLoveInterest: false,
             routeAffiliation: undefined,
             excluded: false,
@@ -388,6 +452,7 @@ export function CharacterImportWizard({
       isSpecial: false,
       sourceFile: "manual",
       confidence: 1,
+      nameType: "literal",
       excluded: false,
     };
 
@@ -672,78 +737,114 @@ export function CharacterImportWizard({
 
               {state.expandedGroups.has("new") && (
                 <div className="p-3 space-y-2 border-t border-border/30">
-                  {state.groups.new.map((char, index) => (
-                    <div
-                      key={char.tag}
-                      className="p-3 bg-background border border-border/30 rounded-md space-y-2"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={!char.excluded}
-                            onChange={(e) =>
-                              updateCharacter("new", index, {
-                                excluded: !e.target.checked,
-                              })
-                            }
-                            className="size-4 rounded"
-                            disabled={state.isImporting}
-                            aria-label={`Include ${char.tag}`}
-                          />
-                          <span className="font-mono text-sm font-medium">
-                            {char.tag}
-                          </span>
+                  {state.groups.new.map((char, index) => {
+                    const badge = getNameTypeBadge(char.nameType);
+                    const showEmptyHint = char.nameType === "empty";
+                    return (
+                      <div
+                        key={char.tag}
+                        className="p-3 bg-background border border-border/30 rounded-md space-y-2"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <input
+                              type="checkbox"
+                              checked={!char.excluded}
+                              onChange={(e) =>
+                                updateCharacter("new", index, {
+                                  excluded: !e.target.checked,
+                                })
+                              }
+                              className="size-4 rounded"
+                              disabled={state.isImporting}
+                              aria-label={`Include ${char.tag}`}
+                            />
+                            <span className="font-mono text-sm font-medium">
+                              {char.tag}
+                            </span>
+                            {existingTags.includes(char.tag) && (
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-muted text-muted-foreground border border-border/30"
+                                title="This character is already in the database. Re-confirming will update it (idempotent upsert)."
+                                data-testid={`already-imported-badge-${char.tag}`}
+                              >
+                                Already imported
+                              </span>
+                            )}
+                            {badge && (
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                                title={badge.helper}
+                                data-testid={`name-type-badge-${char.tag}`}
+                              >
+                                <AlertTriangle className="size-3" />
+                                {badge.label}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="size-6 rounded border border-border/30"
+                              style={{ backgroundColor: char.color }}
+                              title={char.color}
+                            />
+                            {char.excluded && (
+                              <Ban className="size-4 text-muted-foreground" />
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="size-6 rounded border border-border/30"
-                            style={{ backgroundColor: char.color }}
-                            title={char.color}
-                          />
-                          {char.excluded && (
-                            <Ban className="size-4 text-muted-foreground" />
-                          )}
-                        </div>
-                      </div>
 
-                      {!char.excluded && (
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <Label className="text-xs text-muted-foreground">
-                              Display Name (in BF)
-                            </Label>
-                            <Input
-                              value={char.displayName}
-                              onChange={(e) =>
-                                updateCharacter("new", index, {
-                                  displayName: e.target.value,
-                                })
-                              }
-                              className="h-7 text-sm"
-                              disabled={state.isImporting}
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs text-muted-foreground">
-                              Color
-                            </Label>
-                            <Input
-                              type="color"
-                              value={char.color}
-                              onChange={(e) =>
-                                updateCharacter("new", index, {
-                                  color: e.target.value,
-                                })
-                              }
-                              className="h-7 text-sm p-1"
-                              disabled={state.isImporting}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                        {!char.excluded && (
+                          <>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <Label className="text-xs text-muted-foreground">
+                                  Display Name (in BF)
+                                </Label>
+                                <Input
+                                  value={char.displayName}
+                                  placeholder={
+                                    showEmptyHint ? "(unnamed)" : undefined
+                                  }
+                                  onChange={(e) =>
+                                    updateCharacter("new", index, {
+                                      displayName: e.target.value,
+                                    })
+                                  }
+                                  className="h-7 text-sm"
+                                  disabled={state.isImporting}
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs text-muted-foreground">
+                                  Color
+                                </Label>
+                                <Input
+                                  type="color"
+                                  value={char.color}
+                                  onChange={(e) =>
+                                    updateCharacter("new", index, {
+                                      color: e.target.value,
+                                    })
+                                  }
+                                  className="h-7 text-sm p-1"
+                                  disabled={state.isImporting}
+                                />
+                              </div>
+                            </div>
+                            {badge && (
+                              <p
+                                className="text-xs text-muted-foreground"
+                                data-testid={`name-type-helper-${char.tag}`}
+                              >
+                                {badge.helper}
+                              </p>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -862,7 +963,7 @@ export function CharacterImportWizard({
                         />
                         <span className="font-mono text-sm">{char.tag}</span>
                         <span className="text-xs text-muted-foreground">
-                          ({char.displayName})
+                          ({char.displayName || "(unnamed)"})
                         </span>
                       </div>
                       <div
