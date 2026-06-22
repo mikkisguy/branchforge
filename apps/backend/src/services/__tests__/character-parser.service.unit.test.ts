@@ -295,6 +295,48 @@ describe("characterParserService", () => {
     });
   });
 
+  describe("edge cases (regression for #138 follow-ups)", () => {
+    it("classifies an empty quoted name on a multi-line continuation as 'empty'", () => {
+      // Regression: the multi-line continuation quoted regex used
+      // `[^"]+` (one or more), so `""` was not captured and the
+      // narrator's name was left unresolved — letting a subsequent
+      // `color="..."` line be miscaptured as the name. Fixed by
+      // using `[^"]*` (zero or more), matching the standard and
+      // multi-line-start patterns.
+      const content = [
+        "define n = Character(",
+        '    "",',
+        '    color="#cfcfcf"',
+        ")",
+      ].join("\n");
+      const chars = characterParserService.parseFile(content, "test.rpy");
+      expect(chars).toHaveLength(1);
+      expect(chars[0].name).toBe("");
+      expect(chars[0].nameType).toBe("empty");
+      expect(chars[0].color).toBe("#cfcfcf");
+    });
+
+    it("classifies a multi-line start with `None` on the same line as 'none'", () => {
+      // Regression: `define n = Character(None,` (opening paren on
+      // the start line, rest of definition on following lines) used
+      // to fall through to the identifier fallback and capture
+      // `None` as a variable name. The `nullNameMatch` check in
+      // `parseCharacterLine` only catches fully single-line
+      // definitions; the multi-line start path now also checks
+      // explicitly for `None`.
+      const content = [
+        "define n = Character(None,",
+        '    color="#cfcfcf"',
+        ")",
+      ].join("\n");
+      const chars = characterParserService.parseFile(content, "test.rpy");
+      expect(chars).toHaveLength(1);
+      expect(chars[0].name).toBeNull();
+      expect(chars[0].nameType).toBe("none");
+      expect(chars[0].color).toBe("#cfcfcf");
+    });
+  });
+
   describe("deduplication (regression)", () => {
     it("keeps first occurrence when same tag appears in multiple files", () => {
       const result = characterParserService.parseFiles([

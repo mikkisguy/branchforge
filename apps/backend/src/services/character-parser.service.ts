@@ -22,12 +22,15 @@ export type DefaultExcludedTag = (typeof DEFAULT_EXCLUDED_TAGS)[number];
  *
  * Field explanations:
  * - tag: The dialogue tag used in RPY files (e.g., "s" for `s "Hello!"`)
- * - name: The raw name as it appeared in the source Character() call.
- *   For round-tripping back to RPY (export uses this, not displayName).
+ * - name: The raw name as it appeared in the source Character() call,
+ *   preserved for reference and possible future round-tripping. The
+ *   current BranchForge RPY export emits `displayName`, not `name`, so
+ *   do not rely on `name` for export fidelity yet.
  * - displayName: The human-readable name suggested for use in BranchForge
- *   UI. Tags stripped (e.g., "{color=...}Stranger{/color}" → "Stranger"),
- *   variable names preserved as-is. Empty when the source is None/"";
- *   callers should derive a fallback (the tag, or "(unnamed)") for display.
+ *   UI (and emitted by the current RPY export). Tags stripped
+ *   (e.g., "{color=...}Stranger{/color}" → "Stranger"), variable names
+ *   preserved as-is. Empty when the source is `None`/`""`; callers
+ *   should derive a fallback (the tag, or `"(unnamed)"`) for display.
  * - nameType: How the name was specified — drives import-wizard warnings.
  * - color: Hex color for dialogue display
  * - isSpecial: Whether this is a system character (narration, unknown speaker)
@@ -86,17 +89,21 @@ interface CharacterPatternMatch {
    */
   rawName: string | null;
   nameForm: NameForm | null;
+  /**
+   * True when the name has been fully resolved (set to a value or
+   * explicitly to `null` for `None`). For multi-line starts, the
+   * `parseFile` consumer only continues looking for the name on
+   * subsequent lines when this is `false`. Defaults to `true` for
+   * single-line definitions (which never span multiple lines) and
+   * `false` for multi-line starts whose name will appear later.
+   */
+  nameResolved: boolean;
   color?: string;
   isMultiLine: boolean;
 }
 
-/**
- * Re-export for callers that need the shared type but import from the
- * service module. Re-exporting keeps the parser's public surface stable
- * while still using the single source of truth.
- */
-export type { CharacterNameType } from "@branchforge/shared";
-import { CharacterNameType, stripRenpyTextTags } from "@branchforge/shared";
+import type { CharacterNameType } from "@branchforge/shared";
+import { stripRenpyTextTags } from "@branchforge/shared";
 
 /**
  * Classify a raw extracted name and compute the suggested display name.
@@ -282,6 +289,7 @@ class CharacterParserService {
         name: null,
         rawName: null,
         nameForm: null,
+        nameResolved: true,
         color: this.normalizeColor(color),
         isMultiLine: false,
       };
@@ -326,6 +334,7 @@ class CharacterParserService {
         name,
         rawName,
         nameForm,
+        nameResolved: true,
         color: this.normalizeColor(color),
         isMultiLine: false,
       };
@@ -344,12 +353,31 @@ class CharacterParserService {
       let name: string | null = null;
       let rawName: string | null = null;
       let nameForm: NameForm | null = null;
+      // True once we have a final answer for the name — either a
+      // detected form, or explicit `None`. False when the name will
+      // appear on a later line of the multi-line definition.
+      let nameResolved = false;
 
       const quotedNameMatch = rest.match(/"([^"]*)"/);
       if (quotedNameMatch) {
         name = quotedNameMatch[1];
         rawName = quotedNameMatch[1];
         nameForm = "quoted";
+        nameResolved = true;
+      } else if (
+        // Explicit `None` token on the multi-line start line, e.g.
+        // `define n = Character(None,`. The standard `nullNameMatch`
+        // in `parseCharacterLine` only catches single-line
+        // definitions; here we need to handle the multi-line form
+        // before the identifier fallback would otherwise miscapture
+        // `None` as a variable name.
+        /^None\b/.test(rest) ||
+        /^\s*None\s*[,)]/.test(rest)
+      ) {
+        name = null;
+        rawName = null;
+        nameForm = null;
+        nameResolved = true;
       } else {
         const bracketedNameMatch = rest.match(/\[([a-zA-Z_][a-zA-Z0-9_.]*)\]/);
         if (bracketedNameMatch) {
@@ -359,12 +387,14 @@ class CharacterParserService {
           name = `[${bracketedNameMatch[1]}]`;
           rawName = `[${bracketedNameMatch[1]}]`;
           nameForm = "bracketed";
+          nameResolved = true;
         } else {
           const variableNameMatch = rest.match(/([a-zA-Z_][a-zA-Z0-9_.]*)/);
           if (variableNameMatch) {
             rawName = variableNameMatch[1];
             name = variableNameMatch[1];
             nameForm = "identifier";
+            nameResolved = true;
           }
         }
       }
@@ -380,6 +410,9 @@ class CharacterParserService {
         name,
         rawName,
         nameForm,
+        // Pass through the explicit nameResolved signal (covers
+        // detected form, explicit `None`, and unresolved cases).
+        nameResolved,
         color: this.normalizeColor(color),
         isMultiLine: true,
       };
@@ -432,8 +465,10 @@ class CharacterParserService {
         if (trimmed && !trimmed.startsWith("#")) {
           // Check if this line contains the name (if not already found)
           if (!pendingCharacter.nameResolved) {
-            // Try quoted name
-            const quotedNameMatch = trimmed.match(/"([^"]+)"/);
+            // Try quoted name. Use `*` (not `+`) to also match
+            // empty quoted strings like `""`, which Ren'Py treats as
+            // a literal "no display name".
+            const quotedNameMatch = trimmed.match(/"([^"]*)"/);
             if (quotedNameMatch) {
               pendingCharacter.name = quotedNameMatch[1];
               pendingCharacter.rawName = quotedNameMatch[1];
@@ -493,6 +528,10 @@ class CharacterParserService {
             name: pendingCharacter.name,
             rawName: pendingCharacter.rawName,
             nameForm: pendingCharacter.nameForm,
+            // The continuation loop only runs while the name is
+            // unresolved, so by the time we get here the name has
+            // been resolved one way or another.
+            nameResolved: true,
             color: this.normalizeColor(color),
             isMultiLine: true,
           };
@@ -519,11 +558,10 @@ class CharacterParserService {
             color: match.color,
             options: [],
             startLine: i,
-            // The start line only resolves the name when it
-            // identified a form (quoted/bracketed/identifier) OR
-            // found `None`. A bare `define tag = Character(` start
-            // leaves the name unresolved; the next line(s) carry it.
-            nameResolved: match.nameForm !== null,
+            // Pass through the parser's name-resolved signal. When
+            // false, the continuation loop will look for the name
+            // on subsequent lines.
+            nameResolved: match.nameResolved,
           };
         } else {
           // Single-line definition
