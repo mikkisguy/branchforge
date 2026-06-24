@@ -7,7 +7,10 @@ import fastifyStatic from "@fastify/static";
 import { healthRoutes } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.routes.js";
 import { adminSettingsRoutes } from "./routes/admin-settings.routes.js";
-import { userSettingsRoutes } from "./routes/user-settings.routes.js";
+import {
+  userSettingsRoutes,
+  userSettingsAvatarRoutes,
+} from "./routes/user-settings.routes.js";
 import { gitlabRoutes } from "./routes/gitlab.routes.js";
 import { projectsRoutes } from "./routes/projects.routes.js";
 import { labelsRoutes } from "./routes/labels.routes.js";
@@ -146,6 +149,7 @@ await server.register(healthRoutes, { prefix: basePath });
 await server.register(authRoutes, { prefix: basePath });
 await server.register(adminSettingsRoutes, { prefix: basePath });
 await server.register(userSettingsRoutes, { prefix: basePath });
+await server.register(userSettingsAvatarRoutes, { prefix: basePath });
 await server.register(gitlabRoutes, { prefix: basePath });
 await server.register(projectsRoutes, { prefix: basePath });
 await server.register(labelsRoutes, { prefix: basePath });

@@ -8,6 +8,19 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ThemeProvider, themeConfigs } from "../ThemeContext";
 import { useTheme, type ThemePalette } from "../useTheme";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ToastProvider } from "@/contexts/ToastContext";
+import type { ReactNode } from "react";
+
+// Mock the API module
+vi.mock("@/lib/api/user-settings", () => ({
+  userSettingsApi: {
+    getSettings: vi.fn().mockResolvedValue(null),
+    updateProfile: vi.fn().mockResolvedValue({}),
+    uploadAvatar: vi.fn(),
+    deleteAvatar: vi.fn(),
+  },
+}));
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -29,6 +42,23 @@ const localStorageMock = (() => {
 Object.defineProperty(globalThis, "localStorage", {
   value: localStorageMock,
 });
+
+// Create test wrapper that provides QueryClientProvider + ToastProvider
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>{children}</ToastProvider>
+      </QueryClientProvider>
+    );
+  };
+}
 
 describe("ThemeContext", () => {
   const removeCSSProperties = () => {
@@ -70,7 +100,8 @@ describe("ThemeContext", () => {
       render(
         <ThemeProvider>
           <TestComponent />
-        </ThemeProvider>
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
       );
 
       const container = document.querySelector('[data-theme="periwinkle"]');
@@ -81,7 +112,8 @@ describe("ThemeContext", () => {
       render(
         <ThemeProvider>
           <TestComponent />
-        </ThemeProvider>
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
       );
 
       expect(
@@ -96,7 +128,8 @@ describe("ThemeContext", () => {
       render(
         <ThemeProvider>
           <TestComponent />
-        </ThemeProvider>
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
       );
 
       const rgb =
@@ -121,7 +154,8 @@ describe("ThemeContext", () => {
       render(
         <ThemeProvider>
           <TestComponent />
-        </ThemeProvider>
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
       );
 
       const container = document.querySelector('[data-theme="forest"]');
@@ -134,7 +168,8 @@ describe("ThemeContext", () => {
       render(
         <ThemeProvider>
           <TestComponent />
-        </ThemeProvider>
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
       );
 
       const container = document.querySelector('[data-primary="#40bb82"]');
@@ -151,7 +186,8 @@ describe("ThemeContext", () => {
       render(
         <ThemeProvider>
           <TestComponent />
-        </ThemeProvider>
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
       );
 
       const container = document.querySelector('[data-theme="periwinkle"]');
@@ -164,7 +200,8 @@ describe("ThemeContext", () => {
       render(
         <ThemeProvider>
           <TestComponent />
-        </ThemeProvider>
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
       );
 
       fireEvent.click(screen.getByRole("button", { name: "Set Forest" }));
@@ -181,7 +218,8 @@ describe("ThemeContext", () => {
       render(
         <ThemeProvider>
           <TestComponent />
-        </ThemeProvider>
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
       );
 
       fireEvent.click(screen.getByRole("button", { name: "Set Forest" }));
@@ -195,7 +233,8 @@ describe("ThemeContext", () => {
       render(
         <ThemeProvider>
           <TestComponent />
-        </ThemeProvider>
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
       );
 
       fireEvent.click(screen.getByRole("button", { name: "Set Forest" }));
@@ -214,7 +253,8 @@ describe("ThemeContext", () => {
       render(
         <ThemeProvider>
           <TestComponent />
-        </ThemeProvider>
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
       );
 
       fireEvent.click(screen.getByRole("button", { name: "Set Forest" }));
@@ -241,7 +281,8 @@ describe("ThemeContext", () => {
       const { container } = render(
         <ThemeProvider>
           <TestComponent />
-        </ThemeProvider>
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
       );
 
       const primaryEl = container.querySelector(
@@ -274,7 +315,8 @@ describe("ThemeContext", () => {
       const { container } = render(
         <ThemeProvider>
           <TestComponent />
-        </ThemeProvider>
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
       );
 
       // These values should match the documented theme colors
@@ -295,7 +337,8 @@ describe("ThemeContext", () => {
         render(
           <ThemeProvider>
             <TestComponent />
-          </ThemeProvider>
+          </ThemeProvider>,
+          { wrapper: createWrapper() }
         );
       }).not.toThrow();
     });

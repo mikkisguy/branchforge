@@ -1,10 +1,7 @@
 import { createContext, use } from "react";
+import type { ThemePalette } from "@branchforge/shared";
 
-export type ThemePalette =
-  | "forest"
-  | "periwinkle"
-  | "dark-amethyst"
-  | "graphite";
+export type { ThemePalette };
 
 interface ThemeColors {
   primary: string;

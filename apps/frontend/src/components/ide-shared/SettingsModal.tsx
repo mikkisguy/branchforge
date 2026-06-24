@@ -1,5 +1,12 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import { X } from "lucide-react";
+import {
+  useState,
+  useMemo,
+  useRef,
+  useEffect,
+  useCallback,
+  type ChangeEvent,
+} from "react";
+import { Camera, Loader2, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
@@ -9,8 +16,10 @@ import {
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { useSettings } from "@/hooks/useSettings";
+import { useUserSettings } from "@/hooks/useUserSettings";
 import { ProjectsSettingsContent } from "@/components/ide-shared/ProjectsSettingsContent";
 import { IntegrationsSettingsContent } from "@/components/ide-shared/IntegrationsSettingsContent";
 import { ExportHistoryDialog } from "@/components/ide-shared/ExportHistoryDialog";
@@ -25,6 +34,7 @@ import { exportKeys } from "@/lib/query-keys";
 import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 import { APP_NAME, APP_VERSION } from "@/lib/version";
 import type { Tab } from "./settings-types";
+import { AVATAR_MAX_SIZE_MB } from "@branchforge/shared";
 
 interface TabOption {
   id: Tab;
@@ -94,6 +104,15 @@ export function SettingsModal({
 
   const { user } = useAuth();
   const {
+    settings: userSettings,
+    isLoading: userSettingsLoading,
+    isSaving: userSettingsSaving,
+    isUploading: userSettingsUploading,
+    updateProfile: updateUserProfile,
+    uploadAvatar,
+    deleteAvatar,
+  } = useUserSettings();
+  const {
     signUpsEnabled,
     updateSignUpsSetting,
     isLoading: settingsLoading,
@@ -124,6 +143,28 @@ export function SettingsModal({
 
     return { visibleTabs, adjustedActiveTab };
   }, [desiredTab, user?.role]);
+
+  const [username, setUsername] = useState(userSettings?.username ?? "");
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [profileMessage, setProfileMessage] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setUsername(userSettings?.username ?? "");
+  }, [userSettings?.username]);
+
+  const handleSaveUserProfile = useCallback(async () => {
+    setProfileMessage(null);
+    try {
+      await updateUserProfile({ username: username.trim() || undefined });
+      setProfileMessage("User profile saved");
+    } catch {
+      // Error already handled by mutation onError (toast + rollback)
+    }
+  }, [updateUserProfile, username]);
+
+  const isUserSectionBusy =
+    userSettingsLoading || userSettingsSaving || userSettingsUploading;
 
   // Sync derived state during render: adjustedActiveTab is computed from visibleTabs,
   // desiredTab, and user?.role. If the active tab becomes invalid (e.g., user loses OWNER
@@ -201,6 +242,122 @@ export function SettingsModal({
                       {user?.email || "Not available"}
                     </p>
                   </SettingsRow>
+
+                  <SettingsRow
+                    label="Avatar"
+                    description={`Upload an image smaller than ${AVATAR_MAX_SIZE_MB}MB`}
+                    className="mt-4"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="h-16 w-16 overflow-hidden rounded-full border border-border bg-muted">
+                        {userSettings?.avatarUrl ? (
+                          <img
+                            src={userSettings.avatarUrl}
+                            alt="User avatar"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-lg font-semibold text-muted-foreground">
+                            {(userSettings?.username ?? user?.email?.[0] ?? "U")
+                              .slice(0, 1)
+                              .toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <input
+                          ref={avatarInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                            const file = event.target.files?.[0];
+                            if (!file) return;
+
+                            setAvatarError(null);
+                            if (!file.type.startsWith("image/")) {
+                              setAvatarError("Avatar must be an image file.");
+                              return;
+                            }
+                            if (file.size > AVATAR_MAX_SIZE_MB * 1024 * 1024) {
+                              setAvatarError(
+                                `Avatar must be smaller than ${AVATAR_MAX_SIZE_MB}MB.`
+                              );
+                              return;
+                            }
+
+                            uploadAvatar(file);
+                            if (avatarInputRef.current) {
+                              avatarInputRef.current.value = "";
+                            }
+                          }}
+                          disabled={isUserSectionBusy}
+                        />
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => avatarInputRef.current?.click()}
+                            disabled={isUserSectionBusy}
+                          >
+                            <Camera className="mr-2 size-4" />
+                            Upload avatar
+                          </Button>
+                          {userSettings?.avatarUrl && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() => deleteAvatar()}
+                              disabled={isUserSectionBusy}
+                            >
+                              <X className="mr-2 size-4" />
+                              Remove
+                            </Button>
+                          )}
+                        </div>
+                        {avatarError ? (
+                          <p className="text-xs text-red-500">{avatarError}</p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </SettingsRow>
+
+                  <SettingsRow
+                    label="Username"
+                    description="Shown across the app and in shared views"
+                    className="mt-4"
+                  >
+                    <div className="flex w-full max-w-sm flex-col gap-2">
+                      <Input
+                        value={username}
+                        onChange={(event) => setUsername(event.target.value)}
+                        placeholder="Your username"
+                        disabled={isUserSectionBusy}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        3 to 30 characters. Letters, numbers, underscores, and
+                        hyphens.
+                      </p>
+                    </div>
+                  </SettingsRow>
+
+                  <div className="mt-4 flex items-center gap-2">
+                    <Button
+                      type="button"
+                      onClick={() => void handleSaveUserProfile()}
+                      disabled={isUserSectionBusy}
+                    >
+                      {userSettingsSaving ? (
+                        <Loader2 className="mr-2 size-4 animate-spin" />
+                      ) : null}
+                      Save profile
+                    </Button>
+                    {profileMessage ? (
+                      <p className="text-sm text-muted-foreground">
+                        {profileMessage}
+                      </p>
+                    ) : null}
+                  </div>
                 </SettingsSection>
 
                 <SettingsSection title="Writing Goals">

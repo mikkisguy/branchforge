@@ -6,7 +6,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { writingGoalsApi } from "@/lib/api/writing-goals";
+import { userSettingsApi } from "@/lib/api/user-settings";
 import { writingGoalsKeys } from "@/lib/query-keys";
 import { useToast } from "@/contexts/ToastContext";
 
@@ -46,13 +46,13 @@ export function useWritingGoals(): UseWritingGoalsReturn {
   // Query for writing goal settings
   const { data: settings, isLoading } = useQuery({
     queryKey: writingGoalsKeys.settings(),
-    queryFn: writingGoalsApi.getSettings,
+    queryFn: userSettingsApi.getSettings,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Update writing goal settings mutation with optimistic updates
   const updateMutation = useMutation({
-    mutationFn: writingGoalsApi.updateGoal,
+    mutationFn: userSettingsApi.updateWritingGoals,
     onMutate: async (newData) => {
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({
@@ -113,7 +113,7 @@ export function useWritingGoals(): UseWritingGoalsReturn {
 
   // Reset writing statistics mutation
   const resetMutation = useMutation({
-    mutationFn: writingGoalsApi.resetStats,
+    mutationFn: userSettingsApi.resetWritingStats,
     onSuccess: () => {
       toast.success("Writing statistics have been reset", "Reset complete");
     },
