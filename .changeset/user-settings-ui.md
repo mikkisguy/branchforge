@@ -4,4 +4,4 @@
 "@branchforge/backend": minor
 ---
 
-User settings UI: avatar upload, username management, and theme persistence
+Added user settings: avatar upload, username management, and theme persistence
