@@ -8,6 +8,20 @@ interface TooltipProps {
   side?: "top" | "bottom";
   className?: string;
   triggerClassName?: string;
+  portalContainer?: HTMLElement | null;
+}
+
+function getDefaultPortalContainer(from: Element | null): HTMLElement {
+  // Walk up from the trigger itself rather than querying the document
+  // for *any* open dialog: with nested dialogs (e.g. a confirm dialog
+  // rendered inside an already-open settings dialog) the first
+  // `dialog[open]` in document order is the outer one, not the one
+  // actually containing this tooltip. Portaling into the wrong dialog
+  // renders the tooltip behind the (later, higher top-layer) dialog
+  // that really contains it.
+  const dialog = from?.closest("dialog[open]");
+  if (dialog instanceof HTMLElement) return dialog;
+  return document.body;
 }
 
 function mergeHandlers<T>(
@@ -26,12 +40,36 @@ export function Tooltip({
   side = "bottom",
   className,
   triggerClassName,
+  portalContainer,
 }: TooltipProps) {
   const tooltipId = React.useId();
   const [isVisible, setIsVisible] = React.useState(false);
+  const [positioned, setPositioned] = React.useState(false);
   const triggerRef = React.useRef<HTMLElement>(null);
   const tooltipRef = React.useRef<HTMLDivElement>(null);
   const [position, setPosition] = React.useState({ top: 0, left: 0 });
+
+  // Mirror the trigger node into state (in addition to the ref used by
+  // the positioning effect below). Refs must not be read during render
+  // (react-hooks/refs), so the render-time portal-target lookup below
+  // reads this state value instead of `triggerRef.current`.
+  const [triggerNode, setTriggerNode] = React.useState<HTMLElement | null>(
+    null
+  );
+  const setTriggerRef = React.useCallback((node: HTMLElement | null) => {
+    triggerRef.current = node;
+    setTriggerNode(node);
+  }, []);
+
+  // Compute the portal target directly during render so the portal
+  // content mounts in the same commit as isVisible turning true. This
+  // lets the positioning layout effect read tooltipRef.current
+  // immediately, avoiding the top-left flash caused by the previous
+  // two-step state approach.
+  const portalTarget =
+    isVisible && typeof document !== "undefined"
+      ? (portalContainer ?? getDefaultPortalContainer(triggerNode))
+      : null;
 
   const updatePosition = React.useCallback(() => {
     const triggerEl = triggerRef.current;
@@ -71,10 +109,12 @@ export function Tooltip({
     }
 
     setPosition({ top, left });
+    setPositioned(true);
   }, [side]);
 
   React.useLayoutEffect(() => {
     if (!isVisible) {
+      setPositioned(false);
       return;
     }
 
@@ -128,6 +168,30 @@ export function Tooltip({
     Record<string, unknown>
   >;
 
+  const tooltipElement =
+    portalTarget &&
+    createPortal(
+      <div
+        ref={tooltipRef}
+        id={tooltipId}
+        role="tooltip"
+        style={{
+          top: position.top,
+          left: position.left,
+          // Keep hidden until the first successful position calculation
+          // to prevent the top-left flash at {0, 0}.
+          visibility: positioned ? "visible" : "hidden",
+        }}
+        className={cn(
+          "fixed z-[100] max-w-xs break-words whitespace-normal rounded-lg border border-border/70 bg-popover px-2 py-1 text-xs text-popover-foreground shadow-xl shadow-black/25 ring-1 ring-white/5 pointer-events-none",
+          className
+        )}
+      >
+        {content}
+      </div>,
+      portalTarget
+    );
+
   // For valid React elements that are interactive (button, a, or have onClick),
   // clone them to attach tooltip handlers directly
   if (
@@ -178,25 +242,13 @@ export function Tooltip({
     return (
       <>
         {/* Wrap in span with layout to provide valid coordinates for positioning */}
-        <span ref={triggerRef as React.Ref<HTMLSpanElement>} className="inline">
+        <span
+          ref={setTriggerRef as React.Ref<HTMLSpanElement>}
+          className="inline"
+        >
           {clonedChild}
         </span>
-        {isVisible &&
-          createPortal(
-            <div
-              ref={tooltipRef}
-              id={tooltipId}
-              role="tooltip"
-              style={{ top: position.top, left: position.left }}
-              className={cn(
-                "fixed z-[100] max-w-xs break-words whitespace-normal rounded-lg border border-border/70 bg-popover px-2 py-1 text-xs text-popover-foreground shadow-xl shadow-black/25 ring-1 ring-white/5 pointer-events-none",
-                className
-              )}
-            >
-              {content}
-            </div>,
-            document.body
-          )}
+        {tooltipElement}
       </>
     );
   }
@@ -205,7 +257,7 @@ export function Tooltip({
   return (
     // react-doctor-disable-next-line react-doctor/no-static-element-interactions, react-doctor/no-noninteractive-tabindex
     <span
-      ref={triggerRef as React.Ref<HTMLSpanElement>}
+      ref={setTriggerRef as React.Ref<HTMLSpanElement>}
       tabIndex={0}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -216,22 +268,7 @@ export function Tooltip({
       aria-describedby={isVisible ? tooltipId : undefined}
     >
       {children}
-      {isVisible &&
-        createPortal(
-          <div
-            ref={tooltipRef}
-            id={tooltipId}
-            role="tooltip"
-            style={{ top: position.top, left: position.left }}
-            className={cn(
-              "fixed z-[100] max-w-xs break-words whitespace-normal rounded-lg border border-border/70 bg-popover px-2 py-1 text-xs text-popover-foreground shadow-xl shadow-black/25 ring-1 ring-white/5 pointer-events-none",
-              className
-            )}
-          >
-            {content}
-          </div>,
-          document.body
-        )}
+      {tooltipElement}
     </span>
   );
 }
