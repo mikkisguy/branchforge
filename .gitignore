@@ -64,3 +64,4 @@ tsconfig.schema.tsbuildinfo
 .codeql/
 
 .playwright-mcp/
+paseo.json
