@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  type ReactNode,
+} from "react";
 import { ThemeContext, type ThemePalette, type ThemeColors } from "./useTheme";
 import {
   useLocalStorage,
@@ -84,8 +90,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   // Apply dark/light mode. `.dark` activates Tailwind `dark:` utilities and the
   // `:root` dark CSS variables; `.light` swaps in the light CSS variables.
-  // Exactly one class is present at a time.
-  useEffect(() => {
+  // Exactly one class is present at a time. useLayoutEffect avoids a one-frame
+  // dark flash for returning light-mode users before `.light` is applied.
+  useLayoutEffect(() => {
     const root = document.documentElement;
     root.classList.toggle("dark", isDarkMode);
     root.classList.toggle("light", !isDarkMode);

@@ -382,5 +382,31 @@ describe("ToastContext", () => {
       expect(toastTexts[1]).toHaveTextContent("Error message");
       expect(toastTexts[2]).toHaveTextContent("Info message");
     });
+
+    it("should portal toasts into the topmost open dialog", () => {
+      function DialogToastTest() {
+        const { success } = useToast();
+
+        return (
+          <dialog open data-testid="settings-dialog">
+            <button onClick={() => success("Saved", "Settings saved")}>
+              Save settings
+            </button>
+          </dialog>
+        );
+      }
+
+      render(
+        <ToastProvider>
+          <DialogToastTest />
+        </ToastProvider>
+      );
+
+      fireEvent.click(screen.getByText("Save settings"));
+
+      const toastContainer = screen.getByTestId("toast-container");
+      const dialog = screen.getByTestId("settings-dialog");
+      expect(dialog).toContainElement(toastContainer);
+    });
   });
 });

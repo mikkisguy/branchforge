@@ -4,8 +4,10 @@ import {
   useState,
   useCallback,
   useMemo,
+  useEffect,
   ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 
 type ToastVariant = "default" | "success" | "destructive";
 
@@ -24,6 +26,49 @@ interface ToastContextType {
 }
 
 const ToastContext = createContext<ToastContextType | null>(null);
+
+function getToastPortalContainer(): HTMLElement {
+  // Native `<dialog showModal>` content lives in the browser top layer, so
+  // fixed-position toasts on `document.body` render behind the backdrop blur.
+  // Portal into the topmost open dialog (last in document order) when one
+  // is open, matching the tooltip/select fix.
+  const dialogs = document.querySelectorAll("dialog[open]");
+  const topmost = dialogs[dialogs.length - 1];
+  if (topmost instanceof HTMLElement) return topmost;
+  return document.body;
+}
+
+function useToastPortalContainer(): HTMLElement | null {
+  const [container, setContainer] = useState<HTMLElement | null>(() =>
+    typeof document !== "undefined" ? getToastPortalContainer() : null
+  );
+
+  useEffect(() => {
+    const update = () => {
+      if (typeof document === "undefined") return;
+      setContainer(getToastPortalContainer());
+    };
+
+    update();
+
+    const observer = new MutationObserver(update);
+    observer.observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ["open"],
+    });
+
+    document.addEventListener("close", update, true);
+
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("close", update, true);
+    };
+  }, []);
+
+  return container;
+}
 
 export function useToast() {
   const context = use(ToastContext);
@@ -112,7 +157,11 @@ function getToastClasses(variant: ToastVariant): string {
 }
 
 function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
-  return (
+  const portalContainer = useToastPortalContainer();
+
+  if (!portalContainer) return null;
+
+  return createPortal(
     <div
       data-testid="toast-container"
       className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"
@@ -147,6 +196,7 @@ function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
           </div>
         </div>
       ))}
-    </div>
+    </div>,
+    portalContainer
   );
 }
