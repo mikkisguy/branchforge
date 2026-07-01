@@ -79,9 +79,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     () => ({
       theme,
       setTheme: (newTheme: ThemePalette) => {
-        // Update both localStorage and database (silently — no toast for theme changes)
         setLocalThemeState(newTheme);
-        updateProfile({ theme: newTheme }, { silent: true });
+        updateProfile({ theme: newTheme }, { silent: true }).catch(() => {});
       },
       colors,
     }),

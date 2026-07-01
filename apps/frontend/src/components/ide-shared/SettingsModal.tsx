@@ -155,13 +155,21 @@ export function SettingsModal({
 
   const handleSaveUserProfile = useCallback(async () => {
     setProfileMessage(null);
+    const trimmedUsername = username.trim();
+    if (!trimmedUsername) {
+      return;
+    }
+    if (trimmedUsername === userSettings?.username) {
+      setProfileMessage("User profile saved");
+      return;
+    }
     try {
-      await updateUserProfile({ username: username.trim() || undefined });
+      await updateUserProfile({ username: trimmedUsername });
       setProfileMessage("User profile saved");
     } catch {
-      // Error already handled by mutation onError (toast + rollback)
+      // Error handled by mutation onError
     }
-  }, [updateUserProfile, username]);
+  }, [updateUserProfile, username, userSettings?.username]);
 
   const isUserSectionBusy =
     userSettingsLoading || userSettingsSaving || userSettingsUploading;

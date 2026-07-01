@@ -21,6 +21,7 @@ import {
 } from "../lib/storage.js";
 import { getBasePath } from "../lib/config.js";
 import { promises as fs } from "node:fs";
+import { randomBytes } from "node:crypto";
 import { logWarn, LogEventType } from "../lib/logger.js";
 
 // ============================================================================
@@ -257,9 +258,7 @@ export async function uploadUserAvatar(
     const previousAvatarPath = getAvatarFullPath(settings.avatarUrl);
     try {
       await fs.access(previousAvatarPath);
-      previousAvatarBackupPath = `${previousAvatarPath}.backup-${Date.now()}-${
-        process.pid
-      }`;
+      previousAvatarBackupPath = `${previousAvatarPath}.backup-${Date.now()}-${process.pid}-${randomBytes(4).toString("hex")}`;
       await fs.copyFile(previousAvatarPath, previousAvatarBackupPath);
     } catch (accessError) {
       if ((accessError as NodeJS.ErrnoException).code !== "ENOENT") {
