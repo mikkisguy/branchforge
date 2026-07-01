@@ -39,6 +39,10 @@ const testUser = {
 };
 
 const defaultSettings: PublicUserSettings = {
+  avatarUrl: null,
+  username: null,
+  language: "en",
+  theme: "periwinkle",
   dailyWritingGoal: null,
   dailyWordResetHour: 0,
   dailyWordCounts: [],
@@ -113,6 +117,10 @@ describe("User Settings Routes (Integration)", () => {
   describe("GET /user/settings", () => {
     it("should return user settings when authenticated", async () => {
       const mockSettings = {
+        avatarUrl: null,
+        username: null,
+        language: "en",
+        theme: "periwinkle",
         dailyWritingGoal: 1000,
         dailyWordResetHour: 5,
         dailyWordCounts: [{ date: "2024-01-15", count: 500 }],
@@ -189,6 +197,10 @@ describe("User Settings Routes (Integration)", () => {
   describe("PUT /user/settings", () => {
     it("should update settings and return updated values", async () => {
       const updatedSettings = {
+        avatarUrl: null,
+        username: null,
+        language: "en",
+        theme: "periwinkle",
         dailyWritingGoal: 2000,
         dailyWordResetHour: 5,
         dailyWordCounts: [],

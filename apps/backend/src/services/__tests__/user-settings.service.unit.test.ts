@@ -80,7 +80,7 @@ const mockExistingRow = {
   avatarUrl: null,
   username: null,
   language: "en",
-  theme: "light",
+  theme: "periwinkle",
   dailyWritingGoal: 1000,
   dailyWordResetHour: 5,
   dailyWordCounts: [{ date: "2024-01-15", count: 500 }],
@@ -96,7 +96,7 @@ const mockDefaultRow = {
   avatarUrl: null,
   username: null,
   language: "en",
-  theme: "light",
+  theme: "periwinkle",
   dailyWritingGoal: null,
   dailyWordResetHour: 0,
   dailyWordCounts: [],
@@ -133,6 +133,10 @@ describe("User Settings Service", () => {
       const result = await getUserSettings(testUserId);
 
       expect(result).toEqual({
+        avatarUrl: null,
+        username: null,
+        language: "en",
+        theme: "periwinkle",
         dailyWritingGoal: null,
         dailyWordResetHour: 0,
         dailyWordCounts: [],
@@ -161,6 +165,10 @@ describe("User Settings Service", () => {
       const result = await getUserSettings(testUserId);
 
       expect(result).toEqual({
+        avatarUrl: null,
+        username: null,
+        language: "en",
+        theme: "periwinkle",
         dailyWritingGoal: 1000,
         dailyWordResetHour: 5,
         dailyWordCounts: [{ date: "2024-01-15", count: 500 }],
@@ -169,6 +177,23 @@ describe("User Settings Service", () => {
 
       // Insert should NOT have been called
       expect(mockDb.insert).not.toHaveBeenCalled();
+    });
+    it("should return avatar URL (not raw filename) from existing settings", async () => {
+      process.env.BASE_PATH = "/api/";
+      const rowWithAvatar = {
+        ...mockExistingRow,
+        avatarUrl: "test-avatar-123.webp",
+      };
+      mockDb._selectChain.limit.mockResolvedValueOnce([rowWithAvatar]);
+
+      const result = await getUserSettings(testUserId);
+
+      // toPublic must build a full URL path, not return the raw filename
+      expect(result.avatarUrl).toContain("test-avatar-123.webp");
+      expect(result.avatarUrl).not.toBe("test-avatar-123.webp");
+      expect(result.avatarUrl).toMatch(/\/uploads\/avatars\//);
+
+      delete process.env.BASE_PATH;
     });
   });
 
@@ -195,6 +220,10 @@ describe("User Settings Service", () => {
       });
 
       expect(result).toEqual({
+        avatarUrl: null,
+        username: null,
+        language: "en",
+        theme: "periwinkle",
         dailyWritingGoal: 500,
         dailyWordResetHour: 0,
         dailyWordCounts: [],
@@ -249,6 +278,10 @@ describe("User Settings Service", () => {
       });
 
       expect(result).toEqual({
+        avatarUrl: null,
+        username: null,
+        language: "en",
+        theme: "periwinkle",
         dailyWritingGoal: null,
         dailyWordResetHour: 12,
         dailyWordCounts: [{ date: "2024-01-15", count: 500 }],
@@ -322,6 +355,10 @@ describe("User Settings Service", () => {
 
       // Result is from the re-fetched row (could be ours or the concurrent one)
       expect(result).toEqual({
+        avatarUrl: null,
+        username: null,
+        language: "en",
+        theme: "periwinkle",
         dailyWritingGoal: null,
         dailyWordResetHour: 0,
         dailyWordCounts: [],

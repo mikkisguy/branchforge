@@ -38,7 +38,7 @@ export const userSettings = pgTable(
     avatarUrl: text("avatar_url"),
     username: text("username"),
     language: text("language").default("en"),
-    theme: text("theme").default("light"),
+    theme: text("theme").default("periwinkle"),
     // Daily writing goal settings
     dailyWritingGoal: integer("daily_writing_goal"), // null = disabled
     dailyWordResetHour: integer("daily_word_reset_hour").default(0), // 0-23, hour of day for reset

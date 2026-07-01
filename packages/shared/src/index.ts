@@ -832,6 +832,36 @@ export const AVATAR_MAX_SIZE_MB = 2;
  */
 export const AVATAR_MAX_SIZE = AVATAR_MAX_SIZE_MB * 1024 * 1024; // 2MB in bytes
 
+// ============================================================================
+// Theme Palette
+// ============================================================================
+
+/**
+ * Valid theme palette identifiers shared between frontend and backend.
+ */
+export type ThemePalette =
+  | "forest"
+  | "periwinkle"
+  | "dark-amethyst"
+  | "graphite";
+
+/**
+ * All valid theme palette values (for runtime validation / iteration).
+ */
+export const THEME_PALETTES: readonly ThemePalette[] = [
+  "forest",
+  "periwinkle",
+  "dark-amethyst",
+  "graphite",
+] as const;
+
+/**
+ * Validates that a value is a valid ThemePalette.
+ */
+export function isValidTheme(value: string): value is ThemePalette {
+  return (THEME_PALETTES as readonly string[]).includes(value);
+}
+
 /**
  * Validates if a MIME type is allowed for avatar uploads
  * @param mimeType - The MIME type to validate (can be undefined, null, or empty string)
