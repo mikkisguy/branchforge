@@ -89,7 +89,7 @@ export function CharacterList({
                     </span>
                   )}
                   {character.routeAffiliation && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
                       {character.routeAffiliation}
                     </span>
                   )}

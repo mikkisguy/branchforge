@@ -59,7 +59,7 @@ export const renPyBaseTheme = EditorView.theme({
   // Line numbers
   ".cm-gutters": {
     backgroundColor: "transparent",
-    color: "hsl(var(--muted-foreground) / 0.4)",
+    color: "hsl(var(--muted-foreground) / 0.55)",
     border: "none",
   },
   ".cm-lineNumbers .cm-gutterElement": {
@@ -89,12 +89,13 @@ export const renPyBaseTheme = EditorView.theme({
     backgroundColor:
       "rgba(var(--theme-color-rgb, 61, 74, 194), 0.38) !important",
   },
-  // Cursor
+  // Cursor — use var(--theme-color) directly: ThemeContext sets it to a hex
+  // value at runtime, so wrapping in hsl() would produce an invalid color.
   ".cm-cursor": {
-    borderLeftColor: "hsl(var(--theme-color))",
+    borderLeftColor: "var(--theme-color)",
   },
   "&.cm-focused .cm-cursor": {
-    borderLeftColor: "hsl(var(--theme-color))",
+    borderLeftColor: "var(--theme-color)",
   },
   // Matching brackets
   ".cm-matchingBracket, .cm-nonmatchingBracket": {
@@ -203,8 +204,8 @@ export const renPyBaseTheme = EditorView.theme({
     fontWeight: "600",
     fontFamily: "'Fira Code', monospace",
     letterSpacing: "0.06em",
-    color: "hsl(var(--muted-foreground) / 0.7)",
-    backgroundColor: "hsl(var(--muted) / 0.35)",
+    color: "hsl(var(--muted-foreground))",
+    backgroundColor: "rgba(var(--theme-color-rgb, 61, 74, 194), 0.08)",
     border: "1px solid rgba(var(--theme-color-rgb, 61, 74, 194), 0.5)",
     borderRadius: "9999px",
     padding: "1px 8px",

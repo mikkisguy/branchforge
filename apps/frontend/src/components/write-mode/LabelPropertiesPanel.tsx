@@ -16,7 +16,7 @@ import {
 import { FormattedCondition } from "@/components/write-mode/FormattedCondition";
 
 const panelVariants = cva(
-  "min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3 transition-all duration-300 ease-out",
+  "min-h-0 shrink-0 rounded-lg border border-border bg-panel-tinted overflow-hidden mt-3 transition-all duration-300 ease-out",
   {
     variants: {
       collapsed: {

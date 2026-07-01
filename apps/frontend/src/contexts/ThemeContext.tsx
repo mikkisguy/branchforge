@@ -91,6 +91,28 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.classList.toggle("light", !isDarkMode);
   }, [isDarkMode]);
 
+  // Palette-tinted surfaces for light mode. In light mode we layer a subtle
+  // theme-color wash over card backgrounds so the chrome feels branded (matching
+  // dark mode's tinted atmosphere) instead of flat white. In dark mode these
+  // are transparent so behavior is unchanged.
+  useEffect(() => {
+    const root = document.documentElement;
+    const rgb = hexToRgb(colors.primary);
+    if (!isDarkMode && rgb) {
+      root.style.setProperty(
+        "--surface-tint",
+        `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.04)`
+      );
+      root.style.setProperty(
+        "--surface-tint-strong",
+        `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.08)`
+      );
+    } else {
+      root.style.setProperty("--surface-tint", "transparent");
+      root.style.setProperty("--surface-tint-strong", "transparent");
+    }
+  }, [theme, colors, isDarkMode]);
+
   const setDarkMode = useCallback(
     (dark: boolean) => setIsDarkMode(dark),
     [setIsDarkMode]

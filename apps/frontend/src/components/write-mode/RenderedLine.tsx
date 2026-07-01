@@ -143,7 +143,7 @@ function renderTokens(tokens: RenpyToken[]): React.ReactNode[] {
             key={key}
             style={{
               ...computeStyle(stack),
-              color: "hsl(var(--muted-foreground))",
+              color: "var(--variable)",
             }}
             title={`Variable: ${t.name}`}
             data-raw-start={rawStart}

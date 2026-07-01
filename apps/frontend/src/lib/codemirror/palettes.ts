@@ -213,7 +213,11 @@ export const PALETTES: SyntaxPalette[] = [
  * Parse an HSL string into components
  * Supports both "hsl(h, s%, l%)" and "hsl(h s% l%)" formats
  */
-function parseHSL(hslString: string): { h: number; s: number; l: number } {
+export function parseHSL(hslString: string): {
+  h: number;
+  s: number;
+  l: number;
+} {
   const match = hslString.match(
     /hsl\((\d+(?:\.\d+)?)\s*[,]\s*(\d+(?:\.\d+)?)%\s*[,]\s*(\d+(?:\.\d+)?)%\)/
   );
@@ -239,20 +243,34 @@ function parseHSL(hslString: string): { h: number; s: number; l: number } {
 }
 
 /**
- * Derive a light theme color from a dark theme HSL color
- * Light themes need darker colors for contrast on light backgrounds
+ * Derive a light theme color from a dark theme HSL color.
+ * Light backgrounds need darker, more saturated tokens to match the
+ * visual punch of syntax colors on a dark editor surface.
  */
-function deriveLightColor(hslString: string): string {
+export function deriveLightColor(hslString: string): string {
   const { h, s, l } = parseHSL(hslString);
 
-  // For light theme: reduce lightness significantly for contrast
-  // Adjust saturation based on original saturation to maintain color character
-  const newL = Math.max(25, l - 25); // Reduce lightness by ~25%, min 25%
+  let newL: number;
   let newS = s;
 
-  // Increase saturation slightly for low-lightness colors to prevent washing out
-  if (newL < 40 && s < 60) {
-    newS = Math.min(100, s + 10);
+  if (l > 70) {
+    // "Light-on-dark" tokens (string, atom, pale numbers).
+    newL = Math.max(22, Math.min(32, l - 55));
+    if (s > 0) {
+      newS = Math.min(100, s + 25);
+    }
+  } else if (l > 50) {
+    // Medium tones — darken aggressively for legibility on off-white.
+    newL = Math.max(22, l - 38);
+    if (s < 70) {
+      newS = Math.min(100, s + 15);
+    }
+  } else {
+    // Already dark — nudge into the same readable band as other tokens.
+    newL = Math.max(22, Math.min(32, l - 15));
+    if (s > 0 && s < 70) {
+      newS = Math.min(100, s + 10);
+    }
   }
 
   return `hsl(${h}, ${newS}%, ${newL}%)`;
@@ -271,9 +289,10 @@ export function applyPalette(palette: SyntaxPalette): void {
 
   Object.entries(palette.colors).forEach(([key, value]) => {
     const cssKey = keyMap[key] || key;
-    // Set dark theme color (used by default)
-    root.style.setProperty(`--${cssKey}`, value);
-    // Set light theme variant (derived from dark)
+    // Set mode-specific tokens; index.css maps --keyword etc. to the
+    // appropriate variant so inline styles never override .light remapping.
+    root.style.removeProperty(`--${cssKey}`);
+    root.style.setProperty(`--${cssKey}-dark`, value);
     root.style.setProperty(`--${cssKey}-light`, deriveLightColor(value));
   });
 }

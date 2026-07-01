@@ -67,6 +67,8 @@ describe("ThemeContext", () => {
     document.documentElement.style.removeProperty("--theme-color-rgb");
     document.documentElement.style.removeProperty("--theme-border");
     document.documentElement.style.removeProperty("--theme-border-subtle");
+    document.documentElement.style.removeProperty("--surface-tint");
+    document.documentElement.style.removeProperty("--surface-tint-strong");
   };
 
   const removeModeClasses = () => {
@@ -493,6 +495,74 @@ describe("ThemeContext", () => {
       const el = document.querySelector("[data-theme='forest']");
       expect(el).toBeInTheDocument();
       expect(el).toHaveAttribute("data-dark", "false");
+    });
+
+    it("should set transparent surface tints in dark mode", () => {
+      render(
+        <ThemeProvider>
+          <DarkModeTestComponent />
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
+      );
+
+      expect(
+        document.documentElement.style.getPropertyValue("--surface-tint")
+      ).toBe("transparent");
+      expect(
+        document.documentElement.style.getPropertyValue("--surface-tint-strong")
+      ).toBe("transparent");
+    });
+
+    it("should set palette-tinted surface vars in light mode", async () => {
+      render(
+        <ThemeProvider>
+          <DarkModeTestComponent />
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Set Light" }));
+
+      await waitFor(() => {
+        const tint =
+          document.documentElement.style.getPropertyValue("--surface-tint");
+        // Should be an rgba value using the periwinkle theme color (not transparent)
+        expect(tint).toContain("rgba(");
+        expect(tint).not.toBe("transparent");
+      });
+
+      const tintStrong = document.documentElement.style.getPropertyValue(
+        "--surface-tint-strong"
+      );
+      expect(tintStrong).toContain("rgba(");
+      expect(tintStrong).not.toBe("transparent");
+    });
+
+    it("should clear surface tints when switching back to dark mode", async () => {
+      localStorage.setItem("branchforge:dark-mode", "false");
+
+      render(
+        <ThemeProvider>
+          <DarkModeTestComponent />
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
+      );
+
+      // Starts in light mode — tint is set
+      await waitFor(() => {
+        expect(
+          document.documentElement.style.getPropertyValue("--surface-tint")
+        ).not.toBe("transparent");
+      });
+
+      // Switch to dark
+      fireEvent.click(screen.getByRole("button", { name: "Toggle" }));
+
+      await waitFor(() => {
+        expect(
+          document.documentElement.style.getPropertyValue("--surface-tint")
+        ).toBe("transparent");
+      });
     });
   });
 });

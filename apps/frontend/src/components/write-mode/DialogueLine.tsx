@@ -789,7 +789,7 @@ export const DialogueLine = memo(function DialogueLine({
                   ? "Dialogue..."
                   : "Narration..."
             }
-            className={`min-h-[2.5rem] w-full p-0 pr-7 resize-none overflow-hidden bg-transparent border-0 outline-none focus-visible:outline-none focus-visible:ring-0 font-light tracking-normal leading-8 placeholder:text-muted-foreground/50 ${
+            className={`min-h-[2.5rem] w-full p-0 pr-7 resize-none overflow-hidden bg-transparent border-0 outline-none focus-visible:outline-none focus-visible:ring-0 font-light tracking-normal leading-8 placeholder:text-muted-foreground/70 ${
               isFocused
                 ? "opacity-100 pointer-events-auto"
                 : "opacity-0 pointer-events-none"
@@ -859,7 +859,7 @@ export const DialogueLine = memo(function DialogueLine({
       {/* Destination indicator for CHOICE entries — placed below the text row */}
       {isChoice && choiceTargetName && (
         <span
-          className={`text-xs text-muted-foreground/50 flex items-center gap-1 ${
+          className={`text-xs text-muted-foreground/70 flex items-center gap-1 ${
             isStacked ? "" : "ml-[172px]"
           }`}
         >

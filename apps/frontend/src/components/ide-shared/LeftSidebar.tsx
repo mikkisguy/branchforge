@@ -441,7 +441,7 @@ function ThemeSwitcher({
                   }}
                   className={`size-7 rounded transition-all ${
                     theme === palette.key
-                      ? "scale-110 ring-2 ring-white ring-offset-2 ring-offset-card"
+                      ? "scale-110 ring-2 ring-foreground/30 ring-offset-2 ring-offset-background"
                       : "opacity-60 hover:opacity-100 hover:scale-105"
                   }`}
                   style={{ background: palette.color }}
@@ -466,7 +466,7 @@ function ThemeSwitcher({
             onClick={() => setTheme(palette.key)}
             className={`flex-1 h-7 rounded transition-all ${
               theme === palette.key
-                ? "scale-110 ring-2 ring-white ring-offset-2 ring-offset-card"
+                ? "scale-110 ring-2 ring-foreground/30 ring-offset-2 ring-offset-background"
                 : "opacity-60 hover:opacity-100 hover:scale-105"
             }`}
             style={{ background: palette.color }}

@@ -17,7 +17,7 @@ export function CollapsibleSection({
   const [isOpen, setIsOpen] = useState(defaultOpen);
   return (
     <div className="border-b border-border/40 last:border-b-0">
-      <div className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:bg-muted/30 transition-colors">
+      <div className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-foreground/70 uppercase tracking-wider hover:bg-muted/30 transition-colors">
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}

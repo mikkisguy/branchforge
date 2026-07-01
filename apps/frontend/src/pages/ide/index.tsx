@@ -241,7 +241,7 @@ export function HomePageIDE() {
             key={scriptModeKey}
             fallback={
               <div
-                className="flex flex-col items-center justify-center h-full gap-3 text-slate-400"
+                className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground"
                 role="alert"
                 aria-live="assertive"
                 aria-label="Editor failed to load"
@@ -262,7 +262,7 @@ export function HomePageIDE() {
           >
             <Suspense
               fallback={
-                <div className="flex items-center justify-center h-full text-slate-400">
+                <div className="flex items-center justify-center h-full text-muted-foreground">
                   Loading editor…
                 </div>
               }
