@@ -50,6 +50,14 @@
     --punctuation: hsl(0, 0%, 65%);
     --config-keyword: hsl(258, 60%, 60%);
     --audio-keyword: hsl(200, 70%, 60%);
+
+    /* Toast tints - dark mode (subtle tint + colored border per variant) */
+    --toast-success-bg: hsl(142 71% 45% / 0.14);
+    --toast-success-border: hsl(142 71% 45% / 0.45);
+    --toast-destructive-bg: hsl(0 72% 51% / 0.14);
+    --toast-destructive-border: hsl(0 72% 51% / 0.45);
+    --toast-info-bg: hsl(217 91% 60% / 0.14);
+    --toast-info-border: hsl(217 91% 60% / 0.45);
   }
 
   .light {
@@ -87,6 +95,14 @@
     --punctuation: var(--punctuation-light, hsl(0, 0%, 40%));
     --config-keyword: var(--config-keyword-light, hsl(180, 60%, 35%));
     --audio-keyword: var(--audio-keyword-light, hsl(200, 70%, 40%));
+
+    /* Toast tints - light mode (darker hues for good contrast on white) */
+    --toast-success-bg: hsl(142 71% 35% / 0.12);
+    --toast-success-border: hsl(142 71% 35% / 0.4);
+    --toast-destructive-bg: hsl(0 74% 40% / 0.12);
+    --toast-destructive-border: hsl(0 74% 40% / 0.4);
+    --toast-info-bg: hsl(217 91% 45% / 0.12);
+    --toast-info-border: hsl(217 91% 45% / 0.4);
   }
 }
 
@@ -102,6 +118,15 @@
       transparent 0
     );
     background-size: 24px 24px;
+  }
+
+  /* Light mode uses dark dots so the texture stays visible on white */
+  .light body {
+    background-image: radial-gradient(
+      circle at 1px 1px,
+      rgba(0, 0, 0, 0.04) 2px,
+      transparent 0
+    );
   }
 
   /* Custom scrollbar styles */

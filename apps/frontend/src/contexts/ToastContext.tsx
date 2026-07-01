@@ -103,11 +103,11 @@ interface ToastContainerProps {
 function getToastClasses(variant: ToastVariant): string {
   switch (variant) {
     case "success":
-      return "border-green-500/30 bg-green-50/80 dark:bg-green-900/30 dark:border-green-500/50";
+      return "border-[var(--toast-success-border)] bg-[var(--toast-success-bg)]";
     case "destructive":
-      return "border-red-500/30 bg-red-50/80 dark:bg-red-900/30 dark:border-red-500/50";
+      return "border-[var(--toast-destructive-border)] bg-[var(--toast-destructive-bg)]";
     default:
-      return "border-blue-500/30 bg-blue-50/80 dark:bg-blue-900/30 dark:border-blue-500/50";
+      return "border-[var(--toast-info-border)] bg-[var(--toast-info-bg)]";
   }
 }
 

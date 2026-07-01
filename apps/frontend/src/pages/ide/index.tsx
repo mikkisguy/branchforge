@@ -22,7 +22,7 @@ const ScriptMode = lazy(() =>
 );
 
 export function HomePageIDE() {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, isDarkMode, toggleDarkMode } = useTheme();
   const { logout } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useLocalStorage<"write" | "script">(
@@ -206,6 +206,8 @@ export function HomePageIDE() {
         theme={theme}
         setTheme={setTheme}
         themePalettes={themePalettes}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={toggleDarkMode}
         onLogout={handleLogout}
         projectId={currentProject?.id}
         projects={projects}

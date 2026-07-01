@@ -16,6 +16,8 @@ import {
   FolderOpen,
   Network,
   SlidersHorizontal,
+  Sun,
+  Moon,
 } from "lucide-react";
 import type { ThemePalette } from "@/contexts/ThemeContext";
 import type { Project, UpdateProjectBody } from "@/lib/api/projects";
@@ -44,6 +46,8 @@ interface LeftSidebarPropsBase {
   theme: string;
   setTheme: (theme: ThemePalette) => void;
   themePalettes: ThemePaletteOption[];
+  isDarkMode: boolean;
+  onToggleDarkMode: () => void;
   onLogout: () => void;
   projectId?: string;
   projects: Project[];
@@ -503,6 +507,41 @@ function CollapseButton({ isCollapsed, onToggle }: CollapseButtonProps) {
   );
 }
 
+interface DarkModeToggleProps {
+  isDarkMode: boolean;
+  onToggle: () => void;
+  isCollapsed: boolean;
+  showLabel: boolean;
+}
+
+/** Dark/light mode toggle. Icon and label reflect the active mode. */
+function DarkModeToggle({
+  isDarkMode,
+  onToggle,
+  isCollapsed,
+  showLabel,
+}: DarkModeToggleProps) {
+  const label = isDarkMode ? "Dark" : "Light";
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+      title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+      className={`flex items-center ${
+        isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
+      } rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors`}
+    >
+      {isDarkMode ? (
+        <Moon className="size-4 flex-shrink-0" />
+      ) : (
+        <Sun className="size-4 flex-shrink-0" />
+      )}
+      {showLabel && <span>{label}</span>}
+    </button>
+  );
+}
+
 interface UserActionsProps {
   isCollapsed: boolean;
   showLabel: boolean;
@@ -556,6 +595,8 @@ export function LeftSidebar(props: LeftSidebarProps) {
     theme,
     setTheme,
     themePalettes,
+    isDarkMode,
+    onToggleDarkMode,
     onLogout,
     projectId,
     projects,
@@ -687,6 +728,13 @@ export function LeftSidebar(props: LeftSidebarProps) {
           <CollapseButton
             isCollapsed={isCollapsed}
             onToggle={handleToggleCollapse}
+          />
+
+          <DarkModeToggle
+            isDarkMode={isDarkMode}
+            onToggle={onToggleDarkMode}
+            isCollapsed={isCollapsed}
+            showLabel={showLabel}
           />
 
           <ThemeSwitcher

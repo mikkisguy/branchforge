@@ -12,6 +12,10 @@ interface ThemeContextType {
   theme: ThemePalette;
   setTheme: (theme: ThemePalette) => void;
   colors: ThemeColors;
+  /** Whether dark mode is active. Independent of the color palette. */
+  isDarkMode: boolean;
+  setDarkMode: (dark: boolean) => void;
+  toggleDarkMode: () => void;
 }
 
 export const ThemeContext = createContext<ThemeContextType | undefined>(
