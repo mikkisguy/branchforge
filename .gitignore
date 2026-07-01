@@ -62,3 +62,5 @@ tsconfig.schema.tsbuildinfo
 
 # CodeQL local verification tooling (CLI lives in $HOME, not the repo)
 .codeql/
+
+.playwright-mcp/

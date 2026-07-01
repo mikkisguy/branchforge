@@ -17,8 +17,8 @@ const RegisterPage = lazy(() =>
 );
 function App() {
   return (
-    <ThemeProvider>
-      <ToastProvider>
+    <ToastProvider>
+      <ThemeProvider>
         <div className="app">
           <ErrorBoundary
             onError={(error) => {
@@ -51,8 +51,8 @@ function App() {
             </Suspense>
           </ErrorBoundary>
         </div>
-      </ToastProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </ToastProvider>
   );
 }
 

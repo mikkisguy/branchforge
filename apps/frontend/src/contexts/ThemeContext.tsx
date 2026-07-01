@@ -1,6 +1,8 @@
 import { useEffect, useMemo, type ReactNode } from "react";
 import { ThemeContext, type ThemePalette, type ThemeColors } from "./useTheme";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useUserSettings } from "@/hooks/useUserSettings";
+import { isValidTheme } from "@branchforge/shared";
 
 export const themeConfigs: Record<ThemePalette, ThemeColors> = {
   forest: { primary: "#40bb82", hover: "#52c992" },
@@ -16,13 +18,8 @@ const STATUS_COLORS = {
   final: "#10b981", // emerald for final/complete
 } as const;
 
-// Type guard to validate if a string is a valid ThemePalette
-function isValidTheme(value: string): value is ThemePalette {
-  return ["forest", "periwinkle", "dark-amethyst", "graphite"].includes(value);
-}
-
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useLocalStorage<ThemePalette>(
+  const [localTheme, setLocalThemeState] = useLocalStorage<ThemePalette>(
     "theme",
     "periwinkle",
     {
@@ -32,7 +29,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   );
 
+  const { settings, updateProfile } = useUserSettings();
+
+  // Use theme from database settings if available, otherwise fall back to localStorage
+  const theme =
+    (settings?.theme && isValidTheme(settings.theme)
+      ? settings.theme
+      : localTheme) ?? "periwinkle";
+
   const colors = themeConfigs[theme];
+
+  // Sync theme to localStorage when it changes (for immediate feedback)
+  useEffect(() => {
+    setLocalThemeState(theme);
+  }, [theme, setLocalThemeState]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -66,8 +76,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [theme, colors]);
 
   const contextValue = useMemo(
-    () => ({ theme, setTheme: setThemeState, colors }),
-    [theme, setThemeState, colors]
+    () => ({
+      theme,
+      setTheme: (newTheme: ThemePalette) => {
+        setLocalThemeState(newTheme);
+        updateProfile({ theme: newTheme }, { silent: true }).catch(() => {});
+      },
+      colors,
+    }),
+    [theme, setLocalThemeState, updateProfile, colors]
   );
 
   return (

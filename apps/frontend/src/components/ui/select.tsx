@@ -24,8 +24,14 @@ interface SelectProps<T extends string = string> {
   portalContainer?: HTMLElement | null;
 }
 
-function getDefaultPortalContainer(): HTMLElement {
-  const dialog = document.querySelector("dialog[open]");
+function getDefaultPortalContainer(from: Element | null): HTMLElement {
+  // Walk up from the trigger itself rather than querying the document
+  // for *any* open dialog: with nested dialogs, the first
+  // `dialog[open]` in document order is the outer one, not necessarily
+  // the one actually containing this select. Portaling into the wrong
+  // dialog renders the menu behind the (later, higher top-layer)
+  // dialog that really contains it.
+  const dialog = from?.closest("dialog[open]");
   if (dialog instanceof HTMLElement) return dialog;
   return document.body;
 }
@@ -43,12 +49,23 @@ export function Select<T extends string = string>({
   const [isOpen, setIsOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
-  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const listboxRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hasInitializedFocus = useRef(false);
   const gap = 4;
+
+  // Mirror the trigger node into state (in addition to the ref used by
+  // the positioning effect below). Refs must not be read during render
+  // (react-hooks/refs), so the render-time portal-target lookup below
+  // reads this state value instead of `triggerRef.current`.
+  const [triggerNode, setTriggerNode] = useState<HTMLButtonElement | null>(
+    null
+  );
+  const setTriggerRef = useCallback((node: HTMLButtonElement | null) => {
+    triggerRef.current = node;
+    setTriggerNode(node);
+  }, []);
 
   const currentOption = options.find((opt) => opt.value === value);
 
@@ -94,12 +111,12 @@ export function Select<T extends string = string>({
     };
   }, [isOpen, updatePosition]);
 
-  useLayoutEffect(() => {
-    if (isOpen) {
-      const target = portalContainer ?? getDefaultPortalContainer();
-      setPortalTarget(target);
-    }
-  }, [isOpen, portalContainer]);
+  // Compute the portal target directly during render so the portal
+  // content mounts in the same commit as isOpen turning true.
+  const portalTarget =
+    isOpen && typeof document !== "undefined"
+      ? (portalContainer ?? getDefaultPortalContainer(triggerNode))
+      : null;
 
   useEffect(() => {
     if (isOpen && listboxRef.current && !hasInitializedFocus.current) {
@@ -184,7 +201,7 @@ export function Select<T extends string = string>({
   return (
     <div ref={containerRef} className={cn("relative", className)}>
       <button
-        ref={triggerRef}
+        ref={setTriggerRef}
         id={id}
         type="button"
         onClick={() => {

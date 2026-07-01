@@ -18,6 +18,7 @@ import {
   UserRole,
   ROUTE_KEY_REGEX,
   JUMP_PREFIX_REGEX,
+  THEME_PALETTES,
 } from "@branchforge/shared";
 import {
   isPrivateOrLocalHostname,
@@ -1324,6 +1325,39 @@ export const timezoneSchema = z
   });
 
 /**
+ * Username validation schema
+ * Alphanumeric, underscores, hyphens, 3-30 characters
+ */
+export const usernameSchema = z
+  .string()
+  .trim()
+  .min(3, "Username must be at least 3 characters")
+  .max(30, "Username must be 30 characters or less")
+  .regex(
+    /^[a-zA-Z0-9_-]+$/,
+    "Username can only contain letters, numbers, underscores, and hyphens"
+  );
+
+/**
+ * Language validation schema
+ * ISO 639-1 language code (2 letters)
+ */
+export const languageSchema = z
+  .string()
+  .trim()
+  .min(2, "Language code must be 2 characters")
+  .max(2, "Language code must be 2 characters")
+  .regex(/^[a-z]{2}$/, "Language code must be a valid 2-letter ISO code");
+
+/**
+ * Theme validation schema
+ * Uses THEME_PALETTES from shared package as single source of truth
+ */
+export const themeSchema = z.enum(THEME_PALETTES as [string, ...string[]], {
+  message: "Theme must be forest, periwinkle, dark-amethyst, or graphite",
+});
+
+/**
  * Update writing goal settings request validation
  */
 export const updateWritingGoalSchema = z
@@ -1340,6 +1374,19 @@ export const updateWritingGoalSchema = z
   .strict();
 
 export type UpdateWritingGoalInput = z.infer<typeof updateWritingGoalSchema>;
+
+/**
+ * Update user profile settings request validation
+ */
+export const updateUserProfileSchema = z
+  .object({
+    username: usernameSchema.optional(),
+    language: languageSchema.optional(),
+    theme: themeSchema.optional(),
+  })
+  .strict();
+
+export type UpdateUserProfileInput = z.infer<typeof updateUserProfileSchema>;
 export type ConflictResolutionValue = z.infer<typeof conflictResolutionSchema>;
 export type ImportProjectInput = z.infer<typeof importProjectSchema>;
 

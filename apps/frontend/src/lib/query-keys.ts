@@ -27,6 +27,11 @@ export const settingsKeys = {
   signUps: () => ["settings", "signups"] as const,
 } as const;
 
+export const userSettingsKeys = {
+  all: ["userSettings"] as const,
+  settings: () => ["userSettings", "settings"] as const,
+} as const;
+
 // ============================================================================
 // Writing Goals Keys
 // ============================================================================
