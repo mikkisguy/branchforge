@@ -136,8 +136,9 @@ function renderTokens(tokens: RenpyToken[]): React.ReactNode[] {
 
       case "interpolation":
         // Visible — variable references are content, not formatting.
-        // Uses the theme's --muted-foreground color (darker than the body
-        // text) so it reads as a subdued reference rather than syntax noise.
+        // Rendered with var(--variable), a theme token for variable-name
+        // coloring (distinct from body text), so references are visually
+        // identifiable without being overly loud.
         nodes.push(
           <span
             key={key}
