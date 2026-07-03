@@ -388,7 +388,11 @@ describe("ToastContext", () => {
         const { success } = useToast();
 
         return (
-          <dialog open data-testid="settings-dialog">
+          <dialog
+            open
+            aria-label="Settings dialog"
+            data-testid="settings-dialog"
+          >
             <button onClick={() => success("Saved", "Settings saved")}>
               Save settings
             </button>

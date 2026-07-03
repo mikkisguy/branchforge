@@ -39,9 +39,7 @@ function getToastPortalContainer(): HTMLElement {
 }
 
 function useToastPortalContainer(): HTMLElement | null {
-  const [container, setContainer] = useState<HTMLElement | null>(() =>
-    typeof document !== "undefined" ? getToastPortalContainer() : null
-  );
+  const [container, setContainer] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     const update = () => {
@@ -51,10 +49,30 @@ function useToastPortalContainer(): HTMLElement | null {
 
     update();
 
-    const observer = new MutationObserver(update);
-    observer.observe(document.body, {
+    // Only react to dialog-relevant mutations: new / removed dialog
+    // elements as direct body children, and open-attribute toggles on
+    // any dialog in the subtree (showModal / close).
+    const childListObserver = new MutationObserver((mutations) => {
+      const relevant = mutations.some(
+        (m) =>
+          Array.from(m.addedNodes).some(
+            (n) => n instanceof HTMLDialogElement
+          ) ||
+          Array.from(m.removedNodes).some((n) => n instanceof HTMLDialogElement)
+      );
+      if (relevant) update();
+    });
+    childListObserver.observe(document.body, { childList: true });
+
+    const attrObserver = new MutationObserver((mutations) => {
+      const relevant = mutations.some(
+        (m) =>
+          m.target instanceof HTMLDialogElement && m.attributeName === "open"
+      );
+      if (relevant) update();
+    });
+    attrObserver.observe(document.body, {
       subtree: true,
-      childList: true,
       attributes: true,
       attributeFilter: ["open"],
     });
@@ -62,7 +80,8 @@ function useToastPortalContainer(): HTMLElement | null {
     document.addEventListener("close", update, true);
 
     return () => {
-      observer.disconnect();
+      childListObserver.disconnect();
+      attrObserver.disconnect();
       document.removeEventListener("close", update, true);
     };
   }, []);
