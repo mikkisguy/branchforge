@@ -16,7 +16,7 @@ import {
 import { FormattedCondition } from "@/components/write-mode/FormattedCondition";
 
 const panelVariants = cva(
-  "min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3 transition-all duration-300 ease-out",
+  "min-h-0 shrink-0 rounded-lg border border-border bg-panel-tinted overflow-hidden mt-3 transition-all duration-300 ease-out",
   {
     variants: {
       collapsed: {
@@ -32,6 +32,72 @@ const STATUS_COLORS = {
   REVIEW: "var(--theme-review-color)",
   DRAFT: "var(--theme-draft-color)",
 } as const;
+
+interface OutgoingJumpItemProps {
+  jump: {
+    targetLabelId: string;
+    targetLabelName: string;
+    jumpType: "MENU_CHOICE" | "AUTOMATIC";
+    choiceText: string;
+    conditionFlags?: string[];
+    effects?: Record<string, number>;
+  };
+  statByKey: Map<string, Stat>;
+  index: number;
+}
+
+function OutgoingJumpItem({ jump, statByKey, index }: OutgoingJumpItemProps) {
+  return (
+    <div
+      key={`${jump.targetLabelId}-${jump.choiceText}-${index}`}
+      className="p-2 rounded-lg bg-muted/30 border border-border/50 text-xs"
+    >
+      <div className="font-medium text-foreground truncate">
+        {jump.targetLabelName}
+      </div>
+      <div className="flex items-center gap-2 mt-1 text-muted-foreground">
+        {jump.jumpType === "MENU_CHOICE" ? (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600">
+            Choice
+          </span>
+        ) : (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-green-500/10 text-green-600">
+            Auto
+          </span>
+        )}
+        <span className="truncate flex-1">{jump.choiceText}</span>
+      </div>
+      {jump.conditionFlags && jump.conditionFlags.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {jump.conditionFlags.map((flag) => (
+            <span
+              key={flag}
+              className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted/80 border border-border/50 font-mono text-muted-foreground"
+            >
+              {flag}
+            </span>
+          ))}
+        </div>
+      )}
+      {jump.effects && Object.keys(jump.effects).length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {Object.entries(jump.effects).map(([statKey, value]) => {
+            const stat = statByKey.get(statKey);
+            return (
+              <span
+                key={statKey}
+                className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted/80 border border-border/50 font-mono text-muted-foreground"
+              >
+                {stat?.name ?? statKey} {value > 0 ? "+" : ""}
+                {value}
+              </span>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface LabelPropertiesPanelProps {
   activeLabel: LabelDetail | undefined;
@@ -423,61 +489,12 @@ export function LabelPropertiesPanel({
                   ) : (
                     <div className="space-y-2">
                       {outgoingJumps.map((jump, i) => (
-                        <div
+                        <OutgoingJumpItem
                           key={`${jump.targetLabelId}-${jump.choiceText}-${i}`}
-                          className="p-2 rounded-lg bg-muted/30 border border-border/50 text-xs"
-                        >
-                          <div className="font-medium text-foreground truncate">
-                            {jump.targetLabelName}
-                          </div>
-                          <div className="flex items-center gap-2 mt-1 text-muted-foreground">
-                            {jump.jumpType === "MENU_CHOICE" ? (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600">
-                                Choice
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-green-500/10 text-green-600">
-                                Auto
-                              </span>
-                            )}
-                            <span className="truncate flex-1">
-                              {jump.choiceText}
-                            </span>
-                          </div>
-                          {jump.conditionFlags &&
-                            jump.conditionFlags.length > 0 && (
-                              <div className="mt-1.5 flex flex-wrap gap-1">
-                                {jump.conditionFlags.map((flag) => (
-                                  <span
-                                    key={flag}
-                                    className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted/80 border border-border/50 font-mono text-muted-foreground"
-                                  >
-                                    {flag}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          {jump.effects &&
-                            Object.keys(jump.effects).length > 0 && (
-                              <div className="mt-1.5 flex flex-wrap gap-1">
-                                {Object.entries(jump.effects).map(
-                                  ([statKey, value]) => {
-                                    const stat = statByKey.get(statKey);
-                                    return (
-                                      <span
-                                        key={statKey}
-                                        className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted/80 border border-border/50 font-mono text-muted-foreground"
-                                      >
-                                        {stat?.name ?? statKey}{" "}
-                                        {value > 0 ? "+" : ""}
-                                        {value}
-                                      </span>
-                                    );
-                                  }
-                                )}
-                              </div>
-                            )}
-                        </div>
+                          jump={jump}
+                          statByKey={statByKey}
+                          index={i}
+                        />
                       ))}
                     </div>
                   )}

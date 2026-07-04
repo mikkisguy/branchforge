@@ -16,6 +16,8 @@ import {
   FolderOpen,
   Network,
   SlidersHorizontal,
+  Sun,
+  Moon,
 } from "lucide-react";
 import type { ThemePalette } from "@/contexts/ThemeContext";
 import type { Project, UpdateProjectBody } from "@/lib/api/projects";
@@ -44,6 +46,8 @@ interface LeftSidebarPropsBase {
   theme: string;
   setTheme: (theme: ThemePalette) => void;
   themePalettes: ThemePaletteOption[];
+  isDarkMode: boolean;
+  onToggleDarkMode: () => void;
   onLogout: () => void;
   projectId?: string;
   projects: Project[];
@@ -437,7 +441,7 @@ function ThemeSwitcher({
                   }}
                   className={`size-7 rounded transition-all ${
                     theme === palette.key
-                      ? "scale-110 ring-2 ring-white ring-offset-2 ring-offset-card"
+                      ? "scale-110 ring-2 ring-foreground/30 ring-offset-2 ring-offset-background"
                       : "opacity-60 hover:opacity-100 hover:scale-105"
                   }`}
                   style={{ background: palette.color }}
@@ -462,7 +466,7 @@ function ThemeSwitcher({
             onClick={() => setTheme(palette.key)}
             className={`flex-1 h-7 rounded transition-all ${
               theme === palette.key
-                ? "scale-110 ring-2 ring-white ring-offset-2 ring-offset-card"
+                ? "scale-110 ring-2 ring-foreground/30 ring-offset-2 ring-offset-background"
                 : "opacity-60 hover:opacity-100 hover:scale-105"
             }`}
             style={{ background: palette.color }}
@@ -499,6 +503,41 @@ function CollapseButton({ isCollapsed, onToggle }: CollapseButtonProps) {
           {!isCollapsed && <span>Collapse</span>}
         </>
       )}
+    </button>
+  );
+}
+
+interface DarkModeToggleProps {
+  isDarkMode: boolean;
+  onToggle: () => void;
+  isCollapsed: boolean;
+  showLabel: boolean;
+}
+
+/** Dark/light mode toggle. Icon and label reflect the active mode. */
+function DarkModeToggle({
+  isDarkMode,
+  onToggle,
+  isCollapsed,
+  showLabel,
+}: DarkModeToggleProps) {
+  const label = isDarkMode ? "Dark" : "Light";
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+      title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+      className={`flex items-center ${
+        isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
+      } rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors`}
+    >
+      {isDarkMode ? (
+        <Moon className="size-4 flex-shrink-0" />
+      ) : (
+        <Sun className="size-4 flex-shrink-0" />
+      )}
+      {showLabel && <span>{label}</span>}
     </button>
   );
 }
@@ -556,6 +595,8 @@ export function LeftSidebar(props: LeftSidebarProps) {
     theme,
     setTheme,
     themePalettes,
+    isDarkMode,
+    onToggleDarkMode,
     onLogout,
     projectId,
     projects,
@@ -687,6 +728,13 @@ export function LeftSidebar(props: LeftSidebarProps) {
           <CollapseButton
             isCollapsed={isCollapsed}
             onToggle={handleToggleCollapse}
+          />
+
+          <DarkModeToggle
+            isDarkMode={isDarkMode}
+            onToggle={onToggleDarkMode}
+            isCollapsed={isCollapsed}
+            showLabel={showLabel}
           />
 
           <ThemeSwitcher

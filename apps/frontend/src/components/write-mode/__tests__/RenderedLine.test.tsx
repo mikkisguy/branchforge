@@ -162,16 +162,14 @@ describe("RenderedLine", () => {
   });
 
   describe("interpolation (visible)", () => {
-    it("renders [name] with muted foreground color", () => {
+    it("renders [name] with the variable color token", () => {
       const { container } = renderTokens("Hello [name]!");
       expect(container.textContent).toBe("Hello [name]!");
       const spans = getSpans(container);
       const interp = spans.find((s) => s.textContent === "[name]");
-      // Uses the design-system --muted-foreground token so it reads as
-      // a subdued reference (darker than body text) and adapts to the
-      // active theme. Assert on the token name rather than a literal
-      // value so the test doesn't break when the palette changes.
-      expect(interp?.style.color).toContain("--muted-foreground");
+      // Uses the design-system --variable token so it reads as a syntax
+      // reference and adapts to the active palette + light/dark mode.
+      expect(interp?.style.color).toBe("var(--variable)");
     });
 
     it("interpolation inside formatting tags inherits style", () => {

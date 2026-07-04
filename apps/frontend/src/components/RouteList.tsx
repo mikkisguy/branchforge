@@ -68,7 +68,7 @@ export function RouteList({
                 <span className="text-xs font-mono text-muted-foreground">
                   {route.routeKey}
                 </span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
                   {route.isShared ? "Shared" : "Exclusive"}
                 </span>
               </div>

@@ -4,8 +4,10 @@ import {
   useState,
   useCallback,
   useMemo,
+  useEffect,
   ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 
 type ToastVariant = "default" | "success" | "destructive";
 
@@ -24,6 +26,68 @@ interface ToastContextType {
 }
 
 const ToastContext = createContext<ToastContextType | null>(null);
+
+function getToastPortalContainer(): HTMLElement {
+  // Native `<dialog showModal>` content lives in the browser top layer, so
+  // fixed-position toasts on `document.body` render behind the backdrop blur.
+  // Portal into the topmost open dialog (last in document order) when one
+  // is open, matching the tooltip/select fix.
+  const dialogs = document.querySelectorAll("dialog[open]");
+  const topmost = dialogs[dialogs.length - 1];
+  if (topmost instanceof HTMLElement) return topmost;
+  return document.body;
+}
+
+function useToastPortalContainer(): HTMLElement | null {
+  const [container, setContainer] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const update = () => {
+      if (typeof document === "undefined") return;
+      setContainer(getToastPortalContainer());
+    };
+
+    update();
+
+    // Only react to dialog-relevant mutations: new / removed dialog
+    // elements as direct body children, and open-attribute toggles on
+    // any dialog in the subtree (showModal / close).
+    const childListObserver = new MutationObserver((mutations) => {
+      const relevant = mutations.some(
+        (m) =>
+          Array.from(m.addedNodes).some(
+            (n) => n instanceof HTMLDialogElement
+          ) ||
+          Array.from(m.removedNodes).some((n) => n instanceof HTMLDialogElement)
+      );
+      if (relevant) update();
+    });
+    childListObserver.observe(document.body, { childList: true });
+
+    const attrObserver = new MutationObserver((mutations) => {
+      const relevant = mutations.some(
+        (m) =>
+          m.target instanceof HTMLDialogElement && m.attributeName === "open"
+      );
+      if (relevant) update();
+    });
+    attrObserver.observe(document.body, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["open"],
+    });
+
+    document.addEventListener("close", update, true);
+
+    return () => {
+      childListObserver.disconnect();
+      attrObserver.disconnect();
+      document.removeEventListener("close", update, true);
+    };
+  }, []);
+
+  return container;
+}
 
 export function useToast() {
   const context = use(ToastContext);
@@ -103,16 +167,20 @@ interface ToastContainerProps {
 function getToastClasses(variant: ToastVariant): string {
   switch (variant) {
     case "success":
-      return "border-green-500/30 bg-green-50/80 dark:bg-green-900/30 dark:border-green-500/50";
+      return "border-[var(--toast-success-border)] bg-[var(--toast-success-bg)]";
     case "destructive":
-      return "border-red-500/30 bg-red-50/80 dark:bg-red-900/30 dark:border-red-500/50";
+      return "border-[var(--toast-destructive-border)] bg-[var(--toast-destructive-bg)]";
     default:
-      return "border-blue-500/30 bg-blue-50/80 dark:bg-blue-900/30 dark:border-blue-500/50";
+      return "border-[var(--toast-info-border)] bg-[var(--toast-info-bg)]";
   }
 }
 
 function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
-  return (
+  const portalContainer = useToastPortalContainer();
+
+  if (!portalContainer) return null;
+
+  return createPortal(
     <div
       data-testid="toast-container"
       className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"
@@ -147,6 +215,7 @@ function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
           </div>
         </div>
       ))}
-    </div>
+    </div>,
+    portalContainer
   );
 }

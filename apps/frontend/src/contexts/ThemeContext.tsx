@@ -1,6 +1,15 @@
-import { useEffect, useMemo, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  type ReactNode,
+} from "react";
 import { ThemeContext, type ThemePalette, type ThemeColors } from "./useTheme";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
+import {
+  useLocalStorage,
+  useLocalStorageBoolean,
+} from "@/hooks/useLocalStorage";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { isValidTheme } from "@branchforge/shared";
 
@@ -28,6 +37,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       validate: isValidTheme,
     }
   );
+
+  // Dark/light mode preference. Defaults to dark (true) for existing users so
+  // current behavior is unchanged. Stored separately from the color palette.
+  const [isDarkMode, setIsDarkMode] = useLocalStorageBoolean("dark-mode", true);
 
   const { settings, updateProfile } = useUserSettings();
 
@@ -75,6 +88,47 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.style.setProperty("--theme-final-color", STATUS_COLORS.final);
   }, [theme, colors]);
 
+  // Apply dark/light mode. `.dark` activates Tailwind `dark:` utilities and the
+  // `:root` dark CSS variables; `.light` swaps in the light CSS variables.
+  // Exactly one class is present at a time. useLayoutEffect avoids a one-frame
+  // dark flash for returning light-mode users before `.light` is applied.
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("dark", isDarkMode);
+    root.classList.toggle("light", !isDarkMode);
+  }, [isDarkMode]);
+
+  // Palette-tinted surfaces for light mode. In light mode we layer a subtle
+  // theme-color wash over card backgrounds so the chrome feels branded (matching
+  // dark mode's tinted atmosphere) instead of flat white. In dark mode these
+  // are transparent so behavior is unchanged.
+  useEffect(() => {
+    const root = document.documentElement;
+    const rgb = hexToRgb(colors.primary);
+    if (!isDarkMode && rgb) {
+      root.style.setProperty(
+        "--surface-tint",
+        `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.04)`
+      );
+      root.style.setProperty(
+        "--surface-tint-strong",
+        `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.08)`
+      );
+    } else {
+      root.style.setProperty("--surface-tint", "transparent");
+      root.style.setProperty("--surface-tint-strong", "transparent");
+    }
+  }, [theme, colors, isDarkMode]);
+
+  const setDarkMode = useCallback(
+    (dark: boolean) => setIsDarkMode(dark),
+    [setIsDarkMode]
+  );
+  const toggleDarkMode = useCallback(
+    () => setIsDarkMode((prev) => !prev),
+    [setIsDarkMode]
+  );
+
   const contextValue = useMemo(
     () => ({
       theme,
@@ -83,8 +137,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         updateProfile({ theme: newTheme }, { silent: true }).catch(() => {});
       },
       colors,
+      isDarkMode,
+      setDarkMode,
+      toggleDarkMode,
     }),
-    [theme, setLocalThemeState, updateProfile, colors]
+    [
+      theme,
+      setLocalThemeState,
+      updateProfile,
+      colors,
+      isDarkMode,
+      setDarkMode,
+      toggleDarkMode,
+    ]
   );
 
   return (

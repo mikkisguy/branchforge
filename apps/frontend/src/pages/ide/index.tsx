@@ -22,7 +22,7 @@ const ScriptMode = lazy(() =>
 );
 
 export function HomePageIDE() {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, isDarkMode, toggleDarkMode } = useTheme();
   const { logout } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useLocalStorage<"write" | "script">(
@@ -206,6 +206,8 @@ export function HomePageIDE() {
         theme={theme}
         setTheme={setTheme}
         themePalettes={themePalettes}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={toggleDarkMode}
         onLogout={handleLogout}
         projectId={currentProject?.id}
         projects={projects}
@@ -239,7 +241,7 @@ export function HomePageIDE() {
             key={scriptModeKey}
             fallback={
               <div
-                className="flex flex-col items-center justify-center h-full gap-3 text-slate-400"
+                className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground"
                 role="alert"
                 aria-live="assertive"
                 aria-label="Editor failed to load"
@@ -260,7 +262,7 @@ export function HomePageIDE() {
           >
             <Suspense
               fallback={
-                <div className="flex items-center justify-center h-full text-slate-400">
+                <div className="flex items-center justify-center h-full text-muted-foreground">
                   Loading editor…
                 </div>
               }

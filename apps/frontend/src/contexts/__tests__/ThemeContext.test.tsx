@@ -67,18 +67,26 @@ describe("ThemeContext", () => {
     document.documentElement.style.removeProperty("--theme-color-rgb");
     document.documentElement.style.removeProperty("--theme-border");
     document.documentElement.style.removeProperty("--theme-border-subtle");
+    document.documentElement.style.removeProperty("--surface-tint");
+    document.documentElement.style.removeProperty("--surface-tint-strong");
+  };
+
+  const removeModeClasses = () => {
+    document.documentElement.classList.remove("dark", "light");
   };
 
   beforeEach(() => {
     localStorage.clear();
     // Clear CSS custom properties
     removeCSSProperties();
+    removeModeClasses();
   });
 
   afterEach(() => {
     localStorage.clear();
     // Clear CSS custom properties
     removeCSSProperties();
+    removeModeClasses();
   });
 
   // Helper component to test the hook
@@ -356,6 +364,205 @@ describe("ThemeContext", () => {
       }).toThrow("useTheme must be used within ThemeProvider");
 
       consoleError.mockRestore();
+    });
+  });
+
+  describe("Dark/Light Mode", () => {
+    function DarkModeTestComponent() {
+      const { isDarkMode, toggleDarkMode, setDarkMode } = useTheme();
+      return (
+        <div data-testid="mode" data-dark={String(isDarkMode)}>
+          <button onClick={toggleDarkMode}>Toggle</button>
+          <button onClick={() => setDarkMode(false)}>Set Light</button>
+        </div>
+      );
+    }
+
+    it("should default to dark mode", () => {
+      render(
+        <ThemeProvider>
+          <DarkModeTestComponent />
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
+      );
+
+      expect(screen.getByTestId("mode")).toHaveAttribute("data-dark", "true");
+    });
+
+    it("should apply .dark class to <html> and not .light by default", () => {
+      render(
+        <ThemeProvider>
+          <DarkModeTestComponent />
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
+      );
+
+      expect(document.documentElement.classList.contains("dark")).toBe(true);
+      expect(document.documentElement.classList.contains("light")).toBe(false);
+    });
+
+    it("should apply .light class and remove .dark when switching to light", async () => {
+      render(
+        <ThemeProvider>
+          <DarkModeTestComponent />
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Set Light" }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("mode")).toHaveAttribute(
+          "data-dark",
+          "false"
+        );
+      });
+
+      expect(document.documentElement.classList.contains("light")).toBe(true);
+      expect(document.documentElement.classList.contains("dark")).toBe(false);
+    });
+
+    it("should toggle between dark and light", async () => {
+      render(
+        <ThemeProvider>
+          <DarkModeTestComponent />
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
+      );
+
+      expect(screen.getByTestId("mode")).toHaveAttribute("data-dark", "true");
+
+      fireEvent.click(screen.getByRole("button", { name: "Toggle" }));
+      await waitFor(() => {
+        expect(screen.getByTestId("mode")).toHaveAttribute(
+          "data-dark",
+          "false"
+        );
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Toggle" }));
+      await waitFor(() => {
+        expect(screen.getByTestId("mode")).toHaveAttribute("data-dark", "true");
+      });
+    });
+
+    it("should persist dark/light preference to localStorage", async () => {
+      render(
+        <ThemeProvider>
+          <DarkModeTestComponent />
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Set Light" }));
+
+      await waitFor(() => {
+        expect(localStorage.getItem("branchforge:dark-mode")).toBe("false");
+      });
+    });
+
+    it("should load saved light preference from localStorage", () => {
+      localStorage.setItem("branchforge:dark-mode", "false");
+
+      render(
+        <ThemeProvider>
+          <DarkModeTestComponent />
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
+      );
+
+      expect(screen.getByTestId("mode")).toHaveAttribute("data-dark", "false");
+      expect(document.documentElement.classList.contains("light")).toBe(true);
+      expect(document.documentElement.classList.contains("dark")).toBe(false);
+    });
+
+    it("should keep dark/light mode independent of the color palette", async () => {
+      localStorage.setItem("branchforge:theme", "forest");
+      localStorage.setItem("branchforge:dark-mode", "false");
+
+      function CombinedComponent() {
+        const { theme, isDarkMode } = useTheme();
+        return <div data-theme={theme} data-dark={String(isDarkMode)} />;
+      }
+
+      render(
+        <ThemeProvider>
+          <CombinedComponent />
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
+      );
+
+      const el = document.querySelector("[data-theme='forest']");
+      expect(el).toBeInTheDocument();
+      expect(el).toHaveAttribute("data-dark", "false");
+    });
+
+    it("should set transparent surface tints in dark mode", () => {
+      render(
+        <ThemeProvider>
+          <DarkModeTestComponent />
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
+      );
+
+      expect(
+        document.documentElement.style.getPropertyValue("--surface-tint")
+      ).toBe("transparent");
+      expect(
+        document.documentElement.style.getPropertyValue("--surface-tint-strong")
+      ).toBe("transparent");
+    });
+
+    it("should set palette-tinted surface vars in light mode", async () => {
+      render(
+        <ThemeProvider>
+          <DarkModeTestComponent />
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Set Light" }));
+
+      await waitFor(() => {
+        const tint =
+          document.documentElement.style.getPropertyValue("--surface-tint");
+        // Should be an rgba value using the periwinkle theme color (not transparent)
+        expect(tint).toContain("rgba(");
+        expect(tint).not.toBe("transparent");
+      });
+
+      const tintStrong = document.documentElement.style.getPropertyValue(
+        "--surface-tint-strong"
+      );
+      expect(tintStrong).toContain("rgba(");
+      expect(tintStrong).not.toBe("transparent");
+    });
+
+    it("should clear surface tints when switching back to dark mode", async () => {
+      localStorage.setItem("branchforge:dark-mode", "false");
+
+      render(
+        <ThemeProvider>
+          <DarkModeTestComponent />
+        </ThemeProvider>,
+        { wrapper: createWrapper() }
+      );
+
+      // Starts in light mode — tint is set
+      await waitFor(() => {
+        expect(
+          document.documentElement.style.getPropertyValue("--surface-tint")
+        ).not.toBe("transparent");
+      });
+
+      // Switch to dark
+      fireEvent.click(screen.getByRole("button", { name: "Toggle" }));
+
+      await waitFor(() => {
+        expect(
+          document.documentElement.style.getPropertyValue("--surface-tint")
+        ).toBe("transparent");
+      });
     });
   });
 });
