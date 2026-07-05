@@ -914,6 +914,42 @@ export const characterIdParamsSchema = z.object({
 });
 
 // ============================================================================
+// World Element Validation Schemas
+// ============================================================================
+
+/**
+ * Create world element request validation
+ */
+export const createWorldElementSchema = z
+  .object({
+    name: requiredString(200, "Name is too long"),
+    type: elementTypeSchema,
+    description: optionalString(2000, "Description is too long"),
+    tags: z.array(z.string().max(100)).default([]),
+  })
+  .strict();
+
+/**
+ * Update world element request validation
+ */
+export const updateWorldElementSchema = z
+  .object({
+    name: requiredString(200, "Name is too long").optional(),
+    type: elementTypeSchema.optional(),
+    description: optionalString(2000, "Description is too long"),
+    tags: z.array(z.string().max(100)).optional(),
+  })
+  .strict()
+  .partial();
+
+/**
+ * World element ID params validation
+ */
+export const worldElementIdParamsSchema = z.object({
+  elementId: uuidSchema,
+});
+
+// ============================================================================
 // GitLab Schemas
 // ============================================================================
 
@@ -1259,6 +1295,8 @@ export type CreateRouteConfigInput = z.infer<typeof createRouteConfigSchema>;
 export type UpdateRouteConfigInput = z.infer<typeof updateRouteConfigSchema>;
 export type CreateVariableInput = z.infer<typeof createVariableSchema>;
 export type UpdateVariableInput = z.infer<typeof updateVariableSchema>;
+export type CreateWorldElementInput = z.infer<typeof createWorldElementSchema>;
+export type UpdateWorldElementInput = z.infer<typeof updateWorldElementSchema>;
 // ============================================================================
 // User Settings Schemas
 // ============================================================================

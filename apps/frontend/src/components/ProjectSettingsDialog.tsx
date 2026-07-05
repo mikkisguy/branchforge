@@ -23,6 +23,7 @@ import {
   Users,
   Route as RouteIcon,
   Wand2,
+  BookText,
   X,
 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -31,6 +32,7 @@ import { Tabs, TabsList, TabsTrigger, TabsPanel } from "@/components/ui/tabs";
 import { CharacterSettingsContent } from "@/components/CharacterSettingsContent";
 import { RouteSettingsContent } from "@/components/RouteSettingsContent";
 import { VisualSystemFormContent } from "@/components/VisualSystemDialog";
+import { WorldElementsSettingsContent } from "@/components/WorldElementsSettingsContent";
 import { useVisualSystem } from "@/hooks/useVisualSystem";
 import {
   parseGroupPrefixes,
@@ -49,7 +51,7 @@ export interface ProjectSettingsDialogProps {
   defaultTab?: SettingsTab;
 }
 
-export type SettingsTab = "characters" | "routes" | "visual";
+export type SettingsTab = "characters" | "routes" | "visual" | "world";
 
 // ============================================================================
 // Helpers
@@ -59,6 +61,7 @@ const TAB_LABELS: Record<SettingsTab, string> = {
   characters: "Characters",
   routes: "Routes",
   visual: "Visual System",
+  world: "World Bible",
 };
 
 const TAB_ICONS: Record<
@@ -68,9 +71,10 @@ const TAB_ICONS: Record<
   characters: Users,
   routes: RouteIcon,
   visual: Wand2,
+  world: BookText,
 };
 
-const TAB_ORDER: SettingsTab[] = ["characters", "routes", "visual"];
+const TAB_ORDER: SettingsTab[] = ["characters", "routes", "visual", "world"];
 
 // ============================================================================
 // Component
@@ -118,7 +122,8 @@ export function ProjectSettingsDialog({
           <div>
             <h2 className="text-lg font-medium">Project Settings</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Configure characters, routes, and visual filename generation.
+              Configure characters, routes, visual system, and world bible
+              elements.
             </p>
           </div>
           <button
@@ -162,6 +167,9 @@ export function ProjectSettingsDialog({
             </TabsPanel>
             <TabsPanel value="visual" className="space-y-4">
               <VisualSystemTabContent projectId={projectId} />
+            </TabsPanel>
+            <TabsPanel value="world" className="space-y-4">
+              <WorldElementsSettingsContent projectId={projectId} />
             </TabsPanel>
           </div>
         </Tabs>

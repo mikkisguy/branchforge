@@ -132,6 +132,17 @@ export const visualSystemKeys = {
 } as const;
 
 // ============================================================================
+// World Element Keys
+// ============================================================================
+
+export const worldElementKeys = {
+  all: ["worldElements"] as const,
+  lists: (projectId: string) => ["worldElements", projectId, "list"] as const,
+  detail: (elementId: string) =>
+    ["worldElements", "detail", elementId] as const,
+} as const;
+
+// ============================================================================
 // Variable Keys
 // ============================================================================
 

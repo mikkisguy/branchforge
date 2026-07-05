@@ -141,6 +141,29 @@ export interface Stat {
   updatedAt: string;
 }
 
+// ============================================================================
+// World Element Configuration
+// ============================================================================
+
+/**
+ * Element type for world bible entries
+ */
+export type WorldElementType = "LOCATION" | "ITEM" | "CONCEPT" | "EVENT";
+
+/**
+ * World element representing a world bible entry.
+ * Tracks locations, items, concepts, and events in the story world.
+ */
+export interface WorldElement {
+  id: string;
+  projectId: string;
+  name: string;
+  type: WorldElementType;
+  description: string | null;
+  tags: string[];
+  createdAt: string;
+}
+
 /**
  * Summary of a label's effect on a specific stat.
  */
