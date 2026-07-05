@@ -593,6 +593,8 @@ export const DialogueLine = memo(function DialogueLine({
   const isStacked = layoutMode === "stacked";
   const isSpeakerInteractive = isHovered || isDropdownOpen;
   const hasSpeaker = Boolean(entry.speakerId);
+  const speakerFontStyle =
+    !hasSpeaker || isNarrator ? "italic" : ("normal" as const);
   const choiceTargetName = entry.choiceData?.targetLabelName;
   const showDelete =
     (isHovered || entry.text === "") && totalEntries > 1 && !isChoice;
@@ -676,11 +678,7 @@ export const DialogueLine = memo(function DialogueLine({
                       ? "hsl(var(--muted-foreground))"
                       : speakerColor
                     : "hsl(var(--muted-foreground))",
-                fontStyle: isNarrator
-                  ? "italic"
-                  : hasSpeaker
-                    ? "normal"
-                    : "italic",
+                fontStyle: speakerFontStyle,
               }}
               title={
                 hasSpeaker
@@ -818,11 +816,7 @@ export const DialogueLine = memo(function DialogueLine({
             style={{
               fontSize: "var(--prose-editor-font-size, 16px)",
               fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
-              fontStyle: !entry.speakerId
-                ? "italic"
-                : isNarrator
-                  ? "italic"
-                  : "normal",
+              fontStyle: speakerFontStyle,
               color: "hsl(var(--foreground))",
             }}
           />
@@ -842,11 +836,7 @@ export const DialogueLine = memo(function DialogueLine({
               style={{
                 fontSize: "var(--prose-editor-font-size, 16px)",
                 fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
-                fontStyle: !entry.speakerId
-                  ? "italic"
-                  : isNarrator
-                    ? "italic"
-                    : "normal",
+                fontStyle: speakerFontStyle,
                 color: "hsl(var(--foreground))",
               }}
             >

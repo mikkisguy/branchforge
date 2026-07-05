@@ -33,6 +33,8 @@ import { useToast } from "@/contexts/ToastContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { labelKeys, characterKeys } from "@/lib/query-keys";
 
+const EMPTY_TAGS: string[] = [];
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -289,7 +291,7 @@ export function CharacterImportWizard({
   conflicts,
   excludedTags,
   narratorTags,
-  existingTags = [],
+  existingTags = EMPTY_TAGS,
   onComplete,
 }: CharacterImportWizardProps) {
   // Generate unique ID for checkbox to prevent collisions when multiple wizards are mounted
@@ -375,35 +377,33 @@ export function CharacterImportWizard({
         routeAffiliation: c.routeAffiliation,
       }));
 
-      const newExcludedTags = [...excludedTags];
-      const newNarratorTags = [...narratorTags];
+      const newExcludedTags = new Set(excludedTags);
+      const newNarratorTags = new Set(narratorTags);
 
       for (const c of state.groups.new) {
         if (c.excluded) {
-          newExcludedTags.push(c.tag);
-        } else if (c.isNarrator && !newNarratorTags.includes(c.tag)) {
-          newNarratorTags.push(c.tag);
-        } else if (!c.isNarrator) {
-          const idx = newNarratorTags.indexOf(c.tag);
-          if (idx !== -1) newNarratorTags.splice(idx, 1);
+          newExcludedTags.add(c.tag);
+        } else if (c.isNarrator) {
+          newNarratorTags.add(c.tag);
+        } else {
+          newNarratorTags.delete(c.tag);
         }
       }
 
       for (const c of state.groups.special) {
         if (c.excluded) {
-          newExcludedTags.push(c.tag);
-        } else if (c.isNarrator && !newNarratorTags.includes(c.tag)) {
-          newNarratorTags.push(c.tag);
-        } else if (!c.isNarrator) {
-          const idx = newNarratorTags.indexOf(c.tag);
-          if (idx !== -1) newNarratorTags.splice(idx, 1);
+          newExcludedTags.add(c.tag);
+        } else if (c.isNarrator) {
+          newNarratorTags.add(c.tag);
+        } else {
+          newNarratorTags.delete(c.tag);
         }
       }
 
       const result = await charactersApi.importCharacters(projectId, {
         characters: importData,
-        excludedTags: newExcludedTags,
-        narratorTags: newNarratorTags,
+        excludedTags: [...newExcludedTags],
+        narratorTags: [...newNarratorTags],
         linkToLines: state.linkToLines,
       });
 
@@ -438,6 +438,7 @@ export function CharacterImportWizard({
   }, [
     state,
     excludedTags,
+    narratorTags,
     projectId,
     onOpenChange,
     onComplete,
