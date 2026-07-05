@@ -16,12 +16,14 @@ export interface ImportCharacter {
   displayName: string;
   color: string;
   isLoveInterest?: boolean;
+  isNarrator?: boolean;
   routeAffiliation?: string;
 }
 
 export interface ImportCharactersRequest {
   characters: ImportCharacter[];
   excludedTags: string[];
+  narratorTags: string[];
   linkToLines: boolean;
 }
 
@@ -48,11 +50,13 @@ export interface GetCharacterResponse {
 
 export interface ProjectSettings {
   excludedCharacterTags: string[];
+  narratorCharacterTags: string[];
   autoLinkSpeakers: boolean;
 }
 
 export interface ProjectSettingsResponse {
   excludedCharacterTags: string[];
+  narratorCharacterTags: string[];
   autoLinkSpeakers: boolean;
 }
 
@@ -63,6 +67,7 @@ export interface CreateCharacterBody {
   color: string;
   routeAffiliation?: string;
   isLoveInterest?: boolean;
+  isNarrator?: boolean;
   dialogueStyle?: string;
   conditionalPrefix?: string;
 }
@@ -73,6 +78,7 @@ export interface UpdateCharacterBody {
   color?: string;
   routeAffiliation?: string;
   isLoveInterest?: boolean;
+  isNarrator?: boolean;
   dialogueStyle?: string;
   conditionalPrefix?: string;
 }

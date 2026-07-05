@@ -589,6 +589,7 @@ export const DialogueLine = memo(function DialogueLine({
     ? characters.find((c) => c.id === entry.speakerId)
     : null;
   const speakerColor = character?.color;
+  const isNarrator = character?.isNarrator ?? false;
   const isStacked = layoutMode === "stacked";
   const isSpeakerInteractive = isHovered || isDropdownOpen;
   const hasSpeaker = Boolean(entry.speakerId);
@@ -671,9 +672,15 @@ export const DialogueLine = memo(function DialogueLine({
                   : "transparent",
                 color:
                   hasSpeaker && speakerColor
-                    ? speakerColor
+                    ? isNarrator
+                      ? "hsl(var(--muted-foreground))"
+                      : speakerColor
                     : "hsl(var(--muted-foreground))",
-                fontStyle: hasSpeaker ? "normal" : "italic",
+                fontStyle: isNarrator
+                  ? "italic"
+                  : hasSpeaker
+                    ? "normal"
+                    : "italic",
               }}
               title={
                 hasSpeaker
@@ -811,7 +818,11 @@ export const DialogueLine = memo(function DialogueLine({
             style={{
               fontSize: "var(--prose-editor-font-size, 16px)",
               fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
-              fontStyle: !entry.speakerId ? "italic" : "normal",
+              fontStyle: !entry.speakerId
+                ? "italic"
+                : isNarrator
+                  ? "italic"
+                  : "normal",
               color: "hsl(var(--foreground))",
             }}
           />
@@ -831,7 +842,11 @@ export const DialogueLine = memo(function DialogueLine({
               style={{
                 fontSize: "var(--prose-editor-font-size, 16px)",
                 fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
-                fontStyle: !entry.speakerId ? "italic" : "normal",
+                fontStyle: !entry.speakerId
+                  ? "italic"
+                  : isNarrator
+                    ? "italic"
+                    : "normal",
                 color: "hsl(var(--foreground))",
               }}
             >

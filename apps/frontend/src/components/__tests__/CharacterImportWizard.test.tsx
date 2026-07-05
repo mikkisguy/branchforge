@@ -79,6 +79,7 @@ function renderWizard(
           detectedCharacters={detectedCharacters}
           conflicts={[]}
           excludedTags={[]}
+          narratorTags={[]}
           existingTags={existingTags}
           onComplete={onComplete}
         />

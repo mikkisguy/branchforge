@@ -584,6 +584,7 @@ export function ZipImportProjectDialog({
             detectedCharacters={state.detectedCharacters.characters}
             conflicts={state.detectedCharacters.conflicts}
             excludedTags={state.detectedCharacters.excludedTags}
+            narratorTags={state.detectedCharacters.narratorCharacterTags}
             // Fresh project: PR #245 already promoted the
             // characters into the DB so existingTags is non-empty,
             // but the user hasn't reviewed them yet. Treat all as

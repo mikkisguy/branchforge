@@ -14,6 +14,7 @@ const mockCharacters: Character[] = [
     color: "#FF6B6B",
     routeAffiliation: "EILEEN",
     isLoveInterest: true,
+    isNarrator: false,
     dialogueStyle: "casual",
     conditionalPrefix: null,
     avatarUrl: null,

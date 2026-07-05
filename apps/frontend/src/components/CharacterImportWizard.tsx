@@ -17,6 +17,7 @@ import {
   ChevronDown,
   ChevronUp,
   Plus,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,7 @@ export interface CharacterImportWizardProps {
   detectedCharacters: DetectedCharacter[];
   conflicts: CharacterConflict[];
   excludedTags: string[];
+  narratorTags: string[];
   /**
    * Tags of characters already in the database. When a detected
    * character is in this set, the wizard shows an "Already imported"
@@ -56,6 +58,7 @@ export interface CharacterImportWizardProps {
 interface EditableCharacter extends DetectedCharacter {
   excluded: boolean;
   isLoveInterest?: boolean;
+  isNarrator?: boolean;
   routeAffiliation?: string;
 }
 
@@ -72,11 +75,13 @@ interface CharacterGroup {
 function groupCharacters(
   detected: DetectedCharacter[],
   conflicts: CharacterConflict[],
-  excludedTags: string[]
+  excludedTags: string[],
+  narratorTags: string[]
 ): CharacterGroup {
   const conflictTags = new Set(conflicts.map((c) => c.tag));
   const specialTags = new Set(["n", "u", "narrator", "extend"]);
   const excludedTagSet = new Set(excludedTags);
+  const narratorTagSet = new Set(narratorTags);
   const conflictMap = new Map(conflicts.map((c) => [c.tag, c]));
 
   const result: CharacterGroup = {
@@ -93,6 +98,7 @@ function groupCharacters(
       ...char,
       excluded: excludedTagSet.has(char.tag) || (isSpecial && !isConflict),
       isLoveInterest: false,
+      isNarrator: narratorTagSet.has(char.tag),
       routeAffiliation: undefined,
     };
 
@@ -201,10 +207,16 @@ function getNameTypeBadge(
 function createInitialWizardState(
   detectedCharacters: DetectedCharacter[],
   conflicts: CharacterConflict[],
-  excludedTags: string[]
+  excludedTags: string[],
+  narratorTags: string[]
 ): WizardState {
   return {
-    groups: groupCharacters(detectedCharacters, conflicts, excludedTags),
+    groups: groupCharacters(
+      detectedCharacters,
+      conflicts,
+      excludedTags,
+      narratorTags
+    ),
     linkToLines: true,
     expandedGroups: new Set(["new", "existing", "special"]),
     isImporting: false,
@@ -276,6 +288,7 @@ export function CharacterImportWizard({
   detectedCharacters,
   conflicts,
   excludedTags,
+  narratorTags,
   existingTags = [],
   onComplete,
 }: CharacterImportWizardProps) {
@@ -286,9 +299,13 @@ export function CharacterImportWizard({
 
   const [state, dispatch] = useReducer(
     wizardReducer,
-    { detectedCharacters, conflicts, excludedTags },
-    ({ detectedCharacters: dc, conflicts: c, excludedTags: et }) =>
-      createInitialWizardState(dc, c, et)
+    { detectedCharacters, conflicts, excludedTags, narratorTags },
+    ({
+      detectedCharacters: dc,
+      conflicts: c,
+      excludedTags: et,
+      narratorTags: nt,
+    }) => createInitialWizardState(dc, c, et, nt)
   );
 
   /**
@@ -354,26 +371,39 @@ export function CharacterImportWizard({
         displayName: c.displayName,
         color: c.color,
         isLoveInterest: c.isLoveInterest ?? false,
+        isNarrator: c.isNarrator ?? false,
         routeAffiliation: c.routeAffiliation,
       }));
 
       const newExcludedTags = [...excludedTags];
+      const newNarratorTags = [...narratorTags];
 
       for (const c of state.groups.new) {
         if (c.excluded) {
           newExcludedTags.push(c.tag);
+        } else if (c.isNarrator && !newNarratorTags.includes(c.tag)) {
+          newNarratorTags.push(c.tag);
+        } else if (!c.isNarrator) {
+          const idx = newNarratorTags.indexOf(c.tag);
+          if (idx !== -1) newNarratorTags.splice(idx, 1);
         }
       }
 
       for (const c of state.groups.special) {
         if (c.excluded) {
           newExcludedTags.push(c.tag);
+        } else if (c.isNarrator && !newNarratorTags.includes(c.tag)) {
+          newNarratorTags.push(c.tag);
+        } else if (!c.isNarrator) {
+          const idx = newNarratorTags.indexOf(c.tag);
+          if (idx !== -1) newNarratorTags.splice(idx, 1);
         }
       }
 
       const result = await charactersApi.importCharacters(projectId, {
         characters: importData,
         excludedTags: newExcludedTags,
+        narratorTags: newNarratorTags,
         linkToLines: state.linkToLines,
       });
 
@@ -762,6 +792,15 @@ export function CharacterImportWizard({
                             <span className="font-mono text-sm font-medium">
                               {char.tag}
                             </span>
+                            {char.isNarrator && (
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-purple-50 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800"
+                                title="This character is marked as narrator"
+                              >
+                                <BookOpen className="size-3" />
+                                Narrator
+                              </span>
+                            )}
                             {existingTags.includes(char.tag) && (
                               <span
                                 className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-muted text-muted-foreground border border-border/30"
@@ -831,6 +870,32 @@ export function CharacterImportWizard({
                                   disabled={state.isImporting}
                                 />
                               </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateCharacter("new", index, {
+                                    isNarrator: !char.isNarrator,
+                                  })
+                                }
+                                disabled={state.isImporting}
+                                className={`inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded border transition-colors ${
+                                  char.isNarrator
+                                    ? "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950/30 dark:text-purple-300 dark:border-purple-700"
+                                    : "bg-muted/50 text-muted-foreground border-border/30 hover:bg-muted"
+                                }`}
+                                title={
+                                  char.isNarrator
+                                    ? "Remove narrator mark"
+                                    : "Mark as narrator (what_italic=True in export)"
+                                }
+                              >
+                                <BookOpen className="size-3" />
+                                {char.isNarrator
+                                  ? "Narrator"
+                                  : "Mark as Narrator"}
+                              </button>
                             </div>
                             {badge && (
                               <p
@@ -946,9 +1011,9 @@ export function CharacterImportWizard({
                   {state.groups.special.map((char, index) => (
                     <div
                       key={char.tag}
-                      className="flex items-center justify-between p-2 bg-background border border-border/30 rounded-md"
+                      className="flex items-center justify-between p-2 bg-background border border-border/30 rounded-md gap-2"
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <input
                           type="checkbox"
                           checked={!char.excluded}
@@ -965,11 +1030,45 @@ export function CharacterImportWizard({
                         <span className="text-xs text-muted-foreground">
                           ({char.displayName || "(unnamed)"})
                         </span>
+                        {char.isNarrator && (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-purple-50 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800"
+                            title="This character is marked as narrator"
+                          >
+                            <BookOpen className="size-3" />
+                            Narrator
+                          </span>
+                        )}
                       </div>
-                      <div
-                        className="size-4 rounded border border-border/30"
-                        style={{ backgroundColor: char.color }}
-                      />
+                      <div className="flex items-center gap-2">
+                        {!char.excluded && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateCharacter("special", index, {
+                                isNarrator: !char.isNarrator,
+                              })
+                            }
+                            disabled={state.isImporting}
+                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded border transition-colors ${
+                              char.isNarrator
+                                ? "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950/30 dark:text-purple-300 dark:border-purple-700"
+                                : "bg-muted/50 text-muted-foreground border-border/30 hover:bg-muted"
+                            }`}
+                            title={
+                              char.isNarrator
+                                ? "Remove narrator mark"
+                                : "Mark as narrator (what_italic=True in export)"
+                            }
+                          >
+                            <BookOpen className="size-3" />
+                          </button>
+                        )}
+                        <div
+                          className="size-4 rounded border border-border/30"
+                          style={{ backgroundColor: char.color }}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>

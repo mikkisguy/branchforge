@@ -58,6 +58,7 @@ export interface CharacterSummary {
   color: string;
   routeAffiliation: string | null;
   isLoveInterest: boolean;
+  isNarrator: boolean;
   avatarUrl: string | null;
 }
 
@@ -70,6 +71,7 @@ export interface CharacterDetail {
   color: string;
   routeAffiliation: string | null;
   isLoveInterest: boolean;
+  isNarrator: boolean;
   dialogueStyle: string | null;
   conditionalPrefix: string | null;
   avatarUrl: string | null;
@@ -79,6 +81,7 @@ export interface CharacterDetail {
 export interface DetectCharactersResult {
   characters: DetectedCharacter[];
   excludedTags: string[];
+  narratorCharacterTags: string[];
   existingTags: string[];
   conflicts: CharacterConflict[];
 }
@@ -98,6 +101,7 @@ export interface ImportCharactersResult {
 /** Project character settings subset */
 export interface CharacterSettingsResult {
   excludedCharacterTags: string[];
+  narratorCharacterTags: string[];
   autoLinkSpeakers: boolean;
 }
 
@@ -137,6 +141,7 @@ export class CharactersService {
       .values({
         projectId,
         excludedCharacterTags: ["n", "u", "narrator", "extend"],
+        narratorCharacterTags: [],
         autoLinkSpeakers: true,
         updatedAt: new Date(),
       })
@@ -173,6 +178,7 @@ export class CharactersService {
           "narrator",
           "extend",
         ],
+        narratorCharacterTags: input.narratorCharacterTags ?? [],
         autoLinkSpeakers: input.autoLinkSpeakers ?? true,
         updatedAt: new Date(),
       })
@@ -181,6 +187,9 @@ export class CharactersService {
         set: {
           ...(input.excludedCharacterTags && {
             excludedCharacterTags: input.excludedCharacterTags,
+          }),
+          ...(input.narratorCharacterTags && {
+            narratorCharacterTags: input.narratorCharacterTags,
           }),
           ...(input.autoLinkSpeakers !== undefined && {
             autoLinkSpeakers: input.autoLinkSpeakers,
@@ -192,6 +201,7 @@ export class CharactersService {
 
     return {
       excludedCharacterTags: updatedSettings.excludedCharacterTags ?? [],
+      narratorCharacterTags: updatedSettings.narratorCharacterTags ?? [],
       autoLinkSpeakers: updatedSettings.autoLinkSpeakers,
     };
   }
@@ -205,6 +215,7 @@ export class CharactersService {
     const settings = await this.getProjectSettings(projectId, userId);
     return {
       excludedCharacterTags: settings.excludedCharacterTags ?? [],
+      narratorCharacterTags: settings.narratorCharacterTags ?? [],
       autoLinkSpeakers: settings.autoLinkSpeakers,
     };
   }
@@ -310,6 +321,7 @@ export class CharactersService {
     return {
       characters: uniqueCharacters,
       excludedTags: Array.from(excludedTags),
+      narratorCharacterTags: settings.narratorCharacterTags ?? [],
       existingTags,
       conflicts,
     };
@@ -331,7 +343,12 @@ export class CharactersService {
     await requireProjectOwnership(projectId, userId);
 
     const db = getDb();
-    const { characters: charactersToImport, excludedTags, linkToLines } = input;
+    const {
+      characters: charactersToImport,
+      excludedTags,
+      narratorTags,
+      linkToLines,
+    } = input;
 
     // Update project settings
     await db
@@ -339,6 +356,7 @@ export class CharactersService {
       .values({
         projectId,
         excludedCharacterTags: excludedTags,
+        narratorCharacterTags: narratorTags,
         autoLinkSpeakers: linkToLines,
         updatedAt: new Date(),
       })
@@ -346,6 +364,7 @@ export class CharactersService {
         target: [projectSettings.projectId],
         set: {
           excludedCharacterTags: excludedTags,
+          narratorCharacterTags: narratorTags,
           autoLinkSpeakers: linkToLines,
           updatedAt: new Date(),
         },
@@ -365,17 +384,25 @@ export class CharactersService {
         const existing = existingByTag.get(charData.tag);
 
         if (existing) {
-          // Update existing character
+          // Update existing character — only set boolean flags when
+          // explicitly provided to avoid clobbering existing DB values
+          // during re-import of conflict characters.
+          const updates: Record<string, unknown> = {
+            name: charData.name ?? charData.tag,
+            displayName: charData.displayName,
+            color: charData.color,
+            routeAffiliation: charData.routeAffiliation,
+            updatedAt: new Date(),
+          };
+          if (charData.isLoveInterest !== undefined) {
+            updates.isLoveInterest = charData.isLoveInterest;
+          }
+          if (charData.isNarrator !== undefined) {
+            updates.isNarrator = charData.isNarrator;
+          }
           await db
             .update(characters)
-            .set({
-              name: charData.name ?? charData.tag,
-              displayName: charData.displayName,
-              color: charData.color,
-              routeAffiliation: charData.routeAffiliation,
-              isLoveInterest: charData.isLoveInterest ?? false,
-              updatedAt: new Date(),
-            })
+            .set(updates)
             .where(eq(characters.id, existing.id));
 
           return {
@@ -397,6 +424,7 @@ export class CharactersService {
             color: charData.color,
             routeAffiliation: charData.routeAffiliation,
             isLoveInterest: charData.isLoveInterest ?? false,
+            isNarrator: charData.isNarrator ?? false,
           })
           .returning();
 
@@ -456,6 +484,7 @@ export class CharactersService {
         color: characters.color,
         routeAffiliation: characters.routeAffiliation,
         isLoveInterest: characters.isLoveInterest,
+        isNarrator: characters.isNarrator,
         avatarUrl: characters.avatarUrl,
       })
       .from(characters)
@@ -483,6 +512,7 @@ export class CharactersService {
       color: character.color,
       routeAffiliation: character.routeAffiliation,
       isLoveInterest: character.isLoveInterest,
+      isNarrator: character.isNarrator,
       dialogueStyle: character.dialogueStyle,
       conditionalPrefix: character.conditionalPrefix,
       avatarUrl: buildAvatarUrl(character.avatarUrl),
@@ -509,6 +539,7 @@ export class CharactersService {
         color: input.color,
         routeAffiliation: input.routeAffiliation,
         isLoveInterest: input.isLoveInterest,
+        isNarrator: input.isNarrator,
         dialogueStyle: input.dialogueStyle,
         conditionalPrefix: input.conditionalPrefix,
       })
@@ -529,6 +560,7 @@ export class CharactersService {
       color: newCharacter.color,
       routeAffiliation: newCharacter.routeAffiliation,
       isLoveInterest: newCharacter.isLoveInterest,
+      isNarrator: newCharacter.isNarrator,
       dialogueStyle: newCharacter.dialogueStyle,
       conditionalPrefix: newCharacter.conditionalPrefix,
       avatarUrl: buildAvatarUrl(newCharacter.avatarUrl),
@@ -559,6 +591,7 @@ export class CharactersService {
       color: updated.color,
       routeAffiliation: updated.routeAffiliation,
       isLoveInterest: updated.isLoveInterest,
+      isNarrator: updated.isNarrator,
       dialogueStyle: updated.dialogueStyle,
       conditionalPrefix: updated.conditionalPrefix,
       avatarUrl: buildAvatarUrl(updated.avatarUrl),

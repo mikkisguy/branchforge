@@ -16,6 +16,7 @@ const characters: Character[] = [
     avatarUrl: null,
     routeAffiliation: "EILEEN",
     isLoveInterest: true,
+    isNarrator: false,
     dialogueStyle: "casual",
     conditionalPrefix: null,
     createdAt: "2024-01-01T00:00:00.000Z",

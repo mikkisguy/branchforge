@@ -542,6 +542,7 @@ export function GitLabSyncDialog({
           detectedCharacters={formState.detectedCharacters.characters}
           conflicts={formState.detectedCharacters.conflicts}
           excludedTags={formState.detectedCharacters.excludedTags}
+          narratorTags={formState.detectedCharacters.narratorCharacterTags}
           existingTags={formState.detectedCharacters.existingTags}
           onComplete={() => {
             // Refresh labels and characters after character import/linking
