@@ -187,6 +187,34 @@ export interface StatProgression {
 }
 
 // ============================================================================
+// Pair Group Types
+// ============================================================================
+
+/**
+ * Pair group for tracking sequel duo endings.
+ *
+ * A pair group links two characters together with a duo ending label and threshold.
+ * Labels can reference a pair group via their duoPairId field to mark duo endings.
+ */
+export interface PairGroup {
+  id: string;
+  projectId: string;
+  characterAId: string;
+  characterBId: string;
+  duoEndingLabel: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Character summary used when listing pair groups (includes character names).
+ */
+export interface PairGroupWithNames extends PairGroup {
+  characterAName: string;
+  characterBName: string;
+}
+
+// ============================================================================
 // Public User Interface
 // ============================================================================
 
@@ -404,6 +432,7 @@ export interface PublicLabel {
   routeKey: string | null;
   status: LabelStatus | null;
   visibility: LabelVisibility | null;
+  duoPairId?: string | null;
   /** Version number for optimistic concurrency control */
   version?: number | null;
   /** SHA hash of label content for change detection */
@@ -961,6 +990,7 @@ export interface PublicProject {
   description?: string;
   maxStatDelta?: number;
   visibility?: UserRole;
+  duoEndingEnabled: boolean;
   source: SourceOrigin;
   createdAt: string;
   updatedAt: string;

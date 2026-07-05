@@ -187,8 +187,13 @@ export const flowKeys = {
 } as const;
 
 // ============================================================================
-// Export Keys
+// Pair Group Keys
 // ============================================================================
+
+export const pairGroupKeys = {
+  all: ["pairGroups"] as const,
+  lists: (projectId: string) => ["pairGroups", projectId, "list"] as const,
+};
 
 export const exportKeys = {
   all: ["exports"] as const,

@@ -104,6 +104,12 @@ interface LabelPropertiesPanelProps {
   characters: Character[];
   stats: Stat[];
   routeConfigs: RouteConfig[];
+  pairGroups: Array<{
+    id: string;
+    characterAName: string;
+    characterBName: string;
+    duoEndingLabel: string;
+  }>;
   isCollapsed: boolean;
   onCollapseToggle?: () => void;
   onEdit: () => void;
@@ -115,6 +121,7 @@ export function LabelPropertiesPanel({
   characters,
   stats,
   routeConfigs,
+  pairGroups,
   isCollapsed,
   onCollapseToggle,
   onEdit,
@@ -394,6 +401,21 @@ export function LabelPropertiesPanel({
                       title={activeLabel.visibility ?? "—"}
                     >
                       {activeLabel.visibility ?? "—"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Duo Ending</span>
+                    <span className="text-foreground font-medium truncate ml-2 max-w-[120px]">
+                      {(() => {
+                        const pg = activeLabel.duoPairId
+                          ? pairGroups.find(
+                              (g) => g.id === activeLabel.duoPairId
+                            )
+                          : null;
+                        return pg
+                          ? `${pg.characterAName} & ${pg.characterBName}`
+                          : "—";
+                      })()}
                     </span>
                   </div>
                 </div>

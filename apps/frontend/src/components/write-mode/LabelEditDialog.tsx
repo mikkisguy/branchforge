@@ -28,6 +28,17 @@ export interface LabelEditDialogProps {
   currentVisibility: "EXCLUSIVE" | "SHARED" | "DUO_PAIR" | null;
   /** Available route configs from the project */
   routeConfigs: Array<{ id: string; routeKey: string; routeName: string }>;
+  /** Available pair groups for duo ending selection */
+  pairGroups: Array<{
+    id: string;
+    characterAName: string;
+    characterBName: string;
+    duoEndingLabel: string;
+  }>;
+  /** Current duo pair group ID (null if none) */
+  currentDuoPairId: string | null;
+  /** Whether duo ending tracking is enabled for this project */
+  duoEndingEnabled: boolean;
   /** Called when save is clicked */
   onSave: (data: {
     title?: string;
@@ -35,6 +46,7 @@ export interface LabelEditDialogProps {
     route?: string | null;
     status?: "DRAFT" | "REVIEW" | "FINAL";
     visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
+    duoPairId?: string | null;
   }) => Promise<void>;
   /** Whether save is in progress */
   isSaving: boolean;
@@ -46,6 +58,7 @@ type FormState = {
   route: string;
   status: "DRAFT" | "REVIEW" | "FINAL";
   visibility: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
+  duoPairId: string;
   titleError: string;
   labelNameError: string;
 };
@@ -58,12 +71,14 @@ type FormAction =
       route: string;
       status: "DRAFT" | "REVIEW" | "FINAL";
       visibility: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
+      duoPairId: string;
     }
   | { type: "SET_TITLE"; value: string }
   | { type: "SET_LABEL_NAME"; value: string }
   | { type: "SET_ROUTE"; value: string }
   | { type: "SET_STATUS"; value: "DRAFT" | "REVIEW" | "FINAL" }
   | { type: "SET_VISIBILITY"; value: "EXCLUSIVE" | "SHARED" | "DUO_PAIR" }
+  | { type: "SET_DUO_PAIR_ID"; value: string }
   | { type: "SET_TITLE_ERROR"; value: string }
   | { type: "SET_LABEL_NAME_ERROR"; value: string };
 
@@ -76,6 +91,7 @@ function formReducer(state: FormState, action: FormAction): FormState {
         route: action.route,
         status: action.status,
         visibility: action.visibility,
+        duoPairId: action.duoPairId,
         titleError: "",
         labelNameError: "",
       };
@@ -97,6 +113,8 @@ function formReducer(state: FormState, action: FormAction): FormState {
       return { ...state, status: action.value };
     case "SET_VISIBILITY":
       return { ...state, visibility: action.value };
+    case "SET_DUO_PAIR_ID":
+      return { ...state, duoPairId: action.value };
     case "SET_TITLE_ERROR":
       return { ...state, titleError: action.value };
     case "SET_LABEL_NAME_ERROR":
@@ -113,6 +131,9 @@ export function LabelEditDialog({
   currentStatus,
   currentVisibility,
   routeConfigs,
+  pairGroups,
+  currentDuoPairId,
+  duoEndingEnabled,
   onSave,
   isSaving,
 }: LabelEditDialogProps) {
@@ -122,6 +143,7 @@ export function LabelEditDialog({
     route: "",
     status: "DRAFT" as const,
     visibility: "EXCLUSIVE" as const,
+    duoPairId: "",
     titleError: "",
     labelNameError: "",
   });
@@ -139,6 +161,7 @@ export function LabelEditDialog({
         route: currentRoute ?? "",
         status: currentStatus ?? "DRAFT",
         visibility: currentVisibility ?? "EXCLUSIVE",
+        duoPairId: currentDuoPairId ?? "",
       });
     }
   }, [
@@ -148,6 +171,7 @@ export function LabelEditDialog({
     currentRoute,
     currentStatus,
     currentVisibility,
+    currentDuoPairId,
   ]);
 
   const handleSave = async () => {
@@ -196,6 +220,7 @@ export function LabelEditDialog({
       route?: string | null;
       status?: "DRAFT" | "REVIEW" | "FINAL";
       visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
+      duoPairId?: string | null;
     } = {};
 
     if (form.title.trim() !== currentTitle) {
@@ -217,6 +242,11 @@ export function LabelEditDialog({
 
     if (form.visibility !== (currentVisibility ?? "EXCLUSIVE")) {
       changes.visibility = form.visibility;
+    }
+
+    const normalizedDuoPairId = form.duoPairId || null;
+    if (normalizedDuoPairId !== currentDuoPairId) {
+      changes.duoPairId = normalizedDuoPairId;
     }
 
     if (Object.keys(changes).length === 0) {
@@ -383,6 +413,33 @@ export function LabelEditDialog({
               />
             </div>
           </div>
+
+          {/* Duo Pair Group (only shown when duo ending is enabled and pair groups exist) */}
+          {duoEndingEnabled && pairGroups.length > 0 && (
+            <div className="space-y-1.5">
+              <label
+                htmlFor="label-duo-pair-id"
+                className="text-sm font-medium text-foreground"
+              >
+                Duo Pair Group
+              </label>
+              <Select
+                id="label-duo-pair-id"
+                value={form.duoPairId}
+                onChange={(value) =>
+                  dispatch({ type: "SET_DUO_PAIR_ID", value })
+                }
+                disabled={isSaving}
+                options={[
+                  { value: "", label: "None" },
+                  ...pairGroups.map((pg) => ({
+                    value: pg.id,
+                    label: `${pg.characterAName} & ${pg.characterBName} — ${pg.duoEndingLabel}`,
+                  })),
+                ]}
+              />
+            </div>
+          )}
 
           {/* Footer Buttons */}
           <div className="flex justify-end gap-2 mt-6">

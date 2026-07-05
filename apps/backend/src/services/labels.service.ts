@@ -21,6 +21,7 @@ import {
   projectFileSyncState,
   stats,
   variables,
+  pairGroups,
 } from "../db/schema/index.js";
 import { eq, and, asc, or, isNull, sql, desc, inArray, ne } from "drizzle-orm";
 import type { Label, LabelLine } from "../db/schema/index.js";
@@ -2324,6 +2325,7 @@ export async function updateLabel(
     status?: LabelStatus;
     visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
     labelName?: string | null;
+    duoPairId?: string | null;
     conditions?: {
       variables?: Record<string, VariableCondition>;
       stats?: Record<string, number>;
@@ -2477,6 +2479,26 @@ export async function updateLabel(
           projectId: labelWithProject.label.projectId,
         });
         validatedRoute = null;
+      }
+    }
+
+    // Validate duoPairId exists in this project when provided
+    if (data.duoPairId != null) {
+      const [pairGroup] = await tx
+        .select({ id: pairGroups.id })
+        .from(pairGroups)
+        .where(
+          and(
+            eq(pairGroups.id, data.duoPairId),
+            eq(pairGroups.projectId, labelWithProject.label.projectId)
+          )
+        )
+        .limit(1);
+
+      if (!pairGroup) {
+        throw new ValidationError(
+          "Referenced pair group does not exist in this project"
+        );
       }
     }
 

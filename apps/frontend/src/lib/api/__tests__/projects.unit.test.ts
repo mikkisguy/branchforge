@@ -26,6 +26,7 @@ describe("Projects API", () => {
         maxStatDelta: 5,
         visibility: "OWNER",
         source: "ZIP",
+        duoEndingEnabled: false,
         createdAt: "2024-01-01T00:00:00.000Z",
         updatedAt: "2024-01-01T00:00:00.000Z",
       },
@@ -94,6 +95,7 @@ describe("Projects API", () => {
       maxStatDelta: 5,
       visibility: "OWNER",
       source: "ZIP",
+      duoEndingEnabled: false,
       createdAt: "2024-01-01T00:00:00.000Z",
       updatedAt: "2024-01-01T00:00:00.000Z",
     };
@@ -182,6 +184,7 @@ describe("Projects API", () => {
       maxStatDelta: 10,
       visibility: "OWNER",
       source: "ZIP",
+      duoEndingEnabled: false,
       createdAt: "2024-01-01T00:00:00.000Z",
       updatedAt: "2024-01-02T00:00:00.000Z",
     };
@@ -373,6 +376,7 @@ describe("Projects API", () => {
       maxStatDelta: 5,
       visibility: "OWNER",
       source: "ZIP",
+      duoEndingEnabled: false,
       createdAt: "2024-01-01T00:00:00.000Z",
       updatedAt: "2024-01-01T00:00:00.000Z",
     };

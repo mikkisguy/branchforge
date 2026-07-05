@@ -587,6 +587,7 @@ export interface ImportProjectFromZipSuccess {
     id: string;
     name: string;
     description?: string;
+    duoEndingEnabled: boolean;
     source: string;
     createdAt: string;
     updatedAt: string;

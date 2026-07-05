@@ -27,6 +27,7 @@ import { useToast } from "@/contexts/ToastContext";
 import { cva } from "class-variance-authority";
 import { useLocalStorageBoolean } from "@/hooks/useLocalStorage";
 import { useStats } from "@/hooks/useStats";
+import { usePairGroups } from "@/hooks/usePairGroups";
 import {
   useWriteAutosave,
   getPersistedDialogueFromLabel,
@@ -80,6 +81,9 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
   const { characters } = useCharacters(currentProject?.id ?? "");
   const { routeConfigs } = useRouteConfigs(currentProject?.id ?? "");
   const { stats } = useStats(currentProject?.id ?? "");
+  const { pairGroups } = usePairGroups(currentProject?.id ?? "", {
+    enabled: !!currentProject?.id,
+  });
 
   const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] =
     useLocalStorageBoolean("write:left-sidebar-collapsed", false);
@@ -205,6 +209,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
       route?: string | null;
       status?: "DRAFT" | "REVIEW" | "FINAL";
       visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
+      duoPairId?: string | null;
     }) => {
       if (editDialog.label) {
         await updateLabel(editDialog.label.id, data);
@@ -401,6 +406,12 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
           characters={characters}
           stats={stats}
           routeConfigs={routeConfigs}
+          pairGroups={pairGroups.map((pg) => ({
+            id: pg.id,
+            characterAName: pg.characterAName,
+            characterBName: pg.characterBName,
+            duoEndingLabel: pg.duoEndingLabel,
+          }))}
           isCollapsed={isRightSidebarCollapsed || isFocusMode}
           onCollapseToggle={
             !isFocusMode
@@ -431,6 +442,14 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
                   routeKey: rc.routeKey,
                   routeName: rc.routeName,
                 }))}
+                pairGroups={pairGroups.map((pg) => ({
+                  id: pg.id,
+                  characterAName: pg.characterAName,
+                  characterBName: pg.characterBName,
+                  duoEndingLabel: pg.duoEndingLabel,
+                }))}
+                currentDuoPairId={editDialog.label.duoPairId ?? null}
+                duoEndingEnabled={currentProject?.duoEndingEnabled ?? false}
                 onSave={handleEditSave}
                 isSaving={isUpdatingLabel}
               />

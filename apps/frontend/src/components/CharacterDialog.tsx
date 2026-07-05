@@ -15,6 +15,7 @@ import { X } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { CharacterSettingsContent } from "@/components/CharacterSettingsContent";
+import { useProject } from "@/hooks/useProject";
 
 interface CharacterDialogProps {
   open: boolean;
@@ -27,6 +28,12 @@ export function CharacterDialog({
   onOpenChange,
   projectId,
 }: CharacterDialogProps) {
+  const { currentProject, updateProject } = useProject();
+
+  const handleToggleDuoEnding = async (enabled: boolean) => {
+    await updateProject(projectId, { duoEndingEnabled: enabled });
+  };
+
   return (
     <Dialog
       open={open}
@@ -57,7 +64,11 @@ export function CharacterDialog({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          <CharacterSettingsContent projectId={projectId} />
+          <CharacterSettingsContent
+            projectId={projectId}
+            duoEndingEnabled={currentProject?.duoEndingEnabled ?? false}
+            onToggleDuoEnding={handleToggleDuoEnding}
+          />
         </div>
 
         {/* Footer */}
