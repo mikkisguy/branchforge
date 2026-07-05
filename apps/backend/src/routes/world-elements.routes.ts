@@ -22,6 +22,7 @@ import {
   validateParams,
 } from "../middleware/validation.middleware.js";
 import { NotFoundError } from "../middleware/error-handler.middleware.js";
+import { checkRateLimit } from "../services/rate-limiter.service.js";
 import {
   createWorldElementSchema,
   updateWorldElementSchema,
@@ -113,6 +114,8 @@ async function createWorldElementHandler(
   const user = request.user!;
   const body = request.body;
 
+  checkRateLimit(`worldElementCreate:${request.ip}`);
+
   const element = await createWorldElement(projectId, user.id, body);
 
   reply.status(201).send({ element } as CreateWorldElementResponse);
@@ -134,6 +137,8 @@ async function updateWorldElementHandler(
   const user = request.user!;
   const body = request.body;
 
+  checkRateLimit(`worldElementUpdate:${request.ip}`);
+
   const element = await updateWorldElement(elementId, user.id, body);
 
   reply.status(200).send({ element } as UpdateWorldElementResponse);
@@ -150,6 +155,8 @@ async function deleteWorldElementHandler(
 ): Promise<void> {
   const { elementId } = request.params;
   const user = request.user!;
+
+  checkRateLimit(`worldElementDelete:${request.ip}`);
 
   await deleteWorldElement(elementId, user.id);
 

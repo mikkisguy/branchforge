@@ -7,6 +7,10 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { worldElementsApi } from "@/lib/api/world-elements";
+import type {
+  CreateWorldElementBody,
+  UpdateWorldElementBody,
+} from "@/lib/api/world-elements";
 import { worldElementKeys } from "@/lib/query-keys";
 import { useToast } from "@/contexts/ToastContext";
 import type { WorldElement } from "@branchforge/shared";
@@ -14,20 +18,6 @@ import type { WorldElement } from "@branchforge/shared";
 // ============================================================================
 // Types
 // ============================================================================
-
-interface CreateWorldElementInput {
-  name: string;
-  type: "LOCATION" | "ITEM" | "CONCEPT" | "EVENT";
-  description?: string;
-  tags?: string[];
-}
-
-interface UpdateWorldElementInput {
-  name?: string;
-  type?: "LOCATION" | "ITEM" | "CONCEPT" | "EVENT";
-  description?: string;
-  tags?: string[];
-}
 
 export interface UseWorldElementsReturn {
   // State
@@ -42,10 +32,10 @@ export interface UseWorldElementsReturn {
 
   // Methods
   refreshElements: () => void;
-  createElement: (input: CreateWorldElementInput) => Promise<WorldElement>;
+  createElement: (input: CreateWorldElementBody) => Promise<WorldElement>;
   updateElement: (
     elementId: string,
-    input: UpdateWorldElementInput
+    input: UpdateWorldElementBody
   ) => Promise<WorldElement>;
   deleteElement: (elementId: string) => Promise<void>;
 }
@@ -75,7 +65,7 @@ export function useWorldElements(projectId: string): UseWorldElementsReturn {
 
   // Create element mutation
   const createElementMutation = useMutation({
-    mutationFn: async (input: CreateWorldElementInput) => {
+    mutationFn: async (input: CreateWorldElementBody) => {
       return worldElementsApi.createWorldElement(projectId, input);
     },
     onSuccess: () => {
@@ -96,7 +86,7 @@ export function useWorldElements(projectId: string): UseWorldElementsReturn {
       input,
     }: {
       elementId: string;
-      input: UpdateWorldElementInput;
+      input: UpdateWorldElementBody;
     }) => {
       return worldElementsApi.updateWorldElement(elementId, input);
     },
@@ -128,14 +118,14 @@ export function useWorldElements(projectId: string): UseWorldElementsReturn {
   });
 
   const createElement = async (
-    input: CreateWorldElementInput
+    input: CreateWorldElementBody
   ): Promise<WorldElement> => {
     return createElementMutation.mutateAsync(input);
   };
 
   const updateElement = async (
     elementId: string,
-    input: UpdateWorldElementInput
+    input: UpdateWorldElementBody
   ): Promise<WorldElement> => {
     return updateElementMutation.mutateAsync({ elementId, input });
   };

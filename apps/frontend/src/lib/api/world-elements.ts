@@ -6,7 +6,7 @@
  */
 
 import { request, requestVoid } from "./client";
-import type { WorldElement } from "@branchforge/shared";
+import type { WorldElement, WorldElementType } from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -14,15 +14,15 @@ import type { WorldElement } from "@branchforge/shared";
 
 export interface CreateWorldElementBody {
   name: string;
-  type: "LOCATION" | "ITEM" | "CONCEPT" | "EVENT";
-  description?: string;
+  type: WorldElementType;
+  description?: string | null;
   tags?: string[];
 }
 
 export interface UpdateWorldElementBody {
   name?: string;
-  type?: "LOCATION" | "ITEM" | "CONCEPT" | "EVENT";
-  description?: string;
+  type?: WorldElementType;
+  description?: string | null;
   tags?: string[];
 }
 

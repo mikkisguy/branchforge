@@ -43,6 +43,9 @@ export function WorldElementsSettingsContent({
   const handleDelete = async (elementId: string) => {
     try {
       await deleteElement(elementId);
+      if (editingElementId === elementId) {
+        setEditingElementId(null);
+      }
     } catch {
       // Error handled by hook toast
     }

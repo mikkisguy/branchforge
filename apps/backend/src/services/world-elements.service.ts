@@ -19,6 +19,7 @@ import type {
   CreateWorldElementInput,
   UpdateWorldElementInput,
 } from "../lib/validation.js";
+import type { WorldElementType } from "@branchforge/shared";
 
 // ============================================================================
 // Public Types
@@ -28,7 +29,7 @@ export interface PublicWorldElement {
   id: string;
   projectId: string;
   name: string;
-  type: "LOCATION" | "ITEM" | "CONCEPT" | "EVENT";
+  type: WorldElementType;
   description: string | null;
   tags: string[];
   createdAt: Date;
@@ -106,9 +107,7 @@ export async function createWorldElement(
   const result = await db.insert(worldElements).values(newElement).returning();
 
   if (!result || result.length === 0 || !result[0]) {
-    throw new Error(
-      "Failed to create world element: database insert returned no rows"
-    );
+    throw new ValidationError("Failed to create world element");
   }
 
   return mapToPublicWorldElement(result[0]);
@@ -159,9 +158,7 @@ export async function updateWorldElement(
     .returning();
 
   if (!result || result.length === 0 || !result[0]) {
-    throw new Error(
-      "Failed to update world element: database update returned no rows"
-    );
+    throw new NotFoundError("World element");
   }
 
   return mapToPublicWorldElement(result[0]);

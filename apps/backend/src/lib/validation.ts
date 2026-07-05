@@ -924,8 +924,16 @@ export const createWorldElementSchema = z
   .object({
     name: requiredString(200, "Name is too long"),
     type: elementTypeSchema,
-    description: optionalString(2000, "Description is too long"),
-    tags: z.array(z.string().max(100)).default([]),
+    description: z
+      .string()
+      .max(2000, "Description is too long")
+      .trim()
+      .nullable()
+      .optional(),
+    tags: z
+      .array(z.string().max(100))
+      .max(20, "Maximum 20 tags per element")
+      .default([]),
   })
   .strict();
 
@@ -936,8 +944,16 @@ export const updateWorldElementSchema = z
   .object({
     name: requiredString(200, "Name is too long").optional(),
     type: elementTypeSchema.optional(),
-    description: optionalString(2000, "Description is too long"),
-    tags: z.array(z.string().max(100)).optional(),
+    description: z
+      .string()
+      .max(2000, "Description is too long")
+      .trim()
+      .nullable()
+      .optional(),
+    tags: z
+      .array(z.string().max(100))
+      .max(20, "Maximum 20 tags per element")
+      .optional(),
   })
   .strict()
   .partial();

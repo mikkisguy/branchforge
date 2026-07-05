@@ -17,6 +17,8 @@ const TYPE_LABELS: Record<WorldElementType, string> = {
   EVENT: "Events",
 };
 
+const TYPE_ORDER: WorldElementType[] = ["LOCATION", "ITEM", "CONCEPT", "EVENT"];
+
 interface WorldElementsListProps {
   elements: WorldElement[];
   isSaving: boolean;
@@ -61,23 +63,31 @@ export function WorldElementsList({
     }
   };
 
-  const typeOrder: WorldElementType[] = [
-    "LOCATION",
-    "ITEM",
-    "CONCEPT",
-    "EVENT",
-  ];
-
   return (
     <>
       <div className="space-y-6">
-        {typeOrder
-          .map(
-            (type) =>
-              [TYPE_LABELS[type], groupedElements[TYPE_LABELS[type]]] as const
-          )
-          .filter(([, items]) => items && items.length > 0)
-          .map(([category, items]) => (
+        {(() => {
+          const renderedCategories = new Set<string>();
+          const groups: Array<[string, WorldElement[]]> = [];
+
+          // Known types first, in defined order
+          for (const type of TYPE_ORDER) {
+            const category = TYPE_LABELS[type];
+            const items = groupedElements[category];
+            if (items && items.length > 0) {
+              groups.push([category, items]);
+              renderedCategories.add(category);
+            }
+          }
+
+          // Unknown types after known ones
+          for (const [category, items] of Object.entries(groupedElements)) {
+            if (!renderedCategories.has(category) && items) {
+              groups.push([category, items]);
+            }
+          }
+
+          return groups.map(([category, items]) => (
             <div key={category} className="space-y-3">
               <h3 className="text-sm font-medium text-muted-foreground">
                 {category}
@@ -139,7 +149,8 @@ export function WorldElementsList({
                 ))}
               </div>
             </div>
-          ))}
+          ));
+        })()}
       </div>
 
       <ConfirmDialog

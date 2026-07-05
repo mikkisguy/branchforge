@@ -4,7 +4,7 @@
  * Modal for creating or editing a single world element.
  */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Loader2, Plus, X } from "lucide-react";
 import {
   Dialog,
@@ -106,15 +106,6 @@ function ElementFormContent({
   });
   const [errors, setErrors] = useState<ElementFormErrors>({});
   const [newTag, setNewTag] = useState("");
-
-  const isEditMode = !!elementId;
-
-  // Close dialog if editing an element that no longer exists
-  useEffect(() => {
-    if (isEditMode && !elements.find((e) => e.id === elementId)) {
-      onClose();
-    }
-  }, [isEditMode, elementId, elements, onClose]);
 
   const handleChange = (
     field: keyof ElementFormState,
@@ -304,14 +295,14 @@ export function WorldElementEditDialog({
       await updateElement(id, {
         name: form.name.trim(),
         type: form.type as WorldElementType,
-        description: form.description.trim() || undefined,
+        description: form.description.trim() || null,
         tags: form.tags,
       });
     } else {
       await createElement({
         name: form.name.trim(),
         type: form.type as WorldElementType,
-        description: form.description.trim() || undefined,
+        description: form.description.trim() || null,
         tags: form.tags,
       });
     }
