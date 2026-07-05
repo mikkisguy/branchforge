@@ -27,6 +27,7 @@ export const characters = pgTable(
     renpyTag: text("renpy_tag").notNull(),
     routeAffiliation: text("route_affiliation"),
     isLoveInterest: boolean("is_love_interest").default(false).notNull(),
+    isNarrator: boolean("is_narrator").default(false).notNull(),
     // Note: Foreign key to pair_groups.id added manually in migration 0007
     // due to circular dependency (pair_groups also references characters)
     pairGroupId: uuid("pair_group_id"),

@@ -750,6 +750,7 @@ export const createCharacterSchema = z
     color: colorHexSchema,
     routeAffiliation: optionalString(50),
     isLoveInterest: z.boolean().default(false).optional(),
+    isNarrator: z.boolean().default(false).optional(),
     dialogueStyle: optionalString(100),
     conditionalPrefix: optionalString(50),
   })
@@ -765,6 +766,7 @@ export const updateCharacterSchema = z
     color: colorHexSchema.optional(),
     routeAffiliation: optionalString(50),
     isLoveInterest: z.boolean().optional(),
+    isNarrator: z.boolean().optional(),
     dialogueStyle: optionalString(100),
     conditionalPrefix: optionalString(50),
   })
@@ -784,11 +786,13 @@ export const importCharactersSchema = z
           displayName: requiredString(200, "Display name is too long"),
           color: colorHexSchema,
           isLoveInterest: z.boolean().optional(),
+          isNarrator: z.boolean().optional(),
           routeAffiliation: optionalString(50),
         })
       )
       .min(1, "At least one character is required"),
     excludedTags: z.array(renpyTagSchema).default([]),
+    narratorTags: z.array(renpyTagSchema).default([]),
     linkToLines: z.boolean().default(true),
   })
   .strict();
@@ -799,6 +803,7 @@ export const importCharactersSchema = z
 export const projectSettingsSchema = z
   .object({
     excludedCharacterTags: z.array(renpyTagSchema).default([]),
+    narratorCharacterTags: z.array(renpyTagSchema).default([]),
     autoLinkSpeakers: z.boolean().default(true),
   })
   .strict()

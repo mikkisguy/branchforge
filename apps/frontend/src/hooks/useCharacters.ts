@@ -27,6 +27,7 @@ interface CreateCharacterInput {
   color: string;
   routeAffiliation?: string;
   isLoveInterest?: boolean;
+  isNarrator?: boolean;
   dialogueStyle?: string;
   conditionalPrefix?: string;
 }
@@ -37,6 +38,7 @@ interface UpdateCharacterInput {
   color?: string;
   routeAffiliation?: string;
   isLoveInterest?: boolean;
+  isNarrator?: boolean;
   dialogueStyle?: string;
   conditionalPrefix?: string;
 }

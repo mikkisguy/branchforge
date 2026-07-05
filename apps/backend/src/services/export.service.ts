@@ -272,6 +272,7 @@ export async function generateExport(
           renpyTag: characters.renpyTag,
           displayName: characters.displayName,
           color: characters.color,
+          isNarrator: characters.isNarrator,
         })
         .from(characters)
         .where(eq(characters.projectId, projectId)),

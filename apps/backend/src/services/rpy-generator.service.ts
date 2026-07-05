@@ -626,6 +626,7 @@ export function generateCharacterDefinitionsFile(
     renpyTag: string;
     displayName: string;
     color: string;
+    isNarrator?: boolean;
   }>
 ): string {
   const lines: string[] = [];
@@ -645,8 +646,9 @@ export function generateCharacterDefinitionsFile(
 
   for (const char of characters) {
     const escapedName = escapeRenpyString(char.displayName);
+    const italicArg = char.isNarrator ? ", what_italic=True" : "";
     lines.push(
-      `define ${char.renpyTag} = Character("${escapedName}", color="${char.color}")`
+      `define ${char.renpyTag} = Character("${escapedName}", color="${char.color}"${italicArg})`
     );
   }
 

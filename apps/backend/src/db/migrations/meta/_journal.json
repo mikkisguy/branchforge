@@ -344,6 +344,13 @@
       "when": 1782314023659,
       "tag": "0048_plain_owl",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1783237923873,
+      "tag": "0049_tough_spitfire",
+      "breakpoints": true
     }
   ]
 }

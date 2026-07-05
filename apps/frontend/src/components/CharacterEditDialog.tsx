@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useReducer, useRef } from "react";
-import { Loader2, Upload } from "lucide-react";
+import { Loader2, Upload, BookOpen, Heart } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +42,7 @@ interface CharacterFormState {
   dialogueStyle: string;
   conditionalPrefix: string;
   isLoveInterest: boolean;
+  isNarrator: boolean;
   avatarUrl?: string;
   avatarFile?: File;
   avatarPreview?: string;
@@ -73,6 +74,7 @@ const INITIAL_EMPTY: CharacterFormState = {
   dialogueStyle: "",
   conditionalPrefix: "",
   isLoveInterest: false,
+  isNarrator: false,
   avatarUrl: undefined,
   avatarFile: undefined,
   avatarPreview: undefined,
@@ -100,6 +102,7 @@ function formReducer(
         dialogueStyle: char.dialogueStyle ?? "",
         conditionalPrefix: char.conditionalPrefix ?? "",
         isLoveInterest: char.isLoveInterest,
+        isNarrator: char.isNarrator,
         avatarUrl: char.avatarUrl ?? undefined,
       };
     }
@@ -303,6 +306,7 @@ export function CharacterEditDialog({
         color: form.color,
         routeAffiliation: form.routeAffiliation.trim() || undefined,
         isLoveInterest: form.isLoveInterest,
+        isNarrator: form.isNarrator,
         dialogueStyle: form.dialogueStyle.trim() || undefined,
         conditionalPrefix: form.conditionalPrefix.trim() || undefined,
       };
@@ -316,6 +320,7 @@ export function CharacterEditDialog({
           color: payload.color,
           routeAffiliation: payload.routeAffiliation,
           isLoveInterest: payload.isLoveInterest,
+          isNarrator: payload.isNarrator,
           dialogueStyle: payload.dialogueStyle,
           conditionalPrefix: payload.conditionalPrefix,
         });
@@ -541,8 +546,8 @@ export function CharacterEditDialog({
             </div>
           </div>
 
-          {/* Conditional Prefix + Love Interest */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Conditional Prefix + Love Interest + Narrator */}
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label htmlFor="edit-char-prefix" className="text-xs">
                 Conditional Prefix
@@ -573,9 +578,31 @@ export function CharacterEditDialog({
               />
               <Label
                 htmlFor="edit-char-love"
-                className="text-xs cursor-pointer"
+                className="text-xs cursor-pointer flex items-center gap-1"
               >
+                <Heart className="size-3" />
                 Love Interest
+              </Label>
+            </div>
+
+            <div className="flex items-center gap-2 pt-5">
+              <input
+                type="checkbox"
+                id="edit-char-narrator"
+                checked={form.isNarrator}
+                onChange={(e) =>
+                  handleFieldChange("isNarrator", e.target.checked)
+                }
+                disabled={isSaving}
+                className="size-4 accent-purple-500"
+                aria-label="Narrator"
+              />
+              <Label
+                htmlFor="edit-char-narrator"
+                className="text-xs cursor-pointer flex items-center gap-1"
+              >
+                <BookOpen className="size-3" />
+                Narrator
               </Label>
             </div>
           </div>

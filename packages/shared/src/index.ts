@@ -653,6 +653,7 @@ export interface Character {
   avatarUrl: string | null;
   routeAffiliation: string | null;
   isLoveInterest: boolean;
+  isNarrator: boolean;
   dialogueStyle: string | null;
   conditionalPrefix: string | null;
   createdAt: string;
@@ -787,6 +788,7 @@ export interface CharacterConflict {
 export interface DetectCharactersResponse {
   characters: DetectedCharacter[];
   excludedTags: string[];
+  narratorCharacterTags: string[];
   conflicts: CharacterConflict[];
   existingTags: string[]; // Tags of all characters that exist in database (not just conflicts)
 }

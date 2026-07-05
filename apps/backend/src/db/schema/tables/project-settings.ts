@@ -24,6 +24,9 @@ export const projectSettings = pgTable(
     excludedCharacterTags: jsonb("excluded_character_tags")
       .$type<string[]>()
       .default(sql`'[]'::jsonb`),
+    narratorCharacterTags: jsonb("narrator_character_tags")
+      .$type<string[]>()
+      .default(sql`'[]'::jsonb`),
     autoLinkSpeakers: boolean("auto_link_speakers").default(true).notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

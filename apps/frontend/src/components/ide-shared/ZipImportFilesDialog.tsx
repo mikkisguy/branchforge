@@ -280,6 +280,7 @@ export function ZipImportFilesDialog({
               characters: {
                 characters: detectionResult.characters,
                 excludedTags: detectionResult.excludedTags,
+                narratorCharacterTags: detectionResult.narratorCharacterTags,
                 conflicts: detectionResult.conflicts,
                 existingTags: detectionResult.existingTags,
               },
@@ -612,6 +613,7 @@ export function ZipImportFilesDialog({
           detectedCharacters={detectedCharacters.characters}
           conflicts={detectedCharacters.conflicts}
           excludedTags={detectedCharacters.excludedTags}
+          narratorTags={detectedCharacters.narratorCharacterTags}
           existingTags={detectedCharacters.existingTags}
           onComplete={() => {
             onOpenChange(false);

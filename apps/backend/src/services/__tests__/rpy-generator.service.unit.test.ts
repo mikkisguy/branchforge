@@ -146,5 +146,57 @@ describe("RPYGeneratorService", () => {
       // Result should end with a newline
       expect(result.endsWith("\n")).toBe(true);
     });
+
+    it("should append what_italic=True for narrator characters", () => {
+      const characters = [
+        {
+          renpyTag: "n",
+          displayName: "Narrator",
+          color: "#cfcfcf",
+          isNarrator: true,
+        },
+      ];
+
+      const result = generateCharacterDefinitionsFile(characters);
+
+      expect(result).toContain(
+        'define n = Character("Narrator", color="#cfcfcf", what_italic=True)'
+      );
+    });
+
+    it("should NOT append what_italic for non-narrator characters", () => {
+      const characters = [
+        {
+          renpyTag: "e",
+          displayName: "Eileen",
+          color: "#c8ffc8",
+          isNarrator: false,
+        },
+      ];
+
+      const result = generateCharacterDefinitionsFile(characters);
+
+      expect(result).toContain(
+        'define e = Character("Eileen", color="#c8ffc8")'
+      );
+      expect(result).not.toContain("what_italic");
+    });
+
+    it("should NOT append what_italic when isNarrator is omitted", () => {
+      const characters = [
+        {
+          renpyTag: "s",
+          displayName: "Sylvie",
+          color: "#ff0000",
+        },
+      ];
+
+      const result = generateCharacterDefinitionsFile(characters);
+
+      expect(result).toContain(
+        'define s = Character("Sylvie", color="#ff0000")'
+      );
+      expect(result).not.toContain("what_italic");
+    });
   });
 });
