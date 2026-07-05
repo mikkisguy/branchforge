@@ -7,12 +7,15 @@ import {
   Plus,
   Pencil,
   Loader2,
+  BookText,
 } from "lucide-react";
 import { CollapsibleSection } from "@/components/ide-shared/CollapsibleSection";
 import { VariablesDialog } from "./VariablesDialog";
 import { StatManagementDialog } from "./StatManagementDialog";
+import { WorldElementsDialog } from "@/components/WorldElementsDialog";
 import { useVariables } from "@/hooks/useVariables";
 import { useStats } from "@/hooks/useStats";
+import { useWorldElements } from "@/hooks/useWorldElements";
 import { cva } from "class-variance-authority";
 import type { Character } from "@branchforge/shared";
 
@@ -130,6 +133,7 @@ export function ScriptReferencePanel({
 }: ScriptReferencePanelProps) {
   const [variablesDialogOpen, setVariablesDialogOpen] = useState(false);
   const [statsDialogOpen, setStatsDialogOpen] = useState(false);
+  const [worldElementsDialogOpen, setWorldElementsDialogOpen] = useState(false);
   const [failedAvatars, setFailedAvatars] = useState<Record<string, boolean>>(
     {}
   );
@@ -139,6 +143,9 @@ export function ScriptReferencePanel({
     projectId && projectId.trim() ? projectId : ""
   );
   const { stats, isLoadingStats } = useStats(
+    projectId && projectId.trim() ? projectId : ""
+  );
+  const { elements, isLoadingElements } = useWorldElements(
     projectId && projectId.trim() ? projectId : ""
   );
 
@@ -363,6 +370,76 @@ export function ScriptReferencePanel({
                 </div>
               )}
             </CollapsibleSection>
+
+            {/* World Elements — read-only list, edit via dialog */}
+            <CollapsibleSection
+              title="World Bible"
+              defaultOpen={false}
+              headerAction={
+                <button
+                  type="button"
+                  onClick={() => setWorldElementsDialogOpen(true)}
+                  className="p-1 rounded hover:bg-muted/80 transition-colors"
+                  aria-label="Manage world elements"
+                  title="Manage world elements"
+                >
+                  <BookText className="size-3 text-muted-foreground" />
+                </button>
+              }
+            >
+              {isLoadingElements ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                </div>
+              ) : elements.length === 0 ? (
+                <div className="text-center py-3">
+                  <p className="text-xs text-muted-foreground mb-2">
+                    No world elements defined
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setWorldElementsDialogOpen(true)}
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    <Plus className="size-3" />
+                    Add element
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {elements
+                    .toSorted((a, b) =>
+                      a.type !== b.type
+                        ? a.type.localeCompare(b.type)
+                        : a.name.localeCompare(b.name)
+                    )
+                    .map((element) => (
+                      <div
+                        key={element.id}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <span className="text-xs truncate block">
+                            {element.name}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {element.type.charAt(0) +
+                              element.type.slice(1).toLowerCase()}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  <button
+                    type="button"
+                    onClick={() => setWorldElementsDialogOpen(true)}
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-full justify-center pt-1"
+                  >
+                    <Plus className="size-3" />
+                    Manage elements
+                  </button>
+                </div>
+              )}
+            </CollapsibleSection>
           </div>
         </div>
       </div>
@@ -376,6 +453,11 @@ export function ScriptReferencePanel({
       <StatManagementDialog
         open={statsDialogOpen}
         onOpenChange={setStatsDialogOpen}
+        projectId={projectId}
+      />
+      <WorldElementsDialog
+        open={worldElementsDialogOpen}
+        onOpenChange={setWorldElementsDialogOpen}
         projectId={projectId}
       />
 
