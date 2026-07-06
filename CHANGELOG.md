@@ -11,7 +11,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Added world bible feature for tracking info
 - Added user settings: avatar upload, username management, and theme persistence
 - Added per-project visual system configuration
-- Enhanced character detection on import, fixed wixard not showing
+- Enhanced character detection on import, fixed wizard not showing
 
 ## v0.11.1 - 2026-06-17
 
