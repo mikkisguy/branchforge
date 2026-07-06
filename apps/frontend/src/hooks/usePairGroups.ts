@@ -9,11 +9,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { pairGroupsApi } from "@/lib/api/pair-groups";
 import { pairGroupKeys } from "@/lib/query-keys";
 import { useToast } from "@/contexts/ToastContext";
-import type { PairGroupWithNames } from "@branchforge/shared";
+import type { PairGroup, PairGroupWithNames } from "@branchforge/shared";
 import type {
   CreatePairGroupBody,
   UpdatePairGroupBody,
-  PairGroupRow,
 } from "@/lib/api/pair-groups";
 
 // ============================================================================
@@ -30,11 +29,11 @@ export interface UsePairGroupsReturn {
   isDeleting: boolean;
 
   refresh: () => Promise<unknown>;
-  createPairGroup: (input: CreatePairGroupBody) => Promise<PairGroupRow>;
+  createPairGroup: (input: CreatePairGroupBody) => Promise<PairGroup>;
   updatePairGroup: (
     pairGroupId: string,
     input: UpdatePairGroupBody
-  ) => Promise<PairGroupRow>;
+  ) => Promise<PairGroup>;
   deletePairGroup: (pairGroupId: string) => Promise<void>;
 }
 

@@ -16,6 +16,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { CharacterSettingsContent } from "@/components/CharacterSettingsContent";
 import { useProject } from "@/hooks/useProject";
+import { useToast } from "@/contexts/ToastContext";
 
 interface CharacterDialogProps {
   open: boolean;
@@ -29,9 +30,14 @@ export function CharacterDialog({
   projectId,
 }: CharacterDialogProps) {
   const { currentProject, updateProject } = useProject();
+  const { error: showErrorToast } = useToast();
 
   const handleToggleDuoEnding = async (enabled: boolean) => {
-    await updateProject(projectId, { duoEndingEnabled: enabled });
+    try {
+      await updateProject(projectId, { duoEndingEnabled: enabled });
+    } catch {
+      showErrorToast("Failed to update duo ending setting");
+    }
   };
 
   return (

@@ -5,7 +5,7 @@
  */
 
 import { request } from "./client";
-import type { PairGroupWithNames } from "@branchforge/shared";
+import type { PairGroup, PairGroupWithNames } from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -21,22 +21,12 @@ export interface UpdatePairGroupBody {
   duoEndingLabel?: string;
 }
 
-export interface PairGroupRow {
-  id: string;
-  projectId: string;
-  characterAId: string;
-  characterBId: string;
-  duoEndingLabel: string;
-  createdAt: string;
-  updatedAt: string;
+export interface GetPairGroupResponse {
+  pairGroup: PairGroup;
 }
 
 export interface ListPairGroupsResponse {
   pairGroups: PairGroupWithNames[];
-}
-
-export interface GetPairGroupResponse {
-  pairGroup: PairGroupRow;
 }
 
 // ============================================================================
@@ -54,7 +44,7 @@ export const pairGroupsApi = {
   async createPairGroup(
     projectId: string,
     body: CreatePairGroupBody
-  ): Promise<PairGroupRow> {
+  ): Promise<PairGroup> {
     const response = await request<GetPairGroupResponse>(
       `/projects/${projectId}/pairs`,
       {
@@ -69,7 +59,7 @@ export const pairGroupsApi = {
     projectId: string,
     pairGroupId: string,
     body: UpdatePairGroupBody
-  ): Promise<PairGroupRow> {
+  ): Promise<PairGroup> {
     const response = await request<GetPairGroupResponse>(
       `/projects/${projectId}/pairs/${pairGroupId}`,
       {

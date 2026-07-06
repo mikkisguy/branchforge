@@ -12,7 +12,7 @@
  * a `PairGroupEditDialog` for the create-or-edit flow.
  */
 
-import { useState, lazy, Suspense } from "react";
+import { useState } from "react";
 import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,16 +21,10 @@ import { CollapsibleSection } from "@/components/ide-shared/CollapsibleSection";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CharacterList } from "./CharacterList";
 import { CharacterEditDialog } from "./CharacterEditDialog.lazy";
+import { PairGroupEditDialog } from "./PairGroupEditDialog.lazy";
 import { useCharacters } from "@/hooks/useCharacters";
 import { usePairGroups } from "@/hooks/usePairGroups";
 import type { PairGroupWithNames } from "@branchforge/shared";
-
-// Lazy-loaded PairGroupEditDialog
-const LazyPairGroupEditDialog = lazy(() =>
-  import("./PairGroupEditDialog").then((mod) => ({
-    default: mod.PairGroupEditDialog,
-  }))
-);
 
 interface CharacterSettingsContentProps {
   projectId: string;
@@ -281,26 +275,18 @@ export function CharacterSettingsContent({
         <>
           {/* Pair Group Edit Dialog */}
           {isEditModePair && (
-            <Suspense
-              fallback={
-                <div className="fixed inset-0 z-50 flex items-center justify-center">
-                  <Loader2 className="size-8 animate-spin text-muted-foreground" />
-                </div>
+            <PairGroupEditDialog
+              open={isEditModePair}
+              onOpenChange={(nextOpen: boolean) => {
+                if (!nextOpen) setEditingPairGroupId(null);
+              }}
+              projectId={projectId}
+              pairGroupId={
+                editingPairGroupId === MODE_NEW
+                  ? undefined
+                  : (editingPairGroupId as string | undefined)
               }
-            >
-              <LazyPairGroupEditDialog
-                open={isEditModePair}
-                onOpenChange={(nextOpen) => {
-                  if (!nextOpen) setEditingPairGroupId(null);
-                }}
-                projectId={projectId}
-                pairGroupId={
-                  editingPairGroupId === MODE_NEW
-                    ? undefined
-                    : (editingPairGroupId as string | undefined)
-                }
-              />
-            </Suspense>
+            />
           )}
 
           {/* Delete confirmation for pair groups */}

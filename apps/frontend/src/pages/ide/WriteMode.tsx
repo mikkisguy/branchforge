@@ -85,6 +85,19 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
     enabled: !!currentProject?.id,
   });
 
+  // Shared memoized projection reused by both LabelPropertiesPanel and
+  // LabelEditDialog to avoid redundant allocations and broken memoization.
+  const pairGroupSummaries = useMemo(
+    () =>
+      pairGroups.map((pg) => ({
+        id: pg.id,
+        characterAName: pg.characterAName,
+        characterBName: pg.characterBName,
+        duoEndingLabel: pg.duoEndingLabel,
+      })),
+    [pairGroups]
+  );
+
   const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] =
     useLocalStorageBoolean("write:left-sidebar-collapsed", false);
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] =
@@ -406,12 +419,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
           characters={characters}
           stats={stats}
           routeConfigs={routeConfigs}
-          pairGroups={pairGroups.map((pg) => ({
-            id: pg.id,
-            characterAName: pg.characterAName,
-            characterBName: pg.characterBName,
-            duoEndingLabel: pg.duoEndingLabel,
-          }))}
+          pairGroups={pairGroupSummaries}
           isCollapsed={isRightSidebarCollapsed || isFocusMode}
           onCollapseToggle={
             !isFocusMode
@@ -442,12 +450,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
                   routeKey: rc.routeKey,
                   routeName: rc.routeName,
                 }))}
-                pairGroups={pairGroups.map((pg) => ({
-                  id: pg.id,
-                  characterAName: pg.characterAName,
-                  characterBName: pg.characterBName,
-                  duoEndingLabel: pg.duoEndingLabel,
-                }))}
+                pairGroups={pairGroupSummaries}
                 currentDuoPairId={editDialog.label.duoPairId ?? null}
                 duoEndingEnabled={currentProject?.duoEndingEnabled ?? false}
                 onSave={handleEditSave}

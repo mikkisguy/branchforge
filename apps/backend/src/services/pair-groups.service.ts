@@ -143,14 +143,11 @@ export async function createPairGroup(
   await requireProjectOwnership(projectId, userId);
 
   // Canonical order: character_a_id < character_b_id (DB check constraint)
-  const aId =
-    data.characterAId < data.characterBId
-      ? data.characterAId
-      : data.characterBId;
-  const bId =
-    data.characterAId < data.characterBId
-      ? data.characterBId
-      : data.characterAId;
+  // Normalize to lowercase to match PostgreSQL's UUID ordering, which ignores case.
+  const charA = data.characterAId.toLowerCase();
+  const charB = data.characterBId.toLowerCase();
+  const aId = charA < charB ? data.characterAId : data.characterBId;
+  const bId = charA < charB ? data.characterBId : data.characterAId;
 
   // Verify both characters belong to this project
   const charIds = [aId, bId];

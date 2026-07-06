@@ -193,8 +193,9 @@ export interface StatProgression {
 /**
  * Pair group for tracking sequel duo endings.
  *
- * A pair group links two characters together with a duo ending label and threshold.
- * Labels can reference a pair group via their duoPairId field to mark duo endings.
+ * A pair group links two characters together with a duo ending label.
+ * Labels can reference a pair group via their duoPairId field to mark
+ * duo endings.
  */
 export interface PairGroup {
   id: string;
