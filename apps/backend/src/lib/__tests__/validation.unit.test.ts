@@ -1021,7 +1021,7 @@ describe("Character Schemas", () => {
         color: "#ABC123",
         routeAffiliation: "EILEEN",
         isLoveInterest: true,
-        dialogueStyle: "casual",
+        notes: "casual",
         conditionalPrefix: "jane_",
       };
 

@@ -68,7 +68,7 @@ export interface CreateCharacterBody {
   routeAffiliation?: string;
   isLoveInterest?: boolean;
   isNarrator?: boolean;
-  dialogueStyle?: string;
+  notes?: string;
   conditionalPrefix?: string;
 }
 
@@ -79,7 +79,7 @@ export interface UpdateCharacterBody {
   routeAffiliation?: string;
   isLoveInterest?: boolean;
   isNarrator?: boolean;
-  dialogueStyle?: string;
+  notes?: string;
   conditionalPrefix?: string;
 }
 

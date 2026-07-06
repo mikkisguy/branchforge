@@ -59,6 +59,8 @@ export interface CharacterSummary {
   routeAffiliation: string | null;
   isLoveInterest: boolean;
   isNarrator: boolean;
+  notes: string | null;
+  conditionalPrefix: string | null;
   avatarUrl: string | null;
 }
 
@@ -72,7 +74,7 @@ export interface CharacterDetail {
   routeAffiliation: string | null;
   isLoveInterest: boolean;
   isNarrator: boolean;
-  dialogueStyle: string | null;
+  notes: string | null;
   conditionalPrefix: string | null;
   avatarUrl: string | null;
 }
@@ -485,6 +487,8 @@ export class CharactersService {
         routeAffiliation: characters.routeAffiliation,
         isLoveInterest: characters.isLoveInterest,
         isNarrator: characters.isNarrator,
+        notes: characters.notes,
+        conditionalPrefix: characters.conditionalPrefix,
         avatarUrl: characters.avatarUrl,
       })
       .from(characters)
@@ -513,7 +517,7 @@ export class CharactersService {
       routeAffiliation: character.routeAffiliation,
       isLoveInterest: character.isLoveInterest,
       isNarrator: character.isNarrator,
-      dialogueStyle: character.dialogueStyle,
+      notes: character.notes,
       conditionalPrefix: character.conditionalPrefix,
       avatarUrl: buildAvatarUrl(character.avatarUrl),
     };
@@ -540,7 +544,7 @@ export class CharactersService {
         routeAffiliation: input.routeAffiliation,
         isLoveInterest: input.isLoveInterest,
         isNarrator: input.isNarrator,
-        dialogueStyle: input.dialogueStyle,
+        notes: input.notes,
         conditionalPrefix: input.conditionalPrefix,
       })
       .onConflictDoNothing({
@@ -561,7 +565,7 @@ export class CharactersService {
       routeAffiliation: newCharacter.routeAffiliation,
       isLoveInterest: newCharacter.isLoveInterest,
       isNarrator: newCharacter.isNarrator,
-      dialogueStyle: newCharacter.dialogueStyle,
+      notes: newCharacter.notes,
       conditionalPrefix: newCharacter.conditionalPrefix,
       avatarUrl: buildAvatarUrl(newCharacter.avatarUrl),
     };
@@ -592,7 +596,7 @@ export class CharactersService {
       routeAffiliation: updated.routeAffiliation,
       isLoveInterest: updated.isLoveInterest,
       isNarrator: updated.isNarrator,
-      dialogueStyle: updated.dialogueStyle,
+      notes: updated.notes,
       conditionalPrefix: updated.conditionalPrefix,
       avatarUrl: buildAvatarUrl(updated.avatarUrl),
     };

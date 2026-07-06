@@ -707,7 +707,7 @@ export interface Character {
   routeAffiliation: string | null;
   isLoveInterest: boolean;
   isNarrator: boolean;
-  dialogueStyle: string | null;
+  notes: string | null;
   conditionalPrefix: string | null;
   createdAt: string;
   updatedAt: string;

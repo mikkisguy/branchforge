@@ -795,7 +795,7 @@ export const createCharacterSchema = z
     routeAffiliation: optionalString(50),
     isLoveInterest: z.boolean().default(false).optional(),
     isNarrator: z.boolean().default(false).optional(),
-    dialogueStyle: optionalString(100),
+    notes: optionalString(10000),
     conditionalPrefix: optionalString(50),
   })
   .strict();
@@ -811,7 +811,7 @@ export const updateCharacterSchema = z
     routeAffiliation: optionalString(50),
     isLoveInterest: z.boolean().optional(),
     isNarrator: z.boolean().optional(),
-    dialogueStyle: optionalString(100),
+    notes: optionalString(10000),
     conditionalPrefix: optionalString(50),
   })
   .strict()

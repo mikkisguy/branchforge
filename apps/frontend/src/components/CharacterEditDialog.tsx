@@ -39,7 +39,7 @@ interface CharacterFormState {
   renpyTag: string;
   color: string;
   routeAffiliation: string;
-  dialogueStyle: string;
+  notes: string;
   conditionalPrefix: string;
   isLoveInterest: boolean;
   isNarrator: boolean;
@@ -71,7 +71,7 @@ const INITIAL_EMPTY: CharacterFormState = {
   renpyTag: "",
   color: "#FF6B6B",
   routeAffiliation: "",
-  dialogueStyle: "",
+  notes: "",
   conditionalPrefix: "",
   isLoveInterest: false,
   isNarrator: false,
@@ -99,7 +99,7 @@ function formReducer(
         renpyTag: char.renpyTag,
         color: char.color,
         routeAffiliation: char.routeAffiliation ?? "",
-        dialogueStyle: char.dialogueStyle ?? "",
+        notes: char.notes ?? "",
         conditionalPrefix: char.conditionalPrefix ?? "",
         isLoveInterest: char.isLoveInterest,
         isNarrator: char.isNarrator,
@@ -307,7 +307,7 @@ export function CharacterEditDialog({
         routeAffiliation: form.routeAffiliation.trim() || undefined,
         isLoveInterest: form.isLoveInterest,
         isNarrator: form.isNarrator,
-        dialogueStyle: form.dialogueStyle.trim() || undefined,
+        notes: form.notes.trim() || undefined,
         conditionalPrefix: form.conditionalPrefix.trim() || undefined,
       };
 
@@ -321,7 +321,7 @@ export function CharacterEditDialog({
           routeAffiliation: payload.routeAffiliation,
           isLoveInterest: payload.isLoveInterest,
           isNarrator: payload.isNarrator,
-          dialogueStyle: payload.dialogueStyle,
+          notes: payload.notes,
           conditionalPrefix: payload.conditionalPrefix,
         });
       } else {
@@ -511,7 +511,7 @@ export function CharacterEditDialog({
             </div>
           </div>
 
-          {/* Route + Dialogue Style */}
+          {/* Route + Conditional Prefix */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="edit-char-route" className="text-xs">
@@ -528,26 +528,6 @@ export function CharacterEditDialog({
                 disabled={isSaving}
               />
             </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="edit-char-style" className="text-xs">
-                Dialogue Style
-              </Label>
-              <Input
-                id="edit-char-style"
-                type="text"
-                placeholder="casual"
-                value={form.dialogueStyle}
-                onChange={(e) =>
-                  handleFieldChange("dialogueStyle", e.target.value)
-                }
-                disabled={isSaving}
-              />
-            </div>
-          </div>
-
-          {/* Conditional Prefix + Love Interest + Narrator */}
-          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label htmlFor="edit-char-prefix" className="text-xs">
                 Conditional Prefix
@@ -563,7 +543,25 @@ export function CharacterEditDialog({
                 disabled={isSaving}
               />
             </div>
+          </div>
 
+          <div className="space-y-1">
+            <Label htmlFor="edit-char-notes" className="text-xs">
+              Notes
+            </Label>
+            <textarea
+              id="edit-char-notes"
+              rows={4}
+              className="flex min-h-[250px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              placeholder="Backstory, personality notes, voice references..."
+              value={form.notes}
+              onChange={(e) => handleFieldChange("notes", e.target.value)}
+              disabled={isSaving}
+            />
+          </div>
+
+          {/* Love Interest + Narrator */}
+          <div className="grid grid-cols-2 gap-3">
             <div className="flex items-center gap-2 pt-5">
               <input
                 type="checkbox"

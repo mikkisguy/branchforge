@@ -89,7 +89,7 @@ const testCharacter: NewCharacter = {
   color: "#FF6B6B",
   routeAffiliation: "EILEEN",
   isLoveInterest: true,
-  dialogueStyle: "casual",
+  notes: "casual",
   conditionalPrefix: null,
 };
 

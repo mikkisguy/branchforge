@@ -1,0 +1,1 @@
+ALTER TABLE "characters" RENAME COLUMN "dialogue_style" TO "notes";
