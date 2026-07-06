@@ -157,6 +157,11 @@ export function LabelPropertiesPanel({
     [stats]
   );
 
+  const duoEndingLabel = useMemo(() => {
+    if (!activeLabel?.duoPairId) return null;
+    return pairGroups.find((g) => g.id === activeLabel.duoPairId) ?? null;
+  }, [activeLabel, pairGroups]);
+
   const outgoingJumps = useMemo(() => {
     if (!activeLabel?.lines) return [];
     const jumps: Array<{
@@ -402,16 +407,9 @@ export function LabelPropertiesPanel({
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Duo Ending</span>
                     <span className="text-foreground font-medium truncate ml-2 max-w-[120px]">
-                      {(() => {
-                        const pg = activeLabel.duoPairId
-                          ? pairGroups.find(
-                              (g) => g.id === activeLabel.duoPairId
-                            )
-                          : null;
-                        return pg
-                          ? `${pg.characterAName} & ${pg.characterBName}`
-                          : "—";
-                      })()}
+                      {duoEndingLabel
+                        ? `${duoEndingLabel.characterAName} & ${duoEndingLabel.characterBName}`
+                        : "—"}
                     </span>
                   </div>
                 </div>
@@ -506,9 +504,9 @@ export function LabelPropertiesPanel({
                     </p>
                   ) : (
                     <div className="space-y-2">
-                      {outgoingJumps.map((jump) => (
+                      {outgoingJumps.map((jump, i) => (
                         <OutgoingJumpItem
-                          key={`${jump.targetLabelId}-${jump.choiceText}`}
+                          key={`${jump.targetLabelId}-${jump.choiceText}-${i}`}
                           jump={jump}
                           statByKey={statByKey}
                         />
@@ -537,9 +535,9 @@ export function LabelPropertiesPanel({
                   </p>
                 ) : (
                   <div className="space-y-2">
-                    {activeLabel.incomingJumps.map((jump) => (
+                    {activeLabel.incomingJumps.map((jump, i) => (
                       <div
-                        key={`${jump.sourceLabelId}-${jump.choiceText}`}
+                        key={`${jump.sourceLabelId}-${jump.choiceText}-${i}`}
                         className="p-2 rounded-lg bg-muted/30 border border-border/50 text-xs"
                       >
                         <div className="font-medium text-foreground truncate">
