@@ -2472,7 +2472,13 @@ export async function updateLabel(
 
     if (isTouchingPairFields) {
       if (effectiveVisibility === "DUO_PAIR") {
-        validatedDuoPairId = data.duoPairId ?? labelWithProject.label.duoPairId;
+        // Distinguish explicit null ("unlink this pair") from
+        // undefined ("not provided, keep existing") — ?? would
+        // coalesce both and silently preserve a stale pair id.
+        validatedDuoPairId =
+          data.duoPairId !== undefined
+            ? data.duoPairId
+            : labelWithProject.label.duoPairId;
         if (validatedDuoPairId == null) {
           throw new ValidationError(
             "duoPairId is required when visibility is DUO_PAIR"
