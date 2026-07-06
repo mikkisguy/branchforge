@@ -21,6 +21,7 @@ import {
   projectFileSyncState,
   stats,
   variables,
+  pairGroups,
 } from "../db/schema/index.js";
 import { eq, and, asc, or, isNull, sql, desc, inArray, ne } from "drizzle-orm";
 import type { Label, LabelLine } from "../db/schema/index.js";
@@ -2324,6 +2325,7 @@ export async function updateLabel(
     status?: LabelStatus;
     visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
     labelName?: string | null;
+    duoPairId?: string | null;
     conditions?: {
       variables?: Record<string, VariableCondition>;
       stats?: Record<string, number>;
@@ -2454,22 +2456,73 @@ export async function updateLabel(
       updatedContent = lines.join("\n");
     }
 
-    // Validate route exists in route_configs for this project
-    // If route is provided but doesn't exist, coerce to null
+    // Validate route exists in route_configs for this project and
+    // enforce DUO_PAIR visibility requires a non-null duoPairId.
+    // Both existence checks are independent reads — run in parallel.
     let validatedRoute = data.route;
-    if (validatedRoute !== null && validatedRoute !== undefined) {
-      const [route] = await tx
-        .select({ id: routeConfigs.id })
-        .from(routeConfigs)
-        .where(
-          and(
-            eq(routeConfigs.projectId, labelWithProject.label.projectId),
-            eq(routeConfigs.routeKey, validatedRoute)
-          )
-        )
-        .limit(1);
 
-      if (!route) {
+    // When the caller touches visibility or duoPairId, enforce
+    // consistency: DUO_PAIR requires a non-null pair group id;
+    // any other visibility clears the stale pair association.
+    const isTouchingPairFields =
+      data.visibility !== undefined || data.duoPairId !== undefined;
+    const effectiveVisibility =
+      data.visibility ?? labelWithProject.label.visibility;
+    let validatedDuoPairId: string | null | undefined;
+
+    if (isTouchingPairFields) {
+      if (effectiveVisibility === "DUO_PAIR") {
+        // Distinguish explicit null ("unlink this pair") from
+        // undefined ("not provided, keep existing") — ?? would
+        // coalesce both and silently preserve a stale pair id.
+        validatedDuoPairId =
+          data.duoPairId !== undefined
+            ? data.duoPairId
+            : labelWithProject.label.duoPairId;
+        if (validatedDuoPairId == null) {
+          throw new ValidationError(
+            "duoPairId is required when visibility is DUO_PAIR"
+          );
+        }
+      } else {
+        validatedDuoPairId = null; // clear stale pair association
+      }
+    } else {
+      // Caller isn't changing visibility or duoPairId — leave
+      // existing duoPairId alone (validated below only if non-null).
+      validatedDuoPairId = labelWithProject.label.duoPairId;
+    }
+
+    const [routeResult, pairGroupResult] = await Promise.all([
+      validatedRoute !== null && validatedRoute !== undefined
+        ? tx
+            .select({ id: routeConfigs.id })
+            .from(routeConfigs)
+            .where(
+              and(
+                eq(routeConfigs.projectId, labelWithProject.label.projectId),
+                eq(routeConfigs.routeKey, validatedRoute)
+              )
+            )
+            .limit(1)
+        : Promise.resolve(null),
+      validatedDuoPairId != null
+        ? tx
+            .select({ id: pairGroups.id })
+            .from(pairGroups)
+            .where(
+              and(
+                eq(pairGroups.id, validatedDuoPairId),
+                eq(pairGroups.projectId, labelWithProject.label.projectId)
+              )
+            )
+            .limit(1)
+        : Promise.resolve(null),
+    ]);
+
+    if (validatedRoute !== null && validatedRoute !== undefined) {
+      const routeRows = routeResult as { id: string }[] | null;
+      if (!routeRows || routeRows.length === 0) {
         // Coerce to null if route doesn't exist
         logWarn(LogEventType.VALIDATION_WARNING, {
           event: "invalid_route_configuration",
@@ -2477,6 +2530,15 @@ export async function updateLabel(
           projectId: labelWithProject.label.projectId,
         });
         validatedRoute = null;
+      }
+    }
+
+    if (validatedDuoPairId != null) {
+      const pairRows = pairGroupResult as { id: string }[] | null;
+      if (!pairRows || pairRows.length === 0) {
+        throw new ValidationError(
+          "Referenced pair group does not exist in this project"
+        );
       }
     }
 
@@ -2549,6 +2611,9 @@ export async function updateLabel(
       ...data,
       ...(validatedRoute !== undefined ? { route: validatedRoute } : {}),
     };
+    if (isTouchingPairFields) {
+      updateData.duoPairId = validatedDuoPairId;
+    }
     if (data.conditions !== undefined) {
       updateData.conditions = data.conditions ?? {};
     }

@@ -45,6 +45,7 @@ type ProjectRow = {
   name: string;
   description: string | null;
   maxStatDelta: number | null;
+  duoEndingEnabled: boolean;
   source: SourceOrigin;
   createdAt: Date;
   updatedAt: Date;
@@ -68,6 +69,7 @@ function toPublicProject(
     name: project.name,
     description: project.description ?? undefined,
     maxStatDelta: project.maxStatDelta ?? undefined,
+    duoEndingEnabled: project.duoEndingEnabled,
     visibility,
     source: project.source,
     createdAt: project.createdAt.toISOString(),
@@ -86,6 +88,7 @@ export type CreateProjectBody = z.infer<typeof createProjectSchema>;
 export interface UpdateProjectBody {
   name?: string;
   description?: string;
+  duoEndingEnabled?: boolean;
 }
 
 // ============================================================================
@@ -156,6 +159,7 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
       name: projects.name,
       description: projects.description,
       maxStatDelta: projects.maxStatDelta,
+      duoEndingEnabled: projects.duoEndingEnabled,
       source: projects.source,
       role: projectUsers.role, // User's role from project_users
       createdAt: projects.createdAt,
@@ -211,6 +215,7 @@ export async function getProject(
       name: projects.name,
       description: projects.description,
       maxStatDelta: projects.maxStatDelta,
+      duoEndingEnabled: projects.duoEndingEnabled,
       source: projects.source,
       createdAt: projects.createdAt,
       updatedAt: projects.updatedAt,
@@ -230,6 +235,7 @@ export async function getProject(
       name: projects.name,
       description: projects.description,
       maxStatDelta: projects.maxStatDelta,
+      duoEndingEnabled: projects.duoEndingEnabled,
       source: projects.source,
       role: projectUsers.role,
       createdAt: projects.createdAt,
@@ -325,6 +331,7 @@ export async function updateProject(
   const updateData: {
     name?: string;
     description?: string | null;
+    duoEndingEnabled?: boolean;
     updatedAt: Date;
   } = {
     updatedAt: new Date(),
@@ -335,6 +342,9 @@ export async function updateProject(
   }
   if (body.description !== undefined) {
     updateData.description = body.description;
+  }
+  if (body.duoEndingEnabled !== undefined) {
+    updateData.duoEndingEnabled = body.duoEndingEnabled;
   }
 
   const result = await db

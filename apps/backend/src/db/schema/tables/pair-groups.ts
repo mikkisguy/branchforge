@@ -9,7 +9,6 @@ import {
   uuid,
   text,
   timestamp,
-  integer,
   index,
   unique,
   check,
@@ -32,7 +31,6 @@ export const pairGroups = pgTable(
       .notNull()
       .references(() => characters.id, { onDelete: "cascade" }),
     duoEndingLabel: text("duo_ending_label").notNull(),
-    threshold: integer("threshold").default(70).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

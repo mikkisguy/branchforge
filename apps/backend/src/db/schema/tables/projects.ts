@@ -10,6 +10,7 @@ import {
   text,
   timestamp,
   integer,
+  boolean,
   index,
   primaryKey,
 } from "drizzle-orm/pg-core";
@@ -33,6 +34,7 @@ export const projects = pgTable(
     name: text("name").notNull(),
     description: text("description"),
     maxStatDelta: integer("max_stat_delta").default(10),
+    duoEndingEnabled: boolean("duo_ending_enabled").default(false).notNull(),
     visibility: projectVisibilityEnum("visibility").default("PRIVATE"),
     source: fileSourceEnum("source").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),

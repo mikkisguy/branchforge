@@ -75,6 +75,7 @@ export interface UpdateLabelInput {
   status?: "DRAFT" | "REVIEW" | "FINAL";
   visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
   labelName?: string;
+  duoPairId?: string | null;
   conditions?: {
     variables?: Record<string, VariableCondition>;
     stats?: Record<string, number>;

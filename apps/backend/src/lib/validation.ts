@@ -301,6 +301,7 @@ export const updateProjectSchema = z
   .object({
     name: nonEmptyStringSchema.max(200, "Project name is too long").optional(),
     description: optionalString(2000, "Description is too long"),
+    duoEndingEnabled: z.boolean().optional(),
   })
   .strict();
 
@@ -453,6 +454,7 @@ export const updateLabelSchema = z
       )
       .nullable()
       .optional(),
+    duoPairId: uuidSchema.optional().nullable(),
     conditions: z
       .object({
         stats: z.record(z.string(), z.number().finite()).optional(),
@@ -682,6 +684,48 @@ export const statIdParamsSchema = z.object({
 // Type exports
 export type CreateStatInput = z.infer<typeof createStatSchema>;
 export type UpdateStatInput = z.infer<typeof updateStatSchema>;
+
+// ============================================================================
+// Pair Group Schemas
+// ============================================================================
+
+/**
+ * Create pair group request validation
+ */
+export const createPairGroupSchema = z
+  .object({
+    characterAId: uuidSchema,
+    characterBId: uuidSchema,
+    duoEndingLabel: requiredString(255, "Duo ending label is too long"),
+  })
+  .strict()
+  .refine((data) => data.characterAId !== data.characterBId, {
+    message: "Character A and Character B must be different",
+    path: ["characterBId"],
+  });
+
+/**
+ * Update pair group request validation
+ */
+export const updatePairGroupSchema = z
+  .object({
+    duoEndingLabel: requiredString(
+      255,
+      "Duo ending label is too long"
+    ).optional(),
+  })
+  .strict();
+
+/**
+ * Pair group ID params validation
+ */
+export const pairGroupIdParamsSchema = z.object({
+  pairGroupId: uuidSchema,
+});
+
+// Type exports
+export type CreatePairGroupInput = z.infer<typeof createPairGroupSchema>;
+export type UpdatePairGroupInput = z.infer<typeof updatePairGroupSchema>;
 
 // ============================================================================
 // Character Schemas

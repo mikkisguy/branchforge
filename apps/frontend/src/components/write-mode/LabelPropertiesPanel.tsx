@@ -43,15 +43,11 @@ interface OutgoingJumpItemProps {
     effects?: Record<string, number>;
   };
   statByKey: Map<string, Stat>;
-  index: number;
 }
 
-function OutgoingJumpItem({ jump, statByKey, index }: OutgoingJumpItemProps) {
+function OutgoingJumpItem({ jump, statByKey }: OutgoingJumpItemProps) {
   return (
-    <div
-      key={`${jump.targetLabelId}-${jump.choiceText}-${index}`}
-      className="p-2 rounded-lg bg-muted/30 border border-border/50 text-xs"
-    >
+    <div className="p-2 rounded-lg bg-muted/30 border border-border/50 text-xs">
       <div className="font-medium text-foreground truncate">
         {jump.targetLabelName}
       </div>
@@ -104,6 +100,12 @@ interface LabelPropertiesPanelProps {
   characters: Character[];
   stats: Stat[];
   routeConfigs: RouteConfig[];
+  pairGroups: Array<{
+    id: string;
+    characterAName: string;
+    characterBName: string;
+    duoEndingLabel: string;
+  }>;
   isCollapsed: boolean;
   onCollapseToggle?: () => void;
   onEdit: () => void;
@@ -115,6 +117,7 @@ export function LabelPropertiesPanel({
   characters,
   stats,
   routeConfigs,
+  pairGroups,
   isCollapsed,
   onCollapseToggle,
   onEdit,
@@ -153,6 +156,11 @@ export function LabelPropertiesPanel({
     () => new Map(stats.map((s) => [s.key, s])),
     [stats]
   );
+
+  const duoEndingLabel = useMemo(() => {
+    if (!activeLabel?.duoPairId) return null;
+    return pairGroups.find((g) => g.id === activeLabel.duoPairId) ?? null;
+  }, [activeLabel, pairGroups]);
 
   const outgoingJumps = useMemo(() => {
     if (!activeLabel?.lines) return [];
@@ -396,6 +404,14 @@ export function LabelPropertiesPanel({
                       {activeLabel.visibility ?? "—"}
                     </span>
                   </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Duo Ending</span>
+                    <span className="text-foreground font-medium truncate ml-2 max-w-[120px]">
+                      {duoEndingLabel
+                        ? `${duoEndingLabel.characterAName} & ${duoEndingLabel.characterBName}`
+                        : "—"}
+                    </span>
+                  </div>
                 </div>
               </CollapsibleSection>
 
@@ -493,7 +509,6 @@ export function LabelPropertiesPanel({
                           key={`${jump.targetLabelId}-${jump.choiceText}-${i}`}
                           jump={jump}
                           statByKey={statByKey}
-                          index={i}
                         />
                       ))}
                     </div>
@@ -520,9 +535,9 @@ export function LabelPropertiesPanel({
                   </p>
                 ) : (
                   <div className="space-y-2">
-                    {activeLabel.incomingJumps.map((jump) => (
+                    {activeLabel.incomingJumps.map((jump, i) => (
                       <div
-                        key={`${jump.sourceLabelId}-${jump.choiceText}`}
+                        key={`${jump.sourceLabelId}-${jump.choiceText}-${i}`}
                         className="p-2 rounded-lg bg-muted/30 border border-border/50 text-xs"
                       >
                         <div className="font-medium text-foreground truncate">

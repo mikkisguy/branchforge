@@ -27,6 +27,7 @@ export interface Project {
   maxStatDelta?: number;
   visibility?: UserRole;
   source: SourceOrigin;
+  duoEndingEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,6 +35,7 @@ export interface Project {
 export interface UpdateProjectBody {
   name?: string;
   description?: string;
+  duoEndingEnabled?: boolean;
 }
 
 export interface ImportZipBody {

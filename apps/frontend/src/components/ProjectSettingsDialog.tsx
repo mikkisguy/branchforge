@@ -33,6 +33,7 @@ import { CharacterSettingsContent } from "@/components/CharacterSettingsContent"
 import { RouteSettingsContent } from "@/components/RouteSettingsContent";
 import { VisualSystemFormContent } from "@/components/VisualSystemDialog";
 import { WorldElementsSettingsContent } from "@/components/WorldElementsSettingsContent";
+import { useProject } from "@/hooks/useProject";
 import { useVisualSystem } from "@/hooks/useVisualSystem";
 import {
   parseGroupPrefixes,
@@ -160,7 +161,7 @@ export function ProjectSettingsDialog({
 
           <div className="flex-1 overflow-y-auto p-6">
             <TabsPanel value="characters" className="space-y-4">
-              <CharacterSettingsContent projectId={projectId} columns={2} />
+              <CharactersTabContent projectId={projectId} />
             </TabsPanel>
             <TabsPanel value="routes" className="space-y-4">
               <RouteSettingsContent projectId={projectId} columns={2} />
@@ -186,6 +187,35 @@ export function ProjectSettingsDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ============================================================================
+// Characters tab content
+// ============================================================================
+//
+// Fetches the current project to get duoEndingEnabled and wires up
+// the toggle to updateProject. This keeps CharacterSettingsContent
+// presentational and avoids passing project data through the dialog.
+
+interface CharactersTabContentProps {
+  projectId: string;
+}
+
+function CharactersTabContent({ projectId }: CharactersTabContentProps) {
+  const { currentProject, updateProject } = useProject();
+
+  const handleToggleDuoEnding = async (enabled: boolean) => {
+    await updateProject(projectId, { duoEndingEnabled: enabled });
+  };
+
+  return (
+    <CharacterSettingsContent
+      projectId={projectId}
+      columns={2}
+      duoEndingEnabled={currentProject?.duoEndingEnabled ?? false}
+      onToggleDuoEnding={handleToggleDuoEnding}
+    />
   );
 }
 
