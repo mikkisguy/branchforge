@@ -98,9 +98,7 @@ export function CharacterList({
                   <span className="font-mono">
                     {character.renpyTag || "(no tag)"}
                   </span>
-                  {character.dialogueStyle && (
-                    <span>Style: {character.dialogueStyle}</span>
-                  )}
+
                   {character.conditionalPrefix && (
                     <span>Prefix: {character.conditionalPrefix}</span>
                   )}

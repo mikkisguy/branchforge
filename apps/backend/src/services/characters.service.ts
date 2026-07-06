@@ -49,20 +49,7 @@ import type {
 // Types
 // ============================================================================
 
-/** Character summary returned in list views */
-export interface CharacterSummary {
-  id: string;
-  name: string;
-  displayName: string;
-  renpyTag: string;
-  color: string;
-  routeAffiliation: string | null;
-  isLoveInterest: boolean;
-  isNarrator: boolean;
-  avatarUrl: string | null;
-}
-
-/** Full character detail returned for single-character operations */
+/** Character detail returned for list-views and single-character operations */
 export interface CharacterDetail {
   id: string;
   name: string;
@@ -72,7 +59,7 @@ export interface CharacterDetail {
   routeAffiliation: string | null;
   isLoveInterest: boolean;
   isNarrator: boolean;
-  dialogueStyle: string | null;
+  notes: string | null;
   conditionalPrefix: string | null;
   avatarUrl: string | null;
 }
@@ -470,7 +457,7 @@ export class CharactersService {
   async listCharacters(
     projectId: string,
     userId: string
-  ): Promise<CharacterSummary[]> {
+  ): Promise<CharacterDetail[]> {
     await requireProjectOwnership(projectId, userId);
 
     const db = getDb();
@@ -485,6 +472,8 @@ export class CharactersService {
         routeAffiliation: characters.routeAffiliation,
         isLoveInterest: characters.isLoveInterest,
         isNarrator: characters.isNarrator,
+        notes: characters.notes,
+        conditionalPrefix: characters.conditionalPrefix,
         avatarUrl: characters.avatarUrl,
       })
       .from(characters)
@@ -513,7 +502,7 @@ export class CharactersService {
       routeAffiliation: character.routeAffiliation,
       isLoveInterest: character.isLoveInterest,
       isNarrator: character.isNarrator,
-      dialogueStyle: character.dialogueStyle,
+      notes: character.notes,
       conditionalPrefix: character.conditionalPrefix,
       avatarUrl: buildAvatarUrl(character.avatarUrl),
     };
@@ -540,7 +529,7 @@ export class CharactersService {
         routeAffiliation: input.routeAffiliation,
         isLoveInterest: input.isLoveInterest,
         isNarrator: input.isNarrator,
-        dialogueStyle: input.dialogueStyle,
+        notes: input.notes,
         conditionalPrefix: input.conditionalPrefix,
       })
       .onConflictDoNothing({
@@ -561,7 +550,7 @@ export class CharactersService {
       routeAffiliation: newCharacter.routeAffiliation,
       isLoveInterest: newCharacter.isLoveInterest,
       isNarrator: newCharacter.isNarrator,
-      dialogueStyle: newCharacter.dialogueStyle,
+      notes: newCharacter.notes,
       conditionalPrefix: newCharacter.conditionalPrefix,
       avatarUrl: buildAvatarUrl(newCharacter.avatarUrl),
     };
@@ -592,7 +581,7 @@ export class CharactersService {
       routeAffiliation: updated.routeAffiliation,
       isLoveInterest: updated.isLoveInterest,
       isNarrator: updated.isNarrator,
-      dialogueStyle: updated.dialogueStyle,
+      notes: updated.notes,
       conditionalPrefix: updated.conditionalPrefix,
       avatarUrl: buildAvatarUrl(updated.avatarUrl),
     };

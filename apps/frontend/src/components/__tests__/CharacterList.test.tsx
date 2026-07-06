@@ -15,7 +15,7 @@ const mockCharacters: Character[] = [
     routeAffiliation: "EILEEN",
     isLoveInterest: true,
     isNarrator: false,
-    dialogueStyle: "casual",
+    notes: "casual notes",
     conditionalPrefix: null,
     avatarUrl: null,
     createdAt: "2024-01-01T00:00:00.000Z",

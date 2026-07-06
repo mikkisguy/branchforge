@@ -57,7 +57,7 @@ describe("CharactersService.importCharacters", () => {
     isLoveInterest: false,
     isNarrator: false,
     pairGroupId: null,
-    dialogueStyle: null,
+    notes: null,
     conditionalPrefix: null,
     avatarUrl: null,
     createdAt: new Date("2024-01-01"),

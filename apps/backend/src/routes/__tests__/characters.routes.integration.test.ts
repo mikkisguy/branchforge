@@ -90,7 +90,7 @@ describe("CharactersRoutes (Integration)", () => {
     color: "#FF6B6B",
     routeAffiliation: "EILEEN",
     isLoveInterest: true,
-    dialogueStyle: "casual",
+    notes: "casual notes",
     conditionalPrefix: null,
   };
 
@@ -102,7 +102,7 @@ describe("CharactersRoutes (Integration)", () => {
     color: "#4ECDC4",
     routeAffiliation: "LUCAS",
     isLoveInterest: true,
-    dialogueStyle: "formal",
+    notes: "formal notes",
     conditionalPrefix: "lucas_",
   };
 
@@ -114,7 +114,7 @@ describe("CharactersRoutes (Integration)", () => {
     color: "#95E1D3",
     routeAffiliation: null,
     isLoveInterest: false,
-    dialogueStyle: null,
+    notes: null,
     conditionalPrefix: null,
   };
 
@@ -421,7 +421,7 @@ describe("CharactersRoutes (Integration)", () => {
         color: "#FF6B6B",
         routeAffiliation: "EILEEN",
         isLoveInterest: true,
-        dialogueStyle: "casual",
+        notes: "casual notes",
         conditionalPrefix: null,
       });
     });
@@ -449,7 +449,7 @@ describe("CharactersRoutes (Integration)", () => {
         color: testCharacter1.color,
         routeAffiliation: testCharacter1.routeAffiliation,
         isLoveInterest: testCharacter1.isLoveInterest,
-        dialogueStyle: testCharacter1.dialogueStyle,
+        notes: testCharacter1.notes,
         // Don't include conditionalPrefix since it's null
       };
 
@@ -480,7 +480,7 @@ describe("CharactersRoutes (Integration)", () => {
         color: "#123456",
         routeAffiliation: "EILEEN",
         isLoveInterest: true,
-        dialogueStyle: "casual",
+        notes: "casual notes",
         conditionalPrefix: "new_",
       };
 
@@ -502,7 +502,7 @@ describe("CharactersRoutes (Integration)", () => {
         color: "#123456",
         routeAffiliation: "EILEEN",
         isLoveInterest: true,
-        dialogueStyle: "casual",
+        notes: "casual notes",
         conditionalPrefix: "new_",
       });
       expect(json.character.id).toBeDefined();
@@ -601,7 +601,7 @@ describe("CharactersRoutes (Integration)", () => {
         color: "#ABCDEF",
         routeAffiliation: null,
         isLoveInterest: false,
-        dialogueStyle: null,
+        notes: null,
         conditionalPrefix: null,
       });
     });
@@ -696,7 +696,7 @@ describe("CharactersRoutes (Integration)", () => {
         color: "#00FF00",
         routeAffiliation: "EILEEN", // Unchanged
         isLoveInterest: false,
-        dialogueStyle: "casual", // Unchanged
+        notes: "casual notes", // Unchanged
         conditionalPrefix: null, // Unchanged
       });
     });

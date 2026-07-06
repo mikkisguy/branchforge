@@ -31,7 +31,7 @@ export const characters = pgTable(
     // Note: Foreign key to pair_groups.id added manually in migration 0007
     // due to circular dependency (pair_groups also references characters)
     pairGroupId: uuid("pair_group_id"),
-    dialogueStyle: text("dialogue_style"),
+    notes: text("notes"),
     conditionalPrefix: text("conditional_prefix"),
     color: text("color").notNull(),
     avatarUrl: text("avatar_url"), // Path to avatar image file

@@ -281,7 +281,7 @@ describe("CharacterImportWizard — nameType warnings (issue #138)", () => {
           color: "#c8ffc8",
           routeAffiliation: null,
           isLoveInterest: false,
-          dialogueStyle: null,
+          notes: null,
           conditionalPrefix: null,
           avatarUrl: null,
           createdAt: "2024-01-01T00:00:00.000Z",

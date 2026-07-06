@@ -278,11 +278,6 @@ export function LabelPropertiesPanel({
                               <p className="text-sm font-medium truncate">
                                 {char.displayName}
                               </p>
-                              {char.dialogueStyle && (
-                                <p className="text-xs text-muted-foreground truncate italic">
-                                  "{char.dialogueStyle}"
-                                </p>
-                              )}
                             </div>
                             {char.isLoveInterest && (
                               <Heart className="size-4 text-pink-400 fill-pink-400 shrink-0 opacity-70" />

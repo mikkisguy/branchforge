@@ -39,7 +39,7 @@ interface CharacterFormState {
   renpyTag: string;
   color: string;
   routeAffiliation: string;
-  dialogueStyle: string;
+  notes: string;
   conditionalPrefix: string;
   isLoveInterest: boolean;
   isNarrator: boolean;
@@ -51,6 +51,7 @@ interface CharacterFormState {
   displayNameError?: string;
   renpyTagError?: string;
   colorError?: string;
+  notesError?: string;
 }
 
 type FormAction =
@@ -63,6 +64,7 @@ type FormAction =
   | { type: "SET_NAME_ERROR"; value: string }
   | { type: "SET_DISPLAY_NAME_ERROR"; value: string }
   | { type: "SET_RENPY_TAG_ERROR"; value: string }
+  | { type: "SET_NOTES_ERROR"; value: string }
   | { type: "SET_COLOR_ERROR"; value: string };
 
 const INITIAL_EMPTY: CharacterFormState = {
@@ -71,7 +73,7 @@ const INITIAL_EMPTY: CharacterFormState = {
   renpyTag: "",
   color: "#FF6B6B",
   routeAffiliation: "",
-  dialogueStyle: "",
+  notes: "",
   conditionalPrefix: "",
   isLoveInterest: false,
   isNarrator: false,
@@ -83,6 +85,7 @@ const INITIAL_EMPTY: CharacterFormState = {
   displayNameError: "",
   renpyTagError: "",
   colorError: "",
+  notesError: "",
 };
 
 function formReducer(
@@ -99,7 +102,7 @@ function formReducer(
         renpyTag: char.renpyTag,
         color: char.color,
         routeAffiliation: char.routeAffiliation ?? "",
-        dialogueStyle: char.dialogueStyle ?? "",
+        notes: char.notes ?? "",
         conditionalPrefix: char.conditionalPrefix ?? "",
         isLoveInterest: char.isLoveInterest,
         isNarrator: char.isNarrator,
@@ -134,6 +137,8 @@ function formReducer(
       return { ...state, renpyTagError: action.value };
     case "SET_COLOR_ERROR":
       return { ...state, colorError: action.value };
+    case "SET_NOTES_ERROR":
+      return { ...state, notesError: action.value };
   }
 }
 
@@ -157,6 +162,9 @@ function validateForm(state: CharacterFormState): {
   }
   if (!/^#[0-9A-Fa-f]{6}$/.test(state.color)) {
     errors.color = "Color must be valid hex (#RRGGBB)";
+  }
+  if (state.notes.length > 10000) {
+    errors.notes = "Notes must be 10000 characters or fewer";
   }
 
   return { valid: Object.keys(errors).length === 0, errors };
@@ -245,6 +253,7 @@ export function CharacterEditDialog({
     dispatch({ type: "SET_DISPLAY_NAME_ERROR", value: "" });
     dispatch({ type: "SET_RENPY_TAG_ERROR", value: "" });
     dispatch({ type: "SET_COLOR_ERROR", value: "" });
+    dispatch({ type: "SET_NOTES_ERROR", value: "" });
   };
 
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -295,6 +304,8 @@ export function CharacterEditDialog({
         dispatch({ type: "SET_RENPY_TAG_ERROR", value: errors.renpyTag });
       if (errors.color)
         dispatch({ type: "SET_COLOR_ERROR", value: errors.color });
+      if (errors.notes)
+        dispatch({ type: "SET_NOTES_ERROR", value: errors.notes });
       return;
     }
 
@@ -307,7 +318,7 @@ export function CharacterEditDialog({
         routeAffiliation: form.routeAffiliation.trim() || undefined,
         isLoveInterest: form.isLoveInterest,
         isNarrator: form.isNarrator,
-        dialogueStyle: form.dialogueStyle.trim() || undefined,
+        notes: form.notes.trim() || undefined,
         conditionalPrefix: form.conditionalPrefix.trim() || undefined,
       };
 
@@ -321,7 +332,7 @@ export function CharacterEditDialog({
           routeAffiliation: payload.routeAffiliation,
           isLoveInterest: payload.isLoveInterest,
           isNarrator: payload.isNarrator,
-          dialogueStyle: payload.dialogueStyle,
+          notes: payload.notes,
           conditionalPrefix: payload.conditionalPrefix,
         });
       } else {
@@ -511,7 +522,7 @@ export function CharacterEditDialog({
             </div>
           </div>
 
-          {/* Route + Dialogue Style */}
+          {/* Route + Conditional Prefix */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="edit-char-route" className="text-xs">
@@ -528,26 +539,6 @@ export function CharacterEditDialog({
                 disabled={isSaving}
               />
             </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="edit-char-style" className="text-xs">
-                Dialogue Style
-              </Label>
-              <Input
-                id="edit-char-style"
-                type="text"
-                placeholder="casual"
-                value={form.dialogueStyle}
-                onChange={(e) =>
-                  handleFieldChange("dialogueStyle", e.target.value)
-                }
-                disabled={isSaving}
-              />
-            </div>
-          </div>
-
-          {/* Conditional Prefix + Love Interest + Narrator */}
-          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label htmlFor="edit-char-prefix" className="text-xs">
                 Conditional Prefix
@@ -563,7 +554,29 @@ export function CharacterEditDialog({
                 disabled={isSaving}
               />
             </div>
+          </div>
 
+          <div className="space-y-1">
+            <Label htmlFor="edit-char-notes" className="text-xs">
+              Notes
+            </Label>
+            <textarea
+              id="edit-char-notes"
+              rows={4}
+              className="flex min-h-[250px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              placeholder="Backstory, personality notes, voice references..."
+              value={form.notes}
+              onChange={(e) => handleFieldChange("notes", e.target.value)}
+              disabled={isSaving}
+              maxLength={10000}
+            />
+            {form.notesError && (
+              <p className="text-xs text-destructive">{form.notesError}</p>
+            )}
+          </div>
+
+          {/* Love Interest + Narrator */}
+          <div className="grid grid-cols-2 gap-3">
             <div className="flex items-center gap-2 pt-5">
               <input
                 type="checkbox"
