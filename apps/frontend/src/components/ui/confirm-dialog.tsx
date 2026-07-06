@@ -132,7 +132,7 @@ export function ConfirmDialog({
         )}
       >
         {/* Header */}
-        <div className="p-6 border-b border-border/30">
+        <div className="p-6 max-mobile:p-4 border-b border-border/30">
           <h2 id="confirm-dialog-title" className="text-lg font-medium">
             {title}
           </h2>
@@ -145,7 +145,7 @@ export function ConfirmDialog({
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-border/30 flex justify-end gap-2">
+        <div className="p-6 max-mobile:p-4 border-t border-border/30 flex justify-end gap-2">
           <Button variant="outline" onClick={handleCancel} disabled={isLoading}>
             {cancelLabel}
           </Button>

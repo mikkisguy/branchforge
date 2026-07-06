@@ -22,6 +22,9 @@ export default {
         "2xl": "1400px",
       },
     },
+    screens: {
+      mobile: "375px",
+    },
     extend: {
       fontFamily: {
         sans: ["Kanit", "sans-serif"],

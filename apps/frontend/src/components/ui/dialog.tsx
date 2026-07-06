@@ -115,7 +115,7 @@ export function DialogContent({ children, className }: DialogContentProps) {
   return (
     <div
       className={cn(
-        "relative bg-card border border-border/30 rounded-lg shadow-xl p-6 w-full max-w-md max-h-[85vh] overflow-y-auto",
+        "relative bg-card border border-border/30 rounded-lg shadow-xl p-6 max-mobile:p-4 w-full max-w-md max-h-[85vh] overflow-y-auto",
         className
       )}
     >
