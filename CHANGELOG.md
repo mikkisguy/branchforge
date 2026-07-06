@@ -4,6 +4,15 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.12.0 - 2026-07-06
+
+- Added dark/light mode toggle, tuned color tokens
+- Added pair groups for duo tracking
+- Added world bible feature for tracking info
+- Added user settings: avatar upload, username management, and theme persistence
+- Added per-project visual system configuration
+- Enhanced character detection on import, fixed wizard not showing
+
 ## v0.11.1 - 2026-06-17
 
 - Improved safety with security fixes
