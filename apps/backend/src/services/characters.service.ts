@@ -49,22 +49,7 @@ import type {
 // Types
 // ============================================================================
 
-/** Character summary returned in list views */
-export interface CharacterSummary {
-  id: string;
-  name: string;
-  displayName: string;
-  renpyTag: string;
-  color: string;
-  routeAffiliation: string | null;
-  isLoveInterest: boolean;
-  isNarrator: boolean;
-  notes: string | null;
-  conditionalPrefix: string | null;
-  avatarUrl: string | null;
-}
-
-/** Full character detail returned for single-character operations */
+/** Character detail returned for list-views and single-character operations */
 export interface CharacterDetail {
   id: string;
   name: string;
@@ -472,7 +457,7 @@ export class CharactersService {
   async listCharacters(
     projectId: string,
     userId: string
-  ): Promise<CharacterSummary[]> {
+  ): Promise<CharacterDetail[]> {
     await requireProjectOwnership(projectId, userId);
 
     const db = getDb();

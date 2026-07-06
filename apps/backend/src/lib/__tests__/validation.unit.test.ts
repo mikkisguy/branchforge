@@ -1213,6 +1213,34 @@ describe("Character Schemas", () => {
       const result = createCharacterSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
+
+    it("should accept notes with exactly 10000 characters", () => {
+      const validData = {
+        projectId: "550e8400-e29b-41d4-a716-446655440000",
+        name: "Character Name",
+        displayName: "Display Name",
+        renpyTag: "char",
+        color: "#FF5733",
+        notes: "x".repeat(10000),
+      };
+
+      const result = createCharacterSchema.safeParse(validData);
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject notes with 10001 characters", () => {
+      const validData = {
+        projectId: "550e8400-e29b-41d4-a716-446655440000",
+        name: "Character Name",
+        displayName: "Display Name",
+        renpyTag: "char",
+        color: "#FF5733",
+        notes: "x".repeat(10001),
+      };
+
+      const result = createCharacterSchema.safeParse(validData);
+      expect(result.success).toBe(false);
+    });
   });
 
   describe("characterIdParamsSchema", () => {

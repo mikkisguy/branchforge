@@ -51,6 +51,7 @@ interface CharacterFormState {
   displayNameError?: string;
   renpyTagError?: string;
   colorError?: string;
+  notesError?: string;
 }
 
 type FormAction =
@@ -63,6 +64,7 @@ type FormAction =
   | { type: "SET_NAME_ERROR"; value: string }
   | { type: "SET_DISPLAY_NAME_ERROR"; value: string }
   | { type: "SET_RENPY_TAG_ERROR"; value: string }
+  | { type: "SET_NOTES_ERROR"; value: string }
   | { type: "SET_COLOR_ERROR"; value: string };
 
 const INITIAL_EMPTY: CharacterFormState = {
@@ -83,6 +85,7 @@ const INITIAL_EMPTY: CharacterFormState = {
   displayNameError: "",
   renpyTagError: "",
   colorError: "",
+  notesError: "",
 };
 
 function formReducer(
@@ -134,6 +137,8 @@ function formReducer(
       return { ...state, renpyTagError: action.value };
     case "SET_COLOR_ERROR":
       return { ...state, colorError: action.value };
+    case "SET_NOTES_ERROR":
+      return { ...state, notesError: action.value };
   }
 }
 
@@ -157,6 +162,9 @@ function validateForm(state: CharacterFormState): {
   }
   if (!/^#[0-9A-Fa-f]{6}$/.test(state.color)) {
     errors.color = "Color must be valid hex (#RRGGBB)";
+  }
+  if (state.notes.length > 10000) {
+    errors.notes = "Notes must be 10000 characters or fewer";
   }
 
   return { valid: Object.keys(errors).length === 0, errors };
@@ -245,6 +253,7 @@ export function CharacterEditDialog({
     dispatch({ type: "SET_DISPLAY_NAME_ERROR", value: "" });
     dispatch({ type: "SET_RENPY_TAG_ERROR", value: "" });
     dispatch({ type: "SET_COLOR_ERROR", value: "" });
+    dispatch({ type: "SET_NOTES_ERROR", value: "" });
   };
 
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -295,6 +304,8 @@ export function CharacterEditDialog({
         dispatch({ type: "SET_RENPY_TAG_ERROR", value: errors.renpyTag });
       if (errors.color)
         dispatch({ type: "SET_COLOR_ERROR", value: errors.color });
+      if (errors.notes)
+        dispatch({ type: "SET_NOTES_ERROR", value: errors.notes });
       return;
     }
 
@@ -557,7 +568,11 @@ export function CharacterEditDialog({
               value={form.notes}
               onChange={(e) => handleFieldChange("notes", e.target.value)}
               disabled={isSaving}
+              maxLength={10000}
             />
+            {form.notesError && (
+              <p className="text-xs text-destructive">{form.notesError}</p>
+            )}
           </div>
 
           {/* Love Interest + Narrator */}
