@@ -43,15 +43,11 @@ interface OutgoingJumpItemProps {
     effects?: Record<string, number>;
   };
   statByKey: Map<string, Stat>;
-  index: number;
 }
 
-function OutgoingJumpItem({ jump, statByKey, index }: OutgoingJumpItemProps) {
+function OutgoingJumpItem({ jump, statByKey }: OutgoingJumpItemProps) {
   return (
-    <div
-      key={`${jump.targetLabelId}-${jump.choiceText}-${index}`}
-      className="p-2 rounded-lg bg-muted/30 border border-border/50 text-xs"
-    >
+    <div className="p-2 rounded-lg bg-muted/30 border border-border/50 text-xs">
       <div className="font-medium text-foreground truncate">
         {jump.targetLabelName}
       </div>
@@ -510,12 +506,11 @@ export function LabelPropertiesPanel({
                     </p>
                   ) : (
                     <div className="space-y-2">
-                      {outgoingJumps.map((jump, i) => (
+                      {outgoingJumps.map((jump) => (
                         <OutgoingJumpItem
-                          key={`${jump.targetLabelId}-${jump.choiceText}-${i}`}
+                          key={`${jump.targetLabelId}-${jump.choiceText}`}
                           jump={jump}
                           statByKey={statByKey}
-                          index={i}
                         />
                       ))}
                     </div>

@@ -5,7 +5,7 @@
  * Pattern matches RouteEditDialog — standalone dialog with form.
  */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -287,8 +287,8 @@ export function PairGroupEditDialog({
   const isEditMode = !!pairGroupId;
   const isSaving = isCreating || isUpdating;
 
-  const sortedCharacters = [...characters]
-    .sort((a, b) => a.displayName.localeCompare(b.displayName))
+  const sortedCharacters = characters
+    .toSorted((a, b) => a.displayName.localeCompare(b.displayName))
     .map((c) => ({
       id: c.id,
       name: c.name,
@@ -299,12 +299,11 @@ export function PairGroupEditDialog({
     ? (pairGroups.find((pg) => pg.id === pairGroupId) ?? null)
     : null;
 
-  // Close dialog if editing a pair group that no longer exists
-  useEffect(() => {
-    if (isEditMode && !isLoadingPairGroups && !existingPairGroup) {
-      onOpenChange(false);
-    }
-  }, [isEditMode, isLoadingPairGroups, existingPairGroup, onOpenChange]);
+  // Derive whether the dialog should be open: close if editing a
+  // pair group that no longer exists (deleted externally after mount).
+  const pairGroupStillExists =
+    !isEditMode || isLoadingPairGroups || !!existingPairGroup;
+  const effectiveOpen = open && pairGroupStillExists;
 
   const handleCreate = async (form: PairGroupFormState) => {
     await createPairGroup({
@@ -323,7 +322,7 @@ export function PairGroupEditDialog({
 
   if (isEditMode && isLoadingPairGroups) {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={effectiveOpen} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-md w-full">
           <DialogHeader>
             <DialogTitle>Edit Pair Group</DialogTitle>
@@ -338,7 +337,7 @@ export function PairGroupEditDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={effectiveOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md w-full">
         <DialogHeader>
           <DialogTitle>
