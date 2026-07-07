@@ -25,7 +25,7 @@ import { useRouteConfigs } from "@/hooks/useRouteConfigs";
 import { useProject } from "@/hooks/useProject";
 import { useToast } from "@/contexts/ToastContext";
 import { cva } from "class-variance-authority";
-import { useLocalStorageBoolean } from "@/hooks/useLocalStorage";
+import { useResponsiveSidebarState } from "@/hooks/useResponsiveSidebarState";
 import { useStats } from "@/hooks/useStats";
 import { usePairGroups } from "@/hooks/usePairGroups";
 import {
@@ -100,9 +100,9 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
   );
 
   const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] =
-    useLocalStorageBoolean("write:left-sidebar-collapsed", false);
+    useResponsiveSidebarState("write:left-sidebar-collapsed");
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] =
-    useLocalStorageBoolean("write:right-sidebar-collapsed", false);
+    useResponsiveSidebarState("write:right-sidebar-collapsed");
 
   // Lifted dialog state (from LabelNavigator)
   const [editDialog, setEditDialog] = useState<{
@@ -269,7 +269,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
 
   if (!currentProject) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center">
+      <div className="h-full flex flex-col items-center justify-center">
         <div className="size-20 rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-4">
           <FileText className="size-10 text-muted-foreground/60" />
         </div>
@@ -288,7 +288,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
 
   if (isLoadingLabels) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center">
+      <div className="h-full flex flex-col items-center justify-center">
         <div className="relative">
           <div className="size-16 rounded-full bg-[var(--theme-color)]/10 flex items-center justify-center">
             <Loader2 className="size-8 text-[var(--theme-color)] animate-spin" />
@@ -302,7 +302,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
 
   if (!labels.length) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center">
+      <div className="h-full flex flex-col items-center justify-center">
         <div className="size-20 rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-4">
           <FileText className="size-10 text-muted-foreground/60" />
         </div>
@@ -315,7 +315,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden">
       {isFocusMode && (
         <div className="fixed top-2 right-2 z-[100] pointer-events-auto">
           <FocusModeToggle
@@ -326,7 +326,17 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
         </div>
       )}
 
-      <div className="flex-1 flex gap-4 px-4 pb-4 overflow-hidden min-h-0 min-w-0 relative">
+      <div className="flex-1 flex gap-4 px-4 max-md:px-0 pb-0 overflow-hidden min-h-0 min-w-0 relative">
+        {/* Mobile scrim backdrop – collapses open overlays on tap */}
+        {(!isLeftSidebarCollapsed || !isRightSidebarCollapsed) && (
+          <div
+            className="max-md:fixed max-md:inset-0 max-md:bg-black/40 max-md:z-30"
+            onClick={() => {
+              if (!isLeftSidebarCollapsed) setIsLeftSidebarCollapsed(true);
+              if (!isRightSidebarCollapsed) setIsRightSidebarCollapsed(true);
+            }}
+          />
+        )}
         <div
           aria-hidden={isFocusMode}
           className={sidebarVariants({
@@ -360,7 +370,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
         </div>
 
         {isLeftSidebarCollapsed && !isFocusMode && (
-          <div className="min-h-0 shrink-0 mt-3 flex items-start -ml-4">
+          <div className="min-h-0 shrink-0 mt-3 flex items-start -ml-4 max-md:fixed max-md:left-1 max-md:z-50 max-md:mt-0 max-md:-ml-0 max-md:bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))]">
             <button
               type="button"
               onClick={() => setIsLeftSidebarCollapsed(false)}

@@ -792,7 +792,7 @@ export const ProseEditor = function ProseEditor({
       {/* Goal Pill */}
       {writingGoalSettings?.dailyWritingGoal != null && (
         <div
-          className="relative z-10 -mt-12 px-4 pt-10 pb-2 border-b border-border bg-gradient-to-b from-transparent via-card/30 to-card/80 transition-opacity duration-300 ease-out"
+          className="relative z-10 -mt-12 px-4 pt-10 pb-2 border-b border-border bg-gradient-to-b from-transparent via-card/30 to-card/80 transition-opacity duration-300 ease-out flex justify-end"
           style={{
             opacity: isFocusMode ? (isBottomBarHovered ? 1 : 0.4) : 1,
           }}
@@ -847,7 +847,7 @@ export const ProseEditor = function ProseEditor({
             <FontSizeSwitcher mode="write" direction="up" />
           </div>
 
-          <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-4 text-sm max-md:hidden">
             <span className="text-muted-foreground">
               <span className="text-foreground font-medium">{wordCount}</span>{" "}
               word{wordCount !== 1 ? "s" : ""}

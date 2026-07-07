@@ -4,10 +4,12 @@ import {
   useEffectEvent,
   useReducer,
   useRef,
+  useState,
 } from "react";
 import {
   BookOpen,
   SquarePen,
+  Menu,
   Palette,
   Settings,
   LogOut,
@@ -154,7 +156,7 @@ function ModeSwitcher({
         type="button"
         onClick={() => setMode("write")}
         className={`flex ${
-          isCollapsed ? "w-full p-2.5" : "flex-1 px-2 py-1.5"
+          isCollapsed ? "w-full p-3.5" : "flex-1 px-2 py-1.5"
         } items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-all ${
           mode === "write"
             ? "text-white bg-[var(--theme-color)]"
@@ -169,7 +171,7 @@ function ModeSwitcher({
         type="button"
         onClick={() => setMode("script")}
         className={`flex ${
-          isCollapsed ? "w-full p-2.5" : "flex-1 px-2 py-1.5"
+          isCollapsed ? "w-full p-3.5" : "flex-1 px-2 py-1.5"
         } items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-all ${
           mode === "script"
             ? "text-white bg-[var(--theme-color)]"
@@ -193,6 +195,8 @@ interface ProjectSelectorProps {
   isOpen: boolean;
   onToggle: () => void;
   onClose: () => void;
+  /** When true, popover opens above the button (for mobile bottom bar) */
+  bottomPopover?: boolean;
 }
 
 /** Project picker. When collapsed, a button that opens a popover.
@@ -206,6 +210,7 @@ function ProjectSelector({
   isOpen,
   onToggle,
   onClose,
+  bottomPopover = false,
 }: ProjectSelectorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   // `onClose` is read inside the click-outside handler but isn't
@@ -241,7 +246,7 @@ function ProjectSelector({
           type="button"
           onClick={onToggle}
           disabled={isLoadingProjects}
-          className={`flex items-center justify-center p-2.5 rounded-md text-sm font-medium transition-colors ${
+          className={`flex items-center justify-center p-3.5 rounded-md text-sm font-medium transition-colors ${
             isOpen
               ? "text-foreground bg-muted/50"
               : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -251,7 +256,13 @@ function ProjectSelector({
           <FolderOpen className="size-4 flex-shrink-0" />
         </button>
         {isOpen && (
-          <div className="absolute left-full top-0 ml-2 bg-popover border border-border/70 rounded-lg shadow-xl shadow-black/25 ring-1 ring-white/5 min-w-[300px] max-w-[400px] z-50">
+          <div
+            className={`absolute bg-popover border border-border/70 rounded-lg shadow-xl shadow-black/25 ring-1 ring-white/5 min-w-[300px] max-w-[400px] z-50 ${
+              bottomPopover
+                ? "bottom-full left-1/2 -translate-x-1/2 mb-2"
+                : "left-full top-0 ml-2"
+            }`}
+          >
             <div className="p-2 max-h-[400px] overflow-y-auto">
               {isLoadingProjects ? (
                 <div className="px-3 py-2 text-sm text-muted-foreground">
@@ -318,6 +329,8 @@ interface NavButtonsProps {
   showLabel: boolean;
   onOpenProjectSettings: () => void;
   onOpenFlow: () => void;
+  /** Render buttons in a horizontal row (for mobile bottom bar) */
+  horizontal?: boolean;
 }
 
 /** Project Settings + Flow navigation entries. */
@@ -327,16 +340,17 @@ function NavButtons({
   showLabel,
   onOpenProjectSettings,
   onOpenFlow,
+  horizontal = false,
 }: NavButtonsProps) {
   const disabled = !projectId;
   return (
-    <nav className="flex flex-col gap-1">
+    <nav className={`flex gap-1 ${horizontal ? "flex-row" : "flex-col"}`}>
       <button
         type="button"
         onClick={onOpenProjectSettings}
         disabled={disabled}
         className={`flex items-center ${
-          isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
+          isCollapsed ? "justify-center p-3.5" : "gap-3 p-2"
         } rounded-md text-sm font-medium transition-colors ${
           disabled
             ? "text-muted-foreground/50 cursor-not-allowed"
@@ -352,7 +366,7 @@ function NavButtons({
         onClick={onOpenFlow}
         disabled={disabled}
         className={`flex items-center ${
-          isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
+          isCollapsed ? "justify-center p-3.5" : "gap-3 p-2"
         } rounded-md text-sm font-medium transition-colors ${
           disabled
             ? "text-muted-foreground/50 cursor-not-allowed"
@@ -375,6 +389,8 @@ interface ThemeSwitcherProps {
   isOpen: boolean;
   onToggle: () => void;
   onClose: () => void;
+  /** When true, popover opens above the button (for mobile bottom bar) */
+  bottomPopover?: boolean;
 }
 
 /** Theme palette picker. When collapsed, a button that opens a popover.
@@ -387,6 +403,7 @@ function ThemeSwitcher({
   isOpen,
   onToggle,
   onClose,
+  bottomPopover = false,
 }: ThemeSwitcherProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   // `onClose` is read inside the click-outside handler but isn't
@@ -419,7 +436,7 @@ function ThemeSwitcher({
         <button
           type="button"
           onClick={onToggle}
-          className={`flex items-center justify-center p-2.5 rounded-md text-sm font-medium transition-colors ${
+          className={`flex items-center justify-center p-3.5 rounded-md text-sm font-medium transition-colors ${
             isOpen
               ? "text-foreground bg-muted/50"
               : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -429,7 +446,13 @@ function ThemeSwitcher({
           <Palette className="size-4 flex-shrink-0" />
         </button>
         {isOpen && (
-          <div className="absolute left-full top-0 ml-2 bg-popover border border-border/70 rounded-lg p-3 shadow-xl shadow-black/25 ring-1 ring-white/5 z-50">
+          <div
+            className={`absolute bg-popover border border-border/70 rounded-lg p-3 shadow-xl shadow-black/25 ring-1 ring-white/5 z-50 ${
+              bottomPopover
+                ? "bottom-full left-1/2 -translate-x-1/2 mb-2"
+                : "left-full top-0 ml-2"
+            }`}
+          >
             <div className="flex gap-2">
               {themePalettes.map((palette) => (
                 <button
@@ -491,7 +514,7 @@ function CollapseButton({ isCollapsed, onToggle }: CollapseButtonProps) {
       type="button"
       onClick={onToggle}
       className={`flex items-center ${
-        isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
+        isCollapsed ? "justify-center p-3.5" : "gap-3 p-2"
       } rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors`}
       title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
     >
@@ -529,7 +552,7 @@ function DarkModeToggle({
       aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
       title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
       className={`flex items-center ${
-        isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
+        isCollapsed ? "justify-center p-3.5" : "gap-3 p-2"
       } rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors`}
     >
       {isDarkMode ? (
@@ -562,7 +585,7 @@ function UserActions({
         type="button"
         onClick={onOpenSettings}
         className={`flex items-center ${
-          isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
+          isCollapsed ? "justify-center p-3.5" : "gap-3 p-2"
         } rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors`}
         title="Settings"
       >
@@ -573,7 +596,7 @@ function UserActions({
         type="button"
         onClick={onLogout}
         className={`flex items-center ${
-          isCollapsed ? "justify-center p-2.5" : "gap-3 p-2"
+          isCollapsed ? "justify-center p-3.5" : "gap-3 p-2"
         } rounded-md text-sm font-medium text-muted-foreground hover:text-destructive-muted hover:bg-destructive/10 transition-colors`}
         title="Logout"
       >
@@ -613,6 +636,27 @@ export function LeftSidebar(props: LeftSidebarProps) {
   const isSettingsOpenExternally = props.isSettingsOpenExternally;
   const onSettingsOpenChangeExternally = props.onSettingsOpenChangeExternally;
   const [modals, dispatchModal] = useReducer(modalReducer, initialModalState);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const mobileMenuBtnRef = useRef<HTMLButtonElement>(null);
+  const closeMobileMenuEvent = useEffectEvent(() => setMobileMenuOpen(false));
+
+  // Click-outside dismiss for mobile hamburger menu popover
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(event.target as Node) &&
+        mobileMenuBtnRef.current &&
+        !mobileMenuBtnRef.current.contains(event.target as Node)
+      ) {
+        closeMobileMenuEvent();
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [mobileMenuOpen]);
   const projectsRef = useRef(projects);
 
   const isSettingsOpen = isSettingsOpenExternally ?? modals.settings;
@@ -678,7 +722,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
   return (
     <>
       <div
-        className={`fixed left-0 top-0 h-screen ${width} bg-card/95 backdrop-blur border-r border-border/30 flex flex-col transition-all duration-300 z-50`}
+        className={`max-md:hidden fixed left-0 top-0 h-screen ${width} bg-card/95 backdrop-blur border-r border-border/30 flex flex-col transition-all duration-300 z-50`}
       >
         {/* Top Section */}
         <div className="flex-1 flex flex-col p-2 gap-2">
@@ -759,6 +803,140 @@ export function LeftSidebar(props: LeftSidebarProps) {
           />
         </div>
       </div>
+
+      {/* Mobile bottom nav bar (below md breakpoint) */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-card/95 backdrop-blur border-t border-border/30 flex items-center justify-between px-4 pb-[env(safe-area-inset-bottom)] z-50">
+        {/* Mode switcher – horizontal, icon-only */}
+        <div className="flex bg-muted/50 rounded-md p-0.5">
+          <button
+            type="button"
+            onClick={() => setMode("write")}
+            className={`p-3.5 rounded-md transition-all ${
+              mode === "write"
+                ? "text-white bg-[var(--theme-color)]"
+                : "text-muted-foreground"
+            }`}
+            title="Write Mode"
+          >
+            <BookOpen className="size-4 flex-shrink-0" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("script")}
+            className={`p-3.5 rounded-md transition-all ${
+              mode === "script"
+                ? "text-white bg-[var(--theme-color)]"
+                : "text-muted-foreground"
+            }`}
+            title="Script Mode"
+          >
+            <SquarePen className="size-4 flex-shrink-0" />
+          </button>
+        </div>
+
+        <ProjectSelector
+          projectId={projectId}
+          projects={projects}
+          isLoadingProjects={isLoadingProjects}
+          setCurrentProject={setCurrentProject}
+          isCollapsed={true}
+          isOpen={modals.projectPopover}
+          onToggle={() =>
+            dispatchModal({ type: "TOGGLE", key: "projectPopover" })
+          }
+          onClose={() =>
+            dispatchModal({ type: "CLOSE", key: "projectPopover" })
+          }
+          bottomPopover
+        />
+
+        <div className="flex bg-muted/50 rounded-md p-0.5">
+          <NavButtons
+            projectId={projectId}
+            isCollapsed={true}
+            showLabel={false}
+            horizontal
+            onOpenProjectSettings={() =>
+              dispatchModal({ type: "OPEN", key: "projectSettings" })
+            }
+            onOpenFlow={() => dispatchModal({ type: "OPEN", key: "flow" })}
+          />
+        </div>
+
+        {/* Hamburger menu – replaces dark mode, theme, settings, logout */}
+        <button
+          ref={mobileMenuBtnRef}
+          type="button"
+          onClick={() => setMobileMenuOpen((prev) => !prev)}
+          className={`flex items-center justify-center p-3.5 rounded-md text-sm font-medium transition-colors ${
+            mobileMenuOpen
+              ? "text-foreground bg-muted/50"
+              : "text-muted-foreground"
+          }`}
+          title="Menu"
+          aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+        >
+          <Menu className="size-4 flex-shrink-0" />
+        </button>
+      </div>
+
+      {/* Mobile hamburger menu popover */}
+      {mobileMenuOpen && (
+        <div
+          ref={mobileMenuRef}
+          className="md:hidden fixed bottom-14 left-0 right-0 bg-popover border-t border-border/70 shadow-xl shadow-black/25 ring-1 ring-white/5 z-[100]"
+        >
+          <div className="flex flex-col">
+            <div className="p-2 rounded-md text-sm font-medium text-muted-foreground border-b border-muted/60 transition-colors">
+              <DarkModeToggle
+                isDarkMode={isDarkMode}
+                onToggle={onToggleDarkMode}
+                isCollapsed={false}
+                showLabel={true}
+              />
+            </div>
+
+            <div className="p-2 rounded-md text-sm font-medium text-muted-foreground border-b border-muted/60 transition-colors">
+              <ThemeSwitcher
+                theme={theme}
+                setTheme={setTheme}
+                themePalettes={themePalettes}
+                isCollapsed={false}
+                isOpen={false}
+                onToggle={() => {}}
+                onClose={() => {}}
+              />
+            </div>
+
+            <div className="p-2 rounded-md text-sm font-medium text-muted-foreground border-b border-muted/60 transition-colors">
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setSettingsOpen(true);
+                }}
+                className="flex items-center gap-3 p-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                title="Settings"
+              >
+                <Settings className="size-4 flex-shrink-0" />
+                <span>Settings</span>
+              </button>
+            </div>
+
+            <div className="p-2 rounded-md text-sm font-medium text-muted-foreground transition-colors">
+              <button
+                type="button"
+                onClick={onLogout}
+                className="flex items-center gap-3 p-2 rounded-md text-sm font-medium text-muted-foreground hover:text-destructive-muted hover:bg-destructive/10 transition-colors"
+                title="Logout"
+              >
+                <LogOut className="size-4 flex-shrink-0" />
+                <span>Logout</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modals */}
       <SettingsModal

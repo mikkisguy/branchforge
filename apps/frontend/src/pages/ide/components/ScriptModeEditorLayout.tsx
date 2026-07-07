@@ -138,7 +138,17 @@ export function ScriptModeEditorLayout({
         </div>
       )}
 
-      <div className="flex-1 flex gap-4 px-4 pb-4 overflow-hidden min-h-0 min-w-0 relative">
+      <div className="flex-1 flex gap-4 px-4 max-md:px-0 pb-4 overflow-hidden min-h-0 min-w-0 relative">
+        {/* Mobile scrim backdrop – collapses open overlays on tap */}
+        {(!isLeftSidebarCollapsed || !isRightSidebarCollapsed) && (
+          <div
+            className="max-md:fixed max-md:inset-0 max-md:bg-black/40 max-md:z-30"
+            onClick={() => {
+              if (!isLeftSidebarCollapsed) setIsLeftSidebarCollapsed(true);
+              if (!isRightSidebarCollapsed) setIsRightSidebarCollapsed(true);
+            }}
+          />
+        )}
         <div
           aria-hidden={isFocusMode}
           className={sidebarVariants({
@@ -197,7 +207,7 @@ export function ScriptModeEditorLayout({
         </div>
 
         {isLeftSidebarCollapsed && !isFocusMode && (
-          <div className="min-h-0 shrink-0 mt-3 flex items-start -ml-4">
+          <div className="min-h-0 shrink-0 mt-3 flex items-start -ml-4 max-md:fixed max-md:left-1 max-md:z-50 max-md:mt-0 max-md:-ml-0 max-md:bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))]">
             <button
               type="button"
               onClick={() => setIsLeftSidebarCollapsed(false)}
