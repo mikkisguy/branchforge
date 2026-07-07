@@ -45,7 +45,8 @@ const sidebarVariants = cva(
     variants: {
       variant: {
         collapsed: "w-0 opacity-0 -translate-x-full pointer-events-none",
-        expanded: "w-48 opacity-100 translate-x-0",
+        expanded:
+          "w-48 opacity-100 translate-x-0 max-md:absolute max-md:z-50 max-md:left-0 max-md:top-0 max-md:h-full max-md:w-72 max-md:shadow-xl max-md:rounded-none max-md:mt-0",
       },
     },
     defaultVariants: {
@@ -325,7 +326,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
         </div>
       )}
 
-      <div className="flex-1 flex gap-4 px-4 pb-4 overflow-hidden min-h-0 min-w-0">
+      <div className="flex-1 flex gap-4 px-4 pb-4 overflow-hidden min-h-0 min-w-0 relative">
         <div
           aria-hidden={isFocusMode}
           className={sidebarVariants({

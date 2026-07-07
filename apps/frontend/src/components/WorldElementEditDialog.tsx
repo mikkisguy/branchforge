@@ -147,7 +147,7 @@ function ElementFormContent({
 
   return (
     <div className="space-y-4 mt-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
         <div className="space-y-1">
           <Label htmlFor="element-name" className="text-xs">
             Name *

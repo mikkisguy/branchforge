@@ -88,7 +88,7 @@ export function WritingStatsDialog({
     >
       <div className="space-y-6">
         {/* Summary Stats */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 max-sm:grid-cols-1 gap-4">
           <div className="bg-muted/50 rounded-lg p-3 text-center">
             <p className="text-2xl font-bold text-[var(--theme-color)]">
               {totalWords.toLocaleString()}

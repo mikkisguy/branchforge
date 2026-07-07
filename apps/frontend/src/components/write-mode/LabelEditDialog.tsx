@@ -337,7 +337,7 @@ export function LabelEditDialog({
           )}
 
           {/* Route, Status, Visibility Grid */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 max-sm:grid-cols-1 gap-3">
             {/* Route Field */}
             <div className="space-y-1.5">
               <label

@@ -229,7 +229,7 @@ export function VisualSystemFormContent({
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
         <div className="space-y-1">
           <Label htmlFor="vs-label-padding" className="text-xs">
             Label Padding *
@@ -292,7 +292,7 @@ export function VisualSystemFormContent({
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
         <div className="space-y-1">
           <Label htmlFor="vs-default-group" className="text-xs">
             Default Group Type

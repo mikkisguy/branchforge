@@ -119,7 +119,7 @@ export function ProjectSettingsDialog({
     >
       <DialogContent className="max-w-3xl w-full h-[80vh] min-h-[500px] p-0 gap-0 flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="p-6 border-b border-border/30 flex items-start justify-between shrink-0">
+        <div className="p-6 max-mobile:p-4 border-b border-border/30 flex items-start justify-between shrink-0">
           <div>
             <h2 className="text-lg font-medium">Project Settings</h2>
             <p className="text-sm text-muted-foreground mt-1">
@@ -143,8 +143,11 @@ export function ProjectSettingsDialog({
           onValueChange={(next) => setActiveTab(next as SettingsTab)}
           className="flex flex-col flex-1 min-h-0"
         >
-          <div className="px-6 pt-2 shrink-0">
-            <TabsList ariaLabel="Project settings sections">
+          <div className="px-6 pt-2 shrink-0 max-sm:overflow-x-auto">
+            <TabsList
+              ariaLabel="Project settings sections"
+              className="max-sm:mx-0 max-sm:px-3"
+            >
               {TAB_ORDER.map((tab) => {
                 const Icon = TAB_ICONS[tab];
                 return (
@@ -159,7 +162,7 @@ export function ProjectSettingsDialog({
             </TabsList>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto p-6 max-mobile:p-4">
             <TabsPanel value="characters" className="space-y-4">
               <CharactersTabContent projectId={projectId} />
             </TabsPanel>
@@ -176,7 +179,7 @@ export function ProjectSettingsDialog({
         </Tabs>
 
         {/* Footer */}
-        <div className="p-6 border-t border-border/30 flex justify-end shrink-0">
+        <div className="p-6 max-mobile:p-4 border-t border-border/30 flex justify-end shrink-0">
           <Button
             type="button"
             variant="outline"

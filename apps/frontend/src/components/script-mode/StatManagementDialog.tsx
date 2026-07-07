@@ -75,8 +75,8 @@ export function StatManagementDialog({
       maxWidth="5xl"
       onOpenTrigger={refreshProgression}
     >
-      <div className="flex h-full overflow-hidden">
-        <div className="w-[340px] shrink-0 border-r border-border/30 overflow-y-auto p-6">
+      <div className="flex h-full overflow-hidden max-md:flex-col">
+        <div className="w-[340px] shrink-0 border-r border-border/30 overflow-y-auto p-6 max-md:w-full max-md:border-r-0 max-md:border-b">
           <h3 className="text-sm font-medium mb-4">Stats</h3>
           {isLoadingStats ? (
             <div className="flex items-center justify-center py-8">

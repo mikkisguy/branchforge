@@ -145,7 +145,7 @@ function RouteFormContent({
       </DialogHeader>
 
       <div className="space-y-4 mt-4">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
           <div className="space-y-1">
             <Label htmlFor="route-key" className="text-xs">
               Route Key *
@@ -188,7 +188,7 @@ function RouteFormContent({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
           <div className="space-y-1">
             <Label htmlFor="jump-prefix" className="text-xs">
               Jump Prefix *
