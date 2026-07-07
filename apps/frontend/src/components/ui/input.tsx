@@ -30,7 +30,7 @@ function Input({ className, type, size, ref, ...props }: InputProps) {
       type={type}
       className={cn(
         inputVariants({ size, className }),
-        type !== "file" && "min-h-11"
+        type !== "file" && size !== "sm" && "min-h-11"
       )}
       ref={ref}
       {...props}
