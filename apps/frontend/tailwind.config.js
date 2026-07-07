@@ -22,10 +22,10 @@ export default {
         "2xl": "1400px",
       },
     },
-    screens: {
-      mobile: "375px",
-    },
     extend: {
+      screens: {
+        mobile: "375px",
+      },
       fontFamily: {
         sans: ["Kanit", "sans-serif"],
         display: ["Sirin Stencil", "cursive"],
