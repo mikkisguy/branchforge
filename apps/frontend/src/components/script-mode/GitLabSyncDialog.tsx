@@ -307,7 +307,7 @@ export function GitLabSyncDialog({
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="max-w-md w-full p-0 gap-0">
         {/* Header */}
-        <div className="p-6 border-b border-border/30 flex items-start justify-between">
+        <div className="p-6 max-mobile:p-4 border-b border-border/30 flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-muted rounded-md">
               <SyncIcon className="size-5" />
@@ -337,7 +337,7 @@ export function GitLabSyncDialog({
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-4">
+        <div className="p-6 max-mobile:p-4 space-y-4">
           {/* Progress / Status */}
           {state.isProcessing || state.operation ? (
             <div className="space-y-3">
@@ -495,7 +495,7 @@ export function GitLabSyncDialog({
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-border/30 flex justify-end gap-2">
+        <div className="p-6 max-mobile:p-4 border-t border-border/30 flex justify-end gap-2">
           {!state.isProcessing && !state.operation && (
             <>
               <Button type="button" variant="outline" onClick={handleClose}>

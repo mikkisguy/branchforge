@@ -323,7 +323,7 @@ export function ConflictReviewDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl w-full max-h-[90vh] p-0 gap-0 flex flex-col">
         {/* Header */}
-        <div className="p-6 border-b border-border/30 flex items-start justify-between">
+        <div className="p-6 max-mobile:p-4 border-b border-border/30 flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-3">
               <h2 className="text-lg font-medium">Review Sync Conflicts</h2>
@@ -355,7 +355,7 @@ export function ConflictReviewDialog({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6 max-mobile:p-4">
           {state.isLoading && state.conflicts.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
@@ -447,7 +447,7 @@ export function ConflictReviewDialog({
               )}
 
               {/* Side-by-side Comparison */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
                 {/* BranchForge Version */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -523,7 +523,7 @@ export function ConflictReviewDialog({
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-border/30 flex justify-between">
+        <div className="p-6 max-mobile:p-4 border-t border-border/30 flex justify-between">
           <Button
             type="button"
             variant="outline"

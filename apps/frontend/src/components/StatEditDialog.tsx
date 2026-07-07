@@ -158,7 +158,7 @@ function StatFormContent({
 
   return (
     <div className="space-y-4 mt-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
         <div className="space-y-1">
           <Label htmlFor="stat-key" className="text-xs">
             Key *
@@ -199,7 +199,7 @@ function StatFormContent({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
         <div className="space-y-1">
           <Label htmlFor="stat-min" className="text-xs">
             Min Value

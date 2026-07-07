@@ -380,7 +380,7 @@ export function CharacterEditDialog({
 
         <div className="space-y-4 mt-4">
           {/* Name + Display Name */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
             <div className="space-y-1">
               <Label htmlFor="edit-char-name" className="text-xs">
                 Name *
@@ -421,7 +421,7 @@ export function CharacterEditDialog({
           </div>
 
           {/* Ren'Py Tag + Color */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
             <div className="space-y-1">
               <Label htmlFor="edit-char-tag" className="text-xs">
                 Ren'Py Tag *
@@ -523,7 +523,7 @@ export function CharacterEditDialog({
           </div>
 
           {/* Route + Conditional Prefix */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
             <div className="space-y-1">
               <Label htmlFor="edit-char-route" className="text-xs">
                 Route Affiliation
@@ -576,7 +576,7 @@ export function CharacterEditDialog({
           </div>
 
           {/* Love Interest + Narrator */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
             <div className="flex items-center gap-2 pt-5">
               <input
                 type="checkbox"

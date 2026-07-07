@@ -74,7 +74,7 @@ export const WritingGoalPill = memo(function WritingGoalPill({
       </div>
 
       {/* Text indicator */}
-      <span className="text-xs font-medium shrink-0 text-muted-foreground whitespace-nowrap">
+      <span className="text-xs font-medium shrink-0 text-muted-foreground max-sm:whitespace-normal whitespace-nowrap">
         {remaining} words to go
       </span>
 
@@ -90,7 +90,7 @@ export const WritingGoalPill = memo(function WritingGoalPill({
 
       {/* Click hint */}
       {onClick && (
-        <span className="text-xs text-muted-foreground/40 shrink-0">
+        <span className="text-xs text-muted-foreground/40 shrink-0 max-sm:hidden">
           Click for stats
         </span>
       )}
