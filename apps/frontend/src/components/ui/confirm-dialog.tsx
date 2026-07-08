@@ -27,6 +27,8 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   /** Whether the action is in progress */
   isLoading?: boolean;
+  /** Whether the action is non-destructive (default: false) */
+  isNonDestructive?: boolean;
   /** Loading text shown when isLoading is true (default: "Loading...") */
   loadingLabel?: string;
   /** Called when onConfirm throws an error. Receives the error object. */
@@ -44,6 +46,7 @@ export function ConfirmDialog({
   cancelLabel = "Cancel",
   confirmLabel = "Confirm",
   isLoading = false,
+  isNonDestructive = false,
   loadingLabel = "Loading...",
   onError,
   className,
@@ -150,7 +153,7 @@ export function ConfirmDialog({
             {cancelLabel}
           </Button>
           <Button
-            variant="destructive"
+            variant={isNonDestructive ? "default" : "destructive"}
             onClick={handleConfirm}
             disabled={isLoading}
           >

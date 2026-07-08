@@ -1,11 +1,18 @@
-import { useState, useCallback, useReducer } from "react";
-import { Download, Upload, GitBranch, Loader2 } from "lucide-react";
+import { useState, useCallback, useReducer, useRef } from "react";
+import {
+  Download,
+  Upload,
+  GitBranch,
+  Loader2,
+  FolderArchive,
+} from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
 import {
   GitLabSyncDialog,
   SyncOperationType,
 } from "@/components/script-mode/GitLabSyncDialog";
 import { ConflictReviewDialog } from "@/components/script-mode/ConflictReviewDialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
 import { projectFilesApi } from "@/lib/api/project-files";
 import type { SourceOrigin } from "@branchforge/shared";
@@ -100,21 +107,31 @@ export function StatusBar({
   }, [onOpenZipImportDialog]);
 
   /**
-   * Handle ZIP export click - generates export and triggers download
+   * Handle ZIP export click - shows confirm dialog before exporting
    */
   const [isExporting, setIsExporting] = useState(false);
+  const isExportingRef = useRef(false);
+  const [showExportConfirm, setShowExportConfirm] = useState(false);
   const { error: showErrorToast } = useToast();
-  const handleZipExportClick = useCallback(async () => {
-    if (!projectId || isExporting) return;
 
+  const handleZipExportClick = useCallback(() => {
+    if (!projectId) return;
+    setShowExportConfirm(true);
+  }, [projectId]);
+
+  const handleConfirmExport = useCallback(async () => {
+    if (!projectId || isExporting || isExportingRef.current) return;
+    isExportingRef.current = true;
     setIsExporting(true);
     try {
       const result = await projectFilesApi.generateExport(projectId);
       await projectFilesApi.downloadExport(projectId, result.id);
+      setShowExportConfirm(false);
     } catch (err) {
       console.error("Export failed:", err);
       showErrorToast("Export failed. Please try again.", "Export Error");
     } finally {
+      isExportingRef.current = false;
       setIsExporting(false);
     }
   }, [projectId, isExporting, showErrorToast]);
@@ -143,7 +160,7 @@ export function StatusBar({
   return (
     <>
       <div
-        className="flex items-center justify-between px-4 py-2 text-xs bg-card/50 border-t border-dashed transition-opacity duration-300 ease-out"
+        className="flex items-center justify-between px-3 max-sm:px-2 py-2 text-xs bg-card/50 border-t border-dashed transition-opacity duration-300 ease-out gap-2 max-sm:gap-1"
         style={{
           borderColor: "var(--theme-border-subtle)",
           opacity: isFocusMode ? (isHovered ? 1 : 0.6) : 1,
@@ -153,22 +170,22 @@ export function StatusBar({
         onFocusCapture={() => setIsHovered(true)}
         onBlurCapture={() => setIsHovered(false)}
       >
-        <div className="flex items-center gap-4">
-          <div className="text-muted-foreground border-r border-border/30 pr-4">
+        <div className="flex items-center gap-3 max-sm:gap-2">
+          <div className="text-muted-foreground border-r border-border/30 pr-3 max-sm:pr-2">
             {language}
           </div>
           {isGitLabAvailable && (
-            <div className="flex items-center gap-1.5 text-muted-foreground border-r border-border/30 pr-4">
+            <div className="flex items-center gap-1.5 text-muted-foreground border-r border-border/30 pr-3 max-sm:pr-2 max-sm:border-r-0">
               <GitBranch className="size-3" />
               <span>{gitlabBranch ?? "Unknown"}</span>
             </div>
           )}
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 max-sm:gap-1">
           {/* GitLab import - only show for GITLAB source type */}
           {isGitLabAvailable && (
             <>
-              <div className="flex items-center gap-2 border-l border-border/30 pl-4">
+              <div className="flex items-center gap-2 max-sm:gap-1 border-l border-border/30 pl-3 max-sm:pl-2">
                 <button
                   type="button"
                   onClick={handleImportClick}
@@ -179,10 +196,10 @@ export function StatusBar({
                   title="Import from GitLab"
                 >
                   <Download className="size-3.5" />
-                  <span>Import from GitLab</span>
+                  <span className="max-sm:hidden">Import from GitLab</span>
                 </button>
               </div>
-              <div className="border-l border-border/30 pl-4">
+              <div className="border-l border-border/30 pl-4 max-sm:pl-2">
                 <button
                   type="button"
                   onClick={handleExportClick}
@@ -193,7 +210,7 @@ export function StatusBar({
                   title="Sync to GitLab"
                 >
                   <Upload className="size-3.5" />
-                  <span>Sync to GitLab</span>
+                  <span className="max-sm:hidden">Sync to GitLab</span>
                 </button>
               </div>
             </>
@@ -201,7 +218,7 @@ export function StatusBar({
 
           {/* ZIP import - only show for ZIP source type when callback exists */}
           {isZipAvailable && onOpenZipImportDialog && (
-            <div className="flex items-center gap-2 border-l border-border/30 pl-4">
+            <div className="flex items-center gap-2 border-l border-border/30 pl-4 max-sm:pl-2">
               <button
                 type="button"
                 onClick={handleZipImportClick}
@@ -212,14 +229,14 @@ export function StatusBar({
                 title="Import from Zip"
               >
                 <Download className="size-3.5" />
-                <span>Import from Zip</span>
+                <span className="max-sm:hidden">Import from Zip</span>
               </button>
             </div>
           )}
 
           {/* Export as Zip - available for ALL project types */}
           {projectId && (
-            <div className="border-l border-border/30 pl-4">
+            <div className="border-l border-border/30 pl-4 max-sm:pl-2">
               <button
                 type="button"
                 onClick={handleZipExportClick}
@@ -234,9 +251,11 @@ export function StatusBar({
                 {isExporting ? (
                   <Loader2 className="size-3.5 animate-spin" />
                 ) : (
-                  <Upload className="size-3.5" />
+                  <FolderArchive className="size-3.5" />
                 )}
-                <span>{isExporting ? "Exporting..." : "Export Zip"}</span>
+                <span className="max-sm:hidden">
+                  {isExporting ? "Exporting..." : "Export Zip"}
+                </span>
               </button>
             </div>
           )}
@@ -271,6 +290,18 @@ export function StatusBar({
             onApplyResolutions={handleApplyResolutions}
           />
         )}
+      {/* Export Confirm Dialog */}
+      <ConfirmDialog
+        open={showExportConfirm}
+        onOpenChange={setShowExportConfirm}
+        onConfirm={handleConfirmExport}
+        title="Export Project Files"
+        description="Download all project files as a ZIP archive?"
+        confirmLabel="Export"
+        isLoading={isExporting}
+        loadingLabel="Exporting..."
+        isNonDestructive
+      />
     </>
   );
 }

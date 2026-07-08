@@ -31,9 +31,10 @@ const sidebarVariants = cva(
   {
     variants: {
       variant: {
-        collapsed: "w-0 opacity-0 -translate-x-full pointer-events-none",
+        collapsed:
+          "w-0 opacity-0 -translate-x-full pointer-events-none max-md:absolute max-md:z-50 max-md:left-0 max-md:top-0 max-md:h-full max-md:mt-0 max-md:rounded-none",
         expanded:
-          "w-56 opacity-100 translate-x-0 max-md:absolute max-md:z-50 max-md:left-0 max-md:top-0 max-md:h-full max-md:w-72 max-md:shadow-xl max-md:rounded-none max-md:mt-0",
+          "w-56 opacity-100 translate-x-0 max-md:absolute max-md:z-50 max-md:left-0 max-md:top-0 max-md:h-full max-md:w-72 max-md:shadow-xl max-md:rounded-none max-md:mt-0 max-md:bg-card",
       },
     },
     defaultVariants: {
@@ -59,6 +60,7 @@ interface ScriptModeEditorLayoutProps {
   setIsLeftSidebarCollapsed: Dispatch<SetStateAction<boolean>>;
   isRightSidebarCollapsed: boolean;
   setIsRightSidebarCollapsed: Dispatch<SetStateAction<boolean>>;
+  isMobile: boolean;
   focusModeState: FocusModeState;
   editorRef: RefObject<ScriptEditorRef | null>;
   onFocusModeToggle: () => void;
@@ -97,6 +99,7 @@ export function ScriptModeEditorLayout({
   setIsLeftSidebarCollapsed,
   isRightSidebarCollapsed,
   setIsRightSidebarCollapsed,
+  isMobile,
   focusModeState,
   editorRef,
   onFocusModeToggle,
@@ -121,10 +124,17 @@ export function ScriptModeEditorLayout({
     null
   );
 
-  const toggleRightSidebar = useCallback(
-    () => setIsRightSidebarCollapsed((previous) => !previous),
-    [setIsRightSidebarCollapsed]
-  );
+  // On mobile, only one overlay sidebar may be open at a time. Opening
+  // one closes the other so the two panels never stack on a narrow viewport.
+  const openLeftSidebar = useCallback(() => {
+    setIsLeftSidebarCollapsed(false);
+    if (isMobile) setIsRightSidebarCollapsed(true);
+  }, [isMobile, setIsLeftSidebarCollapsed, setIsRightSidebarCollapsed]);
+
+  const toggleRightSidebar = useCallback(() => {
+    setIsRightSidebarCollapsed((previous) => !previous);
+    if (isMobile) setIsLeftSidebarCollapsed(true);
+  }, [isMobile, setIsLeftSidebarCollapsed, setIsRightSidebarCollapsed]);
 
   return (
     <>
@@ -138,7 +148,18 @@ export function ScriptModeEditorLayout({
         </div>
       )}
 
-      <div className="flex-1 flex gap-4 px-4 pb-4 overflow-hidden min-h-0 min-w-0 relative">
+      <div className="flex-1 flex gap-4 px-4 max-md:px-2 pb-4 max-md:pb-0 overflow-hidden min-h-0 min-w-0 relative ">
+        {/* Mobile scrim backdrop – collapses open overlays on tap */}
+        {!isFocusMode &&
+          (!isLeftSidebarCollapsed || !isRightSidebarCollapsed) && (
+            <div
+              className="hidden max-md:block max-md:fixed max-md:inset-0 max-md:bg-black/40 max-md:z-30"
+              onClick={() => {
+                if (!isLeftSidebarCollapsed) setIsLeftSidebarCollapsed(true);
+                if (!isRightSidebarCollapsed) setIsRightSidebarCollapsed(true);
+              }}
+            />
+          )}
         <div
           aria-hidden={isFocusMode}
           className={sidebarVariants({
@@ -197,10 +218,10 @@ export function ScriptModeEditorLayout({
         </div>
 
         {isLeftSidebarCollapsed && !isFocusMode && (
-          <div className="min-h-0 shrink-0 mt-3 flex items-start -ml-4">
+          <div className="min-h-0 shrink-0 mt-3 flex items-start -ml-4 max-md:hidden">
             <button
               type="button"
-              onClick={() => setIsLeftSidebarCollapsed(false)}
+              onClick={openLeftSidebar}
               className="size-12 rounded-lg border border-border bg-card/50 hover:bg-muted/80 transition-colors flex items-center justify-center"
               aria-label="Expand project files sidebar"
               title="Expand project files sidebar"
@@ -212,8 +233,19 @@ export function ScriptModeEditorLayout({
 
         <div className="flex-1 flex flex-col min-h-0 min-w-0 mt-3">
           {!isFocusMode && (
-            <div className="mb-2 flex gap-2">
-              <div className="flex-1 min-w-0">
+            <div className="mb-2 flex gap-2 items-center">
+              {isLeftSidebarCollapsed && (
+                <button
+                  type="button"
+                  onClick={openLeftSidebar}
+                  className="md:hidden h-12 w-9 shrink-0 rounded-lg border border-border/80 bg-card/55 backdrop-blur-sm flex items-center justify-center"
+                  aria-label="Expand project files sidebar"
+                  title="Expand project files sidebar"
+                >
+                  <ChevronRight className="size-4 text-muted-foreground" />
+                </button>
+              )}
+              <div className="flex-1 min-w-0 h-12 overflow-hidden">
                 <EditorTabBar
                   items={tabItems}
                   activeItemId={activeFileId}
@@ -238,6 +270,17 @@ export function ScriptModeEditorLayout({
                   />
                 </div>
               </div>
+              {isRightSidebarCollapsed && (
+                <button
+                  type="button"
+                  onClick={toggleRightSidebar}
+                  className="md:hidden h-12 w-9 shrink-0 rounded-lg border border-border/80 bg-card/55 backdrop-blur-sm flex items-center justify-center"
+                  aria-label="Expand reference sidebar"
+                  title="Expand reference sidebar"
+                >
+                  <ChevronLeft className="size-4 text-muted-foreground" />
+                </button>
+              )}
             </div>
           )}
 

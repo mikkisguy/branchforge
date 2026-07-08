@@ -16,7 +16,7 @@ import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
 import { LabelEditDialog } from "@/components/write-mode/LabelEditDialog.lazy";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CharacterEditDialog } from "@/components/CharacterEditDialog.lazy";
-import { ChevronRight, FileText, Loader2 } from "lucide-react";
+import { ChevronRight, ChevronLeft, FileText, Loader2 } from "lucide-react";
 import { EditorTabBar } from "@/components/ide-shared";
 import { Button } from "@/components/ui/button";
 import { useLabels } from "@/hooks/useLabels";
@@ -25,7 +25,7 @@ import { useRouteConfigs } from "@/hooks/useRouteConfigs";
 import { useProject } from "@/hooks/useProject";
 import { useToast } from "@/contexts/ToastContext";
 import { cva } from "class-variance-authority";
-import { useLocalStorageBoolean } from "@/hooks/useLocalStorage";
+import { useResponsiveSidebarState } from "@/hooks/useResponsiveSidebarState";
 import { useStats } from "@/hooks/useStats";
 import { usePairGroups } from "@/hooks/usePairGroups";
 import {
@@ -44,9 +44,10 @@ const sidebarVariants = cva(
   {
     variants: {
       variant: {
-        collapsed: "w-0 opacity-0 -translate-x-full pointer-events-none",
+        collapsed:
+          "w-0 opacity-0 -translate-x-full pointer-events-none max-md:absolute max-md:z-50 max-md:left-0 max-md:top-0 max-md:h-full max-md:mt-0 max-md:rounded-none",
         expanded:
-          "w-48 opacity-100 translate-x-0 max-md:absolute max-md:z-50 max-md:left-0 max-md:top-0 max-md:h-full max-md:w-72 max-md:shadow-xl max-md:rounded-none max-md:mt-0",
+          "w-48 opacity-100 translate-x-0 max-md:absolute max-md:z-50 max-md:left-0 max-md:top-0 max-md:h-full max-md:w-72 max-md:shadow-xl max-md:rounded-none max-md:mt-0 max-md:bg-card",
       },
     },
     defaultVariants: {
@@ -99,10 +100,10 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
     [pairGroups]
   );
 
-  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] =
-    useLocalStorageBoolean("write:left-sidebar-collapsed", false);
+  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed, isMobile] =
+    useResponsiveSidebarState("write:left-sidebar-collapsed");
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] =
-    useLocalStorageBoolean("write:right-sidebar-collapsed", false);
+    useResponsiveSidebarState("write:right-sidebar-collapsed");
 
   // Lifted dialog state (from LabelNavigator)
   const [editDialog, setEditDialog] = useState<{
@@ -129,6 +130,18 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
       setIsRightSidebarCollapsed,
       editorRef,
     });
+
+  // On mobile, only one overlay sidebar may be open at a time. Opening one
+  // closes the other so the two panels never stack on a narrow viewport.
+  const openLeftSidebar = useCallback(() => {
+    setIsLeftSidebarCollapsed(false);
+    if (isMobile) setIsRightSidebarCollapsed(true);
+  }, [isMobile, setIsLeftSidebarCollapsed, setIsRightSidebarCollapsed]);
+
+  const toggleRightSidebar = useCallback(() => {
+    setIsRightSidebarCollapsed((prev) => !prev);
+    if (isMobile) setIsLeftSidebarCollapsed(true);
+  }, [isMobile, setIsLeftSidebarCollapsed, setIsRightSidebarCollapsed]);
 
   const [currentDraft, setCurrentDraft] = useState<LabelDialogueDraft>(() => ({
     labelId: activeLabel?.id ?? activeLabelId,
@@ -269,7 +282,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
 
   if (!currentProject) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center">
+      <div className="h-full flex flex-col items-center justify-center">
         <div className="size-20 rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-4">
           <FileText className="size-10 text-muted-foreground/60" />
         </div>
@@ -288,7 +301,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
 
   if (isLoadingLabels) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center">
+      <div className="h-full flex flex-col items-center justify-center">
         <div className="relative">
           <div className="size-16 rounded-full bg-[var(--theme-color)]/10 flex items-center justify-center">
             <Loader2 className="size-8 text-[var(--theme-color)] animate-spin" />
@@ -302,7 +315,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
 
   if (!labels.length) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center">
+      <div className="h-full flex flex-col items-center justify-center">
         <div className="size-20 rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-4">
           <FileText className="size-10 text-muted-foreground/60" />
         </div>
@@ -315,7 +328,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden max-md:px-2">
       {isFocusMode && (
         <div className="fixed top-2 right-2 z-[100] pointer-events-auto">
           <FocusModeToggle
@@ -326,7 +339,18 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
         </div>
       )}
 
-      <div className="flex-1 flex gap-4 px-4 pb-4 overflow-hidden min-h-0 min-w-0 relative">
+      <div className="flex-1 flex gap-4 px-4 max-md:px-0 pb-0 overflow-hidden min-h-0 min-w-0 relative">
+        {/* Mobile scrim backdrop – collapses open overlays on tap */}
+        {!isFocusMode &&
+          (!isLeftSidebarCollapsed || !isRightSidebarCollapsed) && (
+            <div
+              className="hidden max-md:block max-md:fixed max-md:inset-0 max-md:bg-black/40 max-md:z-30"
+              onClick={() => {
+                if (!isLeftSidebarCollapsed) setIsLeftSidebarCollapsed(true);
+                if (!isRightSidebarCollapsed) setIsRightSidebarCollapsed(true);
+              }}
+            />
+          )}
         <div
           aria-hidden={isFocusMode}
           className={sidebarVariants({
@@ -360,10 +384,10 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
         </div>
 
         {isLeftSidebarCollapsed && !isFocusMode && (
-          <div className="min-h-0 shrink-0 mt-3 flex items-start -ml-4">
+          <div className="min-h-0 shrink-0 mt-3 flex items-start -ml-4 max-md:hidden">
             <button
               type="button"
-              onClick={() => setIsLeftSidebarCollapsed(false)}
+              onClick={openLeftSidebar}
               className="size-12 rounded-lg border border-border bg-card/50 hover:bg-muted/80 transition-colors flex items-center justify-center"
               aria-label="Expand label navigator sidebar"
               title="Expand label navigator sidebar"
@@ -375,8 +399,19 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
 
         <div className="flex-1 flex flex-col min-h-0 min-w-0 mt-3">
           {!isFocusMode && (
-            <div className="mb-2 flex gap-2">
-              <div className="flex-1 min-w-0">
+            <div className="mb-2 flex gap-2 items-center">
+              {isLeftSidebarCollapsed && (
+                <button
+                  type="button"
+                  onClick={openLeftSidebar}
+                  className="md:hidden h-12 w-9 shrink-0 rounded-lg border border-border/80 bg-card/55 backdrop-blur-sm flex items-center justify-center"
+                  aria-label="Expand label navigator sidebar"
+                  title="Expand label navigator sidebar"
+                >
+                  <ChevronRight className="size-4 text-muted-foreground" />
+                </button>
+              )}
+              <div className="flex-1 min-w-0 h-12 overflow-hidden">
                 <EditorTabBar
                   items={tabItems}
                   activeItemId={activeLabelId}
@@ -395,6 +430,17 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
                   />
                 </div>
               </div>
+              {isRightSidebarCollapsed && (
+                <button
+                  type="button"
+                  onClick={toggleRightSidebar}
+                  className="md:hidden h-12 w-9 shrink-0 rounded-lg border border-border/80 bg-card/55 backdrop-blur-sm flex items-center justify-center"
+                  aria-label="Expand properties sidebar"
+                  title="Expand properties sidebar"
+                >
+                  <ChevronLeft className="size-4 text-muted-foreground" />
+                </button>
+              )}
             </div>
           )}
 
@@ -422,11 +468,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
           routeConfigs={routeConfigs}
           pairGroups={pairGroupSummaries}
           isCollapsed={isRightSidebarCollapsed || isFocusMode}
-          onCollapseToggle={
-            !isFocusMode
-              ? () => setIsRightSidebarCollapsed((prev) => !prev)
-              : undefined
-          }
+          onCollapseToggle={!isFocusMode ? toggleRightSidebar : undefined}
           onEdit={handleEditFromPanel}
           onCharacterEdit={setEditingCharacterId}
         />

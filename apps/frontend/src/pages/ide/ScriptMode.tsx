@@ -16,7 +16,7 @@ import { useScriptModeRefresh } from "@/hooks/useScriptModeRefresh";
 import { useToast } from "@/contexts/ToastContext";
 import type { SourceOrigin } from "@branchforge/shared";
 import type { ScriptEditorRef } from "@/components/script-mode/ScriptEditor";
-import { useLocalStorageBoolean } from "@/hooks/useLocalStorage";
+import { useResponsiveSidebarState } from "@/hooks/useResponsiveSidebarState";
 import { ScriptModeEditorLayout } from "./components/ScriptModeEditorLayout";
 import { ScriptModeEmptyState } from "./components/ScriptModeEmptyState";
 import { useTextUndo } from "@/hooks/useTextUndo";
@@ -53,10 +53,10 @@ export function ScriptMode({
   const [showSyncDialog, setShowSyncDialog] = useState(false);
   const [showZipImportDialog, setShowZipImportDialog] = useState(false);
 
-  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] =
-    useLocalStorageBoolean("script:left-sidebar-collapsed", false);
+  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed, isMobile] =
+    useResponsiveSidebarState("script:left-sidebar-collapsed");
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] =
-    useLocalStorageBoolean("script:right-sidebar-collapsed", false);
+    useResponsiveSidebarState("script:right-sidebar-collapsed");
 
   const focusModeState = useFocusModeState("script:focus-mode");
   const {
@@ -340,7 +340,7 @@ export function ScriptMode({
 
   if (isLoadingLabels || isLoadingFiles) {
     return (
-      <div className="h-screen flex flex-col overflow-hidden">
+      <div className="h-full flex flex-col overflow-hidden">
         <div className="flex-1 flex flex-col pt-16">
           <div className="flex-1 flex items-center justify-center">
             <p className="text-muted-foreground">Loading project…</p>
@@ -352,7 +352,7 @@ export function ScriptMode({
 
   if (!projectFiles.length) {
     return (
-      <div className="h-screen flex flex-col overflow-hidden">
+      <div className="h-full flex flex-col overflow-hidden">
         <ScriptModeEmptyState
           projectId={projectId}
           projectName={projectName}
@@ -369,7 +369,7 @@ export function ScriptMode({
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden">
       <ScriptModeEditorLayout
         projectName={projectName}
         projectId={projectId}
@@ -387,6 +387,7 @@ export function ScriptMode({
         setIsLeftSidebarCollapsed={setIsLeftSidebarCollapsed}
         isRightSidebarCollapsed={isRightSidebarCollapsed}
         setIsRightSidebarCollapsed={setIsRightSidebarCollapsed}
+        isMobile={isMobile}
         focusModeState={focusModeState}
         editorRef={editorRef}
         onFocusModeToggle={handleFocusModeToggle}

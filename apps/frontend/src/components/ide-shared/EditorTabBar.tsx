@@ -1,13 +1,21 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent,
   type MouseEvent,
   type WheelEvent as ReactWheelEvent,
 } from "react";
-import { ChevronsLeft, ChevronsRight, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import {
+  ChevronsLeft,
+  ChevronsRight,
+  ChevronDown,
+  Menu,
+  X,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface EditorTabBarItem {
@@ -27,6 +35,9 @@ interface EditorTabBarProps {
   titleMaxWidthClassName?: string;
 }
 
+const META_BADGE_CLASSES =
+  "rounded px-1.5 py-0.5 text-[11px] font-semibold tracking-wide bg-muted/55 text-muted-foreground/80 shrink-0";
+
 export function EditorTabBar({
   items,
   activeItemId,
@@ -37,10 +48,65 @@ export function EditorTabBar({
   titleMaxWidthClassName = "max-w-[220px]",
 }: EditorTabBarProps) {
   const tabsScrollContainerRef = useRef<HTMLDivElement>(null);
+  const mobileToggleRef = useRef<HTMLButtonElement>(null);
+  const dropdownMenuRef = useRef<HTMLDivElement>(null);
   const scrollIndicatorRafIdRef = useRef<number | null>(null);
   const [showLeftScrollIndicator, setShowLeftScrollIndicator] = useState(false);
   const [showRightScrollIndicator, setShowRightScrollIndicator] =
     useState(false);
+  const [mobileDropdownOpen, setMobileDropdownOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+
+  // Position the dropdown relative to the toggle button (portal + fixed)
+  useLayoutEffect(() => {
+    if (!mobileDropdownOpen || !mobileToggleRef.current) return;
+    const update = () => {
+      const rect = mobileToggleRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setDropdownStyle({
+        position: "fixed",
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+      });
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [mobileDropdownOpen]);
+
+  // Click-outside: close if click is outside both toggle button and dropdown menu
+  useEffect(() => {
+    if (!mobileDropdownOpen) return;
+    const handler = (event: Event) => {
+      const target = event.target as Node;
+      if (
+        !mobileToggleRef.current?.contains(target) &&
+        !dropdownMenuRef.current?.contains(target)
+      ) {
+        setMobileDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [mobileDropdownOpen]);
+
+  // Escape key: close the mobile dropdown
+  useEffect(() => {
+    if (!mobileDropdownOpen) return;
+    const handler = (event: Event) => {
+      if ((event as unknown as { key: string }).key === "Escape") {
+        setMobileDropdownOpen(false);
+        mobileToggleRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [mobileDropdownOpen]);
 
   const updateScrollIndicators = useCallback(() => {
     const container = tabsScrollContainerRef.current;
@@ -63,6 +129,8 @@ export function EditorTabBar({
       setShowLeftScrollIndicator(false);
       // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change
       setShowRightScrollIndicator(false);
+      // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change
+      setMobileDropdownOpen(false);
       return;
     }
 
@@ -185,6 +253,8 @@ export function EditorTabBar({
     [updateScrollIndicators]
   );
 
+  const activeItem = items.find((item) => item.id === activeItemId);
+
   return (
     <div
       className={cn(
@@ -194,7 +264,100 @@ export function EditorTabBar({
           : "mb-2 h-12 overflow-hidden rounded-lg border border-border/80 bg-card/55 opacity-100 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
       )}
     >
-      <div className="relative h-full w-full min-w-0 overflow-hidden rounded-[inherit]">
+      {/* Mobile tab dropdown (below md) */}
+      <div className="md:hidden h-full">
+        <button
+          ref={mobileToggleRef}
+          type="button"
+          onClick={() => {
+            const nextOpen = !mobileDropdownOpen;
+            setMobileDropdownOpen(nextOpen);
+            if (nextOpen) {
+              requestAnimationFrame(() => {
+                const firstItemButton =
+                  dropdownMenuRef.current?.querySelector<HTMLButtonElement>(
+                    "button"
+                  );
+                firstItemButton?.focus();
+              });
+            }
+          }}
+          aria-haspopup="listbox"
+          aria-expanded={mobileDropdownOpen}
+          className="h-full w-full flex items-center gap-2 px-3 text-sm"
+        >
+          <Menu className="size-4 text-muted-foreground shrink-0" />
+          <span className="truncate font-medium">
+            {activeItem?.title ??
+              (items.length === 0 ? "No tabs" : "Select tab")}
+          </span>
+          {activeItem?.meta ? (
+            <span className={META_BADGE_CLASSES}>{activeItem.meta}</span>
+          ) : null}
+          <ChevronDown
+            className={cn(
+              "size-4 text-muted-foreground ml-auto shrink-0 transition-transform",
+              mobileDropdownOpen && "rotate-180"
+            )}
+          />
+        </button>
+
+        {mobileDropdownOpen &&
+          createPortal(
+            <div
+              ref={dropdownMenuRef}
+              role="listbox"
+              style={dropdownStyle}
+              className="z-[110] rounded-lg border border-border bg-card shadow-xl max-h-48 overflow-y-auto"
+            >
+              {items.map((item) => {
+                const isActive = item.id === activeItemId;
+                return (
+                  <div
+                    key={item.id}
+                    role="option"
+                    aria-selected={isActive}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2.5 text-sm",
+                      isActive ? "bg-muted/50" : "hover:bg-muted/30"
+                    )}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void onSelect(item.id);
+                        setMobileDropdownOpen(false);
+                      }}
+                      className="flex-1 text-left truncate min-w-0"
+                    >
+                      <span className={cn(isActive && "font-medium")}>
+                        {item.title}
+                      </span>
+                    </button>
+                    {item.meta ? (
+                      <span className={META_BADGE_CLASSES}>{item.meta}</span>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onClose(event, item.id);
+                      }}
+                      className="rounded p-1 hover:bg-muted-foreground/10 shrink-0 text-muted-foreground"
+                      aria-label={item.closeLabel ?? `Close ${item.title}`}
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>,
+            document.body
+          )}
+      </div>
+
+      {/* Desktop scrollable tab row (md and above) */}
+      <div className="hidden md:block relative h-full w-full min-w-0 overflow-hidden rounded-[inherit]">
         <div
           ref={tabsScrollContainerRef}
           onScroll={updateScrollIndicators}

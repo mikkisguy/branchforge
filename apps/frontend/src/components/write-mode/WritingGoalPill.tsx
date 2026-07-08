@@ -73,8 +73,8 @@ export const WritingGoalPill = memo(function WritingGoalPill({
         </svg>
       </div>
 
-      {/* Text indicator */}
-      <span className="text-xs font-medium shrink-0 text-muted-foreground max-sm:whitespace-normal whitespace-nowrap">
+      {/* Text indicator — hidden on small screens */}
+      <span className="text-xs font-medium shrink-0 text-muted-foreground whitespace-nowrap max-md:hidden">
         {remaining} words to go
       </span>
 
@@ -82,18 +82,6 @@ export const WritingGoalPill = memo(function WritingGoalPill({
       <span className="text-xs text-muted-foreground/60 shrink-0">
         {progressPercent}%
       </span>
-
-      {/* Goal indicator */}
-      <span className="text-xs text-muted-foreground/60 shrink-0">
-        {goal} words
-      </span>
-
-      {/* Click hint */}
-      {onClick && (
-        <span className="text-xs text-muted-foreground/40 shrink-0 max-sm:hidden">
-          Click for stats
-        </span>
-      )}
     </div>
   );
 });
