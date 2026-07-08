@@ -816,6 +816,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
                 ? "text-white bg-[var(--theme-color)]"
                 : "text-muted-foreground"
             }`}
+            aria-label="Write Mode"
             title="Write Mode"
           >
             <BookOpen className="size-4 flex-shrink-0" />
@@ -828,6 +829,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
                 ? "text-white bg-[var(--theme-color)]"
                 : "text-muted-foreground"
             }`}
+            aria-label="Script Mode"
             title="Script Mode"
           >
             <SquarePen className="size-4 flex-shrink-0" />

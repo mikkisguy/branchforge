@@ -32,7 +32,7 @@ const panelVariants = cva(
   {
     variants: {
       collapsed: {
-        true: "w-0 opacity-0 translate-x-full pointer-events-none",
+        true: "w-0 opacity-0 translate-x-full pointer-events-none max-md:absolute max-md:z-40 max-md:inset-y-0 max-md:right-0 max-md:h-full max-md:mb-0 max-md:mt-0 max-md:rounded-none",
         false:
           "w-64 opacity-100 translate-x-0 max-md:absolute max-md:z-40 max-md:inset-y-0 max-md:right-0 max-md:h-full max-md:w-72 max-md:shadow-xl max-md:rounded-none max-md:mt-0",
       },
@@ -463,7 +463,7 @@ export function ScriptReferencePanel({
       />
 
       {isCollapsed && onCollapseToggle && (
-        <div className="min-h-0 shrink-0 mt-3 flex items-start -ml-4 max-md:fixed max-md:left-1 max-md:z-50 max-md:mt-0 max-md:-ml-0 max-md:bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))]">
+        <div className="min-h-0 shrink-0 mt-3 flex items-start -ml-4 max-md:hidden">
           <button
             type="button"
             onClick={onCollapseToggle}

@@ -1,4 +1,4 @@
-import { useState, useCallback, useReducer } from "react";
+import { useState, useCallback, useReducer, useRef } from "react";
 import {
   Download,
   Upload,
@@ -110,6 +110,7 @@ export function StatusBar({
    * Handle ZIP export click - shows confirm dialog before exporting
    */
   const [isExporting, setIsExporting] = useState(false);
+  const isExportingRef = useRef(false);
   const [showExportConfirm, setShowExportConfirm] = useState(false);
   const { error: showErrorToast } = useToast();
 
@@ -119,7 +120,8 @@ export function StatusBar({
   }, [projectId]);
 
   const handleConfirmExport = useCallback(async () => {
-    if (!projectId || isExporting) return;
+    if (!projectId || isExporting || isExportingRef.current) return;
+    isExportingRef.current = true;
     setIsExporting(true);
     try {
       const result = await projectFilesApi.generateExport(projectId);
@@ -129,6 +131,7 @@ export function StatusBar({
       console.error("Export failed:", err);
       showErrorToast("Export failed. Please try again.", "Export Error");
     } finally {
+      isExportingRef.current = false;
       setIsExporting(false);
     }
   }, [projectId, isExporting, showErrorToast]);

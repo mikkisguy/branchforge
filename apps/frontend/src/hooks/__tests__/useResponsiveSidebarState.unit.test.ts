@@ -217,4 +217,36 @@ describe("useResponsiveSidebarState", () => {
       expect.any(Function)
     );
   });
+
+  // ---------------------------------------------------------------------------
+  // isMobile flag (third tuple element)
+  // ---------------------------------------------------------------------------
+
+  it("exposes isMobile=true on mobile", () => {
+    stubMql.matches = false; // mobile
+    const { result } = renderHook(() =>
+      useResponsiveSidebarState("test:sidebar")
+    );
+    expect(result.current[2]).toBe(true);
+  });
+
+  it("exposes isMobile=false on desktop", () => {
+    stubMql.matches = true; // desktop
+    const { result } = renderHook(() =>
+      useResponsiveSidebarState("test:sidebar")
+    );
+    expect(result.current[2]).toBe(false);
+  });
+
+  it("updates isMobile when the viewport changes", () => {
+    stubMql.matches = true; // desktop
+    const { result } = renderHook(() =>
+      useResponsiveSidebarState("test:sidebar")
+    );
+    expect(result.current[2]).toBe(false);
+
+    stubMql.matches = false; // switch to mobile
+    act(() => stubMql.fireChange());
+    expect(result.current[2]).toBe(true);
+  });
 });

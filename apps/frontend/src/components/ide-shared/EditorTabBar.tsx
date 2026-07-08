@@ -35,6 +35,9 @@ interface EditorTabBarProps {
   titleMaxWidthClassName?: string;
 }
 
+const META_BADGE_CLASSES =
+  "rounded px-1.5 py-0.5 text-[11px] font-semibold tracking-wide bg-muted/55 text-muted-foreground/80 shrink-0";
+
 export function EditorTabBar({
   items,
   activeItemId,
@@ -92,6 +95,19 @@ export function EditorTabBar({
     return () => document.removeEventListener("mousedown", handler);
   }, [mobileDropdownOpen]);
 
+  // Escape key: close the mobile dropdown
+  useEffect(() => {
+    if (!mobileDropdownOpen) return;
+    const handler = (event: Event) => {
+      if ((event as unknown as { key: string }).key === "Escape") {
+        setMobileDropdownOpen(false);
+        mobileToggleRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [mobileDropdownOpen]);
+
   const updateScrollIndicators = useCallback(() => {
     const container = tabsScrollContainerRef.current;
     if (!container) {
@@ -113,6 +129,8 @@ export function EditorTabBar({
       setShowLeftScrollIndicator(false);
       // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change
       setShowRightScrollIndicator(false);
+      // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change
+      setMobileDropdownOpen(false);
       return;
     }
 
@@ -251,7 +269,21 @@ export function EditorTabBar({
         <button
           ref={mobileToggleRef}
           type="button"
-          onClick={() => setMobileDropdownOpen((prev) => !prev)}
+          onClick={() => {
+            const nextOpen = !mobileDropdownOpen;
+            setMobileDropdownOpen(nextOpen);
+            if (nextOpen) {
+              requestAnimationFrame(() => {
+                const firstItemButton =
+                  dropdownMenuRef.current?.querySelector<HTMLButtonElement>(
+                    "button"
+                  );
+                firstItemButton?.focus();
+              });
+            }
+          }}
+          aria-haspopup="listbox"
+          aria-expanded={mobileDropdownOpen}
           className="h-full w-full flex items-center gap-2 px-3 text-sm"
         >
           <Menu className="size-4 text-muted-foreground shrink-0" />
@@ -260,9 +292,7 @@ export function EditorTabBar({
               (items.length === 0 ? "No tabs" : "Select tab")}
           </span>
           {activeItem?.meta ? (
-            <span className="rounded px-1.5 py-0.5 text-[11px] font-semibold tracking-wide bg-muted/55 text-muted-foreground/80 shrink-0">
-              {activeItem.meta}
-            </span>
+            <span className={META_BADGE_CLASSES}>{activeItem.meta}</span>
           ) : null}
           <ChevronDown
             className={cn(
@@ -276,6 +306,7 @@ export function EditorTabBar({
           createPortal(
             <div
               ref={dropdownMenuRef}
+              role="listbox"
               style={dropdownStyle}
               className="z-[110] rounded-lg border border-border bg-card shadow-xl max-h-48 overflow-y-auto"
             >
@@ -284,6 +315,8 @@ export function EditorTabBar({
                 return (
                   <div
                     key={item.id}
+                    role="option"
+                    aria-selected={isActive}
                     className={cn(
                       "flex items-center gap-2 px-3 py-2.5 text-sm",
                       isActive ? "bg-muted/50" : "hover:bg-muted/30"
@@ -302,9 +335,7 @@ export function EditorTabBar({
                       </span>
                     </button>
                     {item.meta ? (
-                      <span className="rounded px-1.5 py-0.5 text-[11px] font-semibold tracking-wide bg-muted/55 text-muted-foreground/80 shrink-0">
-                        {item.meta}
-                      </span>
+                      <span className={META_BADGE_CLASSES}>{item.meta}</span>
                     ) : null}
                     <button
                       type="button"

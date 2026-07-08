@@ -53,7 +53,7 @@ export function ScriptMode({
   const [showSyncDialog, setShowSyncDialog] = useState(false);
   const [showZipImportDialog, setShowZipImportDialog] = useState(false);
 
-  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] =
+  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed, isMobile] =
     useResponsiveSidebarState("script:left-sidebar-collapsed");
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] =
     useResponsiveSidebarState("script:right-sidebar-collapsed");
@@ -387,6 +387,7 @@ export function ScriptMode({
         setIsLeftSidebarCollapsed={setIsLeftSidebarCollapsed}
         isRightSidebarCollapsed={isRightSidebarCollapsed}
         setIsRightSidebarCollapsed={setIsRightSidebarCollapsed}
+        isMobile={isMobile}
         focusModeState={focusModeState}
         editorRef={editorRef}
         onFocusModeToggle={handleFocusModeToggle}

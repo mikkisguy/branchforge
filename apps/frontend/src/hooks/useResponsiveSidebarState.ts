@@ -16,6 +16,12 @@ import { useLocalStorageBoolean } from "./useLocalStorage";
  * desktop restores the desktop-persisted state.
  *
  * On desktop (>= 768px): the persisted localStorage value is used.
+ *
+ * Returns a readonly tuple `[collapsed, setCollapsed, isMobile]`. The third
+ * element is the live mobile flag so callers can enforce mobile-only
+ * behaviour (e.g. mutual exclusivity between left/right overlays) without
+ * subscribing to matchMedia themselves. Existing two-element destructuring
+ * `[a, b] = ...` continues to work.
  */
 export function useResponsiveSidebarState(key: string, defaultValue = false) {
   const [stored, setStored] = useLocalStorageBoolean(key, defaultValue);
@@ -63,5 +69,5 @@ export function useResponsiveSidebarState(key: string, defaultValue = false) {
     [setStored]
   );
 
-  return [effective, setValue] as const;
+  return [effective, setValue, isMobile] as const;
 }
