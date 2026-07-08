@@ -8,7 +8,16 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { Ellipsis, Check, ChevronRight, ChevronDown } from "lucide-react";
+import {
+  Ellipsis,
+  Check,
+  ChevronRight,
+  ChevronDown,
+  Undo2,
+  Redo2,
+  Maximize2,
+  Minimize2,
+} from "lucide-react";
 import type { ReactNode, CSSProperties, MouseEvent } from "react";
 
 // ── Context ──────────────────────────────────────────────────────────────
@@ -168,6 +177,85 @@ export function FABExpandableChoice({
   );
 }
 
+// ── Common FAB action button helpers ────────────────────────────────────
+
+interface FABUndoButtonProps {
+  canUndo: boolean;
+  onUndo: () => void;
+}
+
+/** Undo button for mobile FAB popovers. Tapping performs undo and closes the popover. */
+export function FABUndoButton({ canUndo, onUndo }: FABUndoButtonProps) {
+  const { closePopover } = useFABPopover();
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        onUndo();
+        closePopover();
+      }}
+      disabled={!canUndo}
+      aria-disabled={!canUndo}
+      className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-left"
+    >
+      <Undo2 className="size-4" />
+      Undo
+    </button>
+  );
+}
+
+interface FABRedoButtonProps {
+  canRedo: boolean;
+  onRedo: () => void;
+}
+
+/** Redo button for mobile FAB popovers. Tapping performs redo and closes the popover. */
+export function FABRedoButton({ canRedo, onRedo }: FABRedoButtonProps) {
+  const { closePopover } = useFABPopover();
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        onRedo();
+        closePopover();
+      }}
+      disabled={!canRedo}
+      aria-disabled={!canRedo}
+      className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-left"
+    >
+      <Redo2 className="size-4" />
+      Redo
+    </button>
+  );
+}
+
+interface FABFocusButtonProps {
+  isFocusMode: boolean;
+  onToggle: () => void;
+}
+
+/** Focus mode toggle button for mobile FAB popovers. */
+export function FABFocusButton({ isFocusMode, onToggle }: FABFocusButtonProps) {
+  const { closePopover } = useFABPopover();
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        onToggle();
+        closePopover();
+      }}
+      className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors text-left"
+    >
+      {isFocusMode ? (
+        <Minimize2 className="size-4" />
+      ) : (
+        <Maximize2 className="size-4" />
+      )}
+      {isFocusMode ? "Exit Focus" : "Focus Mode"}
+    </button>
+  );
+}
+
 // ── Main component ───────────────────────────────────────────────────────
 
 interface MobileOverflowFABProps {
@@ -239,7 +327,7 @@ export function MobileOverflowFAB({
   useEffect(() => {
     if (!open) return;
     const handler = (event: Event) => {
-      if ((event as unknown as { key: string }).key === "Escape") {
+      if ((event as KeyboardEvent).key === "Escape") {
         setOpen(false);
         fabRef.current?.focus();
       }

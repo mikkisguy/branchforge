@@ -8,4 +8,7 @@ export {
   useFABPopover,
   FABToggle,
   FABExpandableChoice,
+  FABUndoButton,
+  FABRedoButton,
+  FABFocusButton,
 } from "./MobileOverflowFAB";

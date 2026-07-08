@@ -5,11 +5,7 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
-  Maximize2,
-  Minimize2,
-  Redo2,
   Sparkles,
-  Undo2,
   WrapText,
   X,
   Type,
@@ -24,9 +20,11 @@ import {
   type EditorTabBarItem,
   FABExpandableChoice,
   FABToggle,
+  FABUndoButton,
+  FABRedoButton,
+  FABFocusButton,
   MobileOverflowFAB,
   UndoRedoControls,
-  useFABPopover,
 } from "@/components/ide-shared";
 import { Button } from "@/components/ui/button";
 import { CharacterEditDialog } from "@/components/CharacterEditDialog.lazy";
@@ -103,85 +101,6 @@ interface ScriptModeEditorLayoutProps {
   saveConflict?: boolean;
   onSaveRequest?: () => void;
   labelTitles?: LabelTitleMap;
-}
-
-// ── FAB action button helpers ──────────────────────────────────────────
-
-function FABUndoButton({
-  canUndo,
-  onUndo,
-}: {
-  canUndo: boolean;
-  onUndo: () => void;
-}) {
-  const { closePopover } = useFABPopover();
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        onUndo();
-        closePopover();
-      }}
-      disabled={!canUndo}
-      aria-disabled={!canUndo}
-      className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-left"
-    >
-      <Undo2 className="size-4" />
-      Undo
-    </button>
-  );
-}
-
-function FABRedoButton({
-  canRedo,
-  onRedo,
-}: {
-  canRedo: boolean;
-  onRedo: () => void;
-}) {
-  const { closePopover } = useFABPopover();
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        onRedo();
-        closePopover();
-      }}
-      disabled={!canRedo}
-      aria-disabled={!canRedo}
-      className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-left"
-    >
-      <Redo2 className="size-4" />
-      Redo
-    </button>
-  );
-}
-
-function FABFocusButton({
-  isFocusMode,
-  onToggle,
-}: {
-  isFocusMode: boolean;
-  onToggle: () => void;
-}) {
-  const { closePopover } = useFABPopover();
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        onToggle();
-        closePopover();
-      }}
-      className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors text-left"
-    >
-      {isFocusMode ? (
-        <Minimize2 className="size-4" />
-      ) : (
-        <Maximize2 className="size-4" />
-      )}
-      {isFocusMode ? "Exit Focus" : "Focus Mode"}
-    </button>
-  );
 }
 
 // react-doctor-disable-next-line react-doctor/no-many-boolean-props

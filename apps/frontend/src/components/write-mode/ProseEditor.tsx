@@ -62,6 +62,12 @@ interface ProseEditorProps {
   /** Controlled line layout mode. When provided, overrides internal state. */
   layoutMode?: LineLayoutMode;
   onLayoutModeChange?: (mode: LineLayoutMode) => void;
+  /** Controlled font size (px). When provided, FontSizeSwitcher uses this value instead of internal localStorage. */
+  fontSizeValue?: number;
+  onFontSizeChange?: (value: number) => void;
+  /** Controlled font family. When provided, FontFamilySwitcher uses this value instead of internal localStorage. */
+  fontFamilyValue?: string;
+  onFontFamilyChange?: (value: string) => void;
 }
 
 export interface ProseEditorRef {
@@ -228,6 +234,10 @@ export const ProseEditor = function ProseEditor({
   onShowBadgesChange,
   layoutMode: propsLayoutMode,
   onLayoutModeChange,
+  fontSizeValue,
+  onFontSizeChange,
+  fontFamilyValue,
+  onFontFamilyChange,
   ref,
 }: ProseEditorProps & { ref?: React.Ref<ProseEditorRef> }) {
   const labelId = activeLabel?.id ?? "none";
@@ -253,7 +263,10 @@ export const ProseEditor = function ProseEditor({
   const setLayoutMode = onLayoutModeChange ?? setInternalLayoutMode;
 
   // Technical badges toggle state — controlled or internal
-  const [internalShowBadges, setInternalShowBadges] = useState(true);
+  const [internalShowBadges, setInternalShowBadges] = useLocalStorage<boolean>(
+    "show-technical-badges",
+    false
+  );
   const showBadges = propsShowBadges ?? internalShowBadges;
   const setShowBadges = onShowBadgesChange ?? setInternalShowBadges;
 
@@ -906,8 +919,17 @@ export const ProseEditor = function ProseEditor({
               )}
               <span>Badges: {showBadges ? "On" : "Off"}</span>
             </button>
-            <FontFamilySwitcher direction="up" />
-            <FontSizeSwitcher mode="write" direction="up" />
+            <FontFamilySwitcher
+              direction="up"
+              value={fontFamilyValue}
+              onChange={onFontFamilyChange}
+            />
+            <FontSizeSwitcher
+              mode="write"
+              direction="up"
+              value={fontSizeValue}
+              onChange={onFontSizeChange}
+            />
           </div>
 
           <div className="flex items-center gap-4 text-sm max-md:hidden">

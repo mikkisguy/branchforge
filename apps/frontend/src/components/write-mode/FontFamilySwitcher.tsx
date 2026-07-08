@@ -43,6 +43,10 @@ const CSS_VARIABLE = "--prose-editor-font-family";
 interface FontFamilySwitcherProps {
   className?: string;
   direction?: "up" | "down";
+  /** Controlled value. When provided with onChange, overrides internal localStorage state. */
+  value?: string;
+  /** Controlled change handler. When provided with value, overrides internal localStorage state. */
+  onChange?: (value: string) => void;
 }
 
 /**
@@ -53,8 +57,10 @@ interface FontFamilySwitcherProps {
 export function FontFamilySwitcher({
   className = "",
   direction = "down",
+  value: controlledValue,
+  onChange: controlledOnChange,
 }: FontFamilySwitcherProps = {}) {
-  const [fontFamily, setFontFamily] = useLocalStorage<string>(
+  const [internalFontFamily, setInternalFontFamily] = useLocalStorage<string>(
     STORAGE_KEY,
     FONT_FAMILY_OPTIONS[0].value,
     {
@@ -62,6 +68,12 @@ export function FontFamilySwitcher({
         FONT_FAMILY_OPTIONS.some((option) => option.value === value),
     }
   );
+  const isControlled =
+    controlledValue !== undefined && controlledOnChange !== undefined;
+  const fontFamily = isControlled ? controlledValue : internalFontFamily;
+  const setFontFamily = isControlled
+    ? controlledOnChange
+    : setInternalFontFamily;
 
   // Consolidated dropdown state for better clarity
   const [dropdownState, setDropdownState] = useState({

@@ -22,10 +22,6 @@ import {
   ChevronLeft,
   FileText,
   Loader2,
-  Undo2,
-  Redo2,
-  Maximize2,
-  Minimize2,
   PanelTop,
   Eye,
   EyeOff,
@@ -39,6 +35,9 @@ import {
   useFABPopover,
   FABToggle,
   FABExpandableChoice,
+  FABUndoButton,
+  FABRedoButton,
+  FABFocusButton,
 } from "@/components/ide-shared";
 import { Button } from "@/components/ui/button";
 import { useLabels } from "@/hooks/useLabels";
@@ -65,85 +64,6 @@ import {
 } from "@/hooks/useLocalStorage";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { PublicLabel } from "@branchforge/shared";
-
-// ── FAB action button helpers ──────────────────────────────────────────
-
-function FABUndoButton({
-  canUndo,
-  onUndo,
-}: {
-  canUndo: boolean;
-  onUndo: () => void;
-}) {
-  const { closePopover } = useFABPopover();
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        onUndo();
-        closePopover();
-      }}
-      disabled={!canUndo}
-      aria-disabled={!canUndo}
-      className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-left"
-    >
-      <Undo2 className="size-4" />
-      Undo
-    </button>
-  );
-}
-
-function FABRedoButton({
-  canRedo,
-  onRedo,
-}: {
-  canRedo: boolean;
-  onRedo: () => void;
-}) {
-  const { closePopover } = useFABPopover();
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        onRedo();
-        closePopover();
-      }}
-      disabled={!canRedo}
-      aria-disabled={!canRedo}
-      className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-left"
-    >
-      <Redo2 className="size-4" />
-      Redo
-    </button>
-  );
-}
-
-function FABFocusButton({
-  isFocusMode,
-  onToggle,
-}: {
-  isFocusMode: boolean;
-  onToggle: () => void;
-}) {
-  const { closePopover } = useFABPopover();
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        onToggle();
-        closePopover();
-      }}
-      className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors text-left"
-    >
-      {isFocusMode ? (
-        <Minimize2 className="size-4" />
-      ) : (
-        <Maximize2 className="size-4" />
-      )}
-      {isFocusMode ? "Exit Focus" : "Focus Mode"}
-    </button>
-  );
-}
 
 function WritingGoalFABRow({
   todayWordCount,
@@ -688,6 +608,10 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
                 onShowBadgesChange={setShowBadges}
                 layoutMode={writeLineLayout as "inline" | "stacked"}
                 onLayoutModeChange={setWriteLineLayout}
+                fontSizeValue={writeFontSize}
+                onFontSizeChange={setWriteFontSize}
+                fontFamilyValue={writeFontFamily}
+                onFontFamilyChange={setWriteFontFamily}
               />
             </div>
           </div>

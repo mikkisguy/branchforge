@@ -16,6 +16,10 @@ interface FontSizeSwitcherProps {
   defaultSize?: number;
   sizeOptions?: Readonly<FontSizeOption[]>;
   className?: string;
+  /** Controlled value. When provided with onChange, overrides internal localStorage state. */
+  value?: number;
+  /** Controlled change handler. When provided with value, overrides internal localStorage state. */
+  onChange?: (value: number) => void;
 }
 
 const MODE_CONFIGS = {
@@ -79,6 +83,8 @@ export function FontSizeSwitcher({
   defaultSize: customDefaultSize,
   sizeOptions: customSizeOptions,
   className: customClassName,
+  value: controlledValue,
+  onChange: controlledOnChange,
 }: FontSizeSwitcherProps = {}) {
   // Use mode config if provided, otherwise use custom props
   const config = MODE_CONFIGS[mode];
@@ -94,13 +100,17 @@ export function FontSizeSwitcher({
     [sizeOptions]
   );
 
-  const [fontSize, setFontSize] = useLocalStorageNumber(
+  const [internalFontSize, setInternalFontSize] = useLocalStorageNumber(
     storageKey,
     defaultSize,
     {
       validate: validateFontSize,
     }
   );
+  const isControlled =
+    controlledValue !== undefined && controlledOnChange !== undefined;
+  const fontSize = isControlled ? controlledValue : internalFontSize;
+  const setFontSize = isControlled ? controlledOnChange : setInternalFontSize;
   const [isOpen, setIsOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
   const [isKeyboardNav, setIsKeyboardNav] = useState(false);
