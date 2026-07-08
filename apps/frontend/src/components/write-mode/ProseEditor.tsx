@@ -49,10 +49,16 @@ interface ProseEditorProps {
   lastSaved?: Date | null;
   saveError?: boolean;
   saveConflict?: boolean;
+  /** Callback when undo/redo availability changes. Used by mobile FAB. */
+  onUndoStateChange?: (state: { canUndo: boolean; canRedo: boolean }) => void;
 }
 
 export interface ProseEditorRef {
   focus: () => void;
+  /** Trigger in-memory undo (mirrors Ctrl+Z inside the editor). */
+  undo: () => void;
+  /** Trigger in-memory redo (mirrors Ctrl+Y / Ctrl+Shift+Z inside the editor). */
+  redo: () => void;
 }
 
 type LineLayoutMode = "inline" | "stacked";
@@ -203,6 +209,7 @@ export const ProseEditor = function ProseEditor({
   lastSaved = null,
   saveError = false,
   saveConflict = false,
+  onUndoStateChange,
   ref,
 }: ProseEditorProps & { ref?: React.Ref<ProseEditorRef> }) {
   const labelId = activeLabel?.id ?? "none";
@@ -284,6 +291,11 @@ export const ProseEditor = function ProseEditor({
     textareaRefs.current = new Map();
   }
 
+  // Refs for undo/redo functions (defined later in the component).
+  // useImperativeHandle captures these so WriteMode's FAB can call them.
+  const undoRef = useRef<() => void>(() => {});
+  const redoRef = useRef<() => void>(() => {});
+
   useImperativeHandle(
     ref,
     () => ({
@@ -304,6 +316,8 @@ export const ProseEditor = function ProseEditor({
           textarea.focus();
         }
       },
+      undo: () => undoRef.current(),
+      redo: () => redoRef.current(),
     }),
     []
   );
@@ -644,6 +658,20 @@ export const ProseEditor = function ProseEditor({
     inMemoryUndo.redo();
   }, [flushPendingTextHistory, inMemoryUndo]);
 
+  // Wire the ref-based undo/redo so WriteMode's FAB can invoke them
+  useEffect(() => {
+    undoRef.current = handleUndo;
+    redoRef.current = handleRedo;
+  }, [handleUndo, handleRedo]);
+
+  // Sync undo/redo availability to parent (for WriteMode's FAB)
+  useEffect(() => {
+    onUndoStateChange?.({
+      canUndo: inMemoryUndo.canUndo,
+      canRedo: inMemoryUndo.canRedo,
+    });
+  }, [inMemoryUndo.canUndo, inMemoryUndo.canRedo, onUndoStateChange]);
+
   const wordCount = countWordsFromEntries(entries);
   const lineCount = entries.length;
 
@@ -733,12 +761,14 @@ export const ProseEditor = function ProseEditor({
             </span>
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <UndoRedoControls
-              canUndo={inMemoryUndo.canUndo}
-              canRedo={inMemoryUndo.canRedo}
-              onUndo={handleUndo}
-              onRedo={handleRedo}
-            />
+            <div className="max-md:hidden">
+              <UndoRedoControls
+                canUndo={inMemoryUndo.canUndo}
+                canRedo={inMemoryUndo.canRedo}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+              />
+            </div>
             <SaveIndicator
               saveStatus={propsToSaveStatus(isSaving, saveError)}
               displayMode="compact"

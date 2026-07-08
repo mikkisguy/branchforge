@@ -1,5 +1,14 @@
 import { useCallback, useState } from "react";
-import { Sparkles, X, ChevronRight, ChevronLeft } from "lucide-react";
+import {
+  Sparkles,
+  X,
+  ChevronRight,
+  ChevronLeft,
+  Undo2,
+  Redo2,
+  Maximize2,
+  Minimize2,
+} from "lucide-react";
 import { cva } from "class-variance-authority";
 import { ScriptReferencePanel, ScriptEditor } from "@/components/script-mode";
 import { ProjectFileTree } from "@/components/script-mode/ProjectFileTree";
@@ -8,6 +17,7 @@ import {
   EditorTabBar,
   type EditorTabBarItem,
   UndoRedoControls,
+  MobileOverflowFAB,
 } from "@/components/ide-shared";
 import { Button } from "@/components/ui/button";
 import { CharacterEditDialog } from "@/components/CharacterEditDialog.lazy";
@@ -139,7 +149,7 @@ export function ScriptModeEditorLayout({
   return (
     <>
       {isFocusMode && (
-        <div className="fixed top-2 right-2 z-[100] pointer-events-auto">
+        <div className="fixed top-2 right-2 z-[100] pointer-events-auto max-md:hidden">
           <FocusModeToggle
             ref={focusToggleRef}
             isFocusMode={isFocusMode}
@@ -255,7 +265,7 @@ export function ScriptModeEditorLayout({
                   titleMaxWidthClassName="max-w-[240px]"
                 />
               </div>
-              <div className="h-12 overflow-hidden rounded-lg border border-border/80 bg-card/55 opacity-100 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+              <div className="h-12 overflow-hidden rounded-lg border border-border/80 bg-card/55 opacity-100 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] max-md:hidden">
                 <div className="h-full flex items-center justify-end gap-3 px-3">
                   <UndoRedoControls
                     canUndo={canUndo}
@@ -344,6 +354,43 @@ export function ScriptModeEditorLayout({
         projectId={projectId ?? ""}
         characterId={editingCharacterId ?? undefined}
       />
+
+      {/* Mobile FAB — surfaces undo/redo/focus-mode toggle below md */}
+      <MobileOverflowFAB aria-label="Editor actions">
+        <button
+          type="button"
+          onClick={onUndo}
+          disabled={!canUndo}
+          aria-disabled={!canUndo}
+          className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-left"
+        >
+          <Undo2 className="size-4" />
+          Undo
+        </button>
+        <button
+          type="button"
+          onClick={onRedo}
+          disabled={!canRedo}
+          aria-disabled={!canRedo}
+          className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-left"
+        >
+          <Redo2 className="size-4" />
+          Redo
+        </button>
+        <div className="h-px bg-border/30 my-1" />
+        <button
+          type="button"
+          onClick={onFocusModeToggle}
+          className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors text-left"
+        >
+          {isFocusMode ? (
+            <Minimize2 className="size-4" />
+          ) : (
+            <Maximize2 className="size-4" />
+          )}
+          {isFocusMode ? "Exit Focus" : "Focus Mode"}
+        </button>
+      </MobileOverflowFAB>
     </>
   );
 }

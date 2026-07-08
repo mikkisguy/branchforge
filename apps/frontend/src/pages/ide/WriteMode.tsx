@@ -16,8 +16,18 @@ import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
 import { LabelEditDialog } from "@/components/write-mode/LabelEditDialog.lazy";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CharacterEditDialog } from "@/components/CharacterEditDialog.lazy";
-import { ChevronRight, ChevronLeft, FileText, Loader2 } from "lucide-react";
+import {
+  ChevronRight,
+  ChevronLeft,
+  FileText,
+  Loader2,
+  Undo2,
+  Redo2,
+  Maximize2,
+  Minimize2,
+} from "lucide-react";
 import { EditorTabBar } from "@/components/ide-shared";
+import { MobileOverflowFAB } from "@/components/ide-shared";
 import { Button } from "@/components/ui/button";
 import { useLabels } from "@/hooks/useLabels";
 import { useCharacters } from "@/hooks/useCharacters";
@@ -120,7 +130,16 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
     null
   );
 
-  const editorRef = useRef<{ focus: () => void } | null>(null);
+  const editorRef = useRef<{
+    focus: () => void;
+    undo: () => void;
+    redo: () => void;
+  } | null>(null);
+
+  const [proseUndoState, setProseUndoState] = useState({
+    canUndo: false,
+    canRedo: false,
+  });
 
   const { isFocusMode, focusToggleRef, handleFocusModeToggle } =
     useWriteFocusMode({
@@ -330,7 +349,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
   return (
     <div className="h-full flex flex-col overflow-hidden max-md:px-2">
       {isFocusMode && (
-        <div className="fixed top-2 right-2 z-[100] pointer-events-auto">
+        <div className="fixed top-2 right-2 z-[100] pointer-events-auto max-md:hidden">
           <FocusModeToggle
             ref={focusToggleRef}
             isFocusMode={isFocusMode}
@@ -421,7 +440,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
                   titleMaxWidthClassName="max-w-[180px]"
                 />
               </div>
-              <div className="h-12 overflow-hidden rounded-lg border border-border/80 bg-card/55 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+              <div className="h-12 overflow-hidden rounded-lg border border-border/80 bg-card/55 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] max-md:hidden">
                 <div className="h-full flex items-center justify-end px-3">
                   <FocusModeToggle
                     ref={focusToggleRef}
@@ -456,6 +475,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
                 lastSaved={editorSaveProps.lastSaved}
                 saveError={editorSaveProps.saveError}
                 saveConflict={Boolean(hasConflict)}
+                onUndoStateChange={setProseUndoState}
               />
             </div>
           </div>
@@ -534,6 +554,42 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
             />,
             document.body
           )}
+        {/* Mobile FAB — surfaces undo/redo/focus-mode toggle below md */}
+        <MobileOverflowFAB aria-label="Editor actions">
+          <button
+            type="button"
+            onClick={() => editorRef.current?.undo()}
+            disabled={!proseUndoState.canUndo}
+            aria-disabled={!proseUndoState.canUndo}
+            className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-left"
+          >
+            <Undo2 className="size-4" />
+            Undo
+          </button>
+          <button
+            type="button"
+            onClick={() => editorRef.current?.redo()}
+            disabled={!proseUndoState.canRedo}
+            aria-disabled={!proseUndoState.canRedo}
+            className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-left"
+          >
+            <Redo2 className="size-4" />
+            Redo
+          </button>
+          <div className="h-px bg-border/30 my-1" />
+          <button
+            type="button"
+            onClick={handleFocusModeToggle}
+            className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors text-left"
+          >
+            {isFocusMode ? (
+              <Minimize2 className="size-4" />
+            ) : (
+              <Maximize2 className="size-4" />
+            )}
+            {isFocusMode ? "Exit Focus" : "Focus Mode"}
+          </button>
+        </MobileOverflowFAB>
       </div>
     </div>
   );

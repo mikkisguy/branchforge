@@ -722,7 +722,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
   return (
     <>
       <div
-        className={`max-md:hidden fixed left-0 top-0 h-screen ${width} bg-card/95 backdrop-blur border-r border-border/30 flex flex-col transition-all duration-300 z-50`}
+        className={`max-md:hidden fixed left-0 top-0 h-screen pl-[env(safe-area-inset-left)] ${width} bg-card/95 backdrop-blur border-r border-border/30 flex flex-col transition-all duration-300 z-50`}
       >
         {/* Top Section */}
         <div className="flex-1 flex flex-col p-2 gap-2">
