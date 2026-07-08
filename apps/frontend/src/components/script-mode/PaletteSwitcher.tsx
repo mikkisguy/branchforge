@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { Palette } from "lucide-react";
 import {
   PALETTES,
   applyPalette,
@@ -64,6 +65,7 @@ export function PaletteSwitcher({
         className="px-3 py-1.5 text-xs font-code bg-muted/50 hover:bg-muted border border-border rounded flex items-center gap-2 transition-colors"
         title="Change syntax colors"
       >
+        <Palette className="size-3.5" aria-hidden="true" />
         <span
           className="size-2 rounded-full"
           style={{ backgroundColor: PALETTES[selectedIndex].indicator }}

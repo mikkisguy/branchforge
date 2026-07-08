@@ -1,13 +1,19 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Sparkles,
-  X,
-  ChevronRight,
+  AlignJustify,
   ChevronLeft,
-  Undo2,
-  Redo2,
+  ChevronRight,
+  Eye,
+  EyeOff,
   Maximize2,
   Minimize2,
+  Redo2,
+  Sparkles,
+  Undo2,
+  WrapText,
+  X,
+  Type,
+  Palette,
 } from "lucide-react";
 import { cva } from "class-variance-authority";
 import { ScriptReferencePanel, ScriptEditor } from "@/components/script-mode";
@@ -16,8 +22,11 @@ import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
 import {
   EditorTabBar,
   type EditorTabBarItem,
-  UndoRedoControls,
+  FABExpandableChoice,
+  FABToggle,
   MobileOverflowFAB,
+  UndoRedoControls,
+  useFABPopover,
 } from "@/components/ide-shared";
 import { Button } from "@/components/ui/button";
 import { CharacterEditDialog } from "@/components/CharacterEditDialog.lazy";
@@ -27,6 +36,11 @@ import type { ScriptEditorRef } from "@/components/script-mode/ScriptEditor";
 import type { FocusModeState } from "@/hooks/useFocusModeState";
 import type { ProjectFileNode } from "@/hooks/useProjectFiles";
 import type { SaveStatus } from "@/hooks/useAutosave";
+import {
+  useLocalStorageBoolean,
+  useLocalStorageNumber,
+} from "@/hooks/useLocalStorage";
+import { PALETTES, applyPalette } from "@/lib/codemirror/palettes";
 import type { LabelTitleMap } from "@/lib/codemirror/label-title-decoration";
 import type {
   Dispatch,
@@ -91,6 +105,85 @@ interface ScriptModeEditorLayoutProps {
   labelTitles?: LabelTitleMap;
 }
 
+// ── FAB action button helpers ──────────────────────────────────────────
+
+function FABUndoButton({
+  canUndo,
+  onUndo,
+}: {
+  canUndo: boolean;
+  onUndo: () => void;
+}) {
+  const { closePopover } = useFABPopover();
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        onUndo();
+        closePopover();
+      }}
+      disabled={!canUndo}
+      aria-disabled={!canUndo}
+      className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-left"
+    >
+      <Undo2 className="size-4" />
+      Undo
+    </button>
+  );
+}
+
+function FABRedoButton({
+  canRedo,
+  onRedo,
+}: {
+  canRedo: boolean;
+  onRedo: () => void;
+}) {
+  const { closePopover } = useFABPopover();
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        onRedo();
+        closePopover();
+      }}
+      disabled={!canRedo}
+      aria-disabled={!canRedo}
+      className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-left"
+    >
+      <Redo2 className="size-4" />
+      Redo
+    </button>
+  );
+}
+
+function FABFocusButton({
+  isFocusMode,
+  onToggle,
+}: {
+  isFocusMode: boolean;
+  onToggle: () => void;
+}) {
+  const { closePopover } = useFABPopover();
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        onToggle();
+        closePopover();
+      }}
+      className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors text-left"
+    >
+      {isFocusMode ? (
+        <Minimize2 className="size-4" />
+      ) : (
+        <Maximize2 className="size-4" />
+      )}
+      {isFocusMode ? "Exit Focus" : "Focus Mode"}
+    </button>
+  );
+}
+
 // react-doctor-disable-next-line react-doctor/no-many-boolean-props
 export function ScriptModeEditorLayout({
   projectName,
@@ -132,6 +225,55 @@ export function ScriptModeEditorLayout({
   const { isFocusMode, focusToggleRef } = focusModeState;
   const [editingCharacterId, setEditingCharacterId] = useState<string | null>(
     null
+  );
+
+  // ── Mobile FAB settings state (mirrors ScriptEditor/desktop status bar) ──
+
+  const SCRIPT_FONT_SIZE_OPTIONS = useMemo(
+    () =>
+      [
+        { label: "Small", value: 12 },
+        { label: "Medium", value: 14 },
+        { label: "Large", value: 16 },
+        { label: "Extra Large", value: 18 },
+        { label: "Huge", value: 20 },
+      ] as const,
+    []
+  );
+
+  const [scriptFontSize, setScriptFontSize] = useLocalStorageNumber(
+    "script:font-size",
+    14,
+    { validate: (v) => SCRIPT_FONT_SIZE_OPTIONS.some((o) => o.value === v) }
+  );
+
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--editor-font-size",
+      `${scriptFontSize}px`
+    );
+  }, [scriptFontSize]);
+
+  const [paletteIndex, setPaletteIndex] = useLocalStorageNumber(
+    "editor:syntax-palette",
+    0,
+    { validate: (v) => v >= 0 && v < PALETTES.length }
+  );
+
+  useEffect(() => {
+    if (PALETTES[paletteIndex]) {
+      applyPalette(PALETTES[paletteIndex]);
+    }
+  }, [paletteIndex]);
+
+  const [lineWrap, setLineWrap] = useLocalStorageBoolean(
+    "script:line-wrap",
+    false
+  );
+
+  const [showLabelTitles, setShowLabelTitles] = useLocalStorageBoolean(
+    "script:show-label-titles",
+    true
   );
 
   // On mobile, only one overlay sidebar may be open at a time. Opening
@@ -307,6 +449,10 @@ export function ScriptModeEditorLayout({
                   saveConflict={saveConflict}
                   onSaveRequest={onSaveRequest}
                   labelTitles={labelTitles}
+                  lineWrap={lineWrap}
+                  onLineWrapChange={setLineWrap}
+                  showLabelTitles={showLabelTitles}
+                  onShowLabelTitlesChange={setShowLabelTitles}
                 />
               ) : activeLabel ? (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
@@ -355,41 +501,64 @@ export function ScriptModeEditorLayout({
         characterId={editingCharacterId ?? undefined}
       />
 
-      {/* Mobile FAB — surfaces undo/redo/focus-mode toggle below md */}
+      {/* Mobile FAB — settings at top, actions closest to thumb */}
       <MobileOverflowFAB aria-label="Editor actions">
-        <button
-          type="button"
-          onClick={onUndo}
-          disabled={!canUndo}
-          aria-disabled={!canUndo}
-          className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-left"
-        >
-          <Undo2 className="size-4" />
-          Undo
-        </button>
-        <button
-          type="button"
-          onClick={onRedo}
-          disabled={!canRedo}
-          aria-disabled={!canRedo}
-          className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-left"
-        >
-          <Redo2 className="size-4" />
-          Redo
-        </button>
+        <FABExpandableChoice
+          icon={<Type className="size-4" />}
+          label="Font Size"
+          currentLabel={
+            SCRIPT_FONT_SIZE_OPTIONS.find((o) => o.value === scriptFontSize)
+              ?.label ?? "Medium"
+          }
+          options={SCRIPT_FONT_SIZE_OPTIONS.map((o) => ({
+            label: o.label,
+            value: o.value,
+            active: o.value === scriptFontSize,
+          }))}
+          onSelect={(v: string | number) => setScriptFontSize(v as number)}
+        />
+        <FABExpandableChoice
+          icon={<Palette className="size-4" />}
+          label="Syntax Theme"
+          currentLabel={PALETTES[paletteIndex]?.name ?? "Default"}
+          options={PALETTES.map((p, i) => ({
+            label: p.name,
+            value: i,
+            active: i === paletteIndex,
+          }))}
+          onSelect={(v: string | number) => setPaletteIndex(v as number)}
+        />
+        <FABToggle
+          icon={
+            lineWrap ? (
+              <WrapText className="size-4" />
+            ) : (
+              <AlignJustify className="size-4" />
+            )
+          }
+          label="Line Wrap"
+          active={lineWrap}
+          onClick={() => setLineWrap((v) => !v)}
+        />
+        <FABToggle
+          icon={
+            showLabelTitles ? (
+              <Eye className="size-4" />
+            ) : (
+              <EyeOff className="size-4" />
+            )
+          }
+          label="Show Titles"
+          active={showLabelTitles}
+          onClick={() => setShowLabelTitles((v) => !v)}
+        />
         <div className="h-px bg-border/30 my-1" />
-        <button
-          type="button"
-          onClick={onFocusModeToggle}
-          className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors text-left"
-        >
-          {isFocusMode ? (
-            <Minimize2 className="size-4" />
-          ) : (
-            <Maximize2 className="size-4" />
-          )}
-          {isFocusMode ? "Exit Focus" : "Focus Mode"}
-        </button>
+        <FABFocusButton
+          isFocusMode={isFocusMode}
+          onToggle={onFocusModeToggle}
+        />
+        <FABUndoButton canUndo={canUndo} onUndo={onUndo} />
+        <FABRedoButton canRedo={canRedo} onRedo={onRedo} />
       </MobileOverflowFAB>
     </>
   );

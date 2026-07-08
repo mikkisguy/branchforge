@@ -50,6 +50,12 @@ interface ScriptEditorProps {
   saveConflict?: boolean;
   onSaveRequest?: () => void;
   labelTitles?: LabelTitleMap;
+  /** Controlled line wrap mode. When provided, overrides internal state. */
+  lineWrap?: boolean;
+  onLineWrapChange?: (wrap: boolean) => void;
+  /** Controlled label titles visibility. When provided, overrides internal state. */
+  showLabelTitles?: boolean;
+  onShowLabelTitlesChange?: (show: boolean) => void;
 }
 
 const TARGET_LINE_HIGHLIGHT_MS = 920;
@@ -101,12 +107,18 @@ export const ScriptEditor = function ScriptEditor({
   saveConflict,
   onSaveRequest,
   labelTitles,
+  lineWrap: propsLineWrap,
+  onLineWrapChange,
+  showLabelTitles: propsShowLabelTitles,
+  onShowLabelTitlesChange,
   ref,
 }: ScriptEditorProps & { ref?: React.Ref<ScriptEditorRef> }) {
-  const [lineWrap, setLineWrap] = useLocalStorageBoolean(
+  const [internalLineWrap, setInternalLineWrap] = useLocalStorageBoolean(
     "script:line-wrap",
     false
   );
+  const lineWrap = propsLineWrap ?? internalLineWrap;
+  const setLineWrap = onLineWrapChange ?? setInternalLineWrap;
   const lineWrapExtension = useMemo(
     () => (lineWrap ? EditorView.lineWrapping : []),
     [lineWrap]
@@ -127,10 +139,11 @@ export const ScriptEditor = function ScriptEditor({
   });
 
   // Toggle for showing/hiding label title pills
-  const [showLabelTitles, setShowLabelTitles] = useLocalStorageBoolean(
-    "script:show-label-titles",
-    true
-  );
+  const [internalShowLabelTitles, setInternalShowLabelTitles] =
+    useLocalStorageBoolean("script:show-label-titles", true);
+  const showLabelTitles = propsShowLabelTitles ?? internalShowLabelTitles;
+  const setShowLabelTitles =
+    onShowLabelTitlesChange ?? setInternalShowLabelTitles;
   const showLabelTitlesRef = useRef(showLabelTitles);
   useEffect(() => {
     showLabelTitlesRef.current = showLabelTitles;
@@ -350,8 +363,8 @@ export const ScriptEditor = function ScriptEditor({
     useEditorCursor({ initialContent: cleanContent });
 
   const toggleLineWrap = useCallback(
-    () => setLineWrap((prev) => !prev),
-    [setLineWrap]
+    () => setLineWrap(!lineWrap),
+    [setLineWrap, lineWrap]
   );
 
   const extensions = useMemo(
@@ -412,7 +425,7 @@ export const ScriptEditor = function ScriptEditor({
         />
       </div>
       <div
-        className="flex items-center justify-between px-2 py-1 border-t border-border bg-muted/20 font-code text-xs text-muted-foreground transition-opacity duration-300 ease-out"
+        className="flex items-center justify-between px-2 py-1 border-t border-border bg-muted/20 font-code text-xs text-muted-foreground transition-opacity duration-300 ease-out max-md:hidden"
         style={{
           opacity: isFocusMode ? (isHovered ? 1 : 0.4) : 1,
         }}
@@ -427,7 +440,7 @@ export const ScriptEditor = function ScriptEditor({
           <PaletteSwitcher />
           <button
             type="button"
-            onClick={() => setShowLabelTitles((v) => !v)}
+            onClick={() => setShowLabelTitles(!showLabelTitles)}
             className={`px-3 py-1.5 text-xs font-code border rounded flex items-center gap-2 transition-colors ${
               showLabelTitles
                 ? "bg-accent/50 hover:bg-accent border-border"

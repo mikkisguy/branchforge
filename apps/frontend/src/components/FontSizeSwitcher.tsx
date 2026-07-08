@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { Type } from "lucide-react";
 import { useLocalStorageNumber } from "@/hooks/useLocalStorage";
 
 export const EDITOR_FONT_SIZE_CHANGED = "editor-font-size-changed";
@@ -246,20 +247,7 @@ export function FontSizeSwitcher({
         className={`${buttonClassName} text-xs ${baseClassName} text-muted-foreground hover:text-foreground rounded flex items-center gap-2 transition-colors`}
         title="Change font size"
       >
-        <svg
-          className="size-3"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M4 6h16M4 12h16m-7 6h7"
-          />
-        </svg>
+        <Type className="size-3" aria-hidden="true" />
         <span id="font-size-label" className="sr-only">
           Font size: {currentOption.label}
         </span>

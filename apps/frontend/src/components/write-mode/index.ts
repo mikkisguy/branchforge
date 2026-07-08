@@ -5,6 +5,7 @@
  */
 
 export { ProseEditor } from "./ProseEditor";
+export type { ProseEditorRef } from "./ProseEditor";
 export { LabelNavigator } from "./LabelNavigator";
 export { LabelPropertiesPanel } from "./LabelPropertiesPanel";
 export { SaveIndicator } from "./SaveIndicator";

@@ -1,24 +1,189 @@
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { Ellipsis } from "lucide-react";
+import { Ellipsis, Check, ChevronRight, ChevronDown } from "lucide-react";
+import type { ReactNode, CSSProperties, MouseEvent } from "react";
+
+// ── Context ──────────────────────────────────────────────────────────────
+
+interface FABPopoverContextValue {
+  closePopover: () => void;
+}
+
+const FABPopoverContext = createContext<FABPopoverContextValue>({
+  closePopover: () => {},
+});
+
+/** Call from any child inside MobileOverflowFAB to dismiss the popover. */
+export function useFABPopover(): FABPopoverContextValue {
+  return useContext(FABPopoverContext);
+}
+
+// ── Shared row styles ────────────────────────────────────────────────────
+
+const FAB_ROW =
+  "flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors text-left";
+
+const FAB_ICON = "size-4 shrink-0";
+
+// ── Helper components ────────────────────────────────────────────────────
+
+interface FABToggleProps {
+  icon: ReactNode;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}
+
+/** A simple on/off toggle row. Tapping toggles and closes the popover. */
+export function FABToggle({ icon, label, active, onClick }: FABToggleProps) {
+  const { closePopover } = useFABPopover();
+
+  const handle = useCallback(
+    (e: MouseEvent) => {
+      e.stopPropagation();
+      onClick();
+      closePopover();
+    },
+    [onClick, closePopover]
+  );
+
+  return (
+    <button type="button" onClick={handle} className={`${FAB_ROW}`}>
+      <span className={FAB_ICON}>{icon}</span>
+      <span className="flex-1">{label}</span>
+      <span
+        className={`size-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+          active
+            ? "bg-[var(--theme-color)] border-[var(--theme-color)]"
+            : "border-border"
+        }`}
+      >
+        {active && <Check className="size-3 text-white" />}
+      </span>
+    </button>
+  );
+}
+
+interface FABChoiceOption {
+  label: string;
+  value: string | number;
+  active: boolean;
+}
+
+interface FABExpandableChoiceProps {
+  icon: ReactNode;
+  label: string;
+  currentLabel: string;
+  options: FABChoiceOption[];
+  onSelect: (value: string | number) => void;
+}
+
+/**
+ * An expandable choice section with a left icon and two-line collapsed view.
+ * Tapping the header reveals options. Selecting an option applies it and
+ * closes the popover.
+ */
+export function FABExpandableChoice({
+  icon,
+  label,
+  currentLabel,
+  options,
+  onSelect,
+}: FABExpandableChoiceProps) {
+  const { closePopover } = useFABPopover();
+  const [expanded, setExpanded] = useState(false);
+
+  const handleSelect = useCallback(
+    (e: MouseEvent, value: string | number) => {
+      e.stopPropagation();
+      onSelect(value);
+      closePopover();
+    },
+    [onSelect, closePopover]
+  );
+
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setExpanded(true);
+        }}
+        className={`flex flex-col w-full px-3 py-2 text-sm hover:bg-muted/50 transition-colors text-left`}
+      >
+        <span className="flex items-center gap-3 w-full">
+          <span className="size-4 shrink-0">{icon}</span>
+          <span className="flex-1">{label}</span>
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+        </span>
+        <span className="pl-7 text-xs text-muted-foreground mt-0.5">
+          {currentLabel}
+        </span>
+      </button>
+    );
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setExpanded(false);
+        }}
+        className={`flex flex-col w-full px-3 py-2 text-sm hover:bg-muted/50 transition-colors text-left`}
+      >
+        <span className="flex items-center gap-3 w-full">
+          <span className="size-4 shrink-0">{icon}</span>
+          <span className="flex-1">{label}</span>
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+        </span>
+        <span className="pl-7 text-xs text-muted-foreground mt-0.5">
+          {currentLabel}
+        </span>
+      </button>
+      {options.map((opt) => (
+        <button
+          key={String(opt.value)}
+          type="button"
+          onClick={(e) => handleSelect(e, opt.value)}
+          className={`${FAB_ROW} pl-10 ${opt.active ? "bg-accent/50" : ""}`}
+        >
+          <span className="flex-1">{opt.label}</span>
+          {opt.active && (
+            <Check className="size-4 text-[var(--theme-color)] shrink-0" />
+          )}
+        </button>
+      ))}
+    </>
+  );
+}
+
+// ── Main component ───────────────────────────────────────────────────────
 
 interface MobileOverflowFABProps {
-  children: React.ReactNode;
-  /** Accessible label for the FAB button. Defaults to "More actions". */
+  children: ReactNode;
   "aria-label"?: string;
 }
 
 /**
- * A floating action button (FAB) visible only on mobile (below `md`).
- * Tapping it opens a portal-popover anchored above the button that
- * contains action items. Clicking any item inside the popover (or
- * tapping outside, or pressing Escape) dismisses it.
+ * A floating action button visible only on mobile (below `md`).
+ * Tapping it opens a portal-popover anchored above the button.
+ *
+ * Children can call `useFABPopover().closePopover()` to dismiss the
+ * popover explicitly.  `FABToggle` and `FABExpandableChoice` handle
+ * this automatically.
+ *
+ * Clicking outside or pressing Escape also dismisses.
  */
 export function MobileOverflowFAB({
   children,
@@ -27,7 +192,11 @@ export function MobileOverflowFAB({
   const fabRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
+  const [popoverStyle, setPopoverStyle] = useState<CSSProperties>({});
+
+  const closePopover = useCallback(() => {
+    setOpen(false);
+  }, []);
 
   // Position the popover relative to the FAB
   useLayoutEffect(() => {
@@ -79,11 +248,6 @@ export function MobileOverflowFAB({
     return () => document.removeEventListener("keydown", handler);
   }, [open]);
 
-  // Close the popover whenever any child is clicked (menu item action)
-  const handlePopoverClick = useCallback(() => {
-    setOpen(false);
-  }, []);
-
   return (
     <>
       <button
@@ -102,10 +266,11 @@ export function MobileOverflowFAB({
           <div
             ref={popoverRef}
             style={popoverStyle}
-            className="z-[110] rounded-lg border border-border bg-card shadow-xl py-1 min-w-[160px] overflow-hidden"
-            onClick={handlePopoverClick}
+            className="z-[110] rounded-lg border border-border bg-card shadow-xl py-1 min-w-[180px] overflow-hidden"
           >
-            {children}
+            <FABPopoverContext.Provider value={{ closePopover }}>
+              {children}
+            </FABPopoverContext.Provider>
           </div>,
           document.body
         )}

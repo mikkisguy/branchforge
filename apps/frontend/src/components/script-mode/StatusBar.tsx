@@ -19,7 +19,6 @@ import type { SourceOrigin } from "@branchforge/shared";
 
 // Status bar styled like a storybook footer
 interface StatusBarProps {
-  language: string;
   projectId?: string;
   projectName?: string;
   gitlabBranch?: string;
@@ -71,7 +70,6 @@ const initialDialogState: DialogState = {
 };
 
 export function StatusBar({
-  language,
   projectId,
   projectName,
   gitlabBranch,
@@ -160,7 +158,7 @@ export function StatusBar({
   return (
     <>
       <div
-        className="flex items-center justify-between px-3 max-sm:px-2 py-2 text-xs bg-card/50 border-t border-dashed transition-opacity duration-300 ease-out gap-2 max-sm:gap-1"
+        className="flex items-center justify-between max-md:justify-start max-md:pr-16 px-3 max-sm:px-2 py-2 text-xs bg-card/50 border-t border-dashed transition-opacity duration-300 ease-out gap-2 max-sm:gap-1"
         style={{
           borderColor: "var(--theme-border-subtle)",
           opacity: isFocusMode ? (isHovered ? 1 : 0.6) : 1,
@@ -171,9 +169,6 @@ export function StatusBar({
         onBlurCapture={() => setIsHovered(false)}
       >
         <div className="flex items-center gap-3 max-sm:gap-2">
-          <div className="text-muted-foreground border-r border-border/30 pr-3 max-sm:pr-2">
-            {language}
-          </div>
           {isGitLabAvailable && (
             <div className="flex items-center gap-1.5 text-muted-foreground border-r border-border/30 pr-3 max-sm:pr-2 max-sm:border-r-0">
               <GitBranch className="size-3" />
