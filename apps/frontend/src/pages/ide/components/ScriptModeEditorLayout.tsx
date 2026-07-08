@@ -153,7 +153,7 @@ export function ScriptModeEditorLayout({
         {!isFocusMode &&
           (!isLeftSidebarCollapsed || !isRightSidebarCollapsed) && (
             <div
-              className="max-md:fixed max-md:inset-0 max-md:bg-black/40 max-md:z-30"
+              className="hidden max-md:block max-md:fixed max-md:inset-0 max-md:bg-black/40 max-md:z-30"
               onClick={() => {
                 if (!isLeftSidebarCollapsed) setIsLeftSidebarCollapsed(true);
                 if (!isRightSidebarCollapsed) setIsRightSidebarCollapsed(true);

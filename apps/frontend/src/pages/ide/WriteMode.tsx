@@ -341,15 +341,16 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
 
       <div className="flex-1 flex gap-4 px-4 max-md:px-0 pb-0 overflow-hidden min-h-0 min-w-0 relative">
         {/* Mobile scrim backdrop – collapses open overlays on tap */}
-        {(!isLeftSidebarCollapsed || !isRightSidebarCollapsed) && (
-          <div
-            className="max-md:fixed max-md:inset-0 max-md:bg-black/40 max-md:z-30"
-            onClick={() => {
-              if (!isLeftSidebarCollapsed) setIsLeftSidebarCollapsed(true);
-              if (!isRightSidebarCollapsed) setIsRightSidebarCollapsed(true);
-            }}
-          />
-        )}
+        {!isFocusMode &&
+          (!isLeftSidebarCollapsed || !isRightSidebarCollapsed) && (
+            <div
+              className="hidden max-md:block max-md:fixed max-md:inset-0 max-md:bg-black/40 max-md:z-30"
+              onClick={() => {
+                if (!isLeftSidebarCollapsed) setIsLeftSidebarCollapsed(true);
+                if (!isRightSidebarCollapsed) setIsRightSidebarCollapsed(true);
+              }}
+            />
+          )}
         <div
           aria-hidden={isFocusMode}
           className={sidebarVariants({
