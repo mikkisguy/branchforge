@@ -15,6 +15,7 @@ import { cva } from "class-variance-authority";
 import { ScriptReferencePanel, ScriptEditor } from "@/components/script-mode";
 import { ProjectFileTree } from "@/components/script-mode/ProjectFileTree";
 import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
+import { EDITOR_FONT_SIZE_CHANGED } from "@/components/FontSizeSwitcher";
 import {
   EditorTabBar,
   type EditorTabBarItem,
@@ -103,7 +104,7 @@ interface ScriptModeEditorLayoutProps {
   labelTitles?: LabelTitleMap;
 }
 
-// react-doctor-disable-next-line react-doctor/no-many-boolean-props
+// react-doctor-disable-next-line react-doctor/no-many-boolean-props, react-doctor/no-giant-component
 export function ScriptModeEditorLayout({
   projectName,
   projectId,
@@ -170,6 +171,11 @@ export function ScriptModeEditorLayout({
     document.documentElement.style.setProperty(
       "--editor-font-size",
       `${scriptFontSize}px`
+    );
+    window.dispatchEvent(
+      new CustomEvent(EDITOR_FONT_SIZE_CHANGED, {
+        detail: { fontSize: scriptFontSize },
+      })
     );
   }, [scriptFontSize]);
 

@@ -695,12 +695,17 @@ export const ProseEditor = function ProseEditor({
   }, [handleUndo, handleRedo]);
 
   // Sync undo/redo availability to parent (for WriteMode's FAB)
+  const onUndoStateChangeRef = useRef(onUndoStateChange);
   useEffect(() => {
-    onUndoStateChange?.({
+    onUndoStateChangeRef.current = onUndoStateChange;
+  });
+
+  useEffect(() => {
+    onUndoStateChangeRef.current?.({
       canUndo: inMemoryUndo.canUndo,
       canRedo: inMemoryUndo.canRedo,
     });
-  }, [inMemoryUndo.canUndo, inMemoryUndo.canRedo, onUndoStateChange]);
+  }, [inMemoryUndo.canUndo, inMemoryUndo.canRedo]);
 
   const wordCount = countWordsFromEntries(entries);
   const lineCount = entries.length;
@@ -731,16 +736,17 @@ export const ProseEditor = function ProseEditor({
   ]);
 
   // Emit word count changes to parent (for mobile FAB)
+  const onWordCountChangeRef = useRef(onWordCountChange);
   useEffect(() => {
-    onWordCountChange?.({
+    onWordCountChangeRef.current = onWordCountChange;
+  });
+
+  useEffect(() => {
+    onWordCountChangeRef.current?.({
       todayWordCount,
       dailyGoal: writingGoalSettings?.dailyWritingGoal ?? 0,
     });
-  }, [
-    todayWordCount,
-    writingGoalSettings?.dailyWritingGoal,
-    onWordCountChange,
-  ]);
+  }, [todayWordCount, writingGoalSettings?.dailyWritingGoal]);
 
   if (!activeLabel) {
     return (

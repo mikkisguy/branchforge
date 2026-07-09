@@ -355,7 +355,8 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
 
   const [writeLineLayout, setWriteLineLayout] = useLocalStorage<string>(
     "write:line-layout",
-    "inline"
+    "inline",
+    { validate: (v) => v === "inline" || v === "stacked" }
   );
   const [showBadges, setShowBadges] = useLocalStorageBoolean(
     "write:show-badges",

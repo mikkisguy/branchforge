@@ -1,9 +1,10 @@
 import {
   createContext,
+  use,
   useCallback,
-  useContext,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -32,7 +33,7 @@ const FABPopoverContext = createContext<FABPopoverContextValue>({
 
 /** Call from any child inside MobileOverflowFAB to dismiss the popover. */
 export function useFABPopover(): FABPopoverContextValue {
-  return useContext(FABPopoverContext);
+  return use(FABPopoverContext);
 }
 
 // ── Shared row styles ────────────────────────────────────────────────────
@@ -286,6 +287,8 @@ export function MobileOverflowFAB({
     setOpen(false);
   }, []);
 
+  const contextValue = useMemo(() => ({ closePopover }), [closePopover]);
+
   // Position the popover relative to the FAB
   useLayoutEffect(() => {
     if (!open || !fabRef.current) return;
@@ -336,6 +339,15 @@ export function MobileOverflowFAB({
     return () => document.removeEventListener("keydown", handler);
   }, [open]);
 
+  // Focus management: move focus into popover when it opens
+  useEffect(() => {
+    if (!open || !popoverRef.current) return;
+    const firstFocusable = popoverRef.current.querySelector<HTMLElement>(
+      'button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+    firstFocusable?.focus();
+  }, [open]);
+
   return (
     <>
       <button
@@ -345,6 +357,8 @@ export function MobileOverflowFAB({
         className="hidden max-md:flex items-center justify-center fixed bottom-20 right-4 z-40 size-12 rounded-full bg-[var(--theme-color)] text-white shadow-lg hover:opacity-90 transition-opacity"
         aria-label={ariaLabel}
         title={ariaLabel}
+        aria-haspopup="true"
+        aria-expanded={open}
       >
         <Ellipsis className="size-5" />
       </button>
@@ -356,7 +370,7 @@ export function MobileOverflowFAB({
             style={popoverStyle}
             className="z-[110] rounded-lg border border-border bg-card shadow-xl py-1 min-w-[180px] overflow-hidden"
           >
-            <FABPopoverContext.Provider value={{ closePopover }}>
+            <FABPopoverContext.Provider value={contextValue}>
               {children}
             </FABPopoverContext.Provider>
           </div>,
