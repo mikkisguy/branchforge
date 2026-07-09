@@ -55,8 +55,6 @@ export function DialogShell({
         className={cn(
           "w-full max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden",
           MAX_WIDTH_CLASSES[maxWidth],
-          // Full-bleed below sm mirrors DialogContent treatment.
-          "max-sm:w-full max-sm:max-w-full max-sm:max-h-full max-sm:h-full max-sm:rounded-none max-sm:m-0",
           contentClassName
         )}
       >

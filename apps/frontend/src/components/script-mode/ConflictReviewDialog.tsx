@@ -207,6 +207,10 @@ export function ConflictReviewDialog({
     "local" | "remote"
   >("local");
 
+  useEffect(() => {
+    if (open) setMobileConflictView("local");
+  }, [open]);
+
   /**
    * Fetch conflicts when dialog opens
    */
