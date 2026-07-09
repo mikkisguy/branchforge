@@ -116,6 +116,12 @@ export function DialogContent({ children, className }: DialogContentProps) {
     <div
       className={cn(
         "relative bg-card border border-border/30 rounded-lg shadow-xl p-6 max-mobile:p-4 w-full max-w-md max-h-[85vh] overflow-y-auto",
+        // Full-bleed below sm for phone screens — the centered card
+        // wastes too much space on narrow viewports. Safe-area
+        // insets keep content clear of notches and home indicators.
+        "max-sm:w-full max-sm:max-w-full max-sm:max-h-full max-sm:h-full max-sm:rounded-none max-sm:m-0",
+        "max-sm:pt-[calc(1.5rem+env(safe-area-inset-top,0px))] max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]",
+        "max-sm:pl-[calc(1.5rem+env(safe-area-inset-left,0px))] max-sm:pr-[calc(1.5rem+env(safe-area-inset-right,0px))]",
         className
       )}
     >

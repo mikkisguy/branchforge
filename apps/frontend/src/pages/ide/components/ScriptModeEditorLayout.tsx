@@ -191,9 +191,39 @@ export function ScriptModeEditorLayout({
     }
   }, [paletteIndex]);
 
-  const [lineWrap, setLineWrap] = useLocalStorageBoolean(
+  // Desktop: persisted preference, default OFF.
+  // Mobile (<md): defaults ON (line wrapping prevents horizontal
+  // scroll on narrow phones). The FAB toggle can override per session
+  // but the override resets when re-entering mobile.
+  const [storedLineWrap, setStoredLineWrap] = useLocalStorageBoolean(
     "script:line-wrap",
     false
+  );
+  const [mobileLineWrap, setMobileLineWrap] = useState(true);
+
+  useEffect(() => {
+    if (isMobile) setMobileLineWrap(true);
+  }, [isMobile]);
+
+  const lineWrap = isMobile ? mobileLineWrap : storedLineWrap;
+
+  const handleLineWrapToggle = useCallback(() => {
+    if (isMobile) {
+      setMobileLineWrap((v) => !v);
+    } else {
+      setStoredLineWrap((v) => !v);
+    }
+  }, [isMobile, setStoredLineWrap]);
+
+  const handleLineWrapChange = useCallback(
+    (wrap: boolean) => {
+      if (isMobile) {
+        setMobileLineWrap(wrap);
+      } else {
+        setStoredLineWrap(wrap);
+      }
+    },
+    [isMobile, setStoredLineWrap]
   );
 
   const [showLabelTitles, setShowLabelTitles] = useLocalStorageBoolean(
@@ -375,7 +405,7 @@ export function ScriptModeEditorLayout({
                   onSaveRequest={onSaveRequest}
                   labelTitles={labelTitles}
                   lineWrap={lineWrap}
-                  onLineWrapChange={setLineWrap}
+                  onLineWrapChange={handleLineWrapChange}
                   showLabelTitles={showLabelTitles}
                   onShowLabelTitlesChange={setShowLabelTitles}
                 />
@@ -463,7 +493,7 @@ export function ScriptModeEditorLayout({
           }
           label="Line Wrap"
           active={lineWrap}
-          onClick={() => setLineWrap((v) => !v)}
+          onClick={handleLineWrapToggle}
         />
         <FABToggle
           icon={

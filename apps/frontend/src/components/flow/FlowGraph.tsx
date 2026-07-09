@@ -414,6 +414,11 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
           minZoom={0.1}
           maxZoom={2}
           proOptions={{ hideAttribution: true }}
+          // Touch-device interaction: pan with drag, pinch to zoom,
+          // don't auto-select nodes on drag (avoids accidental
+          // selections while panning on touch screens).
+          panOnDrag={[0, 1]}
+          selectNodesOnDrag={false}
           // Only render nodes/edges inside the viewport for large graphs.
           // Below the threshold, keeping all nodes mounted is cheaper than
           // the mount/unmount churn that virtualization triggers when nodes
@@ -449,7 +454,7 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
               characters={characters}
             />
           </div>
-          <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+          <div className="absolute top-4 right-4 z-10 flex items-center gap-2 flex-wrap max-sm:flex-col max-sm:items-end">
             <FlowGraphToolbar
               layoutMode={layoutMode}
               isBusy={isSaving || isResetting}

@@ -208,7 +208,7 @@ export function SettingsModal({
           </Button>
         </DialogHeader>
 
-        <div className="flex max-md:flex-col h-[700px] max-h-[calc(95vh-120px)] max-md:h-auto">
+        <div className="flex max-md:flex-col h-[700px] max-h-[calc(95vh-120px)] max-md:h-auto max-md:max-h-none">
           {/* Vertical Tabs */}
           <div className="w-48 border-r border-border/30 p-2 flex flex-col max-md:w-full max-md:border-r-0 max-md:border-b max-md:flex-row max-md:overflow-x-auto max-md:sticky max-md:top-0 max-md:bg-card max-md:z-10">
             <div className="space-y-1 max-md:flex max-md:space-y-0 max-md:space-x-1 max-md:gap-1">
