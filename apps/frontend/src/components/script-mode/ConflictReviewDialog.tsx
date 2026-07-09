@@ -202,14 +202,21 @@ export function ConflictReviewDialog({
 
   // State
   const [state, dispatch] = useReducer(conflictReducer, initialConflictState);
-  // Mobile tabbed view: which panel to show below sm.
+  // Mobile tabbed view: which panel to show below sm. Reset to Local
+  // whenever the dialog opens so the user always starts on the local
+  // version. Render-phase sync (not useEffect) avoids derived-state-
+  // in-effect warnings.
   const [mobileConflictView, setMobileConflictView] = useState<
     "local" | "remote"
   >("local");
-
-  useEffect(() => {
-    if (open) setMobileConflictView("local");
-  }, [open]);
+  // react-doctor-disable-next-line react-doctor/no-derived-useState, react-doctor/rerender-state-only-in-handlers
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) {
+      setMobileConflictView("local");
+    }
+  }
 
   /**
    * Fetch conflicts when dialog opens

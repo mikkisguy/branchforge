@@ -201,9 +201,19 @@ export function ScriptModeEditorLayout({
   );
   const [mobileLineWrap, setMobileLineWrap] = useState(true);
 
-  useEffect(() => {
-    if (isMobile) setMobileLineWrap(true);
-  }, [isMobile]);
+  // Render-phase sync: reset wrap to ON when entering mobile
+  // (narrower than md), so users get line wrapping by default on
+  // phones. Uses the same pattern as ProjectSettingsDialog's tab
+  // reset. Suppressing derived-useState — the alternative
+  // useEffect would trigger react-doctor no-derived-state-effect.
+  // react-doctor-disable-next-line react-doctor/no-derived-useState, react-doctor/rerender-state-only-in-handlers
+  const [wasMobile, setWasMobile] = useState(isMobile);
+  if (isMobile !== wasMobile) {
+    setWasMobile(isMobile);
+    if (isMobile) {
+      setMobileLineWrap(true);
+    }
+  }
 
   const lineWrap = isMobile ? mobileLineWrap : storedLineWrap;
 
