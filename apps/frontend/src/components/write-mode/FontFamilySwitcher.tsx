@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cva } from "class-variance-authority";
+import { Pilcrow } from "lucide-react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 type FontFamilyOption = {
@@ -42,6 +43,10 @@ const CSS_VARIABLE = "--prose-editor-font-family";
 interface FontFamilySwitcherProps {
   className?: string;
   direction?: "up" | "down";
+  /** Controlled value. When provided with onChange, overrides internal localStorage state. */
+  value?: string;
+  /** Controlled change handler. When provided with value, overrides internal localStorage state. */
+  onChange?: (value: string) => void;
 }
 
 /**
@@ -52,8 +57,10 @@ interface FontFamilySwitcherProps {
 export function FontFamilySwitcher({
   className = "",
   direction = "down",
+  value: controlledValue,
+  onChange: controlledOnChange,
 }: FontFamilySwitcherProps = {}) {
-  const [fontFamily, setFontFamily] = useLocalStorage<string>(
+  const [internalFontFamily, setInternalFontFamily] = useLocalStorage<string>(
     STORAGE_KEY,
     FONT_FAMILY_OPTIONS[0].value,
     {
@@ -61,6 +68,12 @@ export function FontFamilySwitcher({
         FONT_FAMILY_OPTIONS.some((option) => option.value === value),
     }
   );
+  const isControlled =
+    controlledValue !== undefined && controlledOnChange !== undefined;
+  const fontFamily = isControlled ? controlledValue : internalFontFamily;
+  const setFontFamily = isControlled
+    ? controlledOnChange
+    : setInternalFontFamily;
 
   // Consolidated dropdown state for better clarity
   const [dropdownState, setDropdownState] = useState({
@@ -199,20 +212,7 @@ export function FontFamilySwitcher({
         className="px-2 py-1 border border-[hsl(var(--border)/0.6)] hover:bg-[hsl(var(--muted)/0.4)] text-xs text-muted-foreground hover:text-foreground rounded flex items-center gap-2 transition-colors"
         title="Change font family"
       >
-        <svg
-          className="size-3.5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10M5.757 19.537a.5.5 0 01-.765-.436l-.5-4.5a.5.5 0 01.476-.548h4.5a.5.5 0 01.476.548l-.5 4.5a.5.5 0 01-.765.436l-1.961-.98z"
-          />
-        </svg>
+        <Pilcrow className="size-3.5" aria-hidden="true" />
         <span id="font-family-label" className="sr-only">
           Font family: {currentOption.label}
         </span>

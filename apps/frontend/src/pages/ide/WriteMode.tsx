@@ -12,12 +12,33 @@ import {
   LabelNavigator,
   LabelPropertiesPanel,
 } from "@/components/write-mode";
+import type { ProseEditorRef } from "@/components/write-mode";
 import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
 import { LabelEditDialog } from "@/components/write-mode/LabelEditDialog.lazy";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CharacterEditDialog } from "@/components/CharacterEditDialog.lazy";
-import { ChevronRight, ChevronLeft, FileText, Loader2 } from "lucide-react";
-import { EditorTabBar } from "@/components/ide-shared";
+import {
+  ChevronRight,
+  ChevronLeft,
+  FileText,
+  Loader2,
+  PanelTop,
+  Eye,
+  EyeOff,
+  Type,
+  Pilcrow,
+  BarChart3,
+} from "lucide-react";
+import {
+  EditorTabBar,
+  MobileOverflowFAB,
+  useFABPopover,
+  FABToggle,
+  FABExpandableChoice,
+  FABUndoButton,
+  FABRedoButton,
+  FABFocusButton,
+} from "@/components/ide-shared";
 import { Button } from "@/components/ui/button";
 import { useLabels } from "@/hooks/useLabels";
 import { useCharacters } from "@/hooks/useCharacters";
@@ -36,8 +57,48 @@ import {
 import { useWriteTabs } from "@/hooks/useWriteTabs";
 import { useLabelSwitcher } from "@/hooks/useLabelSwitcher";
 import { useWriteFocusMode } from "@/hooks/useWriteFocusMode";
+import {
+  useLocalStorage,
+  useLocalStorageBoolean,
+  useLocalStorageNumber,
+} from "@/hooks/useLocalStorage";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { PublicLabel } from "@branchforge/shared";
+
+function WritingGoalFABRow({
+  todayWordCount,
+  dailyGoal,
+  onOpenStats,
+}: {
+  todayWordCount: number;
+  dailyGoal: number;
+  onOpenStats: () => void;
+}) {
+  const { closePopover } = useFABPopover();
+  const pct =
+    dailyGoal > 0
+      ? Math.min(100, Math.round((todayWordCount / dailyGoal) * 100))
+      : 0;
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        onOpenStats();
+        closePopover();
+      }}
+      className="flex flex-col w-full px-3 py-2 text-sm hover:bg-muted/50 transition-colors text-left"
+    >
+      <span className="flex items-center gap-3 w-full">
+        <BarChart3 className="size-4 shrink-0" />
+        <span className="flex-1">Writing Goal</span>
+        <span className="text-xs text-muted-foreground shrink-0">{pct}%</span>
+      </span>
+      <span className="pl-7 text-xs text-muted-foreground mt-0.5">
+        {todayWordCount.toLocaleString()} / {dailyGoal.toLocaleString()} words
+      </span>
+    </button>
+  );
+}
 
 const sidebarVariants = cva(
   "min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3 transition-all duration-300 ease-out",
@@ -120,7 +181,17 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
     null
   );
 
-  const editorRef = useRef<{ focus: () => void } | null>(null);
+  const editorRef = useRef<ProseEditorRef | null>(null);
+
+  const [proseUndoState, setProseUndoState] = useState({
+    canUndo: false,
+    canRedo: false,
+  });
+
+  const [wordCountState, setWordCountState] = useState<{
+    todayWordCount: number;
+    dailyGoal: number;
+  }>({ todayWordCount: 0, dailyGoal: 0 });
 
   const { isFocusMode, focusToggleRef, handleFocusModeToggle } =
     useWriteFocusMode({
@@ -217,6 +288,82 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
     pendingResetHashRef.current = null;
     isSwitchingLabelsRef.current = false;
   }, [currentDraft, resetSavedHash]);
+
+  // ── Editor font/family/layout/badge settings ─────────────────────────
+
+  const WRITE_FONT_SIZE_OPTIONS = useMemo(
+    () =>
+      [
+        { label: "Small", value: 14 },
+        { label: "Medium", value: 16 },
+        { label: "Large", value: 18 },
+        { label: "Extra Large", value: 20 },
+        { label: "Huge", value: 22 },
+      ] as const,
+    []
+  );
+
+  const [writeFontSize, setWriteFontSize] = useLocalStorageNumber(
+    "write:font-size",
+    16,
+    {
+      validate: (v) => WRITE_FONT_SIZE_OPTIONS.some((o) => o.value === v),
+    }
+  );
+
+  // Apply CSS variable when font size changes (mirrors FontSizeSwitcher)
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--prose-editor-font-size",
+      `${writeFontSize}px`
+    );
+  }, [writeFontSize]);
+
+  const FONT_FAMILY_OPTIONS = useMemo(
+    () =>
+      [
+        { label: "Default", value: "default" },
+        { label: "Fira Code", value: "fira-code" },
+        { label: "Noto Serif", value: "noto-serif" },
+      ] as const,
+    []
+  );
+
+  const [writeFontFamily, setWriteFontFamily] = useLocalStorage<string>(
+    "write:font-family",
+    "default",
+    {
+      validate: (v) => FONT_FAMILY_OPTIONS.some((o) => o.value === v),
+    }
+  );
+
+  // Apply CSS variable when font family changes (mirrors FontFamilySwitcher)
+  useEffect(() => {
+    const option =
+      FONT_FAMILY_OPTIONS.find((o) => o.value === writeFontFamily) ??
+      FONT_FAMILY_OPTIONS[0];
+    const families: Record<string, string> = {
+      default: "var(--font-sans)",
+      "fira-code": "'Fira Code', monospace",
+      "noto-serif": "'Noto Serif', serif",
+    };
+    document.documentElement.style.setProperty(
+      "--prose-editor-font-family",
+      families[option.value] ?? families["default"]
+    );
+  }, [writeFontFamily, FONT_FAMILY_OPTIONS]);
+
+  const [writeLineLayout, setWriteLineLayout] = useLocalStorage<string>(
+    "write:line-layout",
+    "inline",
+    { validate: (v) => v === "inline" || v === "stacked" }
+  );
+  const [showBadges, setShowBadges] = useLocalStorageBoolean(
+    "write:show-badges",
+    true
+  );
+
+  // ──────────────────────────────────────────────────────────────────────
 
   const handleContentChange = useCallback((entries: DialogueEntry[]) => {
     setCurrentDraft((prev) => ({ ...prev, entries }));
@@ -330,7 +477,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
   return (
     <div className="h-full flex flex-col overflow-hidden max-md:px-2">
       {isFocusMode && (
-        <div className="fixed top-2 right-2 z-[100] pointer-events-auto">
+        <div className="fixed top-2 right-2 z-[100] pointer-events-auto max-md:hidden">
           <FocusModeToggle
             ref={focusToggleRef}
             isFocusMode={isFocusMode}
@@ -421,7 +568,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
                   titleMaxWidthClassName="max-w-[180px]"
                 />
               </div>
-              <div className="h-12 overflow-hidden rounded-lg border border-border/80 bg-card/55 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+              <div className="h-12 overflow-hidden rounded-lg border border-border/80 bg-card/55 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] max-md:hidden">
                 <div className="h-full flex items-center justify-end px-3">
                   <FocusModeToggle
                     ref={focusToggleRef}
@@ -456,6 +603,16 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
                 lastSaved={editorSaveProps.lastSaved}
                 saveError={editorSaveProps.saveError}
                 saveConflict={Boolean(hasConflict)}
+                onUndoStateChange={setProseUndoState}
+                onWordCountChange={setWordCountState}
+                showBadges={showBadges}
+                onShowBadgesChange={setShowBadges}
+                layoutMode={writeLineLayout as "inline" | "stacked"}
+                onLayoutModeChange={setWriteLineLayout}
+                fontSizeValue={writeFontSize}
+                onFontSizeChange={setWriteFontSize}
+                fontFamilyValue={writeFontFamily}
+                onFontFamilyChange={setWriteFontFamily}
               />
             </div>
           </div>
@@ -534,6 +691,82 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
             />,
             document.body
           )}
+        {/* Mobile FAB — settings at top, actions closest to thumb */}
+        <MobileOverflowFAB aria-label="Editor actions">
+          <FABExpandableChoice
+            icon={<Type className="size-4" />}
+            label="Font Size"
+            currentLabel={
+              WRITE_FONT_SIZE_OPTIONS.find((o) => o.value === writeFontSize)
+                ?.label ?? "Medium"
+            }
+            options={WRITE_FONT_SIZE_OPTIONS.map((o) => ({
+              label: o.label,
+              value: o.value,
+              active: o.value === writeFontSize,
+            }))}
+            onSelect={(v) => setWriteFontSize(v as number)}
+          />
+          <FABExpandableChoice
+            icon={<Pilcrow className="size-4" />}
+            label="Font Family"
+            currentLabel={
+              FONT_FAMILY_OPTIONS.find((o) => o.value === writeFontFamily)
+                ?.label ?? "Default"
+            }
+            options={FONT_FAMILY_OPTIONS.map((o) => ({
+              label: o.label,
+              value: o.value,
+              active: o.value === writeFontFamily,
+            }))}
+            onSelect={(v) => setWriteFontFamily(v as string)}
+          />
+          <FABToggle
+            icon={<PanelTop className="size-4" />}
+            label="Line Layout: Stacked"
+            active={writeLineLayout === "stacked"}
+            onClick={() =>
+              setWriteLineLayout(
+                writeLineLayout === "stacked" ? "inline" : "stacked"
+              )
+            }
+          />
+          <FABToggle
+            icon={
+              showBadges ? (
+                <Eye className="size-4" />
+              ) : (
+                <EyeOff className="size-4" />
+              )
+            }
+            label="Show Badges"
+            active={showBadges}
+            onClick={() => setShowBadges((v) => !v)}
+          />
+          <div className="h-px bg-border/30 my-1" />
+          {wordCountState.dailyGoal > 0 && (
+            <WritingGoalFABRow
+              todayWordCount={wordCountState.todayWordCount}
+              dailyGoal={wordCountState.dailyGoal}
+              onOpenStats={() => editorRef.current?.openWritingStats()}
+            />
+          )}
+          {wordCountState.dailyGoal > 0 && (
+            <div className="h-px bg-border/30 my-1" />
+          )}
+          <FABFocusButton
+            isFocusMode={isFocusMode}
+            onToggle={handleFocusModeToggle}
+          />
+          <FABUndoButton
+            canUndo={proseUndoState.canUndo}
+            onUndo={() => editorRef.current?.undo()}
+          />
+          <FABRedoButton
+            canRedo={proseUndoState.canRedo}
+            onRedo={() => editorRef.current?.redo()}
+          />
+        </MobileOverflowFAB>
       </div>
     </div>
   );

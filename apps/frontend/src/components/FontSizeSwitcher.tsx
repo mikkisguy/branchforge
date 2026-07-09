@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { Type } from "lucide-react";
 import { useLocalStorageNumber } from "@/hooks/useLocalStorage";
 
 export const EDITOR_FONT_SIZE_CHANGED = "editor-font-size-changed";
@@ -15,6 +16,10 @@ interface FontSizeSwitcherProps {
   defaultSize?: number;
   sizeOptions?: Readonly<FontSizeOption[]>;
   className?: string;
+  /** Controlled value. When provided with onChange, overrides internal localStorage state. */
+  value?: number;
+  /** Controlled change handler. When provided with value, overrides internal localStorage state. */
+  onChange?: (value: number) => void;
 }
 
 const MODE_CONFIGS = {
@@ -78,6 +83,8 @@ export function FontSizeSwitcher({
   defaultSize: customDefaultSize,
   sizeOptions: customSizeOptions,
   className: customClassName,
+  value: controlledValue,
+  onChange: controlledOnChange,
 }: FontSizeSwitcherProps = {}) {
   // Use mode config if provided, otherwise use custom props
   const config = MODE_CONFIGS[mode];
@@ -93,13 +100,17 @@ export function FontSizeSwitcher({
     [sizeOptions]
   );
 
-  const [fontSize, setFontSize] = useLocalStorageNumber(
+  const [internalFontSize, setInternalFontSize] = useLocalStorageNumber(
     storageKey,
     defaultSize,
     {
       validate: validateFontSize,
     }
   );
+  const isControlled =
+    controlledValue !== undefined && controlledOnChange !== undefined;
+  const fontSize = isControlled ? controlledValue : internalFontSize;
+  const setFontSize = isControlled ? controlledOnChange : setInternalFontSize;
   const [isOpen, setIsOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
   const [isKeyboardNav, setIsKeyboardNav] = useState(false);
@@ -246,20 +257,7 @@ export function FontSizeSwitcher({
         className={`${buttonClassName} text-xs ${baseClassName} text-muted-foreground hover:text-foreground rounded flex items-center gap-2 transition-colors`}
         title="Change font size"
       >
-        <svg
-          className="size-3"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M4 6h16M4 12h16m-7 6h7"
-          />
-        </svg>
+        <Type className="size-3" aria-hidden="true" />
         <span id="font-size-label" className="sr-only">
           Font size: {currentOption.label}
         </span>

@@ -1,12 +1,30 @@
-import { useCallback, useState } from "react";
-import { Sparkles, X, ChevronRight, ChevronLeft } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  AlignJustify,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  Sparkles,
+  WrapText,
+  X,
+  Type,
+  Palette,
+} from "lucide-react";
 import { cva } from "class-variance-authority";
 import { ScriptReferencePanel, ScriptEditor } from "@/components/script-mode";
 import { ProjectFileTree } from "@/components/script-mode/ProjectFileTree";
 import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
+import { EDITOR_FONT_SIZE_CHANGED } from "@/components/FontSizeSwitcher";
 import {
   EditorTabBar,
   type EditorTabBarItem,
+  FABExpandableChoice,
+  FABToggle,
+  FABUndoButton,
+  FABRedoButton,
+  FABFocusButton,
+  MobileOverflowFAB,
   UndoRedoControls,
 } from "@/components/ide-shared";
 import { Button } from "@/components/ui/button";
@@ -17,6 +35,11 @@ import type { ScriptEditorRef } from "@/components/script-mode/ScriptEditor";
 import type { FocusModeState } from "@/hooks/useFocusModeState";
 import type { ProjectFileNode } from "@/hooks/useProjectFiles";
 import type { SaveStatus } from "@/hooks/useAutosave";
+import {
+  useLocalStorageBoolean,
+  useLocalStorageNumber,
+} from "@/hooks/useLocalStorage";
+import { PALETTES, applyPalette } from "@/lib/codemirror/palettes";
 import type { LabelTitleMap } from "@/lib/codemirror/label-title-decoration";
 import type {
   Dispatch,
@@ -81,7 +104,7 @@ interface ScriptModeEditorLayoutProps {
   labelTitles?: LabelTitleMap;
 }
 
-// react-doctor-disable-next-line react-doctor/no-many-boolean-props
+// react-doctor-disable-next-line react-doctor/no-many-boolean-props, react-doctor/no-giant-component
 export function ScriptModeEditorLayout({
   projectName,
   projectId,
@@ -124,6 +147,60 @@ export function ScriptModeEditorLayout({
     null
   );
 
+  // ── Mobile FAB settings state (mirrors ScriptEditor/desktop status bar) ──
+
+  const SCRIPT_FONT_SIZE_OPTIONS = useMemo(
+    () =>
+      [
+        { label: "Small", value: 12 },
+        { label: "Medium", value: 14 },
+        { label: "Large", value: 16 },
+        { label: "Extra Large", value: 18 },
+        { label: "Huge", value: 20 },
+      ] as const,
+    []
+  );
+
+  const [scriptFontSize, setScriptFontSize] = useLocalStorageNumber(
+    "script:font-size",
+    14,
+    { validate: (v) => SCRIPT_FONT_SIZE_OPTIONS.some((o) => o.value === v) }
+  );
+
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--editor-font-size",
+      `${scriptFontSize}px`
+    );
+    window.dispatchEvent(
+      new CustomEvent(EDITOR_FONT_SIZE_CHANGED, {
+        detail: { fontSize: scriptFontSize },
+      })
+    );
+  }, [scriptFontSize]);
+
+  const [paletteIndex, setPaletteIndex] = useLocalStorageNumber(
+    "editor:syntax-palette",
+    0,
+    { validate: (v) => v >= 0 && v < PALETTES.length }
+  );
+
+  useEffect(() => {
+    if (PALETTES[paletteIndex]) {
+      applyPalette(PALETTES[paletteIndex]);
+    }
+  }, [paletteIndex]);
+
+  const [lineWrap, setLineWrap] = useLocalStorageBoolean(
+    "script:line-wrap",
+    false
+  );
+
+  const [showLabelTitles, setShowLabelTitles] = useLocalStorageBoolean(
+    "script:show-label-titles",
+    true
+  );
+
   // On mobile, only one overlay sidebar may be open at a time. Opening
   // one closes the other so the two panels never stack on a narrow viewport.
   const openLeftSidebar = useCallback(() => {
@@ -139,7 +216,7 @@ export function ScriptModeEditorLayout({
   return (
     <>
       {isFocusMode && (
-        <div className="fixed top-2 right-2 z-[100] pointer-events-auto">
+        <div className="fixed top-2 right-2 z-[100] pointer-events-auto max-md:hidden">
           <FocusModeToggle
             ref={focusToggleRef}
             isFocusMode={isFocusMode}
@@ -255,7 +332,7 @@ export function ScriptModeEditorLayout({
                   titleMaxWidthClassName="max-w-[240px]"
                 />
               </div>
-              <div className="h-12 overflow-hidden rounded-lg border border-border/80 bg-card/55 opacity-100 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+              <div className="h-12 overflow-hidden rounded-lg border border-border/80 bg-card/55 opacity-100 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] max-md:hidden">
                 <div className="h-full flex items-center justify-end gap-3 px-3">
                   <UndoRedoControls
                     canUndo={canUndo}
@@ -297,6 +374,10 @@ export function ScriptModeEditorLayout({
                   saveConflict={saveConflict}
                   onSaveRequest={onSaveRequest}
                   labelTitles={labelTitles}
+                  lineWrap={lineWrap}
+                  onLineWrapChange={setLineWrap}
+                  showLabelTitles={showLabelTitles}
+                  onShowLabelTitlesChange={setShowLabelTitles}
                 />
               ) : activeLabel ? (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
@@ -344,6 +425,66 @@ export function ScriptModeEditorLayout({
         projectId={projectId ?? ""}
         characterId={editingCharacterId ?? undefined}
       />
+
+      {/* Mobile FAB — settings at top, actions closest to thumb */}
+      <MobileOverflowFAB aria-label="Editor actions">
+        <FABExpandableChoice
+          icon={<Type className="size-4" />}
+          label="Font Size"
+          currentLabel={
+            SCRIPT_FONT_SIZE_OPTIONS.find((o) => o.value === scriptFontSize)
+              ?.label ?? "Medium"
+          }
+          options={SCRIPT_FONT_SIZE_OPTIONS.map((o) => ({
+            label: o.label,
+            value: o.value,
+            active: o.value === scriptFontSize,
+          }))}
+          onSelect={(v: string | number) => setScriptFontSize(v as number)}
+        />
+        <FABExpandableChoice
+          icon={<Palette className="size-4" />}
+          label="Syntax Theme"
+          currentLabel={PALETTES[paletteIndex]?.name ?? "Default"}
+          options={PALETTES.map((p, i) => ({
+            label: p.name,
+            value: i,
+            active: i === paletteIndex,
+          }))}
+          onSelect={(v: string | number) => setPaletteIndex(v as number)}
+        />
+        <FABToggle
+          icon={
+            lineWrap ? (
+              <WrapText className="size-4" />
+            ) : (
+              <AlignJustify className="size-4" />
+            )
+          }
+          label="Line Wrap"
+          active={lineWrap}
+          onClick={() => setLineWrap((v) => !v)}
+        />
+        <FABToggle
+          icon={
+            showLabelTitles ? (
+              <Eye className="size-4" />
+            ) : (
+              <EyeOff className="size-4" />
+            )
+          }
+          label="Show Titles"
+          active={showLabelTitles}
+          onClick={() => setShowLabelTitles((v) => !v)}
+        />
+        <div className="h-px bg-border/30 my-1" />
+        <FABFocusButton
+          isFocusMode={isFocusMode}
+          onToggle={onFocusModeToggle}
+        />
+        <FABUndoButton canUndo={canUndo} onUndo={onUndo} />
+        <FABRedoButton canRedo={canRedo} onRedo={onRedo} />
+      </MobileOverflowFAB>
     </>
   );
 }

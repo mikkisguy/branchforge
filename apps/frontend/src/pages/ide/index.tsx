@@ -196,7 +196,7 @@ export function HomePageIDE() {
   }, []);
 
   return (
-    <div className="h-screen relative overflow-hidden">
+    <div className="h-screen h-[100dvh] relative overflow-hidden">
       <FloatingParticles />
 
       {/* Left Sidebar */}

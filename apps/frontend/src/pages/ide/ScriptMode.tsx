@@ -408,7 +408,6 @@ export function ScriptMode({
       />
 
       <StatusBar
-        language="Ren'Py"
         projectId={projectId}
         projectName={projectName}
         gitlabBranch={linkedRepo?.defaultBranch}

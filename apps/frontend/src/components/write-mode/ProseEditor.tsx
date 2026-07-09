@@ -34,7 +34,7 @@ import { useWritingGoals } from "@/hooks/useWritingGoals";
 import { useEntriesUndo } from "@/hooks/useEntriesUndo";
 import { UndoRedoControls } from "@/components/ide-shared";
 import { useTechnicalInfo } from "@/hooks/useTechnicalInfo";
-import { BookOpen, PenLine } from "lucide-react";
+import { BookOpen, PenLine, PanelTop, Eye, EyeOff } from "lucide-react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { Character, LabelDetail } from "@branchforge/shared";
@@ -49,10 +49,35 @@ interface ProseEditorProps {
   lastSaved?: Date | null;
   saveError?: boolean;
   saveConflict?: boolean;
+  /** Callback when undo/redo availability changes. Used by mobile FAB. */
+  onUndoStateChange?: (state: { canUndo: boolean; canRedo: boolean }) => void;
+  /** Callback when today's word count or daily goal changes. Used by mobile FAB. */
+  onWordCountChange?: (stats: {
+    todayWordCount: number;
+    dailyGoal: number;
+  }) => void;
+  /** Controlled badge visibility. When provided, overrides internal state. */
+  showBadges?: boolean;
+  onShowBadgesChange?: (showBadges: boolean) => void;
+  /** Controlled line layout mode. When provided, overrides internal state. */
+  layoutMode?: LineLayoutMode;
+  onLayoutModeChange?: (mode: LineLayoutMode) => void;
+  /** Controlled font size (px). When provided, FontSizeSwitcher uses this value instead of internal localStorage. */
+  fontSizeValue?: number;
+  onFontSizeChange?: (value: number) => void;
+  /** Controlled font family. When provided, FontFamilySwitcher uses this value instead of internal localStorage. */
+  fontFamilyValue?: string;
+  onFontFamilyChange?: (value: string) => void;
 }
 
 export interface ProseEditorRef {
   focus: () => void;
+  /** Trigger in-memory undo (mirrors Ctrl+Z inside the editor). */
+  undo: () => void;
+  /** Trigger in-memory redo (mirrors Ctrl+Y / Ctrl+Shift+Z inside the editor). */
+  redo: () => void;
+  /** Open the writing stats dialog. Used by mobile FAB. */
+  openWritingStats: () => void;
 }
 
 type LineLayoutMode = "inline" | "stacked";
@@ -203,6 +228,16 @@ export const ProseEditor = function ProseEditor({
   lastSaved = null,
   saveError = false,
   saveConflict = false,
+  onUndoStateChange,
+  onWordCountChange,
+  showBadges: propsShowBadges,
+  onShowBadgesChange,
+  layoutMode: propsLayoutMode,
+  onLayoutModeChange,
+  fontSizeValue,
+  onFontSizeChange,
+  fontFamilyValue,
+  onFontFamilyChange,
   ref,
 }: ProseEditorProps & { ref?: React.Ref<ProseEditorRef> }) {
   const labelId = activeLabel?.id ?? "none";
@@ -218,21 +253,22 @@ export const ProseEditor = function ProseEditor({
   const [entries, setEntries] = useState<DialogueEntry[]>(() =>
     convertLabelLinesToEntries(activeLabel)
   );
-  const [layoutMode, setLayoutMode] = useLocalStorage<LineLayoutMode>(
-    LINE_LAYOUT_STORAGE_KEY,
-    "inline",
-    {
+  const [internalLayoutMode, setInternalLayoutMode] =
+    useLocalStorage<LineLayoutMode>(LINE_LAYOUT_STORAGE_KEY, "inline", {
       serializer: (value) => value,
       deserializer: (value) => value as LineLayoutMode,
       validate: (value) => value === "inline" || value === "stacked",
-    }
-  );
+    });
+  const layoutMode = propsLayoutMode ?? internalLayoutMode;
+  const setLayoutMode = onLayoutModeChange ?? setInternalLayoutMode;
 
-  // Technical badges toggle state
-  const [showBadges, setShowBadges] = useLocalStorage<boolean>(
+  // Technical badges toggle state — controlled or internal
+  const [internalShowBadges, setInternalShowBadges] = useLocalStorage<boolean>(
     "show-technical-badges",
     false
   );
+  const showBadges = propsShowBadges ?? internalShowBadges;
+  const setShowBadges = onShowBadgesChange ?? setInternalShowBadges;
 
   // Writing stats dialog state
   const [statsDialogOpen, setStatsDialogOpen] = useState(false);
@@ -284,6 +320,11 @@ export const ProseEditor = function ProseEditor({
     textareaRefs.current = new Map();
   }
 
+  // Refs for undo/redo functions (defined later in the component).
+  // useImperativeHandle captures these so WriteMode's FAB can call them.
+  const undoRef = useRef<() => void>(() => {});
+  const redoRef = useRef<() => void>(() => {});
+
   useImperativeHandle(
     ref,
     () => ({
@@ -304,6 +345,9 @@ export const ProseEditor = function ProseEditor({
           textarea.focus();
         }
       },
+      undo: () => undoRef.current(),
+      redo: () => redoRef.current(),
+      openWritingStats: () => setStatsDialogOpen(true),
     }),
     []
   );
@@ -644,6 +688,25 @@ export const ProseEditor = function ProseEditor({
     inMemoryUndo.redo();
   }, [flushPendingTextHistory, inMemoryUndo]);
 
+  // Wire the ref-based undo/redo so WriteMode's FAB can invoke them
+  useEffect(() => {
+    undoRef.current = handleUndo;
+    redoRef.current = handleRedo;
+  }, [handleUndo, handleRedo]);
+
+  // Sync undo/redo availability to parent (for WriteMode's FAB)
+  const onUndoStateChangeRef = useRef(onUndoStateChange);
+  useEffect(() => {
+    onUndoStateChangeRef.current = onUndoStateChange;
+  });
+
+  useEffect(() => {
+    onUndoStateChangeRef.current?.({
+      canUndo: inMemoryUndo.canUndo,
+      canRedo: inMemoryUndo.canRedo,
+    });
+  }, [inMemoryUndo.canUndo, inMemoryUndo.canRedo]);
+
   const wordCount = countWordsFromEntries(entries);
   const lineCount = entries.length;
 
@@ -671,6 +734,19 @@ export const ProseEditor = function ProseEditor({
     wordCount,
     initialWordCount,
   ]);
+
+  // Emit word count changes to parent (for mobile FAB)
+  const onWordCountChangeRef = useRef(onWordCountChange);
+  useEffect(() => {
+    onWordCountChangeRef.current = onWordCountChange;
+  });
+
+  useEffect(() => {
+    onWordCountChangeRef.current?.({
+      todayWordCount,
+      dailyGoal: writingGoalSettings?.dailyWritingGoal ?? 0,
+    });
+  }, [todayWordCount, writingGoalSettings?.dailyWritingGoal]);
 
   if (!activeLabel) {
     return (
@@ -733,12 +809,14 @@ export const ProseEditor = function ProseEditor({
             </span>
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <UndoRedoControls
-              canUndo={inMemoryUndo.canUndo}
-              canRedo={inMemoryUndo.canRedo}
-              onUndo={handleUndo}
-              onRedo={handleRedo}
-            />
+            <div className="max-md:hidden">
+              <UndoRedoControls
+                canUndo={inMemoryUndo.canUndo}
+                canRedo={inMemoryUndo.canRedo}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+              />
+            </div>
             <SaveIndicator
               saveStatus={propsToSaveStatus(isSaving, saveError)}
               displayMode="compact"
@@ -792,7 +870,7 @@ export const ProseEditor = function ProseEditor({
       {/* Goal Pill */}
       {writingGoalSettings?.dailyWritingGoal != null && (
         <div
-          className="relative z-10 -mt-12 px-4 pt-10 pb-2 border-b border-border bg-gradient-to-b from-transparent via-card/30 to-card/80 transition-opacity duration-300 ease-out flex justify-end"
+          className="relative z-10 -mt-12 px-4 pt-10 pb-2 border-b border-border bg-gradient-to-b from-transparent via-card/30 to-card/80 transition-opacity duration-300 ease-out flex justify-end max-md:hidden"
           style={{
             opacity: isFocusMode ? (isBottomBarHovered ? 1 : 0.4) : 1,
           }}
@@ -811,7 +889,7 @@ export const ProseEditor = function ProseEditor({
 
       {/* Status Bar */}
       <div
-        className="px-4 py-2 border-t border-border bg-card rounded-b-lg transition-opacity duration-300 ease-out"
+        className="px-4 py-2 border-t border-border bg-card rounded-b-lg transition-opacity duration-300 ease-out max-md:hidden"
         style={{
           opacity: isFocusMode ? (isBottomBarHovered ? 1 : 0.4) : 1,
         }}
@@ -825,26 +903,39 @@ export const ProseEditor = function ProseEditor({
             <button
               type="button"
               onClick={() =>
-                setLayoutMode((prev) =>
-                  prev === "inline" ? "stacked" : "inline"
-                )
+                setLayoutMode(layoutMode === "inline" ? "stacked" : "inline")
               }
-              className="px-2 py-1 rounded border border-[hsl(var(--border)/0.6)] hover:bg-[hsl(var(--muted)/0.4)] text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="px-2 py-1 rounded border border-[hsl(var(--border)/0.6)] hover:bg-[hsl(var(--muted)/0.4)] text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
               title="Toggle line layout"
             >
-              {layoutMode === "inline" ? "Inline" : "Stacked"}
+              <PanelTop className="size-3" aria-hidden="true" />
+              <span>{layoutMode === "inline" ? "Inline" : "Stacked"}</span>
             </button>
             <button
               type="button"
               onClick={() => setShowBadges(!showBadges)}
-              className="px-2 py-1 rounded border border-[hsl(var(--border)/0.6)] hover:bg-[hsl(var(--muted)/0.4)] text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="px-2 py-1 rounded border border-[hsl(var(--border)/0.6)] hover:bg-[hsl(var(--muted)/0.4)] text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
               title="Toggle technical badges (jumps, menus, etc.)"
               aria-pressed={showBadges}
             >
+              {showBadges ? (
+                <Eye className="size-3" aria-hidden="true" />
+              ) : (
+                <EyeOff className="size-3" aria-hidden="true" />
+              )}
               <span>Badges: {showBadges ? "On" : "Off"}</span>
             </button>
-            <FontFamilySwitcher direction="up" />
-            <FontSizeSwitcher mode="write" direction="up" />
+            <FontFamilySwitcher
+              direction="up"
+              value={fontFamilyValue}
+              onChange={onFontFamilyChange}
+            />
+            <FontSizeSwitcher
+              mode="write"
+              direction="up"
+              value={fontSizeValue}
+              onChange={onFontSizeChange}
+            />
           </div>
 
           <div className="flex items-center gap-4 text-sm max-md:hidden">

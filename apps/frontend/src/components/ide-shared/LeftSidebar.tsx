@@ -195,7 +195,7 @@ interface ProjectSelectorProps {
   isOpen: boolean;
   onToggle: () => void;
   onClose: () => void;
-  /** When true, popover opens above the button (for mobile bottom bar) */
+  /** When true, popover opens as a full-width panel from the bottom (for mobile bottom bar) */
   bottomPopover?: boolean;
 }
 
@@ -257,41 +257,82 @@ function ProjectSelector({
         </button>
         {isOpen && (
           <div
-            className={`absolute bg-popover border border-border/70 rounded-lg shadow-xl shadow-black/25 ring-1 ring-white/5 min-w-[300px] max-w-[400px] z-50 ${
+            className={`${
               bottomPopover
-                ? "bottom-full left-1/2 -translate-x-1/2 mb-2"
-                : "left-full top-0 ml-2"
+                ? "fixed bottom-14 left-0 right-0 bg-popover border-t border-border/70 shadow-xl shadow-black/25 ring-1 ring-white/5 z-[100] md:hidden"
+                : "absolute bg-popover border border-border/70 rounded-lg shadow-xl shadow-black/25 ring-1 ring-white/5 min-w-[300px] max-w-[400px] z-50 left-full top-0 ml-2"
             }`}
           >
-            <div className="p-2 max-h-[400px] overflow-y-auto">
-              {isLoadingProjects ? (
-                <div className="px-3 py-2 text-sm text-muted-foreground">
-                  Loading…
-                </div>
-              ) : projects.length === 0 ? (
-                <div className="px-3 py-2 text-sm text-muted-foreground">
-                  No projects found. Create a new project to get started.
-                </div>
-              ) : (
-                projects.map((project) => (
-                  <button
-                    type="button"
-                    key={project.id}
-                    onClick={() => {
-                      setCurrentProject(project);
-                      onClose();
-                    }}
-                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-left transition-colors ${
-                      projectId === project.id
-                        ? "bg-accent text-accent-foreground font-medium"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                    }`}
-                  >
-                    {project.name}
-                  </button>
-                ))
-              )}
-            </div>
+            {bottomPopover ? (
+              <div className="p-2 max-h-[400px] overflow-y-auto">
+                {isLoadingProjects ? (
+                  <div className="p-2 border-b border-muted/60">
+                    <div className="p-3 text-sm text-muted-foreground">
+                      Loading…
+                    </div>
+                  </div>
+                ) : projects.length === 0 ? (
+                  <div className="p-2 border-b border-muted/60">
+                    <div className="p-3 text-sm text-muted-foreground">
+                      No projects found. Create a new project to get started.
+                    </div>
+                  </div>
+                ) : (
+                  projects.map((project) => (
+                    <div
+                      key={project.id}
+                      className="p-2 border-b border-muted/60 last:border-b-0"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCurrentProject(project);
+                          onClose();
+                        }}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium w-full text-left transition-colors ${
+                          projectId === project.id
+                            ? "text-foreground bg-muted/50"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                        }`}
+                      >
+                        <FolderOpen className="size-4 flex-shrink-0" />
+                        {project.name}
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            ) : (
+              <div className="p-2 max-h-[400px] overflow-y-auto">
+                {isLoadingProjects ? (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">
+                    Loading…
+                  </div>
+                ) : projects.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">
+                    No projects found. Create a new project to get started.
+                  </div>
+                ) : (
+                  projects.map((project) => (
+                    <button
+                      type="button"
+                      key={project.id}
+                      onClick={() => {
+                        setCurrentProject(project);
+                        onClose();
+                      }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-left transition-colors ${
+                        projectId === project.id
+                          ? "bg-accent text-accent-foreground font-medium"
+                          : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                      }`}
+                    >
+                      {project.name}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -344,7 +385,7 @@ function NavButtons({
 }: NavButtonsProps) {
   const disabled = !projectId;
   return (
-    <nav className={`flex gap-1 ${horizontal ? "flex-row" : "flex-col"}`}>
+    <nav className={`flex gap-3 ${horizontal ? "flex-row" : "flex-col"}`}>
       <button
         type="button"
         onClick={onOpenProjectSettings}
@@ -722,7 +763,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
   return (
     <>
       <div
-        className={`max-md:hidden fixed left-0 top-0 h-screen ${width} bg-card/95 backdrop-blur border-r border-border/30 flex flex-col transition-all duration-300 z-50`}
+        className={`max-md:hidden fixed left-0 top-0 h-screen pl-[env(safe-area-inset-left)] ${width} bg-card/95 backdrop-blur border-r border-border/30 flex flex-col transition-all duration-300 z-50`}
       >
         {/* Top Section */}
         <div className="flex-1 flex flex-col p-2 gap-2">
@@ -805,7 +846,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
       </div>
 
       {/* Mobile bottom nav bar (below md breakpoint) */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-card/95 backdrop-blur border-t border-border/30 flex items-center justify-between px-4 pb-[env(safe-area-inset-bottom)] z-50">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-card/95 backdrop-blur border-t border-border/30 flex items-center justify-center gap-3 px-4 pb-[env(safe-area-inset-bottom)] z-50">
         {/* Mode switcher – horizontal, icon-only */}
         <div className="flex bg-muted/50 rounded-md p-0.5">
           <button
@@ -852,7 +893,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
           bottomPopover
         />
 
-        <div className="flex bg-muted/50 rounded-md p-0.5">
+        <div className="flex p-0.5">
           <NavButtons
             projectId={projectId}
             isCollapsed={true}

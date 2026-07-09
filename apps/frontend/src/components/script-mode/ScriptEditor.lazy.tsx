@@ -31,6 +31,12 @@ interface ScriptEditorProps {
   saveConflict?: boolean;
   onSaveRequest?: () => void;
   labelTitles?: LabelTitleMap;
+  /** Controlled line wrap mode. When provided, overrides internal state. */
+  lineWrap?: boolean;
+  onLineWrapChange?: (wrap: boolean) => void;
+  /** Controlled label titles visibility. When provided, overrides internal state. */
+  showLabelTitles?: boolean;
+  onShowLabelTitlesChange?: (show: boolean) => void;
   ref?: React.Ref<ScriptEditorRef>;
 }
 

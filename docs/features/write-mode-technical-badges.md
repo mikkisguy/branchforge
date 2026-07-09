@@ -44,8 +44,8 @@ Technical badges in write mode display line-level technical metadata (conditions
 - **Location**: ProseEditor header (bottom bar)
 - **Icon**: Eye (show) / EyeOff (hide)
 - **Style**: Matches other bottom bar controls
-- **Persistence**: Saved to localStorage key `"show-technical-badges"`
-- **Default**: OFF
+- **Persistence**: Saved to localStorage key `"write:show-badges"`
+- **Default**: ON
 
 ## Implementation
 
