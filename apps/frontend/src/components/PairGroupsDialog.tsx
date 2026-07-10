@@ -14,7 +14,6 @@
  */
 
 import { useState, useRef } from "react";
-import { flushSync } from "react-dom";
 import { Loader2, Plus, Pencil, Trash2, X, Check } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -97,12 +96,8 @@ export function PairGroupsDialog({
   };
 
   const handleStartEditLabel = (pg: PairGroupWithNames) => {
-    flushSync(() => {
-      setEditingLabelId(pg.id);
-      setEditLabelValue(pg.duoEndingLabel);
-    });
-    editInputRef.current?.focus();
-    editInputRef.current?.select();
+    setEditingLabelId(pg.id);
+    setEditLabelValue(pg.duoEndingLabel);
   };
 
   const handleSaveLabel = async () => {
@@ -236,7 +231,11 @@ export function PairGroupsDialog({
                         {isEditing ? (
                           <div className="flex items-center gap-1.5">
                             <Input
-                              ref={editInputRef}
+                              ref={(el) => {
+                                editInputRef.current = el;
+                                el?.focus();
+                                el?.select();
+                              }}
                               value={editLabelValue}
                               onChange={(e) =>
                                 setEditLabelValue(e.target.value)
