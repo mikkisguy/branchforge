@@ -13,7 +13,8 @@
  * opens the PairGroupEditDialog.
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
+import { flushSync } from "react-dom";
 import { Loader2, Plus, Pencil, Trash2, X, Check } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -74,24 +75,18 @@ export function PairGroupsDialog({
 
   const editInputRef = useRef<HTMLInputElement>(null);
 
-  // Reset transient UI state when the dialog closes so stale state
-  // does not carry over to the next open.
-  useEffect(() => {
-    if (!open) {
+  // Reset transient UI state when the dialog closes, handled in the
+  // onOpenChange event handler (not a useEffect) so state resets
+  // happen in the same synchronous event as the close action.
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
       setCreatingNew(false);
       setEditingLabelId(null);
       setEditLabelValue("");
       setDeleteTarget(null);
     }
-  }, [open]);
-
-  // Focus the inline edit input when it appears
-  useEffect(() => {
-    if (editingLabelId) {
-      editInputRef.current?.focus();
-      editInputRef.current?.select();
-    }
-  }, [editingLabelId]);
+    onOpenChange(nextOpen);
+  };
 
   const handleToggleDuoEnding = async (checked: boolean) => {
     try {
@@ -102,8 +97,12 @@ export function PairGroupsDialog({
   };
 
   const handleStartEditLabel = (pg: PairGroupWithNames) => {
-    setEditingLabelId(pg.id);
-    setEditLabelValue(pg.duoEndingLabel);
+    flushSync(() => {
+      setEditingLabelId(pg.id);
+      setEditLabelValue(pg.duoEndingLabel);
+    });
+    editInputRef.current?.focus();
+    editInputRef.current?.select();
   };
 
   const handleSaveLabel = async () => {
@@ -136,6 +135,8 @@ export function PairGroupsDialog({
     try {
       await deletePairGroup(deleteTarget.id);
       setDeleteTarget(null);
+    } catch {
+      // error toast shown by hook's onError — dialog stays open
     } finally {
       setIsDeletingConfirm(false);
     }
@@ -144,7 +145,11 @@ export function PairGroupsDialog({
   const canCreate = characters.length >= 2;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} aria-label="Pair Groups">
+    <Dialog
+      open={open}
+      onOpenChange={handleOpenChange}
+      aria-label="Pair Groups"
+    >
       {/* p-0 gap-0 + overflow-hidden outer → three-section flex layout */}
       <DialogContent className="max-w-md w-full max-h-[85vh] p-0 gap-0 flex flex-col overflow-hidden">
         {/* === Header (sticky) === */}
