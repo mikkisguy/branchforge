@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { TabScrollArea } from "@/components/ui/tab-scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -208,10 +209,11 @@ export function SettingsModal({
           </Button>
         </DialogHeader>
 
-        <div className="flex max-md:flex-col h-[700px] max-h-[calc(95vh-120px)] max-md:h-auto">
-          {/* Vertical Tabs */}
-          <div className="w-48 border-r border-border/30 p-2 flex flex-col max-md:w-full max-md:border-r-0 max-md:border-b max-md:flex-row max-md:overflow-x-auto max-md:sticky max-md:top-0 max-md:bg-card max-md:z-10">
-            <div className="space-y-1 max-md:flex max-md:space-y-0 max-md:space-x-1 max-md:gap-1">
+        <div className="flex max-md:flex-col h-[700px] max-h-[calc(95vh-120px)] max-md:h-auto max-md:max-h-none">
+          {/* Vertical Tabs — desktop sidebar, mobile scrollable row */}
+          <div className="w-48 border-r border-border/30 flex flex-col max-md:w-full max-md:border-r-0 max-md:border-b max-md:sticky max-md:top-0 max-md:bg-card max-md:z-10">
+            {/* Desktop: vertical sidebar */}
+            <div className="p-2 space-y-1 max-md:hidden">
               {visibleTabs.map((tab) => (
                 <button
                   type="button"
@@ -229,7 +231,26 @@ export function SettingsModal({
               ))}
             </div>
 
-            {/* Version */}
+            {/* Mobile: horizontally scrollable with fade indicators */}
+            <TabScrollArea className="md:hidden w-full" fadeFrom="card">
+              {visibleTabs.map((tab) => (
+                <button
+                  type="button"
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    "shrink-0 whitespace-nowrap px-3 py-2 my-1.5 rounded-md text-sm font-medium transition-colors",
+                    activeTab === tab.id
+                      ? "bg-accent text-accent-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </TabScrollArea>
+
+            {/* Version — desktop only */}
             <div className="mt-auto pt-4 px-3 max-md:hidden">
               <p className="text-xs text-muted-foreground">
                 {APP_NAME} v{APP_VERSION}

@@ -58,9 +58,10 @@ export const renPyBaseTheme = EditorView.theme({
   },
   // Line numbers
   ".cm-gutters": {
-    backgroundColor: "transparent",
+    backgroundColor: "hsl(var(--background))",
     color: "hsl(var(--muted-foreground) / 0.55)",
     border: "none",
+    borderRight: "1px solid hsl(var(--border))",
   },
   ".cm-lineNumbers .cm-gutterElement": {
     padding: "0 4px 0 8px",

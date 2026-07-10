@@ -5,7 +5,7 @@
  * Shows side-by-side comparison and allows user to choose which version to keep.
  */
 
-import { useReducer, useCallback, useEffect } from "react";
+import { useReducer, useCallback, useEffect, useState } from "react";
 import { X, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -202,6 +202,21 @@ export function ConflictReviewDialog({
 
   // State
   const [state, dispatch] = useReducer(conflictReducer, initialConflictState);
+  // Mobile tabbed view: which panel to show below sm. Reset to Local
+  // whenever the dialog opens so the user always starts on the local
+  // version. Render-phase sync (not useEffect) avoids derived-state-
+  // in-effect warnings.
+  const [mobileConflictView, setMobileConflictView] = useState<
+    "local" | "remote"
+  >("local");
+  // react-doctor-disable-next-line react-doctor/no-derived-useState, react-doctor/rerender-state-only-in-handlers
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) {
+      setMobileConflictView("local");
+    }
+  }
 
   /**
    * Fetch conflicts when dialog opens
@@ -447,9 +462,40 @@ export function ConflictReviewDialog({
               )}
 
               {/* Side-by-side Comparison */}
+              {/* Mobile tabbed-toggle (below sm): segmented control to switch
+                  between Local and Remote views — avoids two very long stacked
+                  panels that force excessive scrolling on narrow phones. */}
+              <div className="hidden max-sm:flex items-center gap-0 border border-border/50 rounded-lg overflow-hidden mb-4">
+                <button
+                  type="button"
+                  onClick={() => setMobileConflictView("local")}
+                  className={`flex-1 px-4 py-2 text-xs font-medium transition-colors ${
+                    mobileConflictView === "local"
+                      ? "bg-accent text-accent-foreground"
+                      : "bg-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Local
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMobileConflictView("remote")}
+                  className={`flex-1 px-4 py-2 text-xs font-medium transition-colors border-l border-border/50 ${
+                    mobileConflictView === "remote"
+                      ? "bg-accent text-accent-foreground"
+                      : "bg-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Remote
+                </button>
+              </div>
               <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
                 {/* BranchForge Version */}
-                <div className="space-y-2">
+                <div
+                  className={`space-y-2 ${
+                    mobileConflictView !== "local" ? "max-sm:hidden" : ""
+                  }`}
+                >
                   <div className="flex items-center justify-between">
                     <h4 className="text-sm font-medium">BranchForge Version</h4>
                     <Button
@@ -472,7 +518,11 @@ export function ConflictReviewDialog({
                 </div>
 
                 {/* GitLab Version */}
-                <div className="space-y-2">
+                <div
+                  className={`space-y-2 ${
+                    mobileConflictView !== "remote" ? "max-sm:hidden" : ""
+                  }`}
+                >
                   <div className="flex items-center justify-between">
                     <h4 className="text-sm font-medium">GitLab Version</h4>
                     <Button
