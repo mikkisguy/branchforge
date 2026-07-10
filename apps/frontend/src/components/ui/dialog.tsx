@@ -1,6 +1,7 @@
 import * as React from "react";
 import { useEffect, useEffectEvent, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 interface DialogProps {
   open?: boolean;
@@ -27,6 +28,9 @@ export function Dialog({
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   const handleClose = useEffectEvent(() => onOpenChange?.(false));
+
+  // Trap focus within the dialog when open
+  useFocusTrap(dialogRef, open ?? false);
 
   // Sync open prop with native dialog showModal/close API via ref callback
   // (runs at commit time, same timing as event handlers)

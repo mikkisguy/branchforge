@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useEffectEvent, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { Loader2 } from "lucide-react";
 
 interface ConfirmDialogProps {
@@ -53,6 +54,9 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const isLoadingRef = useRef(isLoading);
+
+  // Trap focus within the dialog when open
+  useFocusTrap(dialogRef, open);
 
   // Keep the ref in sync with isLoading
   useEffect(() => {
