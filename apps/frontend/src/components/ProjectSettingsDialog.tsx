@@ -119,7 +119,7 @@ export function ProjectSettingsDialog({
     >
       <DialogContent className="max-w-3xl w-full h-[80vh] min-h-[500px] max-md:min-h-0 p-0 gap-0 flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="p-6 max-mobile:p-4 border-b border-border/30 flex items-start justify-between shrink-0">
+        <div className="p-6 max-sm:p-4 border-b border-border/30 flex items-start justify-between shrink-0">
           <div>
             <h2 className="text-lg font-medium">Project Settings</h2>
             <p className="text-sm text-muted-foreground mt-1">
@@ -159,7 +159,7 @@ export function ProjectSettingsDialog({
             </TabsList>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 max-mobile:p-4">
+          <div className="flex-1 overflow-y-auto p-6 max-sm:p-4">
             <TabsPanel value="characters" className="space-y-4">
               <CharactersTabContent projectId={projectId} />
             </TabsPanel>
@@ -176,7 +176,7 @@ export function ProjectSettingsDialog({
         </Tabs>
 
         {/* Footer */}
-        <div className="p-6 max-mobile:p-4 border-t border-border/30 flex justify-end shrink-0">
+        <div className="p-6 max-sm:p-4 border-t border-border/30 flex justify-end shrink-0">
           <Button
             type="button"
             variant="outline"

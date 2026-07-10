@@ -50,7 +50,7 @@ export function CharacterDialog({
     >
       <DialogContent className="max-w-3xl w-full max-h-[90vh] p-0 gap-0 flex flex-col">
         {/* Header */}
-        <div className="p-6 max-mobile:p-4 border-b border-border/30 flex items-start justify-between">
+        <div className="p-6 max-sm:p-4 border-b border-border/30 flex items-start justify-between">
           <div>
             <h2 className="text-lg font-medium">Character Management</h2>
             <p className="text-sm text-muted-foreground mt-1">
@@ -69,7 +69,7 @@ export function CharacterDialog({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 max-mobile:p-4">
+        <div className="flex-1 overflow-y-auto p-6 max-sm:p-4">
           <CharacterSettingsContent
             projectId={projectId}
             duoEndingEnabled={currentProject?.duoEndingEnabled ?? false}
@@ -78,7 +78,7 @@ export function CharacterDialog({
         </div>
 
         {/* Footer */}
-        <div className="p-6 max-mobile:p-4 border-t border-border/30 flex justify-end">
+        <div className="p-6 max-sm:p-4 border-t border-border/30 flex justify-end">
           <Button
             type="button"
             variant="outline"

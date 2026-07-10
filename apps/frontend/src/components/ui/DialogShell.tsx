@@ -58,7 +58,7 @@ export function DialogShell({
           contentClassName
         )}
       >
-        <div className="p-6 max-mobile:p-4 border-b border-border/30 flex items-start justify-between shrink-0">
+        <div className="p-6 max-sm:p-4 border-b border-border/30 flex items-start justify-between shrink-0">
           <div>
             <h2 className="text-lg font-medium">{title}</h2>
             {description && (
@@ -77,12 +77,10 @@ export function DialogShell({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 max-mobile:p-4">
-          {children}
-        </div>
+        <div className="flex-1 overflow-y-auto p-6 max-sm:p-4">{children}</div>
 
         {footerMode !== "none" && (
-          <div className="p-6 max-mobile:p-4 border-t border-border/30 flex justify-end shrink-0">
+          <div className="p-6 max-sm:p-4 border-t border-border/30 flex justify-end shrink-0">
             {footerMode === "custom" ? (
               footerActions
             ) : (
