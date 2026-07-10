@@ -63,7 +63,7 @@ export function FlowDialog({ open, onOpenChange, projectId }: FlowDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-[2200px] h-[96vh] p-0 gap-0 overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 max-mobile:px-4 max-mobile:py-2 border-b border-border/30 shrink-0">
+        <div className="flex items-center justify-between px-5 py-3 max-sm:px-4 max-sm:py-2 border-b border-border/30 shrink-0">
           <DialogTitle>Flow Graph</DialogTitle>
           <button
             type="button"

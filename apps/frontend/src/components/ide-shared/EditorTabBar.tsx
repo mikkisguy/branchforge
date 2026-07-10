@@ -343,7 +343,7 @@ export function EditorTabBar({
                         event.stopPropagation();
                         onClose(event, item.id);
                       }}
-                      className="rounded p-1 hover:bg-muted-foreground/10 shrink-0 text-muted-foreground"
+                      className="rounded p-1 hover:bg-muted-foreground/10 shrink-0 text-muted-foreground max-md:min-h-11"
                       aria-label={item.closeLabel ?? `Close ${item.title}`}
                     >
                       <X className="size-3.5" />

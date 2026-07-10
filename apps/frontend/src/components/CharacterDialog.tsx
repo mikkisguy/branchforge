@@ -15,8 +15,6 @@ import { X } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { CharacterSettingsContent } from "@/components/CharacterSettingsContent";
-import { useProject } from "@/hooks/useProject";
-import { useToast } from "@/contexts/ToastContext";
 
 interface CharacterDialogProps {
   open: boolean;
@@ -29,17 +27,6 @@ export function CharacterDialog({
   onOpenChange,
   projectId,
 }: CharacterDialogProps) {
-  const { currentProject, updateProject } = useProject();
-  const { error: showErrorToast } = useToast();
-
-  const handleToggleDuoEnding = async (enabled: boolean) => {
-    try {
-      await updateProject(projectId, { duoEndingEnabled: enabled });
-    } catch {
-      showErrorToast("Failed to update duo ending setting");
-    }
-  };
-
   return (
     <Dialog
       open={open}
@@ -48,9 +35,9 @@ export function CharacterDialog({
         else onOpenChange(nextOpen);
       }}
     >
-      <DialogContent className="max-w-3xl w-full max-h-[90vh] p-0 gap-0 flex flex-col">
+      <DialogContent className="max-w-3xl w-full max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="p-6 max-mobile:p-4 border-b border-border/30 flex items-start justify-between">
+        <div className="p-6 max-sm:p-4 border-b border-border/30 flex items-start justify-between shrink-0">
           <div>
             <h2 className="text-lg font-medium">Character Management</h2>
             <p className="text-sm text-muted-foreground mt-1">
@@ -69,16 +56,12 @@ export function CharacterDialog({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 max-mobile:p-4">
-          <CharacterSettingsContent
-            projectId={projectId}
-            duoEndingEnabled={currentProject?.duoEndingEnabled ?? false}
-            onToggleDuoEnding={handleToggleDuoEnding}
-          />
+        <div className="flex-1 overflow-y-auto p-6 max-sm:p-4">
+          <CharacterSettingsContent projectId={projectId} />
         </div>
 
         {/* Footer */}
-        <div className="p-6 max-mobile:p-4 border-t border-border/30 flex justify-end">
+        <div className="p-6 max-sm:p-4 border-t border-border/30 flex justify-end shrink-0">
           <Button
             type="button"
             variant="outline"

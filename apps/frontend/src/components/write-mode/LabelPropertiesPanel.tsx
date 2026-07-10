@@ -16,13 +16,13 @@ import {
 import { FormattedCondition } from "@/components/write-mode/FormattedCondition";
 
 const panelVariants = cva(
-  "min-h-0 shrink-0 rounded-lg border border-border bg-panel-tinted overflow-hidden mt-3 transition-all duration-300 ease-out",
+  "min-h-0 shrink-0 rounded-lg border border-border bg-panel-tinted mt-3 transition-all duration-300 ease-out",
   {
     variants: {
       collapsed: {
         true: "w-0 opacity-0 translate-x-full pointer-events-none max-md:absolute max-md:z-40 max-md:inset-y-0 max-md:right-0 max-md:h-full max-md:mt-0 max-md:rounded-none",
         false:
-          "w-56 opacity-100 translate-x-0 max-md:absolute max-md:z-40 max-md:inset-y-0 max-md:right-0 max-md:h-full max-md:w-72 max-md:shadow-xl max-md:rounded-none max-md:mt-0",
+          "w-60 opacity-100 translate-x-0 max-md:absolute max-md:z-40 max-md:inset-y-0 max-md:right-0 max-md:h-full max-md:w-72 max-md:shadow-xl max-md:rounded-none max-md:mt-0",
       },
     },
   }

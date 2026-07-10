@@ -21,7 +21,7 @@ export function CollapsibleSection({
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-1.5"
+          className="flex items-center gap-1.5 max-md:min-h-11 max-md:min-w-11"
         >
           {title}
           <ChevronDown

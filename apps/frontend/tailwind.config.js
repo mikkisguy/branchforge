@@ -23,9 +23,6 @@ export default {
       },
     },
     extend: {
-      screens: {
-        mobile: "375px",
-      },
       fontFamily: {
         sans: ["Kanit", "sans-serif"],
         display: ["Sirin Stencil", "cursive"],
