@@ -121,7 +121,7 @@ export function DialogContent({ children, className }: DialogContentProps) {
         // dialog reads as a modal overlay rather than a page
         // transition. Inner sections still carry their own
         // responsive padding via p-6 max-mobile:p-4.
-        "max-sm:w-[calc(100%-16px)] max-sm:max-w-[calc(100%-16px)] max-sm:h-[calc(100%-32px)] max-sm:rounded-xl",
+        "max-sm:w-[calc(100%-16px)] max-sm:max-w-[calc(100%-16px)] max-sm:h-[calc(100%-32px)] max-sm:max-h-[calc(100%-32px)] max-sm:rounded-xl",
         className
       )}
     >

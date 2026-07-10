@@ -307,19 +307,23 @@ export function TabsList({
   // indicators. The outer div carries no role/border — just positioning.
   if (!scrollable) return content;
 
-  // Lookup for gradient stop classes matching the fadeFrom color
-  const fadeLeftClass =
-    `bg-gradient-to-r from-${fadeFrom} to-transparent` as const;
-  const fadeRightClass =
-    `bg-gradient-to-l from-${fadeFrom} to-transparent` as const;
+  // Lookup for gradient stop classes matching the fadeFrom color.
+  // Must be a static lookup (not template-literal interpolation)
+  // so Tailwind JIT can detect every class.
+  const FADE_STOP: Record<"card" | "background" | "muted", string> = {
+    card: "from-card to-transparent",
+    background: "from-background to-transparent",
+    muted: "from-muted to-transparent",
+  };
+  const fadeStop = FADE_STOP[fadeFrom];
 
   return (
     <div className="relative">
       {showLeftFade && (
         <div
           className={cn(
-            "pointer-events-none absolute inset-y-0 left-0 z-10 w-8",
-            fadeLeftClass
+            "pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r",
+            fadeStop
           )}
           aria-hidden="true"
         />
@@ -327,8 +331,8 @@ export function TabsList({
       {showRightFade && (
         <div
           className={cn(
-            "pointer-events-none absolute inset-y-0 right-0 z-10 w-8",
-            fadeRightClass
+            "pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l",
+            fadeStop
           )}
           aria-hidden="true"
         />
