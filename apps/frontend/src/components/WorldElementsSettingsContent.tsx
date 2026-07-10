@@ -65,12 +65,6 @@ export function WorldElementsSettingsContent({
         </InlineMessage>
       ) : elements.length === 0 ? (
         <div className="space-y-4">
-          <div className="p-8 border border-dashed border-border/30 rounded-md text-center">
-            <p className="text-sm text-muted-foreground">
-              No world elements yet. Add your first location, item, concept, or
-              event to build your world bible.
-            </p>
-          </div>
           <Button
             type="button"
             onClick={() => setEditingElementId(MODE_NEW)}
@@ -80,6 +74,12 @@ export function WorldElementsSettingsContent({
             <Plus className="size-4 mr-2" />
             Add Element
           </Button>
+          <div className="p-8 border border-dashed border-border/30 rounded-md text-center">
+            <p className="text-sm text-muted-foreground">
+              No world elements yet. Add your first location, item, concept, or
+              event to build your world bible.
+            </p>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">

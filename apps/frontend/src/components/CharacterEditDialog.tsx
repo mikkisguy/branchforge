@@ -10,7 +10,6 @@ import { Loader2, Upload, BookOpen, Heart } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
@@ -366,8 +365,9 @@ export function CharacterEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl w-full max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="p-6 max-sm:p-4 border-b border-border/30 shrink-0">
           <DialogTitle>
             {isEditMode ? "Edit Character" : "Add Character"}
           </DialogTitle>
@@ -376,265 +376,272 @@ export function CharacterEditDialog({
               ? "Update character details and avatar."
               : "Create a new character for your project."}
           </DialogDescription>
-        </DialogHeader>
+        </div>
 
-        <div className="space-y-4 mt-4">
-          {/* Name + Display Name */}
-          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="edit-char-name" className="text-xs">
-                Name *
-              </Label>
-              <Input
-                id="edit-char-name"
-                type="text"
-                placeholder="Eileen"
-                value={form.name}
-                onChange={(e) => handleFieldChange("name", e.target.value)}
-                disabled={isSaving}
-              />
-              {form.nameError && (
-                <p className="text-xs text-destructive">{form.nameError}</p>
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="edit-char-display-name" className="text-xs">
-                Display Name *
-              </Label>
-              <Input
-                id="edit-char-display-name"
-                type="text"
-                placeholder="Eileen"
-                value={form.displayName}
-                onChange={(e) =>
-                  handleFieldChange("displayName", e.target.value)
-                }
-                disabled={isSaving}
-              />
-              {form.displayNameError && (
-                <p className="text-xs text-destructive">
-                  {form.displayNameError}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Ren'Py Tag + Color */}
-          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="edit-char-tag" className="text-xs">
-                Ren'Py Tag *
-              </Label>
-              <Input
-                id="edit-char-tag"
-                type="text"
-                placeholder="a"
-                value={form.renpyTag}
-                onChange={(e) => handleFieldChange("renpyTag", e.target.value)}
-                disabled={isSaving || isEditMode}
-              />
-              <p className="text-xs text-muted-foreground">
-                Unique identifier (e.g., "a", "lucas")
-              </p>
-              {form.renpyTagError && (
-                <p className="text-xs text-destructive">{form.renpyTagError}</p>
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="edit-char-color" className="text-xs">
-                Color *
-              </Label>
-              <div className="flex gap-2">
+        {/* Scrollable form content */}
+        <div className="flex-1 overflow-y-auto p-6 max-sm:p-4">
+          <div className="space-y-4">
+            {/* Name + Display Name */}
+            <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="edit-char-name" className="text-xs">
+                  Name *
+                </Label>
                 <Input
-                  id="edit-char-color"
+                  id="edit-char-name"
                   type="text"
-                  placeholder="#FF6B6B"
-                  value={form.color}
-                  onChange={(e) => handleFieldChange("color", e.target.value)}
+                  placeholder="Eileen"
+                  value={form.name}
+                  onChange={(e) => handleFieldChange("name", e.target.value)}
                   disabled={isSaving}
                 />
-                <Input
-                  type="color"
-                  value={form.color}
-                  onChange={(e) => handleFieldChange("color", e.target.value)}
-                  disabled={isSaving}
-                  className="w-12 h-9 p-0.5"
-                />
-              </div>
-              {form.colorError && (
-                <p className="text-xs text-destructive">{form.colorError}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Avatar Upload */}
-          <div className="space-y-2">
-            <Label htmlFor="edit-char-avatar" className="text-xs">
-              Avatar Image
-            </Label>
-            <div className="flex items-center gap-4">
-              <div className="relative size-20 flex-shrink-0">
-                {form.avatarPreview || form.avatarUrl ? (
-                  <img
-                    src={form.avatarPreview || form.avatarUrl}
-                    alt="Avatar preview"
-                    className="w-full h-full rounded-full object-cover border-4"
-                    style={{ borderColor: form.color }}
-                  />
-                ) : (
-                  <div
-                    className="w-full h-full rounded-full border-4 border-dashed flex items-center justify-center"
-                    style={{ borderColor: form.color }}
-                  >
-                    <Upload className="size-6 text-muted-foreground" />
-                  </div>
+                {form.nameError && (
+                  <p className="text-xs text-destructive">{form.nameError}</p>
                 )}
               </div>
 
-              <div className="flex-1 space-y-2">
+              <div className="space-y-1">
+                <Label htmlFor="edit-char-display-name" className="text-xs">
+                  Display Name *
+                </Label>
                 <Input
-                  id="edit-char-avatar"
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/gif"
-                  onChange={handleAvatarSelect}
+                  id="edit-char-display-name"
+                  type="text"
+                  placeholder="Eileen"
+                  value={form.displayName}
+                  onChange={(e) =>
+                    handleFieldChange("displayName", e.target.value)
+                  }
                   disabled={isSaving}
-                  className="text-sm"
-                  ref={fileInputRef}
+                />
+                {form.displayNameError && (
+                  <p className="text-xs text-destructive">
+                    {form.displayNameError}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Ren'Py Tag + Color */}
+            <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="edit-char-tag" className="text-xs">
+                  Ren'Py Tag *
+                </Label>
+                <Input
+                  id="edit-char-tag"
+                  type="text"
+                  placeholder="a"
+                  value={form.renpyTag}
+                  onChange={(e) =>
+                    handleFieldChange("renpyTag", e.target.value)
+                  }
+                  disabled={isSaving || isEditMode}
                 />
                 <p className="text-xs text-muted-foreground">
-                  PNG, JPEG, WebP, or GIF (max {AVATAR_MAX_SIZE_MB}MB)
+                  Unique identifier (e.g., "a", "lucas")
                 </p>
-                {(form.avatarPreview || form.avatarUrl) && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleAvatarRemove}
+                {form.renpyTagError && (
+                  <p className="text-xs text-destructive">
+                    {form.renpyTagError}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="edit-char-color" className="text-xs">
+                  Color *
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="edit-char-color"
+                    type="text"
+                    placeholder="#FF6B6B"
+                    value={form.color}
+                    onChange={(e) => handleFieldChange("color", e.target.value)}
                     disabled={isSaving}
-                    className="text-destructive h-8 px-2 text-xs"
-                  >
-                    Remove Avatar
-                  </Button>
+                  />
+                  <Input
+                    type="color"
+                    value={form.color}
+                    onChange={(e) => handleFieldChange("color", e.target.value)}
+                    disabled={isSaving}
+                    className="w-12 h-9 p-0.5"
+                  />
+                </div>
+                {form.colorError && (
+                  <p className="text-xs text-destructive">{form.colorError}</p>
                 )}
               </div>
             </div>
-          </div>
 
-          {/* Route + Conditional Prefix */}
-          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
+            {/* Avatar Upload */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-char-avatar" className="text-xs">
+                Avatar Image
+              </Label>
+              <div className="flex items-center gap-4">
+                <div className="relative size-20 flex-shrink-0">
+                  {form.avatarPreview || form.avatarUrl ? (
+                    <img
+                      src={form.avatarPreview || form.avatarUrl}
+                      alt="Avatar preview"
+                      className="w-full h-full rounded-full object-cover border-4"
+                      style={{ borderColor: form.color }}
+                    />
+                  ) : (
+                    <div
+                      className="w-full h-full rounded-full border-4 border-dashed flex items-center justify-center"
+                      style={{ borderColor: form.color }}
+                    >
+                      <Upload className="size-6 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 space-y-2">
+                  <Input
+                    id="edit-char-avatar"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    onChange={handleAvatarSelect}
+                    disabled={isSaving}
+                    className="text-sm"
+                    ref={fileInputRef}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    PNG, JPEG, WebP, or GIF (max {AVATAR_MAX_SIZE_MB}MB)
+                  </p>
+                  {(form.avatarPreview || form.avatarUrl) && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleAvatarRemove}
+                      disabled={isSaving}
+                      className="text-destructive h-8 px-2 text-xs"
+                    >
+                      Remove Avatar
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Route + Conditional Prefix */}
+            <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="edit-char-route" className="text-xs">
+                  Route Affiliation
+                </Label>
+                <Input
+                  id="edit-char-route"
+                  type="text"
+                  placeholder="EILEEN"
+                  value={form.routeAffiliation}
+                  onChange={(e) =>
+                    handleFieldChange("routeAffiliation", e.target.value)
+                  }
+                  disabled={isSaving}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-char-prefix" className="text-xs">
+                  Conditional Prefix
+                </Label>
+                <Input
+                  id="edit-char-prefix"
+                  type="text"
+                  placeholder="lucas_"
+                  value={form.conditionalPrefix}
+                  onChange={(e) =>
+                    handleFieldChange("conditionalPrefix", e.target.value)
+                  }
+                  disabled={isSaving}
+                />
+              </div>
+            </div>
+
             <div className="space-y-1">
-              <Label htmlFor="edit-char-route" className="text-xs">
-                Route Affiliation
+              <Label htmlFor="edit-char-notes" className="text-xs">
+                Notes
               </Label>
-              <Input
-                id="edit-char-route"
-                type="text"
-                placeholder="EILEEN"
-                value={form.routeAffiliation}
-                onChange={(e) =>
-                  handleFieldChange("routeAffiliation", e.target.value)
-                }
+              <textarea
+                id="edit-char-notes"
+                rows={4}
+                className="flex min-h-[250px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="Backstory, personality notes, voice references..."
+                value={form.notes}
+                onChange={(e) => handleFieldChange("notes", e.target.value)}
                 disabled={isSaving}
+                maxLength={10000}
               />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="edit-char-prefix" className="text-xs">
-                Conditional Prefix
-              </Label>
-              <Input
-                id="edit-char-prefix"
-                type="text"
-                placeholder="lucas_"
-                value={form.conditionalPrefix}
-                onChange={(e) =>
-                  handleFieldChange("conditionalPrefix", e.target.value)
-                }
-                disabled={isSaving}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <Label htmlFor="edit-char-notes" className="text-xs">
-              Notes
-            </Label>
-            <textarea
-              id="edit-char-notes"
-              rows={4}
-              className="flex min-h-[250px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              placeholder="Backstory, personality notes, voice references..."
-              value={form.notes}
-              onChange={(e) => handleFieldChange("notes", e.target.value)}
-              disabled={isSaving}
-              maxLength={10000}
-            />
-            {form.notesError && (
-              <p className="text-xs text-destructive">{form.notesError}</p>
-            )}
-          </div>
-
-          {/* Love Interest + Narrator */}
-          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
-            <div className="flex items-center gap-2 pt-5">
-              <input
-                type="checkbox"
-                id="edit-char-love"
-                checked={form.isLoveInterest}
-                onChange={(e) =>
-                  handleFieldChange("isLoveInterest", e.target.checked)
-                }
-                disabled={isSaving}
-                className="size-4"
-                aria-label="Love Interest"
-              />
-              <Label
-                htmlFor="edit-char-love"
-                className="text-xs cursor-pointer flex items-center gap-1"
-              >
-                <Heart className="size-3" />
-                Love Interest
-              </Label>
+              {form.notesError && (
+                <p className="text-xs text-destructive">{form.notesError}</p>
+              )}
             </div>
 
-            <div className="flex items-center gap-2 pt-5">
-              <input
-                type="checkbox"
-                id="edit-char-narrator"
-                checked={form.isNarrator}
-                onChange={(e) =>
-                  handleFieldChange("isNarrator", e.target.checked)
-                }
-                disabled={isSaving}
-                className="size-4 accent-purple-500"
-                aria-label="Narrator"
-              />
-              <Label
-                htmlFor="edit-char-narrator"
-                className="text-xs cursor-pointer flex items-center gap-1"
-              >
-                <BookOpen className="size-3" />
-                Narrator
-              </Label>
+            {/* Love Interest + Narrator */}
+            <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
+              <div className="flex items-center gap-2 pt-5">
+                <input
+                  type="checkbox"
+                  id="edit-char-love"
+                  checked={form.isLoveInterest}
+                  onChange={(e) =>
+                    handleFieldChange("isLoveInterest", e.target.checked)
+                  }
+                  disabled={isSaving}
+                  className="size-4"
+                  aria-label="Love Interest"
+                />
+                <Label
+                  htmlFor="edit-char-love"
+                  className="text-xs cursor-pointer flex items-center gap-1"
+                >
+                  <Heart className="size-3" />
+                  Love Interest
+                </Label>
+              </div>
+
+              <div className="flex items-center gap-2 pt-5">
+                <input
+                  type="checkbox"
+                  id="edit-char-narrator"
+                  checked={form.isNarrator}
+                  onChange={(e) =>
+                    handleFieldChange("isNarrator", e.target.checked)
+                  }
+                  disabled={isSaving}
+                  className="size-4 accent-purple-500"
+                  aria-label="Narrator"
+                />
+                <Label
+                  htmlFor="edit-char-narrator"
+                  className="text-xs cursor-pointer flex items-center gap-1"
+                >
+                  <BookOpen className="size-3" />
+                  Narrator
+                </Label>
+              </div>
             </div>
           </div>
+        </div>
 
-          {/* Footer */}
-          <div className="flex justify-end gap-2 pt-4 border-t border-border/30">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isSaving}
-            >
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleSave} disabled={isSaving}>
-              {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
-              Save
-            </Button>
-          </div>
+        {/* Footer — sticky on mobile */}
+        <div className="p-6 max-sm:p-4 border-t border-border/30 flex justify-end gap-2 shrink-0">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isSaving}
+          >
+            Cancel
+          </Button>
+          <Button type="button" onClick={handleSave} disabled={isSaving}>
+            {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
+            Save
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

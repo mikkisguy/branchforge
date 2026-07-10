@@ -33,7 +33,6 @@ import { CharacterSettingsContent } from "@/components/CharacterSettingsContent"
 import { RouteSettingsContent } from "@/components/RouteSettingsContent";
 import { VisualSystemFormContent } from "@/components/VisualSystemDialog";
 import { WorldElementsSettingsContent } from "@/components/WorldElementsSettingsContent";
-import { useProject } from "@/hooks/useProject";
 import { useVisualSystem } from "@/hooks/useVisualSystem";
 import {
   parseGroupPrefixes,
@@ -61,8 +60,8 @@ export type SettingsTab = "characters" | "routes" | "visual" | "world";
 const TAB_LABELS: Record<SettingsTab, string> = {
   characters: "Characters",
   routes: "Routes",
-  visual: "Visual System",
   world: "World Bible",
+  visual: "Visual System",
 };
 
 const TAB_ICONS: Record<
@@ -71,11 +70,11 @@ const TAB_ICONS: Record<
 > = {
   characters: Users,
   routes: RouteIcon,
-  visual: Wand2,
   world: BookText,
+  visual: Wand2,
 };
 
-const TAB_ORDER: SettingsTab[] = ["characters", "routes", "visual", "world"];
+const TAB_ORDER: SettingsTab[] = ["characters", "routes", "world", "visual"];
 
 // ============================================================================
 // Component
@@ -117,7 +116,7 @@ export function ProjectSettingsDialog({
       onOpenChange={onOpenChange}
       aria-label="Project Settings"
     >
-      <DialogContent className="max-w-3xl w-full h-[80vh] min-h-[500px] max-md:min-h-0 p-0 gap-0 flex flex-col overflow-hidden">
+      <DialogContent className="max-w-3xl w-full max-h-[80vh] min-h-[500px] max-md:min-h-0 p-0 gap-0 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="p-6 max-sm:p-4 border-b border-border/30 flex items-start justify-between shrink-0">
           <div>
@@ -143,7 +142,7 @@ export function ProjectSettingsDialog({
           onValueChange={(next) => setActiveTab(next as SettingsTab)}
           className="flex flex-col flex-1 min-h-0"
         >
-          <div className="px-3 pt-2 pb-0 shrink-0 sm:px-6">
+          <div className="px-3 pt-2 pb-3 shrink-0 sm:px-6">
             <TabsList ariaLabel="Project settings sections" scrollable>
               {TAB_ORDER.map((tab) => {
                 const Icon = TAB_ICONS[tab];
@@ -166,11 +165,11 @@ export function ProjectSettingsDialog({
             <TabsPanel value="routes" className="space-y-4">
               <RouteSettingsContent projectId={projectId} columns={2} />
             </TabsPanel>
-            <TabsPanel value="visual" className="space-y-4">
-              <VisualSystemTabContent projectId={projectId} />
-            </TabsPanel>
             <TabsPanel value="world" className="space-y-4">
               <WorldElementsSettingsContent projectId={projectId} />
+            </TabsPanel>
+            <TabsPanel value="visual" className="space-y-4">
+              <VisualSystemTabContent projectId={projectId} />
             </TabsPanel>
           </div>
         </Tabs>
@@ -203,20 +202,7 @@ interface CharactersTabContentProps {
 }
 
 function CharactersTabContent({ projectId }: CharactersTabContentProps) {
-  const { currentProject, updateProject } = useProject();
-
-  const handleToggleDuoEnding = async (enabled: boolean) => {
-    await updateProject(projectId, { duoEndingEnabled: enabled });
-  };
-
-  return (
-    <CharacterSettingsContent
-      projectId={projectId}
-      columns={2}
-      duoEndingEnabled={currentProject?.duoEndingEnabled ?? false}
-      onToggleDuoEnding={handleToggleDuoEnding}
-    />
-  );
+  return <CharacterSettingsContent projectId={projectId} columns={2} />;
 }
 
 // ============================================================================

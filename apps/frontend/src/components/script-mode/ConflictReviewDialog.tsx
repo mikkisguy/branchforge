@@ -336,9 +336,9 @@ export function ConflictReviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-full max-h-[90vh] p-0 gap-0 flex flex-col">
+      <DialogContent className="max-w-4xl w-full max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="p-6 max-sm:p-4 border-b border-border/30 flex items-start justify-between">
+        <div className="p-6 max-sm:p-4 border-b border-border/30 flex items-start justify-between shrink-0">
           <div className="flex-1">
             <div className="flex items-center gap-3">
               <h2 className="text-lg font-medium">Review Sync Conflicts</h2>
@@ -573,7 +573,7 @@ export function ConflictReviewDialog({
         </div>
 
         {/* Footer */}
-        <div className="p-6 max-sm:p-4 border-t border-border/30 flex justify-between">
+        <div className="p-6 max-sm:p-4 border-t border-border/30 flex justify-between shrink-0">
           <Button
             type="button"
             variant="outline"

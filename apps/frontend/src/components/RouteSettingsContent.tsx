@@ -72,11 +72,6 @@ export function RouteSettingsContent({
           </InlineMessage>
         ) : routeConfigs.length === 0 ? (
           <div className="space-y-4">
-            <div className="p-8 border border-dashed border-border/30 rounded-md text-center">
-              <p className="text-sm text-muted-foreground">
-                No routes configured yet. Add your first route to get started.
-              </p>
-            </div>
             <Button
               type="button"
               onClick={() => setEditingRouteId(MODE_NEW)}
@@ -86,6 +81,11 @@ export function RouteSettingsContent({
               <Plus className="size-4 mr-2" />
               Add Route
             </Button>
+            <div className="p-8 border border-dashed border-border/30 rounded-md text-center">
+              <p className="text-sm text-muted-foreground">
+                No routes configured yet. Add your first route to get started.
+              </p>
+            </div>
           </div>
         ) : (
           <div className="space-y-4">

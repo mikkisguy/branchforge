@@ -438,7 +438,7 @@ export function TabsTrigger({
       }}
       onKeyDown={handleKeyDown}
       className={cn(
-        "px-3 min-h-11 py-2 text-sm font-medium transition-colors relative",
+        "px-3 min-h-11 py-2 text-sm font-medium whitespace-nowrap shrink-0 transition-colors relative",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         isActive
           ? "text-foreground"
