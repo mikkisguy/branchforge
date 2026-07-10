@@ -38,6 +38,12 @@ import {
 } from "react";
 import { cn } from "@/lib/utils";
 
+const FADE_STOP: Record<"card" | "background" | "muted", string> = {
+  card: "from-card to-transparent",
+  background: "from-background to-transparent",
+  muted: "from-muted to-transparent",
+};
+
 // ============================================================================
 // Context
 // ============================================================================
@@ -307,14 +313,6 @@ export function TabsList({
   // indicators. The outer div carries no role/border — just positioning.
   if (!scrollable) return content;
 
-  // Lookup for gradient stop classes matching the fadeFrom color.
-  // Must be a static lookup (not template-literal interpolation)
-  // so Tailwind JIT can detect every class.
-  const FADE_STOP: Record<"card" | "background" | "muted", string> = {
-    card: "from-card to-transparent",
-    background: "from-background to-transparent",
-    muted: "from-muted to-transparent",
-  };
   const fadeStop = FADE_STOP[fadeFrom];
 
   return (
