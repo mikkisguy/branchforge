@@ -143,11 +143,8 @@ export function ProjectSettingsDialog({
           onValueChange={(next) => setActiveTab(next as SettingsTab)}
           className="flex flex-col flex-1 min-h-0"
         >
-          <div className="px-6 pt-2 shrink-0 max-sm:overflow-x-auto">
-            <TabsList
-              ariaLabel="Project settings sections"
-              className="max-sm:mx-0 max-sm:px-3"
-            >
+          <div className="px-3 pt-2 pb-0 shrink-0 sm:px-6">
+            <TabsList ariaLabel="Project settings sections" scrollable>
               {TAB_ORDER.map((tab) => {
                 const Icon = TAB_ICONS[tab];
                 return (

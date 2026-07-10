@@ -116,12 +116,12 @@ export function DialogContent({ children, className }: DialogContentProps) {
     <div
       className={cn(
         "relative bg-card border border-border/30 rounded-lg shadow-xl p-6 max-mobile:p-4 w-full max-w-md max-h-[85vh] overflow-y-auto",
-        // Full-bleed below sm for phone screens — the centered card
-        // wastes too much space on narrow viewports. Inner sections
-        // (DialogShell header/body/footer, ProjectSettingsDialog, etc.)
-        // already carry their own responsive padding via p-6 max-mobile:p-4,
-        // so no extra padding is needed on the container.
-        "max-sm:w-full max-sm:max-w-full max-sm:max-h-full max-sm:h-full max-sm:rounded-none max-sm:m-0",
+        // Near-fullscreen card below sm — a thin gap (8px sides,
+        // 16px top/bottom) lets the backdrop peek through so the
+        // dialog reads as a modal overlay rather than a page
+        // transition. Inner sections still carry their own
+        // responsive padding via p-6 max-mobile:p-4.
+        "max-sm:w-[calc(100%-16px)] max-sm:max-w-[calc(100%-16px)] max-sm:h-[calc(100%-32px)] max-sm:rounded-xl",
         className
       )}
     >

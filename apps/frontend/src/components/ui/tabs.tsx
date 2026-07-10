@@ -34,6 +34,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
   type RefObject,
+  type WheelEvent,
 } from "react";
 import { cn } from "@/lib/utils";
 
@@ -195,24 +196,144 @@ interface TabsListProps {
   className?: string;
   /** Accessible label for the tab list. */
   ariaLabel?: string;
+  /**
+   * When true, the tab list becomes horizontally scrollable with
+   * fade indicators on the edges when content overflows. Tabs
+   * are kept in a single row (no wrapping). Use this for narrow
+   * viewports where tabs would otherwise wrap to multiple rows.
+   */
+  scrollable?: boolean;
+  /**
+   * CSS variable color used by the fade gradient stop. Must match
+   * the background behind the tab bar. Defaults to "card".
+   */
+  fadeFrom?: "card" | "background" | "muted";
 }
 
-export function TabsList({ children, className, ariaLabel }: TabsListProps) {
-  // The ref is set on the tablist root so TabsTrigger can scope
-  // focus queries (e.g. on arrow-key navigation) to the current
-  // tablist instance.
+export function TabsList({
+  children,
+  className,
+  ariaLabel,
+  scrollable,
+  fadeFrom = "card",
+}: TabsListProps) {
   const { tablistRef } = useTabsContext("TabsList");
-  return (
+
+  // Scroll indicators for scrollable mode
+  const scrollRafRef = useRef<number | null>(null);
+  const [showLeftFade, setShowLeftFade] = useState(false);
+  const [showRightFade, setShowRightFade] = useState(false);
+
+  const updateFades = useCallback(() => {
+    const el = tablistRef.current;
+    if (!el) return;
+    const overflow = el.scrollWidth > el.clientWidth;
+    setShowLeftFade(overflow && el.scrollLeft > 1);
+    setShowRightFade(
+      overflow && el.scrollLeft < el.scrollWidth - el.clientWidth - 1
+    );
+  }, [tablistRef]);
+
+  // Schedule fade update (debounced via RAF)
+  const scheduleFadeUpdate = useCallback(() => {
+    if (scrollRafRef.current !== null)
+      cancelAnimationFrame(scrollRafRef.current);
+    scrollRafRef.current = requestAnimationFrame(updateFades);
+  }, [updateFades]);
+
+  useEffect(() => {
+    if (!scrollable) return;
+    scheduleFadeUpdate();
+    const el = tablistRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(scheduleFadeUpdate);
+    observer.observe(el);
+    window.addEventListener("resize", scheduleFadeUpdate);
+    return () => {
+      window.removeEventListener("resize", scheduleFadeUpdate);
+      observer.disconnect();
+      if (scrollRafRef.current !== null)
+        cancelAnimationFrame(scrollRafRef.current);
+    };
+  }, [scrollable, scheduleFadeUpdate, tablistRef]);
+
+  const handleWheel = useCallback(
+    (e: WheelEvent<HTMLDivElement>) => {
+      const el = tablistRef.current;
+      if (!el) return;
+      const overflow = el.scrollWidth > el.clientWidth;
+      if (!overflow) return;
+      const delta =
+        Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (delta === 0) return;
+      const prev = el.scrollLeft;
+      el.scrollLeft += delta;
+      if (el.scrollLeft !== prev) {
+        e.preventDefault();
+        updateFades();
+      }
+    },
+    [tablistRef, updateFades]
+  );
+
+  const baseClasses = cn(
+    scrollable
+      ? // Scrollable: single row, horizontal scroll, no wrapping.
+        // TabsList owns the scroll container (no intermediate wrapper
+        // so tablistRef points directly at the element that holds the
+        // tab buttons, preserving ARIA relationships and focus scoping).
+        "flex flex-nowrap gap-1 overflow-x-auto scrollbar-hide border-b border-border/30"
+      : "flex gap-1 border-b border-border/30 px-6 -mx-6",
+    // Fade indicators are absolutely positioned inside the scrollable
+    // container, so we need relative positioning.
+    scrollable && "relative",
+    className
+  );
+
+  const content = (
     <div
       ref={tablistRef}
       role="tablist"
       aria-label={ariaLabel}
-      className={cn(
-        "flex gap-1 border-b border-border/30 px-6 -mx-6",
-        className
-      )}
+      onScroll={scrollable ? updateFades : undefined}
+      onWheel={scrollable ? handleWheel : undefined}
+      className={baseClasses}
     >
       {children}
+    </div>
+  );
+
+  // In scrollable mode, wrap with relative positioning for fade
+  // indicators. The outer div carries no role/border — just positioning.
+  if (!scrollable) return content;
+
+  // Lookup for gradient stop classes matching the fadeFrom color
+  const fadeLeftClass =
+    `bg-gradient-to-r from-${fadeFrom} to-transparent` as const;
+  const fadeRightClass =
+    `bg-gradient-to-l from-${fadeFrom} to-transparent` as const;
+
+  return (
+    <div className="relative">
+      {showLeftFade && (
+        <div
+          className={cn(
+            "pointer-events-none absolute inset-y-0 left-0 z-10 w-8",
+            fadeLeftClass
+          )}
+          aria-hidden="true"
+        />
+      )}
+      {showRightFade && (
+        <div
+          className={cn(
+            "pointer-events-none absolute inset-y-0 right-0 z-10 w-8",
+            fadeRightClass
+          )}
+          aria-hidden="true"
+        />
+      )}
+      {content}
     </div>
   );
 }
