@@ -70,7 +70,11 @@ export function RegisterPage() {
   // Show loading state while checking settings
   if (settingsLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
+      <div
+        id="main-content"
+        tabIndex={-1}
+        className="flex min-h-screen items-center justify-center p-4"
+      >
         <div className="w-full max-w-md space-y-8">
           <div className="text-center">
             <Logo className="text-4xl" />
@@ -91,7 +95,11 @@ export function RegisterPage() {
   // Show disabled state when signups are closed
   if (!signUpsEnabled) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
+      <div
+        id="main-content"
+        tabIndex={-1}
+        className="flex min-h-screen items-center justify-center p-4"
+      >
         <div className="w-full max-w-md space-y-8">
           <div className="text-center">
             <Logo className="text-4xl" />
@@ -154,7 +162,11 @@ export function RegisterPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div
+      id="main-content"
+      tabIndex={-1}
+      className="flex min-h-screen items-center justify-center p-4"
+    >
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <Logo className="text-4xl" />

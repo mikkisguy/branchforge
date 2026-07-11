@@ -27,6 +27,10 @@
     --ring: 0 0% 70%;
     --radius: 0.5rem;
 
+    /* Focus ring */
+    --focus-ring-width: 3px;
+    --focus-ring-color: 108 30% 40%;
+
     /* Theme accent color (default) */
     --theme-accent: 108 30% 40%;
     --theme-accent-hover: 108 30% 45%;
@@ -88,6 +92,9 @@
     --input: 214 20% 88%;
     --ring: 222 47% 11%;
 
+    /* Focus ring */
+    --focus-ring-color: 222 47% 11%;
+
     --logo-gradient-mid: black;
 
     /* Ren'Py syntax highlighting colors (light theme - dynamic from palette) */
@@ -134,6 +141,19 @@
       rgba(0, 0, 0, 0.04) 2px,
       transparent 0
     );
+  }
+
+  /* -----------------------------------------------------------------
+     Global focus-visible fallback
+     Provides a visible 3px outline for any interactive element that
+     does not already have a component-level focus style. Components
+     with their own focus-visible utilities (buttons, inputs, etc.)
+     take precedence because their Tailwind utility classes live in
+     @layer utilities, which always wins over @layer base.
+     ----------------------------------------------------------------- */
+  :focus-visible {
+    outline: var(--focus-ring-width) solid hsl(var(--focus-ring-color));
+    outline-offset: 2px;
   }
 
   /* Custom scrollbar styles */
