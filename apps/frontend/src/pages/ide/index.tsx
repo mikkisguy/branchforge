@@ -226,6 +226,7 @@ export function HomePageIDE() {
       {/* Main content area */}
       <div
         id="main-content"
+        tabIndex={-1}
         className={`h-full overflow-hidden transition-all duration-300 max-md:ml-0 max-md:w-full max-md:pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] ${
           isSidebarCollapsed
             ? "md:ml-14 md:w-[calc(100%-3.5rem)]"

@@ -12,6 +12,7 @@ const FOCUSABLE_SELECTOR = [
   "input:not([disabled])",
   "select:not([disabled])",
   "[tabindex]",
+  "[contenteditable]",
 ].join(", ");
 
 /**
@@ -34,6 +35,10 @@ export function useFocusTrap(
   // so we can restore it on deactivation.
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
+  // Track whether this hook added a temporary tabindex to the container,
+  // so cleanup can avoid removing a pre-existing attribute.
+  const tabindexAddedByUsRef = useRef(false);
+
   useEffect(() => {
     if (!enabled) return;
 
@@ -52,7 +57,10 @@ export function useFocusTrap(
     } else {
       // Nothing focusable — make the container itself focusable
       // temporarily so Tab doesn't escape to browser chrome.
-      container.setAttribute("tabindex", "-1");
+      if (!container.hasAttribute("tabindex")) {
+        container.setAttribute("tabindex", "-1");
+        tabindexAddedByUsRef.current = true;
+      }
       container.focus();
     }
 
@@ -99,9 +107,10 @@ export function useFocusTrap(
       }
       previouslyFocusedRef.current = null;
 
-      // Clean up temporary tabindex
-      if (container.getAttribute("tabindex") === "-1") {
+      // Clean up temporary tabindex, but only if this hook set it
+      if (tabindexAddedByUsRef.current) {
         container.removeAttribute("tabindex");
+        tabindexAddedByUsRef.current = false;
       }
     };
   }, [enabled, containerRef]);
