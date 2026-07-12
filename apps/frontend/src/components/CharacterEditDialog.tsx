@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FormErrorMessage } from "@/components/ui/form-error-message";
 import { useCharacters } from "@/hooks/useCharacters";
 import { useToast } from "@/contexts/ToastContext";
 import type { Character } from "@branchforge/shared";
@@ -394,10 +395,15 @@ export function CharacterEditDialog({
                   value={form.name}
                   onChange={(e) => handleFieldChange("name", e.target.value)}
                   disabled={isSaving}
+                  aria-invalid={!!form.nameError}
+                  aria-describedby={
+                    form.nameError ? "edit-char-name-error" : undefined
+                  }
                 />
-                {form.nameError && (
-                  <p className="text-xs text-destructive">{form.nameError}</p>
-                )}
+                <FormErrorMessage
+                  id="edit-char-name-error"
+                  message={form.nameError}
+                />
               </div>
 
               <div className="space-y-1">
@@ -413,12 +419,17 @@ export function CharacterEditDialog({
                     handleFieldChange("displayName", e.target.value)
                   }
                   disabled={isSaving}
+                  aria-invalid={!!form.displayNameError}
+                  aria-describedby={
+                    form.displayNameError
+                      ? "edit-char-display-name-error"
+                      : undefined
+                  }
                 />
-                {form.displayNameError && (
-                  <p className="text-xs text-destructive">
-                    {form.displayNameError}
-                  </p>
-                )}
+                <FormErrorMessage
+                  id="edit-char-display-name-error"
+                  message={form.displayNameError}
+                />
               </div>
             </div>
 
@@ -437,15 +448,18 @@ export function CharacterEditDialog({
                     handleFieldChange("renpyTag", e.target.value)
                   }
                   disabled={isSaving || isEditMode}
+                  aria-invalid={!!form.renpyTagError}
+                  aria-describedby={
+                    form.renpyTagError ? "edit-char-tag-error" : undefined
+                  }
                 />
                 <p className="text-xs text-muted-foreground">
                   Unique identifier (e.g., "a", "lucas")
                 </p>
-                {form.renpyTagError && (
-                  <p className="text-xs text-destructive">
-                    {form.renpyTagError}
-                  </p>
-                )}
+                <FormErrorMessage
+                  id="edit-char-tag-error"
+                  message={form.renpyTagError}
+                />
               </div>
 
               <div className="space-y-1">
@@ -460,6 +474,10 @@ export function CharacterEditDialog({
                     value={form.color}
                     onChange={(e) => handleFieldChange("color", e.target.value)}
                     disabled={isSaving}
+                    aria-invalid={!!form.colorError}
+                    aria-describedby={
+                      form.colorError ? "edit-char-color-error" : undefined
+                    }
                   />
                   <Input
                     type="color"
@@ -469,9 +487,10 @@ export function CharacterEditDialog({
                     className="w-12 h-9 p-0.5"
                   />
                 </div>
-                {form.colorError && (
-                  <p className="text-xs text-destructive">{form.colorError}</p>
-                )}
+                <FormErrorMessage
+                  id="edit-char-color-error"
+                  message={form.colorError}
+                />
               </div>
             </div>
 
@@ -575,10 +594,15 @@ export function CharacterEditDialog({
                 onChange={(e) => handleFieldChange("notes", e.target.value)}
                 disabled={isSaving}
                 maxLength={10000}
+                aria-invalid={!!form.notesError}
+                aria-describedby={
+                  form.notesError ? "edit-char-notes-error" : undefined
+                }
               />
-              {form.notesError && (
-                <p className="text-xs text-destructive">{form.notesError}</p>
-              )}
+              <FormErrorMessage
+                id="edit-char-notes-error"
+                message={form.notesError}
+              />
             </div>
 
             {/* Love Interest + Narrator */}

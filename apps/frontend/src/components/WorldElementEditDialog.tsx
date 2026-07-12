@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FormErrorMessage } from "@/components/ui/form-error-message";
 import { Select, type SelectOption } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useWorldElements } from "@/hooks/useWorldElements";
@@ -159,10 +160,10 @@ function ElementFormContent({
             value={form.name}
             onChange={(event) => handleChange("name", event.target.value)}
             disabled={isSaving}
+            aria-invalid={!!errors.name}
+            aria-describedby={errors.name ? "element-name-error" : undefined}
           />
-          {errors.name && (
-            <p className="text-xs text-destructive">{errors.name}</p>
-          )}
+          <FormErrorMessage id="element-name-error" message={errors.name} />
         </div>
 
         <div className="space-y-1">
@@ -176,10 +177,10 @@ function ElementFormContent({
             onChange={(value) => handleChange("type", value)}
             placeholder="Select type"
             disabled={isSaving}
+            aria-invalid={!!errors.type}
+            aria-describedby={errors.type ? "element-type-error" : undefined}
           />
-          {errors.type && (
-            <p className="text-xs text-destructive">{errors.type}</p>
-          )}
+          <FormErrorMessage id="element-type-error" message={errors.type} />
         </div>
       </div>
 
@@ -195,10 +196,15 @@ function ElementFormContent({
           disabled={isSaving}
           rows={3}
           className="resize-none"
+          aria-invalid={!!errors.description}
+          aria-describedby={
+            errors.description ? "element-description-error" : undefined
+          }
         />
-        {errors.description && (
-          <p className="text-xs text-destructive">{errors.description}</p>
-        )}
+        <FormErrorMessage
+          id="element-description-error"
+          message={errors.description}
+        />
       </div>
 
       <div className="space-y-1">

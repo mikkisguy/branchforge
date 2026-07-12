@@ -21,6 +21,7 @@ export function CollapsibleSection({
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
+          aria-expanded={isOpen}
           className="flex items-center gap-1.5 max-md:min-h-11 max-md:min-w-11"
         >
           {title}
@@ -28,9 +29,7 @@ export function CollapsibleSection({
             className={`size-3.5 transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`}
           />
         </button>
-        {headerAction && (
-          <div onClick={(e) => e.stopPropagation()}>{headerAction}</div>
-        )}
+        {headerAction && <div role="presentation">{headerAction}</div>}
       </div>
       {isOpen && <div className="px-3 pb-3">{children}</div>}
     </div>

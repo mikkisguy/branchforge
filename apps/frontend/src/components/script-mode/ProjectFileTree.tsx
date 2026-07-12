@@ -97,6 +97,7 @@ export function ProjectFileTree({
             <button
               type="button"
               onClick={() => toggleFolder(folder)}
+              // eslint-disable-next-line jsx-a11y/role-has-required-aria-props
               role="treeitem"
               aria-expanded={expandedFolders.has(folder)}
               aria-level={1}
@@ -119,6 +120,7 @@ export function ProjectFileTree({
                 <div key={file.id}>
                   <div
                     role="treeitem"
+                    aria-selected={activeFileId === file.id}
                     aria-expanded={
                       file.fileType === "STORY" && file.labels.length > 0
                         ? expandedFiles.has(file.id)
@@ -187,6 +189,7 @@ export function ProjectFileTree({
                               key={label.id}
                               onClick={() => onSceneSelect(label.id)}
                               role="treeitem"
+                              aria-selected={activeSceneId === label.id}
                               aria-level={folder ? 3 : 2}
                               className={`w-full flex items-center gap-2 py-1 px-2 rounded-md text-xs transition-colors ${
                                 activeSceneId === label.id

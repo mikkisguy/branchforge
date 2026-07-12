@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FormErrorMessage } from "@/components/ui/form-error-message";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
 import { usePairGroups } from "@/hooks/usePairGroups";
@@ -126,10 +127,15 @@ function CreateForm({
           onChange={(value: string) => handleChange("characterAId", value)}
           placeholder="Select character A..."
           disabled={isSaving || characters.length === 0}
+          aria-invalid={!!errors.characterAId}
+          aria-describedby={
+            errors.characterAId ? "pair-char-a-error" : undefined
+          }
         />
-        {errors.characterAId && (
-          <p className="text-xs text-destructive">{errors.characterAId}</p>
-        )}
+        <FormErrorMessage
+          id="pair-char-a-error"
+          message={errors.characterAId}
+        />
       </div>
 
       <div className="space-y-1">
@@ -143,10 +149,15 @@ function CreateForm({
           onChange={(value: string) => handleChange("characterBId", value)}
           placeholder="Select character B..."
           disabled={isSaving || !form.characterAId}
+          aria-invalid={!!errors.characterBId}
+          aria-describedby={
+            errors.characterBId ? "pair-char-b-error" : undefined
+          }
         />
-        {errors.characterBId && (
-          <p className="text-xs text-destructive">{errors.characterBId}</p>
-        )}
+        <FormErrorMessage
+          id="pair-char-b-error"
+          message={errors.characterBId}
+        />
       </div>
 
       <div className="space-y-1">
@@ -162,10 +173,15 @@ function CreateForm({
             handleChange("duoEndingLabel", event.target.value)
           }
           disabled={isSaving}
+          aria-invalid={!!errors.duoEndingLabel}
+          aria-describedby={
+            errors.duoEndingLabel ? "pair-duo-label-error" : undefined
+          }
         />
-        {errors.duoEndingLabel && (
-          <p className="text-xs text-destructive">{errors.duoEndingLabel}</p>
-        )}
+        <FormErrorMessage
+          id="pair-duo-label-error"
+          message={errors.duoEndingLabel}
+        />
       </div>
 
       <div className="flex justify-end gap-2 pt-2">
@@ -241,8 +257,13 @@ function EditForm({
             }))
           }
           disabled={isSaving}
+          aria-invalid={!!error}
+          aria-describedby={error ? "edit-pair-duo-label-error" : undefined}
         />
-        {error && <p className="text-xs text-destructive">{error}</p>}
+        <FormErrorMessage
+          id="edit-pair-duo-label-error"
+          message={error ?? undefined}
+        />
       </div>
 
       <div className="flex justify-end gap-2 pt-2">

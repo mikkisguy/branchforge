@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useId } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -47,10 +47,15 @@ export function DialogShell({
     onOpenChange(nextOpen);
   };
 
+  const titleId = useId();
   const closeLabel = `Close ${title.toLowerCase()} dialog`;
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={handleOpenChange}
+      aria-labelledby={titleId}
+    >
       <DialogContent
         className={cn(
           "w-full max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden",
@@ -60,7 +65,9 @@ export function DialogShell({
       >
         <div className="p-6 max-sm:p-4 border-b border-border/30 flex items-start justify-between shrink-0">
           <div>
-            <h2 className="text-lg font-medium">{title}</h2>
+            <h2 id={titleId} className="text-lg font-medium">
+              {title}
+            </h2>
             {description && (
               <p className="text-sm text-muted-foreground mt-1">
                 {description}

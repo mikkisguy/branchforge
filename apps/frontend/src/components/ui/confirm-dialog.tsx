@@ -5,7 +5,7 @@
  * Features customizable title, description, button labels, and loading state.
  */
 
-import { useCallback, useEffect, useEffectEvent, useRef } from "react";
+import { useCallback, useEffect, useEffectEvent, useId, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
@@ -52,6 +52,8 @@ export function ConfirmDialog({
   onError,
   className,
 }: ConfirmDialogProps) {
+  const titleId = useId();
+  const descriptionId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const isLoadingRef = useRef(isLoading);
 
@@ -130,6 +132,9 @@ export function ConfirmDialog({
   return (
     <dialog
       ref={syncDialogRef}
+      aria-labelledby={titleId}
+      aria-describedby={descriptionId}
+      aria-modal="true"
       className="backdrop:bg-black/50 m-auto border-0 p-0 bg-transparent text-[hsl(var(--foreground))]"
     >
       <div
@@ -140,13 +145,10 @@ export function ConfirmDialog({
       >
         {/* Header */}
         <div className="p-6 max-sm:p-4 border-b border-border/30">
-          <h2 id="confirm-dialog-title" className="text-lg font-medium">
+          <h2 id={titleId} className="text-lg font-medium">
             {title}
           </h2>
-          <p
-            id="confirm-dialog-description"
-            className="text-sm text-muted-foreground mt-2"
-          >
+          <p id={descriptionId} className="text-sm text-muted-foreground mt-2">
             {description}
           </p>
         </div>

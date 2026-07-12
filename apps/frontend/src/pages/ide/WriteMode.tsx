@@ -492,9 +492,20 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
           (!isLeftSidebarCollapsed || !isRightSidebarCollapsed) && (
             <div
               className="hidden max-md:block max-md:fixed max-md:inset-0 max-md:bg-black/40 max-md:z-30"
+              role="button"
+              tabIndex={0}
+              aria-label="Close overlays"
               onClick={() => {
                 if (!isLeftSidebarCollapsed) setIsLeftSidebarCollapsed(true);
                 if (!isRightSidebarCollapsed) setIsRightSidebarCollapsed(true);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  if (!isLeftSidebarCollapsed) setIsLeftSidebarCollapsed(true);
+                  if (!isRightSidebarCollapsed)
+                    setIsRightSidebarCollapsed(true);
+                }
               }}
             />
           )}

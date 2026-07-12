@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FormErrorMessage } from "@/components/ui/form-error-message";
 import { useVariables } from "@/hooks/useVariables";
 import type { Variable } from "@branchforge/shared";
 
@@ -143,15 +144,15 @@ function VariableFormContent({
             value={form.key}
             onChange={(event) => handleChange("key", event.target.value)}
             disabled={isSaving || isEditMode}
+            aria-invalid={!!errors.key}
+            aria-describedby={errors.key ? "variable-key-error" : undefined}
           />
           <p className="text-xs text-muted-foreground">
             {isEditMode
               ? "Key cannot be changed after creation"
               : "Unique identifier (letters, numbers, underscores)"}
           </p>
-          {errors.key && (
-            <p className="text-xs text-destructive">{errors.key}</p>
-          )}
+          <FormErrorMessage id="variable-key-error" message={errors.key} />
         </div>
 
         <div className="space-y-1">
@@ -165,10 +166,15 @@ function VariableFormContent({
             value={form.category}
             onChange={(event) => handleChange("category", event.target.value)}
             disabled={isSaving}
+            aria-invalid={!!errors.category}
+            aria-describedby={
+              errors.category ? "variable-category-error" : undefined
+            }
           />
-          {errors.category && (
-            <p className="text-xs text-destructive">{errors.category}</p>
-          )}
+          <FormErrorMessage
+            id="variable-category-error"
+            message={errors.category}
+          />
         </div>
       </div>
 
@@ -183,10 +189,15 @@ function VariableFormContent({
           value={form.description}
           onChange={(event) => handleChange("description", event.target.value)}
           disabled={isSaving}
+          aria-invalid={!!errors.description}
+          aria-describedby={
+            errors.description ? "variable-description-error" : undefined
+          }
         />
-        {errors.description && (
-          <p className="text-xs text-destructive">{errors.description}</p>
-        )}
+        <FormErrorMessage
+          id="variable-description-error"
+          message={errors.description}
+        />
       </div>
 
       <div className="flex justify-end gap-2">

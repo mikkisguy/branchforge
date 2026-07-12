@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { FormErrorMessage } from "@/components/ui/form-error-message";
 import { useRouteConfigs } from "@/hooks/useRouteConfigs";
 import { isValidJumpPrefix, isValidRouteKey } from "@branchforge/shared";
 import type { RouteConfig } from "@branchforge/shared";
@@ -157,15 +158,15 @@ function RouteFormContent({
               value={form.routeKey}
               onChange={(event) => handleChange("routeKey", event.target.value)}
               disabled={isSaving || isEditMode}
+              aria-invalid={!!errors.routeKey}
+              aria-describedby={errors.routeKey ? "route-key-error" : undefined}
             />
             <p className="text-xs text-muted-foreground">
               {isEditMode
                 ? "Route key cannot be changed after creation"
                 : "Unique identifier (letters, numbers, underscores, hyphens)"}
             </p>
-            {errors.routeKey && (
-              <p className="text-xs text-destructive">{errors.routeKey}</p>
-            )}
+            <FormErrorMessage id="route-key-error" message={errors.routeKey} />
           </div>
 
           <div className="space-y-1">
@@ -181,10 +182,15 @@ function RouteFormContent({
                 handleChange("routeName", event.target.value)
               }
               disabled={isSaving}
+              aria-invalid={!!errors.routeName}
+              aria-describedby={
+                errors.routeName ? "route-name-error" : undefined
+              }
             />
-            {errors.routeName && (
-              <p className="text-xs text-destructive">{errors.routeName}</p>
-            )}
+            <FormErrorMessage
+              id="route-name-error"
+              message={errors.routeName}
+            />
           </div>
         </div>
 
@@ -202,10 +208,15 @@ function RouteFormContent({
                 handleChange("jumpPrefix", event.target.value)
               }
               disabled={isSaving}
+              aria-invalid={!!errors.jumpPrefix}
+              aria-describedby={
+                errors.jumpPrefix ? "jump-prefix-error" : undefined
+              }
             />
-            {errors.jumpPrefix && (
-              <p className="text-xs text-destructive">{errors.jumpPrefix}</p>
-            )}
+            <FormErrorMessage
+              id="jump-prefix-error"
+              message={errors.jumpPrefix}
+            />
           </div>
 
           <div className="space-y-1">

@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FormErrorMessage } from "@/components/ui/form-error-message";
 import { useStats } from "@/hooks/useStats";
 import type { Stat } from "@branchforge/shared";
 
@@ -170,15 +171,15 @@ function StatFormContent({
             value={form.key}
             onChange={(event) => handleChange("key", event.target.value)}
             disabled={isSaving || isEditMode}
+            aria-invalid={!!errors.key}
+            aria-describedby={errors.key ? "stat-key-error" : undefined}
           />
           <p className="text-xs text-muted-foreground">
             {isEditMode
               ? "Key cannot be changed after creation"
               : "Unique identifier (lowercase, underscores)"}
           </p>
-          {errors.key && (
-            <p className="text-xs text-destructive">{errors.key}</p>
-          )}
+          <FormErrorMessage id="stat-key-error" message={errors.key} />
         </div>
 
         <div className="space-y-1">
@@ -192,10 +193,10 @@ function StatFormContent({
             value={form.name}
             onChange={(event) => handleChange("name", event.target.value)}
             disabled={isSaving}
+            aria-invalid={!!errors.name}
+            aria-describedby={errors.name ? "stat-name-error" : undefined}
           />
-          {errors.name && (
-            <p className="text-xs text-destructive">{errors.name}</p>
-          )}
+          <FormErrorMessage id="stat-name-error" message={errors.name} />
         </div>
       </div>
 
@@ -210,6 +211,8 @@ function StatFormContent({
             value={form.minValue}
             onChange={(event) => handleChange("minValue", event.target.value)}
             disabled={isSaving}
+            aria-invalid={!!errors.range}
+            aria-describedby={errors.range ? "stat-range-error" : undefined}
           />
         </div>
 
@@ -223,13 +226,13 @@ function StatFormContent({
             value={form.maxValue}
             onChange={(event) => handleChange("maxValue", event.target.value)}
             disabled={isSaving}
+            aria-invalid={!!errors.range}
+            aria-describedby={errors.range ? "stat-range-error" : undefined}
           />
         </div>
       </div>
 
-      {errors.range && (
-        <p className="text-xs text-destructive">{errors.range}</p>
-      )}
+      <FormErrorMessage id="stat-range-error" message={errors.range} />
 
       <div className="space-y-1">
         <Label htmlFor="stat-description" className="text-xs">

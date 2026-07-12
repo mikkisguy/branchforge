@@ -16,6 +16,7 @@ export function InlineMessage({
 }: InlineMessageProps) {
   return (
     <div
+      role="alert"
       className={cn(
         "p-3 rounded-md text-sm flex items-start gap-2",
         variant === "error"

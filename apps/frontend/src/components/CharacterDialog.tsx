@@ -34,6 +34,7 @@ export function CharacterDialog({
         if (!nextOpen) onOpenChange(false);
         else onOpenChange(nextOpen);
       }}
+      aria-label="Character Management"
     >
       <DialogContent className="max-w-3xl w-full max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
         {/* Header */}

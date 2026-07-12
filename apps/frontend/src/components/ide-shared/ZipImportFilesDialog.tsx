@@ -367,7 +367,11 @@ export function ZipImportFilesDialog({
   // ============================================================================
 
   return (
-    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={handleDialogOpenChange}
+      aria-label="Import Zip File"
+    >
       <DialogContent className="max-w-md w-full p-0 gap-0">
         {/* Header */}
         <div className="p-6 border-b border-border/30 flex items-start justify-between">

@@ -11,7 +11,6 @@ import {
   CardDescription,
   CardFooter,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { InlineMessage } from "@/components/ui/inline-error";
 import { BASE_URL } from "@/lib/constants";
@@ -41,7 +40,7 @@ export function LoginPage() {
   };
 
   return (
-    <div
+    <main
       id="main-content"
       tabIndex={-1}
       className="flex min-h-screen items-center justify-center p-4"
@@ -52,7 +51,9 @@ export function LoginPage() {
         </div>
         <Card>
           <CardHeader>
-            <CardTitle>Sign In</CardTitle>
+            <h2 className="font-semibold leading-none tracking-tight">
+              Sign In
+            </h2>
             <CardDescription>
               Enter your credentials to access {APP_NAME}
             </CardDescription>
@@ -103,6 +104,6 @@ export function LoginPage() {
           </form>
         </Card>
       </div>
-    </div>
+    </main>
   );
 }

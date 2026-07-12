@@ -183,11 +183,15 @@ function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
   return createPortal(
     <div
       data-testid="toast-container"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
       className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"
     >
       {toasts.map((toast) => (
         <div
           key={toast.id}
+          role={toast.variant === "destructive" ? "alert" : "status"}
           className="pointer-events-auto animate-in slide-in-from-right-4 fade-in-50 duration-300"
         >
           <div
@@ -207,6 +211,7 @@ function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
             </div>
             <button
               type="button"
+              aria-label="Dismiss notification"
               onClick={() => onRemove(toast.id)}
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
