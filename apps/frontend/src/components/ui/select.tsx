@@ -208,7 +208,8 @@ export function Select<T extends string = string>({
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>
-      {/* eslint-disable-next-line jsx-a11y/role-supports-aria-props -- aria-invalid on custom widget trigger */}
+      {/* eslint-disable jsx-a11y/role-supports-aria-props -- aria-invalid on custom widget trigger */}
+      {/* react-doctor-disable-next-line react-doctor/role-supports-aria-props */}
       <button
         ref={setTriggerRef}
         id={id}
@@ -255,6 +256,7 @@ export function Select<T extends string = string>({
           />
         </svg>
       </button>
+      {/* eslint-enable jsx-a11y/role-supports-aria-props */}
 
       {isOpen &&
         portalTarget &&

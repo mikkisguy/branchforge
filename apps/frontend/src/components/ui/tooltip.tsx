@@ -255,8 +255,8 @@ export function Tooltip({
 
   // For non-interactive or non-element children, wrap in a focusable span
   return (
-    // react-doctor-disable-next-line react-doctor/no-static-element-interactions, react-doctor/no-noninteractive-tabindex
     /* eslint-disable jsx-a11y/no-static-element-interactions, jsx-a11y/no-noninteractive-tabindex */
+    // react-doctor-disable-next-line react-doctor/no-static-element-interactions, react-doctor/no-noninteractive-tabindex
     <span
       ref={setTriggerRef as React.Ref<HTMLSpanElement>}
       tabIndex={0}

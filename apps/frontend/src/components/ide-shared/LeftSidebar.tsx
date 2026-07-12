@@ -772,9 +772,8 @@ export function LeftSidebar(props: LeftSidebarProps) {
 
   return (
     <>
-      <div
+      <nav
         aria-label="Main navigation"
-        role="navigation"
         className={`max-md:hidden fixed left-0 top-0 h-screen pl-[env(safe-area-inset-left)] ${width} bg-card/95 backdrop-blur border-r border-border/30 flex flex-col transition-all duration-300 z-50`}
       >
         {/* Top Section */}
@@ -855,9 +854,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
             onLogout={onLogout}
           />
         </div>
-      </div>
-
-      {/* Mobile bottom nav bar (below md breakpoint) */}
+      </nav>
       <div className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-card/95 backdrop-blur border-t border-border/30 flex items-center justify-center gap-3 px-4 pb-[env(safe-area-inset-bottom)] z-50">
         {/* Mode switcher – horizontal, icon-only */}
         <div className="flex bg-muted/50 rounded-md p-0.5">

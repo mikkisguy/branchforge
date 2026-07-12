@@ -32,32 +32,50 @@ export function CharacterAvatarChip({
         </span>
       }
     >
-      {/* react-doctor-disable-next-line react-doctor/no-static-element-interactions */}
-      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-      <div
-        className={`size-8 rounded-full flex items-center justify-center text-white text-xs font-medium shrink-0 shadow-sm hover:ring-2 hover:ring-ring transition-all ${
-          onClick ? "cursor-pointer" : "cursor-default"
-        }`}
-        style={{ backgroundColor: character.color }}
-        aria-label={
-          character.isLoveInterest
-            ? `${character.displayName} (love interest)`
-            : character.displayName
-        }
-        onClick={onClick}
-        onKeyDown={onClick ? handleKeyDown : undefined}
-        {...(onClick && { role: "button", tabIndex: 0 })}
-      >
-        {character.avatarUrl ? (
-          <img
-            src={character.avatarUrl}
-            alt={character.displayName}
-            className="size-8 rounded-full object-cover"
-          />
-        ) : (
-          character.displayName[0] || "?"
-        )}
-      </div>
+      {onClick ? (
+        <button
+          type="button"
+          className={`size-8 rounded-full flex items-center justify-center text-white text-xs font-medium shrink-0 shadow-sm hover:ring-2 hover:ring-ring transition-all cursor-pointer border-0 p-0`}
+          style={{ backgroundColor: character.color }}
+          aria-label={
+            character.isLoveInterest
+              ? `${character.displayName} (love interest)`
+              : character.displayName
+          }
+          onClick={onClick}
+          onKeyDown={handleKeyDown}
+        >
+          {character.avatarUrl ? (
+            <img
+              src={character.avatarUrl}
+              alt={character.displayName}
+              className="size-8 rounded-full object-cover"
+            />
+          ) : (
+            character.displayName[0] || "?"
+          )}
+        </button>
+      ) : (
+        <div
+          className="size-8 rounded-full flex items-center justify-center text-white text-xs font-medium shrink-0 shadow-sm cursor-default"
+          style={{ backgroundColor: character.color }}
+          aria-label={
+            character.isLoveInterest
+              ? `${character.displayName} (love interest)`
+              : character.displayName
+          }
+        >
+          {character.avatarUrl ? (
+            <img
+              src={character.avatarUrl}
+              alt={character.displayName}
+              className="size-8 rounded-full object-cover"
+            />
+          ) : (
+            character.displayName[0] || "?"
+          )}
+        </div>
+      )}
     </Tooltip>
   );
 }

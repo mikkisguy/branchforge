@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useId, useEffect, useEffectEvent, useRef } from "react";
+import { useId, useEffect, useEffectEvent, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 
@@ -77,10 +77,14 @@ export function Dialog({
   }, [closeOnBackdropClick, dialogRef]);
 
   const generatedTitleId = useId();
-  const titleId = ariaLabelledBy ?? generatedTitleId;
+  const contextValue = useMemo(
+    () => ({ titleId: ariaLabelledBy ?? generatedTitleId }),
+    [ariaLabelledBy, generatedTitleId]
+  );
+  const titleId = contextValue.titleId;
 
   return (
-    <DialogContext.Provider value={{ titleId }}>
+    <DialogContext.Provider value={contextValue}>
       <dialog
         ref={syncDialogRef}
         aria-label={ariaLabel}
