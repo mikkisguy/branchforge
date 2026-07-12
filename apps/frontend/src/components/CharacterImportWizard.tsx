@@ -532,6 +532,7 @@ export function CharacterImportWizard({
           </div>
           <button
             type="button"
+            aria-label="Close import dialog"
             onClick={handleClose}
             className="text-muted-foreground hover:text-foreground transition-colors"
             disabled={state.isImporting}

@@ -481,9 +481,14 @@ export function CharacterEditDialog({
                   />
                   <Input
                     type="color"
+                    aria-label="Color picker"
                     value={form.color}
                     onChange={(e) => handleFieldChange("color", e.target.value)}
                     disabled={isSaving}
+                    aria-invalid={!!form.colorError}
+                    aria-describedby={
+                      form.colorError ? "edit-char-color-error" : undefined
+                    }
                     className="w-12 h-9 p-0.5"
                   />
                 </div>

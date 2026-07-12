@@ -10,22 +10,18 @@ interface AnnouncementProps extends React.HTMLAttributes<HTMLDivElement> {
   regionId?: string;
 }
 
-const MAX_MESSAGES = 10;
-
 const Announcement = React.forwardRef<AnnouncementHandle, AnnouncementProps>(
   ({ politeness = "polite", regionId, className, ...props }, ref) => {
-    const [messages, setMessages] = React.useState<
-      Array<{ id: number; text: string }>
-    >([]);
+    const [message, setMessage] = React.useState<{
+      id: number;
+      text: string;
+    } | null>(null);
     const counterRef = React.useRef(0);
 
     const announce = React.useCallback((message: string) => {
       counterRef.current += 1;
       const id = counterRef.current;
-      setMessages((prev) => {
-        const next = [...prev, { id, text: message }];
-        return next.slice(-MAX_MESSAGES);
-      });
+      setMessage({ id, text: message });
     }, []);
 
     React.useImperativeHandle(
@@ -48,9 +44,7 @@ const Announcement = React.forwardRef<AnnouncementHandle, AnnouncementProps>(
         className={cn("sr-only", className)}
         {...props}
       >
-        {messages.map((msg) => (
-          <div key={msg.id}>{msg.text}</div>
-        ))}
+        {message && <div key={message.id}>{message.text}</div>}
       </div>
     );
   }

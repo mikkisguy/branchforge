@@ -365,6 +365,7 @@ export function ConflictReviewDialog({
           </div>
           <button
             type="button"
+            aria-label="Close conflict review"
             onClick={() => onOpenChange(false)}
             className="text-muted-foreground hover:text-foreground transition-colors"
             disabled={state.isLoading}

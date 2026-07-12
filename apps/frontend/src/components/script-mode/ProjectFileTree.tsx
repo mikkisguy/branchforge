@@ -118,45 +118,46 @@ export function ProjectFileTree({
             <div className="space-y-0.5" role="group">
               {folderFiles.map((file) => (
                 <div key={file.id}>
-                  <div
-                    role="treeitem"
-                    aria-selected={activeFileId === file.id}
-                    aria-expanded={
-                      file.fileType === "STORY" && file.labels.length > 0
-                        ? expandedFiles.has(file.id)
-                        : undefined
-                    }
-                    aria-level={folder ? 2 : 1}
-                    className={`w-full flex items-center gap-2 py-1.5 px-2 rounded-md text-sm transition-colors ${
-                      activeFileId === file.id
-                        ? "bg-[var(--theme-color)]/10 text-foreground font-medium"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
-                    }`}
-                  >
+                  <div className="flex items-center gap-0.5">
                     {file.fileType === "STORY" && file.labels.length > 0 ? (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleFile(file.id);
-                        }}
-                        className="flex items-center rounded p-0.5 hover:bg-muted/30"
-                        aria-label="Toggle labels"
-                        tabIndex={-1}
+                      <span
+                        aria-hidden="true"
+                        className="flex items-center justify-center size-5"
                       >
                         {expandedFiles.has(file.id) ? (
-                          <ChevronDown className="size-3" />
+                          <ChevronDown className="size-3 text-muted-foreground" />
                         ) : (
-                          <ChevronRight className="size-3" />
+                          <ChevronRight className="size-3 text-muted-foreground" />
                         )}
-                      </button>
+                      </span>
                     ) : (
-                      <span className="w-3" />
+                      <span className="w-5" />
                     )}
                     <button
                       type="button"
-                      onClick={() => onFileSelect(file.id)}
-                      className="flex-1 text-left flex items-center gap-2 py-0.5 px-1 -my-0.5 rounded transition-colors"
+                      onClick={() => {
+                        if (
+                          file.fileType === "STORY" &&
+                          file.labels.length > 0
+                        ) {
+                          toggleFile(file.id);
+                        } else {
+                          onFileSelect(file.id);
+                        }
+                      }}
+                      role="treeitem"
+                      aria-selected={activeFileId === file.id}
+                      aria-expanded={
+                        file.fileType === "STORY" && file.labels.length > 0
+                          ? expandedFiles.has(file.id)
+                          : undefined
+                      }
+                      aria-level={folder ? 2 : 1}
+                      className={`flex-1 flex items-center gap-2 py-1.5 px-2 rounded-md text-sm text-left transition-colors ${
+                        activeFileId === file.id
+                          ? "bg-[var(--theme-color)]/10 text-foreground font-medium"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
+                      }`}
                     >
                       <span className="truncate" title={file.filePath}>
                         {getFileName(file.filePath)}

@@ -28,7 +28,7 @@ function AddDestructiveToast() {
 }
 
 describe("Toast accessibility", () => {
-  it("renders toast container with role='status' and aria-live='polite'", () => {
+  it("renders toast container as a plain layout element without live-region attributes", () => {
     render(
       <ToastProvider>
         <AddSuccessToast />
@@ -36,8 +36,9 @@ describe("Toast accessibility", () => {
     );
 
     const container = screen.getByTestId("toast-container");
-    expect(container).toHaveAttribute("role", "status");
-    expect(container).toHaveAttribute("aria-live", "polite");
+    expect(container).not.toHaveAttribute("role");
+    expect(container).not.toHaveAttribute("aria-live");
+    expect(container).not.toHaveAttribute("aria-atomic");
   });
 
   it("marks destructive toasts with role='alert'", async () => {

@@ -221,10 +221,15 @@ export function VisualSystemFormContent({
           disabled={isSaving}
           aria-invalid={!!errors.namingTemplate}
           aria-describedby={
-            errors.namingTemplate ? "vs-naming-template-error" : undefined
+            errors.namingTemplate
+              ? "vs-naming-template-hint vs-naming-template-error"
+              : "vs-naming-template-hint"
           }
         />
-        <p className="text-xs text-muted-foreground">
+        <p
+          id="vs-naming-template-hint"
+          className="text-xs text-muted-foreground"
+        >
           Tokens: <code>{`{route}`}</code>, <code>{`{group}`}</code>,{" "}
           <code>{`{label}`}</code> (or legacy <code>{`{scene}`}</code>),{" "}
           <code>{`{counter}`}</code>, <code>{`{slug}`}</code>
@@ -375,10 +380,15 @@ export function VisualSystemFormContent({
           rows={4}
           aria-invalid={!!errors.groupPrefixesJson}
           aria-describedby={
-            errors.groupPrefixesJson ? "vs-group-prefixes-error" : undefined
+            errors.groupPrefixesJson
+              ? "vs-group-prefixes-hint vs-group-prefixes-error"
+              : "vs-group-prefixes-hint"
           }
         />
-        <p className="text-xs text-muted-foreground">
+        <p
+          id="vs-group-prefixes-hint"
+          className="text-xs text-muted-foreground"
+        >
           Map of group type to value→prefix. Empty or <code>{`{}`}</code> for
           none.
         </p>

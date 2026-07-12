@@ -159,9 +159,13 @@ function RouteFormContent({
               onChange={(event) => handleChange("routeKey", event.target.value)}
               disabled={isSaving || isEditMode}
               aria-invalid={!!errors.routeKey}
-              aria-describedby={errors.routeKey ? "route-key-error" : undefined}
+              aria-describedby={
+                errors.routeKey
+                  ? "route-key-hint route-key-error"
+                  : "route-key-hint"
+              }
             />
-            <p className="text-xs text-muted-foreground">
+            <p id="route-key-hint" className="text-xs text-muted-foreground">
               {isEditMode
                 ? "Route key cannot be changed after creation"
                 : "Unique identifier (letters, numbers, underscores, hyphens)"}
