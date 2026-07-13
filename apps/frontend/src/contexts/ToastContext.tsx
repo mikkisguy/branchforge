@@ -188,6 +188,7 @@ function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
       {toasts.map((toast) => (
         <div
           key={toast.id}
+          role={toast.variant === "destructive" ? "alert" : "status"}
           className="pointer-events-auto animate-in slide-in-from-right-4 fade-in-50 duration-300"
         >
           <div
@@ -207,6 +208,7 @@ function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
             </div>
             <button
               type="button"
+              aria-label="Dismiss notification"
               onClick={() => onRemove(toast.id)}
               className="text-muted-foreground hover:text-foreground transition-colors"
             >

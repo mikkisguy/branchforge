@@ -1,7 +1,17 @@
 import * as React from "react";
-import { useEffect, useEffectEvent, useRef } from "react";
+import { useId, useEffect, useEffectEvent, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
+
+interface DialogContextValue {
+  titleId: string;
+}
+
+const DialogContext = React.createContext<DialogContextValue | null>(null);
+
+function useDialogTitleId(): string | undefined {
+  return React.useContext(DialogContext)?.titleId;
+}
 
 interface DialogProps {
   open?: boolean;
@@ -66,47 +76,57 @@ export function Dialog({
     };
   }, [closeOnBackdropClick, dialogRef]);
 
+  const generatedTitleId = useId();
+  const contextValue = useMemo(
+    () => ({ titleId: ariaLabelledBy ?? generatedTitleId }),
+    [ariaLabelledBy, generatedTitleId]
+  );
+  const titleId = contextValue.titleId;
+
   return (
-    <dialog
-      ref={syncDialogRef}
-      aria-label={ariaLabel}
-      aria-labelledby={ariaLabelledBy}
-      // Center the dialog content with a full-viewport flex overlay,
-      // scoped to the `open` variant (targets `&[open]`). Four
-      // constraints drive the exact class set:
-      //
-      //   1. Keep closed dialogs hidden. The UA
-      //      `dialog:not([open]) { display: none }` is a user-agent
-      //      rule, which any *unconditional* author `display` utility
-      //      (e.g. a bare `flex`) always wins over regardless of
-      //      specificity — silently making every closed <dialog>
-      //      visible. So `hidden` by default, `open:flex` only when
-      //      `[open]`.
-      //
-      //   2. Make the dialog actually fill the viewport so flexbox can
-      //      center. The UA gives `<dialog>` `width: fit-content`, so
-      //      `inset:0` alone does NOT stretch it (it shrink-wraps and
-      //      sits at the top-left). We need an explicit size —
-      //      `open:w-full open:h-full` — to claim the full viewport.
-      //      (`open:fixed open:inset-0` pins it at 0,0.)
-      //
-      //   3. Defeat the UA size cap. The UA also sets `max-width` /
-      //      `max-height` on the dialog that clip it short of the
-      //      viewport (observed ~38px inset), which throws off the
-      //      flex centering by ~19px each axis. `open:max-w-none
-      //      open:max-h-none` removes that cap so the box is the full
-      //      viewport and content centers exactly.
-      //
-      //   4. NO `transform`. A transform (the previous
-      //      `-translate-x/y-1/2` centering) establishes a containing
-      //      block for `position: fixed` descendants, breaking portaled
-      //      tooltips/selects that rely on viewport-relative fixed
-      //      positioning. None of the classes above have that side
-      //      effect, so those portals keep anchoring to the viewport.
-      className="hidden open:flex open:fixed open:inset-0 open:w-full open:h-full open:max-w-none open:max-h-none open:items-center open:justify-center backdrop:bg-black/30 backdrop:backdrop-blur-sm m-0 border-0 p-0 bg-transparent text-[hsl(var(--foreground))]"
-    >
-      {children}
-    </dialog>
+    <DialogContext.Provider value={contextValue}>
+      <dialog
+        ref={syncDialogRef}
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabel ? undefined : titleId}
+        aria-modal="true"
+        // Center the dialog content with a full-viewport flex overlay,
+        // scoped to the `open` variant (targets `&[open]`). Four
+        // constraints drive the exact class set:
+        //
+        //   1. Keep closed dialogs hidden. The UA
+        //      `dialog:not([open]) { display: none }` is a user-agent
+        //      rule, which any *unconditional* author `display` utility
+        //      (e.g. a bare `flex`) always wins over regardless of
+        //      specificity — silently making every closed <dialog>
+        //      visible. So `hidden` by default, `open:flex` only when
+        //      `[open]`.
+        //
+        //   2. Make the dialog actually fill the viewport so flexbox can
+        //      center. The UA gives `<dialog>` `width: fit-content`, so
+        //      `inset:0` alone does NOT stretch it (it shrink-wraps and
+        //      sits at the top-left). We need an explicit size —
+        //      `open:w-full open:h-full` — to claim the full viewport.
+        //      (`open:fixed open:inset-0` pins it at 0,0.)
+        //
+        //   3. Defeat the UA size cap. The UA also sets `max-width` /
+        //      `max-height` on the dialog that clip it short of the
+        //      viewport (observed ~38px inset), which throws off the
+        //      flex centering by ~19px each axis. `open:max-w-none
+        //      open:max-h-none` removes that cap so the box is the full
+        //      viewport and content centers exactly.
+        //
+        //   4. NO `transform`. A transform (the previous
+        //      `-translate-x/y-1/2` centering) establishes a containing
+        //      block for `position: fixed` descendants, breaking portaled
+        //      tooltips/selects that rely on viewport-relative fixed
+        //      positioning. None of the classes above have that side
+        //      effect, so those portals keep anchoring to the viewport.
+        className="hidden open:flex open:fixed open:inset-0 open:w-full open:h-full open:max-w-none open:max-h-none open:items-center open:justify-center backdrop:bg-black/30 backdrop:backdrop-blur-sm m-0 border-0 p-0 bg-transparent text-[hsl(var(--foreground))]"
+      >
+        {children}
+      </dialog>
+    </DialogContext.Provider>
   );
 }
 
@@ -160,8 +180,10 @@ interface DialogTitleProps {
 }
 
 export function DialogTitle({ children, className }: DialogTitleProps) {
+  const titleId = useDialogTitleId();
   return (
     <h2
+      id={titleId}
       className={cn(
         "text-lg font-semibold leading-none tracking-tight",
         className

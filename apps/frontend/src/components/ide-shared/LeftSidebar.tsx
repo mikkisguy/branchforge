@@ -31,6 +31,7 @@ import { ZipImportProjectDialog } from "./ZipImportProjectDialog.lazy";
 import { FlowDialog } from "@/components/flow/FlowDialog";
 import { Select } from "@/components/ui/select";
 import { Logo } from "@/components/ui/logo";
+import { IconButton } from "@/components/ui/icon-button";
 
 // ============================================================================
 // Types
@@ -163,6 +164,7 @@ function ModeSwitcher({
             : "text-muted-foreground hover:text-foreground"
         }`}
         title="Write Mode"
+        aria-label="Write Mode"
       >
         <BookOpen className="size-4 flex-shrink-0" />
         {showLabel && <span>Write</span>}
@@ -178,6 +180,7 @@ function ModeSwitcher({
             : "text-muted-foreground hover:text-foreground"
         }`}
         title="Script Mode"
+        aria-label="Script Mode"
       >
         <SquarePen className="size-4 flex-shrink-0" />
         {showLabel && <span>Script</span>}
@@ -252,6 +255,7 @@ function ProjectSelector({
               : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
           }`}
           title="Select Project"
+          aria-label="Select Project"
         >
           <FolderOpen className="size-4 flex-shrink-0" />
         </button>
@@ -398,6 +402,7 @@ function NavButtons({
             : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
         }`}
         title="Project settings"
+        aria-label="Project settings"
       >
         <SlidersHorizontal className="size-4 flex-shrink-0" />
         {showLabel && <span>Project Settings</span>}
@@ -414,6 +419,7 @@ function NavButtons({
             : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
         }`}
         title="Flow Graph"
+        aria-label="Flow Graph"
       >
         <Network className="size-4 flex-shrink-0" />
         {showLabel && <span>Flow Graph</span>}
@@ -483,6 +489,7 @@ function ThemeSwitcher({
               : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
           }`}
           title="Theme"
+          aria-label="Theme"
         >
           <Palette className="size-4 flex-shrink-0" />
         </button>
@@ -558,6 +565,7 @@ function CollapseButton({ isCollapsed, onToggle }: CollapseButtonProps) {
         isCollapsed ? "justify-center p-3.5" : "gap-3 p-2"
       } rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors`}
       title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+      aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
     >
       {isCollapsed ? (
         <ChevronsRight className="size-4 flex-shrink-0" />
@@ -629,6 +637,7 @@ function UserActions({
           isCollapsed ? "justify-center p-3.5" : "gap-3 p-2"
         } rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors`}
         title="Settings"
+        aria-label="Settings"
       >
         <Settings className="size-4 flex-shrink-0" />
         {showLabel && <span>Settings</span>}
@@ -640,6 +649,7 @@ function UserActions({
           isCollapsed ? "justify-center p-3.5" : "gap-3 p-2"
         } rounded-md text-sm font-medium text-muted-foreground hover:text-destructive-muted hover:bg-destructive/10 transition-colors`}
         title="Logout"
+        aria-label="Logout"
       >
         <LogOut className="size-4 flex-shrink-0" />
         {showLabel && <span>Logout</span>}
@@ -762,7 +772,8 @@ export function LeftSidebar(props: LeftSidebarProps) {
 
   return (
     <>
-      <div
+      <nav
+        aria-label="Main navigation"
         className={`max-md:hidden fixed left-0 top-0 h-screen pl-[env(safe-area-inset-left)] ${width} bg-card/95 backdrop-blur border-r border-border/30 flex flex-col transition-all duration-300 z-50`}
       >
         {/* Top Section */}
@@ -843,9 +854,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
             onLogout={onLogout}
           />
         </div>
-      </div>
-
-      {/* Mobile bottom nav bar (below md breakpoint) */}
+      </nav>
       <div className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-card/95 backdrop-blur border-t border-border/30 flex items-center justify-center gap-3 px-4 pb-[env(safe-area-inset-bottom)] z-50">
         {/* Mode switcher – horizontal, icon-only */}
         <div className="flex bg-muted/50 rounded-md p-0.5">
@@ -907,20 +916,19 @@ export function LeftSidebar(props: LeftSidebarProps) {
         </div>
 
         {/* Hamburger menu – replaces dark mode, theme, settings, logout */}
-        <button
-          ref={mobileMenuBtnRef}
-          type="button"
-          onClick={() => setMobileMenuOpen((prev) => !prev)}
-          className={`flex items-center justify-center p-3.5 rounded-md text-sm font-medium transition-colors ${
-            mobileMenuOpen
-              ? "text-foreground bg-muted/50"
-              : "text-muted-foreground"
-          }`}
-          title="Menu"
-          aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-        >
-          <Menu className="size-4 flex-shrink-0" />
-        </button>
+        <span ref={mobileMenuBtnRef}>
+          <IconButton
+            icon={<Menu className="size-4 flex-shrink-0" />}
+            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            variant="ghost"
+            className={`p-3.5 h-auto w-auto rounded-md text-sm font-medium transition-colors ${
+              mobileMenuOpen
+                ? "text-foreground bg-muted/50"
+                : "text-muted-foreground"
+            }`}
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+          />
+        </span>
       </div>
 
       {/* Mobile hamburger menu popover */}

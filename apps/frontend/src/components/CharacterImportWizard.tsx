@@ -510,6 +510,7 @@ export function CharacterImportWizard({
       onOpenChange={(nextOpen) => {
         if (!nextOpen) handleClose();
       }}
+      aria-label="Import Characters"
     >
       <DialogContent className="max-w-2xl w-full p-0 gap-0 max-h-[80vh] overflow-hidden flex flex-col">
         {/* Header */}
@@ -531,6 +532,7 @@ export function CharacterImportWizard({
           </div>
           <button
             type="button"
+            aria-label="Close import dialog"
             onClick={handleClose}
             className="text-muted-foreground hover:text-foreground transition-colors"
             disabled={state.isImporting}

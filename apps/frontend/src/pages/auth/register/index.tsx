@@ -12,7 +12,6 @@ import {
   CardDescription,
   CardFooter,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { InlineMessage } from "@/components/ui/inline-error";
 import { BASE_URL } from "@/lib/constants";
@@ -70,7 +69,7 @@ export function RegisterPage() {
   // Show loading state while checking settings
   if (settingsLoading) {
     return (
-      <div
+      <main
         id="main-content"
         tabIndex={-1}
         className="flex min-h-screen items-center justify-center p-4"
@@ -81,21 +80,23 @@ export function RegisterPage() {
           </div>
           <Card>
             <CardHeader>
-              <CardTitle>Create Account</CardTitle>
+              <h2 className="font-semibold leading-none tracking-tight">
+                Create Account
+              </h2>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">Loading…</p>
             </CardContent>
           </Card>
         </div>
-      </div>
+      </main>
     );
   }
 
   // Show disabled state when signups are closed
   if (!signUpsEnabled) {
     return (
-      <div
+      <main
         id="main-content"
         tabIndex={-1}
         className="flex min-h-screen items-center justify-center p-4"
@@ -106,7 +107,9 @@ export function RegisterPage() {
           </div>
           <Card>
             <CardHeader>
-              <CardTitle>Registration Closed</CardTitle>
+              <h2 className="font-semibold leading-none tracking-tight">
+                Registration Closed
+              </h2>
               <CardDescription>
                 New user registration is currently disabled. Please contact an
                 administrator.
@@ -125,7 +128,7 @@ export function RegisterPage() {
             </CardFooter>
           </Card>
         </div>
-      </div>
+      </main>
     );
   }
 
@@ -162,7 +165,7 @@ export function RegisterPage() {
   };
 
   return (
-    <div
+    <main
       id="main-content"
       tabIndex={-1}
       className="flex min-h-screen items-center justify-center p-4"
@@ -173,7 +176,9 @@ export function RegisterPage() {
         </div>
         <Card>
           <CardHeader>
-            <CardTitle>Create Account</CardTitle>
+            <h2 className="font-semibold leading-none tracking-tight">
+              Create Account
+            </h2>
             <CardDescription>
               Register for {APP_NAME} to start creating visual novels
             </CardDescription>
@@ -252,6 +257,6 @@ export function RegisterPage() {
           </form>
         </Card>
       </div>
-    </div>
+    </main>
   );
 }

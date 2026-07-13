@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { FormErrorMessage } from "@/components/ui/form-error-message";
 import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 
 interface ProjectEditDialogProps {
@@ -219,11 +220,10 @@ export function ProjectEditDialog({
               />
             </div>
 
-            {formState.error && (
-              <p id={nameErrorId} className="text-sm text-destructive">
-                {formState.error}
-              </p>
-            )}
+            <FormErrorMessage
+              id={nameErrorId}
+              message={formState.error ?? undefined}
+            />
 
             <div className="flex justify-end gap-2 pt-2">
               <Button

@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FormErrorMessage } from "@/components/ui/form-error-message";
 import { Select } from "@/components/ui/select";
 import { useVisualSystem } from "@/hooks/useVisualSystem";
 import {
@@ -218,15 +219,25 @@ export function VisualSystemFormContent({
             handleChange("namingTemplate", event.target.value)
           }
           disabled={isSaving}
+          aria-invalid={!!errors.namingTemplate}
+          aria-describedby={
+            errors.namingTemplate
+              ? "vs-naming-template-hint vs-naming-template-error"
+              : "vs-naming-template-hint"
+          }
         />
-        <p className="text-xs text-muted-foreground">
+        <p
+          id="vs-naming-template-hint"
+          className="text-xs text-muted-foreground"
+        >
           Tokens: <code>{`{route}`}</code>, <code>{`{group}`}</code>,{" "}
           <code>{`{label}`}</code> (or legacy <code>{`{scene}`}</code>),{" "}
           <code>{`{counter}`}</code>, <code>{`{slug}`}</code>
         </p>
-        {errors.namingTemplate && (
-          <p className="text-xs text-destructive">{errors.namingTemplate}</p>
-        )}
+        <FormErrorMessage
+          id="vs-naming-template-error"
+          message={errors.namingTemplate}
+        />
       </div>
 
       <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
@@ -245,10 +256,15 @@ export function VisualSystemFormContent({
               { value: "1", label: "1 (e.g. 1, 2, 3)" },
               { value: "2", label: "2 (e.g. 01, 02, 03)" },
             ]}
+            aria-invalid={!!errors.labelPadding}
+            aria-describedby={
+              errors.labelPadding ? "vs-label-padding-error" : undefined
+            }
           />
-          {errors.labelPadding && (
-            <p className="text-xs text-destructive">{errors.labelPadding}</p>
-          )}
+          <FormErrorMessage
+            id="vs-label-padding-error"
+            message={errors.labelPadding}
+          />
         </div>
 
         <div className="space-y-1">
@@ -266,10 +282,15 @@ export function VisualSystemFormContent({
               { value: "1", label: "1 (e.g. 1, 2, 3)" },
               { value: "2", label: "2 (e.g. 01, 02, 03)" },
             ]}
+            aria-invalid={!!errors.counterPadding}
+            aria-describedby={
+              errors.counterPadding ? "vs-counter-padding-error" : undefined
+            }
           />
-          {errors.counterPadding && (
-            <p className="text-xs text-destructive">{errors.counterPadding}</p>
-          )}
+          <FormErrorMessage
+            id="vs-counter-padding-error"
+            message={errors.counterPadding}
+          />
         </div>
       </div>
 
@@ -286,10 +307,15 @@ export function VisualSystemFormContent({
             handleChange("jumpPrefixShared", event.target.value)
           }
           disabled={isSaving}
+          aria-invalid={!!errors.jumpPrefixShared}
+          aria-describedby={
+            errors.jumpPrefixShared ? "vs-jump-prefix-error" : undefined
+          }
         />
-        {errors.jumpPrefixShared && (
-          <p className="text-xs text-destructive">{errors.jumpPrefixShared}</p>
-        )}
+        <FormErrorMessage
+          id="vs-jump-prefix-error"
+          message={errors.jumpPrefixShared}
+        />
       </div>
 
       <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
@@ -325,12 +351,15 @@ export function VisualSystemFormContent({
               handleChange("placeholderBaseUrl", event.target.value)
             }
             disabled={isSaving}
+            aria-invalid={!!errors.placeholderBaseUrl}
+            aria-describedby={
+              errors.placeholderBaseUrl ? "vs-placeholder-error" : undefined
+            }
           />
-          {errors.placeholderBaseUrl && (
-            <p className="text-xs text-destructive">
-              {errors.placeholderBaseUrl}
-            </p>
-          )}
+          <FormErrorMessage
+            id="vs-placeholder-error"
+            message={errors.placeholderBaseUrl}
+          />
         </div>
       </div>
 
@@ -349,14 +378,24 @@ export function VisualSystemFormContent({
           }
           disabled={isSaving}
           rows={4}
+          aria-invalid={!!errors.groupPrefixesJson}
+          aria-describedby={
+            errors.groupPrefixesJson
+              ? "vs-group-prefixes-hint vs-group-prefixes-error"
+              : "vs-group-prefixes-hint"
+          }
         />
-        <p className="text-xs text-muted-foreground">
+        <p
+          id="vs-group-prefixes-hint"
+          className="text-xs text-muted-foreground"
+        >
           Map of group type to value→prefix. Empty or <code>{`{}`}</code> for
           none.
         </p>
-        {errors.groupPrefixesJson && (
-          <p className="text-xs text-destructive">{errors.groupPrefixesJson}</p>
-        )}
+        <FormErrorMessage
+          id="vs-group-prefixes-error"
+          message={errors.groupPrefixesJson}
+        />
       </div>
 
       <div className="rounded-md border border-border/50 bg-muted/40 p-3 text-xs">

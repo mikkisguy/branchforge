@@ -335,7 +335,11 @@ export function ConflictReviewDialog({
   // ============================================================================
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      aria-label="Review Sync Conflicts"
+    >
       <DialogContent className="max-w-4xl w-full max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="p-6 max-sm:p-4 border-b border-border/30 flex items-start justify-between shrink-0">
@@ -361,6 +365,7 @@ export function ConflictReviewDialog({
           </div>
           <button
             type="button"
+            aria-label="Close conflict review"
             onClick={() => onOpenChange(false)}
             className="text-muted-foreground hover:text-foreground transition-colors"
             disabled={state.isLoading}

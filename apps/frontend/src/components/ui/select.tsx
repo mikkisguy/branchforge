@@ -22,6 +22,10 @@ interface SelectProps<T extends string = string> {
   disabled?: boolean;
   className?: string;
   portalContainer?: HTMLElement | null;
+  "aria-invalid"?: boolean | "true" | "false";
+  "aria-describedby"?: string;
+  "aria-label"?: string;
+  "aria-labelledby"?: string;
 }
 
 function getDefaultPortalContainer(from: Element | null): HTMLElement {
@@ -45,6 +49,10 @@ export function Select<T extends string = string>({
   disabled = false,
   className,
   portalContainer,
+  "aria-invalid": ariaInvalid,
+  "aria-describedby": ariaDescribedby,
+  "aria-label": ariaLabel,
+  "aria-labelledby": ariaLabelledby,
 }: SelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
@@ -210,6 +218,10 @@ export function Select<T extends string = string>({
         disabled={disabled}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
+        aria-describedby={ariaDescribedby}
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledby}
+        data-invalid={ariaInvalid || undefined}
         className={cn(
           "w-full flex items-center justify-between gap-2 min-h-11 px-3 py-2 rounded-lg text-sm",
           "bg-popover border border-border/70",
@@ -272,7 +284,7 @@ export function Select<T extends string = string>({
               onKeyDown={handleKeyDown}
             >
               {options.map((option, index) => (
-                // react-doctor-disable-next-line react-doctor/prefer-tag-over-role, react-doctor/click-events-have-key-events
+                // eslint-disable-next-line jsx-a11y/click-events-have-key-events -- Listbox handles keyboard navigation via aria-activedescendant
                 <div
                   key={option.value}
                   id={`select-option-${index}`}

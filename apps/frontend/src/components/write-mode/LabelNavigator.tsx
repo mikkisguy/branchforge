@@ -24,6 +24,7 @@ import {
 import { LabelContextMenu } from "@/components/write-mode/LabelContextMenu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
+import { FormErrorMessage } from "@/components/ui/form-error-message";
 import type { UpdateLabelInput } from "@/lib/api/labels";
 
 const STATUS_COLORS: Record<LabelStatus, string> = {
@@ -277,6 +278,10 @@ function InlineCreateInput({
           placeholder="Label title..."
           className="flex-1 min-w-0"
           disabled={isCreating}
+          aria-invalid={!!error}
+          aria-describedby={
+            error ? "inline-label-title-input-error" : undefined
+          }
         />
         {isCreating ? (
           <Loader2 className="size-4 animate-spin text-muted-foreground" />
@@ -291,7 +296,10 @@ function InlineCreateInput({
           </button>
         )}
       </div>
-      {error && <p className="text-xs text-destructive mt-1.5 px-1">{error}</p>}
+      <FormErrorMessage
+        id="inline-label-title-input-error"
+        message={error ?? undefined}
+      />
     </div>
   );
 }

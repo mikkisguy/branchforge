@@ -269,11 +269,21 @@ export function ScriptModeEditorLayout({
         {/* Mobile scrim backdrop – collapses open overlays on tap */}
         {!isFocusMode &&
           (!isLeftSidebarCollapsed || !isRightSidebarCollapsed) && (
-            <div
-              className="hidden max-md:block max-md:fixed max-md:inset-0 max-md:bg-black/40 max-md:z-30"
+            <button
+              type="button"
+              className="hidden max-md:block max-md:fixed max-md:inset-0 max-md:bg-black/40 max-md:z-30 border-0 p-0 cursor-pointer"
+              aria-label="Close overlays"
               onClick={() => {
                 if (!isLeftSidebarCollapsed) setIsLeftSidebarCollapsed(true);
                 if (!isRightSidebarCollapsed) setIsRightSidebarCollapsed(true);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  if (!isLeftSidebarCollapsed) setIsLeftSidebarCollapsed(true);
+                  if (!isRightSidebarCollapsed)
+                    setIsRightSidebarCollapsed(true);
+                }
               }}
             />
           )}

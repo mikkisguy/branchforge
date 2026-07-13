@@ -97,9 +97,15 @@ export function ProjectFileTree({
             <button
               type="button"
               onClick={() => toggleFolder(folder)}
+              // eslint-disable-next-line jsx-a11y/role-has-required-aria-props
               role="treeitem"
               aria-expanded={expandedFolders.has(folder)}
               aria-level={1}
+              aria-owns={
+                expandedFolders.has(folder)
+                  ? `folder-group-${folder.replace(/[^a-zA-Z0-9-_]/g, "-")}`
+                  : undefined
+              }
               className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/20 hover:bg-muted/30 transition-colors"
             >
               {expandedFolders.has(folder) ? (
@@ -114,47 +120,64 @@ export function ProjectFileTree({
 
           {(!folder || expandedFolders.has(folder)) && (
             // react-doctor-disable-next-line react-doctor/prefer-tag-over-role
-            <div className="space-y-0.5" role="group">
+            <div
+              className="space-y-0.5"
+              role="group"
+              id={
+                folder
+                  ? `folder-group-${folder.replace(/[^a-zA-Z0-9-_]/g, "-")}`
+                  : undefined
+              }
+            >
               {folderFiles.map((file) => (
                 <div key={file.id}>
-                  <div
-                    role="treeitem"
-                    aria-expanded={
-                      file.fileType === "STORY" && file.labels.length > 0
-                        ? expandedFiles.has(file.id)
-                        : undefined
-                    }
-                    aria-level={folder ? 2 : 1}
-                    className={`w-full flex items-center gap-2 py-1.5 px-2 rounded-md text-sm transition-colors ${
-                      activeFileId === file.id
-                        ? "bg-[var(--theme-color)]/10 text-foreground font-medium"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
-                    }`}
-                  >
+                  <div className="flex items-center gap-0.5">
                     {file.fileType === "STORY" && file.labels.length > 0 ? (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleFile(file.id);
-                        }}
-                        className="flex items-center rounded p-0.5 hover:bg-muted/30"
-                        aria-label="Toggle labels"
-                        tabIndex={-1}
+                      <span
+                        aria-hidden="true"
+                        className="flex items-center justify-center size-5"
                       >
                         {expandedFiles.has(file.id) ? (
-                          <ChevronDown className="size-3" />
+                          <ChevronDown className="size-3 text-muted-foreground" />
                         ) : (
-                          <ChevronRight className="size-3" />
+                          <ChevronRight className="size-3 text-muted-foreground" />
                         )}
-                      </button>
+                      </span>
                     ) : (
-                      <span className="w-3" />
+                      <span className="w-5" />
                     )}
                     <button
                       type="button"
-                      onClick={() => onFileSelect(file.id)}
-                      className="flex-1 text-left flex items-center gap-2 py-0.5 px-1 -my-0.5 rounded transition-colors"
+                      onClick={() => {
+                        if (
+                          file.fileType === "STORY" &&
+                          file.labels.length > 0
+                        ) {
+                          toggleFile(file.id);
+                        } else {
+                          onFileSelect(file.id);
+                        }
+                      }}
+                      role="treeitem"
+                      aria-selected={activeFileId === file.id}
+                      aria-expanded={
+                        file.fileType === "STORY" && file.labels.length > 0
+                          ? expandedFiles.has(file.id)
+                          : undefined
+                      }
+                      aria-level={folder ? 2 : 1}
+                      aria-owns={
+                        file.fileType === "STORY" &&
+                        file.labels.length > 0 &&
+                        expandedFiles.has(file.id)
+                          ? `label-group-${file.id}`
+                          : undefined
+                      }
+                      className={`flex-1 flex items-center gap-2 py-1.5 px-2 rounded-md text-sm text-left transition-colors ${
+                        activeFileId === file.id
+                          ? "bg-[var(--theme-color)]/10 text-foreground font-medium"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
+                      }`}
                     >
                       <span className="truncate" title={file.filePath}>
                         {getFileName(file.filePath)}
@@ -172,7 +195,11 @@ export function ProjectFileTree({
                     expandedFiles.has(file.id) &&
                     file.labels.length > 0 && (
                       // react-doctor-disable-next-line react-doctor/prefer-tag-over-role
-                      <div className="pl-7 space-y-0.5" role="group">
+                      <div
+                        className="pl-7 space-y-0.5"
+                        role="group"
+                        id={`label-group-${file.id}`}
+                      >
                         {file.labels.map((label) => {
                           const safeStatus =
                             typeof label.status === "string" &&
@@ -187,6 +214,7 @@ export function ProjectFileTree({
                               key={label.id}
                               onClick={() => onSceneSelect(label.id)}
                               role="treeitem"
+                              aria-selected={activeSceneId === label.id}
                               aria-level={folder ? 3 : 2}
                               className={`w-full flex items-center gap-2 py-1 px-2 rounded-md text-xs transition-colors ${
                                 activeSceneId === label.id
