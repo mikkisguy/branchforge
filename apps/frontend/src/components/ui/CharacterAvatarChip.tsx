@@ -10,13 +10,6 @@ export function CharacterAvatarChip({
   character,
   onClick,
 }: CharacterAvatarChipProps) {
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (onClick && (e.key === "Enter" || e.key === " ")) {
-      e.preventDefault();
-      onClick();
-    }
-  };
-
   return (
     <Tooltip
       content={
@@ -43,7 +36,6 @@ export function CharacterAvatarChip({
               : character.displayName
           }
           onClick={onClick}
-          onKeyDown={handleKeyDown}
         >
           {character.avatarUrl ? (
             <img

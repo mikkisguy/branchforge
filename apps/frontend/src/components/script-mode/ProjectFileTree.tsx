@@ -101,6 +101,11 @@ export function ProjectFileTree({
               role="treeitem"
               aria-expanded={expandedFolders.has(folder)}
               aria-level={1}
+              aria-owns={
+                expandedFolders.has(folder)
+                  ? `folder-group-${folder.replace(/[^a-zA-Z0-9-_]/g, "-")}`
+                  : undefined
+              }
               className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/20 hover:bg-muted/30 transition-colors"
             >
               {expandedFolders.has(folder) ? (
@@ -115,7 +120,15 @@ export function ProjectFileTree({
 
           {(!folder || expandedFolders.has(folder)) && (
             // react-doctor-disable-next-line react-doctor/prefer-tag-over-role
-            <div className="space-y-0.5" role="group">
+            <div
+              className="space-y-0.5"
+              role="group"
+              id={
+                folder
+                  ? `folder-group-${folder.replace(/[^a-zA-Z0-9-_]/g, "-")}`
+                  : undefined
+              }
+            >
               {folderFiles.map((file) => (
                 <div key={file.id}>
                   <div className="flex items-center gap-0.5">
@@ -153,6 +166,13 @@ export function ProjectFileTree({
                           : undefined
                       }
                       aria-level={folder ? 2 : 1}
+                      aria-owns={
+                        file.fileType === "STORY" &&
+                        file.labels.length > 0 &&
+                        expandedFiles.has(file.id)
+                          ? `label-group-${file.id}`
+                          : undefined
+                      }
                       className={`flex-1 flex items-center gap-2 py-1.5 px-2 rounded-md text-sm text-left transition-colors ${
                         activeFileId === file.id
                           ? "bg-[var(--theme-color)]/10 text-foreground font-medium"
@@ -175,7 +195,11 @@ export function ProjectFileTree({
                     expandedFiles.has(file.id) &&
                     file.labels.length > 0 && (
                       // react-doctor-disable-next-line react-doctor/prefer-tag-over-role
-                      <div className="pl-7 space-y-0.5" role="group">
+                      <div
+                        className="pl-7 space-y-0.5"
+                        role="group"
+                        id={`label-group-${file.id}`}
+                      >
                         {file.labels.map((label) => {
                           const safeStatus =
                             typeof label.status === "string" &&

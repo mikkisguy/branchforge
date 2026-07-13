@@ -67,6 +67,10 @@ describe("Toast accessibility", () => {
     await waitFor(() => {
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
+
+    // Non-destructive success toasts should be announced with role="status"
+    const statusToast = await waitFor(() => screen.getByRole("status"));
+    expect(statusToast).toBeInTheDocument();
   });
 
   it("provides aria-label on dismiss button", async () => {

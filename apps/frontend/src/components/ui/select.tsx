@@ -208,8 +208,6 @@ export function Select<T extends string = string>({
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>
-      {/* eslint-disable jsx-a11y/role-supports-aria-props -- aria-invalid on custom widget trigger */}
-      {/* react-doctor-disable-next-line react-doctor/role-supports-aria-props */}
       <button
         ref={setTriggerRef}
         id={id}
@@ -220,10 +218,10 @@ export function Select<T extends string = string>({
         disabled={disabled}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
-        aria-invalid={ariaInvalid}
         aria-describedby={ariaDescribedby}
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledby}
+        data-invalid={ariaInvalid || undefined}
         className={cn(
           "w-full flex items-center justify-between gap-2 min-h-11 px-3 py-2 rounded-lg text-sm",
           "bg-popover border border-border/70",
@@ -256,7 +254,6 @@ export function Select<T extends string = string>({
           />
         </svg>
       </button>
-      {/* eslint-enable jsx-a11y/role-supports-aria-props */}
 
       {isOpen &&
         portalTarget &&
