@@ -465,6 +465,7 @@ export function GitLabImportDialog({
                     }
                     placeholder="My Visual Novel"
                     maxLength={200}
+                    aria-required="true"
                   />
                 </div>
 
@@ -501,6 +502,7 @@ export function GitLabImportDialog({
                       payload: e.target.value,
                     })
                   }
+                  aria-label="GitLab repository"
                 />
               </div>
 

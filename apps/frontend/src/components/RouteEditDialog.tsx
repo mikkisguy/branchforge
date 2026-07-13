@@ -158,6 +158,7 @@ function RouteFormContent({
               value={form.routeKey}
               onChange={(event) => handleChange("routeKey", event.target.value)}
               disabled={isSaving || isEditMode}
+              aria-required="true"
               aria-invalid={!!errors.routeKey}
               aria-describedby={
                 errors.routeKey
@@ -186,6 +187,7 @@ function RouteFormContent({
                 handleChange("routeName", event.target.value)
               }
               disabled={isSaving}
+              aria-required="true"
               aria-invalid={!!errors.routeName}
               aria-describedby={
                 errors.routeName ? "route-name-error" : undefined
@@ -212,6 +214,7 @@ function RouteFormContent({
                 handleChange("jumpPrefix", event.target.value)
               }
               disabled={isSaving}
+              aria-required="true"
               aria-invalid={!!errors.jumpPrefix}
               aria-describedby={
                 errors.jumpPrefix ? "jump-prefix-error" : undefined

@@ -8,7 +8,9 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { FormErrorMessage } from "@/components/ui/form-error-message";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 
 export interface LabelEditDialogProps {
@@ -278,12 +280,9 @@ export function LabelEditDialog({
         <div className="space-y-4 mt-4">
           {/* Title Field */}
           <div className="space-y-1.5">
-            <label
-              htmlFor="label-title"
-              className="text-sm font-medium text-foreground"
-            >
-              Title
-            </label>
+            <Label htmlFor="label-title" className="text-xs">
+              Title *
+            </Label>
             <Input
               id="label-title"
               type="text"
@@ -296,21 +295,24 @@ export function LabelEditDialog({
               disabled={isSaving}
               placeholder="Enter label title"
               maxLength={255}
+              aria-required="true"
+              aria-invalid={!!form.titleError}
+              aria-describedby={
+                form.titleError ? "label-title-error" : undefined
+              }
             />
-            {form.titleError && (
-              <p className="text-xs text-destructive mt-1">{form.titleError}</p>
-            )}
+            <FormErrorMessage
+              id="label-title-error"
+              message={form.titleError}
+            />
           </div>
 
           {/* Label Name Field (only shown for file-backed labels) */}
           {currentLabelName !== null && (
             <div className="space-y-1.5">
-              <label
-                htmlFor="label-name"
-                className="text-sm font-medium text-foreground"
-              >
+              <Label htmlFor="label-name" className="text-xs">
                 Label Name
-              </label>
+              </Label>
               <Input
                 id="label-name"
                 type="text"
@@ -323,12 +325,15 @@ export function LabelEditDialog({
                 disabled={isSaving}
                 placeholder={currentLabelName}
                 className="font-mono"
+                aria-invalid={!!form.labelNameError}
+                aria-describedby={
+                  form.labelNameError ? "label-name-error" : undefined
+                }
               />
-              {form.labelNameError && (
-                <p className="text-xs text-destructive mt-1">
-                  {form.labelNameError}
-                </p>
-              )}
+              <FormErrorMessage
+                id="label-name-error"
+                message={form.labelNameError}
+              />
               <p className="text-xs text-muted-foreground">
                 Ren'Py label identifier. Changing this updates the label
                 definition in the .rpy file.
@@ -340,12 +345,9 @@ export function LabelEditDialog({
           <div className="grid grid-cols-3 max-sm:grid-cols-1 gap-3">
             {/* Route Field */}
             <div className="space-y-1.5">
-              <label
-                htmlFor="label-route"
-                className="text-sm font-medium text-foreground"
-              >
+              <Label htmlFor="label-route" className="text-xs">
                 Route
-              </label>
+              </Label>
               <Select
                 id="label-route"
                 value={form.route ?? ""}
@@ -363,12 +365,9 @@ export function LabelEditDialog({
 
             {/* Status Field */}
             <div className="space-y-1.5">
-              <label
-                htmlFor="label-status"
-                className="text-sm font-medium text-foreground"
-              >
+              <Label htmlFor="label-status" className="text-xs">
                 Status
-              </label>
+              </Label>
               <Select
                 id="label-status"
                 value={form.status}
@@ -389,12 +388,9 @@ export function LabelEditDialog({
 
             {/* Visibility Field */}
             <div className="space-y-1.5">
-              <label
-                htmlFor="label-visibility"
-                className="text-sm font-medium text-foreground"
-              >
+              <Label htmlFor="label-visibility" className="text-xs">
                 Visibility
-              </label>
+              </Label>
               <Select
                 id="label-visibility"
                 value={form.visibility}

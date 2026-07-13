@@ -189,9 +189,9 @@ export function ProjectEditDialog({
             details.
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div className="space-y-2">
-              <Label htmlFor="edit-project-name">Project name</Label>
+              <Label htmlFor="edit-project-name">Project name *</Label>
               <Input
                 id="edit-project-name"
                 value={formState.name}
@@ -200,6 +200,7 @@ export function ProjectEditDialog({
                 }
                 disabled={isSaving}
                 maxLength={200}
+                aria-required="true"
                 aria-invalid={formState.error ? true : undefined}
                 aria-describedby={formState.error ? nameErrorId : undefined}
               />

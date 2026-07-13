@@ -279,7 +279,9 @@ describe("RegisterPage", () => {
       await user.click(submitButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Email already exists")).toBeInTheDocument();
+        expect(
+          screen.getAllByText("Email already exists")[0]
+        ).toBeInTheDocument();
       });
     });
 
@@ -302,14 +304,14 @@ describe("RegisterPage", () => {
       await user.click(submitButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Previous error")).toBeInTheDocument();
+        expect(screen.getAllByText("Previous error")[0]).toBeInTheDocument();
       });
 
       // Type in input to verify error doesn't auto-clear
       await user.type(emailInput, "x");
 
       // Error should remain visible
-      expect(screen.getByText("Previous error")).toBeInTheDocument();
+      expect(screen.getAllByText("Previous error")[0]).toBeInTheDocument();
     });
 
     it("should handle non-Error errors", async () => {
@@ -439,7 +441,7 @@ describe("RegisterPage", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText("Password must be at least 8 characters")
+          screen.getAllByText("Password must be at least 8 characters")[0]
         ).toBeInTheDocument();
       });
 
@@ -464,7 +466,9 @@ describe("RegisterPage", () => {
       await user.click(submitButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Passwords do not match")).toBeInTheDocument();
+        expect(
+          screen.getAllByText("Passwords do not match")[0]
+        ).toBeInTheDocument();
       });
 
       expect(mockRegister).not.toHaveBeenCalled();

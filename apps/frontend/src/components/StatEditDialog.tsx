@@ -171,6 +171,7 @@ function StatFormContent({
             value={form.key}
             onChange={(event) => handleChange("key", event.target.value)}
             disabled={isSaving || isEditMode}
+            aria-required="true"
             aria-invalid={!!errors.key}
             aria-describedby={errors.key ? "stat-key-error" : undefined}
           />
@@ -193,6 +194,7 @@ function StatFormContent({
             value={form.name}
             onChange={(event) => handleChange("name", event.target.value)}
             disabled={isSaving}
+            aria-required="true"
             aria-invalid={!!errors.name}
             aria-describedby={errors.name ? "stat-name-error" : undefined}
           />

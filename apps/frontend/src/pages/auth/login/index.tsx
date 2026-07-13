@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,11 @@ import {
   CardFooter,
   CardHeader,
 } from "@/components/ui/card";
-import { InlineMessage } from "@/components/ui/inline-error";
+import { FormErrorMessage } from "@/components/ui/form-error-message";
+import {
+  Announcement,
+  type AnnouncementHandle,
+} from "@/components/ui/announcement";
 import { BASE_URL } from "@/lib/constants";
 import { APP_NAME } from "../../../lib/version";
 
@@ -23,6 +27,13 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const announceRef = useRef<AnnouncementHandle>(null);
+
+  useEffect(() => {
+    if (error) {
+      announceRef.current?.announce(error);
+    }
+  }, [error]);
 
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -58,9 +69,10 @@ export function LoginPage() {
               Enter your credentials to access {APP_NAME}
             </CardDescription>
           </CardHeader>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             <CardContent className="space-y-4">
-              {error && <InlineMessage variant="error">{error}</InlineMessage>}
+              <Announcement ref={announceRef} />
+              {error && <FormErrorMessage id="login-error" message={error} />}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -70,6 +82,9 @@ export function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  aria-required="true"
+                  aria-invalid={!!error}
+                  aria-describedby={error ? "login-error" : undefined}
                   disabled={isLoading}
                 />
               </div>
@@ -82,6 +97,9 @@ export function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  aria-required="true"
+                  aria-invalid={!!error}
+                  aria-describedby={error ? "login-error" : undefined}
                   disabled={isLoading}
                   minLength={8}
                 />

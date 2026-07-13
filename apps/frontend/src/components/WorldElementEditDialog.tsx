@@ -160,6 +160,7 @@ function ElementFormContent({
             value={form.name}
             onChange={(event) => handleChange("name", event.target.value)}
             disabled={isSaving}
+            aria-required="true"
             aria-invalid={!!errors.name}
             aria-describedby={errors.name ? "element-name-error" : undefined}
           />
@@ -177,6 +178,7 @@ function ElementFormContent({
             onChange={(value) => handleChange("type", value)}
             placeholder="Select type"
             disabled={isSaving}
+            aria-required="true"
             aria-invalid={!!errors.type}
             aria-describedby={errors.type ? "element-type-error" : undefined}
           />

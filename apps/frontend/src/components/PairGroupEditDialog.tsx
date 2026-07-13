@@ -127,6 +127,7 @@ function CreateForm({
           onChange={(value: string) => handleChange("characterAId", value)}
           placeholder="Select character A..."
           disabled={isSaving || characters.length === 0}
+          aria-required="true"
           aria-invalid={!!errors.characterAId}
           aria-describedby={
             errors.characterAId ? "pair-char-a-error" : undefined
@@ -149,6 +150,7 @@ function CreateForm({
           onChange={(value: string) => handleChange("characterBId", value)}
           placeholder="Select character B..."
           disabled={isSaving || !form.characterAId}
+          aria-required="true"
           aria-invalid={!!errors.characterBId}
           aria-describedby={
             errors.characterBId ? "pair-char-b-error" : undefined
@@ -173,6 +175,7 @@ function CreateForm({
             handleChange("duoEndingLabel", event.target.value)
           }
           disabled={isSaving}
+          aria-required="true"
           aria-invalid={!!errors.duoEndingLabel}
           aria-describedby={
             errors.duoEndingLabel ? "pair-duo-label-error" : undefined
@@ -257,6 +260,7 @@ function EditForm({
             }))
           }
           disabled={isSaving}
+          aria-required="true"
           aria-invalid={!!error}
           aria-describedby={error ? "edit-pair-duo-label-error" : undefined}
         />
