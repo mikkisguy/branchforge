@@ -67,6 +67,7 @@ describe("ThemeContext", () => {
     document.documentElement.style.removeProperty("--theme-color-rgb");
     document.documentElement.style.removeProperty("--theme-border");
     document.documentElement.style.removeProperty("--theme-border-subtle");
+    document.documentElement.style.removeProperty("--theme-foreground");
     document.documentElement.style.removeProperty("--surface-tint");
     document.documentElement.style.removeProperty("--surface-tint-strong");
   };
@@ -126,10 +127,10 @@ describe("ThemeContext", () => {
 
       expect(
         document.documentElement.style.getPropertyValue("--theme-color")
-      ).toBe("#3d4ac2");
+      ).toBe("#5b6ae0");
       expect(
         document.documentElement.style.getPropertyValue("--theme-color-hover")
-      ).toBe("#515fcc");
+      ).toBe("#727ae8");
     });
 
     it("should calculate RGB variants correctly for periwinkle", () => {
@@ -142,16 +143,16 @@ describe("ThemeContext", () => {
 
       const rgb =
         document.documentElement.style.getPropertyValue("--theme-color-rgb");
-      expect(rgb).toBe("61, 74, 194"); // #3d4ac2 = rgb(61, 74, 194)
+      expect(rgb).toBe("91, 106, 224"); // #5b6ae0 = rgb(91, 106, 224)
 
       const border =
         document.documentElement.style.getPropertyValue("--theme-border");
-      expect(border).toBe("rgba(61, 74, 194, 0.3)");
+      expect(border).toBe("rgba(91, 106, 224, 0.3)");
 
       const borderSubtle = document.documentElement.style.getPropertyValue(
         "--theme-border-subtle"
       );
-      expect(borderSubtle).toBe("rgba(61, 74, 194, 0.15)");
+      expect(borderSubtle).toBe("rgba(91, 106, 224, 0.15)");
     });
   });
 
@@ -180,12 +181,12 @@ describe("ThemeContext", () => {
         { wrapper: createWrapper() }
       );
 
-      const container = document.querySelector('[data-primary="#40bb82"]');
+      const container = document.querySelector('[data-primary="#26714e"]');
       expect(container).toBeInTheDocument();
 
       expect(
         document.documentElement.style.getPropertyValue("--theme-color")
-      ).toBe("#40bb82");
+      ).toBe("#26714e");
     });
 
     it("should fall back to default for invalid saved theme", () => {
@@ -250,10 +251,10 @@ describe("ThemeContext", () => {
       await waitFor(() => {
         expect(
           document.documentElement.style.getPropertyValue("--theme-color")
-        ).toBe("#40bb82");
+        ).toBe("#26714e");
         expect(
           document.documentElement.style.getPropertyValue("--theme-color-hover")
-        ).toBe("#52c992");
+        ).toBe("#339668");
       });
     });
 
@@ -270,7 +271,7 @@ describe("ThemeContext", () => {
       await waitFor(() => {
         const rgb =
           document.documentElement.style.getPropertyValue("--theme-color-rgb");
-        expect(rgb).toBe("64, 187, 130"); // #40bb82 = rgb(64, 187, 130)
+        expect(rgb).toBe("38, 113, 78"); // #26714e = rgb(38, 113, 78)
       });
     });
   });
@@ -311,10 +312,10 @@ describe("ThemeContext", () => {
       ThemePalette,
       { primary: string; hover: string }
     > = {
-      forest: { primary: "#40bb82", hover: "#52c992" },
-      periwinkle: { primary: "#3d4ac2", hover: "#515fcc" },
+      forest: { primary: "#26714e", hover: "#339668" },
+      periwinkle: { primary: "#5b6ae0", hover: "#727ae8" },
       "dark-amethyst": { primary: "#9549b6", hover: "#a960c7" },
-      graphite: { primary: "#72757d", hover: "#b0b7c4" },
+      graphite: { primary: "#686a71", hover: "#b0b7c4" },
     };
 
     it.each(themes)("should have correct hardcoded colors for %s", (theme) => {

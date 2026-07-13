@@ -36,8 +36,8 @@ export const themePalettes: {
   key: ThemePalette;
   color: string;
 }[] = [
-  { name: "Forest", key: "forest", color: "#40bb82" },
-  { name: "Periwinkle", key: "periwinkle", color: "#3d4ac2" },
+  { name: "Forest", key: "forest", color: "#26714e" },
+  { name: "Periwinkle", key: "periwinkle", color: "#5b6ae0" },
   { name: "Dark Amethyst", key: "dark-amethyst", color: "#9549b6" },
-  { name: "Graphite", key: "graphite", color: "#9ca3af" },
+  { name: "Graphite", key: "graphite", color: "#686a71" },
 ];

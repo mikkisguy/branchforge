@@ -25,8 +25,8 @@ const mockProjects: Project[] = [
 ];
 
 const themePalettes = [
-  { name: "Periwinkle", key: "periwinkle" as ThemePalette, color: "#3d4ac2" },
-  { name: "Forest", key: "forest" as ThemePalette, color: "#40bb82" },
+  { name: "Periwinkle", key: "periwinkle" as ThemePalette, color: "#5b6ae0" },
+  { name: "Forest", key: "forest" as ThemePalette, color: "#26714e" },
 ];
 
 const defaultProps = {

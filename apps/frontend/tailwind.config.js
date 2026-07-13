@@ -5,7 +5,7 @@ export default {
   safelist: [
     "bg-[#6c9385]",
     "bg-[#4e95b1]",
-    "bg-[#3d4ac2]",
+    "bg-[#5b6ae0]",
     "bg-[#9549b6]",
     "bg-[#6a6d95]",
     // Dynamic theme swatch classes
