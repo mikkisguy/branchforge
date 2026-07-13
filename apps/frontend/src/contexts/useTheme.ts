@@ -8,6 +8,8 @@ interface ThemeColors {
   hover: string;
   /** Text color to use on primary background — guaranteed ≥4.5:1 contrast. */
   foreground: string;
+  /** Text color to use on hover background — guaranteed ≥4.5:1 contrast. */
+  hoverForeground: string;
 }
 
 interface ThemeContextType {

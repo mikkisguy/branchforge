@@ -8,6 +8,7 @@
 import axe, { type AxeResults } from "axe-core";
 import { render, type RenderResult } from "@testing-library/react";
 import type { ReactNode } from "react";
+import { DARK_TOKENS, LIGHT_TOKENS, tokensToVars } from "./theme-tokens";
 
 // ---------------------------------------------------------------------------
 // CSS variable presets matching index.css :root (dark) and .light blocks
@@ -15,26 +16,7 @@ import type { ReactNode } from "react";
 
 /** Dark-mode CSS variables — mirrors index.css :root block. */
 const DARK_VARS: Record<string, string> = {
-  "--background": "0 0% 6%",
-  "--foreground": "0 0% 95%",
-  "--card": "0 0% 8%",
-  "--card-foreground": "0 0% 95%",
-  "--popover": "0 0% 6%",
-  "--popover-foreground": "0 0% 95%",
-  "--primary": "0 0% 98%",
-  "--primary-foreground": "0 0% 9%",
-  "--secondary": "0 0% 14%",
-  "--secondary-foreground": "0 0% 90%",
-  "--muted": "0 0% 14%",
-  "--muted-foreground": "0 0% 55%",
-  "--accent": "0 0% 14%",
-  "--accent-foreground": "0 0% 90%",
-  "--destructive": "0 62.8% 30.6%",
-  "--destructive-foreground": "0 0% 98%",
-  "--destructive-muted": "0 70% 55%",
-  "--border": "0 0% 20%",
-  "--input": "0 0% 18%",
-  "--ring": "0 0% 70%",
+  ...tokensToVars(DARK_TOKENS),
   "--radius": "0.5rem",
   "--focus-ring-width": "3px",
   "--focus-ring-color": "108 30% 40%",
@@ -43,38 +25,23 @@ const DARK_VARS: Record<string, string> = {
   "--theme-color-rgb": "91, 106, 224",
   "--theme-color-hover": "#727ae8",
   "--theme-foreground": "#ffffff",
+  "--theme-foreground-hover": "#0a0a0a",
   "--theme-border": "rgba(91, 106, 224, 0.3)",
   "--surface-tint": "transparent",
 };
 
 /** Light-mode CSS variables — mirrors index.css .light block. */
 const LIGHT_VARS: Record<string, string> = {
-  "--background": "220 20% 97%",
-  "--foreground": "222 47% 11%",
-  "--card": "220 25% 99%",
-  "--card-foreground": "222 47% 11%",
-  "--popover": "220 25% 99%",
-  "--popover-foreground": "222 47% 11%",
-  "--primary": "222 47% 11%",
-  "--primary-foreground": "210 40% 98%",
-  "--secondary": "220 16% 92%",
-  "--secondary-foreground": "222 47% 11%",
-  "--muted": "220 15% 93%",
-  "--muted-foreground": "220 10% 38%",
-  "--accent": "220 30% 94%",
-  "--accent-foreground": "222 47% 11%",
-  "--destructive": "0 72% 48%",
-  "--destructive-foreground": "0 0% 98%",
-  "--destructive-muted": "0 75% 45%",
-  "--border": "214 20% 88%",
-  "--input": "214 20% 88%",
-  "--ring": "222 47% 11%",
+  ...tokensToVars(LIGHT_TOKENS),
+  "--radius": "0.5rem",
+  "--focus-ring-width": "3px",
   "--focus-ring-color": "222 47% 11%",
   // Theme accent (periwinkle, same color)
   "--theme-color": "#5b6ae0",
   "--theme-color-rgb": "91, 106, 224",
   "--theme-color-hover": "#727ae8",
   "--theme-foreground": "#ffffff",
+  "--theme-foreground-hover": "#0a0a0a",
   "--theme-border": "rgba(91, 106, 224, 0.3)",
   "--surface-tint": "rgba(91, 106, 224, 0.04)",
 };
@@ -168,10 +135,14 @@ function applyCSSVars(mode: "light" | "dark"): () => void {
 /**
  * Render a component with the given mode's CSS variables applied.
  */
-export function renderForAxe(ui: ReactNode, darkMode = false): RenderResult {
+export function renderForAxe(
+  ui: ReactNode,
+  darkMode = false
+): RenderResult & { cleanup: () => void } {
   const mode = darkMode ? "dark" : "light";
-  applyCSSVars(mode);
-  return render(<>{ui}</>);
+  const cleanup = applyCSSVars(mode);
+  const result = render(<>{ui}</>);
+  return Object.assign(result, { cleanup });
 }
 
 /**
@@ -184,10 +155,12 @@ export async function testInBothModes(
   const lightResult = renderForAxe(ui, false);
   const lightViolations = await runAxe(lightResult.container, options);
   lightResult.unmount();
+  lightResult.cleanup();
 
   const darkResult = renderForAxe(ui, true);
   const darkViolations = await runAxe(darkResult.container, options);
   darkResult.unmount();
+  darkResult.cleanup();
 
   return { light: lightViolations, dark: darkViolations };
 }

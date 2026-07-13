@@ -22,6 +22,7 @@ import {
   type HSL,
   type RGB,
 } from "@/test/contrast-utils";
+import { DARK_TOKENS, LIGHT_TOKENS } from "@/test/theme-tokens";
 
 // ---------------------------------------------------------------------------
 // CSS token definitions
@@ -29,57 +30,39 @@ import {
 
 type TokenMap = Record<string, string>;
 
-const DARK_TOKENS: TokenMap = {
-  background: "0 0% 6%",
-  foreground: "0 0% 95%",
-  card: "0 0% 8%",
-  "card-foreground": "0 0% 95%",
-  popover: "0 0% 6%",
-  "popover-foreground": "0 0% 95%",
-  primary: "0 0% 98%",
-  "primary-foreground": "0 0% 9%",
-  secondary: "0 0% 14%",
-  "secondary-foreground": "0 0% 90%",
-  muted: "0 0% 14%",
-  "muted-foreground": "0 0% 55%",
-  accent: "0 0% 14%",
-  "accent-foreground": "0 0% 90%",
-  destructive: "0 62.8% 30.6%",
-  "destructive-foreground": "0 0% 98%",
-  "destructive-muted": "0 70% 55%",
-  border: "0 0% 20%",
-  input: "0 0% 18%",
-  ring: "0 0% 70%",
-};
-
-const LIGHT_TOKENS: TokenMap = {
-  background: "220 20% 97%",
-  foreground: "222 47% 11%",
-  card: "220 25% 99%",
-  "card-foreground": "222 47% 11%",
-  popover: "220 25% 99%",
-  "popover-foreground": "222 47% 11%",
-  primary: "222 47% 11%",
-  "primary-foreground": "210 40% 98%",
-  secondary: "220 16% 92%",
-  "secondary-foreground": "222 47% 11%",
-  muted: "220 15% 93%",
-  "muted-foreground": "220 10% 38%",
-  accent: "220 30% 94%",
-  "accent-foreground": "222 47% 11%",
-  destructive: "0 72% 48%",
-  "destructive-foreground": "0 0% 98%",
-  "destructive-muted": "0 75% 45%",
-  border: "214 20% 88%",
-  input: "214 20% 88%",
-  ring: "222 47% 11%",
-};
-
-const THEME_COLORS: Record<string, { primary: string; foreground: string }> = {
-  forest: { primary: "#26714e", foreground: "#ffffff" },
-  periwinkle: { primary: "#5b6ae0", foreground: "#ffffff" },
-  "dark-amethyst": { primary: "#9549b6", foreground: "#ffffff" },
-  graphite: { primary: "#72757d", foreground: "#ffffff" },
+const THEME_COLORS: Record<
+  string,
+  {
+    primary: string;
+    foreground: string;
+    hover: string;
+    hoverForeground: string;
+  }
+> = {
+  forest: {
+    primary: "#26714e",
+    foreground: "#ffffff",
+    hover: "#339668",
+    hoverForeground: "#0a0a0a",
+  },
+  periwinkle: {
+    primary: "#5b6ae0",
+    foreground: "#ffffff",
+    hover: "#727ae8",
+    hoverForeground: "#0a0a0a",
+  },
+  "dark-amethyst": {
+    primary: "#9549b6",
+    foreground: "#ffffff",
+    hover: "#a960c7",
+    hoverForeground: "#0a0a0a",
+  },
+  graphite: {
+    primary: "#686a71",
+    foreground: "#ffffff",
+    hover: "#b0b7c4",
+    hoverForeground: "#0a0a0a",
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -186,7 +169,10 @@ describe("Light mode token contrast (WCAG AA)", () => {
 describe("Theme color contrast (all palettes, both modes)", () => {
   const darkBg = rgbFor(DARK_TOKENS, "background");
 
-  for (const [name, { primary, foreground }] of Object.entries(THEME_COLORS)) {
+  for (const [
+    name,
+    { primary, foreground, hover, hoverForeground },
+  ] of Object.entries(THEME_COLORS)) {
     const theme = hexToRgb(primary);
     const fg = hexToRgb(foreground);
 
@@ -195,6 +181,17 @@ describe("Theme color contrast (all palettes, both modes)", () => {
       if (ratio < 4.5) {
         throw new Error(
           `${name} foreground ${foreground} on ${primary}: ${ratio.toFixed(2)}:1 < 4.5:1`
+        );
+      }
+    });
+
+    it(`${name}: hover foreground on hover >= 4.5:1`, () => {
+      const hBg = hexToRgb(hover);
+      const hFg = hexToRgb(hoverForeground);
+      const ratio = contrastRatioRgb(hFg, hBg);
+      if (ratio < 4.5) {
+        throw new Error(
+          `${name} hoverForeground ${hoverForeground} on ${hover}: ${ratio.toFixed(2)}:1 < 4.5:1`
         );
       }
     });

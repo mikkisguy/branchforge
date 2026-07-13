@@ -16,23 +16,31 @@ import { isValidTheme } from "@branchforge/shared";
 export const themeConfigs: Record<ThemePalette, ThemeColors> = {
   // Forest green darkened from #40bb82 to #26714e for ≥4.5:1 white-on-green
   // button contrast while still reading as Forest green on dark UIs.
-  forest: { primary: "#26714e", hover: "#339668", foreground: "#ffffff" },
-  // Periwinkle brightened from #3d4ac2 to #5b6ae0 for ≥3:1 text contrast
-  // on dark backgrounds while keeping white foreground on buttons ≥4.5:1.
+  // Hover foregrounds are dark (#0a0a0a) so labels meet ≥4.5:1 on every
+  // hover swatch — the button lightens on hover and the text flips to dark.
+  forest: {
+    primary: "#26714e",
+    hover: "#339668",
+    foreground: "#ffffff",
+    hoverForeground: "#0a0a0a",
+  },
   periwinkle: {
     primary: "#5b6ae0",
     hover: "#727ae8",
     foreground: "#ffffff",
+    hoverForeground: "#0a0a0a",
   },
   "dark-amethyst": {
     primary: "#9549b6",
     hover: "#a960c7",
     foreground: "#ffffff",
+    hoverForeground: "#0a0a0a",
   },
   graphite: {
-    primary: "#72757d",
+    primary: "#686a71",
     hover: "#b0b7c4",
     foreground: "#ffffff",
+    hoverForeground: "#0a0a0a",
   },
 };
 
@@ -96,6 +104,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       );
       // Theme foreground color (computed per-palette for ≥4.5:1 contrast)
       root.style.setProperty("--theme-foreground", colors.foreground);
+      // Hover foreground — dark label for lighter hover swatch
+      root.style.setProperty(
+        "--theme-foreground-hover",
+        colors.hoverForeground
+      );
     }
 
     // Status colors for scene navigation
