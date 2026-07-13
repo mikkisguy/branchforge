@@ -315,7 +315,7 @@ describe("ThemeContext", () => {
       forest: { primary: "#26714e", hover: "#339668" },
       periwinkle: { primary: "#5b6ae0", hover: "#727ae8" },
       "dark-amethyst": { primary: "#9549b6", hover: "#a960c7" },
-      graphite: { primary: "#72757d", hover: "#b0b7c4" },
+      graphite: { primary: "#686a71", hover: "#b0b7c4" },
     };
 
     it.each(themes)("should have correct hardcoded colors for %s", (theme) => {

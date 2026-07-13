@@ -168,6 +168,7 @@ describe("Light mode token contrast (WCAG AA)", () => {
 
 describe("Theme color contrast (all palettes, both modes)", () => {
   const darkBg = rgbFor(DARK_TOKENS, "background");
+  const lightBg = rgbFor(LIGHT_TOKENS, "background");
 
   for (const [
     name,
@@ -201,6 +202,15 @@ describe("Theme color contrast (all palettes, both modes)", () => {
       if (ratio < 3.0) {
         throw new Error(
           `${name} ${primary} on dark bg: ${ratio.toFixed(2)}:1 < 3:1`
+        );
+      }
+    });
+
+    it(`${name}: primary text on light bg >= 3:1 (links/UI)`, () => {
+      const ratio = contrastRatioRgb(theme, lightBg);
+      if (ratio < 3.0) {
+        throw new Error(
+          `${name} ${primary} on light bg: ${ratio.toFixed(2)}:1 < 3:1`
         );
       }
     });

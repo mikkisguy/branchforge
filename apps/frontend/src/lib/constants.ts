@@ -39,5 +39,5 @@ export const themePalettes: {
   { name: "Forest", key: "forest", color: "#26714e" },
   { name: "Periwinkle", key: "periwinkle", color: "#5b6ae0" },
   { name: "Dark Amethyst", key: "dark-amethyst", color: "#9549b6" },
-  { name: "Graphite", key: "graphite", color: "#72757d" },
+  { name: "Graphite", key: "graphite", color: "#686a71" },
 ];
