@@ -79,16 +79,16 @@ export const renPyBaseTheme = EditorView.theme({
   // Selection
   ".cm-selectionBackground, .cm-selectionLayer .cm-selectionBackground": {
     backgroundColor:
-      "rgba(var(--theme-color-rgb, 61, 74, 194), 0.38) !important",
+      "rgba(var(--theme-color-rgb, 91, 106, 224), 0.38) !important",
   },
   "&.cm-focused .cm-selectionBackground, &.cm-focused .cm-selectionLayer .cm-selectionBackground":
     {
       backgroundColor:
-        "rgba(var(--theme-color-rgb, 61, 74, 194), 0.52) !important",
+        "rgba(var(--theme-color-rgb, 91, 106, 224), 0.52) !important",
     },
   ".cm-content::selection, .cm-line::selection, .cm-content *::selection": {
     backgroundColor:
-      "rgba(var(--theme-color-rgb, 61, 74, 194), 0.38) !important",
+      "rgba(var(--theme-color-rgb, 91, 106, 224), 0.38) !important",
   },
   // Cursor — use var(--theme-color) directly: ThemeContext sets it to a hex
   // value at runtime, so wrapping in hsl() would produce an invalid color.
@@ -206,8 +206,8 @@ export const renPyBaseTheme = EditorView.theme({
     fontFamily: "'Fira Code', monospace",
     letterSpacing: "0.06em",
     color: "hsl(var(--muted-foreground))",
-    backgroundColor: "rgba(var(--theme-color-rgb, 61, 74, 194), 0.08)",
-    border: "1px solid rgba(var(--theme-color-rgb, 61, 74, 194), 0.5)",
+    backgroundColor: "rgba(var(--theme-color-rgb, 91, 106, 224), 0.08)",
+    border: "1px solid rgba(var(--theme-color-rgb, 91, 106, 224), 0.5)",
     borderRadius: "9999px",
     padding: "1px 8px",
     lineHeight: "1.4",

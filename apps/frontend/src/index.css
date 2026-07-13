@@ -85,8 +85,8 @@
     --muted-foreground: 220 10% 38%;
     --accent: 220 30% 94%;
     --accent-foreground: 222 47% 11%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 72% 48%;
+    --destructive-foreground: 0 0% 98%;
     --destructive-muted: 0 75% 45%;
     --border: 214 20% 88%;
     --input: 214 20% 88%;
@@ -525,8 +525,8 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: rgba(var(--theme-color-rgb, 61, 74, 194), 0.26);
-  box-shadow: inset 2px 0 0 rgba(var(--theme-color-rgb, 61, 74, 194), 0.85);
+  background: rgba(var(--theme-color-rgb, 91, 106, 224), 0.26);
+  box-shadow: inset 2px 0 0 rgba(var(--theme-color-rgb, 91, 106, 224), 0.85);
   opacity: 0;
   transform: translateZ(0);
   will-change: opacity;
@@ -549,7 +549,7 @@
   .cm-target-line-highlight::before {
     animation: none;
     opacity: 1;
-    background: rgba(var(--theme-color-rgb, 61, 74, 194), 0.14);
-    box-shadow: inset 2px 0 0 rgba(var(--theme-color-rgb, 61, 74, 194), 0.6);
+    background: rgba(var(--theme-color-rgb, 91, 106, 224), 0.14);
+    box-shadow: inset 2px 0 0 rgba(var(--theme-color-rgb, 91, 106, 224), 0.6);
   }
 }

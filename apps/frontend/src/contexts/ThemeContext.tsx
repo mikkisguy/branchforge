@@ -14,10 +14,26 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { isValidTheme } from "@branchforge/shared";
 
 export const themeConfigs: Record<ThemePalette, ThemeColors> = {
-  forest: { primary: "#40bb82", hover: "#52c992" },
-  periwinkle: { primary: "#3d4ac2", hover: "#515fcc" },
-  "dark-amethyst": { primary: "#9549b6", hover: "#a960c7" },
-  graphite: { primary: "#72757d", hover: "#b0b7c4" },
+  // Forest green darkened from #40bb82 to #26714e for ≥4.5:1 white-on-green
+  // button contrast while still reading as Forest green on dark UIs.
+  forest: { primary: "#26714e", hover: "#339668", foreground: "#ffffff" },
+  // Periwinkle brightened from #3d4ac2 to #5b6ae0 for ≥3:1 text contrast
+  // on dark backgrounds while keeping white foreground on buttons ≥4.5:1.
+  periwinkle: {
+    primary: "#5b6ae0",
+    hover: "#727ae8",
+    foreground: "#ffffff",
+  },
+  "dark-amethyst": {
+    primary: "#9549b6",
+    hover: "#a960c7",
+    foreground: "#ffffff",
+  },
+  graphite: {
+    primary: "#72757d",
+    hover: "#b0b7c4",
+    foreground: "#ffffff",
+  },
 };
 
 // Status colors (theme-independent for semantic consistency)
@@ -78,8 +94,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         "--theme-border-subtle",
         `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`
       );
-      // Theme foreground color for buttons (always white for best contrast with theme colors)
-      root.style.setProperty("--theme-foreground", "#ffffff");
+      // Theme foreground color (computed per-palette for ≥4.5:1 contrast)
+      root.style.setProperty("--theme-foreground", colors.foreground);
     }
 
     // Status colors for scene navigation

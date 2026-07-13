@@ -6,6 +6,8 @@ export type { ThemePalette };
 interface ThemeColors {
   primary: string;
   hover: string;
+  /** Text color to use on primary background — guaranteed ≥4.5:1 contrast. */
+  foreground: string;
 }
 
 interface ThemeContextType {
