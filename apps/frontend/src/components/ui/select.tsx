@@ -1,4 +1,5 @@
 import {
+  useId,
   useState,
   useRef,
   useCallback,
@@ -26,6 +27,7 @@ interface SelectProps<T extends string = string> {
   "aria-describedby"?: string;
   "aria-label"?: string;
   "aria-labelledby"?: string;
+  "aria-required"?: boolean | "true" | "false";
 }
 
 function getDefaultPortalContainer(from: Element | null): HTMLElement {
@@ -53,10 +55,12 @@ export function Select<T extends string = string>({
   "aria-describedby": ariaDescribedby,
   "aria-label": ariaLabel,
   "aria-labelledby": ariaLabelledby,
+  "aria-required": ariaRequired,
 }: SelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+  const listboxId = useId();
   const listboxRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -212,15 +216,19 @@ export function Select<T extends string = string>({
         ref={setTriggerRef}
         id={id}
         type="button"
+        role="combobox"
         onClick={() => {
           if (!disabled) setIsOpen(!isOpen);
         }}
         disabled={disabled}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
+        aria-controls={listboxId}
         aria-describedby={ariaDescribedby}
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledby}
+        aria-required={ariaRequired}
+        aria-invalid={ariaInvalid}
         data-invalid={ariaInvalid || undefined}
         className={cn(
           "w-full flex items-center justify-between gap-2 min-h-11 px-3 py-2 rounded-lg text-sm",
@@ -267,6 +275,7 @@ export function Select<T extends string = string>({
             {/* react-doctor-disable-next-line react-doctor/prefer-tag-over-role */}
             <div
               ref={listboxRef}
+              id={listboxId}
               role="listbox"
               tabIndex={0}
               aria-label="Select option"

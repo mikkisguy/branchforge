@@ -219,6 +219,7 @@ export function VisualSystemFormContent({
             handleChange("namingTemplate", event.target.value)
           }
           disabled={isSaving}
+          aria-required="true"
           aria-invalid={!!errors.namingTemplate}
           aria-describedby={
             errors.namingTemplate
@@ -256,6 +257,7 @@ export function VisualSystemFormContent({
               { value: "1", label: "1 (e.g. 1, 2, 3)" },
               { value: "2", label: "2 (e.g. 01, 02, 03)" },
             ]}
+            aria-required="true"
             aria-invalid={!!errors.labelPadding}
             aria-describedby={
               errors.labelPadding ? "vs-label-padding-error" : undefined
@@ -282,6 +284,7 @@ export function VisualSystemFormContent({
               { value: "1", label: "1 (e.g. 1, 2, 3)" },
               { value: "2", label: "2 (e.g. 01, 02, 03)" },
             ]}
+            aria-required="true"
             aria-invalid={!!errors.counterPadding}
             aria-describedby={
               errors.counterPadding ? "vs-counter-padding-error" : undefined
@@ -307,6 +310,7 @@ export function VisualSystemFormContent({
             handleChange("jumpPrefixShared", event.target.value)
           }
           disabled={isSaving}
+          aria-required="true"
           aria-invalid={!!errors.jumpPrefixShared}
           aria-describedby={
             errors.jumpPrefixShared ? "vs-jump-prefix-error" : undefined

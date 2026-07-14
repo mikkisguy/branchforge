@@ -190,7 +190,7 @@ describe("LoginPage", () => {
       await user.click(submitButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Previous error")).toBeInTheDocument();
+        expect(screen.getAllByText("Previous error")[0]).toBeInTheDocument();
       });
 
       // Type in email - error should remain (component doesn't clear errors on input)
@@ -198,7 +198,7 @@ describe("LoginPage", () => {
       await user.type(emailInput, "a");
 
       // Error should still be visible
-      expect(screen.getByText("Previous error")).toBeInTheDocument();
+      expect(screen.getAllByText("Previous error")[0]).toBeInTheDocument();
     });
 
     it("should handle non-Error errors", async () => {

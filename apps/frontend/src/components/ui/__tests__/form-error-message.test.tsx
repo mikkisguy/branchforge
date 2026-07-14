@@ -13,16 +13,15 @@ describe("FormErrorMessage", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders the error message with role='alert'", () => {
+  it("renders the error message", () => {
     render(<FormErrorMessage id="price-error" message="Price is required" />);
-    const error = screen.getByRole("alert");
-    expect(error).toHaveTextContent("Price is required");
+    const error = screen.getByText("Price is required");
     expect(error).toHaveAttribute("id", "price-error");
   });
 
   it("applies additional className", () => {
     render(<FormErrorMessage id="x" message="Oops" className="extra" />);
-    const error = screen.getByRole("alert");
+    const error = screen.getByText("Oops");
     expect(error.className).toContain("extra");
   });
 });

@@ -371,6 +371,7 @@ export function ZipImportProjectDialog({
                       }
                       placeholder="My Visual Novel"
                       maxLength={200}
+                      aria-required="true"
                     />
                   </div>
 

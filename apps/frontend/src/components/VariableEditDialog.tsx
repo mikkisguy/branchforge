@@ -144,6 +144,7 @@ function VariableFormContent({
             value={form.key}
             onChange={(event) => handleChange("key", event.target.value)}
             disabled={isSaving || isEditMode}
+            aria-required="true"
             aria-invalid={!!errors.key}
             aria-describedby={errors.key ? "variable-key-error" : undefined}
           />

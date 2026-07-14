@@ -1,4 +1,4 @@
-import { useReducer } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useSettings } from "@/hooks/useSettings";
@@ -14,6 +14,10 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 import { InlineMessage } from "@/components/ui/inline-error";
+import {
+  Announcement,
+  type AnnouncementHandle,
+} from "@/components/ui/announcement";
 import { BASE_URL } from "@/lib/constants";
 import { APP_NAME } from "../../../lib/version";
 
@@ -65,6 +69,13 @@ export function RegisterPage() {
   const { register } = useAuth();
   const { signUpsEnabled, isLoading: settingsLoading } = useSettings();
   const [state, dispatch] = useReducer(formReducer, initialFormState);
+  const announceRef = useRef<AnnouncementHandle>(null);
+
+  useEffect(() => {
+    if (state.error) {
+      announceRef.current?.announce(state.error);
+    }
+  }, [state.error]);
 
   // Show loading state while checking settings
   if (settingsLoading) {
@@ -183,10 +194,13 @@ export function RegisterPage() {
               Register for {APP_NAME} to start creating visual novels
             </CardDescription>
           </CardHeader>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             <CardContent className="space-y-4">
+              <Announcement ref={announceRef} politeness="assertive" />
               {state.error && (
-                <InlineMessage variant="error">{state.error}</InlineMessage>
+                <div id="register-error">
+                  <InlineMessage variant="error">{state.error}</InlineMessage>
+                </div>
               )}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -199,6 +213,9 @@ export function RegisterPage() {
                     dispatch({ type: "SET_EMAIL", value: e.target.value })
                   }
                   required
+                  aria-required="true"
+                  aria-invalid={!!state.error}
+                  aria-describedby={state.error ? "register-error" : undefined}
                   disabled={state.isLoading}
                 />
               </div>
@@ -213,6 +230,9 @@ export function RegisterPage() {
                     dispatch({ type: "SET_PASSWORD", value: e.target.value })
                   }
                   required
+                  aria-required="true"
+                  aria-invalid={!!state.error}
+                  aria-describedby={state.error ? "register-error" : undefined}
                   disabled={state.isLoading}
                   minLength={8}
                 />
@@ -231,6 +251,9 @@ export function RegisterPage() {
                     })
                   }
                   required
+                  aria-required="true"
+                  aria-invalid={!!state.error}
+                  aria-describedby={state.error ? "register-error" : undefined}
                   disabled={state.isLoading}
                   minLength={8}
                 />

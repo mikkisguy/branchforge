@@ -395,6 +395,7 @@ export function CharacterEditDialog({
                   value={form.name}
                   onChange={(e) => handleFieldChange("name", e.target.value)}
                   disabled={isSaving}
+                  aria-required="true"
                   aria-invalid={!!form.nameError}
                   aria-describedby={
                     form.nameError ? "edit-char-name-error" : undefined
@@ -419,6 +420,7 @@ export function CharacterEditDialog({
                     handleFieldChange("displayName", e.target.value)
                   }
                   disabled={isSaving}
+                  aria-required="true"
                   aria-invalid={!!form.displayNameError}
                   aria-describedby={
                     form.displayNameError
@@ -448,6 +450,7 @@ export function CharacterEditDialog({
                     handleFieldChange("renpyTag", e.target.value)
                   }
                   disabled={isSaving || isEditMode}
+                  aria-required="true"
                   aria-invalid={!!form.renpyTagError}
                   aria-describedby={
                     form.renpyTagError ? "edit-char-tag-error" : undefined
@@ -474,6 +477,7 @@ export function CharacterEditDialog({
                     value={form.color}
                     onChange={(e) => handleFieldChange("color", e.target.value)}
                     disabled={isSaving}
+                    aria-required="true"
                     aria-invalid={!!form.colorError}
                     aria-describedby={
                       form.colorError ? "edit-char-color-error" : undefined
@@ -485,6 +489,7 @@ export function CharacterEditDialog({
                     value={form.color}
                     onChange={(e) => handleFieldChange("color", e.target.value)}
                     disabled={isSaving}
+                    aria-required="true"
                     aria-invalid={!!form.colorError}
                     aria-describedby={
                       form.colorError ? "edit-char-color-error" : undefined
@@ -611,7 +616,10 @@ export function CharacterEditDialog({
             </div>
 
             {/* Love Interest + Narrator */}
-            <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
+            <fieldset className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
+              <legend className="col-span-2 text-xs font-medium mb-2">
+                Character Types
+              </legend>
               <div className="flex items-center gap-2 pt-5">
                 <input
                   type="checkbox"
@@ -653,7 +661,7 @@ export function CharacterEditDialog({
                   Narrator
                 </Label>
               </div>
-            </div>
+            </fieldset>
           </div>
         </div>
 

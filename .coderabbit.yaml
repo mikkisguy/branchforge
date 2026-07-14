@@ -2,3 +2,6 @@ reviews:
   auto_review:
     ignore_title_keywords:
       - "[skip-coderabbit]"
+  tools:
+    eslint:
+      enabled: false

@@ -465,6 +465,7 @@ export function GitLabImportDialog({
                     }
                     placeholder="My Visual Novel"
                     maxLength={200}
+                    aria-required="true"
                   />
                 </div>
 
@@ -491,8 +492,9 @@ export function GitLabImportDialog({
 
               {/* Repository selection */}
               <div className="space-y-2">
-                <Label>GitLab repository *</Label>
+                <Label htmlFor="gitlab-repo-search">Search repositories</Label>
                 <Input
+                  id="gitlab-repo-search"
                   placeholder="Search repositories..."
                   value={state.searchQuery}
                   onChange={(e) =>
@@ -521,6 +523,8 @@ export function GitLabImportDialog({
                 <div
                   // react-doctor-disable-next-line react-doctor/prefer-tag-over-role
                   role="listbox"
+                  aria-label="GitLab repository"
+                  aria-required="true"
                   className="border rounded-lg max-h-[200px] overflow-y-auto"
                 >
                   {filteredRepositories.map((repo) => (

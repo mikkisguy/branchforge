@@ -419,6 +419,7 @@ export function GitLabSyncDialog({
                     dispatch({ type: "SET_USER_BRANCH", value: e.target.value })
                   }
                   disabled={state.isProcessing}
+                  aria-required="true"
                 />
                 <p className="text-xs text-muted-foreground">
                   The GitLab branch to{" "}
@@ -458,8 +459,10 @@ export function GitLabSyncDialog({
                     </div>
                   ) : (
                     // Existing data - show conflict resolution options
-                    <>
-                      <Label>Conflict Resolution</Label>
+                    <fieldset className="space-y-2">
+                      <legend className="text-sm font-medium">
+                        Conflict Resolution
+                      </legend>
                       <div className="space-y-2">
                         {CONFLICT_RESOLUTIONS.map((cr) => (
                           <button
@@ -470,6 +473,9 @@ export function GitLabSyncDialog({
                                 type: "SET_CONFLICT_RESOLUTION",
                                 value: cr.value,
                               })
+                            }
+                            aria-pressed={
+                              formState.conflictResolution === cr.value
                             }
                             className={`w-full p-3 text-left rounded-md border transition-colors ${
                               formState.conflictResolution === cr.value
@@ -485,7 +491,7 @@ export function GitLabSyncDialog({
                           </button>
                         ))}
                       </div>
-                    </>
+                    </fieldset>
                   )}
                 </div>
               )}
