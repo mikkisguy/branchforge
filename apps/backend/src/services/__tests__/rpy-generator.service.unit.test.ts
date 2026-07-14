@@ -198,5 +198,107 @@ describe("RPYGeneratorService", () => {
       );
       expect(result).not.toContain("what_italic");
     });
+
+    it("should skip character with invalid renpyTag (e.g. with spaces or special chars)", () => {
+      const characters = [
+        {
+          renpyTag: "valid_tag",
+          displayName: "Valid",
+          color: "#ffffff",
+        },
+        {
+          renpyTag: "bad tag",
+          displayName: "Bad Tag Character",
+          color: "#ff0000",
+        },
+        {
+          renpyTag: "ok",
+          displayName: "Another Valid",
+          color: "#0000ff",
+        },
+      ];
+
+      const result = generateCharacterDefinitionsFile(characters);
+
+      // Valid characters should be included
+      expect(result).toContain("valid_tag");
+      expect(result).toContain("ok");
+      // Invalid character should be skipped
+      expect(result).not.toContain("bad tag");
+      expect(result).not.toContain("Bad Tag Character");
+    });
+
+    it("should skip character with invalid color that is not a hex color", () => {
+      const characters = [
+        {
+          renpyTag: "e",
+          displayName: "Eileen",
+          color: "#c8ffc8",
+        },
+        {
+          renpyTag: "h",
+          displayName: "Hacker",
+          color: 'red") $ evil = True #',
+        },
+      ];
+
+      const result = generateCharacterDefinitionsFile(characters);
+
+      // Valid character should be included
+      expect(result).toContain("define e = Character");
+      expect(result).toContain("Eileen");
+      // Malicious character should be skipped entirely
+      expect(result).not.toContain("Hacker");
+      expect(result).not.toContain("evil = True");
+      expect(result).not.toContain('color="red');
+    });
+
+    it("should skip character with invalid renpyTag that starts with a digit", () => {
+      const characters = [
+        {
+          renpyTag: "1bad",
+          displayName: "StartsWithDigit",
+          color: "#ffffff",
+        },
+        {
+          renpyTag: "ok",
+          displayName: "Valid",
+          color: "#ffffff",
+        },
+      ];
+
+      const result = generateCharacterDefinitionsFile(characters);
+
+      expect(result).not.toContain("1bad");
+      expect(result).toContain("ok");
+    });
+
+    it("should accept valid 6-digit hex colors", () => {
+      const characters = [
+        {
+          renpyTag: "a",
+          displayName: "White",
+          color: "#ffffff",
+        },
+        {
+          renpyTag: "b",
+          displayName: "Red",
+          color: "#ff0000",
+        },
+        {
+          renpyTag: "c",
+          displayName: "Blue",
+          color: "#0000ff",
+        },
+      ];
+
+      const result = generateCharacterDefinitionsFile(characters);
+
+      expect(result).toContain(
+        'define a = Character("White", color="#ffffff")'
+      );
+      expect(result).toContain('define b = Character("Red", color="#ff0000")');
+      expect(result).toContain('define c = Character("Blue", color="#0000ff")');
+    });
   });
 });

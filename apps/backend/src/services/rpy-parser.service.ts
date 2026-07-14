@@ -416,7 +416,9 @@ export function extractDialogue(
     }
 
     // Try to match with single quotes: speaker 'text'
-    const dialogueMatch2 = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s+'(.*)'$/);
+    const dialogueMatch2 = trimmed.match(
+      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+'((?:[^'\\]|\\.)*)'$/
+    );
     if (dialogueMatch2) {
       dialogue.push({
         speaker: dialogueMatch2[1],
@@ -426,7 +428,7 @@ export function extractDialogue(
     }
 
     // Try to match narration (just text in quotes)
-    const narrationMatch = trimmed.match(/^"(.*)"$/);
+    const narrationMatch = trimmed.match(/^"((?:[^"\\]|\\.)*)"$/);
     if (narrationMatch) {
       dialogue.push({
         speaker: null,
@@ -435,7 +437,7 @@ export function extractDialogue(
       continue;
     }
 
-    const narrationMatch2 = trimmed.match(/^'(.*)'$/);
+    const narrationMatch2 = trimmed.match(/^'((?:[^'\\]|\\.)*)'$/);
     if (narrationMatch2) {
       dialogue.push({
         speaker: null,
@@ -641,10 +643,13 @@ export function extractJumps(
 
     if (!currentLabel) continue;
 
+    // Skip dynamic jumps (jump expression ...) — no static target to report
+    if (/^jump\s+expression\b/.test(trimmed)) continue;
+
     // Check for jump statement
-    const jumpMatch = trimmed.match(/^jump\s+(.+)$/);
+    const jumpMatch = trimmed.match(/^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
     if (jumpMatch) {
-      const target = jumpMatch[1].trim();
+      const target = jumpMatch[1];
       const jumpKey = `${currentLabel}->${target}`;
       if (!jumpSet.has(jumpKey)) {
         jumpSet.add(jumpKey);
@@ -652,6 +657,9 @@ export function extractJumps(
       }
       continue;
     }
+
+    // Skip dynamic calls
+    if (/^call\s+expression\b/.test(trimmed)) continue;
 
     // Check for call statement
     const callMatch = trimmed.match(/^call\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
@@ -763,6 +771,28 @@ function extractCharacters(
   let inCharacterDef = false;
   let parenDepth = 0;
 
+  function countCharOutsideStrings(s: string, ch: string): number {
+    let count = 0;
+    let inString: string | null = null;
+    for (let i = 0; i < s.length; i++) {
+      const c = s[i];
+      if (inString) {
+        if (c === "\\" && i + 1 < s.length) {
+          i++;
+        } else if (c === inString) {
+          inString = null;
+        }
+      } else {
+        if (c === '"' || c === "'") {
+          inString = c;
+        } else if (c === ch) {
+          count++;
+        }
+      }
+    }
+    return count;
+  }
+
   for (const line of lines) {
     const trimmed = line.trim();
 
@@ -774,7 +804,7 @@ function extractCharacters(
     // Check for single-line character definition
     // Format: define tag = Character("name", options...)
     const singleLineMatch = trimmed.match(
-      /define\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\(\s*"([^"]+)"(\s*,\s*([^)]*))?\s*\)/
+      /define\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\(\s*"((?:[^"\\]|\\.)*)"(\s*,\s*([^)]*))?\s*\)/
     );
     if (singleLineMatch && !trimmed.includes("\n")) {
       const tag = singleLineMatch[1];
@@ -803,13 +833,13 @@ function extractCharacters(
       const rest = multiLineStartMatch[2];
 
       // Check if name is on the same line
-      const nameMatch = rest.match(/"([^"]*)"/);
+      const nameMatch = rest.match(/"((?:[^"\\]|\\.)*)"/);
       const name = nameMatch ? nameMatch[1] : undefined;
 
       pendingCharacter = { tag, name, options: [] };
       inCharacterDef = true;
       parenDepth =
-        (rest.match(/\(/g) || []).length - (rest.match(/\)/g) || []).length;
+        countCharOutsideStrings(rest, "(") - countCharOutsideStrings(rest, ")");
 
       // Extract options from the rest of the line (excluding the name we already captured)
       if (nameMatch) {
@@ -828,14 +858,14 @@ function extractCharacters(
     // Continue multi-line character definition
     if (inCharacterDef && pendingCharacter) {
       // Track parentheses to find end of definition
-      parenDepth += (line.match(/\(/g) || []).length;
-      parenDepth -= (line.match(/\)/g) || []).length;
+      parenDepth +=
+        countCharOutsideStrings(line, "(") - countCharOutsideStrings(line, ")");
 
       // Capture options
       if (trimmed && !trimmed.startsWith("#")) {
         // Check if this line contains the name (if not already found)
         if (!pendingCharacter.name) {
-          const nameMatch = trimmed.match(/"([^"]+)"/);
+          const nameMatch = trimmed.match(/"((?:[^"\\]|\\.)*)"/);
           if (nameMatch) {
             pendingCharacter.name = nameMatch[1];
           }
@@ -1022,7 +1052,7 @@ export function parseRPYFileWithLabels(
         continue;
       }
 
-      const narrationMatch = trimmed.match(/^"(.*)"$/);
+      const narrationMatch = trimmed.match(/^"((?:[^"\\]|\\.)*)"$/);
       if (narrationMatch) {
         currentLabelData.dialogue.push({
           speaker: null,
@@ -1039,6 +1069,7 @@ export function parseRPYFileWithLabels(
 
     // Now extract choices and jumps for each label
     // We need to track which label we're in and associate choices/jumps with it
+    const labelMap = new Map(result.labels.map((l) => [l.label, l]));
     let currentLabelForTracking = "";
 
     // Reuse the pre-computed skipLines to avoid duplicating screen block logic
@@ -1058,9 +1089,7 @@ export function parseRPYFileWithLabels(
       }
 
       // Find the label data for this label
-      const labelData = result.labels.find(
-        (l) => l.label === currentLabelForTracking
-      );
+      const labelData = labelMap.get(currentLabelForTracking);
       if (!labelData) continue;
 
       // Check for menu start
@@ -1368,7 +1397,7 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
     const dialogueMatch = trimmed.match(
       /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"((?:[^"\\]|\\.)*)"$/
     );
-    const narrationMatch = trimmed.match(/^"(.*)"$/);
+    const narrationMatch = trimmed.match(/^"((?:[^"\\]|\\.)*)"$/);
 
     // Match and replace dialogue/narration both outside AND inside menu blocks.
     // Menu titles are editable entries that should be updated like any other
@@ -1630,7 +1659,10 @@ export function convertToBranchForgeFormatFromLabels(
       i <= labelEndLine && i <= originalLines.length;
       i++
     ) {
-      const constructs = extractTechnicalConstructs(originalContent!, i - 1); // 0-indexed
+      const constructs = extractTechnicalConstructsFromLines(
+        originalLines,
+        i - 1
+      ); // 0-indexed
       if (constructs.visuals && constructs.visuals.length > 0) {
         entries.push({
           type: "VISUAL",
@@ -2163,18 +2195,17 @@ export function generateRpyFile(scene: BranchForgeScene): string {
 }
 
 /**
- * Extract technical constructs from a specific line in RPY content
- * Used for displaying badges in write mode to show jumps, conditions, visuals, etc.
+ * Extract technical constructs from a specific line in RPY content.
+ * Internal version that accepts pre-split lines to avoid repeated splitting.
  *
- * @param rpyContent - Full RPY file content
+ * @param lines - Pre-split RPY file lines
  * @param lineNumber - Line number to analyze (0-based)
  * @returns Technical constructs found at or related to this line
  */
-export function extractTechnicalConstructs(
-  rpyContent: string,
+function extractTechnicalConstructsFromLines(
+  lines: string[],
   lineNumber: number
 ): TechnicalConstructs {
-  const lines = rpyContent.split("\n");
   const constructs: TechnicalConstructs = {};
 
   // Bounds check
@@ -2472,6 +2503,25 @@ export function extractTechnicalConstructs(
   }
 
   return constructs;
+}
+
+/**
+ * Extract technical constructs from a specific line in RPY content.
+ * Public wrapper that splits content into lines and delegates to the
+ * internal implementation.
+ *
+ * @param rpyContent - Full RPY file content
+ * @param lineNumber - Line number to analyze (0-based)
+ * @returns Technical constructs found at or related to this line
+ */
+export function extractTechnicalConstructs(
+  rpyContent: string,
+  lineNumber: number
+): TechnicalConstructs {
+  return extractTechnicalConstructsFromLines(
+    rpyContent.split("\n"),
+    lineNumber
+  );
 }
 
 /**

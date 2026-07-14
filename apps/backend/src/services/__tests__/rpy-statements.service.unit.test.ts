@@ -381,6 +381,14 @@ describe("rpy-statements.service", () => {
       ]);
     });
 
+    it("should handle parens inside quoted display names in Character definitions", () => {
+      const content = `define c = Character("Name (with parens)", color="#fff")`;
+      const result = extractAndStripRpySymbols(content);
+      expect(result.characters).toHaveLength(1);
+      expect(result.characters[0].tag).toBe("c");
+      expect(result.characters[0].name).toBe("Name (with parens)");
+    });
+
     it("preserves dialogue lines that look like assigns but are not define/default", () => {
       const content = [
         "label start:",

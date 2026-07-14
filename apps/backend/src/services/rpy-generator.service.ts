@@ -17,6 +17,7 @@ import { RENPY_LABEL_REGEX, type VariableCondition } from "@branchforge/shared";
  * This prevents code injection through malicious variable names
  */
 const RENPY_IDENTIFIER_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+const RENPY_HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
 
 /**
  * Type guard to validate a Ren'Py identifier
@@ -645,6 +646,18 @@ export function generateCharacterDefinitionsFile(
   lines.push("");
 
   for (const char of characters) {
+    if (!isValidRenpyIdentifier(char.renpyTag)) {
+      console.warn(
+        `Skipping character: invalid renpyTag ${JSON.stringify(char.renpyTag)} (display name: ${JSON.stringify(char.displayName)})`
+      );
+      continue;
+    }
+    if (!RENPY_HEX_COLOR_REGEX.test(char.color)) {
+      console.warn(
+        `Skipping character: invalid color ${JSON.stringify(char.color)} (tag: ${JSON.stringify(char.renpyTag)}, display name: ${JSON.stringify(char.displayName)})`
+      );
+      continue;
+    }
     const escapedName = escapeRenpyString(char.displayName);
     const italicArg = char.isNarrator ? ", what_italic=True" : "";
     lines.push(

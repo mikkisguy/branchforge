@@ -251,6 +251,15 @@ label START:
       expect(dialogue[0].text).toBe('She said "Hello" to me');
     });
 
+    it("single-quote dialogue should handle escaped single quotes", () => {
+      const dialogue = extractDialogue(`label start:
+    e 'it\\'s a test'
+`);
+      expect(dialogue).toHaveLength(1);
+      expect(dialogue[0].speaker).toBe("e");
+      expect(dialogue[0].text).toBe("it\\'s a test");
+    });
+
     it("should handle triple-quoted dialogue", () => {
       const tripleQuotedRPY = `label start:
     s """
@@ -373,14 +382,13 @@ label ending:
     });
 
     it("should handle jumps with expressions", () => {
+      // "jump expression" is a dynamic target — no static label edge
       const expressionJumpRPY = `label start:
     jump expression "chapter_" + str(1)
 `;
       const jumps = extractJumps(expressionJumpRPY);
 
-      expect(jumps).toHaveLength(1);
-      expect(jumps[0].to).toContain("chapter_");
-      expect(jumps[0].from).toBe("start");
+      expect(jumps).toHaveLength(0);
     });
 
     it("should handle if statements", () => {
@@ -429,6 +437,17 @@ label next:
       expect(jumps).toHaveLength(1);
       expect(jumps[0].to).toBe("__return__");
       expect(jumps[0].from).toBe("start");
+    });
+
+    it("extractJumps should not capture inline comments as part of jump target", () => {
+      const content = `label start:
+    jump chapter1 # go to this chapter
+`;
+      const jumps = extractJumps(content);
+      expect(jumps).toHaveLength(1);
+      expect(jumps[0].to).toBe("chapter1");
+      expect(jumps[0].to).not.toContain("#");
+      expect(jumps[0].to).not.toContain("go to");
     });
   });
 
@@ -609,6 +628,15 @@ label start:
       expect(result.characters).toHaveLength(1);
       expect(result.characters[0].tag).toBe("s");
       expect(result.characters[0].name).toBe("Sylvie");
+    });
+
+    it("extractCharacters should handle parens inside quoted display names", () => {
+      const content = `define c = Character("Name (with parens)", color="#fff")`;
+      const result = parseRPYContent(content);
+      expect(result.characters).toHaveLength(1);
+      expect(result.characters[0].tag).toBe("c");
+      expect(result.characters[0].name).toBe("Name (with parens)");
+      expect(result.characters[0].color).toBe("#fff");
     });
 
     it("should parse labels with their dialogue", () => {
