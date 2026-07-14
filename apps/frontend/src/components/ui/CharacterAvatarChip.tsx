@@ -28,7 +28,7 @@ export function CharacterAvatarChip({
       {onClick ? (
         <button
           type="button"
-          className={`size-8 rounded-full flex items-center justify-center text-white text-xs font-medium shrink-0 shadow-sm hover:ring-2 hover:ring-ring transition-all cursor-pointer border-0 p-0`}
+          className={`size-8 rounded-full flex items-center justify-center text-white text-xs font-medium shrink-0 shadow-sm hover:ring-2 hover:ring-ring transition-all cursor-pointer border-0 p-0 focus-ring`}
           style={{ backgroundColor: character.color }}
           aria-label={
             character.isLoveInterest

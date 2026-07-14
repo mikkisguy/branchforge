@@ -203,14 +203,12 @@ export function Tooltip({
       ...child.props,
       onMouseEnter: mergeHandlers(
         child.props.onMouseEnter as
-          | ((e: React.MouseEvent) => unknown)
-          | undefined,
+          ((e: React.MouseEvent) => unknown) | undefined,
         handleMouseEnter
       ),
       onMouseLeave: mergeHandlers(
         child.props.onMouseLeave as
-          | ((e: React.MouseEvent) => unknown)
-          | undefined,
+          ((e: React.MouseEvent) => unknown) | undefined,
         handleMouseLeave
       ),
       onFocus: mergeHandlers(
@@ -223,8 +221,7 @@ export function Tooltip({
       ),
       onKeyDown: mergeHandlers(
         child.props.onKeyDown as
-          | ((e: React.KeyboardEvent) => unknown)
-          | undefined,
+          ((e: React.KeyboardEvent) => unknown) | undefined,
         handleKeyDown
       ),
       "aria-describedby": isVisible ? tooltipId : undefined,
@@ -265,7 +262,7 @@ export function Tooltip({
       onFocus={showTooltip}
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
-      className={cn("inline-block", triggerClassName)}
+      className={cn("inline-block focus-ring rounded-sm", triggerClassName)}
       aria-describedby={isVisible ? tooltipId : undefined}
     >
       {children}

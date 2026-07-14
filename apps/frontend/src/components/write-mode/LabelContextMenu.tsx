@@ -199,7 +199,7 @@ export function LabelContextMenu({
           type="button"
           className={`flex items-center gap-2 px-3 py-2 text-sm cursor-pointer transition-colors w-full text-left ${
             item.destructive
-              ? "text-destructive-muted hover:bg-destructive/10 focus:bg-destructive/10"
+              ? "text-destructive-muted hover:bg-destructive/10 focus-visible:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive-muted/40 focus-visible:ring-offset-2 focus-visible:ring-offset-popover"
               : "hover:bg-accent/50"
           } ${
             focusedIndex === index

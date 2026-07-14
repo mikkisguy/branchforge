@@ -77,7 +77,7 @@ export function DialogShell({
           <button
             type="button"
             onClick={() => handleOpenChange(false)}
-            className="inline-flex items-center justify-center size-11 text-muted-foreground hover:text-foreground transition-colors rounded-md"
+            className="inline-flex items-center justify-center size-11 text-muted-foreground hover:text-foreground transition-colors rounded-md focus-ring"
             aria-label={closeLabel}
           >
             <X className="size-5" />
