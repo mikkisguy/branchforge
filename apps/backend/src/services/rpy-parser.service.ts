@@ -402,10 +402,10 @@ export function extractDialogue(
     // Regex breakdown:
     // ^([a-zA-Z_][a-zA-Z0-9_]*) - Speaker tag (identifier starting with letter/underscore)
     // \s+ - Whitespace separator
-    // "((?:[^"\\]|\\.)*)" - Quoted text allowing escaped characters (\")
-    // The (?:[^"\\]|\\.)* pattern matches: non-quote/non-backslash OR escaped char
+    // "([^"\\]*(?:\\.[^"\\]*)*)" - Quoted text allowing escaped characters (\")
+    // The [^"\\]*(?:\\.[^"\\]*)* pattern matches: non-quote/non-backslash OR escaped char
     const dialogueMatch = trimmed.match(
-      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"((?:[^"\\]|\\.)*)"$/
+      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"([^"\\]*(?:\\.[^"\\]*)*)"$/
     );
     if (dialogueMatch) {
       dialogue.push({
@@ -417,7 +417,7 @@ export function extractDialogue(
 
     // Try to match with single quotes: speaker 'text'
     const dialogueMatch2 = trimmed.match(
-      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+'((?:[^'\\]|\\.)*)'$/
+      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+'([^'\\]*(?:\\.[^'\\]*)*)'$/
     );
     if (dialogueMatch2) {
       dialogue.push({
@@ -428,7 +428,7 @@ export function extractDialogue(
     }
 
     // Try to match narration (just text in quotes)
-    const narrationMatch = trimmed.match(/^"((?:[^"\\]|\\.)*)"$/);
+    const narrationMatch = trimmed.match(/^"([^"\\]*(?:\\.[^"\\]*)*)"$/);
     if (narrationMatch) {
       dialogue.push({
         speaker: null,
@@ -437,7 +437,7 @@ export function extractDialogue(
       continue;
     }
 
-    const narrationMatch2 = trimmed.match(/^'((?:[^'\\]|\\.)*)'$/);
+    const narrationMatch2 = trimmed.match(/^'([^'\\]*(?:\\.[^'\\]*)*)'$/);
     if (narrationMatch2) {
       dialogue.push({
         speaker: null,
@@ -804,7 +804,7 @@ function extractCharacters(
     // Check for single-line character definition
     // Format: define tag = Character("name", options...)
     const singleLineMatch = trimmed.match(
-      /define\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\(\s*"((?:[^"\\]|\\.)*)"(\s*,\s*([^)]*))?\s*\)/
+      /define\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\(\s*"([^"\\]*(?:\\.[^"\\]*)*)"(\s*,\s*([^)]*))?\s*\)/
     );
     if (singleLineMatch && !trimmed.includes("\n")) {
       const tag = singleLineMatch[1];
@@ -833,7 +833,7 @@ function extractCharacters(
       const rest = multiLineStartMatch[2];
 
       // Check if name is on the same line
-      const nameMatch = rest.match(/"((?:[^"\\]|\\.)*)"/);
+      const nameMatch = rest.match(/"([^"\\]*(?:\\.[^"\\]*)*)"/);
       const name = nameMatch ? nameMatch[1] : undefined;
 
       pendingCharacter = { tag, name, options: [] };
@@ -865,7 +865,7 @@ function extractCharacters(
       if (trimmed && !trimmed.startsWith("#")) {
         // Check if this line contains the name (if not already found)
         if (!pendingCharacter.name) {
-          const nameMatch = trimmed.match(/"((?:[^"\\]|\\.)*)"/);
+          const nameMatch = trimmed.match(/"([^"\\]*(?:\\.[^"\\]*)*)"/);
           if (nameMatch) {
             pendingCharacter.name = nameMatch[1];
           }
@@ -1041,7 +1041,7 @@ export function parseRPYFileWithLabels(
 
       // Extract dialogue
       const dialogueMatch = trimmed.match(
-        /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"((?:[^"\\]|\\.)*)"$/
+        /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"([^"\\]*(?:\\.[^"\\]*)*)"$/
       );
       if (dialogueMatch) {
         currentLabelData.dialogue.push({
@@ -1052,7 +1052,7 @@ export function parseRPYFileWithLabels(
         continue;
       }
 
-      const narrationMatch = trimmed.match(/^"((?:[^"\\]|\\.)*)"$/);
+      const narrationMatch = trimmed.match(/^"([^"\\]*(?:\\.[^"\\]*)*)"$/);
       if (narrationMatch) {
         currentLabelData.dialogue.push({
           speaker: null,
@@ -1395,9 +1395,9 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
 
     // Check if this is a dialogue line
     const dialogueMatch = trimmed.match(
-      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"((?:[^"\\]|\\.)*)"$/
+      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"([^"\\]*(?:\\.[^"\\]*)*)"$/
     );
-    const narrationMatch = trimmed.match(/^"((?:[^"\\]|\\.)*)"$/);
+    const narrationMatch = trimmed.match(/^"([^"\\]*(?:\\.[^"\\]*)*)"$/);
 
     // Match and replace dialogue/narration both outside AND inside menu blocks.
     // Menu titles are editable entries that should be updated like any other
@@ -2054,7 +2054,7 @@ export function replaceLabelDialogue(
 
       // Skip dialogue lines within the target label (they'll be replaced)
       const dialogueMatch = trimmed.match(
-        /^(?:([a-zA-Z_][a-zA-Z0-9_]*)\s+)?"((?:[^"\\]|\\.)*)"$/
+        /^(?:([a-zA-Z_][a-zA-Z0-9_]*)\s+)?"([^"\\]*(?:\\.[^"\\]*)*)"$/
       );
       if (dialogueMatch && trimmed !== '" "') {
         // This is a dialogue line - skip it
