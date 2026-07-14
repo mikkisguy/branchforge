@@ -43,6 +43,7 @@ export function PaletteSwitcher({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const focusedIndexRef = useRef<number>(-1);
   const closeReasonRef = useRef<"keyboard" | "mouse">("keyboard");
+  const hasOpenedRef = useRef(false);
 
   useEffect(() => {
     applyPalette(PALETTES[selectedIndex]);
@@ -96,24 +97,22 @@ export function PaletteSwitcher({
   );
 
   // Focus management when dropdown opens/closes
+  // State updates are co-located with setIsOpen in the event handlers;
+  // this effect handles only ref sync and DOM focus side-effects.
   useEffect(() => {
     if (isOpen) {
-      const currentIdx = flatIndexForSelected >= 0 ? flatIndexForSelected : 0;
-      focusedIndexRef.current = currentIdx;
-      setFocusedIndex(currentIdx);
-      // Reset close reason when opening
       closeReasonRef.current = "keyboard";
+      hasOpenedRef.current = true;
       // Focus the listbox when opened (preventScroll avoids viewport jump)
       listboxRef.current?.focus({ preventScroll: true });
     } else {
       focusedIndexRef.current = -1;
-      setFocusedIndex(-1);
-      // Only restore focus to button when closed via keyboard
-      if (closeReasonRef.current === "keyboard") {
+      // Only restore focus to button when closed via keyboard after a real open
+      if (closeReasonRef.current === "keyboard" && hasOpenedRef.current) {
         buttonRef.current?.focus({ preventScroll: true });
       }
     }
-  }, [isOpen, flatIndexForSelected]);
+  }, [isOpen]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     setIsKeyboardNav(true);
@@ -121,6 +120,9 @@ export function PaletteSwitcher({
     if (!isOpen) {
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
+        const currentIdx = flatIndexForSelected >= 0 ? flatIndexForSelected : 0;
+        focusedIndexRef.current = currentIdx;
+        setFocusedIndex(currentIdx);
         setIsOpen(true);
       }
       return;

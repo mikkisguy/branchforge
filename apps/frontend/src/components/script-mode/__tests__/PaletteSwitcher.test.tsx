@@ -189,4 +189,11 @@ describe("PaletteSwitcher", () => {
     // First option should be selected (index 0 is Mixed)
     expect(options[0]).toHaveAttribute("aria-selected", "true");
   });
+
+  it("does not steal focus on initial mount", () => {
+    render(<PaletteSwitcher />);
+
+    const button = screen.getByRole("button", { name: /syntax palette/i });
+    expect(document.activeElement).not.toBe(button);
+  });
 });
