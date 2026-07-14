@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { Palette } from "lucide-react";
 import {
   PALETTES,
@@ -13,6 +13,10 @@ interface PaletteSwitcherProps {
 
 /**
  * Palette switcher for syntax highlighting colors
+ *
+ * Supports full keyboard navigation: ArrowDown/ArrowUp/Home/End to
+ * move between palette items, Enter/Space to select, Escape to close.
+ * Follows the same listbox pattern as FontSizeSwitcher and FontFamilySwitcher.
  */
 export function PaletteSwitcher({
   direction = "up",
@@ -25,15 +29,24 @@ export function PaletteSwitcher({
     }
   );
   const [isOpen, setIsOpen] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState<number>(-1);
+  const [isKeyboardNav, setIsKeyboardNav] = useState(false);
+  const listboxRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const focusedIndexRef = useRef<number>(-1);
+  const closeReasonRef = useRef<"keyboard" | "mouse">("keyboard");
 
   useEffect(() => {
     applyPalette(PALETTES[selectedIndex]);
   }, [selectedIndex]);
 
-  const handleSelect = (index: number) => {
-    setSelectedIndex(index);
-    setIsOpen(false);
-  };
+  const handleSelect = useCallback(
+    (index: number) => {
+      setSelectedIndex(index);
+      setIsOpen(false);
+    },
+    [setSelectedIndex]
+  );
 
   // Group palettes by their group field
   const groupedPalettes = useMemo(() => {
@@ -54,14 +67,138 @@ export function PaletteSwitcher({
     return groups;
   }, []);
 
+  // Flat list of all palette items for keyboard navigation (skips group headers)
+  const flatItems = useMemo(() => {
+    const items: Array<{
+      name: string;
+      indicator: string;
+      originalIndex: number;
+    }> = [];
+    for (const palettes of Object.values(groupedPalettes)) {
+      for (const p of palettes) {
+        items.push(p);
+      }
+    }
+    return items;
+  }, [groupedPalettes]);
+
+  const flatIndexForSelected = useMemo(
+    () => flatItems.findIndex((item) => item.originalIndex === selectedIndex),
+    [flatItems, selectedIndex]
+  );
+
+  // Focus management when dropdown opens/closes
+  useEffect(() => {
+    if (isOpen) {
+      const currentIdx = flatIndexForSelected >= 0 ? flatIndexForSelected : 0;
+      focusedIndexRef.current = currentIdx;
+      setFocusedIndex(currentIdx);
+      // Reset close reason when opening
+      closeReasonRef.current = "keyboard";
+      // Focus the listbox when opened
+      listboxRef.current?.focus();
+    } else {
+      focusedIndexRef.current = -1;
+      setFocusedIndex(-1);
+      // Only restore focus to button when closed via keyboard
+      if (closeReasonRef.current === "keyboard") {
+        buttonRef.current?.focus();
+      }
+    }
+  }, [isOpen, flatIndexForSelected]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    setIsKeyboardNav(true);
+
+    if (!isOpen) {
+      if (
+        e.key === "ArrowDown" ||
+        e.key === "ArrowUp" ||
+        e.key === "Enter" ||
+        e.key === " "
+      ) {
+        e.preventDefault();
+        setIsOpen(true);
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case "Escape":
+        e.preventDefault();
+        closeReasonRef.current = "keyboard";
+        setIsOpen(false);
+        break;
+      case "ArrowDown":
+        e.preventDefault();
+        focusedIndexRef.current = Math.min(
+          focusedIndexRef.current + 1,
+          flatItems.length - 1
+        );
+        setFocusedIndex(focusedIndexRef.current);
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        focusedIndexRef.current = Math.max(focusedIndexRef.current - 1, 0);
+        setFocusedIndex(focusedIndexRef.current);
+        break;
+      case "Enter":
+      case " ":
+        e.preventDefault();
+        if (
+          focusedIndexRef.current >= 0 &&
+          focusedIndexRef.current < flatItems.length
+        ) {
+          closeReasonRef.current = "keyboard";
+          handleSelect(flatItems[focusedIndexRef.current].originalIndex);
+        }
+        break;
+      case "Home":
+        e.preventDefault();
+        focusedIndexRef.current = 0;
+        setFocusedIndex(0);
+        break;
+      case "End":
+        e.preventDefault();
+        focusedIndexRef.current = flatItems.length - 1;
+        setFocusedIndex(flatItems.length - 1);
+        break;
+    }
+  };
+
+  const handleMouseDown = () => {
+    setIsKeyboardNav(false);
+  };
+
+  const closeOnFocusLeave = (e: React.FocusEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      closeReasonRef.current = "mouse";
+      setIsOpen(false);
+    }
+  };
+
   const dropdownPositionClasses =
     direction === "up" ? "bottom-full left-0 mb-1" : "top-full mt-1";
 
+  // Compute the current focused index for aria-activedescendant
+  const currentFocusedIndex = isKeyboardNav
+    ? focusedIndex
+    : flatIndexForSelected;
+
   return (
-    <div className="relative z-50 flex items-center gap-2">
+    <div
+      className="relative z-50 flex items-center gap-2"
+      onBlur={closeOnFocusLeave}
+    >
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
+        onKeyDown={handleKeyDown}
+        onMouseDown={handleMouseDown}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        aria-labelledby="palette-switcher-label"
         className="px-3 py-1.5 text-xs font-code bg-muted/50 hover:bg-muted border border-border rounded flex items-center gap-2 transition-colors"
         title="Change syntax colors"
       >
@@ -70,7 +207,10 @@ export function PaletteSwitcher({
           className="size-2 rounded-full"
           style={{ backgroundColor: PALETTES[selectedIndex].indicator }}
         />
-        <span>{PALETTES[selectedIndex].name}</span>
+        <span id="palette-switcher-label" className="sr-only">
+          Syntax palette: {PALETTES[selectedIndex].name}
+        </span>
+        <span aria-hidden="true">{PALETTES[selectedIndex].name}</span>
         <svg
           className={`size-3 transition-transform ${
             isOpen
@@ -84,6 +224,7 @@ export function PaletteSwitcher({
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
+          aria-hidden="true"
         >
           <path
             strokeLinecap="round"
@@ -97,36 +238,68 @@ export function PaletteSwitcher({
       {isOpen && (
         <>
           <div
-            className="fixed inset-0"
+            className="fixed inset-0 z-40"
             aria-hidden="true"
-            onClick={() => setIsOpen(false)}
+            onClick={() => {
+              closeReasonRef.current = "mouse";
+              setIsOpen(false);
+            }}
           />
           <div
-            className={`absolute ${dropdownPositionClasses} bg-popover border border-border/70 rounded-lg shadow-xl shadow-black/25 ring-1 ring-white/5 overflow-hidden min-w-[200px] animate-in fade-in-0 zoom-in-95 duration-150`}
+            ref={listboxRef}
+            // react-doctor-disable-next-line react-doctor/prefer-tag-over-role
+            role="listbox"
+            tabIndex={0}
+            aria-label="Syntax palette options"
+            aria-activedescendant={
+              currentFocusedIndex >= 0
+                ? `palette-option-${currentFocusedIndex}`
+                : undefined
+            }
+            className={`absolute z-50 ${dropdownPositionClasses} bg-popover border border-border/70 rounded-lg shadow-xl shadow-black/25 ring-1 ring-white/5 overflow-hidden min-w-[200px] animate-in fade-in-0 zoom-in-95 duration-150`}
+            onKeyDown={handleKeyDown}
           >
             {Object.entries(groupedPalettes).map(([groupName, palettes]) => (
               <div key={groupName}>
                 <div className="px-3 py-1 text-xs font-semibold text-muted-foreground bg-muted/30">
                   {groupName}
                 </div>
-                {palettes.map((palette) => (
-                  <button
-                    type="button"
-                    key={palette.originalIndex}
-                    onClick={() => handleSelect(palette.originalIndex)}
-                    className={`w-full px-3 py-2 text-left text-xs font-code hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2 ${
-                      palette.originalIndex === selectedIndex
-                        ? "bg-accent/50"
-                        : ""
-                    }`}
-                  >
-                    <span
-                      className="size-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: palette.indicator }}
-                    />
-                    <span className="truncate">{palette.name}</span>
-                  </button>
-                ))}
+                {palettes.map((palette) => {
+                  const flatIdx = flatItems.findIndex(
+                    (item) => item.originalIndex === palette.originalIndex
+                  );
+                  return (
+                    <button
+                      key={palette.originalIndex}
+                      id={`palette-option-${flatIdx}`}
+                      type="button"
+                      role="option"
+                      aria-selected={palette.originalIndex === selectedIndex}
+                      onClick={() => {
+                        closeReasonRef.current = "mouse";
+                        handleSelect(palette.originalIndex);
+                      }}
+                      tabIndex={-1}
+                      className={`w-full px-3 py-2 text-left text-xs font-code hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2 ${
+                        palette.originalIndex === selectedIndex
+                          ? "bg-accent/50"
+                          : ""
+                      } ${
+                        isKeyboardNav && flatIdx === currentFocusedIndex
+                          ? "outline outline-2 outline-offset-[-2px]"
+                          : ""
+                      }`}
+                    >
+                      <span
+                        className="size-3 rounded-full flex-shrink-0"
+                        style={{
+                          backgroundColor: palette.indicator,
+                        }}
+                      />
+                      <span className="truncate">{palette.name}</span>
+                    </button>
+                  );
+                })}
               </div>
             ))}
           </div>
