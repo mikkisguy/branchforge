@@ -474,6 +474,9 @@ export function GitLabSyncDialog({
                                 value: cr.value,
                               })
                             }
+                            aria-pressed={
+                              formState.conflictResolution === cr.value
+                            }
                             className={`w-full p-3 text-left rounded-md border transition-colors ${
                               formState.conflictResolution === cr.value
                                 ? "border-primary bg-primary/10"

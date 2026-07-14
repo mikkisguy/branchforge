@@ -71,7 +71,7 @@ export function LoginPage() {
           </CardHeader>
           <form onSubmit={handleSubmit} noValidate>
             <CardContent className="space-y-4">
-              <Announcement ref={announceRef} />
+              <Announcement ref={announceRef} politeness="assertive" />
               {error && <FormErrorMessage id="login-error" message={error} />}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>

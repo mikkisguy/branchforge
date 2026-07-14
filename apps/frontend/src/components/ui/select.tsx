@@ -228,6 +228,7 @@ export function Select<T extends string = string>({
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledby}
         aria-required={ariaRequired}
+        aria-invalid={ariaInvalid}
         data-invalid={ariaInvalid || undefined}
         className={cn(
           "w-full flex items-center justify-between gap-2 min-h-11 px-3 py-2 rounded-lg text-sm",

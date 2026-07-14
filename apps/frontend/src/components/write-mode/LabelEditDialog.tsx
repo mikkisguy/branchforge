@@ -311,7 +311,7 @@ export function LabelEditDialog({
           {currentLabelName !== null && (
             <div className="space-y-1.5">
               <Label htmlFor="label-name" className="text-xs">
-                Label Name
+                Label Name *
               </Label>
               <Input
                 id="label-name"
@@ -325,6 +325,7 @@ export function LabelEditDialog({
                 disabled={isSaving}
                 placeholder={currentLabelName}
                 className="font-mono"
+                aria-required="true"
                 aria-invalid={!!form.labelNameError}
                 aria-describedby={
                   form.labelNameError ? "label-name-error" : undefined
@@ -413,12 +414,12 @@ export function LabelEditDialog({
           {/* Duo Pair Group (only shown when duo ending is enabled and pair groups exist) */}
           {duoEndingEnabled && pairGroups.length > 0 && (
             <div className="space-y-1.5">
-              <label
+              <Label
                 htmlFor="label-duo-pair-id"
                 className="text-sm font-medium text-foreground"
               >
                 Duo Pair Group
-              </label>
+              </Label>
               <Select
                 id="label-duo-pair-id"
                 value={form.duoPairId}

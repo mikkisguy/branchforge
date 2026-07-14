@@ -617,7 +617,7 @@ export function CharacterEditDialog({
 
             {/* Love Interest + Narrator */}
             <fieldset className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
-              <legend className="text-xs font-medium mb-2">
+              <legend className="col-span-2 text-xs font-medium mb-2">
                 Character Types
               </legend>
               <div className="flex items-center gap-2 pt-5">

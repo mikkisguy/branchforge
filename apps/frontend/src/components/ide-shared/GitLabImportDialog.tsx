@@ -492,8 +492,9 @@ export function GitLabImportDialog({
 
               {/* Repository selection */}
               <div className="space-y-2">
-                <Label>GitLab repository *</Label>
+                <Label htmlFor="gitlab-repo-search">GitLab repository *</Label>
                 <Input
+                  id="gitlab-repo-search"
                   placeholder="Search repositories..."
                   value={state.searchQuery}
                   onChange={(e) =>
@@ -502,7 +503,6 @@ export function GitLabImportDialog({
                       payload: e.target.value,
                     })
                   }
-                  aria-label="GitLab repository"
                 />
               </div>
 

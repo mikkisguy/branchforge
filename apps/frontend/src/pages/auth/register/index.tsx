@@ -196,7 +196,7 @@ export function RegisterPage() {
           </CardHeader>
           <form onSubmit={handleSubmit} noValidate>
             <CardContent className="space-y-4">
-              <Announcement ref={announceRef} />
+              <Announcement ref={announceRef} politeness="assertive" />
               {state.error && (
                 <div id="register-error">
                   <InlineMessage variant="error">{state.error}</InlineMessage>
