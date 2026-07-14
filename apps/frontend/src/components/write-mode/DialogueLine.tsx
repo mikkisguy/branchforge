@@ -832,7 +832,7 @@ export const DialogueLine = memo(function DialogueLine({
                     ? "Edit dialogue text"
                     : "Edit narration text"
               }
-              className="absolute inset-0 pr-7 cursor-text leading-8 text-left bg-transparent border-0 p-0 outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm overflow-hidden"
+              className="absolute inset-0 pr-7 cursor-text leading-8 text-left bg-transparent border-0 p-0 outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm overflow-hidden inline-flex items-start"
               style={{
                 fontSize: "var(--prose-editor-font-size, 16px)",
                 fontFamily: "var(--prose-editor-font-family, var(--font-sans))",

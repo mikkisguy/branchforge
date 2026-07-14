@@ -513,6 +513,22 @@
       var(--surface-tint, transparent)
     );
   }
+
+  /* Reusable focus-ring utility for interactive components. Applies a
+     2px ring using --ring (light gray in dark mode, near-black in light
+     mode) with a 2px offset to create a visible gap. Suppresses the
+     native browser outline since the ring serves as the focus indicator.
+     Components that need theme-colored focus (inputs, switches) should
+     continue using their own ring color instead of this utility. */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+}
+
+@media (forced-colors: active) {
+  .focus-ring:focus-visible {
+    outline: 2px solid ButtonText;
+  }
 }
 
 /* Target line highlight animation */

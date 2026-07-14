@@ -234,7 +234,7 @@ export function Select<T extends string = string>({
           "w-full flex items-center justify-between gap-2 min-h-11 px-3 py-2 rounded-lg text-sm",
           "bg-popover border border-border/70",
           "cursor-pointer transition-colors",
-          "text-foreground",
+          "text-foreground focus-ring",
           !disabled && "hover:bg-popover hover:border-[var(--theme-color)]/40",
           disabled && "opacity-50 cursor-not-allowed"
         )}
