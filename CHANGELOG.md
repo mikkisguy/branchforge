@@ -4,6 +4,16 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.13.0 - 2026-07-14
+
+- Made the app shell significantly more mobile-responsive
+- Added a mobile overflow menu and improved mobile-safe layouts
+- Improved form accessibility
+- Overhauled keyboard navigation
+- Improved screen reader support
+- Fixed contrast errors
+- Changed dialogue style to more generic notes on the character info
+
 ## v0.12.0 - 2026-07-06
 
 - Added dark/light mode toggle, tuned color tokens
