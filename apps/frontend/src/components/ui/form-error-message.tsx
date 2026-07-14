@@ -16,7 +16,11 @@ export function FormErrorMessage({
   }
 
   return (
-    <p id={id} className={cn("text-xs text-destructive mt-1", className)}>
+    <p
+      id={id}
+      role="alert"
+      className={cn("text-xs text-destructive mt-1", className)}
+    >
       {message}
     </p>
   );

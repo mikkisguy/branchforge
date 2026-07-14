@@ -492,7 +492,7 @@ export function GitLabImportDialog({
 
               {/* Repository selection */}
               <div className="space-y-2">
-                <Label htmlFor="gitlab-repo-search">GitLab repository *</Label>
+                <Label htmlFor="gitlab-repo-search">Search repositories</Label>
                 <Input
                   id="gitlab-repo-search"
                   placeholder="Search repositories..."
@@ -523,6 +523,8 @@ export function GitLabImportDialog({
                 <div
                   // react-doctor-disable-next-line react-doctor/prefer-tag-over-role
                   role="listbox"
+                  aria-label="GitLab repository"
+                  aria-required="true"
                   className="border rounded-lg max-h-[200px] overflow-y-auto"
                 >
                   {filteredRepositories.map((repo) => (
