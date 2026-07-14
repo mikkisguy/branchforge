@@ -793,6 +793,29 @@ function extractCharacters(
     return count;
   }
 
+  // Extract the first double-quoted string from s (with escape handling).
+  // Returns the content and the index after the closing quote, or null.
+  function extractFirstQuotedString(
+    s: string
+  ): { content: string; endIndex: number } | null {
+    const startIdx = s.indexOf('"');
+    if (startIdx === -1) return null;
+    let i = startIdx + 1;
+    let result = "";
+    while (i < s.length) {
+      if (s[i] === "\\" && i + 1 < s.length) {
+        result += s[i + 1];
+        i += 2;
+      } else if (s[i] === '"') {
+        return { content: result, endIndex: i + 1 };
+      } else {
+        result += s[i];
+        i++;
+      }
+    }
+    return null; // unclosed quote
+  }
+
   for (const line of lines) {
     const trimmed = line.trim();
 
@@ -804,24 +827,35 @@ function extractCharacters(
     // Check for single-line character definition
     // Format: define tag = Character("name", options...)
     const singleLineMatch = trimmed.match(
-      /define\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\(\s*"([^"\\]*(?:\\.[^"\\]*)*)"(\s*,\s*([^)]*))?\s*\)/
+      /define\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\(\s*/
     );
-    if (singleLineMatch && !trimmed.includes("\n")) {
+    if (singleLineMatch) {
       const tag = singleLineMatch[1];
-      const name = singleLineMatch[2];
-      const options = singleLineMatch[4]; // May be undefined if no options
+      const afterPrefix = trimmed.slice(singleLineMatch[0].length);
 
-      // Extract color if present
-      let color: string | undefined = undefined;
-      if (options) {
-        const colorMatch = options.match(/color\s*=\s*["']?([^"')\s]+)/);
-        if (colorMatch) {
-          color = colorMatch[1];
+      // Extract quoted name manually (avoids ReDoS)
+      const nameResult = extractFirstQuotedString(afterPrefix);
+      const name = nameResult?.content;
+
+      if (name !== undefined && nameResult) {
+        const afterName = afterPrefix.slice(nameResult.endIndex).trimStart();
+        // Match closing paren and optional options
+        const closingMatch = afterName.match(/^\s*\)$/);
+        const optionsMatch = afterName.match(/^\s*,\s*([^)]*)\s*\)$/);
+
+        if (closingMatch || optionsMatch) {
+          const options = optionsMatch ? optionsMatch[1] : undefined;
+
+          let color: string | undefined = undefined;
+          if (options) {
+            const colorMatch = options.match(/color\s*=\s*["']?([^"')\s]+)/);
+            if (colorMatch) color = colorMatch[1];
+          }
+
+          characters.push({ tag, name, color });
+          continue;
         }
       }
-
-      characters.push({ tag, name, color });
-      continue;
     }
 
     // Check for start of multi-line character definition
@@ -833,8 +867,8 @@ function extractCharacters(
       const rest = multiLineStartMatch[2];
 
       // Check if name is on the same line
-      const nameMatch = rest.match(/"([^"\\]*(?:\\.[^"\\]*)*)"/);
-      const name = nameMatch ? nameMatch[1] : undefined;
+      const quoted = extractFirstQuotedString(rest);
+      const name = quoted ? quoted.content : undefined;
 
       pendingCharacter = { tag, name, options: [] };
       inCharacterDef = true;
@@ -842,10 +876,10 @@ function extractCharacters(
         countCharOutsideStrings(rest, "(") - countCharOutsideStrings(rest, ")");
 
       // Extract options from the rest of the line (excluding the name we already captured)
-      if (nameMatch) {
-        const optionsPart = rest
-          .substring(rest.indexOf(nameMatch[0]) + nameMatch[0].length)
-          .trim();
+      if (quoted) {
+        // Find the start of the quoted string to compute its position
+        const quoteStart = rest.indexOf('"');
+        const optionsPart = rest.substring(quoteStart + quoted.endIndex).trim();
         if (optionsPart.startsWith(",")) {
           pendingCharacter.options.push(optionsPart.substring(1).trim());
         }
@@ -865,9 +899,9 @@ function extractCharacters(
       if (trimmed && !trimmed.startsWith("#")) {
         // Check if this line contains the name (if not already found)
         if (!pendingCharacter.name) {
-          const nameMatch = trimmed.match(/"([^"\\]*(?:\\.[^"\\]*)*)"/);
-          if (nameMatch) {
-            pendingCharacter.name = nameMatch[1];
+          const quoted = extractFirstQuotedString(trimmed);
+          if (quoted) {
+            pendingCharacter.name = quoted.content;
           }
         }
         pendingCharacter.options.push(trimmed);
