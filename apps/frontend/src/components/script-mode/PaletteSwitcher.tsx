@@ -1,10 +1,17 @@
-import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import {
+  useEffect,
+  useState,
+  useMemo,
+  useRef,
+  useCallback,
+  useId,
+} from "react";
 import { Palette } from "lucide-react";
 import {
   PALETTES,
   applyPalette,
   type PaletteGroup,
-} from "../../lib/codemirror/palettes";
+} from "@/lib/codemirror/palettes";
 import { useLocalStorageNumber } from "@/hooks/useLocalStorage";
 
 interface PaletteSwitcherProps {
@@ -28,6 +35,7 @@ export function PaletteSwitcher({
       validate: (value) => value >= 0 && value < PALETTES.length,
     }
   );
+  const labelId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
   const [isKeyboardNav, setIsKeyboardNav] = useState(false);
@@ -95,14 +103,14 @@ export function PaletteSwitcher({
       setFocusedIndex(currentIdx);
       // Reset close reason when opening
       closeReasonRef.current = "keyboard";
-      // Focus the listbox when opened
-      listboxRef.current?.focus();
+      // Focus the listbox when opened (preventScroll avoids viewport jump)
+      listboxRef.current?.focus({ preventScroll: true });
     } else {
       focusedIndexRef.current = -1;
       setFocusedIndex(-1);
       // Only restore focus to button when closed via keyboard
       if (closeReasonRef.current === "keyboard") {
-        buttonRef.current?.focus();
+        buttonRef.current?.focus({ preventScroll: true });
       }
     }
   }, [isOpen, flatIndexForSelected]);
@@ -111,12 +119,7 @@ export function PaletteSwitcher({
     setIsKeyboardNav(true);
 
     if (!isOpen) {
-      if (
-        e.key === "ArrowDown" ||
-        e.key === "ArrowUp" ||
-        e.key === "Enter" ||
-        e.key === " "
-      ) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
         setIsOpen(true);
       }
@@ -198,7 +201,7 @@ export function PaletteSwitcher({
         onMouseDown={handleMouseDown}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
-        aria-labelledby="palette-switcher-label"
+        aria-labelledby={labelId}
         className="px-3 py-1.5 text-xs font-code bg-muted/50 hover:bg-muted border border-border rounded flex items-center gap-2 transition-colors"
         title="Change syntax colors"
       >
@@ -207,7 +210,7 @@ export function PaletteSwitcher({
           className="size-2 rounded-full"
           style={{ backgroundColor: PALETTES[selectedIndex].indicator }}
         />
-        <span id="palette-switcher-label" className="sr-only">
+        <span id={labelId} className="sr-only">
           Syntax palette: {PALETTES[selectedIndex].name}
         </span>
         <span aria-hidden="true">{PALETTES[selectedIndex].name}</span>
@@ -260,8 +263,11 @@ export function PaletteSwitcher({
             onKeyDown={handleKeyDown}
           >
             {Object.entries(groupedPalettes).map(([groupName, palettes]) => (
-              <div key={groupName}>
-                <div className="px-3 py-1 text-xs font-semibold text-muted-foreground bg-muted/30">
+              <div key={groupName} role="group" aria-label={groupName}>
+                <div
+                  className="px-3 py-1 text-xs font-semibold text-muted-foreground bg-muted/30"
+                  aria-hidden="true"
+                >
                   {groupName}
                 </div>
                 {palettes.map((palette) => {
@@ -269,10 +275,11 @@ export function PaletteSwitcher({
                     (item) => item.originalIndex === palette.originalIndex
                   );
                   return (
-                    <button
+                    // Keyboard navigation is handled at listbox level via onKeyDown
+                    // eslint-disable-next-line jsx-a11y/click-events-have-key-events
+                    <div
                       key={palette.originalIndex}
                       id={`palette-option-${flatIdx}`}
-                      type="button"
                       role="option"
                       aria-selected={palette.originalIndex === selectedIndex}
                       onClick={() => {
@@ -280,7 +287,7 @@ export function PaletteSwitcher({
                         handleSelect(palette.originalIndex);
                       }}
                       tabIndex={-1}
-                      className={`w-full px-3 py-2 text-left text-xs font-code hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2 ${
+                      className={`w-full px-3 py-2 text-left text-xs font-code hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2 cursor-pointer ${
                         palette.originalIndex === selectedIndex
                           ? "bg-accent/50"
                           : ""
@@ -297,7 +304,7 @@ export function PaletteSwitcher({
                         }}
                       />
                       <span className="truncate">{palette.name}</span>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
