@@ -6,6 +6,7 @@
  */
 
 import { RENPY_LABEL_REGEX, type VariableCondition } from "@branchforge/shared";
+import { logWarn, LogEventType } from "../lib/logger.js";
 
 // ============================================================================
 // Types
@@ -100,9 +101,9 @@ export function generateConditionCode(
     for (const [varName, condition] of Object.entries(conditions.variables)) {
       // Validate variable name before using it
       if (!isValidRenpyIdentifier(varName)) {
-        process.stderr.write(
-          `Warning: Skipping invalid variable name in conditions: "${varName}"\n`
-        );
+        logWarn(LogEventType.VALIDATION_WARNING, {
+          message: `Skipping invalid variable name in conditions: "${varName}"`,
+        });
         continue;
       }
 
@@ -150,9 +151,9 @@ export function generateConditionCode(
     for (const [stat, value] of Object.entries(conditions.stats)) {
       // Validate stat name before using it
       if (!isValidRenpyIdentifier(stat)) {
-        process.stderr.write(
-          `Warning: Skipping invalid stat name in conditions: "${stat}"\n`
-        );
+        logWarn(LogEventType.VALIDATION_WARNING, {
+          message: `Skipping invalid stat name in conditions: "${stat}"`,
+        });
         continue;
       }
       lines.push(`${indent}if ${stat} < ${value}:`);
@@ -187,9 +188,9 @@ export function generateEffectCode(
     for (const sv of effects.variablesSet) {
       // Validate variable name before using it
       if (!isValidRenpyIdentifier(sv)) {
-        process.stderr.write(
-          `Warning: Skipping invalid variable name in effects (set): "${sv}"\n`
-        );
+        logWarn(LogEventType.VALIDATION_WARNING, {
+          message: `Skipping invalid variable name in effects (set): "${sv}"`,
+        });
         continue;
       }
       lines.push(`${indent}$ ${sv} = True`);
@@ -200,9 +201,9 @@ export function generateEffectCode(
     for (const sv of effects.variablesUnset) {
       // Validate variable name before using it
       if (!isValidRenpyIdentifier(sv)) {
-        process.stderr.write(
-          `Warning: Skipping invalid variable name in effects (unset): "${sv}"\n`
-        );
+        logWarn(LogEventType.VALIDATION_WARNING, {
+          message: `Skipping invalid variable name in effects (unset): "${sv}"`,
+        });
         continue;
       }
       lines.push(`${indent}$ ${sv} = False`);
@@ -214,12 +215,16 @@ export function generateEffectCode(
     for (const [stat, value] of Object.entries(effects.stats)) {
       // Validate stat name before using it
       if (!isValidRenpyIdentifier(stat)) {
-        process.stderr.write(
-          `Warning: Skipping invalid stat name in effects: "${stat}"\n`
-        );
+        logWarn(LogEventType.VALIDATION_WARNING, {
+          message: `Skipping invalid stat name in effects: "${stat}"`,
+        });
         continue;
       }
-      lines.push(`${indent}$ ${stat} += ${value}`);
+      if (value >= 0) {
+        lines.push(`${indent}$ ${stat} += ${value}`);
+      } else {
+        lines.push(`${indent}$ ${stat} -= ${Math.abs(value)}`);
+      }
     }
   }
 
@@ -243,9 +248,9 @@ export function generateInitBlock(variables: string[]): string[] {
   for (const sv of variables) {
     // Validate variable name before using it
     if (!isValidRenpyIdentifier(sv)) {
-      process.stderr.write(
-        `Warning: Skipping invalid variable name in init block: "${sv}"\n`
-      );
+      logWarn(LogEventType.VALIDATION_WARNING, {
+        message: `Skipping invalid variable name in init block: "${sv}"`,
+      });
       continue;
     }
     lines.push(`default ${sv} = False`);
@@ -325,6 +330,14 @@ function detectIndentUnit(lines: string[]): number {
 }
 
 /**
+ * Normalize a raw leading-whitespace string to its space-equivalent length.
+ * Each tab counts as 4 spaces (consistent with detectIndentUnit).
+ */
+function normalizeIndent(raw: string): number {
+  return raw.replace(/\t/g, "    ").length;
+}
+
+/**
  * Patch RPY content with variable conditions and effects
  *
  * This function:
@@ -363,7 +376,8 @@ export function patchRPYWithVariables(
     const trimmed = line.trim();
 
     // Detect label declaration: label xyz:
-    const labelIndent = line.match(/^(\s*)/)?.[0]?.length ?? 0;
+    const labelLead = line.match(/^(\s*)/)?.[1] ?? "";
+    const labelIndent = normalizeIndent(labelLead);
     const labelNameMatch = line.match(RENPY_LABEL_REGEX);
     if (labelNameMatch) {
       currentLabel = labelNameMatch[1];
@@ -395,7 +409,8 @@ export function patchRPYWithVariables(
     // Detect end of label (for effect insertion)
     // We look for jump, return, or end of file at a lower indent level
     if (currentLabel && !effectsInserted.has(currentLabel)) {
-      const lineIndent = line.match(/^(\s*)/)?.[1].length ?? 0;
+      const lineLead = line.match(/^(\s*)/)?.[1] ?? "";
+      const lineIndent = normalizeIndent(lineLead);
 
       // Check if this line ends the label (jump, return at lower indent)
       if (
@@ -451,16 +466,16 @@ export function patchRPYWithVariables(
           const labelMatch = result[i].match(RENPY_LABEL_REGEX);
           if (labelMatch && labelMatch[1] === labelTitle) {
             labelIndex = i;
-            labelIndent = indentMatch?.[1]?.length ?? 0;
+            labelIndent = normalizeIndent(indentMatch?.[1] ?? "");
             break;
           }
         }
 
         if (labelIndex === -1) {
           // Label not found - this shouldn't happen if the file is well-formed
-          process.stderr.write(
-            `Warning: label '${labelTitle}' not found in RPY content, skipping effects\n`
-          );
+          logWarn(LogEventType.VALIDATION_WARNING, {
+            message: `label '${labelTitle}' not found in RPY content, skipping effects`,
+          });
           continue;
         }
 
@@ -470,7 +485,8 @@ export function patchRPYWithVariables(
 
         for (let i = labelIndex + 1; i < result.length; i++) {
           const line = result[i];
-          const lineIndent = line.match(/^(\s*)/)?.[1].length ?? 0;
+          const lineLead = line.match(/^(\s*)/)?.[1] ?? "";
+          const lineIndent = normalizeIndent(lineLead);
 
           // Check if this line is a label declaration at same or lesser indent
           const labelMatch = line.match(RENPY_LABEL_REGEX);
@@ -540,9 +556,9 @@ export function generateVariablesFile(
     for (const key of keys) {
       // Validate variable key before using it
       if (!isValidRenpyIdentifier(key)) {
-        process.stderr.write(
-          `Warning: Skipping invalid variable key in variables file: "${key}"\n`
-        );
+        logWarn(LogEventType.VALIDATION_WARNING, {
+          message: `Skipping invalid variable key in variables file: "${key}"`,
+        });
         continue;
       }
       lines.push(`default ${key} = False`);
@@ -595,9 +611,9 @@ export function generateStatsFile(
   for (const stat of statsList) {
     // Validate stat key before using it
     if (!isValidRenpyIdentifier(stat.key)) {
-      process.stderr.write(
-        `Warning: Skipping invalid stat key in stats file: "${stat.key}"\n`
-      );
+      logWarn(LogEventType.VALIDATION_WARNING, {
+        message: `Skipping invalid stat key in stats file: "${stat.key}"`,
+      });
       continue;
     }
 

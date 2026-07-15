@@ -11,6 +11,7 @@
 
 import { NotFoundError } from "../middleware/error-handler.middleware.js";
 import { countCharOutsideStrings } from "./rpy-helpers.js";
+import { escapeRenpyString } from "./rpy-generator.service.js";
 import {
   sanitizeLabelName,
   RENPY_LABEL_REGEX,
@@ -512,9 +513,9 @@ export function extractChoices(
         let choiceLabel = doubleQuoteMatch[1];
         // Remove trailing quotes if present (for unescaped quotes inside)
         choiceLabel = choiceLabel
-          .replace(/"+$/, "")
           .replace(/\\"/g, '"')
-          .replace(/""/g, '"');
+          .replace(/""/g, '"')
+          .replace(/"+$/, "");
         let target: string | null = null;
 
         // Look ahead for jump statement in this choice block
@@ -2145,9 +2146,6 @@ export function replaceLabelDialogue(
 export function generateRpyFile(scene: BranchForgeScene): string {
   const lines: string[] = [];
 
-  const escapeRenPyString = (s: string) =>
-    s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-
   // Start with label
   lines.push(`label ${scene.name}:`);
   lines.push("");
@@ -2160,13 +2158,13 @@ export function generateRpyFile(scene: BranchForgeScene): string {
       if (inMenu) {
         inMenu = false;
       }
-      lines.push(`    ${entry.speaker} "${escapeRenPyString(entry.text)}"`);
+      lines.push(`    ${entry.speaker} "${escapeRenpyString(entry.text)}"`);
     } else if (entry.type === "NARRATION" && entry.text) {
       // Close any open menu before narration
       if (inMenu) {
         inMenu = false;
       }
-      lines.push(`    "${escapeRenPyString(entry.text)}"`);
+      lines.push(`    "${escapeRenpyString(entry.text)}"`);
     } else if (
       entry.type === "MENU" &&
       entry.menuOptions &&
@@ -2179,7 +2177,7 @@ export function generateRpyFile(scene: BranchForgeScene): string {
       const bodyIndent = choiceIndent + "    ";
       lines.push(`${menuIndent}menu:`);
       for (const opt of entry.menuOptions) {
-        lines.push(`${choiceIndent}"${escapeRenPyString(opt.label)}":`);
+        lines.push(`${choiceIndent}"${escapeRenpyString(opt.label)}":`);
         if (opt.effects?.stats) {
           for (const [stat, value] of Object.entries(opt.effects.stats)) {
             const op = value >= 0 ? "+=" : "-=";
@@ -2202,7 +2200,7 @@ export function generateRpyFile(scene: BranchForgeScene): string {
         lines.push(`    menu:`);
         inMenu = true;
       }
-      lines.push(`        "${escapeRenPyString(entry.text)}":`);
+      lines.push(`        "${escapeRenpyString(entry.text)}":`);
       lines.push(`            jump ${entry.target}`);
     } else if (entry.type === "JUMP" && entry.target) {
       if (inMenu) {
@@ -2369,6 +2367,18 @@ function extractTechnicalConstructsFromLines(
         }
 
         constructs.choices.push(choice);
+
+        // Clean up empty effects/effects.stats
+        if (Object.keys(choice.effects.stats).length === 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          delete (choice as any).effects.stats;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (!(choice as any).effects.stats) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          delete (choice as any).effects;
+        }
+
         i += countLinesInChoice(lines, i);
       }
     }
@@ -2487,7 +2497,9 @@ function extractTechnicalConstructsFromLines(
       }
 
       // Bare identifier (truthy check)
-      const varMatches = part.match(/([a-zA-Z_][a-zA-Z0-9_]*)/g);
+      const varMatches = part.match(
+        /([a-zA-Z_][a-zA-Z0-9_]*)(?![a-zA-Z0-9_(]*\()/g
+      );
       if (varMatches) {
         for (const varName of varMatches) {
           if (
@@ -2654,5 +2666,6 @@ function countLinesInChoice(lines: string[], startIndex: number): number {
  * Get the indentation level of a line
  */
 function getIndent(line: string): number {
-  return line.search(/\S/);
+  const idx = line.search(/\S/);
+  return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
 }
