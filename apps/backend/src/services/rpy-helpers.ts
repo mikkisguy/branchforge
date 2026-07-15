@@ -22,6 +22,10 @@ export function countCharOutsideStrings(s: string, ch: string): number {
         inString = null;
       }
     } else {
+      // Ren'Py inline comment — skip rest of line
+      if (c === "#") {
+        break;
+      }
       if (c === '"' || c === "'") {
         inString = c;
       } else if (c === ch) {
