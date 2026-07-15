@@ -1,5 +1,6 @@
 import { RENPY_LABEL_REGEX } from "@branchforge/shared";
 import type { ReconstructedFileOptions } from "./types.js";
+import { escapeRenpyString } from "../rpy-generator.service.js";
 
 /**
  * Reconstruct RPY file content with updated dialogue while preserving keywords.
@@ -23,6 +24,9 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
   const labelDialogueIndices = new Map<string, number>();
   const labelIndentation = new Map<string, string>();
   let lastDialogueIndent = "    "; // Default RPY indentation
+
+  // Track labels encountered during processing for validation
+  const encounteredLabels = new Set<string>();
 
   // Track menu block nesting to prevent premature dialogue insertion.
   // Menu titles are editable dialogue entries, so they must be matched and
@@ -67,9 +71,11 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
           for (let i = currentIndex; i < labelDialogue.length; i++) {
             const entry = labelDialogue[i];
             if (entry.speaker) {
-              result.push(`${indent}${entry.speaker} "${entry.text}"`);
+              result.push(
+                `${indent}${entry.speaker} "${escapeRenpyString(entry.text)}"`
+              );
             } else {
-              result.push(`${indent}"${entry.text}"`);
+              result.push(`${indent}"${escapeRenpyString(entry.text)}"`);
             }
           }
           labelDialogueIndices.set(currentLabel, labelDialogue.length);
@@ -88,6 +94,7 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
       }
 
       currentLabel = labelMatch[1];
+      encounteredLabels.add(currentLabel);
       labelDialogueIndices.set(currentLabel, 0);
       // Reset menu tracking on label boundary
       menuStack.length = 0;
@@ -149,10 +156,12 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
           const quote = choiceMatch[1] ? '"' : choiceMatch[2] ? "'" : "";
           if (conditionPart) {
             result.push(
-              `${indent}${quote}${newChoiceText}${quote} ${conditionPart}:`
+              `${indent}${quote}${escapeRenpyString(newChoiceText)}${quote} ${conditionPart}:`
             );
           } else {
-            result.push(`${indent}${quote}${newChoiceText}${quote}:`);
+            result.push(
+              `${indent}${quote}${escapeRenpyString(newChoiceText)}${quote}:`
+            );
           }
           continue;
         }
@@ -202,10 +211,12 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
         const quote = isSingleQuoted ? "'" : '"';
         if (newDialogue.speaker) {
           result.push(
-            `${indent}${newDialogue.speaker} ${quote}${newDialogue.text}${quote}`
+            `${indent}${newDialogue.speaker} ${quote}${escapeRenpyString(newDialogue.text)}${quote}`
           );
         } else {
-          result.push(`${indent}${quote}${newDialogue.text}${quote}`);
+          result.push(
+            `${indent}${quote}${escapeRenpyString(newDialogue.text)}${quote}`
+          );
         }
         continue;
       }
@@ -236,9 +247,11 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
         for (let i = currentIndex; i < labelDialogue.length; i++) {
           const entry = labelDialogue[i];
           if (entry.speaker) {
-            result.push(`${indent}${entry.speaker} "${entry.text}"`);
+            result.push(
+              `${indent}${entry.speaker} "${escapeRenpyString(entry.text)}"`
+            );
           } else {
-            result.push(`${indent}"${entry.text}"`);
+            result.push(`${indent}"${escapeRenpyString(entry.text)}"`);
           }
         }
         labelDialogueIndices.set(currentLabel, labelDialogue.length);
@@ -251,15 +264,20 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
 
   // After processing all lines, insert any remaining dialogue entries
   for (const [label, labelDialogue] of updatedDialogue.entries()) {
+    if (!encounteredLabels.has(label)) {
+      throw new Error(`Unknown label in updatedDialogue: ${label}`);
+    }
     const currentIndex = labelDialogueIndices.get(label) ?? 0;
     if (currentIndex < labelDialogue.length) {
       const indent = labelIndentation.get(label) || lastDialogueIndent;
       for (let i = currentIndex; i < labelDialogue.length; i++) {
         const entry = labelDialogue[i];
         if (entry.speaker) {
-          result.push(`${indent}${entry.speaker} "${entry.text}"`);
+          result.push(
+            `${indent}${entry.speaker} "${escapeRenpyString(entry.text)}"`
+          );
         } else {
-          result.push(`${indent}"${entry.text}"`);
+          result.push(`${indent}"${escapeRenpyString(entry.text)}"`);
         }
       }
     }

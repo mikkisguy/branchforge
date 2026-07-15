@@ -22,6 +22,13 @@ export function extractTechnicalConstructsFromLines(
   }
 
   const line = lines[lineNumber];
+
+  // Guard against ReDoS on maliciously long lines
+  const MAX_LINE_LENGTH = 5000;
+  if (line.length > MAX_LINE_LENGTH) {
+    return constructs;
+  }
+
   const trimmed = line.trim();
 
   // Extract jump (negative lookahead skips dynamic "jump expression")
@@ -34,9 +41,9 @@ export function extractTechnicalConstructsFromLines(
   }
 
   // Extract scene/show/hide
-  const sceneMatch = trimmed.match(/^scene\s+(\S+)(?:\s+with\s+(\S+))?/);
+  const sceneMatch = trimmed.match(/^scene\s+(.+?)(?:\s+with\s+(\S+))?$/);
   const showMatch = trimmed.match(
-    /^show\s+(.+?)(?:\s+at\s+(\S+))?(?:\s+with\s+(\S+))?(?:\s+zorder\s+(\d+))?$/
+    /^show\s+(.+?)(?:\s+at\s+(\S+))?(?:\s+zorder\s+(\d+))?(?:\s+with\s+(\S+))?$/
   );
   const hideMatch = trimmed.match(/^hide\s+(\S+)(?:\s+with\s+(\S+))?$/);
 
@@ -54,8 +61,8 @@ export function extractTechnicalConstructsFromLines(
       type: "SHOW",
       target: showMatch[1],
       at: showMatch[2],
-      with: showMatch[3],
-      zorder: showMatch[4] ? Number.parseInt(showMatch[4], 10) : undefined,
+      zorder: showMatch[3] ? Number.parseInt(showMatch[3], 10) : undefined,
+      with: showMatch[4],
     });
     return constructs;
   } else if (hideMatch) {
@@ -85,11 +92,17 @@ export function extractTechnicalConstructsFromLines(
         break;
       }
 
+      // Guard against ReDoS on maliciously long menu lines
+      if (menuTrimmed.length > MAX_LINE_LENGTH) continue;
+
       // Extract choice
-      const choiceMatch = menuTrimmed.match(/^"([^"]+)":/);
+      const choiceMatch = menuTrimmed.match(
+        /^"([^"]+)"(?:\s+(if\s+[^:]+))?:\s*$/
+      );
       if (choiceMatch) {
         const choice = {
           label: choiceMatch[1],
+          condition: choiceMatch[2] || undefined,
           targetLabelId: "",
           targetLabelName: "",
           effects: { stats: {} as Record<string, number> },
@@ -123,9 +136,11 @@ export function extractTechnicalConstructsFromLines(
             const value = Number.parseInt(statMatch[3], 10);
 
             if (operator === "+=") {
-              choice.effects.stats[statName] = value;
+              const prev = choice.effects.stats[statName] || 0;
+              choice.effects.stats[statName] = prev + value;
             } else if (operator === "-=") {
-              choice.effects.stats[statName] = -value;
+              const prev = choice.effects.stats[statName] || 0;
+              choice.effects.stats[statName] = prev - value;
             }
           }
         }
@@ -159,16 +174,18 @@ export function extractTechnicalConstructsFromLines(
     };
 
     // Remove leading if/elif keyword and trailing colon
-    const conditionExpr = trimmed
-      .replace(/^(if|elif)\s+/, "")
-      .replace(/:+$/, "")
-      .trim();
+    let conditionExpr = trimmed.replace(/^(if|elif)\s+/, "").trim();
+
+    // Remove trailing colons non-regex to avoid ReDoS
+    while (conditionExpr.endsWith(":")) {
+      conditionExpr = conditionExpr.slice(0, -1);
+    }
 
     // Extract stat comparisons: e.g., "strength >= 5" or "magic < 10"
     // Limitations: Does not handle variable comparisons (e.g., "strength >= max_value")
     const statRegex = /([a-zA-Z_][a-zA-Z0-9_]*)\s*(>=|<=|>|<|==|!=)\s*(-?\d+)/g;
-    let statMatch;
-    while ((statMatch = statRegex.exec(conditionExpr)) !== null) {
+    const statMatches = conditionExpr.matchAll(statRegex);
+    for (const statMatch of statMatches) {
       const statName = statMatch[1];
       const operator = statMatch[2] as ComparisonOperator;
       const value = Number.parseInt(statMatch[3], 10);
@@ -303,8 +320,9 @@ export function extractTechnicalConstructsFromLines(
         const value = Number.parseInt(statModMatch[3], 10);
 
         // Store deltas separately to preserve thresholds from if-expressions
+        const prev = constructs.conditions.statDeltas![statName] || 0;
         constructs.conditions.statDeltas![statName] =
-          operator === "+=" ? value : -value;
+          prev + (operator === "+=" ? value : -value);
       }
     }
 

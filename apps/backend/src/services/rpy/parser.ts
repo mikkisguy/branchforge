@@ -212,7 +212,6 @@ export function extractChoices(
 
     // Look for choice labels inside menu (check if we're in any menu)
     if (menuStack.length > 0) {
-      const menuIndent = menuStack[menuStack.length - 1];
       // More permissive matching: find the text between the first quote and the colon
       // This handles cases where quotes inside the string aren't properly escaped
 
@@ -226,6 +225,7 @@ export function extractChoices(
           .replace(/""/g, '"')
           .replace(/"+$/, "");
         let target: string | null = null;
+        const choiceIndent = line.search(/\S/);
 
         // Look ahead for jump statement in this choice block
         let j = i + 1;
@@ -250,8 +250,8 @@ export function extractChoices(
             break;
           }
 
-          // Exit choice block if indentation decreased to menu level or above
-          if (nextLineIndent <= menuIndent) {
+          // Exit choice block if indentation decreased to choice indent level or above
+          if (nextLineIndent <= choiceIndent) {
             break;
           }
 
@@ -276,6 +276,7 @@ export function extractChoices(
           .replace(/\\'/g, "'")
           .replace(/''/g, "'");
         let target: string | null = null;
+        const choiceIndent = line.search(/\S/);
 
         let j = i + 1;
         while (j < lines.length && j < i + 20) {
@@ -299,8 +300,8 @@ export function extractChoices(
             break;
           }
 
-          // Exit choice block if indentation decreased to menu level or above
-          if (nextLineIndent <= menuIndent) {
+          // Exit choice block if indentation decreased to choice indent level or above
+          if (nextLineIndent <= choiceIndent) {
             break;
           }
 
@@ -360,7 +361,7 @@ export function extractJumps(
     );
     if (jumpMatch) {
       const target = jumpMatch[1];
-      const jumpKey = `${currentLabel}->${target}`;
+      const jumpKey = `jump:${currentLabel}->${target}`;
       if (!jumpSet.has(jumpKey)) {
         jumpSet.add(jumpKey);
         jumps.push({ from: currentLabel, to: target });
@@ -374,7 +375,7 @@ export function extractJumps(
     );
     if (callMatch) {
       const target = callMatch[1];
-      const jumpKey = `${currentLabel}->${target}`;
+      const jumpKey = `call:${currentLabel}->${target}`;
       if (!jumpSet.has(jumpKey)) {
         jumpSet.add(jumpKey);
         jumps.push({ from: currentLabel, to: target, isCall: true });
@@ -406,7 +407,7 @@ export function extractJumps(
         );
         if (nestedJumpMatch) {
           const target = nestedJumpMatch[1];
-          const jumpKey = `${currentLabel}->${target}`;
+          const jumpKey = `jump:${currentLabel}->${target}`;
           if (!jumpSet.has(jumpKey)) {
             jumpSet.add(jumpKey);
             jumps.push({ from: currentLabel, to: target });
@@ -433,7 +434,7 @@ export function extractJumps(
             );
             if (elseJumpMatch) {
               const target = elseJumpMatch[1];
-              const jumpKey = `${currentLabel}->${target}`;
+              const jumpKey = `jump:${currentLabel}->${target}`;
               if (!jumpSet.has(jumpKey)) {
                 jumpSet.add(jumpKey);
                 jumps.push({ from: currentLabel, to: target });
@@ -560,7 +561,9 @@ export function extractCharacters(
       pendingCharacter = { tag, name, options: [] };
       inCharacterDef = true;
       parenDepth =
-        countCharOutsideStrings(rest, "(") - countCharOutsideStrings(rest, ")");
+        1 +
+        countCharOutsideStrings(rest, "(") -
+        countCharOutsideStrings(rest, ")");
 
       // Extract options from the rest of the line (excluding the name we already captured)
       if (quoted) {
@@ -861,9 +864,33 @@ export function parseRPYFileWithLabels(
           // Try double-quoted, single-quoted, or unquoted choice
           const doubleQuoteMatch = choiceTrimmed.match(/^"(.+)":/);
           const singleQuoteMatch = choiceTrimmed.match(/^'(.+)':/);
-          const unquotedMatch = choiceTrimmed.match(
+          const UNQUOTED_BLOCKLIST = new Set([
+            "if",
+            "else",
+            "elif",
+            "pass",
+            "jump",
+            "call",
+            "return",
+            "python",
+            "while",
+            "for",
+            "default",
+            "define",
+            "label",
+            "menu",
+            "init",
+          ]);
+          let unquotedMatch = null;
+          const rawUnquotedMatch = choiceTrimmed.match(
             /^([a-zA-Z_][a-zA-Z0-9_ ]*):$/
           );
+          if (
+            rawUnquotedMatch &&
+            !UNQUOTED_BLOCKLIST.has(rawUnquotedMatch[1])
+          ) {
+            unquotedMatch = rawUnquotedMatch;
+          }
           const quoteMatch =
             doubleQuoteMatch || singleQuoteMatch || unquotedMatch;
           if (quoteMatch) {

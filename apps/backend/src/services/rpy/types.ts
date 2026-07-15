@@ -75,6 +75,7 @@ export interface BranchForgeScene {
       targetLabelId: string;
       targetLabelName: string;
       conditionFlags?: string[];
+      condition?: string;
       effects?: {
         stats?: Record<string, number>;
       };
@@ -114,6 +115,7 @@ export interface LabeledDialogue {
       lineNumber: number;
       effects?: Record<string, number>;
       conditionFlags?: string[];
+      condition?: string;
     }>;
   }>;
 }

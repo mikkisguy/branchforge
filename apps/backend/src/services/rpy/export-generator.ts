@@ -100,21 +100,29 @@ export function convertToBranchForgeFormatFromLabels(
     }
   }
 
-  // Collect all targets from menu options to avoid duplicate jump entries
-  // when menu choice bodies contain explicit jump statements
-  const menuTargets = new Set<string>();
+  // Collect line number ranges of menu choice bodies to avoid emitting jumps
+  // that are inside menu blocks (those are handled by menuOptions emission).
+  // Standalone jumps targeting the same label as a menu option are preserved.
+  const menuBodyRanges: Array<{ start: number; end: number }> = [];
   if (labelData.menus) {
     for (const menu of labelData.menus) {
       for (const opt of menu.options) {
-        if (opt.target) menuTargets.add(opt.target);
+        if (opt.lineNumber) {
+          // Menu body starts at the option line and continues for a few lines
+          // (typically the jump + any stat/flag lines within the choice)
+          const bodyEnd = opt.lineNumber + 5; // conservative estimate
+          menuBodyRanges.push({ start: opt.lineNumber, end: bodyEnd });
+        }
       }
     }
   }
 
-  // Add jump entries for THIS label only, excluding those already captured
-  // as menu choice targets (jumps inside menu bodies are redundant with menuOptions)
+  // Add jump entries for THIS label only, excluding those inside menu bodies
   for (const j of labelData.jumps) {
-    if (!menuTargets.has(j.to)) {
+    const insideMenu = menuBodyRanges.some(
+      (r) => j.lineNumber >= r.start && j.lineNumber <= r.end
+    );
+    if (!insideMenu) {
       entries.push({
         type: "JUMP",
         target: j.to,
@@ -216,16 +224,14 @@ export function generateRpyFile(scene: BranchForgeScene): string {
       const bodyIndent = choiceIndent + "    ";
       lines.push(`${menuIndent}menu:`);
       for (const opt of entry.menuOptions) {
-        lines.push(`${choiceIndent}"${escapeRenpyString(opt.label)}":`);
+        const conditionSuffix = opt.condition ? ` ${opt.condition}` : "";
+        lines.push(
+          `${choiceIndent}"${escapeRenpyString(opt.label)}"${conditionSuffix}:`
+        );
         if (opt.effects?.stats) {
           for (const [stat, value] of Object.entries(opt.effects.stats)) {
             const op = value >= 0 ? "+=" : "-=";
             lines.push(`${bodyIndent}$ ${stat} ${op} ${Math.abs(value)}`);
-          }
-        }
-        if (opt.conditionFlags && opt.conditionFlags.length > 0) {
-          for (const flag of opt.conditionFlags) {
-            lines.push(`${bodyIndent}if ${flag}:`);
           }
         }
         if (opt.targetLabelName) {
@@ -259,8 +265,8 @@ export function generateRpyFile(scene: BranchForgeScene): string {
         } else if (v.type === "SHOW") {
           let line = `${indent}show ${v.target}`;
           if (v.at) line += ` at ${v.at}`;
-          if (v.with) line += ` with ${v.with}`;
           if (v.zorder !== undefined) line += ` zorder ${v.zorder}`;
+          if (v.with) line += ` with ${v.with}`;
           lines.push(line);
         } else if (v.type === "HIDE") {
           let line = `${indent}hide ${v.target}`;

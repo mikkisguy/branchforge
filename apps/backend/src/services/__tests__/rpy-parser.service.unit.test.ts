@@ -1167,18 +1167,17 @@ label chapter1:
       expect(result).toBe(originalContent);
     });
 
-    it("should handle labels not in original content", () => {
+    it("should throw for labels not in original content", () => {
       const updatedDialogue = new Map([
         ["new_label", [{ speaker: null, text: "New label content" }]],
       ]);
 
-      const result = reconstructRPYFile({
-        originalContent,
-        updatedDialogue,
-      });
-
-      // New label content should be appended
-      expect(result).toContain("New label content");
+      expect(() =>
+        reconstructRPYFile({
+          originalContent,
+          updatedDialogue,
+        })
+      ).toThrow("Unknown label in updatedDialogue: new_label");
     });
 
     it("should properly reconstruct dialogue with speakers", () => {

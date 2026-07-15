@@ -62,7 +62,7 @@ export async function register(
   password: string
 ): Promise<PublicUser> {
   // Validate email format
-  if (!email || !EMAIL_REGEX.test(email)) {
+  if (!email || email.length > 254 || !EMAIL_REGEX.test(email)) {
     throw new Error("Invalid email format");
   }
 

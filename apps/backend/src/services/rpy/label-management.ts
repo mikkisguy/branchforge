@@ -1,6 +1,7 @@
 import { NotFoundError } from "../../middleware/error-handler.middleware.js";
 import { RENPY_LABEL_REGEX, sanitizeLabelName } from "@branchforge/shared";
 import type { LabelBlock } from "./types.js";
+import { escapeRenpyString } from "../rpy-generator.service.js";
 
 /**
  * Remove a label from RPY file content
@@ -339,9 +340,11 @@ export function replaceLabelDialogue(
             " ".repeat(labelIndent + (labelIndent % 4 === 0 ? 4 : 2));
           for (const entry of newDialogue) {
             if (entry.speaker) {
-              result.push(`${indent}${entry.speaker} "${entry.text}"`);
+              result.push(
+                `${indent}${entry.speaker} "${escapeRenpyString(entry.text)}"`
+              );
             } else {
-              result.push(`${indent}"${entry.text}"`);
+              result.push(`${indent}"${escapeRenpyString(entry.text)}"`);
             }
           }
           newDialogueInserted = true;
@@ -352,11 +355,30 @@ export function replaceLabelDialogue(
       }
 
       // Skip dialogue lines within the target label (they'll be replaced)
-      const dialogueMatch = trimmed.match(
+      const doubleQuoteMatch = trimmed.match(
         /^(?:([a-zA-Z_][a-zA-Z0-9_]*)\s+)?"([^"\\]*(?:\\.[^"\\]*)*)"$/
       );
-      if (dialogueMatch && trimmed !== '" "') {
-        // This is a dialogue line - skip it
+      const singleQuoteMatch = trimmed.match(
+        /^(?:([a-zA-Z_][a-zA-Z0-9_]*)\s+)?'([^'\\]*(?:\\.[^'\\]*)*)'$/
+      );
+      const dialogueMatch = doubleQuoteMatch || singleQuoteMatch;
+      if (dialogueMatch && trimmed !== '" "' && trimmed !== "' '") {
+        // This is a dialogue line - skip it, but first emit new dialogue if not yet done
+        if (!newDialogueInserted && newDialogue.length > 0) {
+          const indent =
+            dialogueIndent ||
+            " ".repeat(labelIndent + (labelIndent % 4 === 0 ? 4 : 2));
+          for (const entry of newDialogue) {
+            if (entry.speaker) {
+              result.push(
+                `${indent}${entry.speaker} "${escapeRenpyString(entry.text)}"`
+              );
+            } else {
+              result.push(`${indent}"${escapeRenpyString(entry.text)}"`);
+            }
+          }
+          newDialogueInserted = true;
+        }
         continue;
       }
 
@@ -381,9 +403,11 @@ export function replaceLabelDialogue(
       " ".repeat(labelIndent + (labelIndent % 4 === 0 ? 4 : 2));
     for (const entry of newDialogue) {
       if (entry.speaker) {
-        result.push(`${indent}${entry.speaker} "${entry.text}"`);
+        result.push(
+          `${indent}${entry.speaker} "${escapeRenpyString(entry.text)}"`
+        );
       } else {
-        result.push(`${indent}"${entry.text}"`);
+        result.push(`${indent}"${escapeRenpyString(entry.text)}"`);
       }
     }
   }
