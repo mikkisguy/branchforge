@@ -589,7 +589,7 @@ export const RENPY_LABEL_REGEX = /^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/;
 export function sanitizeLabelName(title: string): string {
   // Guard against ReDoS on maliciously long titles
   if (title.length > 500) {
-    return "untitled";
+    throw new Error("Title exceeds maximum length of 500 characters");
   }
   let labelName = title
     .toLowerCase()
