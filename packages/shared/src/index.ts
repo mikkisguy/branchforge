@@ -457,12 +457,7 @@ export interface PublicLabel {
  * Label line content type enumeration
  */
 export type LabelLineContentType =
-  | "DIALOGUE"
-  | "NARRATION"
-  | "CHOICE"
-  | "MENU"
-  | "JUMP"
-  | "VISUAL";
+  "DIALOGUE" | "NARRATION" | "CHOICE" | "MENU" | "JUMP" | "VISUAL";
 
 /**
  * Incoming jump information - which labels jump TO this label
@@ -592,6 +587,10 @@ export const RENPY_LABEL_REGEX = /^\s*label\s+([a-zA-Z_][a-zA-Z0-9_]*)/;
  * sanitizeLabelName("") // returns "untitled" (empty)
  */
 export function sanitizeLabelName(title: string): string {
+  // Guard against ReDoS on maliciously long titles
+  if (title.length > 500) {
+    throw new Error("Title exceeds maximum length of 500 characters");
+  }
   let labelName = title
     .toLowerCase()
     .replace(/[^a-z0-9_]+/g, "_")
@@ -895,10 +894,7 @@ export const AVATAR_MAX_SIZE = AVATAR_MAX_SIZE_MB * 1024 * 1024; // 2MB in bytes
  * Valid theme palette identifiers shared between frontend and backend.
  */
 export type ThemePalette =
-  | "forest"
-  | "periwinkle"
-  | "dark-amethyst"
-  | "graphite";
+  "forest" | "periwinkle" | "dark-amethyst" | "graphite";
 
 /**
  * All valid theme palette values (for runtime validation / iteration).
