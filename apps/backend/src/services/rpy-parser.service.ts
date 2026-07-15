@@ -10,6 +10,7 @@
  */
 
 import { NotFoundError } from "../middleware/error-handler.middleware.js";
+import { countCharOutsideStrings } from "./rpy-helpers.js";
 import {
   sanitizeLabelName,
   RENPY_LABEL_REGEX,
@@ -532,7 +533,7 @@ export function extractChoices(
 
           // Check for jump statement before breaking on indentation
           const jumpMatch = nextTrimmed.match(
-            /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/
+            /^jump\s+(?!expression\b)([a-zA-Z_][a-zA-Z0-9_]*)/
           );
           if (jumpMatch) {
             target = jumpMatch[1];
@@ -581,7 +582,7 @@ export function extractChoices(
 
           // Check for jump statement before breaking on indentation
           const jumpMatch = nextTrimmed.match(
-            /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/
+            /^jump\s+(?!expression\b)([a-zA-Z_][a-zA-Z0-9_]*)/
           );
           if (jumpMatch) {
             target = jumpMatch[1];
@@ -643,11 +644,10 @@ export function extractJumps(
 
     if (!currentLabel) continue;
 
-    // Skip dynamic jumps (jump expression ...) — no static target to report
-    if (/^jump\s+expression\b/.test(trimmed)) continue;
-
-    // Check for jump statement
-    const jumpMatch = trimmed.match(/^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+    // Check for jump statement (negative lookahead skips dynamic "jump expression")
+    const jumpMatch = trimmed.match(
+      /^jump\s+(?!expression\b)([a-zA-Z_][a-zA-Z0-9_]*)/
+    );
     if (jumpMatch) {
       const target = jumpMatch[1];
       const jumpKey = `${currentLabel}->${target}`;
@@ -658,11 +658,10 @@ export function extractJumps(
       continue;
     }
 
-    // Skip dynamic calls
-    if (/^call\s+expression\b/.test(trimmed)) continue;
-
-    // Check for call statement
-    const callMatch = trimmed.match(/^call\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+    // Check for call statement (negative lookahead skips dynamic "call expression")
+    const callMatch = trimmed.match(
+      /^call\s+(?!expression\b)([a-zA-Z_][a-zA-Z0-9_]*)/
+    );
     if (callMatch) {
       const target = callMatch[1];
       const jumpKey = `${currentLabel}->${target}`;
@@ -693,7 +692,7 @@ export function extractJumps(
         }
 
         const nestedJumpMatch = nextTrimmed.match(
-          /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/
+          /^jump\s+(?!expression\b)([a-zA-Z_][a-zA-Z0-9_]*)/
         );
         if (nestedJumpMatch) {
           const target = nestedJumpMatch[1];
@@ -720,7 +719,7 @@ export function extractJumps(
             const elseTrimmed = elseLine.trim();
 
             const elseJumpMatch = elseTrimmed.match(
-              /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/
+              /^jump\s+(?!expression\b)([a-zA-Z_][a-zA-Z0-9_]*)/
             );
             if (elseJumpMatch) {
               const target = elseJumpMatch[1];
@@ -770,28 +769,6 @@ function extractCharacters(
   } | null = null;
   let inCharacterDef = false;
   let parenDepth = 0;
-
-  function countCharOutsideStrings(s: string, ch: string): number {
-    let count = 0;
-    let inString: string | null = null;
-    for (let i = 0; i < s.length; i++) {
-      const c = s[i];
-      if (inString) {
-        if (c === "\\" && i + 1 < s.length) {
-          i++;
-        } else if (c === inString) {
-          inString = null;
-        }
-      } else {
-        if (c === '"' || c === "'") {
-          inString = c;
-        } else if (c === ch) {
-          count++;
-        }
-      }
-    }
-    return count;
-  }
 
   // Extract the first double-quoted string from s (with escape handling).
   // Returns the content and the index after the closing quote, or null.
@@ -1086,11 +1063,33 @@ export function parseRPYFileWithLabels(
         continue;
       }
 
+      // Single-quoted dialogue: speaker 'text'
+      const dialogueMatch2 = trimmed.match(
+        /^([a-zA-Z_][a-zA-Z0-9_]*)\s+'([^'\\]*(?:\\.[^'\\]*)*)'$/
+      );
+      if (dialogueMatch2) {
+        currentLabelData.dialogue.push({
+          speaker: dialogueMatch2[1],
+          text: dialogueMatch2[2],
+          lineNumber: i + 1,
+        });
+        continue;
+      }
+
       const narrationMatch = trimmed.match(/^"([^"\\]*(?:\\.[^"\\]*)*)"$/);
       if (narrationMatch) {
         currentLabelData.dialogue.push({
           speaker: null,
           text: narrationMatch[1],
+          lineNumber: i + 1,
+        });
+      }
+
+      const narrationMatch2 = trimmed.match(/^'([^'\\]*(?:\\.[^'\\]*)*)'$/);
+      if (narrationMatch2) {
+        currentLabelData.dialogue.push({
+          speaker: null,
+          text: narrationMatch2[1],
           lineNumber: i + 1,
         });
       }
@@ -1200,7 +1199,7 @@ export function parseRPYFileWithLabels(
 
               // Extract jump target
               const jumpInChoice = bodyTrimmed.match(
-                /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/
+                /^jump\s+(?!expression\b)([a-zA-Z_][a-zA-Z0-9_]*)/
               );
               if (jumpInChoice) {
                 target = jumpInChoice[1];
@@ -1255,8 +1254,10 @@ export function parseRPYFileWithLabels(
         }
       }
 
-      // Check for jump statement
-      const jumpMatch = trimmed.match(/^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+      // Check for jump statement (negative lookahead skips dynamic "jump expression")
+      const jumpMatch = trimmed.match(
+        /^jump\s+(?!expression\b)([a-zA-Z_][a-zA-Z0-9_]*)/
+      );
       if (jumpMatch) {
         labelData.jumps.push({
           to: jumpMatch[1],
@@ -1431,14 +1432,21 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
     const dialogueMatch = trimmed.match(
       /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"([^"\\]*(?:\\.[^"\\]*)*)"$/
     );
+    const dialogueMatchSingle = trimmed.match(
+      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+'([^'\\]*(?:\\.[^'\\]*)*)'$/
+    );
     const narrationMatch = trimmed.match(/^"([^"\\]*(?:\\.[^"\\]*)*)"$/);
+    const narrationMatchSingle = trimmed.match(/^'([^'\\]*(?:\\.[^'\\]*)*)'$/);
 
     // Match and replace dialogue/narration both outside AND inside menu blocks.
     // Menu titles are editable entries that should be updated like any other
     // dialogue. The label-end insertion below handles the case where there are
     // more entries than original lines.
     if (
-      (dialogueMatch || narrationMatch) &&
+      (dialogueMatch ||
+        dialogueMatchSingle ||
+        narrationMatch ||
+        narrationMatchSingle) &&
       currentLabel &&
       updatedDialogue.has(currentLabel)
     ) {
@@ -1458,11 +1466,15 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
         const newDialogue = labelDialogue[currentIndex];
         labelDialogueIndices.set(currentLabel, currentIndex + 1);
 
-        // Reconstruct dialogue line with original indentation
+        // Reconstruct dialogue line with original indentation and quote style
+        const isSingleQuoted = !!(dialogueMatchSingle || narrationMatchSingle);
+        const quote = isSingleQuoted ? "'" : '"';
         if (newDialogue.speaker) {
-          result.push(`${indent}${newDialogue.speaker} "${newDialogue.text}"`);
+          result.push(
+            `${indent}${newDialogue.speaker} ${quote}${newDialogue.text}${quote}`
+          );
         } else {
-          result.push(`${indent}"${newDialogue.text}"`);
+          result.push(`${indent}${quote}${newDialogue.text}${quote}`);
         }
         continue;
       }
@@ -2250,8 +2262,10 @@ function extractTechnicalConstructsFromLines(
   const line = lines[lineNumber];
   const trimmed = line.trim();
 
-  // Extract jump
-  const jumpMatch = trimmed.match(/^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+  // Extract jump (negative lookahead skips dynamic "jump expression")
+  const jumpMatch = trimmed.match(
+    /^jump\s+(?!expression\b)([a-zA-Z_][a-zA-Z0-9_]*)/
+  );
   if (jumpMatch) {
     constructs.jumpTarget = jumpMatch[1];
     return constructs;
@@ -2330,7 +2344,7 @@ function extractTechnicalConstructsFromLines(
 
           // Extract jump target
           const jumpInChoice = bodyLine.match(
-            /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/
+            /^jump\s+(?!expression\b)([a-zA-Z_][a-zA-Z0-9_]*)/
           );
           if (jumpInChoice) {
             choice.targetLabelId = jumpInChoice[1];

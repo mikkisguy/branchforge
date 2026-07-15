@@ -14,6 +14,8 @@
  * successfully.
  */
 
+import { countCharOutsideStrings } from "./rpy-helpers.js";
+
 /**
  * A character definition detected in RPY content.
  *
@@ -171,13 +173,16 @@ export function extractAndStripRpySymbols(
       // `indexOf("Character(")` would not find the substring.
       const firstOpenIdx = line.search(/Character\s*\(/);
       let body = firstOpenIdx === -1 ? "" : line.slice(firstOpenIdx);
-      let parenDepth = countChar(body, "(") - countChar(body, ")");
+      let parenDepth =
+        countCharOutsideStrings(body, "(") - countCharOutsideStrings(body, ")");
       let j = i;
       while (parenDepth > 0 && j + 1 < lines.length) {
         j += 1;
         const nextLine = lines[j];
         body += "\n" + nextLine;
-        parenDepth += countChar(nextLine, "(") - countChar(nextLine, ")");
+        parenDepth +=
+          countCharOutsideStrings(nextLine, "(") -
+          countCharOutsideStrings(nextLine, ")");
       }
       const character = parseCharacterBody(tag, body);
       if (character && !charactersByTag.has(character.tag)) {
@@ -240,34 +245,6 @@ export function extractAndStripRpySymbols(
 // ============================================================================
 // Internals
 // ============================================================================
-
-/**
- * Count occurrences of a single character in a string, skipping
- * characters inside single- or double-quoted strings. This prevents
- * parens inside display names (e.g. `"Name (suffix)"`) from being
- * counted when tracking paren depth in `Character()` definitions.
- */
-function countChar(s: string, ch: string): number {
-  let n = 0;
-  let inString: string | null = null;
-  for (let k = 0; k < s.length; k += 1) {
-    const c = s[k];
-    if (inString) {
-      if (c === "\\" && k + 1 < s.length) {
-        k += 1;
-      } else if (c === inString) {
-        inString = null;
-      }
-    } else {
-      if (c === '"' || c === "'") {
-        inString = c;
-      } else if (c === ch) {
-        n += 1;
-      }
-    }
-  }
-  return n;
-}
 
 /**
  * Parse a Character() body (the slice starting at the opening
