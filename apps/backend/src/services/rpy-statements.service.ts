@@ -289,8 +289,7 @@ function parseCharacterBody(
  * Character() body/options string. Returns the Ren'Py default
  * (`#cfcfcf`) when nothing is present.
  */
-function extractColorFromOptions(options: string | undefined): string {
-  if (!options) return "#cfcfcf";
+function extractColorFromOptions(options: string): string {
   const whoColorMatch = options.match(/who_color\s*=\s*["']?([^"')\s,]+)/);
   if (whoColorMatch) return whoColorMatch[1];
   const colorMatch = options.match(/color\s*=\s*["']?([^"')\s,]+)/);
