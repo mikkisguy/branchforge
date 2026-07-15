@@ -10,6 +10,7 @@
  */
 
 import { NotFoundError } from "../middleware/error-handler.middleware.js";
+import { countCharOutsideStrings } from "./rpy-helpers.js";
 import {
   sanitizeLabelName,
   RENPY_LABEL_REGEX,
@@ -402,10 +403,10 @@ export function extractDialogue(
     // Regex breakdown:
     // ^([a-zA-Z_][a-zA-Z0-9_]*) - Speaker tag (identifier starting with letter/underscore)
     // \s+ - Whitespace separator
-    // "((?:[^"\\]|\\.)*)" - Quoted text allowing escaped characters (\")
-    // The (?:[^"\\]|\\.)* pattern matches: non-quote/non-backslash OR escaped char
+    // "([^"\\]*(?:\\.[^"\\]*)*)" - Quoted text allowing escaped characters (\")
+    // The [^"\\]*(?:\\.[^"\\]*)* pattern matches: non-quote/non-backslash OR escaped char
     const dialogueMatch = trimmed.match(
-      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"((?:[^"\\]|\\.)*)"$/
+      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"([^"\\]*(?:\\.[^"\\]*)*)"$/
     );
     if (dialogueMatch) {
       dialogue.push({
@@ -416,7 +417,9 @@ export function extractDialogue(
     }
 
     // Try to match with single quotes: speaker 'text'
-    const dialogueMatch2 = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s+'(.*)'$/);
+    const dialogueMatch2 = trimmed.match(
+      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+'([^'\\]*(?:\\.[^'\\]*)*)'$/
+    );
     if (dialogueMatch2) {
       dialogue.push({
         speaker: dialogueMatch2[1],
@@ -426,7 +429,7 @@ export function extractDialogue(
     }
 
     // Try to match narration (just text in quotes)
-    const narrationMatch = trimmed.match(/^"(.*)"$/);
+    const narrationMatch = trimmed.match(/^"([^"\\]*(?:\\.[^"\\]*)*)"$/);
     if (narrationMatch) {
       dialogue.push({
         speaker: null,
@@ -435,7 +438,7 @@ export function extractDialogue(
       continue;
     }
 
-    const narrationMatch2 = trimmed.match(/^'(.*)'$/);
+    const narrationMatch2 = trimmed.match(/^'([^'\\]*(?:\\.[^'\\]*)*)'$/);
     if (narrationMatch2) {
       dialogue.push({
         speaker: null,
@@ -530,7 +533,7 @@ export function extractChoices(
 
           // Check for jump statement before breaking on indentation
           const jumpMatch = nextTrimmed.match(
-            /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/
+            /^jump\s+(?!expression\b)([a-zA-Z_][a-zA-Z0-9_]*)/
           );
           if (jumpMatch) {
             target = jumpMatch[1];
@@ -579,7 +582,7 @@ export function extractChoices(
 
           // Check for jump statement before breaking on indentation
           const jumpMatch = nextTrimmed.match(
-            /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/
+            /^jump\s+(?!expression\b)([a-zA-Z_][a-zA-Z0-9_]*)/
           );
           if (jumpMatch) {
             target = jumpMatch[1];
@@ -641,10 +644,12 @@ export function extractJumps(
 
     if (!currentLabel) continue;
 
-    // Check for jump statement
-    const jumpMatch = trimmed.match(/^jump\s+(.+)$/);
+    // Check for jump statement (negative lookahead skips dynamic "jump expression")
+    const jumpMatch = trimmed.match(
+      /^jump\s+(?!expression\b)([a-zA-Z_][a-zA-Z0-9_]*)/
+    );
     if (jumpMatch) {
-      const target = jumpMatch[1].trim();
+      const target = jumpMatch[1];
       const jumpKey = `${currentLabel}->${target}`;
       if (!jumpSet.has(jumpKey)) {
         jumpSet.add(jumpKey);
@@ -653,8 +658,10 @@ export function extractJumps(
       continue;
     }
 
-    // Check for call statement
-    const callMatch = trimmed.match(/^call\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+    // Check for call statement (negative lookahead skips dynamic "call expression")
+    const callMatch = trimmed.match(
+      /^call\s+(?!expression\b)([a-zA-Z_][a-zA-Z0-9_]*)/
+    );
     if (callMatch) {
       const target = callMatch[1];
       const jumpKey = `${currentLabel}->${target}`;
@@ -685,7 +692,7 @@ export function extractJumps(
         }
 
         const nestedJumpMatch = nextTrimmed.match(
-          /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/
+          /^jump\s+(?!expression\b)([a-zA-Z_][a-zA-Z0-9_]*)/
         );
         if (nestedJumpMatch) {
           const target = nestedJumpMatch[1];
@@ -712,7 +719,7 @@ export function extractJumps(
             const elseTrimmed = elseLine.trim();
 
             const elseJumpMatch = elseTrimmed.match(
-              /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/
+              /^jump\s+(?!expression\b)([a-zA-Z_][a-zA-Z0-9_]*)/
             );
             if (elseJumpMatch) {
               const target = elseJumpMatch[1];
@@ -763,6 +770,29 @@ function extractCharacters(
   let inCharacterDef = false;
   let parenDepth = 0;
 
+  // Extract the first double-quoted string from s (with escape handling).
+  // Returns the content and the index after the closing quote, or null.
+  function extractFirstQuotedString(
+    s: string
+  ): { content: string; endIndex: number } | null {
+    const startIdx = s.indexOf('"');
+    if (startIdx === -1) return null;
+    let i = startIdx + 1;
+    let result = "";
+    while (i < s.length) {
+      if (s[i] === "\\" && i + 1 < s.length) {
+        result += s[i + 1];
+        i += 2;
+      } else if (s[i] === '"') {
+        return { content: result, endIndex: i + 1 };
+      } else {
+        result += s[i];
+        i++;
+      }
+    }
+    return null; // unclosed quote
+  }
+
   for (const line of lines) {
     const trimmed = line.trim();
 
@@ -774,24 +804,35 @@ function extractCharacters(
     // Check for single-line character definition
     // Format: define tag = Character("name", options...)
     const singleLineMatch = trimmed.match(
-      /define\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\(\s*"([^"]+)"(\s*,\s*([^)]*))?\s*\)/
+      /define\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*Character\s*\(\s*/
     );
-    if (singleLineMatch && !trimmed.includes("\n")) {
+    if (singleLineMatch) {
       const tag = singleLineMatch[1];
-      const name = singleLineMatch[2];
-      const options = singleLineMatch[4]; // May be undefined if no options
+      const afterPrefix = trimmed.slice(singleLineMatch[0].length);
 
-      // Extract color if present
-      let color: string | undefined = undefined;
-      if (options) {
-        const colorMatch = options.match(/color\s*=\s*["']?([^"')\s]+)/);
-        if (colorMatch) {
-          color = colorMatch[1];
+      // Extract quoted name manually (avoids ReDoS)
+      const nameResult = extractFirstQuotedString(afterPrefix);
+      const name = nameResult?.content;
+
+      if (name !== undefined && nameResult) {
+        const afterName = afterPrefix.slice(nameResult.endIndex).trimStart();
+        // Match closing paren and optional options
+        const closingMatch = afterName.match(/^\s*\)$/);
+        const optionsMatch = afterName.match(/^\s*,\s*([^)]*)\s*\)$/);
+
+        if (closingMatch || optionsMatch) {
+          const options = optionsMatch ? optionsMatch[1] : undefined;
+
+          let color: string | undefined = undefined;
+          if (options) {
+            const colorMatch = options.match(/color\s*=\s*["']?([^"')\s]+)/);
+            if (colorMatch) color = colorMatch[1];
+          }
+
+          characters.push({ tag, name, color });
+          continue;
         }
       }
-
-      characters.push({ tag, name, color });
-      continue;
     }
 
     // Check for start of multi-line character definition
@@ -803,19 +844,19 @@ function extractCharacters(
       const rest = multiLineStartMatch[2];
 
       // Check if name is on the same line
-      const nameMatch = rest.match(/"([^"]*)"/);
-      const name = nameMatch ? nameMatch[1] : undefined;
+      const quoted = extractFirstQuotedString(rest);
+      const name = quoted ? quoted.content : undefined;
 
       pendingCharacter = { tag, name, options: [] };
       inCharacterDef = true;
       parenDepth =
-        (rest.match(/\(/g) || []).length - (rest.match(/\)/g) || []).length;
+        countCharOutsideStrings(rest, "(") - countCharOutsideStrings(rest, ")");
 
       // Extract options from the rest of the line (excluding the name we already captured)
-      if (nameMatch) {
-        const optionsPart = rest
-          .substring(rest.indexOf(nameMatch[0]) + nameMatch[0].length)
-          .trim();
+      if (quoted) {
+        // Find the start of the quoted string to compute its position
+        const quoteStart = rest.indexOf('"');
+        const optionsPart = rest.substring(quoteStart + quoted.endIndex).trim();
         if (optionsPart.startsWith(",")) {
           pendingCharacter.options.push(optionsPart.substring(1).trim());
         }
@@ -828,16 +869,16 @@ function extractCharacters(
     // Continue multi-line character definition
     if (inCharacterDef && pendingCharacter) {
       // Track parentheses to find end of definition
-      parenDepth += (line.match(/\(/g) || []).length;
-      parenDepth -= (line.match(/\)/g) || []).length;
+      parenDepth +=
+        countCharOutsideStrings(line, "(") - countCharOutsideStrings(line, ")");
 
       // Capture options
       if (trimmed && !trimmed.startsWith("#")) {
         // Check if this line contains the name (if not already found)
         if (!pendingCharacter.name) {
-          const nameMatch = trimmed.match(/"([^"]+)"/);
-          if (nameMatch) {
-            pendingCharacter.name = nameMatch[1];
+          const quoted = extractFirstQuotedString(trimmed);
+          if (quoted) {
+            pendingCharacter.name = quoted.content;
           }
         }
         pendingCharacter.options.push(trimmed);
@@ -1011,7 +1052,7 @@ export function parseRPYFileWithLabels(
 
       // Extract dialogue
       const dialogueMatch = trimmed.match(
-        /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"((?:[^"\\]|\\.)*)"$/
+        /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"([^"\\]*(?:\\.[^"\\]*)*)"$/
       );
       if (dialogueMatch) {
         currentLabelData.dialogue.push({
@@ -1022,11 +1063,33 @@ export function parseRPYFileWithLabels(
         continue;
       }
 
-      const narrationMatch = trimmed.match(/^"(.*)"$/);
+      // Single-quoted dialogue: speaker 'text'
+      const dialogueMatch2 = trimmed.match(
+        /^([a-zA-Z_][a-zA-Z0-9_]*)\s+'([^'\\]*(?:\\.[^'\\]*)*)'$/
+      );
+      if (dialogueMatch2) {
+        currentLabelData.dialogue.push({
+          speaker: dialogueMatch2[1],
+          text: dialogueMatch2[2],
+          lineNumber: i + 1,
+        });
+        continue;
+      }
+
+      const narrationMatch = trimmed.match(/^"([^"\\]*(?:\\.[^"\\]*)*)"$/);
       if (narrationMatch) {
         currentLabelData.dialogue.push({
           speaker: null,
           text: narrationMatch[1],
+          lineNumber: i + 1,
+        });
+      }
+
+      const narrationMatch2 = trimmed.match(/^'([^'\\]*(?:\\.[^'\\]*)*)'$/);
+      if (narrationMatch2) {
+        currentLabelData.dialogue.push({
+          speaker: null,
+          text: narrationMatch2[1],
           lineNumber: i + 1,
         });
       }
@@ -1039,6 +1102,7 @@ export function parseRPYFileWithLabels(
 
     // Now extract choices and jumps for each label
     // We need to track which label we're in and associate choices/jumps with it
+    const labelMap = new Map(result.labels.map((l) => [l.label, l]));
     let currentLabelForTracking = "";
 
     // Reuse the pre-computed skipLines to avoid duplicating screen block logic
@@ -1058,9 +1122,7 @@ export function parseRPYFileWithLabels(
       }
 
       // Find the label data for this label
-      const labelData = result.labels.find(
-        (l) => l.label === currentLabelForTracking
-      );
+      const labelData = labelMap.get(currentLabelForTracking);
       if (!labelData) continue;
 
       // Check for menu start
@@ -1137,7 +1199,7 @@ export function parseRPYFileWithLabels(
 
               // Extract jump target
               const jumpInChoice = bodyTrimmed.match(
-                /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/
+                /^jump\s+(?!expression\b)([a-zA-Z_][a-zA-Z0-9_]*)/
               );
               if (jumpInChoice) {
                 target = jumpInChoice[1];
@@ -1192,8 +1254,10 @@ export function parseRPYFileWithLabels(
         }
       }
 
-      // Check for jump statement
-      const jumpMatch = trimmed.match(/^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+      // Check for jump statement (negative lookahead skips dynamic "jump expression")
+      const jumpMatch = trimmed.match(
+        /^jump\s+(?!expression\b)([a-zA-Z_][a-zA-Z0-9_]*)/
+      );
       if (jumpMatch) {
         labelData.jumps.push({
           to: jumpMatch[1],
@@ -1366,16 +1430,23 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
 
     // Check if this is a dialogue line
     const dialogueMatch = trimmed.match(
-      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"((?:[^"\\]|\\.)*)"$/
+      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"([^"\\]*(?:\\.[^"\\]*)*)"$/
     );
-    const narrationMatch = trimmed.match(/^"(.*)"$/);
+    const dialogueMatchSingle = trimmed.match(
+      /^([a-zA-Z_][a-zA-Z0-9_]*)\s+'([^'\\]*(?:\\.[^'\\]*)*)'$/
+    );
+    const narrationMatch = trimmed.match(/^"([^"\\]*(?:\\.[^"\\]*)*)"$/);
+    const narrationMatchSingle = trimmed.match(/^'([^'\\]*(?:\\.[^'\\]*)*)'$/);
 
     // Match and replace dialogue/narration both outside AND inside menu blocks.
     // Menu titles are editable entries that should be updated like any other
     // dialogue. The label-end insertion below handles the case where there are
     // more entries than original lines.
     if (
-      (dialogueMatch || narrationMatch) &&
+      (dialogueMatch ||
+        dialogueMatchSingle ||
+        narrationMatch ||
+        narrationMatchSingle) &&
       currentLabel &&
       updatedDialogue.has(currentLabel)
     ) {
@@ -1395,11 +1466,15 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
         const newDialogue = labelDialogue[currentIndex];
         labelDialogueIndices.set(currentLabel, currentIndex + 1);
 
-        // Reconstruct dialogue line with original indentation
+        // Reconstruct dialogue line with original indentation and quote style
+        const isSingleQuoted = !!(dialogueMatchSingle || narrationMatchSingle);
+        const quote = isSingleQuoted ? "'" : '"';
         if (newDialogue.speaker) {
-          result.push(`${indent}${newDialogue.speaker} "${newDialogue.text}"`);
+          result.push(
+            `${indent}${newDialogue.speaker} ${quote}${newDialogue.text}${quote}`
+          );
         } else {
-          result.push(`${indent}"${newDialogue.text}"`);
+          result.push(`${indent}${quote}${newDialogue.text}${quote}`);
         }
         continue;
       }
@@ -1630,7 +1705,10 @@ export function convertToBranchForgeFormatFromLabels(
       i <= labelEndLine && i <= originalLines.length;
       i++
     ) {
-      const constructs = extractTechnicalConstructs(originalContent!, i - 1); // 0-indexed
+      const constructs = extractTechnicalConstructsFromLines(
+        originalLines,
+        i - 1
+      ); // 0-indexed
       if (constructs.visuals && constructs.visuals.length > 0) {
         entries.push({
           type: "VISUAL",
@@ -2022,7 +2100,7 @@ export function replaceLabelDialogue(
 
       // Skip dialogue lines within the target label (they'll be replaced)
       const dialogueMatch = trimmed.match(
-        /^(?:([a-zA-Z_][a-zA-Z0-9_]*)\s+)?"((?:[^"\\]|\\.)*)"$/
+        /^(?:([a-zA-Z_][a-zA-Z0-9_]*)\s+)?"([^"\\]*(?:\\.[^"\\]*)*)"$/
       );
       if (dialogueMatch && trimmed !== '" "') {
         // This is a dialogue line - skip it
@@ -2163,18 +2241,17 @@ export function generateRpyFile(scene: BranchForgeScene): string {
 }
 
 /**
- * Extract technical constructs from a specific line in RPY content
- * Used for displaying badges in write mode to show jumps, conditions, visuals, etc.
+ * Extract technical constructs from a specific line in RPY content.
+ * Internal version that accepts pre-split lines to avoid repeated splitting.
  *
- * @param rpyContent - Full RPY file content
+ * @param lines - Pre-split RPY file lines
  * @param lineNumber - Line number to analyze (0-based)
  * @returns Technical constructs found at or related to this line
  */
-export function extractTechnicalConstructs(
-  rpyContent: string,
+function extractTechnicalConstructsFromLines(
+  lines: string[],
   lineNumber: number
 ): TechnicalConstructs {
-  const lines = rpyContent.split("\n");
   const constructs: TechnicalConstructs = {};
 
   // Bounds check
@@ -2185,8 +2262,10 @@ export function extractTechnicalConstructs(
   const line = lines[lineNumber];
   const trimmed = line.trim();
 
-  // Extract jump
-  const jumpMatch = trimmed.match(/^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+  // Extract jump (negative lookahead skips dynamic "jump expression")
+  const jumpMatch = trimmed.match(
+    /^jump\s+(?!expression\b)([a-zA-Z_][a-zA-Z0-9_]*)/
+  );
   if (jumpMatch) {
     constructs.jumpTarget = jumpMatch[1];
     return constructs;
@@ -2265,7 +2344,7 @@ export function extractTechnicalConstructs(
 
           // Extract jump target
           const jumpInChoice = bodyLine.match(
-            /^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/
+            /^jump\s+(?!expression\b)([a-zA-Z_][a-zA-Z0-9_]*)/
           );
           if (jumpInChoice) {
             choice.targetLabelId = jumpInChoice[1];
@@ -2472,6 +2551,25 @@ export function extractTechnicalConstructs(
   }
 
   return constructs;
+}
+
+/**
+ * Extract technical constructs from a specific line in RPY content.
+ * Public wrapper that splits content into lines and delegates to the
+ * internal implementation.
+ *
+ * @param rpyContent - Full RPY file content
+ * @param lineNumber - Line number to analyze (0-based)
+ * @returns Technical constructs found at or related to this line
+ */
+export function extractTechnicalConstructs(
+  rpyContent: string,
+  lineNumber: number
+): TechnicalConstructs {
+  return extractTechnicalConstructsFromLines(
+    rpyContent.split("\n"),
+    lineNumber
+  );
 }
 
 /**
