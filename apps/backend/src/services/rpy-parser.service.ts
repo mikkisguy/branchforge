@@ -2497,21 +2497,24 @@ function extractTechnicalConstructsFromLines(
       }
 
       // Bare identifier (truthy check)
-      const varMatches = part.match(
-        /([a-zA-Z_][a-zA-Z0-9_]*)(?![a-zA-Z0-9_(]*\()/g
-      );
-      if (varMatches) {
-        for (const varName of varMatches) {
-          if (
-            !keywords.has(varName) &&
-            !constructs.conditions.variables![varName]
-          ) {
-            constructs.conditions.variables![varName] = {
-              value: true,
-              operator: "truthy",
-            };
-          }
+      // Use matchAll with a simple identifier regex, then filter out
+      // function calls separately to avoid ReDoS in the lookahead.
+      for (const m of part.matchAll(/[a-zA-Z_][a-zA-Z0-9_]*/g)) {
+        const varName = m[0];
+        if (
+          keywords.has(varName) ||
+          constructs.conditions.variables![varName]
+        ) {
+          continue;
         }
+        // Skip identifiers that are function calls (followed by '(',
+        // optionally with whitespace between the name and the paren).
+        const after = part.slice(m.index + varName.length);
+        if (/^\s*\(/.test(after)) continue;
+        constructs.conditions.variables![varName] = {
+          value: true,
+          operator: "truthy",
+        };
       }
     }
 
