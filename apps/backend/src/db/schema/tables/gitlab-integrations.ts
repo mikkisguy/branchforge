@@ -13,7 +13,9 @@ import {
   integer,
   index,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import {
   syncOperationEnum,
   syncStatusEnum,
@@ -68,6 +70,12 @@ export const projectFileSyncState = pgTable(
       table.projectFileId
     ),
     index("project_file_sync_state_status_idx").on(table.status),
+    // Prevent concurrent syncs: only one in-progress row per project file
+    uniqueIndex("project_file_sync_state_in_progress_unique_idx")
+      .on(table.projectFileId)
+      .where(
+        sql`${table.status} = 'MODIFIED_LOCAL' AND ${table.completedAt} IS NULL`
+      ),
   ]
 );
 

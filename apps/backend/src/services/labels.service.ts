@@ -37,6 +37,7 @@ import {
 } from "@branchforge/shared";
 import type { IncomingJump } from "@branchforge/shared";
 import { createAuditFields, updateAuditFields } from "../lib/audit.js";
+import { isUniqueConstraintViolation } from "../lib/db.js";
 import {
   NotFoundError,
   ForbiddenError,
@@ -75,8 +76,7 @@ export type { PublicLabel };
  * Only includes the query methods actually used by reconstructFileForLabel.
  */
 type QueryContext =
-  | Pick<ReturnType<typeof getDb>, "select">
-  | Pick<Transaction, "select">;
+  Pick<ReturnType<typeof getDb>, "select"> | Pick<Transaction, "select">;
 
 // ============================================================================
 // Constants
@@ -206,27 +206,84 @@ async function checkContentAlreadySynced(
 }
 
 /**
- * Create a new sync state record
+ * Create a new sync state record.
+ *
+ * Uses a partial unique index on project_file_sync_state(project_file_id)
+ * for in-progress rows to prevent TOCTOU races between checkInProgressSync
+ * and createSyncState. If a concurrent sync already created an in-progress
+ * row, the insert fails with a unique violation and we handle it gracefully.
+ *
+ * @returns The sync state ID, or null if the content has already been synced
+ *          by a concurrent caller (idempotent case).
  */
 async function createSyncState(
   projectFileId: string,
   contentHash: string,
-  labelCount: number
-): Promise<string> {
+  labelCount: number,
+  _retryCount = 0
+): Promise<string | null> {
+  const MAX_RETRIES = 3;
   const db = getDb();
 
-  const [syncState] = await db
-    .insert(projectFileSyncState)
-    .values({
-      projectFileId,
-      contentHash,
-      status: "MODIFIED_LOCAL",
-      rpyLabelCount: labelCount,
-      dbLabelCount: 0,
-    })
-    .returning();
+  try {
+    const [syncState] = await db
+      .insert(projectFileSyncState)
+      .values({
+        projectFileId,
+        contentHash,
+        status: "MODIFIED_LOCAL",
+        rpyLabelCount: labelCount,
+        dbLabelCount: 0,
+      })
+      .returning();
 
-  return syncState.id;
+    return syncState.id;
+  } catch (error) {
+    // TOCTOU race: another concurrent sync already created an in-progress row
+    if (isUniqueConstraintViolation(error)) {
+      // Query the existing in-progress row
+      const [existing] = await db
+        .select()
+        .from(projectFileSyncState)
+        .where(
+          and(
+            eq(projectFileSyncState.projectFileId, projectFileId),
+            eq(projectFileSyncState.status, "MODIFIED_LOCAL"),
+            isNull(projectFileSyncState.completedAt)
+          )
+        )
+        .limit(1);
+
+      // Any active in-progress sync — matching contentHash or not — is a
+      // genuine concurrent call. Fail fast so the caller can retry after
+      // the in-progress transaction commits.
+      if (existing) {
+        throw new ConflictError("Sync already in progress for this file");
+      }
+
+      // The concurrent sync completed between our failed INSERT and SELECT.
+      // Re-check idempotency — the content may already be synced.
+      const alreadySynced = await checkContentAlreadySynced(
+        projectFileId,
+        contentHash
+      );
+      if (alreadySynced) {
+        return null; // signal idempotent skip to caller
+      }
+
+      // Not yet synced and no in-progress row — race window passed, retry
+      if (_retryCount < MAX_RETRIES) {
+        return createSyncState(
+          projectFileId,
+          contentHash,
+          labelCount,
+          _retryCount + 1
+        );
+      }
+      throw new ConflictError("Sync failed after multiple concurrent attempts");
+    }
+    throw error;
+  }
 }
 
 /**
@@ -672,10 +729,12 @@ async function syncLabelsInTransaction(
     }
   }
 
+  // Normalize to lowercase for case-insensitive matching (matches the
+  // partial unique index on labels(project_file_id, lower(label_name)))
   const existingLabelsByName = new Map<string, (typeof existingLabels)[0]>();
   for (const labelRow of existingLabels) {
     if (labelRow.labelName) {
-      existingLabelsByName.set(labelRow.labelName, labelRow);
+      existingLabelsByName.set(labelRow.labelName.toLowerCase(), labelRow);
     }
   }
 
@@ -686,8 +745,10 @@ async function syncLabelsInTransaction(
   const errors: Array<{ label: string; error: string }> = [];
   const affectedLabelIds: string[] = [];
 
-  // Build set of parsed label names (for rename detection)
-  const parsedLabelNames = new Set(parsed.labels.map((l) => l.label));
+  // Build set of parsed label names (for rename detection, case-insensitive)
+  const parsedLabelNames = new Set(
+    parsed.labels.map((l) => l.label.toLowerCase())
+  );
 
   // Track which existing labels have been matched (by name or rename)
   // to avoid double-matching an existing label when detecting renames
@@ -738,8 +799,20 @@ async function syncLabelsInTransaction(
       rpyContent
     );
 
+    // Deferred line count — only added to linesProcessed after RELEASE SAVEPOINT
+    // succeeds, avoiding counter drift if a per-label savepoint rolls back.
+    let iterLinesProcessed = 0;
+
+    // Use SAVEPOINT to isolate each label's operations within the transaction.
+    // If one label fails (e.g. validation error), we roll back only that
+    // label's work while preserving the rest of the transaction.
+    const savepointName = `sp_label_${i}`;
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(savepointName)) {
+      throw new Error(`Invalid savepoint name: ${savepointName}`);
+    }
+    await tx.execute(sql.raw(`SAVEPOINT ${savepointName}`));
     try {
-      const existingLabel = existingLabelsByName.get(label.label);
+      const existingLabel = existingLabelsByName.get(label.label.toLowerCase());
 
       if (existingLabel) {
         // If existing label is soft-deleted, create a new one instead of reviving
@@ -768,8 +841,6 @@ async function syncLabelsInTransaction(
             })
             .returning();
 
-          affectedLabelIds.push(newScene.id);
-
           // Insert lines in batch
           if (labelData.entries.length > 0) {
             const lineValues = buildLineValues(
@@ -780,10 +851,15 @@ async function syncLabelsInTransaction(
             );
 
             await tx.insert(labelLines).values(lineValues);
-            linesProcessed += lineValues.length;
+            iterLinesProcessed += lineValues.length;
           }
 
+          // JS state mutations after all DB operations (avoids savepoint drift)
+          affectedLabelIds.push(newScene.id);
           labelsCreated++;
+
+          linesProcessed += iterLinesProcessed;
+          await tx.execute(sql.raw(`RELEASE SAVEPOINT ${savepointName}`));
           continue;
         }
 
@@ -805,7 +881,7 @@ async function syncLabelsInTransaction(
           );
 
           await tx.insert(labelLines).values(lineValues);
-          linesProcessed += lineValues.length;
+          iterLinesProcessed += lineValues.length;
         }
 
         // Update label sync metadata (clear deletedAt to revive if soft-deleted)
@@ -834,7 +910,7 @@ async function syncLabelsInTransaction(
             s.labelName &&
             !matchedExistingIds.has(s.id) &&
             !s.deletedAt &&
-            !parsedLabelNames.has(s.labelName)
+            !parsedLabelNames.has(s.labelName.toLowerCase())
         );
 
         // Pass 1: exact hash match
@@ -927,8 +1003,6 @@ async function syncLabelsInTransaction(
         }
 
         if (renameCandidate) {
-          matchedExistingIds.add(renameCandidate.id);
-
           // Delete old lines
           await tx
             .delete(labelLines)
@@ -945,7 +1019,7 @@ async function syncLabelsInTransaction(
               lookupMaps
             );
             await tx.insert(labelLines).values(lineValues);
-            linesProcessed += lineValues.length;
+            iterLinesProcessed += lineValues.length;
           }
 
           // Rename existing label: update labelName, preserve custom title
@@ -972,6 +1046,8 @@ async function syncLabelsInTransaction(
             })
             .where(eq(labels.id, renameCandidate.id));
 
+          // JS state mutations after all DB operations (avoids savepoint drift)
+          matchedExistingIds.add(renameCandidate.id);
           affectedLabelIds.push(renameCandidate.id);
           labelsUpdated++;
         } else {
@@ -999,8 +1075,6 @@ async function syncLabelsInTransaction(
             })
             .returning();
 
-          affectedLabelIds.push(newScene.id);
-
           // Insert lines in batch
           if (labelData.entries.length > 0) {
             const lineValues = buildLineValues(
@@ -1011,13 +1085,22 @@ async function syncLabelsInTransaction(
             );
 
             await tx.insert(labelLines).values(lineValues);
-            linesProcessed += lineValues.length;
+            iterLinesProcessed += lineValues.length;
           }
 
+          // JS state mutations after all DB operations (avoids savepoint drift)
+          affectedLabelIds.push(newScene.id);
           labelsCreated++;
         }
       }
+      // Release the savepoint on success; on error the catch block
+      // handles ROLLBACK TO SAVEPOINT instead. Deferred line count
+      // committed only after the savepoint is released successfully.
+      linesProcessed += iterLinesProcessed;
+      await tx.execute(sql.raw(`RELEASE SAVEPOINT ${savepointName}`));
     } catch (error) {
+      // Roll back only this label's operations; the transaction remains viable
+      await tx.execute(sql.raw(`ROLLBACK TO SAVEPOINT ${savepointName}`));
       errors.push({
         label: label.label,
         error: error instanceof Error ? error.message : "Unknown error",
@@ -1028,14 +1111,16 @@ async function syncLabelsInTransaction(
   // Orphan cleanup (labels that no longer exist in RPY content)
   let labelsDeleted = 0;
   if (!skipCleanup) {
-    const currentLabelNames = new Set(parsed.labels.map((l) => l.label));
+    const currentLabelNames = new Set(
+      parsed.labels.map((l) => l.label.toLowerCase())
+    );
 
     // Find orphaned labels (excluding already soft-deleted and labels
     // that were handled during the main loop — matched by name or renamed)
     const orphanedLabels = existingLabels.filter(
       (s: (typeof existingLabels)[0]) =>
         s.labelName &&
-        !currentLabelNames.has(s.labelName) &&
+        !currentLabelNames.has(s.labelName.toLowerCase()) &&
         !s.deletedAt &&
         !matchedExistingIds.has(s.id)
     );
@@ -1360,6 +1445,14 @@ export async function syncLabelsFromGitLabFile(
       parsed.labels.length
     );
 
+    // createSyncState returns null when a concurrent sync already completed
+    // with the same content (idempotent case).
+    if (syncStateId === null) {
+      result.skipped = true;
+      result.success = true;
+      return result;
+    }
+
     // Step 7-9: Validate and sync in a single try block for proper error handling
     try {
       // Step 7: Validate file type from database
@@ -1415,30 +1508,13 @@ export async function syncLabelsFromGitLabFile(
       }
 
       // Step 11: Complete sync state (critical for unblocking checkInProgressSync)
-      try {
-        await completeSyncState(
-          syncStateId,
-          true,
-          syncResult.labelsCreated + syncResult.labelsUpdated
-        );
-      } catch (syncStateError) {
-        // This is critical - if it fails, checkInProgressSync will block future syncs
-        const errorMessage =
-          syncStateError instanceof Error
-            ? syncStateError.message
-            : "Unknown error";
-        logError(
-          LogEventType.SERVICE_ERROR,
-          {
-            event: "sync_state_completion_failed",
-            projectFileId,
-            syncStateId,
-            error: errorMessage,
-            note: "Sync state record not completed - future syncs may be blocked",
-          },
-          syncStateError
-        );
-      }
+      // If this fails, the caller receives the error so they can act on it
+      // rather than silently leaving a permanent sync lock.
+      await completeSyncState(
+        syncStateId,
+        true,
+        syncResult.labelsCreated + syncResult.labelsUpdated
+      );
 
       // Return success
       return {
@@ -1452,13 +1528,33 @@ export async function syncLabelsFromGitLabFile(
         affectedLabelIds: syncResult.affectedLabelIds,
       };
     } catch (error) {
-      // Transaction failed - mark sync as failed
-      await completeSyncState(
-        syncStateId,
-        false,
-        undefined,
-        error instanceof Error ? error.message : "Unknown error"
-      );
+      // Transaction failed - mark sync as failed. If the completion update
+      // itself fails, log it but still throw the original transaction error
+      // so operators see the real root cause.
+      try {
+        await completeSyncState(
+          syncStateId,
+          false,
+          undefined,
+          error instanceof Error ? error.message : "Unknown error"
+        );
+      } catch (syncStateError) {
+        logError(
+          LogEventType.SERVICE_ERROR,
+          {
+            event: "sync_state_completion_failed",
+            projectFileId,
+            syncStateId,
+            originalError:
+              error instanceof Error ? error.message : "Unknown error",
+            completionError:
+              syncStateError instanceof Error
+                ? syncStateError.message
+                : "Unknown error",
+          },
+          syncStateError
+        );
+      }
 
       throw error;
     }
