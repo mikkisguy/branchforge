@@ -5,7 +5,10 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { generateCharacterDefinitionsFile } from "../rpy-generator.service.js";
+import {
+  generateCharacterDefinitionsFile,
+  generateConditionCode,
+} from "../rpy-generator.service.js";
 
 describe("RPYGeneratorService", () => {
   describe("generateCharacterDefinitionsFile", () => {
@@ -299,6 +302,38 @@ describe("RPYGeneratorService", () => {
       );
       expect(result).toContain('define b = Character("Red", color="#ff0000")');
       expect(result).toContain('define c = Character("Blue", color="#0000ff")');
+    });
+  });
+
+  describe("generateConditionCode", () => {
+    it("generates a guard clause for a stat condition with >=", () => {
+      const code = generateConditionCode(
+        { stats: { health: { value: 50, operator: ">=" } } },
+        1
+      );
+      expect(code).toEqual(["    if not (health >= 50):", "        return"]);
+    });
+
+    it("generates a guard clause for a plain-number stat (legacy)", () => {
+      const code = generateConditionCode({ stats: { health: 50 } }, 1);
+      // legacy plain numbers default to operator ">="
+      expect(code).toEqual(["    if not (health >= 50):", "        return"]);
+    });
+
+    it("generates guard clauses for a variable condition (truthy)", () => {
+      const code = generateConditionCode(
+        { variables: { met_alex: { value: true, operator: "truthy" } } },
+        1
+      );
+      expect(code).toEqual(["    if not (met_alex):", "        return"]);
+    });
+
+    it("skips invalid stat names and still generates valid code", () => {
+      const code = generateConditionCode(
+        { stats: { "123invalid": { value: 50, operator: "==" } } },
+        1
+      );
+      expect(code).toEqual([]);
     });
   });
 });

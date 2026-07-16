@@ -24,13 +24,7 @@ import type {
  * Matches the database enum for label_lines.contentType
  */
 export type ContentType =
-  | "NARRATION"
-  | "DIALOGUE"
-  | "CHOICE"
-  | "MENU"
-  | "JUMP"
-  | "FLAG"
-  | "VISUAL";
+  "NARRATION" | "DIALOGUE" | "CHOICE" | "MENU" | "JUMP" | "FLAG" | "VISUAL";
 
 /**
  * Type for line-level conditions
@@ -122,7 +116,9 @@ function isStrictContentType(type: string): type is StrictContentType {
  * @param value - Either a number or a StatCondition object
  * @returns A normalized StatCondition object
  */
-function normalizeStatCondition(value: number | StatCondition): StatCondition {
+export function normalizeStatCondition(
+  value: number | StatCondition
+): StatCondition {
   if (typeof value === "number") {
     return { value, operator: DEFAULT_OPERATOR };
   }

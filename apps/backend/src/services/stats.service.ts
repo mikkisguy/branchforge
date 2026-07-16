@@ -17,7 +17,11 @@ import {
 } from "../middleware/error-handler.middleware.js";
 import { requireProjectOwnership } from "./authz.service.js";
 import { isUniqueConstraintViolation } from "../lib/db.js";
-import type { StatLabelEffect, StatProgression } from "@branchforge/shared";
+import type {
+  StatLabelEffect,
+  StatProgression,
+  StatCondition,
+} from "@branchforge/shared";
 import type { CreateStatInput, UpdateStatInput } from "../lib/validation.js";
 
 // ============================================================================
@@ -251,13 +255,19 @@ export class StatsService {
 
       for (const label of projectLabels) {
         const conditions = (label.conditions ?? {}) as {
-          stats?: Record<string, number>;
+          stats?: Record<string, StatCondition | number>;
         };
         const fx = (label.effects ?? {}) as {
           stats?: Record<string, number>;
         };
 
-        const conditionValue = conditions.stats?.[stat.key] ?? null;
+        const rawCondition = conditions.stats?.[stat.key] ?? null;
+        const conditionValue: number | null =
+          rawCondition !== null
+            ? typeof rawCondition === "number"
+              ? rawCondition
+              : (rawCondition as StatCondition).value
+            : null;
         const effectDelta = fx.stats?.[stat.key] ?? null;
 
         // Only include labels that actually reference this stat

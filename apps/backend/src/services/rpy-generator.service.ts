@@ -5,8 +5,13 @@
  * Patches existing RPY content with conditional logic and variable assignments.
  */
 
-import { RENPY_LABEL_REGEX, type VariableCondition } from "@branchforge/shared";
+import {
+  RENPY_LABEL_REGEX,
+  type VariableCondition,
+  type StatCondition,
+} from "@branchforge/shared";
 import { logWarn, LogEventType } from "../lib/logger.js";
+import { normalizeStatCondition } from "./label-line-mapper.js";
 
 // ============================================================================
 // Types
@@ -48,7 +53,7 @@ export function escapeRenpyString(value: string): string {
  */
 export interface Conditions {
   variables?: Record<string, VariableCondition>;
-  stats?: Record<string, number>;
+  stats?: Record<string, StatCondition | number>;
 }
 
 /**
@@ -146,9 +151,11 @@ export function generateConditionCode(
     }
   }
 
-  // Generate stat checks
+  // Generate stat checks (guard clauses: negate condition so label is
+  // reachable only when the condition is satisfied, consistent with the
+  // variable-conditions pattern above).
   if (conditions.stats) {
-    for (const [stat, value] of Object.entries(conditions.stats)) {
+    for (const [stat, cond] of Object.entries(conditions.stats)) {
       // Validate stat name before using it
       if (!isValidRenpyIdentifier(stat)) {
         logWarn(LogEventType.VALIDATION_WARNING, {
@@ -156,7 +163,11 @@ export function generateConditionCode(
         });
         continue;
       }
-      lines.push(`${indent}if ${stat} < ${value}:`);
+      // Defensively handle legacy plain-number values (pre-schema-change data)
+      const statCond = normalizeStatCondition(cond as number | StatCondition);
+      lines.push(
+        `${indent}if not (${stat} ${statCond.operator} ${statCond.value}):`
+      );
       lines.push(`${nestedIndent}return`);
     }
   }

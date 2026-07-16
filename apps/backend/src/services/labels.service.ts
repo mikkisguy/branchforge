@@ -31,7 +31,6 @@ import {
   LabelStatus,
   sanitizeLabelName,
   RENPY_LABEL_REGEX,
-  type ComparisonOperator,
   type StatCondition,
   type VariableCondition,
 } from "@branchforge/shared";
@@ -57,6 +56,7 @@ import {
 import { calculateContentHash, calculateLinesHash } from "../lib/hash.js";
 import {
   mapEntryToDbType,
+  normalizeStatCondition,
   type ContentType,
   type VisualStatement,
 } from "./label-line-mapper.js";
@@ -85,6 +85,28 @@ type QueryContext =
 // Maximum attempts to find a unique label name before falling back to timestamp/UUID
 const MAX_LABEL_ATTEMPTS = 1000;
 
+// Sync lease timeout: if an in-progress sync has a startedAt older than this,
+// it is considered stale and can be reclaimed by a new sync.
+const SYNC_LEASE_TIMEOUT_MS = 5 * 60 * 1000;
+
+/**
+ * Mark an in-progress sync state row as stale (timed out).
+ * Shared between checkInProgressSync and createSyncState to DRY the cleanup logic.
+ */
+async function markSyncStale(
+  db: ReturnType<typeof getDb>,
+  row: { id: string }
+): Promise<void> {
+  await db
+    .update(projectFileSyncState)
+    .set({
+      status: "CONFLICT",
+      completedAt: new Date(),
+      errorMessage: "Sync timed out (stale lock)",
+    })
+    .where(eq(projectFileSyncState.id, row.id));
+}
+
 // ============================================================================
 // Sync Types
 // ============================================================================
@@ -98,6 +120,7 @@ export interface SyncLabelsResult {
   errors: Array<{ label: string; error: string }>;
   skipped: boolean; // True if sync was skipped due to idempotency
   affectedLabelIds: string[]; // IDs of labels created, updated, or deleted
+  dbLabelCount: number; // Actual count of active labels in DB after sync
 }
 
 export interface SyncLabelsOptions {
@@ -164,6 +187,8 @@ export function validateFileType(fileType: string): void {
  */
 async function checkInProgressSync(projectFileId: string): Promise<boolean> {
   const db = getDb();
+  const now = new Date();
+  const staleThreshold = new Date(now.getTime() - SYNC_LEASE_TIMEOUT_MS);
 
   const [inProgress] = await db
     .select()
@@ -177,7 +202,17 @@ async function checkInProgressSync(projectFileId: string): Promise<boolean> {
     )
     .limit(1);
 
-  return !!inProgress;
+  if (!inProgress) {
+    return false;
+  }
+
+  // Check if the in-progress sync is stale (lease expired)
+  if (inProgress.startedAt < staleThreshold) {
+    await markSyncStale(db, inProgress);
+    return false; // Allow new sync
+  }
+
+  return true;
 }
 
 /**
@@ -254,10 +289,29 @@ async function createSyncState(
         )
         .limit(1);
 
-      // Any active in-progress sync — matching contentHash or not — is a
-      // genuine concurrent call. Fail fast so the caller can retry after
-      // the in-progress transaction commits.
       if (existing) {
+        // Check if the existing in-progress row is stale
+        const staleThreshold = new Date(Date.now() - SYNC_LEASE_TIMEOUT_MS);
+        if (existing.startedAt < staleThreshold) {
+          await markSyncStale(db, existing);
+
+          // Retry creating the sync state
+          if (_retryCount < MAX_RETRIES) {
+            return createSyncState(
+              projectFileId,
+              contentHash,
+              labelCount,
+              _retryCount + 1
+            );
+          }
+          throw new ConflictError(
+            "Sync failed after multiple concurrent attempts"
+          );
+        }
+
+        // Any active in-progress sync — matching contentHash or not — is a
+        // genuine concurrent call. Fail fast so the caller can retry after
+        // the in-progress transaction commits.
         throw new ConflictError("Sync already in progress for this file");
       }
 
@@ -685,6 +739,7 @@ async function syncLabelsInTransaction(
   linesProcessed: number;
   errors: Array<{ label: string; error: string }>;
   affectedLabelIds: string[];
+  dbLabelCount: number;
 }> {
   // Fetch existing labels for this source file (including soft-deleted)
   // We need soft-deleted labels to check for name conflicts when creating new labels
@@ -891,6 +946,8 @@ async function syncLabelsInTransaction(
             contentHash: labelLinesHash,
             lastSyncedHash: labelLinesHash,
             syncStatus: "SYNCED",
+            labelPosition: i,
+            sequenceOrder: i,
             updatedAt: new Date(),
             deletedAt: null,
           })
@@ -1154,6 +1211,9 @@ async function syncLabelsInTransaction(
     }
   }
 
+  // Resync all label positions to fix any remaining inconsistencies
+  await resyncLabelPositions(tx, sourceId);
+
   // Expand the recompute scope to include cross-file jump targets so their
   // `incomingJumps` stay in sync after the synced file changes.  Without this
   // expansion, labels in *other* files that are referenced by (or were
@@ -1240,6 +1300,19 @@ async function syncLabelsInTransaction(
     projectId
   );
 
+  // Query the actual count of active labels in the DB after the sync
+  const [countResult] = await tx
+    .select({ count: sql<number>`count(*)::int` })
+    .from(labels)
+    .where(
+      and(
+        eq(labels.projectId, projectId),
+        eq(labels.projectFileId, sourceId),
+        isNull(labels.deletedAt)
+      )
+    );
+  const dbLabelCount = countResult?.count ?? 0;
+
   return {
     labelsCreated,
     labelsUpdated,
@@ -1247,6 +1320,7 @@ async function syncLabelsInTransaction(
     linesProcessed,
     errors,
     affectedLabelIds,
+    dbLabelCount,
   };
 }
 
@@ -1296,6 +1370,7 @@ export async function syncLabelsFromFile(
     errors: [],
     skipped: false,
     affectedLabelIds: [],
+    dbLabelCount: 0,
   };
 
   try {
@@ -1340,8 +1415,15 @@ export async function syncLabelsFromFile(
       errors: syncResult.errors,
       skipped: false,
       affectedLabelIds: syncResult.affectedLabelIds,
+      dbLabelCount: syncResult.dbLabelCount,
     };
   } catch (error) {
+    // If called with an external transaction, rethrow so the caller's
+    // transaction can roll back instead of committing partial work.
+    if (externalTx) {
+      throw error;
+    }
+
     // Sync failed
     result.errors.push({
       label: "",
@@ -1386,6 +1468,7 @@ export async function syncLabelsFromGitLabFile(
     errors: [],
     skipped: false,
     affectedLabelIds: [],
+    dbLabelCount: 0,
   };
 
   try {
@@ -1510,11 +1593,7 @@ export async function syncLabelsFromGitLabFile(
       // Step 11: Complete sync state (critical for unblocking checkInProgressSync)
       // If this fails, the caller receives the error so they can act on it
       // rather than silently leaving a permanent sync lock.
-      await completeSyncState(
-        syncStateId,
-        true,
-        syncResult.labelsCreated + syncResult.labelsUpdated
-      );
+      await completeSyncState(syncStateId, true, syncResult.dbLabelCount);
 
       // Return success
       return {
@@ -1526,6 +1605,7 @@ export async function syncLabelsFromGitLabFile(
         errors: syncResult.errors,
         skipped: false,
         affectedLabelIds: syncResult.affectedLabelIds,
+        dbLabelCount: syncResult.dbLabelCount,
       };
     } catch (error) {
       // Transaction failed - mark sync as failed. If the completion update
@@ -2031,7 +2111,7 @@ export async function authorizeLabelAccess(
     })
     .from(labels)
     .innerJoin(projects, eq(labels.projectId, projects.id))
-    .where(eq(labels.id, labelId))
+    .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
     .limit(1);
 
   if (labelResult.length === 0) {
@@ -2065,8 +2145,9 @@ export async function authorizeLabelAccess(
  * @param label - The label data (with filePath from JOIN)
  */
 function mapToPublicLabel(label: LabelForPublic): PublicLabel {
-  // Transform database format to API format for conditions.stats
-  // Database stores stats as Record<string, number | StatCondition>, API expects Record<string, StatCondition>
+  // Defensively normalize stats: legacy rows may store plain numbers instead of
+  // StatCondition objects (pre-schema-change data).  Normalize at read time so
+  // the API contract is always StatCondition.
   const transformedConditions: PublicLabel["conditions"] = label.conditions
     ? {
         variables: label.conditions.variables,
@@ -2074,16 +2155,7 @@ function mapToPublicLabel(label: LabelForPublic): PublicLabel {
           ? Object.fromEntries(
               Object.entries(label.conditions.stats).map(([key, value]) => [
                 key,
-                // Check if already a StatCondition object (has value and operator properties)
-                typeof value === "object" &&
-                value !== null &&
-                "value" in value &&
-                "operator" in value
-                  ? (value as StatCondition)
-                  : {
-                      value: value as number,
-                      operator: ">=" as ComparisonOperator,
-                    },
+                normalizeStatCondition(value as number | StatCondition),
               ])
             )
           : undefined,
@@ -2424,7 +2496,7 @@ export async function updateLabel(
     duoPairId?: string | null;
     conditions?: {
       variables?: Record<string, VariableCondition>;
-      stats?: Record<string, number>;
+      stats?: Record<string, StatCondition | number>;
     } | null;
   }
 ): Promise<PublicLabel> {
@@ -2711,7 +2783,19 @@ export async function updateLabel(
       updateData.duoPairId = validatedDuoPairId;
     }
     if (data.conditions !== undefined) {
-      updateData.conditions = data.conditions ?? {};
+      const conditions = data.conditions ?? {};
+      // Normalize any plain number values to StatCondition objects
+      // (handles legacy data where frontend may send plain numbers)
+      if (conditions.stats) {
+        const normalizedStats: Record<string, StatCondition> = {};
+        for (const [key, value] of Object.entries(conditions.stats)) {
+          normalizedStats[key] = normalizeStatCondition(
+            value as number | StatCondition
+          );
+        }
+        conditions.stats = normalizedStats;
+      }
+      updateData.conditions = conditions;
     }
 
     // Also update project_files content if labelName changed
@@ -2732,8 +2816,14 @@ export async function updateLabel(
         ...auditFields,
         updatedAt: new Date(),
       })
-      .where(eq(labels.id, labelId))
+      .where(and(eq(labels.id, labelId), eq(labels.version, currentVersion)))
       .returning();
+
+    if (!updated) {
+      throw new ConflictError(
+        "Label was modified by another user, please refresh and try again"
+      );
+    }
 
     return mapToPublicLabel({
       ...updated,
