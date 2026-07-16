@@ -437,7 +437,13 @@ async function getDbLabelCount(
   const [result] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(labels)
-    .where(and(eq(labels.projectId, projectId), isNull(labels.deletedAt)));
+    .where(
+      and(
+        eq(labels.projectId, projectId),
+        eq(labels.projectFileId, projectFileId),
+        isNull(labels.deletedAt)
+      )
+    );
 
   return result?.count ?? 0;
 }
