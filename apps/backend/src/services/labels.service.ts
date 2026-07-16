@@ -254,12 +254,10 @@ async function createSyncState(
         )
         .limit(1);
 
+      // Any active in-progress sync — matching contentHash or not — is a
+      // genuine concurrent call. Fail fast so the caller can retry after
+      // the in-progress transaction commits.
       if (existing) {
-        // Same contentHash → retry of the same sync, reuse the existing row
-        if (existing.contentHash === contentHash) {
-          return existing.id;
-        }
-        // Different contentHash → genuinely concurrent sync
         throw new ConflictError("Sync already in progress for this file");
       }
 
