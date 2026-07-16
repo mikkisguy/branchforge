@@ -371,8 +371,7 @@ async function updateLabelDialogueHandler(
 
         const values = {
           contentType: (entry.speakerId ? "DIALOGUE" : "NARRATION") as
-            | "DIALOGUE"
-            | "NARRATION",
+            "DIALOGUE" | "NARRATION",
           content: entry.text,
           speakerId: entry.speakerId,
           demoNotes: null,
@@ -591,7 +590,12 @@ async function updateLabelHandler(
   const user = request.user!;
 
   try {
-    const label = await updateLabel(labelId, user.id, request.body);
+    const label = await updateLabel(
+      labelId,
+      user.id,
+      request.body,
+      request.body.version
+    );
     reply.status(200).send({ label });
   } catch (error) {
     request.log.error(error);

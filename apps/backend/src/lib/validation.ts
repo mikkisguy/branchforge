@@ -457,7 +457,18 @@ export const updateLabelSchema = z
     duoPairId: uuidSchema.optional().nullable(),
     conditions: z
       .object({
-        stats: z.record(z.string(), z.number().finite()).optional(),
+        stats: z
+          .record(
+            z.string(),
+            z.union([
+              z.number().finite(),
+              z.object({
+                value: z.number().finite(),
+                operator: z.enum([">=", "<=", ">", "<", "==", "!="]),
+              }),
+            ])
+          )
+          .optional(),
         variables: z
           .record(
             z.string(),
@@ -470,6 +481,7 @@ export const updateLabelSchema = z
       })
       .optional()
       .nullable(),
+    version: z.number().int().positive().optional(),
   })
   .strict()
   .partial();
