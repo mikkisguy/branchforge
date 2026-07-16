@@ -23,6 +23,7 @@ import {
   integer,
   jsonb,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import type { IncomingJump, VariableCondition } from "@branchforge/shared";
@@ -128,6 +129,12 @@ export const labels = pgTable(
     // Audit trail indexes
     index("labels_created_by_idx").on(table.createdBy),
     index("labels_updated_by_idx").on(table.updatedBy),
+    // Prevent duplicate active label names within a file (case-insensitive)
+    uniqueIndex("labels_project_file_label_name_unique_idx")
+      .on(table.projectFileId, sql`lower(${table.labelName})`)
+      .where(
+        sql`${table.deletedAt} IS NULL AND ${table.labelName} IS NOT NULL`
+      ),
   ]
 );
 
