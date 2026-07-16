@@ -481,6 +481,7 @@ export const updateLabelSchema = z
       })
       .optional()
       .nullable(),
+    version: z.number().int().positive().optional(),
   })
   .strict()
   .partial();

@@ -23,7 +23,18 @@ import {
   variables,
   pairGroups,
 } from "../db/schema/index.js";
-import { eq, and, asc, or, isNull, sql, desc, inArray, ne } from "drizzle-orm";
+import {
+  eq,
+  and,
+  asc,
+  or,
+  isNull,
+  sql,
+  desc,
+  inArray,
+  ne,
+  lt,
+} from "drizzle-orm";
 import type { Label, LabelLine } from "../db/schema/index.js";
 import type { Transaction } from "../db/types.js";
 import type { PublicLabel } from "@branchforge/shared";
@@ -32,11 +43,11 @@ import {
   sanitizeLabelName,
   RENPY_LABEL_REGEX,
   type StatCondition,
-  type VariableCondition,
 } from "@branchforge/shared";
 import type { IncomingJump } from "@branchforge/shared";
 import { createAuditFields, updateAuditFields } from "../lib/audit.js";
 import { isUniqueConstraintViolation } from "../lib/db.js";
+import type { UpdateLabelInput } from "../lib/validation.js";
 import {
   NotFoundError,
   ForbiddenError,
@@ -89,22 +100,38 @@ const MAX_LABEL_ATTEMPTS = 1000;
 // it is considered stale and can be reclaimed by a new sync.
 const SYNC_LEASE_TIMEOUT_MS = 5 * 60 * 1000;
 
+// Heartbeat interval: refresh the lease on the sync state row while sync runs,
+// preventing a long-running sync from being reclaimed as stale.
+const SYNC_HEARTBEAT_MS = 60 * 1000; // 1 minute
+
 /**
- * Mark an in-progress sync state row as stale (timed out).
- * Shared between checkInProgressSync and createSyncState to DRY the cleanup logic.
+ * Mark an in-progress sync state row as stale (timed out), but only if it
+ * is still in-progress and past the stale threshold. Returns true when the
+ * row was actually reclaimed; false if another caller already completed or
+ * renewed the lease.
  */
 async function markSyncStale(
   db: ReturnType<typeof getDb>,
-  row: { id: string }
-): Promise<void> {
-  await db
+  projectFileId: string,
+  staleThreshold: Date
+): Promise<boolean> {
+  const [reclaimed] = await db
     .update(projectFileSyncState)
     .set({
       status: "CONFLICT",
       completedAt: new Date(),
       errorMessage: "Sync timed out (stale lock)",
     })
-    .where(eq(projectFileSyncState.id, row.id));
+    .where(
+      and(
+        eq(projectFileSyncState.projectFileId, projectFileId),
+        eq(projectFileSyncState.status, "MODIFIED_LOCAL"),
+        isNull(projectFileSyncState.completedAt),
+        lt(projectFileSyncState.startedAt, staleThreshold)
+      )
+    )
+    .returning({ id: projectFileSyncState.id });
+  return reclaimed !== undefined;
 }
 
 // ============================================================================
@@ -208,8 +235,12 @@ async function checkInProgressSync(projectFileId: string): Promise<boolean> {
 
   // Check if the in-progress sync is stale (lease expired)
   if (inProgress.startedAt < staleThreshold) {
-    await markSyncStale(db, inProgress);
-    return false; // Allow new sync
+    const reclaimed = await markSyncStale(db, projectFileId, staleThreshold);
+    if (reclaimed) {
+      return false; // Allow new sync — row was successfully reclaimed
+    }
+    // Reclamation failed: another caller already completed/renewed it
+    return true; // Sync still in progress by someone else
   }
 
   return true;
@@ -293,20 +324,26 @@ async function createSyncState(
         // Check if the existing in-progress row is stale
         const staleThreshold = new Date(Date.now() - SYNC_LEASE_TIMEOUT_MS);
         if (existing.startedAt < staleThreshold) {
-          await markSyncStale(db, existing);
-
-          // Retry creating the sync state
-          if (_retryCount < MAX_RETRIES) {
-            return createSyncState(
-              projectFileId,
-              contentHash,
-              labelCount,
-              _retryCount + 1
+          const reclaimed = await markSyncStale(
+            db,
+            projectFileId,
+            staleThreshold
+          );
+          if (reclaimed) {
+            // Retry creating the sync state
+            if (_retryCount < MAX_RETRIES) {
+              return createSyncState(
+                projectFileId,
+                contentHash,
+                labelCount,
+                _retryCount + 1
+              );
+            }
+            throw new ConflictError(
+              "Sync failed after multiple concurrent attempts"
             );
           }
-          throw new ConflictError(
-            "Sync failed after multiple concurrent attempts"
-          );
+          // Reclamation raced — another caller finished first.
         }
 
         // Any active in-progress sync — matching contentHash or not — is a
@@ -338,6 +375,71 @@ async function createSyncState(
     }
     throw error;
   }
+}
+
+/**
+ * Start a heartbeat interval that periodically renews the sync lease
+ * by updating startedAt on the sync state row. This prevents a
+ * long-running sync from being reclaimed as stale.
+ *
+ * @returns A cleanup function that stops the heartbeat.
+ */
+function startSyncHeartbeat(syncStateId: string): () => void {
+  const interval = setInterval(async () => {
+    try {
+      const db = getDb();
+      await db
+        .update(projectFileSyncState)
+        .set({ startedAt: new Date() })
+        .where(
+          and(
+            eq(projectFileSyncState.id, syncStateId),
+            eq(projectFileSyncState.status, "MODIFIED_LOCAL"),
+            isNull(projectFileSyncState.completedAt)
+          )
+        );
+    } catch {
+      // Heartbeat failure is non-fatal; the next tick will retry.
+    }
+  }, SYNC_HEARTBEAT_MS);
+  return () => clearInterval(interval);
+}
+
+/**
+ * Get the actual database label count from the most recent completed sync state
+ * for a project file. Falls back to querying the live labels table if no sync
+ * state exists.
+ */
+async function getDbLabelCount(
+  projectFileId: string,
+  projectId: string
+): Promise<number> {
+  const db = getDb();
+
+  // First try the most recent completed sync state
+  const [lastSynced] = await db
+    .select({ dbLabelCount: projectFileSyncState.dbLabelCount })
+    .from(projectFileSyncState)
+    .where(
+      and(
+        eq(projectFileSyncState.projectFileId, projectFileId),
+        eq(projectFileSyncState.status, "SYNCED")
+      )
+    )
+    .orderBy(desc(projectFileSyncState.completedAt))
+    .limit(1);
+
+  if (lastSynced?.dbLabelCount != null) {
+    return lastSynced.dbLabelCount;
+  }
+
+  // Fall back to live count from labels table
+  const [result] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(labels)
+    .where(and(eq(labels.projectId, projectId), isNull(labels.deletedAt)));
+
+  return result?.count ?? 0;
 }
 
 /**
@@ -1518,6 +1620,10 @@ export async function syncLabelsFromGitLabFile(
     if (alreadySynced) {
       result.skipped = true;
       result.success = true;
+      result.dbLabelCount = await getDbLabelCount(
+        projectFileId,
+        file.projectId
+      );
       return result;
     }
 
@@ -1533,8 +1639,15 @@ export async function syncLabelsFromGitLabFile(
     if (syncStateId === null) {
       result.skipped = true;
       result.success = true;
+      result.dbLabelCount = await getDbLabelCount(
+        projectFileId,
+        file.projectId
+      );
       return result;
     }
+
+    // Start heartbeat to prevent lease expiration during sync
+    const stopHeartbeat = startSyncHeartbeat(syncStateId);
 
     // Step 7-9: Validate and sync in a single try block for proper error handling
     try {
@@ -1637,6 +1750,8 @@ export async function syncLabelsFromGitLabFile(
       }
 
       throw error;
+    } finally {
+      stopHeartbeat();
     }
   } catch (error) {
     // Sync failed
@@ -2487,18 +2602,8 @@ export async function createLabel(
 export async function updateLabel(
   labelId: string,
   userId: string,
-  data: {
-    title?: string;
-    route?: string | null;
-    status?: LabelStatus;
-    visibility?: "EXCLUSIVE" | "SHARED" | "DUO_PAIR";
-    labelName?: string | null;
-    duoPairId?: string | null;
-    conditions?: {
-      variables?: Record<string, VariableCondition>;
-      stats?: Record<string, StatCondition | number>;
-    } | null;
-  }
+  data: UpdateLabelInput,
+  expectedVersion?: number
 ): Promise<PublicLabel> {
   const db = getDb();
 
@@ -2769,7 +2874,8 @@ export async function updateLabel(
       }
     }
 
-    const currentVersion = labelWithProject.label.version ?? 1;
+    const currentVersion =
+      expectedVersion ?? labelWithProject.label.version ?? 1;
     const auditFields = updateAuditFields(currentVersion, userId);
 
     // Build update data with validated route, optional labelName,
