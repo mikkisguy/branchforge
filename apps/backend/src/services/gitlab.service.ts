@@ -34,8 +34,8 @@ import { createProject, deleteProject } from "./projects.service.js";
 import { importFromGitlab } from "./gitlab-sync.service.js";
 import { requireProjectOwnership } from "./authz.service.js";
 import { syncLabelsFromGitLabFile } from "./labels.service.js";
-import { logError, logWarn, LogEventType } from "../lib/logger.js";
 import { calculateContentHash } from "../lib/hash.js";
+import { logError, logWarn, LogEventType } from "../lib/logger.js";
 import type {
   ConflictResolution,
   SyncOperation,
@@ -1027,8 +1027,7 @@ export async function batchCommitFiles(
   // Build actions array
   const actions = files.map((file) => ({
     action: (existingFilePaths.has(file.filePath) ? "update" : "create") as
-      | "create"
-      | "update",
+      "create" | "update",
     file_path: file.filePath,
     content: file.content,
   }));
@@ -1334,7 +1333,9 @@ export async function updateGitLabFileContent(
     });
   }
 
-  // Update file content and hash after sync succeeds (or after non-concurrent errors are logged)
+  // Update file content and hash (syncLabelsFromGitLabFile also updates
+  // contentHash in a best-effort manner, but we set it here as a safety net
+  // in case that update was swallowed by its internal error handling)
   await db
     .update(projectFiles)
     .set({

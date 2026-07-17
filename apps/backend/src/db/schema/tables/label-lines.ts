@@ -101,10 +101,6 @@ export const labelLines = pgTable(
     index("label_lines_label_sequence_idx").on(table.labelId, table.sequence),
     // GitLab file reference indexes
     index("label_lines_project_file_id_idx").on(table.projectFileId),
-    index("label_lines_project_file_position_idx").on(
-      table.projectFileId,
-      table.linePosition
-    ),
     // Sync status indexes - use partial indexes for sparse/poorly-selective columns
     // Partial index on dirty records only (rare case) for sync queries
     index("label_lines_is_dirty_idx")

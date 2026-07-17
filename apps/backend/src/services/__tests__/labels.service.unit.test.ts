@@ -231,7 +231,12 @@ describe("LabelsService", () => {
       });
 
       const selectResult = Promise.resolve([
-        { id: "project-file-123", content: mockContent },
+        {
+          id: "project-file-123",
+          content: mockContent,
+          labelName: "chapter1_label1",
+          projectFileId: "project-file-123",
+        },
       ]);
       mockTransaction.mockImplementation(async (callback) => {
         const tx = {
