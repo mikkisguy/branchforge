@@ -241,11 +241,12 @@ export function findDialogueInsertIndex(
   if (current.contentType === "CHOICE") {
     const lineId = current.choiceData?.lineId;
     let i = index;
-    while (
-      i + 1 < entries.length &&
-      entries[i + 1].contentType === "CHOICE" &&
-      (!lineId || entries[i + 1].choiceData?.lineId === lineId)
-    ) {
+    while (i + 1 < entries.length && entries[i + 1].contentType === "CHOICE") {
+      const nextId = entries[i + 1].choiceData?.lineId;
+      // Stop only when both line IDs exist and differ
+      if (lineId && nextId && lineId !== nextId) {
+        break;
+      }
       i++;
     }
     return i + 1;
@@ -256,11 +257,11 @@ export function findDialogueInsertIndex(
   if (next?.contentType === "CHOICE") {
     const lineId = next.choiceData?.lineId;
     let i = index + 1;
-    while (
-      i < entries.length &&
-      entries[i].contentType === "CHOICE" &&
-      (!lineId || entries[i].choiceData?.lineId === lineId)
-    ) {
+    while (i < entries.length && entries[i].contentType === "CHOICE") {
+      const curId = entries[i].choiceData?.lineId;
+      if (lineId && curId && lineId !== curId) {
+        break;
+      }
       i++;
     }
     return i;

@@ -91,6 +91,12 @@ function nextSurvivingIsMenu(
   return false;
 }
 
+function isTerminalControlFlow(line: ExistingLineForPlan): boolean {
+  if (line.contentType === "JUMP") return true;
+  const trimmed = line.content.trim().toLowerCase();
+  return /^(jump|call|return)\b/.test(trimmed);
+}
+
 /**
  * Plan deletes, updates, inserts, and final sequences for a label's lines
  * after a Write Mode dialogue save.
@@ -160,16 +166,34 @@ export function planDialogueLineUpdates(
     pendingAfterMenu = [];
   };
 
+  /** Flush remaining all-new / trailing inserts from proseResult */
+  const flushRemainingNewProse = () => {
+    while (
+      proseIdx < proseResult.length &&
+      proseResult[proseIdx].kind === "new"
+    ) {
+      pushInsert(
+        merged,
+        proseResult[proseIdx] as Extract<ProseSlot, { kind: "new" }>
+      );
+      proseIdx++;
+    }
+  };
+
   for (let lineIndex = 0; lineIndex < existingLines.length; lineIndex++) {
     const line = existingLines[lineIndex];
 
     if (!isProse(line.contentType)) {
+      // All-new prose goes after MENU and before terminal JUMP/CALL/RETURN
+      if (isTerminalControlFlow(line)) {
+        flushPendingAfterMenu();
+        flushRemainingNewProse();
+      }
       merged.push({
         key: line.id,
         speakerId: line.speakerId,
         text: line.content,
       });
-      // Place deferred post-title inserts immediately after the MENU row
       if (line.contentType === "MENU") {
         flushPendingAfterMenu();
       }

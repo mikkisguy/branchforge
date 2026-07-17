@@ -1330,6 +1330,40 @@ label chapter1:
       expect(result).toContain('e "Updated speaker"');
     });
 
+    it("should replace multiple consecutive dialogue lines without shifting visuals", () => {
+      const original = `label start:
+    scene bg1
+    a "one"
+    show a happy
+    b "two"
+    show b sad
+    c "three"
+`;
+
+      const updatedDialogue = new Map([
+        [
+          "start",
+          [
+            { speaker: "a", text: "ONE" },
+            { speaker: "b", text: "TWO" },
+            { speaker: "c", text: "THREE" },
+          ],
+        ],
+      ]);
+
+      const result = reconstructRPYFile({
+        originalContent: original,
+        updatedDialogue,
+      });
+
+      expect(result).toMatch(/scene bg1\n\s*a "ONE"/);
+      expect(result).toMatch(/show a happy\n\s*b "TWO"/);
+      expect(result).toMatch(/show b sad\n\s*c "THREE"/);
+      expect(result).not.toContain('"one"');
+      expect(result).not.toContain('"two"');
+      expect(result).not.toContain('"three"');
+    });
+
     it("should place dialogue inserted after a menu title outside the menu block", () => {
       // Write Mode payload is flat prose: menu title then the new line (choices
       // are not in the dialogue list). Inserts after the title must not land
@@ -1683,6 +1717,44 @@ label second:
         { type: "equal", origIndex: 2, updatedIndex: 1 },
       ]);
     });
+    it("should coalesce multiple consecutive replacements in one edit run", () => {
+      const ops = alignDialogue(
+        [
+          { speaker: "a", text: "one" },
+          { speaker: "b", text: "two" },
+          { speaker: "c", text: "three" },
+        ],
+        [
+          { speaker: "a", text: "ONE" },
+          { speaker: "b", text: "TWO" },
+          { speaker: "c", text: "THREE" },
+        ]
+      );
+      expect(ops).toEqual([
+        { type: "replace", origIndex: 0, updatedIndex: 0 },
+        { type: "replace", origIndex: 1, updatedIndex: 1 },
+        { type: "replace", origIndex: 2, updatedIndex: 2 },
+      ]);
+    });
+
+    it("should pair multi-delete/multi-insert runs without leaving a stray delete", () => {
+      // Old pairwise coalescing turned delete,delete,insert,insert into
+      // delete + replace + insert — wrong. Must be replace, replace.
+      const ops = alignDialogue(
+        [
+          { speaker: null, text: "A" },
+          { speaker: null, text: "B" },
+        ],
+        [
+          { speaker: null, text: "X" },
+          { speaker: null, text: "Y" },
+        ]
+      );
+      expect(ops).toEqual([
+        { type: "replace", origIndex: 0, updatedIndex: 0 },
+        { type: "replace", origIndex: 1, updatedIndex: 1 },
+      ]);
+    });
   });
 
   describe("planDialogueLineUpdates", () => {
@@ -1840,19 +1912,19 @@ label second:
 
       // No prose to delete
       expect(plan.deleteIds).toEqual([]);
-      // Prose inserted after structural rows
+      // MENU → new prose → JUMP (terminal control stays at end)
       expect(plan.sequenceByKey.get(mId)).toBe(1);
-      expect(plan.sequenceByKey.get(jId)).toBe(2);
-      expect(plan.sequenceByKey.get("insert:0")).toBe(3);
-      expect(plan.sequenceByKey.get("insert:1")).toBe(4);
+      expect(plan.sequenceByKey.get("insert:0")).toBe(2);
+      expect(plan.sequenceByKey.get("insert:1")).toBe(3);
+      expect(plan.sequenceByKey.get(jId)).toBe(4);
       expect(plan.inserts).toHaveLength(2);
       expect(plan.inserts[0]).toMatchObject({
-        sequence: 3,
+        sequence: 2,
         speakerId: "char-a",
         text: "First line",
       });
       expect(plan.inserts[1]).toMatchObject({
-        sequence: 4,
+        sequence: 3,
         speakerId: "char-b",
         text: "Second line",
       });

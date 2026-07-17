@@ -27,7 +27,8 @@ export function dialogueEntriesEqual(
 
 /**
  * Align `original` against `updated` via LCS.
- * Adjacent delete+insert pairs are coalesced into replace (in-place edits).
+ * Contiguous non-equal runs are coalesced by pairing deletes and inserts into
+ * replace ops; unmatched deletes/inserts are preserved in order.
  */
 export function alignDialogue(
   original: DialogueAlignEntry[],
@@ -75,27 +76,42 @@ export function alignDialogue(
     j++;
   }
 
-  // Coalesce adjacent delete+insert into replace
+  // Coalesce each contiguous non-equal run: pair deletes/inserts by position
+  // into replaces, then emit any unmatched deletes or inserts in order.
   const ops: DialogueAlignOp[] = [];
-  for (let k = 0; k < raw.length; k++) {
-    const cur = raw[k];
-    const next = raw[k + 1];
-    if (cur.type === "delete" && next?.type === "insert") {
+  let k = 0;
+  while (k < raw.length) {
+    if (raw[k].type === "equal") {
+      ops.push(raw[k]);
+      k++;
+      continue;
+    }
+
+    const deletes: number[] = [];
+    const inserts: number[] = [];
+    while (k < raw.length && raw[k].type !== "equal") {
+      const op = raw[k];
+      if (op.type === "delete") {
+        deletes.push(op.origIndex);
+      } else if (op.type === "insert") {
+        inserts.push(op.updatedIndex);
+      }
+      k++;
+    }
+
+    const paired = Math.min(deletes.length, inserts.length);
+    for (let p = 0; p < paired; p++) {
       ops.push({
         type: "replace",
-        origIndex: cur.origIndex,
-        updatedIndex: next.updatedIndex,
+        origIndex: deletes[p],
+        updatedIndex: inserts[p],
       });
-      k++;
-    } else if (cur.type === "insert" && next?.type === "delete") {
-      ops.push({
-        type: "replace",
-        origIndex: next.origIndex,
-        updatedIndex: cur.updatedIndex,
-      });
-      k++;
-    } else {
-      ops.push(cur);
+    }
+    for (let p = paired; p < deletes.length; p++) {
+      ops.push({ type: "delete", origIndex: deletes[p] });
+    }
+    for (let p = paired; p < inserts.length; p++) {
+      ops.push({ type: "insert", updatedIndex: inserts[p] });
     }
   }
 

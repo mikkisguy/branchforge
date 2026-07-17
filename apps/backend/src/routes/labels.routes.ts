@@ -367,58 +367,70 @@ async function updateLabelDialogueHandler(
           .where(inArray(labelLines.id, plan.deleteIds));
       }
 
-      // 3. Update matched prose rows in place
-      for (const update of plan.updates) {
-        await tx
-          .update(labelLines)
-          .set({
-            contentType: (update.speakerId ? "DIALOGUE" : "NARRATION") as
+      // 3. Update matched prose rows in place (independent writes)
+      await Promise.all(
+        plan.updates.map((update) =>
+          tx
+            .update(labelLines)
+            .set({
+              contentType: (update.speakerId ? "DIALOGUE" : "NARRATION") as
+                "DIALOGUE" | "NARRATION",
+              content: update.text,
+              speakerId: update.speakerId,
+              demoNotes: null,
+              isDirty: true,
+              projectFileId: lockedProjectFile.id,
+              contentHash: calculateContentHash(update.text),
+              lastSyncedHash: null,
+              sequence: plan.sequenceByKey.get(update.id)!,
+            })
+            .where(eq(labelLines.id, update.id))
+        )
+      );
+
+      // 4. Insert new prose rows at planned sequences (bulk)
+      if (plan.inserts.length > 0) {
+        await tx.insert(labelLines).values(
+          plan.inserts.map((insert) => ({
+            labelId,
+            sequence: insert.sequence,
+            contentType: (insert.speakerId ? "DIALOGUE" : "NARRATION") as
               "DIALOGUE" | "NARRATION",
-            content: update.text,
-            speakerId: update.speakerId,
+            content: insert.text,
+            speakerId: insert.speakerId,
             demoNotes: null,
             isDirty: true,
             projectFileId: lockedProjectFile.id,
-            contentHash: calculateContentHash(update.text),
+            contentHash: calculateContentHash(insert.text),
             lastSyncedHash: null,
-            sequence: plan.sequenceByKey.get(update.id)!,
-          })
-          .where(eq(labelLines.id, update.id));
-      }
-
-      // 4. Insert new prose rows at planned sequences
-      for (const insert of plan.inserts) {
-        await tx.insert(labelLines).values({
-          labelId,
-          sequence: insert.sequence,
-          contentType: (insert.speakerId ? "DIALOGUE" : "NARRATION") as
-            "DIALOGUE" | "NARRATION",
-          content: insert.text,
-          speakerId: insert.speakerId,
-          demoNotes: null,
-          isDirty: true,
-          projectFileId: lockedProjectFile.id,
-          contentHash: calculateContentHash(insert.text),
-          lastSyncedHash: null,
-        });
+          }))
+        );
       }
 
       // 5. Reindex non-prose rows that shifted due to inserts/deletes
-      for (const line of existingLines) {
+      const structuralReindexes = existingLines.filter((line) => {
         if (
           line.contentType === "DIALOGUE" ||
           line.contentType === "NARRATION"
         ) {
-          continue;
+          return false;
         }
         const newSequence = plan.sequenceByKey.get(line.id);
-        if (newSequence !== undefined && newSequence !== line.sequence) {
-          await tx
+        return newSequence !== undefined && newSequence !== line.sequence;
+      });
+      await Promise.all(
+        structuralReindexes.map((line) =>
+          tx
             .update(labelLines)
-            .set({ sequence: newSequence })
-            .where(eq(labelLines.id, line.id));
-        }
-      }
+            .set({
+              sequence: plan.sequenceByKey.get(line.id)!,
+              projectFileId: lockedProjectFile.id,
+              isDirty: true,
+              lastSyncedHash: null,
+            })
+            .where(eq(labelLines.id, line.id))
+        )
+      );
 
       // 6. Process menu blocks - update MENU lines' menuOptions
       if (menuBlocks && menuBlocks.length > 0) {

@@ -141,4 +141,70 @@ describe("findDialogueInsertIndex", () => {
     expect(findDialogueInsertIndex(menuOnly, 0)).toBe(3);
     expect(findDialogueInsertIndex(menuOnly, 2)).toBe(3);
   });
+
+  it("continues across CHOICE entries with missing lineId from the prompt", () => {
+    const missingMeta: DialogueEntry[] = [
+      menuPrompt,
+      {
+        id: "c1",
+        speakerId: null,
+        text: "Yes",
+        contentType: "CHOICE",
+        // no choiceData
+      },
+      {
+        id: "c2",
+        speakerId: null,
+        text: "No",
+        contentType: "CHOICE",
+        choiceData: {
+          lineId: "menu-1",
+          optionIndex: 1,
+          targetLabelId: "t2",
+          targetLabelName: "no",
+        },
+      },
+      after,
+    ];
+    expect(findDialogueInsertIndex(missingMeta, 0)).toBe(3);
+  });
+
+  it("continues across CHOICE entries when starting CHOICE has no lineId", () => {
+    const missingOnChoice: DialogueEntry[] = [
+      menuPrompt,
+      {
+        id: "c1",
+        speakerId: null,
+        text: "Yes",
+        contentType: "CHOICE",
+      },
+      choice2,
+      after,
+    ];
+    // Enter on first choice (no lineId) should still skip the rest of the block
+    expect(findDialogueInsertIndex(missingOnChoice, 1)).toBe(3);
+  });
+
+  it("stops at a different menu when both lineIds exist and differ", () => {
+    const twoMenus: DialogueEntry[] = [
+      menuPrompt,
+      choice1,
+      choice2,
+      {
+        id: "c3",
+        speakerId: null,
+        text: "Other",
+        contentType: "CHOICE",
+        choiceData: {
+          lineId: "menu-2",
+          optionIndex: 0,
+          targetLabelId: "t3",
+          targetLabelName: "other",
+        },
+      },
+      after,
+    ];
+    expect(findDialogueInsertIndex(twoMenus, 0)).toBe(3);
+    expect(findDialogueInsertIndex(twoMenus, 1)).toBe(3);
+  });
 });

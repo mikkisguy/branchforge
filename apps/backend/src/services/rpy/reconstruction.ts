@@ -6,6 +6,9 @@ import {
   type DialogueAlignEntry,
   type DialogueAlignOp,
 } from "./dialogue-align.js";
+import { parseLabelBoundaries } from "./label-management.js";
+import type { LabelBlock } from "./types.js";
+import { trackBlocks } from "./helpers.js";
 
 interface LabelAlignState {
   ops: DialogueAlignOp[];
@@ -13,20 +16,21 @@ interface LabelAlignState {
   updated: DialogueAlignEntry[];
 }
 
-function formatDialogueLine(
-  entry: DialogueAlignEntry,
-  indent: string,
-  quote: string = '"'
-): string {
+/**
+ * Always emit double-quoted Ren'Py strings. escapeRenpyString only escapes
+ * double quotes / backslashes / newlines — single-quoted output would be
+ * invalid when the text contains apostrophes.
+ */
+function formatDialogueLine(entry: DialogueAlignEntry, indent: string): string {
+  const text = escapeRenpyString(entry.text);
   if (entry.speaker) {
-    return `${indent}${entry.speaker} ${quote}${escapeRenpyString(entry.text)}${quote}`;
+    return `${indent}${entry.speaker} "${text}"`;
   }
-  return `${indent}${quote}${escapeRenpyString(entry.text)}${quote}`;
+  return `${indent}"${text}"`;
 }
 
 function isDialogueOrNarrationLine(trimmed: string): {
   isDialogue: boolean;
-  isSingleQuoted: boolean;
 } {
   const dialogueMatch = trimmed.match(
     /^([a-zA-Z_][a-zA-Z0-9_]*)\s+"([^"\\]*(?:\\.[^"\\]*)*)"$/
@@ -43,8 +47,7 @@ function isDialogueOrNarrationLine(trimmed: string): {
     narrationMatch ||
     narrationMatchSingle
   );
-  const isSingleQuoted = !!(dialogueMatchSingle || narrationMatchSingle);
-  return { isDialogue, isSingleQuoted };
+  return { isDialogue };
 }
 
 function parseDialogueEntry(trimmed: string): DialogueAlignEntry | null {
@@ -73,30 +76,26 @@ function parseDialogueEntry(trimmed: string): DialogueAlignEntry | null {
 
 /**
  * Pre-extract dialogue/narration entries per label from RPY content.
- * Menu titles (quoted lines inside menu blocks) are included; choice lines
- * ending with `:` are not.
+ * Uses explicit label boundaries (and skips screen/init blocks) so dialogue
+ * outside a label body is not attributed to the previous label.
  */
 function extractOriginalDialogueByLabel(
-  lines: string[]
+  lines: string[],
+  labelBlocks: LabelBlock[],
+  skipLines: Set<number>
 ): Map<string, DialogueAlignEntry[]> {
   const byLabel = new Map<string, DialogueAlignEntry[]>();
-  let currentLabel: string | null = null;
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    const labelMatch = line.match(RENPY_LABEL_REGEX);
-    if (labelMatch) {
-      currentLabel = labelMatch[1];
-      if (!byLabel.has(currentLabel)) {
-        byLabel.set(currentLabel, []);
+  for (const block of labelBlocks) {
+    const entries: DialogueAlignEntry[] = [];
+    for (let i = block.startLine + 1; i <= block.endLine; i++) {
+      if (skipLines.has(i)) continue;
+      const entry = parseDialogueEntry(lines[i].trim());
+      if (entry) {
+        entries.push(entry);
       }
-      continue;
     }
-    if (!currentLabel) continue;
-    const entry = parseDialogueEntry(trimmed);
-    if (entry) {
-      byLabel.get(currentLabel)!.push(entry);
-    }
+    byLabel.set(block.name, entries);
   }
 
   return byLabel;
@@ -146,7 +145,23 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
   const lines = originalContent.split("\n");
   const result: string[] = [];
 
-  const originalByLabel = extractOriginalDialogueByLabel(lines);
+  const labelBlocks = parseLabelBoundaries(originalContent);
+  const labelEndByName = new Map(
+    labelBlocks.map((b) => [b.name, b.endLine] as const)
+  );
+  const labelIndentByName = new Map(
+    labelBlocks.map((b) => {
+      const indentCol = lines[b.startLine]?.search(/\S/) ?? 0;
+      return [b.name, indentCol] as const;
+    })
+  );
+  const { skipLines } = trackBlocks(lines);
+
+  const originalByLabel = extractOriginalDialogueByLabel(
+    lines,
+    labelBlocks,
+    skipLines
+  );
   const alignStates = new Map<string, LabelAlignState>();
 
   for (const [label, updated] of updatedDialogue.entries()) {
@@ -163,6 +178,7 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
   let lastDialogueIndent = "    ";
   const encounteredLabels = new Set<string>();
   const menuStack: number[] = [];
+  const openMenuKeywordIndent = new Map<string, number>();
   const menuBlockIndices = new Map<string, number>();
   const menuChoiceIndices = new Map<string, number>();
 
@@ -181,7 +197,8 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
     return flushRemainingInserts(state, result, indent);
   };
 
-  for (const line of lines) {
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    const line = lines[lineIndex];
     const trimmed = line.trim();
 
     const labelMatch = line.match(RENPY_LABEL_REGEX);
@@ -206,12 +223,38 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
       continue;
     }
 
+    // Exit the current label body when we leave its parsed range (e.g. top-level
+    // screen / init / sibling block at label indent or above).
+    if (currentLabel && trimmed) {
+      const endLine = labelEndByName.get(currentLabel);
+      const labelIndent = labelIndentByName.get(currentLabel) ?? 0;
+      const lineIndent = line.search(/\S/);
+      if (
+        (endLine !== undefined && lineIndex > endLine) ||
+        lineIndent <= labelIndent
+      ) {
+        if (alignStates.has(currentLabel)) {
+          flushLabelTrailing(currentLabel);
+        }
+        currentLabel = null;
+        menuStack.length = 0;
+      }
+    }
+
+    // Skip screen/init interiors for dialogue mutation (still emit the line)
+    if (skipLines.has(lineIndex)) {
+      result.push(line);
+      continue;
+    }
+
     // Track menu block nesting: push on menu:, pop on dedent.
     // Inserts that follow a menu title in the flat dialogue list must not be
     // emitted inside the menu — flush them when the menu block ends.
     if (trimmed === "menu:") {
-      menuStack.push(line.search(/\S/));
+      const menuIndent = line.search(/\S/);
+      menuStack.push(menuIndent);
       if (currentLabel) {
+        openMenuKeywordIndent.set(currentLabel, menuIndent);
         const blockIdx = menuBlockIndices.get(currentLabel) ?? 0;
         menuBlockIndices.set(currentLabel, blockIdx + 1);
         menuChoiceIndices.set(currentLabel, 0);
@@ -219,20 +262,24 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
     } else if (menuStack.length > 0 && trimmed) {
       const lineIndent = line.search(/\S/);
       const wasInMenu = menuStack.length > 0;
+      let poppedMenuIndent: number | null = null;
       while (
         menuStack.length > 0 &&
         lineIndent <= menuStack[menuStack.length - 1]
       ) {
+        poppedMenuIndent = menuStack[menuStack.length - 1];
         menuStack.pop();
       }
       if (
         wasInMenu &&
         menuStack.length === 0 &&
         currentLabel &&
-        alignStates.has(currentLabel)
+        alignStates.has(currentLabel) &&
+        poppedMenuIndent !== null
       ) {
+        openMenuKeywordIndent.delete(currentLabel);
         const state = alignStates.get(currentLabel)!;
-        const indent = labelIndentation.get(currentLabel) || lastDialogueIndent;
+        const indent = " ".repeat(poppedMenuIndent);
         flushInserts(state, result, indent);
       }
     }
@@ -247,35 +294,33 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
         /^(?:"(.+?)"|'(.+?)'|(?!(?:if|elif|else|pass|jump|call|return|python|while|for|default|define|label|menu|init)\s*:)([a-zA-Z_][a-zA-Z0-9_ ]*?))(?:\s+(if\s+.+))?:(?:\s*)?$/
       );
       if (choiceMatch) {
-        const labelBlocks = updatedMenuChoices.get(currentLabel)!;
+        const labelBlocksChoices = updatedMenuChoices.get(currentLabel)!;
         const blockIdx = (menuBlockIndices.get(currentLabel) ?? 1) - 1;
         const choiceIdx = menuChoiceIndices.get(currentLabel) ?? 0;
 
         if (
-          blockIdx < labelBlocks.length &&
-          choiceIdx < labelBlocks[blockIdx].length
+          blockIdx < labelBlocksChoices.length &&
+          choiceIdx < labelBlocksChoices[blockIdx].length
         ) {
-          const newChoiceText = labelBlocks[blockIdx][choiceIdx].label;
+          const newChoiceText = labelBlocksChoices[blockIdx][choiceIdx].label;
           menuChoiceIndices.set(currentLabel, choiceIdx + 1);
 
           const indent = line.match(/^(\s*)/)?.[1] || "";
           const conditionPart = choiceMatch[4];
-          const quote = choiceMatch[1] ? '"' : choiceMatch[2] ? "'" : "";
+          // Always double-quote — escapeRenpyString handles " safely
           if (conditionPart) {
             result.push(
-              `${indent}${quote}${escapeRenpyString(newChoiceText)}${quote} ${conditionPart}:`
+              `${indent}"${escapeRenpyString(newChoiceText)}" ${conditionPart}:`
             );
           } else {
-            result.push(
-              `${indent}${quote}${escapeRenpyString(newChoiceText)}${quote}:`
-            );
+            result.push(`${indent}"${escapeRenpyString(newChoiceText)}":`);
           }
           continue;
         }
       }
     }
 
-    const { isDialogue, isSingleQuoted } = isDialogueOrNarrationLine(trimmed);
+    const { isDialogue } = isDialogueOrNarrationLine(trimmed);
 
     if (isDialogue && currentLabel && alignStates.has(currentLabel)) {
       const state = alignStates.get(currentLabel)!;
@@ -311,8 +356,7 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
       if (op.type === "equal" || op.type === "replace") {
         const newDialogue = state.updated[op.updatedIndex];
         state.opIdx++;
-        const quote = isSingleQuoted ? "'" : '"';
-        result.push(formatDialogueLine(newDialogue, indent, quote));
+        result.push(formatDialogueLine(newDialogue, indent));
         if (menuStack.length === 0) {
           flushInserts(state, result, indent);
         }
@@ -346,7 +390,11 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
       throw new Error(`Unknown label in updatedDialogue: ${label}`);
     }
     if (state.opIdx < state.ops.length) {
-      const indent = labelIndentation.get(label) || lastDialogueIndent;
+      const menuIndent = openMenuKeywordIndent.get(label);
+      const indent =
+        menuIndent !== undefined
+          ? " ".repeat(menuIndent)
+          : labelIndentation.get(label) || lastDialogueIndent;
       flushRemainingInserts(state, result, indent);
     }
   }
