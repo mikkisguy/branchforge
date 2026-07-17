@@ -6,7 +6,7 @@
 
 import { ValidationError } from "../../middleware/error-handler.middleware.js";
 import type { ParsedRPYFileWithLabels } from "../rpy-parser.service.js";
-import { LabelStatus } from "@branchforge/shared";
+import type { LabelStatus } from "@branchforge/shared";
 
 // ============================================================================
 // Sync Validation Functions
@@ -68,14 +68,6 @@ export function validateFileType(fileType: string): void {
 export function isValidLabelStatus(
   value: string | null | undefined
 ): value is LabelStatus {
-  const validStatuses: LabelStatus[] = [
-    LabelStatus.DRAFT,
-    LabelStatus.REVIEW,
-    LabelStatus.FINAL,
-  ];
-  return (
-    value !== null &&
-    value !== undefined &&
-    validStatuses.includes(value as LabelStatus)
-  );
+  const VALID_STATUSES = new Set<string>(["DRAFT", "REVIEW", "FINAL"]);
+  return value !== null && value !== undefined && VALID_STATUSES.has(value);
 }

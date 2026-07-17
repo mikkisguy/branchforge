@@ -117,14 +117,13 @@ export async function checkContentAlreadySynced(
     .where(
       and(
         eq(projectFileSyncState.projectFileId, projectFileId),
-        eq(projectFileSyncState.status, "SYNCED"),
-        eq(projectFileSyncState.contentHash, contentHash)
+        eq(projectFileSyncState.status, "SYNCED")
       )
     )
     .orderBy(desc(projectFileSyncState.completedAt))
     .limit(1);
 
-  return !!lastSynced;
+  return lastSynced?.contentHash === contentHash;
 }
 
 /**
@@ -241,10 +240,12 @@ export async function createSyncState(
  * @returns A cleanup function that stops the heartbeat.
  */
 export function startSyncHeartbeat(syncStateId: string): () => void {
+  let stopped = false;
   const interval = setInterval(async () => {
+    if (stopped) return;
     try {
       const db = getDb();
-      await db
+      const [updated] = await db
         .update(projectFileSyncState)
         .set({ startedAt: new Date() })
         .where(
@@ -253,12 +254,21 @@ export function startSyncHeartbeat(syncStateId: string): () => void {
             eq(projectFileSyncState.status, "MODIFIED_LOCAL"),
             isNull(projectFileSyncState.completedAt)
           )
-        );
+        )
+        .returning({ id: projectFileSyncState.id });
+      if (!updated) {
+        // Lease lost — the row was completed or conflicted by another process.
+        stopped = true;
+        clearInterval(interval);
+      }
     } catch {
       // Heartbeat failure is non-fatal; the next tick will retry.
     }
   }, SYNC_HEARTBEAT_MS);
-  return () => clearInterval(interval);
+  return () => {
+    stopped = true;
+    clearInterval(interval);
+  };
 }
 
 /**
@@ -315,7 +325,7 @@ export async function completeSyncState(
 ): Promise<void> {
   const db = getDb();
 
-  await db
+  const [updated] = await db
     .update(projectFileSyncState)
     .set({
       status: success ? "SYNCED" : "CONFLICT",
@@ -323,5 +333,18 @@ export async function completeSyncState(
       dbLabelCount,
       errorMessage,
     })
-    .where(eq(projectFileSyncState.id, syncStateId));
+    .where(
+      and(
+        eq(projectFileSyncState.id, syncStateId),
+        eq(projectFileSyncState.status, "MODIFIED_LOCAL"),
+        isNull(projectFileSyncState.completedAt)
+      )
+    )
+    .returning({ id: projectFileSyncState.id });
+
+  if (!updated) {
+    throw new ConflictError(
+      "Sync state row is no longer active — may have been completed or reclaimed"
+    );
+  }
 }

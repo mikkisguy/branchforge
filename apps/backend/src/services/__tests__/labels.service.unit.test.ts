@@ -247,9 +247,11 @@ describe("LabelsService", () => {
                 for: vi.fn(() => ({
                   limit: vi.fn(() => selectResult),
                 })),
+                orderBy: vi.fn(() => selectResult),
               })),
             })),
           })),
+          execute: vi.fn().mockResolvedValue(undefined),
         };
         await callback(tx);
       });

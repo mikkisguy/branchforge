@@ -390,9 +390,23 @@ export async function updateLabel(
     // Use content read under the lock for the rename logic
     const fileContent = lockedFile?.content ?? null;
 
+    // Re-select the label with FOR UPDATE after locking the project file
+    // to prevent TOCTOU races (e.g. concurrent soft-delete).  Use the
+    // refreshed label for all subsequent metadata updates and the result.
+    const [lockedLabel] = await tx
+      .select()
+      .from(labels)
+      .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
+      .for("update")
+      .limit(1);
+
+    if (!lockedLabel) {
+      throw new NotFoundError("Label");
+    }
+
     // Handle labelName update: validate and update RPY file content
     let updatedContent: string | null = null;
-    const oldLabelName = labelWithProject.label.labelName;
+    const oldLabelName = lockedLabel.labelName;
 
     // Reject null labelName for file-backed labels — persisting null
     // would desync the DB from the file content.
@@ -429,7 +443,7 @@ export async function updateLabel(
         .from(labels)
         .where(
           and(
-            eq(labels.projectFileId, labelWithProject.label.projectFileId),
+            eq(labels.projectFileId, lockedLabel.projectFileId),
             sql`lower(${labels.labelName}) = ${data.labelName.toLowerCase()}`,
             isNull(labels.deletedAt),
             ne(labels.id, labelId)
@@ -483,8 +497,7 @@ export async function updateLabel(
     // any other visibility clears the stale pair association.
     const isTouchingPairFields =
       data.visibility !== undefined || data.duoPairId !== undefined;
-    const effectiveVisibility =
-      data.visibility ?? labelWithProject.label.visibility;
+    const effectiveVisibility = data.visibility ?? lockedLabel.visibility;
     let validatedDuoPairId: string | null | undefined;
 
     if (isTouchingPairFields) {
@@ -493,9 +506,7 @@ export async function updateLabel(
         // undefined ("not provided, keep existing") — ?? would
         // coalesce both and silently preserve a stale pair id.
         validatedDuoPairId =
-          data.duoPairId !== undefined
-            ? data.duoPairId
-            : labelWithProject.label.duoPairId;
+          data.duoPairId !== undefined ? data.duoPairId : lockedLabel.duoPairId;
         if (validatedDuoPairId == null) {
           throw new ValidationError(
             "duoPairId is required when visibility is DUO_PAIR"
@@ -507,7 +518,7 @@ export async function updateLabel(
     } else {
       // Caller isn't changing visibility or duoPairId — leave
       // existing duoPairId alone (validated below only if non-null).
-      validatedDuoPairId = labelWithProject.label.duoPairId;
+      validatedDuoPairId = lockedLabel.duoPairId;
     }
 
     const [routeResult, pairGroupResult] = await Promise.all([
@@ -517,7 +528,7 @@ export async function updateLabel(
             .from(routeConfigs)
             .where(
               and(
-                eq(routeConfigs.projectId, labelWithProject.label.projectId),
+                eq(routeConfigs.projectId, lockedLabel.projectId),
                 eq(routeConfigs.routeKey, validatedRoute)
               )
             )
@@ -530,7 +541,7 @@ export async function updateLabel(
             .where(
               and(
                 eq(pairGroups.id, validatedDuoPairId),
-                eq(pairGroups.projectId, labelWithProject.label.projectId)
+                eq(pairGroups.projectId, lockedLabel.projectId)
               )
             )
             .limit(1)
@@ -544,7 +555,7 @@ export async function updateLabel(
         logWarn(LogEventType.VALIDATION_WARNING, {
           event: "invalid_route_configuration",
           route: validatedRoute,
-          projectId: labelWithProject.label.projectId,
+          projectId: lockedLabel.projectId,
         });
         validatedRoute = null;
       }
@@ -578,7 +589,7 @@ export async function updateLabel(
             .from(stats)
             .where(
               and(
-                eq(stats.projectId, labelWithProject.label.projectId),
+                eq(stats.projectId, lockedLabel.projectId),
                 inArray(stats.key, statKeys)
               )
             )
@@ -589,7 +600,7 @@ export async function updateLabel(
             .from(variables)
             .where(
               and(
-                eq(variables.projectId, labelWithProject.label.projectId),
+                eq(variables.projectId, lockedLabel.projectId),
                 inArray(variables.key, variableKeys)
               )
             )
@@ -618,8 +629,7 @@ export async function updateLabel(
       }
     }
 
-    const currentVersion =
-      expectedVersion ?? labelWithProject.label.version ?? 1;
+    const currentVersion = expectedVersion ?? lockedLabel.version ?? 1;
     const auditFields = updateAuditFields(currentVersion, userId);
 
     // Build typed update data — exclude `version` (used only for concurrency check)
@@ -659,7 +669,7 @@ export async function updateLabel(
           content: updatedContent,
           contentHash: calculateContentHash(updatedContent),
         })
-        .where(eq(projectFiles.id, labelWithProject.label.projectFileId));
+        .where(eq(projectFiles.id, lockedLabel.projectFileId));
     }
 
     const [updated] = await tx
@@ -782,5 +792,9 @@ export async function deleteLabel(
         })
         .where(eq(projectFiles.id, lockedLabel.projectFileId!));
     }
+
+    // Reindex labelPosition, sequenceOrder, and labelNumber after deletion
+    // to prevent later appends from colliding with stale positions.
+    await resyncLabelPositions(tx, lockedLabel.projectFileId!);
   });
 }

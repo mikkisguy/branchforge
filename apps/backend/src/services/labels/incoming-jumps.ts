@@ -57,7 +57,9 @@ export async function updateIncomingJumpsForLabels(
   // 2. Collect all jump target names (menu choices + automatic jumps).
   // Menu option `targetLabelId` can be either a raw UUID (already-resolved
   // label ID) or a label name; only the latter needs name → ID lookup.
+  // Collect UUID targets separately to validate project ownership.
   const targetNames = new Set<string>();
+  const uuidTargets = new Set<string>();
   for (const row of allLines) {
     if (row.line.menuOptions) {
       for (const option of row.line.menuOptions) {
@@ -67,6 +69,12 @@ export async function updateIncomingJumpsForLabels(
           !UUID_REGEX.test(option.targetLabelId)
         ) {
           targetNames.add(option.targetLabelId);
+        } else if (
+          option.targetLabelId &&
+          option.targetLabelId !== "" &&
+          UUID_REGEX.test(option.targetLabelId)
+        ) {
+          uuidTargets.add(option.targetLabelId);
         }
       }
     }
@@ -78,7 +86,25 @@ export async function updateIncomingJumpsForLabels(
     }
   }
 
-  // 3. Batch-resolve names to label IDs (single query)
+  // 3. Validate UUID menu targets belong to the current project.
+  const validUuidTargets = new Set<string>();
+  if (uuidTargets.size > 0) {
+    const resolvedUuids = await context
+      .select({ id: labels.id })
+      .from(labels)
+      .where(
+        and(
+          eq(labels.projectId, projectId),
+          inArray(labels.id, Array.from(uuidTargets)),
+          isNull(labels.deletedAt)
+        )
+      );
+    for (const l of resolvedUuids) {
+      validUuidTargets.add(l.id);
+    }
+  }
+
+  // 4. Batch-resolve names to label IDs (single query)
   const nameToId = new Map<string, string>();
   if (targetNames.size > 0) {
     const resolvedLabels = await context
@@ -99,7 +125,7 @@ export async function updateIncomingJumpsForLabels(
     }
   }
 
-  // 4. Compute incoming jumps for all affected labels in a single pass
+  // 5. Compute incoming jumps for all affected labels in a single pass
   const incomingJumpsByLabel = new Map<string, IncomingJump[]>();
   for (const id of labelIds) {
     incomingJumpsByLabel.set(id, []);
@@ -114,10 +140,12 @@ export async function updateIncomingJumpsForLabels(
     if (line.menuOptions) {
       for (const option of line.menuOptions) {
         if (option.targetLabelId && option.targetLabelId !== "") {
-          // UUID targetLabelId is already a label ID; name targets must be
-          // resolved via the name → ID map built above.
+          // UUID targetLabelId is already a label ID; verify project ownership
+          // before using it. Name targets must be resolved via the name → ID map.
           const resolvedId = UUID_REGEX.test(option.targetLabelId)
-            ? option.targetLabelId
+            ? validUuidTargets.has(option.targetLabelId)
+              ? option.targetLabelId
+              : undefined
             : nameToId.get(option.targetLabelId.toLowerCase());
           if (resolvedId && targetSet.has(resolvedId)) {
             const key = `${sourceLabel.id}::${option.label}`;
@@ -171,7 +199,8 @@ export async function updateIncomingJumpsForLabels(
     }
   }
 
-  // 5. Chunked batch-update to stay within PostgreSQL's parameter limit
+  // 6. Chunked batch-update scoped to the current project to stay within
+  // PostgreSQL's parameter limit and prevent cross-project contamination.
   if (labelIds.length > 0) {
     const BATCH_SIZE = 1000;
     for (let i = 0; i < labelIds.length; i += BATCH_SIZE) {
@@ -184,7 +213,7 @@ export async function updateIncomingJumpsForLabels(
         sql`UPDATE ${labels} SET incoming_jumps = CASE id ${sql.join(cases, sql` `)} END WHERE id IN (${sql.join(
           batch.map((id) => sql`${id}`),
           sql`, `
-        )})`
+        )}) AND ${labels.projectId} = ${projectId}`
       );
     }
   }

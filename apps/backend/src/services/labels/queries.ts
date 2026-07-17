@@ -252,17 +252,27 @@ export async function getLabel(
 
   const { label, filePath } = labelResult[0];
 
-  // Fetch label lines with speaker information (excluding soft-deleted)
-  const linesResult = await db
-    .select({
-      line: labelLines,
-      speakerName: characters.displayName,
-      speakerTag: characters.renpyTag,
-    })
-    .from(labelLines)
-    .leftJoin(characters, eq(labelLines.speakerId, characters.id))
-    .where(and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt)))
-    .orderBy(asc(labelLines.sequence));
+  // Fetch label lines, jump-target resolution set, and derived characters
+  // concurrently — all three are independent reads.
+  const [linesResult, allLabels, labelCharactersWithInfo] = await Promise.all([
+    db
+      .select({
+        line: labelLines,
+        speakerName: characters.displayName,
+        speakerTag: characters.renpyTag,
+      })
+      .from(labelLines)
+      .leftJoin(characters, eq(labelLines.speakerId, characters.id))
+      .where(and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt)))
+      .orderBy(asc(labelLines.sequence)),
+    db
+      .select({ id: labels.id, labelName: labels.labelName })
+      .from(labels)
+      .where(
+        and(eq(labels.projectId, label.projectId), isNull(labels.deletedAt))
+      ),
+    getDerivedCharactersForLabel(labelId),
+  ]);
 
   // Map results to the expected format
   const lines: LabelLineWithSpeaker[] = linesResult.map((row) => ({
@@ -273,19 +283,7 @@ export async function getLabel(
     updatedAt: row.line.updatedAt.toISOString(),
   }));
 
-  // Resolve jump targets to actual label IDs
-  // Fetch all labels in the same project for resolution
-  const allLabels = await db
-    .select({ id: labels.id, labelName: labels.labelName })
-    .from(labels)
-    .where(
-      and(eq(labels.projectId, label.projectId), isNull(labels.deletedAt))
-    );
-
   const resolvedLines = resolveJumpTargets(lines, allLabels);
-
-  // Derive characters using the shared helper function
-  const labelCharactersWithInfo = await getDerivedCharactersForLabel(labelId);
 
   return {
     ...mapToPublicLabel({ ...label, filePath }),

@@ -12,6 +12,7 @@ import {
   labelLines,
   characters,
   projectFiles,
+  projectFileSyncState,
 } from "../../db/schema/index.js";
 import { eq, and, asc, isNull, sql, inArray, or } from "drizzle-orm";
 import type { Label } from "../../db/schema/index.js";
@@ -28,6 +29,11 @@ import {
   type VisualStatement,
 } from "../label-line-mapper.js";
 import { logError, LogEventType } from "../../lib/logger.js";
+import {
+  NotFoundError,
+  ValidationError,
+  ConflictError,
+} from "../../middleware/error-handler.middleware.js";
 import { validateRPYContent, validateFileType } from "./validation.js";
 import {
   checkInProgressSync,
@@ -47,7 +53,8 @@ import { UUID_REGEX } from "./types.js";
 
 /**
  * Resync label positions for all labels in a file
- * Ensures positions are sequential starting from 0
+ * Ensures labelPosition, sequenceOrder, and labelNumber are sequential
+ * starting from 0/1 after structural changes.
  *
  * @param tx - Database transaction or connection
  * @param projectFileId - The project file ID
@@ -75,21 +82,23 @@ export async function resyncLabelPositions(
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
-  // Batch update all label positions in a single query using parameterized VALUES
-  // This avoids N round-trips to the database and prevents SQL injection
+  // Batch update labelPosition, sequenceOrder, and labelNumber in a
+  // single query using parameterized VALUES to avoid N round-trips.
   if (fileLabels.length > 0) {
-    // Create a parameterized VALUES list with explicit type casting
     const valuesList = sql.join(
       fileLabels.map(
-        (label: Label, i: number) => sql`(${label.id}::uuid, ${i}::integer)`
+        (label: Label, i: number) =>
+          sql`(${label.id}::uuid, ${i}::integer, ${i}::integer, ${i + 1}::integer)`
       ),
       sql`, `
     );
 
     await tx.execute(
       sql`UPDATE labels
-          SET "label_position" = new_positions.position
-          FROM (VALUES ${valuesList}) AS new_positions(id, position)
+          SET "label_position" = new_positions.position,
+              "sequence_order" = new_positions.seq,
+              "label_number"   = new_positions.num
+          FROM (VALUES ${valuesList}) AS new_positions(id, position, seq, num)
           WHERE labels.id = new_positions.id`
     );
   }
@@ -382,22 +391,18 @@ async function syncLabelsInTransaction(
   affectedLabelIds: string[];
   dbLabelCount: number;
 }> {
-  // Fetch existing labels for this source file (including soft-deleted)
-  // We need soft-deleted labels to check for name conflicts when creating new labels
-  const existingLabels = await tx
-    .select()
-    .from(labels)
-    .where(eq(labels.projectFileId, sourceId));
-
-  // Build character lookup maps once for robust speaker linking during sync
-  const projectCharacters = await tx
-    .select({
-      id: characters.id,
-      renpyTag: characters.renpyTag,
-      displayName: characters.displayName,
-    })
-    .from(characters)
-    .where(eq(characters.projectId, projectId));
+  // Fetch existing labels and project characters in parallel
+  const [existingLabels, projectCharacters] = await Promise.all([
+    tx.select().from(labels).where(eq(labels.projectFileId, sourceId)),
+    tx
+      .select({
+        id: characters.id,
+        renpyTag: characters.renpyTag,
+        displayName: characters.displayName,
+      })
+      .from(characters)
+      .where(eq(characters.projectId, projectId)),
+  ]);
 
   const lookupMaps: CharacterLookupMaps = {
     byTag: new Map<string, string | null>(),
@@ -430,7 +435,16 @@ async function syncLabelsInTransaction(
   const existingLabelsByName = new Map<string, (typeof existingLabels)[0]>();
   for (const labelRow of existingLabels) {
     if (labelRow.labelName) {
-      existingLabelsByName.set(labelRow.labelName.toLowerCase(), labelRow);
+      const key = labelRow.labelName.toLowerCase();
+      const existing = existingLabelsByName.get(key);
+      // Prefer non-deleted rows; only overwrite if the current entry
+      // is soft-deleted and the new row is active.
+      if (
+        !existing ||
+        (existing.deletedAt !== null && labelRow.deletedAt === null)
+      ) {
+        existingLabelsByName.set(key, labelRow);
+      }
     }
   }
 
@@ -1120,12 +1134,12 @@ export async function syncLabelsFromGitLabFile(
       .limit(1);
 
     if (!file) {
-      throw new Error("Project file not found");
+      throw new NotFoundError("ProjectFile");
     }
 
     // Validate filePath is not null/empty before passing to parser
     if (!file.filePath) {
-      throw new Error(
+      throw new ValidationError(
         `Project file path is missing for projectFileId: ${projectFileId}`
       );
     }
@@ -1191,8 +1205,31 @@ export async function syncLabelsFromGitLabFile(
       // Step 8: Validate RPY content
       validateRPYContent(rpyContent, parsed);
 
-      // Step 9: Execute sync in atomic transaction
+      // Step 9: Execute sync in atomic transaction, first verifying the
+      // active syncStateId under lock to prevent zombie writes.
       const syncResult = await db.transaction(async (tx) => {
+        // Lock the sync state row to confirm it is still active before
+        // committing writes.  If the row was completed or reclaimed we
+        // abort early to avoid a zombie sync.
+        const [activeState] = await tx
+          .select({ id: projectFileSyncState.id })
+          .from(projectFileSyncState)
+          .where(
+            and(
+              eq(projectFileSyncState.id, syncStateId),
+              eq(projectFileSyncState.status, "MODIFIED_LOCAL"),
+              isNull(projectFileSyncState.completedAt)
+            )
+          )
+          .for("update")
+          .limit(1);
+
+        if (!activeState) {
+          throw new ConflictError(
+            "Sync state is no longer active — may have been completed or reclaimed"
+          );
+        }
+
         const syncData = await syncLabelsInTransaction(
           tx,
           file.projectId,
@@ -1205,10 +1242,32 @@ export async function syncLabelsFromGitLabFile(
         return syncData;
       });
 
-      // Step 10-11: Update metadata (contentHash and syncState)
-      // These operations run after the main transaction commits. If they fail,
-      // we log the inconsistency but do not rethrow, since the core work is done.
-      // Each operation is isolated so that one failure doesn't block the other.
+      // Step 10-11: Update metadata (contentHash and syncState).
+      // When sync produced errors we mark the attempt conflicted and skip
+      // persisting contentHash so the file is re-synced on the next attempt.
+
+      if (syncResult.errors.length > 0) {
+        // Sync had partial failures — do not mark as fully synced or persist
+        // the new contentHash.  The error rows are reported to the caller and
+        // the file will be re-evaluated on the next sync.
+        await completeSyncState(
+          syncStateId,
+          false,
+          syncResult.dbLabelCount,
+          `Sync completed with ${syncResult.errors.length} error(s)`
+        );
+        return {
+          success: false,
+          labelsCreated: syncResult.labelsCreated,
+          labelsUpdated: syncResult.labelsUpdated,
+          labelsDeleted: syncResult.labelsDeleted,
+          linesProcessed: syncResult.linesProcessed,
+          errors: syncResult.errors,
+          skipped: false,
+          affectedLabelIds: syncResult.affectedLabelIds,
+          dbLabelCount: syncResult.dbLabelCount,
+        };
+      }
 
       // Step 10: Update projectFiles contentHash and updatedAt
       try {
