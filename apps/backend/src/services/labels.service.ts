@@ -676,7 +676,6 @@ function buildLineValues(
   speakerId: string | null;
   visualType: "GENERATED";
   projectFileId: string;
-  linePosition: number;
   contentHash: string;
   lastSyncedHash: string;
   lastSyncedAt: Date;
@@ -707,7 +706,6 @@ function buildLineValues(
         speakerId: null,
         visualType: "GENERATED" as const,
         projectFileId: sourceId,
-        linePosition: index,
         contentHash,
         lastSyncedHash: contentHash,
         lastSyncedAt: new Date(),
@@ -730,7 +728,6 @@ function buildLineValues(
         speakerId: null,
         visualType: "GENERATED" as const,
         projectFileId: sourceId,
-        linePosition: index,
         contentHash,
         lastSyncedHash: contentHash,
         lastSyncedAt: new Date(),
@@ -757,7 +754,6 @@ function buildLineValues(
       speakerId,
       visualType: "GENERATED" as const,
       projectFileId: sourceId,
-      linePosition: index,
       contentHash: lineHash,
       lastSyncedHash: lineHash,
       lastSyncedAt: new Date(),
@@ -795,29 +791,40 @@ const RENAME_MIN_LINE_SIMILARITY = 0.25;
  * @returns Score between 0 and 1 (higher = more likely a rename)
  */
 function computeRenameScore(
-  existingLineHashes: Set<string>,
-  parsedEntryHashes: Set<string>,
+  existingLineHashes: string[],
+  parsedEntryHashes: string[],
   existingPosition: number,
   parsedPosition: number
 ): { score: number; lineSimilarity: number } {
-  // Edge case: both empty → cannot distinguish, low score
-  if (existingLineHashes.size === 0 && parsedEntryHashes.size === 0) {
+  if (existingLineHashes.length === 0 && parsedEntryHashes.length === 0) {
     return { score: 0.1, lineSimilarity: 0 };
   }
 
-  // Line Jaccard similarity: |intersection| / |union|
-  let intersection = 0;
+  // Build frequency maps
+  const existingFreq = new Map<string, number>();
   for (const h of existingLineHashes) {
-    if (parsedEntryHashes.has(h)) intersection++;
+    existingFreq.set(h, (existingFreq.get(h) ?? 0) + 1);
   }
-  const union = existingLineHashes.size + parsedEntryHashes.size - intersection;
-  const lineSimilarity = union === 0 ? 0 : intersection / union;
+  const parsedFreq = new Map<string, number>();
+  for (const h of parsedEntryHashes) {
+    parsedFreq.set(h, (parsedFreq.get(h) ?? 0) + 1);
+  }
 
-  // Position proximity: 1.0 when adjacent, decays with distance
+  // Frequency-weighted Jaccard: sum(min) / sum(max) for each hash
+  const allHashes = new Set([...existingFreq.keys(), ...parsedFreq.keys()]);
+  let intersectionSum = 0;
+  let unionSum = 0;
+  for (const h of allHashes) {
+    const eCount = existingFreq.get(h) ?? 0;
+    const pCount = parsedFreq.get(h) ?? 0;
+    intersectionSum += Math.min(eCount, pCount);
+    unionSum += Math.max(eCount, pCount);
+  }
+  const lineSimilarity = unionSum === 0 ? 0 : intersectionSum / unionSum;
+
   const posDistance = Math.abs(existingPosition - parsedPosition);
   const posScore = 1 / (1 + posDistance);
 
-  // Weighted composite: content is the primary signal
   return { score: lineSimilarity * 0.8 + posScore * 0.2, lineSimilarity };
 }
 
@@ -916,42 +923,6 @@ async function syncLabelsInTransaction(
   // Track which existing labels have been matched (by name or rename)
   // to avoid double-matching an existing label when detecting renames
   const matchedExistingIds = new Set<string>();
-
-  // Lazy-loaded map of label ID → Set of per-line content hashes.
-  // Populated on first use to avoid querying when all renames are detected
-  // by exact content hash match.
-  let lineHashesByLabelId: Map<string, Set<string>> | null = null;
-
-  async function getLineHashesForLabel(labelId: string): Promise<Set<string>> {
-    if (!lineHashesByLabelId) {
-      // Batch-fetch all line hashes for active labels in this file
-      const allLines = await tx
-        .select({
-          labelId: labelLines.labelId,
-          contentHash: labelLines.contentHash,
-        })
-        .from(labelLines)
-        .where(
-          and(
-            eq(labelLines.projectFileId, sourceId),
-            isNull(labelLines.deletedAt)
-          )
-        );
-
-      lineHashesByLabelId = new Map<string, Set<string>>();
-      for (const line of allLines) {
-        let hashSet = lineHashesByLabelId.get(line.labelId);
-        if (!hashSet) {
-          hashSet = new Set<string>();
-          lineHashesByLabelId.set(line.labelId, hashSet);
-        }
-        if (line.contentHash) {
-          hashSet.add(line.contentHash);
-        }
-      }
-    }
-    return lineHashesByLabelId.get(labelId) ?? new Set<string>();
-  }
 
   // Process each label
   for (let i = 0; i < parsed.labels.length; i++) {
@@ -1116,22 +1087,46 @@ async function syncLabelsInTransaction(
 
         // Pass 2: if no exact match, try multi-signal scoring
         if (!renameCandidate && unmatchedExisting.length > 0) {
-          const parsedHashes = new Set<string>(
-            labelData.entries.map((entry) => {
-              if (entry.type === "MENU" && entry.menuOptions) {
-                return calculateContentHash(JSON.stringify(entry.menuOptions));
+          const parsedHashes = labelData.entries.map((entry) => {
+            if (entry.type === "MENU" && entry.menuOptions) {
+              return calculateContentHash(JSON.stringify(entry.menuOptions));
+            }
+            if (entry.type === "VISUAL") {
+              return calculateContentHash(JSON.stringify(entry.visuals ?? []));
+            }
+            const content = entry.target
+              ? `jump ${entry.target}`
+              : entry.text || "";
+            return calculateContentHash(content);
+          });
+
+          // Batch-fetch line hashes for all unmatched labels to avoid N+1
+          const candidateIds = unmatchedExisting.map((e) => e.id);
+          const hashesByLabel = new Map<string, string[]>();
+          if (candidateIds.length > 0) {
+            const allLines = await tx
+              .select({
+                labelId: labelLines.labelId,
+                contentHash: labelLines.contentHash,
+              })
+              .from(labelLines)
+              .where(
+                and(
+                  inArray(labelLines.labelId, candidateIds),
+                  isNull(labelLines.deletedAt)
+                )
+              );
+            for (const line of allLines) {
+              if (line.contentHash) {
+                const arr = hashesByLabel.get(line.labelId);
+                if (arr) {
+                  arr.push(line.contentHash);
+                } else {
+                  hashesByLabel.set(line.labelId, [line.contentHash]);
+                }
               }
-              if (entry.type === "VISUAL") {
-                return calculateContentHash(
-                  JSON.stringify(entry.visuals ?? [])
-                );
-              }
-              const content = entry.target
-                ? `jump ${entry.target}`
-                : entry.text || "";
-              return calculateContentHash(content);
-            })
-          );
+            }
+          }
 
           const scored: Array<{
             labelId: string;
@@ -1139,7 +1134,7 @@ async function syncLabelsInTransaction(
             score: number;
           }> = [];
           for (const existing of unmatchedExisting) {
-            const existingHashes = await getLineHashesForLabel(existing.id);
+            const existingHashes = hashesByLabel.get(existing.id) ?? [];
             const { score, lineSimilarity } = computeRenameScore(
               existingHashes,
               parsedHashes,
@@ -1385,18 +1380,25 @@ async function syncLabelsInTransaction(
     // b) Stale targets: labels whose existing incomingJumps reference an
     //    affected label as source.  These need recomputation to drop edges
     //    that no longer exist after the sync.
-    const labelsWithIncoming = await tx
-      .select({ id: labels.id, incomingJumps: labels.incomingJumps })
-      .from(labels)
-      .where(and(eq(labels.projectId, projectId), isNull(labels.deletedAt)));
-    for (const l of labelsWithIncoming) {
-      if (l.incomingJumps) {
-        for (const ij of l.incomingJumps) {
-          if (affectedSet.has(ij.sourceLabelId)) {
-            expandedLabelIdSet.add(l.id);
-            break;
-          }
-        }
+    if (affectedSet.size > 0) {
+      const containmentConditions = Array.from(affectedSet).map(
+        (sourceId) =>
+          sql`${labels.incomingJumps} @> ${JSON.stringify([{ sourceLabelId: sourceId }])}::jsonb`
+      );
+      const staleIncoming = await tx
+        .select({ id: labels.id })
+        .from(labels)
+        .where(
+          and(
+            eq(labels.projectId, projectId),
+            isNull(labels.deletedAt),
+            containmentConditions.length === 1
+              ? containmentConditions[0]
+              : or(...containmentConditions)
+          )
+        );
+      for (const row of staleIncoming) {
+        expandedLabelIdSet.add(row.id);
       }
     }
   }
@@ -2884,15 +2886,17 @@ export async function updateLabel(
       expectedVersion ?? labelWithProject.label.version ?? 1;
     const auditFields = updateAuditFields(currentVersion, userId);
 
-    // Build update data with validated route, optional labelName,
-    // and normalized conditions (null → {} for the not-null JSONB column).
-    // Using Record<string, unknown> to allow the normalized conditions type.
-    const updateData: Record<string, unknown> = {
-      ...data,
+    // Build typed update data — exclude `version` (used only for concurrency check)
+    // and `conditions` (handled separately with normalization below).
+    const { version: _v, conditions: _c, ...labelFields } = data;
+
+    const updateData: Partial<typeof labels.$inferInsert> = {
+      ...labelFields,
       ...(validatedRoute !== undefined ? { route: validatedRoute } : {}),
     };
+
     if (isTouchingPairFields) {
-      updateData.duoPairId = validatedDuoPairId;
+      updateData.duoPairId = validatedDuoPairId as string | null | undefined;
     }
     if (data.conditions !== undefined) {
       const conditions = data.conditions ?? {};
@@ -2907,7 +2911,8 @@ export async function updateLabel(
         }
         conditions.stats = normalizedStats;
       }
-      updateData.conditions = conditions;
+      updateData.conditions =
+        conditions as typeof labels.$inferInsert.conditions;
     }
 
     // Also update project_files content if labelName changed
@@ -2957,7 +2962,7 @@ export async function deleteLabel(
 ): Promise<void> {
   const db = getDb();
 
-  // Get label with project owner info and projectFileId
+  // Read label with project owner info, projectFileId, and labelName
   const [labelWithProject] = await db
     .select({
       label: labels,
@@ -2978,12 +2983,37 @@ export async function deleteLabel(
     throw new ForbiddenError("Insufficient permissions");
   }
 
-  const labelName = labelWithProject.label.labelName;
-
-  // Soft delete the label and all associated lines in a single transaction
-  // This ensures both updates succeed or fail together, preventing
-  // inconsistencies where a label is deleted but its lines remain active
   await db.transaction(async (tx) => {
+    // Lock the associated projectFiles row FIRST to prevent deadlock with
+    // updateLabel, which locks projectFiles → labels.
+    let lockedFile: { id: string; content: string } | undefined;
+    if (labelWithProject.projectFileId) {
+      const [pf] = await tx
+        .select({ id: projectFiles.id, content: projectFiles.content })
+        .from(projectFiles)
+        .where(eq(projectFiles.id, labelWithProject.projectFileId))
+        .for("update")
+        .limit(1);
+      lockedFile = pf;
+    }
+
+    // Lock the label row to serialize concurrent operations (e.g. rename)
+    // Read labelName and projectFileId under the lock to prevent TOCTOU races
+    const [lockedLabel] = await tx
+      .select({
+        id: labels.id,
+        labelName: labels.labelName,
+        projectFileId: labels.projectFileId,
+      })
+      .from(labels)
+      .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
+      .for("update")
+      .limit(1);
+
+    if (!lockedLabel) {
+      throw new NotFoundError("Label");
+    }
+
     // Delete the label
     await tx
       .update(labels)
@@ -2998,35 +3028,23 @@ export async function deleteLabel(
         and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt))
       );
 
-    // If the label has a projectFileId and a valid labelName, rebuild the file content without this label
-    // This ensures exports don't re-publish the deleted label.
-    // UI-created labels have null labelName and should skip this step since they don't exist in RPY files.
-    if (labelWithProject.projectFileId && labelName !== null) {
-      // Lock and read the project file content to avoid stale reads from
-      // concurrent operations (e.g. a simultaneous rename) targeting the same file.
-      const [lockedFile] = await tx
-        .select({ id: projectFiles.id, content: projectFiles.content })
-        .from(projectFiles)
-        .where(eq(projectFiles.id, labelWithProject.projectFileId))
-        .for("update")
-        .limit(1);
+    // If the label has a projectFileId and a valid labelName, rebuild the file
+    // content without this label. Reuse content read under the projectFiles lock
+    // (acquired before the labels lock) to avoid a second lock.
+    if (lockedFile?.content && lockedLabel.labelName !== null) {
+      const updatedContent = removeLabelFromRPYContent(
+        lockedFile.content,
+        lockedLabel.labelName
+      );
 
-      if (lockedFile?.content) {
-        const updatedContent = removeLabelFromRPYContent(
-          lockedFile.content,
-          labelName
-        );
-
-        // Update the project_files.content with the new content (without the deleted label)
-        await tx
-          .update(projectFiles)
-          .set({
-            content: updatedContent,
-            contentHash: calculateContentHash(updatedContent),
-            updatedAt: new Date(),
-          })
-          .where(eq(projectFiles.id, labelWithProject.projectFileId));
-      }
+      await tx
+        .update(projectFiles)
+        .set({
+          content: updatedContent,
+          contentHash: calculateContentHash(updatedContent),
+          updatedAt: new Date(),
+        })
+        .where(eq(projectFiles.id, lockedLabel.projectFileId!));
     }
   });
 }
@@ -3049,26 +3067,33 @@ export async function getLabelCharacters(
 ): Promise<LabelCharacterWithInfo[]> {
   const db = getDb();
 
-  // Check if user has access to this label (owner or shared via project_users)
-  const hasAccess = await authorizeLabelAccess(labelId, userId);
+  // Single JOIN query: check label exists AND user has access (owner or shared)
+  const [labelResult] = await db
+    .select({ labelId: labels.id })
+    .from(labels)
+    .innerJoin(projects, eq(labels.projectId, projects.id))
+    .leftJoin(projectUsers, eq(projectUsers.projectId, projects.id))
+    .where(
+      and(
+        eq(labels.id, labelId),
+        isNull(labels.deletedAt),
+        or(eq(projects.userId, userId), eq(projectUsers.userId, userId))
+      )
+    )
+    .limit(1);
 
-  if (!hasAccess) {
-    // Label doesn't exist or user lacks permission
-    // Verify label exists to throw appropriate error
+  if (!labelResult) {
+    // Distinguish NotFound vs Forbidden
     const [label] = await db
-      .select()
+      .select({ id: labels.id })
       .from(labels)
       .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
       .limit(1);
 
-    if (!label) {
-      throw new NotFoundError("Label");
-    }
-
+    if (!label) throw new NotFoundError("Label");
     throw new ForbiddenError("Insufficient permissions");
   }
 
-  // Return characters derived from dialogue speakers
   return await getDerivedCharactersForLabel(labelId);
 }
 
@@ -3093,7 +3118,7 @@ const UUID_REGEX =
  * @param projectId - The project ID to scan for incoming jumps
  */
 export async function updateIncomingJumpsForLabels(
-  context: Pick<ReturnType<typeof getDb>, "select" | "update">,
+  context: Pick<ReturnType<typeof getDb>, "select" | "update" | "execute">,
   labelIds: string[],
   projectId: string
 ): Promise<void> {
@@ -3238,15 +3263,23 @@ export async function updateIncomingJumpsForLabels(
     }
   }
 
-  // 5. Batch-update all affected labels
-  await Promise.all(
-    labelIds.map((id) =>
-      context
-        .update(labels)
-        .set({ incomingJumps: incomingJumpsByLabel.get(id) ?? [] })
-        .where(eq(labels.id, id))
-    )
-  );
+  // 5. Chunked batch-update to stay within PostgreSQL's parameter limit
+  if (labelIds.length > 0) {
+    const BATCH_SIZE = 1000;
+    for (let i = 0; i < labelIds.length; i += BATCH_SIZE) {
+      const batch = labelIds.slice(i, i + BATCH_SIZE);
+      const cases = batch.map(
+        (id) =>
+          sql`WHEN ${id} THEN ${JSON.stringify(incomingJumpsByLabel.get(id) ?? [])}::jsonb`
+      );
+      await context.execute(
+        sql`UPDATE ${labels} SET incoming_jumps = CASE id ${sql.join(cases, sql` `)} END WHERE id IN (${sql.join(
+          batch.map((id) => sql`${id}`),
+          sql`, `
+        )})`
+      );
+    }
+  }
 }
 
 // ============================================================================

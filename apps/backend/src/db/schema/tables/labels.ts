@@ -130,6 +130,8 @@ export const labels = pgTable(
     // Sync status indexes
     index("labels_sync_status_idx").on(table.syncStatus),
     index("labels_deleted_at_idx").on(table.deletedAt),
+    // JSONB containment index for incoming-jump queries (L-16 from #302)
+    index("labels_incoming_jumps_gin_idx").using("gin", table.incomingJumps),
     // Audit trail indexes
     index("labels_created_by_idx").on(table.createdBy),
     index("labels_updated_by_idx").on(table.updatedBy),

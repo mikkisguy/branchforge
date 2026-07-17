@@ -393,7 +393,6 @@ async function updateLabelDialogueHandler(
           await tx.insert(labelLines).values({
             labelId,
             sequence: nextSequence++,
-            linePosition: existingLines.length + index,
             ...values,
           });
         }

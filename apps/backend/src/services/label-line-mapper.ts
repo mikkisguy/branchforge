@@ -64,7 +64,6 @@ export type LabelLineInsertValues = Pick<
   | "content"
   | "speakerId"
   | "projectFileId"
-  | "linePosition"
   | "contentHash"
   | "lastSyncedHash"
   | "lastSyncedAt"
@@ -282,7 +281,6 @@ export function mapEntriesToLabelLineValues(
         content: "",
         speakerId: null,
         projectFileId,
-        linePosition: index,
         contentHash,
         lastSyncedHash: contentHash,
         lastSyncedAt: new Date(),
@@ -306,7 +304,6 @@ export function mapEntriesToLabelLineValues(
         content: "",
         speakerId: null,
         projectFileId,
-        linePosition: index,
         contentHash,
         lastSyncedHash: contentHash,
         lastSyncedAt: new Date(),
@@ -329,7 +326,6 @@ export function mapEntriesToLabelLineValues(
       content: mapped.content,
       speakerId,
       projectFileId,
-      linePosition: index,
       contentHash: entryContentHash,
       lastSyncedHash: entryContentHash,
       lastSyncedAt: new Date(),
