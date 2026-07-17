@@ -217,3 +217,55 @@ export function menuLineToChoiceEntries(line: {
   }
   return result;
 }
+
+/**
+ * Find where to insert a new dialogue line after pressing Enter at `index`.
+ *
+ * Write Mode must not insert prose between a menu prompt and its choices, or
+ * create new choices (Script Mode owns that). Enter on a menu prompt or any
+ * CHOICE inserts after the contiguous choice block for that menu.
+ *
+ * @returns Index at which to splice the new dialogue entry
+ */
+export function findDialogueInsertIndex(
+  entries: DialogueEntry[],
+  index: number
+): number {
+  if (index < 0 || index >= entries.length) {
+    return entries.length;
+  }
+
+  const current = entries[index];
+
+  // Enter on a CHOICE → after that menu's contiguous choice run
+  if (current.contentType === "CHOICE") {
+    const lineId = current.choiceData?.lineId;
+    let i = index;
+    while (i + 1 < entries.length && entries[i + 1].contentType === "CHOICE") {
+      const nextId = entries[i + 1].choiceData?.lineId;
+      // Stop only when both line IDs exist and differ
+      if (lineId && nextId && lineId !== nextId) {
+        break;
+      }
+      i++;
+    }
+    return i + 1;
+  }
+
+  // Enter on prose immediately before CHOICEs (menu prompt) → after that block
+  const next = entries[index + 1];
+  if (next?.contentType === "CHOICE") {
+    const lineId = next.choiceData?.lineId;
+    let i = index + 1;
+    while (i < entries.length && entries[i].contentType === "CHOICE") {
+      const curId = entries[i].choiceData?.lineId;
+      if (lineId && curId && lineId !== curId) {
+        break;
+      }
+      i++;
+    }
+    return i;
+  }
+
+  return index + 1;
+}

@@ -20,6 +20,7 @@ import { DialogueLine } from "./DialogueLine";
 import {
   areDialogueEntriesEqual,
   menuLineToChoiceEntries,
+  findDialogueInsertIndex,
 } from "@/lib/prose-converter";
 import { WritingGoalPill } from "./WritingGoalPill";
 const WritingStatsDialog = lazy(() =>
@@ -585,39 +586,26 @@ export const ProseEditor = function ProseEditor({
       setEntries((prev) => {
         const newEntries = [...prev];
         const currentEntry = prev[index];
-
-        // If adding from a CHOICE entry, create another CHOICE entry
-        if (currentEntry?.contentType === "CHOICE" && currentEntry.choiceData) {
-          const { lineId, targetLabelId, targetLabelName } =
-            currentEntry.choiceData;
-          const newEntry: DialogueEntry = {
-            id: crypto.randomUUID(),
-            speakerId: null,
-            text: "",
-            contentType: "CHOICE",
-            choiceData: {
-              lineId,
-              optionIndex: index + 1, // Will be recalculated on save
-              targetLabelId,
-              targetLabelName,
-            },
-          };
-          newEntries.splice(index + 1, 0, newEntry);
-        } else {
-          // Default: create a dialogue/narration entry
-          const newEntry: DialogueEntry = {
-            id: crypto.randomUUID(),
-            speakerId: prev[index]?.speakerId || null,
-            text: "",
-          };
-          newEntries.splice(index + 1, 0, newEntry);
-        }
+        // Always insert dialogue/narration. Never create CHOICE rows here —
+        // Script Mode owns menu structure, and empty choice labels fail API
+        // validation. Enter on a menu prompt or choice jumps past the block.
+        const insertAt = findDialogueInsertIndex(prev, index);
+        const speakerId =
+          currentEntry?.contentType === "CHOICE"
+            ? null
+            : (currentEntry?.speakerId ?? null);
+        const newEntry: DialogueEntry = {
+          id: crypto.randomUUID(),
+          speakerId,
+          text: "",
+        };
+        newEntries.splice(insertAt, 0, newEntry);
 
         // Record history snapshot
         recordImmediateHistorySnapshot(newEntries);
 
         // Queue focus operation
-        pendingFocusRef.current = { index: index + 1, scrollIntoView: true };
+        pendingFocusRef.current = { index: insertAt, scrollIntoView: true };
 
         return newEntries;
       });

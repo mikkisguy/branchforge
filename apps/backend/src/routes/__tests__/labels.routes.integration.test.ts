@@ -421,7 +421,9 @@ describe("LabelsRoutes (Integration)", () => {
       .where(eq(labelLines.labelId, introLabelId))
       .orderBy(asc(labelLines.sequence));
 
-    // seq 1: updated NARRATION, seq 2: MENU, seq 3: JUMP, seq 4: new DIALOGUE, seq 5: new NARRATION
+    // seq 1: updated NARRATION, seq 2: MENU, seq 3: new DIALOGUE, seq 4: new NARRATION, seq 5: JUMP
+    // New prose lines are inserted after the MENU block (menu-aware ordering)
+    // so Write Mode reload matches Script Mode: prompt → choices → new prose.
     expect(lines).toHaveLength(5);
 
     expect(lines[0].contentType).toBe("NARRATION");
@@ -436,14 +438,14 @@ describe("LabelsRoutes (Integration)", () => {
       },
     ]);
 
-    expect(lines[2].contentType).toBe("JUMP");
-    expect(lines[2].content).toBe("jump ending");
+    expect(lines[2].contentType).toBe("DIALOGUE");
+    expect(lines[2].content).toBe("Second prose");
+    expect(lines[2].speakerId).toBe(testCharacterId);
 
-    expect(lines[3].contentType).toBe("DIALOGUE");
-    expect(lines[3].content).toBe("Second prose");
-    expect(lines[3].speakerId).toBe(testCharacterId);
+    expect(lines[3].contentType).toBe("NARRATION");
+    expect(lines[3].content).toBe("Third prose");
 
-    expect(lines[4].contentType).toBe("NARRATION");
-    expect(lines[4].content).toBe("Third prose");
+    expect(lines[4].contentType).toBe("JUMP");
+    expect(lines[4].content).toBe("jump ending");
   });
 });

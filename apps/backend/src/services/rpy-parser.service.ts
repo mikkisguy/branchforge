@@ -45,6 +45,10 @@ export {
 
 export { reconstructRPYFile } from "./rpy/reconstruction.js";
 
+export { alignDialogue, dialogueEntriesEqual } from "./rpy/dialogue-align.js";
+
+export { planDialogueLineUpdates } from "./rpy/plan-dialogue-updates.js";
+
 export {
   removeLabelFromRPYContent,
   parseLabelBoundaries,
