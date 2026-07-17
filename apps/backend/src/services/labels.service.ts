@@ -2984,6 +2984,19 @@ export async function deleteLabel(
   }
 
   await db.transaction(async (tx) => {
+    // Lock the associated projectFiles row FIRST to prevent deadlock with
+    // updateLabel, which locks projectFiles → labels.
+    let lockedFile: { id: string; content: string } | undefined;
+    if (labelWithProject.projectFileId) {
+      const [pf] = await tx
+        .select({ id: projectFiles.id, content: projectFiles.content })
+        .from(projectFiles)
+        .where(eq(projectFiles.id, labelWithProject.projectFileId))
+        .for("update")
+        .limit(1);
+      lockedFile = pf;
+    }
+
     // Lock the label row to serialize concurrent operations (e.g. rename)
     // Read labelName and projectFileId under the lock to prevent TOCTOU races
     const [lockedLabel] = await tx
@@ -3015,35 +3028,23 @@ export async function deleteLabel(
         and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt))
       );
 
-    // If the label has a projectFileId and a valid labelName, rebuild the file content without this label
-    // This ensures exports don't re-publish the deleted label.
-    // UI-created labels have null labelName and should skip this step since they don't exist in RPY files.
-    if (lockedLabel.projectFileId && lockedLabel.labelName !== null) {
-      // Lock and read the project file content to avoid stale reads from
-      // concurrent operations (e.g. a simultaneous rename) targeting the same file.
-      const [lockedFile] = await tx
-        .select({ id: projectFiles.id, content: projectFiles.content })
-        .from(projectFiles)
-        .where(eq(projectFiles.id, lockedLabel.projectFileId))
-        .for("update")
-        .limit(1);
+    // If the label has a projectFileId and a valid labelName, rebuild the file
+    // content without this label. Reuse content read under the projectFiles lock
+    // (acquired before the labels lock) to avoid a second lock.
+    if (lockedFile?.content && lockedLabel.labelName !== null) {
+      const updatedContent = removeLabelFromRPYContent(
+        lockedFile.content,
+        lockedLabel.labelName
+      );
 
-      if (lockedFile?.content) {
-        const updatedContent = removeLabelFromRPYContent(
-          lockedFile.content,
-          lockedLabel.labelName
-        );
-
-        // Update the project_files.content with the new content (without the deleted label)
-        await tx
-          .update(projectFiles)
-          .set({
-            content: updatedContent,
-            contentHash: calculateContentHash(updatedContent),
-            updatedAt: new Date(),
-          })
-          .where(eq(projectFiles.id, lockedLabel.projectFileId));
-      }
+      await tx
+        .update(projectFiles)
+        .set({
+          content: updatedContent,
+          contentHash: calculateContentHash(updatedContent),
+          updatedAt: new Date(),
+        })
+        .where(eq(projectFiles.id, lockedLabel.projectFileId!));
     }
   });
 }
@@ -3262,18 +3263,22 @@ export async function updateIncomingJumpsForLabels(
     }
   }
 
-  // 5. Batch-update all affected labels in a single atomic UPDATE
+  // 5. Chunked batch-update to stay within PostgreSQL's parameter limit
   if (labelIds.length > 0) {
-    const cases = labelIds.map(
-      (id) =>
-        sql`WHEN ${id} THEN ${JSON.stringify(incomingJumpsByLabel.get(id) ?? [])}::jsonb`
-    );
-    await context.execute(
-      sql`UPDATE ${labels} SET incoming_jumps = CASE id ${sql.join(cases, sql` `)} END WHERE id IN (${sql.join(
-        labelIds.map((id) => sql`${id}`),
-        sql`, `
-      )})`
-    );
+    const BATCH_SIZE = 1000;
+    for (let i = 0; i < labelIds.length; i += BATCH_SIZE) {
+      const batch = labelIds.slice(i, i + BATCH_SIZE);
+      const cases = batch.map(
+        (id) =>
+          sql`WHEN ${id} THEN ${JSON.stringify(incomingJumpsByLabel.get(id) ?? [])}::jsonb`
+      );
+      await context.execute(
+        sql`UPDATE ${labels} SET incoming_jumps = CASE id ${sql.join(cases, sql` `)} END WHERE id IN (${sql.join(
+          batch.map((id) => sql`${id}`),
+          sql`, `
+        )})`
+      );
+    }
   }
 }
 
