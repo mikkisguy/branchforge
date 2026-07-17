@@ -55,6 +55,7 @@ import { eq, asc, inArray, isNull, and, sql } from "drizzle-orm";
 import { calculateLinesHash, calculateContentHash } from "../lib/hash.js";
 import { updateAuditFields } from "../lib/audit.js";
 import { trackWordsForLabel } from "../services/word-count.service.js";
+import { planDialogueLineUpdates } from "../services/rpy/plan-dialogue-updates.js";
 
 // ============================================================================
 // Types
@@ -346,68 +347,80 @@ async function updateLabelDialogueHandler(
         )
         .orderBy(asc(labelLines.sequence));
 
-      // Separate prose lines (DIALOGUE/NARRATION) from non-prose lines (MENU/JUMP).
-      // Non-prose lines are structural and must be preserved during prose edits –
-      // the frontend only sends DIALOGUE/NARRATION entries, so mapping 1:1 by
-      // sequence would overwrite or delete MENU/JUMP lines.
-      const proseLines = existingLines.filter(
-        (line) =>
-          line.contentType === "DIALOGUE" || line.contentType === "NARRATION"
-      );
-      const _nonProseLines = existingLines.filter(
-        (line) =>
-          line.contentType !== "DIALOGUE" && line.contentType !== "NARRATION"
+      // Align prose against the incoming list so mid-list inserts/deletes keep
+      // VISUAL/MENU rows interleaved correctly (not appended at max sequence).
+      const plan = planDialogueLineUpdates(
+        existingLines.map((line) => ({
+          id: line.id,
+          sequence: line.sequence,
+          contentType: line.contentType,
+          content: line.content,
+          speakerId: line.speakerId,
+        })),
+        dialogue
       );
 
-      const maxExistingSequence = Math.max(
-        ...existingLines.map((l) => l.sequence),
-        0
-      );
-      let nextSequence = maxExistingSequence + 1;
+      // 2. Delete removed prose rows (structural MENU/JUMP/VISUAL are never deleted)
+      if (plan.deleteIds.length > 0) {
+        await tx
+          .delete(labelLines)
+          .where(inArray(labelLines.id, plan.deleteIds));
+      }
 
-      // 2. Update existing prose lines by position among prose lines, insert new ones
-      for (const [index, entry] of dialogue.entries()) {
-        const existingProseLine = proseLines[index];
+      // 3. Update matched prose rows in place
+      for (const update of plan.updates) {
+        await tx
+          .update(labelLines)
+          .set({
+            contentType: (update.speakerId ? "DIALOGUE" : "NARRATION") as
+              "DIALOGUE" | "NARRATION",
+            content: update.text,
+            speakerId: update.speakerId,
+            demoNotes: null,
+            isDirty: true,
+            projectFileId: lockedProjectFile.id,
+            contentHash: calculateContentHash(update.text),
+            lastSyncedHash: null,
+            sequence: plan.sequenceByKey.get(update.id)!,
+          })
+          .where(eq(labelLines.id, update.id));
+      }
 
-        const values = {
-          contentType: (entry.speakerId ? "DIALOGUE" : "NARRATION") as
+      // 4. Insert new prose rows at planned sequences
+      for (const insert of plan.inserts) {
+        await tx.insert(labelLines).values({
+          labelId,
+          sequence: insert.sequence,
+          contentType: (insert.speakerId ? "DIALOGUE" : "NARRATION") as
             "DIALOGUE" | "NARRATION",
-          content: entry.text,
-          speakerId: entry.speakerId,
+          content: insert.text,
+          speakerId: insert.speakerId,
           demoNotes: null,
           isDirty: true,
           projectFileId: lockedProjectFile.id,
-          contentHash: calculateContentHash(entry.text),
+          contentHash: calculateContentHash(insert.text),
           lastSyncedHash: null,
-        };
+        });
+      }
 
-        if (existingProseLine) {
-          // Update existing prose line, preserving its sequence position
-          // so non-prose lines at other sequences remain undisturbed
+      // 5. Reindex non-prose rows that shifted due to inserts/deletes
+      for (const line of existingLines) {
+        if (
+          line.contentType === "DIALOGUE" ||
+          line.contentType === "NARRATION"
+        ) {
+          continue;
+        }
+        const newSequence = plan.sequenceByKey.get(line.id);
+        if (newSequence !== undefined && newSequence !== line.sequence) {
           await tx
             .update(labelLines)
-            .set(values)
-            .where(eq(labelLines.id, existingProseLine.id));
-        } else {
-          // Insert new line after all existing sequences
-          await tx.insert(labelLines).values({
-            labelId,
-            sequence: nextSequence++,
-            ...values,
-          });
+            .set({ sequence: newSequence })
+            .where(eq(labelLines.id, line.id));
         }
       }
 
-      // 3. Delete only prose lines beyond the dialogue entry count.
-      // Non-prose lines (MENU/JUMP) are never deleted during prose edits.
-      const proseLinesToDelete = proseLines.slice(dialogue.length);
-      const idsToDelete = proseLinesToDelete.map((line) => line.id);
-
-      if (idsToDelete.length > 0) {
-        await tx.delete(labelLines).where(inArray(labelLines.id, idsToDelete));
-      }
-
-      // 3.5. Process menu blocks - update MENU lines' menuOptions
+      // 6. Process menu blocks - update MENU lines' menuOptions
       if (menuBlocks && menuBlocks.length > 0) {
         for (const block of menuBlocks) {
           const menuContentHash = calculateContentHash(
@@ -437,7 +450,7 @@ async function updateLabelDialogueHandler(
         }
       }
 
-      // 4. Compute content hash from the actual persisted label_lines
+      // 7. Compute content hash from the actual persisted label_lines
       // (includes MENU/JUMP rows preserved during prose edits) so the hash
       // stays consistent with sync/import flows that use calculateLinesHash.
       const finalLines = await tx
@@ -449,7 +462,7 @@ async function updateLabelDialogueHandler(
         .orderBy(asc(labelLines.sequence));
       const contentHash = calculateLinesHash(finalLines);
 
-      // 5. Update label with audit fields and sync status
+      // 8. Update label with audit fields and sync status
       const auditFields = updateAuditFields(lockedCurrentVersion, user.id);
       await tx
         .update(labels)

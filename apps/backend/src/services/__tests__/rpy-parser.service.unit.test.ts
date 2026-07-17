@@ -13,6 +13,7 @@
  */
 
 import { describe, it, expect } from "vitest";
+import { testUuid } from "../../utils/test-ids.js";
 import {
   parseRPYContent,
   extractLabels,
@@ -25,6 +26,8 @@ import {
   reconstructRPYFile,
   addLabelToRPYContent,
   parseLabelBoundaries,
+  alignDialogue,
+  planDialogueLineUpdates,
 } from "../rpy-parser.service.js";
 
 describe("RPYParserService", () => {
@@ -1078,7 +1081,7 @@ label chapter1:
       expect(result).toContain("label chapter1:");
     });
 
-    it("should handle fewer updated entries than original", () => {
+    it("should delete removed dialogue lines when update has fewer entries", () => {
       const updatedDialogue = new Map([
         ["start", [{ speaker: null, text: "Only one line" }]],
       ]);
@@ -1088,10 +1091,9 @@ label chapter1:
         updatedDialogue,
       });
 
-      // Original lines should be preserved when update has fewer entries
       expect(result).toContain('Only one line"');
-      // The second original line should still be there (preserved)
-      expect(result).toContain('s "Original line 2"');
+      // Deleted lines must not linger in the RPY file
+      expect(result).not.toContain('s "Original line 2"');
     });
 
     it("should append extra updated dialogue entries", () => {
@@ -1117,6 +1119,136 @@ label chapter1:
       expect(result).toContain('Line 1"');
       expect(result).toContain('Line 2"');
       expect(result).toContain('Line 3 (extra)"');
+    });
+
+    it("should insert mid-list dialogue without shifting scene/show partners", () => {
+      // Regression: Example 2 — insert between prose lines interleaved with visuals
+      const original = `label start:
+    scene ai1_hw1 with fade
+    "At a certain mansion in Hornwood..."
+    show ai1_hw2 with dissolve
+    play ambiance sfx_breakfast_ambiance
+    "...Nelson was lost in thought."
+    scene ai1_hw3
+    ma "Nelson, I was..."
+    show ai1_hw4
+    ne "(Riley asked me to get coffee with her...)"
+`;
+
+      const updatedDialogue = new Map([
+        [
+          "start",
+          [
+            { speaker: null, text: "At a certain mansion in Hornwood..." },
+            { speaker: null, text: "...Nelson was lost in thought." },
+            { speaker: "le", text: "Added dialogue" },
+            { speaker: "ma", text: "Nelson, I was..." },
+            {
+              speaker: "ne",
+              text: "(Riley asked me to get coffee with her...)",
+            },
+          ],
+        ],
+      ]);
+
+      const result = reconstructRPYFile({
+        originalContent: original,
+        updatedDialogue,
+      });
+
+      // Keywords stay paired with their original dialogue partners
+      expect(result).toMatch(/scene ai1_hw3\n\s*ma "Nelson, I was\.\.\."/);
+      expect(result).toMatch(
+        /show ai1_hw4\n\s*ne "\(Riley asked me to get coffee with her\.\.\.\)"/
+      );
+      // New line sits after the preceding matched prose (Nelson narration), before ma's scene block partners stay intact
+      expect(result).toMatch(
+        /\.\.\.Nelson was lost in thought\."\n\s*le "Added dialogue"\n\s*scene ai1_hw3/
+      );
+    });
+
+    it("should insert mid-list dialogue before menu without stealing the menu title", () => {
+      // Regression: Example 1 — insert before menu title narration
+      const original = `label start:
+    w "Game contains sexually explicit material."
+    w "Narrative also delves into sensitive themes."
+
+    if not persistent.age_verified:
+        hide logo
+        menu:
+            "{i}Are {b}you{/b} over 18?{/i}"
+
+            "Yes, I am.":
+                $ persistent.age_verified = True
+                jump start_continued
+
+            "No, I'm not.":
+                $ persistent.age_verified = False
+                jump not_18
+`;
+
+      const updatedDialogue = new Map([
+        [
+          "start",
+          [
+            {
+              speaker: "w",
+              text: "Game contains sexually explicit material.",
+            },
+            { speaker: "w", text: "Added dialogue" },
+            {
+              speaker: "w",
+              text: "Narrative also delves into sensitive themes.",
+            },
+            { speaker: null, text: "{i}Are {b}you{/b} over 18?{/i}" },
+          ],
+        ],
+      ]);
+
+      const result = reconstructRPYFile({
+        originalContent: original,
+        updatedDialogue,
+      });
+
+      // New line is outside the menu
+      expect(result).toMatch(
+        /w "Added dialogue"\n\s*w "Narrative also delves into sensitive themes\."/
+      );
+      // Menu title stays inside the menu block
+      expect(result).toMatch(
+        /menu:\n\s*"\{i\}Are \{b\}you\{\/b\} over 18\?\{\/i\}"/
+      );
+      // Menu title must not appear as a stray line after the menu
+      const titleMatches = result.match(
+        /"\{i\}Are \{b\}you\{\/b\} over 18\?\{\/i\}"/g
+      );
+      expect(titleMatches).toHaveLength(1);
+      // Narrative must not become the menu title
+      expect(result).not.toMatch(
+        /menu:\n\s*w "Narrative also delves into sensitive themes\."/
+      );
+    });
+
+    it("should delete mid-list dialogue while keeping nearby show statements", () => {
+      const original = `label start:
+    scene ai1_hw3
+    ma "Nelson, I was..."
+    show ai1_hw4
+    ne "(Riley asked me...)"
+`;
+
+      const updatedDialogue = new Map([
+        ["start", [{ speaker: "ne", text: "(Riley asked me...)" }]],
+      ]);
+
+      const result = reconstructRPYFile({
+        originalContent: original,
+        updatedDialogue,
+      });
+
+      expect(result).not.toContain('ma "Nelson, I was..."');
+      expect(result).toContain("show ai1_hw4");
+      expect(result).toContain('ne "(Riley asked me...)"');
     });
 
     it("should preserve original indentation", () => {
@@ -1196,6 +1328,48 @@ label chapter1:
       });
 
       expect(result).toContain('e "Updated speaker"');
+    });
+
+    it("should place dialogue inserted after a menu title outside the menu block", () => {
+      // Write Mode payload is flat prose: menu title then the new line (choices
+      // are not in the dialogue list). Inserts after the title must not land
+      // inside the menu: block.
+      const original = `label start:
+    "Before menu"
+    menu:
+        "Are you sure?"
+        "Yes":
+            jump yes_label
+        "No":
+            jump no_label
+    "After menu"
+`;
+
+      const updatedDialogue = new Map([
+        [
+          "start",
+          [
+            { speaker: null, text: "Before menu" },
+            { speaker: null, text: "Are you sure?" },
+            { speaker: null, text: "Added after menu" },
+            { speaker: null, text: "After menu" },
+          ],
+        ],
+      ]);
+
+      const result = reconstructRPYFile({
+        originalContent: original,
+        updatedDialogue,
+      });
+
+      expect(result).toMatch(
+        /jump no_label\n\s*"Added after menu"\n\s*"After menu"/
+      );
+      expect(result).not.toMatch(
+        /menu:\n\s*"Are you sure\?"\n\s*"Added after menu"/
+      );
+      const titleMatches = result.match(/"Are you sure\?"/g);
+      expect(titleMatches).toHaveLength(1);
     });
 
     it("should NOT duplicate menu title during reconstruction", () => {
@@ -1460,6 +1634,455 @@ label second:
       const result = parseLabelBoundaries(content);
       expect(result[0].startLine).toBe(0);
       expect(result[0].endLine).toBe(4);
+    });
+  });
+
+  describe("alignDialogue", () => {
+    it("should detect mid-list inserts", () => {
+      const ops = alignDialogue(
+        [
+          { speaker: null, text: "A" },
+          { speaker: null, text: "B" },
+        ],
+        [
+          { speaker: null, text: "A" },
+          { speaker: "x", text: "X" },
+          { speaker: null, text: "B" },
+        ]
+      );
+      expect(ops).toEqual([
+        { type: "equal", origIndex: 0, updatedIndex: 0 },
+        { type: "insert", updatedIndex: 1 },
+        { type: "equal", origIndex: 1, updatedIndex: 2 },
+      ]);
+    });
+
+    it("should coalesce in-place edits to replace", () => {
+      const ops = alignDialogue(
+        [{ speaker: "a", text: "old" }],
+        [{ speaker: "a", text: "new" }]
+      );
+      expect(ops).toEqual([{ type: "replace", origIndex: 0, updatedIndex: 0 }]);
+    });
+
+    it("should detect deletes", () => {
+      const ops = alignDialogue(
+        [
+          { speaker: null, text: "A" },
+          { speaker: null, text: "B" },
+          { speaker: null, text: "C" },
+        ],
+        [
+          { speaker: null, text: "A" },
+          { speaker: null, text: "C" },
+        ]
+      );
+      expect(ops).toEqual([
+        { type: "equal", origIndex: 0, updatedIndex: 0 },
+        { type: "delete", origIndex: 1 },
+        { type: "equal", origIndex: 2, updatedIndex: 1 },
+      ]);
+    });
+  });
+
+  describe("planDialogueLineUpdates", () => {
+    // Nested menus (menu inside a menu choice) are out of scope for this function.
+    // The planDialogueLineUpdates function treats each menu: line as an atomic
+    // structural block regardless of nesting depth.
+    it("should insert prose between visuals at the correct sequence", () => {
+      const existing = [
+        {
+          id: "v1",
+          sequence: 1,
+          contentType: "VISUAL",
+          content: "",
+          speakerId: null,
+        },
+        {
+          id: "p1",
+          sequence: 2,
+          contentType: "DIALOGUE",
+          content: "Nelson, I was...",
+          speakerId: "char-ma",
+        },
+        {
+          id: "v2",
+          sequence: 3,
+          contentType: "VISUAL",
+          content: "",
+          speakerId: null,
+        },
+        {
+          id: "p2",
+          sequence: 4,
+          contentType: "DIALOGUE",
+          content: "(Riley...)",
+          speakerId: "char-ne",
+        },
+      ];
+
+      const plan = planDialogueLineUpdates(existing, [
+        { speakerId: "char-ma", text: "Nelson, I was..." },
+        { speakerId: "char-le", text: "Added dialogue" },
+        { speakerId: "char-ne", text: "(Riley...)" },
+      ]);
+
+      expect(plan.deleteIds).toEqual([]);
+      expect(plan.inserts).toHaveLength(1);
+      expect(plan.inserts[0]).toMatchObject({
+        speakerId: "char-le",
+        text: "Added dialogue",
+      });
+      // Order: v1, p1, new, v2, p2
+      expect(plan.sequenceByKey.get("v1")).toBe(1);
+      expect(plan.sequenceByKey.get("p1")).toBe(2);
+      expect(plan.sequenceByKey.get("insert:0")).toBe(3);
+      expect(plan.sequenceByKey.get("v2")).toBe(4);
+      expect(plan.sequenceByKey.get("p2")).toBe(5);
+    });
+
+    it("should place inserts after MENU so Write Mode reload stays after choices", () => {
+      const existing = [
+        {
+          id: "title",
+          sequence: 1,
+          contentType: "NARRATION",
+          content: "Are you sure?",
+          speakerId: null,
+        },
+        {
+          id: "menu-1",
+          sequence: 2,
+          contentType: "MENU",
+          content: "",
+          speakerId: null,
+        },
+        {
+          id: "after",
+          sequence: 3,
+          contentType: "NARRATION",
+          content: "After menu",
+          speakerId: null,
+        },
+      ];
+
+      const plan = planDialogueLineUpdates(existing, [
+        { speakerId: null, text: "Are you sure?" },
+        { speakerId: null, text: "Added after menu" },
+        { speakerId: null, text: "After menu" },
+      ]);
+
+      // Order: title, MENU, new, after — NOT title, new, MENU, after
+      expect(plan.sequenceByKey.get("title")).toBe(1);
+      expect(plan.sequenceByKey.get("menu-1")).toBe(2);
+      expect(plan.sequenceByKey.get("insert:0")).toBe(3);
+      expect(plan.sequenceByKey.get("after")).toBe(4);
+      expect(plan.inserts[0]).toMatchObject({
+        sequence: 3,
+        text: "Added after menu",
+      });
+    });
+
+    it("should handle empty dialogue list — all-delete of existing prose", () => {
+      const nId = testUuid("nan", 1);
+      const mId = testUuid("men", 1);
+      const existing = [
+        {
+          id: nId,
+          sequence: 1,
+          contentType: "NARRATION",
+          content: "Some prose",
+          speakerId: null,
+        },
+        {
+          id: mId,
+          sequence: 2,
+          contentType: "MENU",
+          content: "",
+          speakerId: null,
+        },
+      ];
+
+      const plan = planDialogueLineUpdates(existing, []);
+
+      expect(plan.deleteIds).toEqual([nId]);
+      expect(plan.inserts).toEqual([]);
+      expect(plan.updates).toEqual([]);
+      // MENU row keeps its original sequence (1-based reindexed to position 1)
+      expect(plan.sequenceByKey.get(mId)).toBe(1);
+      expect(plan.sequenceByKey.size).toBe(1);
+    });
+
+    it("should insert all prose into label with only structural lines", () => {
+      const mId = testUuid("men", 1);
+      const jId = testUuid("jmp", 1);
+      const existing = [
+        {
+          id: mId,
+          sequence: 1,
+          contentType: "MENU",
+          content: "",
+          speakerId: null,
+        },
+        {
+          id: jId,
+          sequence: 2,
+          contentType: "JUMP",
+          content: "",
+          speakerId: null,
+        },
+      ];
+
+      const plan = planDialogueLineUpdates(existing, [
+        { speakerId: "char-a", text: "First line" },
+        { speakerId: "char-b", text: "Second line" },
+      ]);
+
+      // No prose to delete
+      expect(plan.deleteIds).toEqual([]);
+      // Prose inserted after structural rows
+      expect(plan.sequenceByKey.get(mId)).toBe(1);
+      expect(plan.sequenceByKey.get(jId)).toBe(2);
+      expect(plan.sequenceByKey.get("insert:0")).toBe(3);
+      expect(plan.sequenceByKey.get("insert:1")).toBe(4);
+      expect(plan.inserts).toHaveLength(2);
+      expect(plan.inserts[0]).toMatchObject({
+        sequence: 3,
+        speakerId: "char-a",
+        text: "First line",
+      });
+      expect(plan.inserts[1]).toMatchObject({
+        sequence: 4,
+        speakerId: "char-b",
+        text: "Second line",
+      });
+    });
+
+    it("should handle interleaved VISUAL/MENU with mid-list deletes", () => {
+      const v1Id = testUuid("vis", 1);
+      const n1Id = testUuid("nar", 1);
+      const mId = testUuid("men", 2);
+      const n2Id = testUuid("nar", 2);
+      const v2Id = testUuid("vis", 2);
+      const existing = [
+        {
+          id: v1Id,
+          sequence: 1,
+          contentType: "VISUAL",
+          content: "",
+          speakerId: null,
+        },
+        {
+          id: n1Id,
+          sequence: 2,
+          contentType: "NARRATION",
+          content: "NARRATION-A",
+          speakerId: null,
+        },
+        {
+          id: mId,
+          sequence: 3,
+          contentType: "MENU",
+          content: "",
+          speakerId: null,
+        },
+        {
+          id: n2Id,
+          sequence: 4,
+          contentType: "NARRATION",
+          content: "NARRATION-B",
+          speakerId: null,
+        },
+        {
+          id: v2Id,
+          sequence: 5,
+          contentType: "VISUAL",
+          content: "",
+          speakerId: null,
+        },
+      ];
+
+      const plan = planDialogueLineUpdates(existing, [
+        { speakerId: null, text: "NARRATION-A" },
+      ]);
+
+      // NARRATION-B is removed
+      expect(plan.deleteIds).toEqual([n2Id]);
+      // VISUAL(1) stays seq 1
+      expect(plan.sequenceByKey.get(v1Id)).toBe(1);
+      // NARRATION-A matches to seq 2
+      expect(plan.sequenceByKey.get(n1Id)).toBe(2);
+      // MENU shifts to seq 3
+      expect(plan.sequenceByKey.get(mId)).toBe(3);
+      // VISUAL(5) shifts to seq 4
+      expect(plan.sequenceByKey.get(v2Id)).toBe(4);
+      // Total: 4 entries, no gaps
+      expect(plan.sequenceByKey.size).toBe(4);
+    });
+
+    it("should delete the menu prompt and keep MENU before surviving prose", () => {
+      const n1Id = testUuid("nar", 1);
+      const mId = testUuid("men", 3);
+      const n2Id = testUuid("nar", 3);
+      const existing = [
+        {
+          id: n1Id,
+          sequence: 1,
+          contentType: "NARRATION",
+          content: "Are you sure?",
+          speakerId: null,
+        },
+        {
+          id: mId,
+          sequence: 2,
+          contentType: "MENU",
+          content: "",
+          speakerId: null,
+        },
+        {
+          id: n2Id,
+          sequence: 3,
+          contentType: "NARRATION",
+          content: "After menu",
+          speakerId: null,
+        },
+      ];
+
+      const plan = planDialogueLineUpdates(existing, [
+        { speakerId: null, text: "After menu" },
+      ]);
+
+      // The NARRATION at seq 1 (menu title) is deleted
+      expect(plan.deleteIds).toEqual([n1Id]);
+      // Order: MENU, NARRATION(3)
+      expect(plan.sequenceByKey.get(mId)).toBe(1);
+      expect(plan.sequenceByKey.get(n2Id)).toBe(2);
+      expect(plan.sequenceByKey.size).toBe(2);
+    });
+
+    it("should preserve all sequences when multiple menus have equal dialogue", () => {
+      const n1Id = testUuid("nar", 1);
+      const m1Id = testUuid("men", 1);
+      const n2Id = testUuid("nar", 2);
+      const m2Id = testUuid("men", 4);
+      const n3Id = testUuid("nar", 5);
+      const existing = [
+        {
+          id: n1Id,
+          sequence: 1,
+          contentType: "NARRATION",
+          content: "Before menu A",
+          speakerId: null,
+        },
+        {
+          id: m1Id,
+          sequence: 2,
+          contentType: "MENU",
+          content: "",
+          speakerId: null,
+        },
+        {
+          id: n2Id,
+          sequence: 3,
+          contentType: "NARRATION",
+          content: "Before menu B",
+          speakerId: null,
+        },
+        {
+          id: m2Id,
+          sequence: 4,
+          contentType: "MENU",
+          content: "",
+          speakerId: null,
+        },
+        {
+          id: n3Id,
+          sequence: 5,
+          contentType: "NARRATION",
+          content: "After menu B",
+          speakerId: null,
+        },
+      ];
+
+      const plan = planDialogueLineUpdates(existing, [
+        { speakerId: null, text: "Before menu A" },
+        { speakerId: null, text: "Before menu B" },
+        { speakerId: null, text: "After menu B" },
+      ]);
+
+      expect(plan.deleteIds).toEqual([]);
+      expect(plan.sequenceByKey.get(n1Id)).toBe(1);
+      expect(plan.sequenceByKey.get(m1Id)).toBe(2);
+      expect(plan.sequenceByKey.get(n2Id)).toBe(3);
+      expect(plan.sequenceByKey.get(m2Id)).toBe(4);
+      expect(plan.sequenceByKey.get(n3Id)).toBe(5);
+    });
+
+    it("should defer insert for first menu but not second with multiple menus", () => {
+      const n1Id = testUuid("nar", 1);
+      const m1Id = testUuid("men", 1);
+      const n2Id = testUuid("nar", 2);
+      const m2Id = testUuid("men", 4);
+      const n3Id = testUuid("nar", 5);
+      const existing = [
+        {
+          id: n1Id,
+          sequence: 1,
+          contentType: "NARRATION",
+          content: "Before menu A",
+          speakerId: null,
+        },
+        {
+          id: m1Id,
+          sequence: 2,
+          contentType: "MENU",
+          content: "",
+          speakerId: null,
+        },
+        {
+          id: n2Id,
+          sequence: 3,
+          contentType: "NARRATION",
+          content: "Before menu B",
+          speakerId: null,
+        },
+        {
+          id: m2Id,
+          sequence: 4,
+          contentType: "MENU",
+          content: "",
+          speakerId: null,
+        },
+        {
+          id: n3Id,
+          sequence: 5,
+          contentType: "NARRATION",
+          content: "After menu B",
+          speakerId: null,
+        },
+      ];
+
+      const plan = planDialogueLineUpdates(existing, [
+        { speakerId: null, text: "Before menu A" },
+        { speakerId: "char-x", text: "New line after menu A" },
+        { speakerId: null, text: "Before menu B" },
+        { speakerId: null, text: "After menu B" },
+      ]);
+
+      expect(plan.deleteIds).toEqual([]);
+      // New line is deferred past MENU-A, landing after it
+      expect(plan.sequenceByKey.get(n1Id)).toBe(1);
+      expect(plan.sequenceByKey.get(m1Id)).toBe(2);
+      expect(plan.sequenceByKey.get("insert:0")).toBe(3);
+      expect(plan.sequenceByKey.get(n2Id)).toBe(4);
+      expect(plan.sequenceByKey.get(m2Id)).toBe(5);
+      expect(plan.sequenceByKey.get(n3Id)).toBe(6);
+      expect(plan.sequenceByKey.size).toBe(6);
+      expect(plan.inserts[0]).toMatchObject({
+        sequence: 3,
+        speakerId: "char-x",
+        text: "New line after menu A",
+      });
     });
   });
 });
