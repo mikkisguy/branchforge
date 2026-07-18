@@ -28,6 +28,10 @@ import {
   gitlabUrlSchema,
   validateData,
   safeValidateData,
+  updateLabelDialogueBodySchema,
+  updateLabelSchema,
+  createWorldElementSchema,
+  updateWorldElementSchema,
 } from "../validation.js";
 import { ValidationError } from "../../middleware/error-handler.middleware.js";
 
@@ -141,6 +145,15 @@ describe("Common Schemas", () => {
     it("should reject passwords that are too long", () => {
       const result = passwordSchema.safeParse("a".repeat(129));
       expect(result.success).toBe(false);
+    });
+
+    it("should preserve leading and trailing whitespace (no trim)", () => {
+      const pwd = "  password123  ";
+      const result = passwordSchema.safeParse(pwd);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toBe(pwd);
+      }
     });
   });
 });
@@ -538,6 +551,16 @@ describe("Auth Schemas", () => {
       const result = loginSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
+
+    it("should reject password shorter than 8 characters (reuses passwordSchema)", () => {
+      const invalidData = {
+        email: "user@example.com",
+        password: "short",
+      };
+
+      const result = loginSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+    });
   });
 });
 
@@ -596,6 +619,39 @@ describe("Project Schemas", () => {
 
       const result = createProjectSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
+    });
+
+    it("should reject negative maxStatDelta", () => {
+      const invalidData = {
+        name: "Test Project",
+        source: "ZIP" as const,
+        maxStatDelta: -1,
+      };
+
+      const result = createProjectSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject maxStatDelta greater than 1000", () => {
+      const invalidData = {
+        name: "Test Project",
+        source: "ZIP" as const,
+        maxStatDelta: 1001,
+      };
+
+      const result = createProjectSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+    });
+
+    it("should accept valid maxStatDelta within bounds", () => {
+      const validData = {
+        name: "Test Project",
+        source: "ZIP" as const,
+        maxStatDelta: 10,
+      };
+
+      const result = createProjectSchema.safeParse(validData);
+      expect(result.success).toBe(true);
     });
   });
 
@@ -939,6 +995,108 @@ describe("Create Label Schema", () => {
 
       const result = createLabelSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
+    });
+  });
+});
+
+describe("Update Label Dialogue Schema", () => {
+  describe("updateLabelDialogueBodySchema", () => {
+    const baseValid = {
+      dialogue: [{ speakerId: null, text: "Hello world" }],
+      expectedContentHash: "abc123",
+    };
+
+    it("should accept valid dialogue body", () => {
+      const result = updateLabelDialogueBodySchema.safeParse(baseValid);
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject whitespace-only dialogue text", () => {
+      const data = {
+        ...baseValid,
+        dialogue: [{ speakerId: null, text: "   " }],
+      };
+      const result = updateLabelDialogueBodySchema.safeParse(data);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject whitespace-only menu option label", () => {
+      const data = {
+        dialogue: [{ speakerId: null, text: "Hi" }],
+        menuBlocks: [
+          {
+            lineId: "550e8400-e29b-41d4-a716-446655440000",
+            menuOptions: [
+              {
+                label: "   ",
+                targetLabelId: "550e8400-e29b-41d4-a716-446655440001",
+                targetLabelName: "target",
+              },
+            ],
+          },
+        ],
+        expectedContentHash: "abc123",
+      };
+      const result = updateLabelDialogueBodySchema.safeParse(data);
+      expect(result.success).toBe(false);
+    });
+  });
+});
+
+describe("Update Label Schema", () => {
+  describe("updateLabelSchema (labelName max length)", () => {
+    it("should reject labelName longer than 50 characters", () => {
+      const data = { labelName: "a".repeat(51) };
+      const result = updateLabelSchema.safeParse(data);
+      expect(result.success).toBe(false);
+    });
+
+    it("should accept labelName with exactly 50 characters", () => {
+      const data = { labelName: "a".repeat(50) };
+      const result = updateLabelSchema.safeParse(data);
+      expect(result.success).toBe(true);
+    });
+  });
+});
+
+describe("World Element Schemas", () => {
+  describe("createWorldElementSchema (tags)", () => {
+    it("should reject whitespace-only tag", () => {
+      const data = {
+        name: "Test Element",
+        type: "LOCATION" as const,
+        tags: ["   "],
+      };
+      const result = createWorldElementSchema.safeParse(data);
+      expect(result.success).toBe(false);
+    });
+
+    it("should accept valid tags", () => {
+      const data = {
+        name: "Test Element",
+        type: "LOCATION" as const,
+        tags: ["forest", "magical"],
+      };
+      const result = createWorldElementSchema.safeParse(data);
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("updateWorldElementSchema (tags)", () => {
+    it("should reject whitespace-only tag", () => {
+      const data = {
+        tags: ["\t\n"],
+      };
+      const result = updateWorldElementSchema.safeParse(data);
+      expect(result.success).toBe(false);
+    });
+
+    it("should accept valid tags", () => {
+      const data = {
+        tags: ["updated-tag"],
+      };
+      const result = updateWorldElementSchema.safeParse(data);
+      expect(result.success).toBe(true);
     });
   });
 });

@@ -95,13 +95,10 @@ export function optionalString(max: number, message?: string) {
  * Password validation schema
  * Enforces reasonable password requirements
  */
-export const passwordSchema = z.preprocess(
-  (val) => (typeof val === "string" ? val.trim() : val),
-  z
-    .string()
-    .min(8, "Password must be at least 8 characters")
-    .max(128, "Password is too long")
-);
+export const passwordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters")
+  .max(128, "Password is too long");
 
 /**
  * Expected content hash validation schema
@@ -268,7 +265,7 @@ export const registerSchema = z.object({
  */
 export const loginSchema = z.object({
   email: emailSchema,
-  password: z.string().min(1, "Password is required"),
+  password: passwordSchema,
 });
 
 // ============================================================================
@@ -289,7 +286,7 @@ export const createProjectSchema = z
   .object({
     name: requiredString(200, "Project name is too long"),
     description: optionalString(2000, "Description is too long"),
-    maxStatDelta: z.number().int().optional(),
+    maxStatDelta: z.number().int().min(0).max(1000).optional(),
     source: sourceOriginSchema,
   })
   .strict();
@@ -447,7 +444,7 @@ export const updateLabelSchema = z
       .string()
       .trim()
       .min(1)
-      .max(255)
+      .max(50)
       .regex(
         /^[a-zA-Z_][a-zA-Z0-9_]*$/,
         "Label name must start with a letter or underscore and contain only letters, numbers, and underscores"
@@ -490,7 +487,7 @@ export const updateLabelSchema = z
  * Update label dialogue request validation
  */
 const menuOptionSchema = z.object({
-  label: z.string().min(1, "Choice label cannot be empty"),
+  label: z.string().trim().min(1, "Choice label cannot be empty"),
   targetLabelId: z.string().uuid(),
   targetLabelName: z.string(),
   conditionFlags: z.array(z.string()).optional(),
@@ -507,7 +504,7 @@ export const updateLabelDialogueBodySchema = z
     dialogue: z.array(
       z.object({
         speakerId: z.string().uuid().nullable(),
-        text: z.string().min(1, "Dialogue text cannot be empty"),
+        text: z.string().trim().min(1, "Dialogue text cannot be empty"),
       })
     ),
     menuBlocks: z.array(menuBlockSchema).optional(),
@@ -672,19 +669,7 @@ export const updateStatSchema = z
     description: optionalString(500, "Description is too long"),
   })
   .strict()
-  .partial()
-  .refine(
-    (data) => {
-      if (data.minValue !== undefined && data.maxValue !== undefined) {
-        return data.minValue <= data.maxValue;
-      }
-      return true;
-    },
-    {
-      message: "Minimum value must be less than or equal to maximum value",
-      path: ["minValue"],
-    }
-  );
+  .partial();
 
 /**
  * Stat ID params validation
@@ -987,7 +972,7 @@ export const createWorldElementSchema = z
       .nullable()
       .optional(),
     tags: z
-      .array(z.string().max(100))
+      .array(z.string().trim().min(1).max(100))
       .max(20, "Maximum 20 tags per element")
       .default([]),
   })
@@ -1007,7 +992,7 @@ export const updateWorldElementSchema = z
       .nullable()
       .optional(),
     tags: z
-      .array(z.string().max(100))
+      .array(z.string().trim().min(1).max(100))
       .max(20, "Maximum 20 tags per element")
       .optional(),
   })
@@ -1082,10 +1067,14 @@ export const gitlabUrlSchema = z
   )
   .refine(
     (url) => {
-      const parsed = new URL(url);
-      const isHttps = parsed.protocol === "https:";
-      const isAllowedHost = isAllowedGitlabHost(parsed.hostname);
-      return isHttps && isAllowedHost;
+      try {
+        const parsed = new URL(url);
+        const isHttps = parsed.protocol === "https:";
+        const isAllowedHost = isAllowedGitlabHost(parsed.hostname);
+        return isHttps && isAllowedHost;
+      } catch {
+        return false;
+      }
     },
     {
       message: "Only HTTPS URLs to gitlab.com or GitLab instances are allowed",
