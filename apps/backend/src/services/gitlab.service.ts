@@ -6,6 +6,7 @@
  */
 
 import { getDb } from "../db/index.js";
+import { pinnedHttpsRequest } from "../lib/pinned-request.js";
 import {
   gitlabIntegrations,
   gitlabRepositories,
@@ -29,7 +30,7 @@ import { isPostgresError } from "../lib/db.js";
 import {
   isPrivateOrLocalHostname,
   isAllowedGitlabHost,
-  isValidPublicHost,
+  resolvePublicHost,
 } from "../lib/ip-validation.js";
 import { createProject, deleteProject } from "./projects.service.js";
 import { importFromGitlab } from "./gitlab-sync.service.js";
@@ -127,22 +128,40 @@ async function fetchWithTimeout(
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      // Validate the resolved IP immediately before making the outbound
-      // request. This closes a DNS rebinding window where a hostname's
-      // A/AAAA records are changed between hostname-only validation
-      // (approveGitlabUrl) and the actual fetch call.
+      // Resolve DNS to a known-public IP and pin the TCP connection
+      // to that exact IP via https.request's `lookup` option, closing
+      // the DNS rebinding TOCTOU window: the hostname is never
+      // re-resolved by the outbound transport.
       const parsedHost = new URL(currentUrl).hostname;
-      if (!(await isValidPublicHost(parsedHost))) {
+      const pinnedIps = await resolvePublicHost(parsedHost);
+      if (!pinnedIps) {
         logSecurityEvent(LogEventType.SECURITY_SSRF_REFUSAL, {
           hostname: parsedHost,
         });
         throw new Error("Refused GitLab fetch to non-public IP");
       }
-      const response = await fetch(currentUrl, {
-        ...options,
-        redirect: "manual",
-        signal: controller.signal,
-      });
+      const pinnedIp = pinnedIps[0];
+
+      const parsedUrl = new URL(currentUrl);
+      const requestHeaders: Record<string, string> = {};
+      if (options.headers) {
+        const h = options.headers as Record<string, string>;
+        for (const [k, v] of Object.entries(h)) {
+          requestHeaders[k] = v;
+        }
+      }
+
+      const response = await pinnedHttpsRequest(
+        {
+          hostname: parsedUrl.hostname,
+          path: parsedUrl.pathname + parsedUrl.search,
+          method: (options.method as string) || "GET",
+          headers: requestHeaders,
+          body: options.body as string | undefined,
+          signal: controller.signal,
+        },
+        pinnedIp
+      );
 
       // Only follow real redirects (300-399 excluding 304 Not Modified
       // and 305 Use Proxy). If there is no Location header, surface the

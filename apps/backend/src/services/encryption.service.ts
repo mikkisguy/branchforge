@@ -15,8 +15,9 @@ import crypto from "node:crypto";
 import {
   isPrivateOrLocalHostname,
   isAllowedGitlabHost,
-  isValidPublicHost,
+  resolvePublicHost,
 } from "../lib/ip-validation.js";
+import { pinnedHttpsRequest } from "../lib/pinned-request.js";
 import { logWarn, LogEventType } from "../lib/logger.js";
 
 // GitLab PAT format: glpat- followed by alphanumeric characters, hyphens, underscores, and dots
@@ -189,29 +190,29 @@ export async function validateAndGetUsername(
   try {
     const url = new URL("/api/v4/user", validatedUrl);
 
-    // Validate the resolved IP immediately before making the outbound
-    // request, closing a DNS rebinding window between hostname validation
-    // (validateGitLabUrl) and the actual fetch call.
-    if (!(await isValidPublicHost(url.hostname))) {
+    // Resolve DNS to a known-public IP and pin the TCP connection
+    // via https.request's `lookup` option, closing the DNS rebinding
+    // TOCTOU window between hostname validation (validateGitLabUrl)
+    // and the outbound call.
+    const pinnedIps = await resolvePublicHost(url.hostname);
+    if (!pinnedIps) {
       logWarn(LogEventType.SECURITY_SSRF_REFUSAL, {
         hostname: url.hostname,
       });
       return null;
     }
+    const pinnedIp = pinnedIps[0];
 
-    const response = await fetch(url.toString(), {
-      method: "GET",
-      headers: {
-        "PRIVATE-TOKEN": token,
+    const response = await pinnedHttpsRequest(
+      {
+        hostname: url.hostname,
+        path: url.pathname + url.search,
+        method: "GET",
+        headers: { "PRIVATE-TOKEN": token },
+        signal: controller.signal,
       },
-      // Never follow redirects automatically: a 3xx could point to an
-      // internal host or cloud-metadata endpoint and would carry the
-      // PAT header. A redirect on /api/v4/user is treated as a
-      // validation failure (response.ok is false for 3xx) rather than
-      // risking token leakage off the allowlisted host.
-      redirect: "manual",
-      signal: controller.signal,
-    });
+      pinnedIp
+    );
 
     if (!response.ok) {
       return null;

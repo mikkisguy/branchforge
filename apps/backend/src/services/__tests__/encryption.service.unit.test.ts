@@ -15,7 +15,13 @@ vi.mock("../../lib/ip-validation.js", () => ({
   isPrivateIP: vi.fn(() => false),
   isPrivateOrLocalHostname: vi.fn(() => false),
   isAllowedGitlabHost: vi.fn(() => true),
-  isValidPublicHost: vi.fn(() => Promise.resolve(true)),
+  resolvePublicHost: vi.fn(() => Promise.resolve(["8.8.8.8"])),
+}));
+
+// Mock pinnedHttpsRequest so the test controls the response without
+// real network calls or DNS resolution.
+vi.mock("../../lib/pinned-request.js", () => ({
+  pinnedHttpsRequest: vi.fn(),
 }));
 
 import {
@@ -24,6 +30,7 @@ import {
   isValidPATFormat,
   validateAndGetUsername,
 } from "../encryption.service.js";
+import * as pinnedRequest from "../../lib/pinned-request.js";
 
 describe("EncryptionService", () => {
   const testToken = "glpat-123456789abcdefghijklmn";
@@ -169,38 +176,35 @@ describe("EncryptionService", () => {
     const expectedUsername = "testuser";
 
     beforeEach(() => {
-      // Mock fetch globally
-      global.fetch = vi.fn();
-    });
-
-    afterEach(() => {
-      vi.restoreAllMocks();
+      vi.clearAllMocks();
     });
 
     it("should validate token and return username for valid GitLab PAT", async () => {
       // Mock successful GitLab API response
-      vi.mocked(global.fetch).mockResolvedValueOnce({
+      vi.mocked(pinnedRequest.pinnedHttpsRequest).mockResolvedValueOnce({
         ok: true,
         json: async () => ({ username: expectedUsername }),
       } as Response);
 
       const result = await validateAndGetUsername(validPat, testGitlabUrl);
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        `${testGitlabUrl}/api/v4/user`,
+      expect(pinnedRequest.pinnedHttpsRequest).toHaveBeenCalledWith(
         expect.objectContaining({
+          hostname: "gitlab.com",
+          path: "/api/v4/user",
           method: "GET",
           headers: {
             "PRIVATE-TOKEN": validPat,
           },
-        })
+        }),
+        "8.8.8.8"
       );
       expect(result).toBe(expectedUsername);
     });
 
     it("should return null for invalid PAT (401 unauthorized)", async () => {
       // Mock unauthorized GitLab API response
-      vi.mocked(global.fetch).mockResolvedValueOnce({
+      vi.mocked(pinnedRequest.pinnedHttpsRequest).mockResolvedValueOnce({
         ok: false,
         status: 401,
       } as Response);
@@ -217,21 +221,21 @@ describe("EncryptionService", () => {
       );
 
       expect(result).toBeNull();
-      // Fetch should not be called for invalid format
-      expect(global.fetch).not.toHaveBeenCalled();
+      // Request should not be made for invalid format
+      expect(pinnedRequest.pinnedHttpsRequest).not.toHaveBeenCalled();
     });
 
     it("should return null for empty token", async () => {
       const result = await validateAndGetUsername("", testGitlabUrl);
 
       expect(result).toBeNull();
-      // Fetch should not be called for empty token
-      expect(global.fetch).not.toHaveBeenCalled();
+      // Request should not be made for empty token
+      expect(pinnedRequest.pinnedHttpsRequest).not.toHaveBeenCalled();
     });
 
     it("should return null when API response lacks username", async () => {
       // Mock successful response but without username field
-      vi.mocked(global.fetch).mockResolvedValueOnce({
+      vi.mocked(pinnedRequest.pinnedHttpsRequest).mockResolvedValueOnce({
         ok: true,
         json: async () => ({ id: 123, name: "Test User" }),
       } as Response);
@@ -243,7 +247,9 @@ describe("EncryptionService", () => {
 
     it("should return null on network error", async () => {
       // Mock network error
-      vi.mocked(global.fetch).mockRejectedValueOnce(new Error("Network error"));
+      vi.mocked(pinnedRequest.pinnedHttpsRequest).mockRejectedValueOnce(
+        new Error("Network error")
+      );
 
       const result = await validateAndGetUsername(validPat, testGitlabUrl);
 
@@ -254,7 +260,9 @@ describe("EncryptionService", () => {
       // Mock AbortError for timeout
       const abortError = new Error("Request timeout");
       abortError.name = "AbortError";
-      vi.mocked(global.fetch).mockRejectedValueOnce(abortError);
+      vi.mocked(pinnedRequest.pinnedHttpsRequest).mockRejectedValueOnce(
+        abortError
+      );
 
       const result = await validateAndGetUsername(validPat, testGitlabUrl);
 

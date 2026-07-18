@@ -10,6 +10,7 @@ import {
   isPrivateOrLocalHostname,
   isAllowedGitlabHost,
   isValidPublicHost,
+  resolvePublicHost,
 } from "../ip-validation.js";
 
 // Mock node:dns
@@ -55,6 +56,11 @@ describe("isPrivateIP", () => {
   it("should detect multicast addresses", () => {
     expect(isPrivateIP("224.0.0.1")).toBe(true);
     expect(isPrivateIP("ff02::1")).toBe(true);
+  });
+
+  it("should detect unspecified addresses (0.0.0.0 and ::)", () => {
+    expect(isPrivateIP("0.0.0.0")).toBe(true);
+    expect(isPrivateIP("::")).toBe(true);
   });
 
   it("should accept public IPv4", () => {
@@ -133,64 +139,86 @@ describe("isAllowedGitlabHost", () => {
   });
 });
 
+describe("resolvePublicHost", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should return IP list when all resolved IPs are public", async () => {
+    vi.mocked(dns.resolve4).mockResolvedValue(["8.8.8.8", "1.1.1.1"]);
+    vi.mocked(dns.resolve6).mockResolvedValue(["2001:4860:4860::8888"]);
+
+    const result = await resolvePublicHost("gitlab.com");
+    expect(result).toEqual(["8.8.8.8", "1.1.1.1", "2001:4860:4860::8888"]);
+  });
+
+  it("should return null when any resolved IP is private", async () => {
+    vi.mocked(dns.resolve4).mockResolvedValue(["8.8.8.8", "192.168.1.1"]);
+    vi.mocked(dns.resolve6).mockRejectedValue(new Error("ENODATA"));
+
+    const result = await resolvePublicHost("evil.example.com");
+    expect(result).toBeNull();
+  });
+
+  it("should return null when IPv6 ULA resolves", async () => {
+    vi.mocked(dns.resolve4).mockRejectedValue(new Error("ENODATA"));
+    vi.mocked(dns.resolve6).mockResolvedValue(["fd12::1"]);
+
+    const result = await resolvePublicHost("ula.example.com");
+    expect(result).toBeNull();
+  });
+
+  it("should return null when multicast IP resolves", async () => {
+    vi.mocked(dns.resolve4).mockResolvedValue(["224.0.0.1"]);
+    vi.mocked(dns.resolve6).mockRejectedValue(new Error("ENODATA"));
+
+    const result = await resolvePublicHost("multicast.example.com");
+    expect(result).toBeNull();
+  });
+
+  it("should return null when DNS fails entirely", async () => {
+    vi.mocked(dns.resolve4).mockRejectedValue(new Error("ENOTFOUND"));
+    vi.mocked(dns.resolve6).mockRejectedValue(new Error("ENOTFOUND"));
+
+    const result = await resolvePublicHost("does-not-exist.test");
+    expect(result).toBeNull();
+  });
+
+  it("should return null when one family fails but other has private IP", async () => {
+    vi.mocked(dns.resolve4).mockRejectedValue(new Error("ENODATA"));
+    vi.mocked(dns.resolve6).mockResolvedValue(["::1"]);
+
+    const result = await resolvePublicHost("localhost.example.com");
+    expect(result).toBeNull();
+  });
+
+  it("should return IP list when only IPv4 resolves with public IP", async () => {
+    vi.mocked(dns.resolve4).mockResolvedValue(["8.8.8.8"]);
+    vi.mocked(dns.resolve6).mockRejectedValue(new Error("ENODATA"));
+
+    const result = await resolvePublicHost("ipv4-only.example.com");
+    expect(result).toEqual(["8.8.8.8"]);
+  });
+});
+
 describe("isValidPublicHost", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("should return true when all resolved IPs are public", async () => {
-    vi.mocked(dns.resolve4).mockResolvedValue(["8.8.8.8", "1.1.1.1"]);
-    vi.mocked(dns.resolve6).mockResolvedValue(["2001:4860:4860::8888"]);
+  it("should return true when resolvePublicHost returns IPs", async () => {
+    vi.mocked(dns.resolve4).mockResolvedValue(["8.8.8.8"]);
+    vi.mocked(dns.resolve6).mockRejectedValue(new Error("ENODATA"));
 
     const result = await isValidPublicHost("gitlab.com");
     expect(result).toBe(true);
   });
 
-  it("should return false when any resolved IP is private", async () => {
-    vi.mocked(dns.resolve4).mockResolvedValue(["8.8.8.8", "192.168.1.1"]);
+  it("should return false when resolvePublicHost returns null", async () => {
+    vi.mocked(dns.resolve4).mockResolvedValue(["192.168.1.1"]);
     vi.mocked(dns.resolve6).mockRejectedValue(new Error("ENODATA"));
 
-    const result = await isValidPublicHost("evil.example.com");
+    const result = await isValidPublicHost("private.example.com");
     expect(result).toBe(false);
-  });
-
-  it("should return false when IPv6 ULA resolves", async () => {
-    vi.mocked(dns.resolve4).mockRejectedValue(new Error("ENODATA"));
-    vi.mocked(dns.resolve6).mockResolvedValue(["fd12::1"]);
-
-    const result = await isValidPublicHost("ula.example.com");
-    expect(result).toBe(false);
-  });
-
-  it("should return false when multicast IP resolves", async () => {
-    vi.mocked(dns.resolve4).mockResolvedValue(["224.0.0.1"]);
-    vi.mocked(dns.resolve6).mockRejectedValue(new Error("ENODATA"));
-
-    const result = await isValidPublicHost("multicast.example.com");
-    expect(result).toBe(false);
-  });
-
-  it("should return false when DNS fails entirely", async () => {
-    vi.mocked(dns.resolve4).mockRejectedValue(new Error("ENOTFOUND"));
-    vi.mocked(dns.resolve6).mockRejectedValue(new Error("ENOTFOUND"));
-
-    const result = await isValidPublicHost("does-not-exist.test");
-    expect(result).toBe(false);
-  });
-
-  it("should return false when one family fails but other has private IP", async () => {
-    vi.mocked(dns.resolve4).mockRejectedValue(new Error("ENODATA"));
-    vi.mocked(dns.resolve6).mockResolvedValue(["::1"]);
-
-    const result = await isValidPublicHost("localhost.example.com");
-    expect(result).toBe(false);
-  });
-
-  it("should return true when only IPv4 resolves with public IP", async () => {
-    vi.mocked(dns.resolve4).mockResolvedValue(["8.8.8.8"]);
-    vi.mocked(dns.resolve6).mockRejectedValue(new Error("ENODATA"));
-
-    const result = await isValidPublicHost("ipv4-only.example.com");
-    expect(result).toBe(true);
   });
 });

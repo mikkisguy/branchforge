@@ -14,9 +14,9 @@ const DNS_RESOLVE_TIMEOUT_MS = 5000;
 // Allowed GitLab hostnames (can be extended with environment variable)
 const ALLOWED_GITLAB_HOSTS = new Set([
   "gitlab.com",
-  ...(process.env.ALLOWED_GITLAB_HOSTS?.split(",").map((h) =>
-    h.trim().toLowerCase()
-  ) || []),
+  ...(process.env.ALLOWED_GITLAB_HOSTS?.split(",")
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean) || []),
 ]);
 
 /**
@@ -42,7 +42,8 @@ export function isPrivateIP(ip: string): boolean {
       range === "broadcast" ||
       range === "carrierGradeNat" ||
       range === "uniqueLocal" ||
-      range === "multicast"
+      range === "multicast" ||
+      range === "unspecified"
     );
   } catch {
     return false;
@@ -119,6 +120,26 @@ export function isAllowedGitlabHost(hostname: string): boolean {
  *   failure, timeout, or if any resolved IP is private.
  */
 export async function isValidPublicHost(hostname: string): Promise<boolean> {
+  const ips = await resolvePublicHost(hostname);
+  return ips !== null && ips.length > 0;
+}
+
+/**
+ * Resolve a hostname to a list of public IP addresses suitable for
+ * connection pinning.
+ *
+ * Performs the same validation as `isValidPublicHost` but returns the
+ * actual resolved addresses so callers can pin the TCP connection
+ * (via `https.request`'s `lookup` option) rather than letting `fetch()`
+ * independently re-resolve the hostname, closing the DNS rebinding
+ * TOCTOU race entirely.
+ *
+ * @returns array of public IP addresses, or null if DNS fails, times
+ *   out, or any resolved address is private.
+ */
+export async function resolvePublicHost(
+  hostname: string
+): Promise<string[] | null> {
   let timeoutId: NodeJS.Timeout | undefined;
 
   try {
@@ -135,14 +156,15 @@ export async function isValidPublicHost(hostname: string): Promise<boolean> {
         ...(v4.status === "fulfilled" ? v4.value : []),
         ...(v6.status === "fulfilled" ? v6.value : []),
       ];
-      if (addresses.length === 0) return false;
-      return addresses.every((ip) => !isPrivateIP(ip));
+      if (addresses.length === 0) return null;
+      if (addresses.some((ip) => isPrivateIP(ip))) return null;
+      return addresses;
     })();
 
     const result = await Promise.race([resolve, timeout]);
-    return result === "timeout" ? false : result;
+    return result === "timeout" ? null : result;
   } catch {
-    return false;
+    return null;
   } finally {
     if (timeoutId !== undefined) clearTimeout(timeoutId);
   }

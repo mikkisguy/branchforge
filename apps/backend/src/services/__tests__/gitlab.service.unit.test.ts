@@ -39,7 +39,7 @@ vi.mock("../../lib/ip-validation.js", () => ({
   isPrivateIP: vi.fn(() => false),
   isPrivateOrLocalHostname: vi.fn(() => false),
   isAllowedGitlabHost: vi.fn(() => true),
-  isValidPublicHost: vi.fn(() => Promise.resolve(true)),
+  resolvePublicHost: vi.fn(() => Promise.resolve(["8.8.8.8"])),
 }));
 
 // Wire the mocked allowlist to the imported namespace so per-test overrides
@@ -811,13 +811,13 @@ describe("GitLabService (HTTP Operations)", () => {
       );
     });
 
-    it("should refuse to fetch when isValidPublicHost returns false (DNS rebind guard)", async () => {
+    it("should refuse to fetch when resolvePublicHost returns null (DNS rebind guard)", async () => {
       // All hostname-level checks pass, but the resolved-IP check fails.
       // This simulates a DNS rebinding attack where a previously-valid
       // hostname now resolves to a private IP.
       vi.mocked(ipValidation.isAllowedGitlabHost).mockReturnValue(true);
       vi.mocked(ipValidation.isPrivateOrLocalHostname).mockReturnValue(false);
-      vi.mocked(ipValidation.isValidPublicHost).mockResolvedValue(false);
+      vi.mocked(ipValidation.resolvePublicHost).mockResolvedValue(null);
 
       mockLimit.mockResolvedValueOnce([
         {
