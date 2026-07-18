@@ -29,13 +29,19 @@ import { isPostgresError } from "../lib/db.js";
 import {
   isPrivateOrLocalHostname,
   isAllowedGitlabHost,
+  isValidPublicHost,
 } from "../lib/ip-validation.js";
 import { createProject, deleteProject } from "./projects.service.js";
 import { importFromGitlab } from "./gitlab-sync.service.js";
 import { requireProjectOwnership } from "./authz.service.js";
 import { syncLabelsFromGitLabFile } from "./labels.service.js";
 import { calculateContentHash } from "../lib/hash.js";
-import { logError, logWarn, LogEventType } from "../lib/logger.js";
+import {
+  logError,
+  logWarn,
+  logSecurityEvent,
+  LogEventType,
+} from "../lib/logger.js";
 import type {
   ConflictResolution,
   SyncOperation,
@@ -121,6 +127,17 @@ async function fetchWithTimeout(
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
+      // Validate the resolved IP immediately before making the outbound
+      // request. This closes a DNS rebinding window where a hostname's
+      // A/AAAA records are changed between hostname-only validation
+      // (approveGitlabUrl) and the actual fetch call.
+      const parsedHost = new URL(currentUrl).hostname;
+      if (!(await isValidPublicHost(parsedHost))) {
+        logSecurityEvent(LogEventType.SECURITY_SSRF_REFUSAL, {
+          hostname: parsedHost,
+        });
+        throw new Error("Refused GitLab fetch to non-public IP");
+      }
       const response = await fetch(currentUrl, {
         ...options,
         redirect: "manual",

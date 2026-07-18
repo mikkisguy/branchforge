@@ -1555,7 +1555,7 @@ export const ALLOWED_SESSION_KEYS = [
  * Allowed primitive value types for session data
  */
 const allowedPrimitiveSchema = z.union([
-  z.string(),
+  z.string().max(4096, "Session value string too long"),
   z.number(),
   z.boolean(),
   z.null(),

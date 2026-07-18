@@ -6,6 +6,18 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
+// Mock DNS-based SSRF guard so tests don't require real DNS resolution.
+// The hostname-level guards (isPrivateOrLocalHostname, isAllowedGitlabHost)
+// are tested separately in validation.unit.test.ts; this mock only ensures
+// the resolved-IP check doesn't block mocked fetch calls.
+vi.mock("../../lib/ip-validation.js", () => ({
+  isPrivateIP: vi.fn(() => false),
+  isPrivateOrLocalHostname: vi.fn(() => false),
+  isAllowedGitlabHost: vi.fn(() => true),
+  isValidPublicHost: vi.fn(() => Promise.resolve(true)),
+}));
+
 import {
   encryptPAT,
   decryptPAT,

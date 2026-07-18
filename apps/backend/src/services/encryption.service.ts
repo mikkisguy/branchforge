@@ -15,7 +15,9 @@ import crypto from "node:crypto";
 import {
   isPrivateOrLocalHostname,
   isAllowedGitlabHost,
+  isValidPublicHost,
 } from "../lib/ip-validation.js";
+import { logWarn, LogEventType } from "../lib/logger.js";
 
 // GitLab PAT format: glpat- followed by alphanumeric characters, hyphens, underscores, and dots
 const GITLAB_PAT_REGEX = /^glpat-[a-zA-Z0-9_.-]+$/;
@@ -186,6 +188,16 @@ export async function validateAndGetUsername(
 
   try {
     const url = new URL("/api/v4/user", validatedUrl);
+
+    // Validate the resolved IP immediately before making the outbound
+    // request, closing a DNS rebinding window between hostname validation
+    // (validateGitLabUrl) and the actual fetch call.
+    if (!(await isValidPublicHost(url.hostname))) {
+      logWarn(LogEventType.SECURITY_SSRF_REFUSAL, {
+        hostname: url.hostname,
+      });
+      return null;
+    }
 
     const response = await fetch(url.toString(), {
       method: "GET",

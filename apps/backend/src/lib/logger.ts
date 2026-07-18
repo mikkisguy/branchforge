@@ -109,6 +109,7 @@ export const LogEventType = {
   // General security events
   SECURITY_PATH_TRAVERSAL: "security.path_traversal",
   SECURITY_INVALID_PATH: "security.invalid_path",
+  SECURITY_SSRF_REFUSAL: "security.ssrf_refusal",
 
   // Service lifecycle events - general operational states
   SERVICE_START: "service.start",
