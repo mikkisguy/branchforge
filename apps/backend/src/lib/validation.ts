@@ -15,7 +15,6 @@ import { z } from "zod";
 import { ValidationError } from "../middleware/error-handler.middleware.js";
 import {
   LabelStatus,
-  UserRole,
   ROUTE_KEY_REGEX,
   JUMP_PREFIX_REGEX,
   THEME_PALETTES,
@@ -28,6 +27,9 @@ import {
 // ============================================================================
 // Common Schemas
 // ============================================================================
+
+/** Maximum file content size in bytes (10 MB) */
+const FILE_CONTENT_MAX_SIZE = 10_000_000;
 
 /**
  * UUID validation schema
@@ -144,13 +146,6 @@ export const intStringSchema = z
 // ============================================================================
 
 /**
- * User role enum
- */
-export const userRoleSchema = z.enum(Object.values(UserRole), {
-  message: "Role must be OWNER, READER, or TESTER",
-});
-
-/**
  * Label status enum
  */
 export const labelStatusSchema = z.enum(
@@ -174,23 +169,6 @@ export const routeConfigKeySchema = z
   );
 
 /**
- * Content type enum
- */
-export const contentTypeSchema = z.enum(
-  ["NARRATION", "DIALOGUE", "CHOICE", "MENU", "JUMP"],
-  {
-    message: "Content type must be NARRATION, DIALOGUE, CHOICE, MENU, or JUMP",
-  }
-);
-
-/**
- * Visual type enum
- */
-export const visualTypeSchema = z.enum(["GENERATED", "BLACK", "CUSTOM"], {
-  message: "Visual type must be GENERATED, BLACK, or CUSTOM",
-});
-
-/**
  * Element type enum
  */
 export const elementTypeSchema = z.enum(
@@ -201,50 +179,12 @@ export const elementTypeSchema = z.enum(
 );
 
 /**
- * Suggestion type enum
- */
-export const suggestionTypeSchema = z.enum(
-  ["CONSISTENCY", "FLAG_SUGGEST", "METER_SUGGEST", "DIALOGUE_VARIANT"],
-  {
-    message:
-      "Suggestion type must be CONSISTENCY, FLAG_SUGGEST, METER_SUGGEST, or DIALOGUE_VARIANT",
-  }
-);
-
-/**
- * Suggestion status enum
- */
-export const suggestionStatusSchema = z.enum(
-  ["PENDING", "ACCEPTED", "REJECTED"],
-  {
-    message: "Suggestion status must be PENDING, ACCEPTED, or REJECTED",
-  }
-);
-
-/**
  * Label visibility enum
  */
 export const labelVisibilitySchema = z.enum(
   ["EXCLUSIVE", "SHARED", "DUO_PAIR"],
   {
     message: "Label visibility must be EXCLUSIVE, SHARED, or DUO_PAIR",
-  }
-);
-
-/**
- * Sync operation enum
- */
-export const syncOperationSchema = z.enum(["EXPORT", "IMPORT"], {
-  message: "Sync operation must be EXPORT or IMPORT",
-});
-
-/**
- * Sync status enum
- */
-export const syncStatusSchema = z.enum(
-  ["SYNCED", "MODIFIED_LOCAL", "CONFLICT"],
-  {
-    message: "Sync status must be SYNCED, MODIFIED_LOCAL, or CONFLICT",
   }
 );
 
@@ -260,6 +200,8 @@ export const registerSchema = z.object({
   password: passwordSchema,
 });
 
+export type RegisterInput = z.infer<typeof registerSchema>;
+
 /**
  * Login request validation
  */
@@ -267,6 +209,8 @@ export const loginSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
 });
+
+export type LoginInput = z.infer<typeof loginSchema>;
 
 // ============================================================================
 // Project Schemas
@@ -291,6 +235,8 @@ export const createProjectSchema = z
   })
   .strict();
 
+export type CreateProjectInput = z.infer<typeof createProjectSchema>;
+
 /**
  * Update project request validation
  */
@@ -301,6 +247,8 @@ export const updateProjectSchema = z
     duoEndingEnabled: z.boolean().optional(),
   })
   .strict();
+
+export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 
 /**
  * Project ID params validation
@@ -383,7 +331,9 @@ export type FileIdParams = z.infer<typeof fileIdParamsSchema>;
  */
 export const updateFileContentSchema = z
   .object({
-    content: z.string().max(10_000_000, "File content too large (max 10MB)"),
+    content: z
+      .string()
+      .max(FILE_CONTENT_MAX_SIZE, "File content too large (max 10MB)"),
     expectedContentHash: expectedContentHashSchema,
   })
   .strict();
@@ -404,6 +354,8 @@ export const listLabelsQuerySchema = z.object({
   groupType: z.string().optional(),
   groupValue: z.string().optional(),
 });
+
+export type ListLabelsQuery = z.infer<typeof listLabelsQuerySchema>;
 
 /**
  * Label ID params validation
@@ -430,6 +382,8 @@ export const createLabelSchema = z
     afterLabelId: uuidSchema.optional().nullable(),
   })
   .strict();
+
+export type CreateLabelInput = z.infer<typeof createLabelSchema>;
 
 /**
  * Update label request validation
@@ -483,6 +437,8 @@ export const updateLabelSchema = z
   .strict()
   .partial();
 
+export type UpdateLabelInput = z.infer<typeof updateLabelSchema>;
+
 /**
  * Update label dialogue request validation
  */
@@ -519,6 +475,10 @@ export const updateLabelDialogueBodySchema = z
     }
   );
 
+export type UpdateLabelDialogueInput = z.infer<
+  typeof updateLabelDialogueBodySchema
+>;
+
 // ============================================================================
 // Route Configuration Schemas
 // ============================================================================
@@ -543,6 +503,8 @@ export const createRouteConfigSchema = z
   })
   .strict();
 
+export type CreateRouteConfigInput = z.infer<typeof createRouteConfigSchema>;
+
 /**
  * Update route configuration request validation
  */
@@ -563,6 +525,8 @@ export const updateRouteConfigSchema = z
   })
   .strict();
 
+export type UpdateRouteConfigInput = z.infer<typeof updateRouteConfigSchema>;
+
 /**
  * Route configuration ID params validation
  */
@@ -573,9 +537,7 @@ export const routeConfigIdParamsSchema = z.object({
 /**
  * Route configuration with project ID params validation
  */
-export const routeConfigProjectIdParamsSchema = z.object({
-  projectId: uuidSchema,
-});
+export const routeConfigProjectIdParamsSchema = projectIdParamsSchema;
 
 // ============================================================================
 // Variable Schemas
@@ -605,6 +567,8 @@ export const createVariableSchema = z
   })
   .strict();
 
+export type CreateVariableInput = z.infer<typeof createVariableSchema>;
+
 /**
  * Update variable request validation
  */
@@ -614,6 +578,8 @@ export const updateVariableSchema = z
     category: optionalString(50, "Category is too long"),
   })
   .strict();
+
+export type UpdateVariableInput = z.infer<typeof updateVariableSchema>;
 
 /**
  * Variable ID params validation
@@ -750,30 +716,6 @@ export const colorHexSchema = z
   .regex(/^#[0-9A-Fa-f]{6}$/, "Color must be a valid hex format (#RRGGBB)");
 
 /**
- * Detected character from RPY file
- */
-export const detectedCharacterSchema = z.object({
-  tag: renpyTagSchema,
-  name: z.string().nullable().optional(),
-  displayName: z.string().min(1, "Display name is required").max(200),
-  nameType: z
-    .enum([
-      "literal",
-      "variable",
-      "interpolated",
-      "tagged",
-      "none",
-      "empty",
-      "unknown",
-    ])
-    .default("literal"),
-  color: colorHexSchema,
-  isSpecial: z.boolean().default(false),
-  sourceFile: z.string().optional(),
-  confidence: z.number().min(0).max(1).optional(),
-});
-
-/**
  * Create character request validation (import from RPY)
  *
  * Field explanations:
@@ -790,12 +732,14 @@ export const createCharacterSchema = z
     renpyTag: renpyTagSchema,
     color: colorHexSchema,
     routeAffiliation: optionalString(50),
-    isLoveInterest: z.boolean().default(false).optional(),
-    isNarrator: z.boolean().default(false).optional(),
+    isLoveInterest: z.boolean().default(false),
+    isNarrator: z.boolean().default(false),
     notes: optionalString(10000),
     conditionalPrefix: optionalString(50),
   })
   .strict();
+
+export type CreateCharacterInput = z.infer<typeof createCharacterSchema>;
 
 /**
  * Update character request validation
@@ -813,6 +757,8 @@ export const updateCharacterSchema = z
   })
   .strict()
   .partial();
+
+export type UpdateCharacterInput = z.infer<typeof updateCharacterSchema>;
 
 /**
  * Character import request validation
@@ -838,6 +784,8 @@ export const importCharactersSchema = z
   })
   .strict();
 
+export type ImportCharactersInput = z.infer<typeof importCharactersSchema>;
+
 /**
  * Project settings validation
  */
@@ -849,6 +797,8 @@ export const projectSettingsSchema = z
   })
   .strict()
   .partial();
+
+export type ProjectSettingsInput = z.infer<typeof projectSettingsSchema>;
 
 /**
  * Padding value for zero-padded number fields in visual system config.
@@ -934,6 +884,8 @@ export const visualSystemConfigSchema = z
   .strict()
   .partial();
 
+export type VisualSystemConfigInput = z.infer<typeof visualSystemConfigSchema>;
+
 /**
  * Visual system config defaults — applied when a project has no row in
  * `visual_systems` yet (or when the client sends only a partial update).
@@ -978,6 +930,8 @@ export const createWorldElementSchema = z
   })
   .strict();
 
+export type CreateWorldElementInput = z.infer<typeof createWorldElementSchema>;
+
 /**
  * Update world element request validation
  */
@@ -998,6 +952,8 @@ export const updateWorldElementSchema = z
   })
   .strict()
   .partial();
+
+export type UpdateWorldElementInput = z.infer<typeof updateWorldElementSchema>;
 
 /**
  * World element ID params validation
@@ -1043,6 +999,8 @@ export function isValidConflictResolution(
   );
 }
 
+export type ConflictResolutionValue = z.infer<typeof conflictResolutionSchema>;
+
 /**
  * GitLab URL validation (with SSRF protection)
  *
@@ -1082,116 +1040,16 @@ export const gitlabUrlSchema = z
   );
 
 /**
- * GitLab integration request validation
+ * GitLab token validation
+ * Shared between create integration and token validation schemas
  */
-export const createGitLabIntegrationSchema = z
-  .object({
-    projectId: uuidSchema,
-    gitlabUrl: gitlabUrlSchema,
-    accessToken: nonEmptyStringSchema
-      .min(20, "Access token is too short")
-      .max(100),
-    branchName: z
-      .string()
-      .min(1, "Branch name is required")
-      .max(255, "Branch name is too long")
-      .regex(/^[a-zA-Z0-9_/$.-]+$/, "Branch name contains invalid characters")
-      .refine(
-        (name) =>
-          !name.startsWith("-") &&
-          !name.startsWith("/") &&
-          !name.endsWith("/") &&
-          !name.includes(".."),
-        "Branch name cannot start with '-' or '/', end with '/', or contain '..'"
-      ),
-  })
-  .strict();
+const gitlabTokenSchema = nonEmptyStringSchema
+  .min(20, "Access token is too short")
+  .max(100, "Access token is too long");
 
 /**
- * Import project request validation
- */
-export const importProjectSchema = z
-  .object({
-    projectName: requiredString(200, "Project name is too long"),
-    projectDescription: optionalString(2000, "Project description is too long"),
-    gitlabProjectId: z
-      .number()
-      .int()
-      .positive("GitLab project ID must be positive"),
-    gitlabProjectName: requiredString(500, "GitLab project name is too long"),
-    branch: z
-      .string()
-      .min(1, "Branch is required")
-      .max(255, "Branch name is too long")
-      .regex(/^[a-zA-Z0-9_/$.-]+$/, "Branch name contains invalid characters")
-      .refine(
-        (name) =>
-          !name.startsWith("-") &&
-          !name.startsWith("/") &&
-          !name.endsWith("/") &&
-          !name.includes(".."),
-        "Branch name cannot start with '-' or '/', end with '/', or contain '..'"
-      ),
-    conflictResolution: conflictResolutionSchema,
-  })
-  .strict();
-
-/**
- * GitLab file content update request validation (Script Mode editing)
- * Mirrors updateFileContentSchema but without expectedContentHash, because
- * the GitLab sync path tracks conflicts via a separate in-flight mechanism
- * (see updateGitLabFileContent service).
- */
-export const updateGitLabFileContentSchema = z
-  .object({
-    content: z
-      .string()
-      .min(1, "File content is required")
-      .max(10_000_000, "File content too large (max 10MB)"),
-  })
-  .strict();
-
-export type UpdateGitLabFileContentInput = z.infer<
-  typeof updateGitLabFileContentSchema
->;
-
-/**
- * GitLab export request validation
- */
-export const exportToGitlabSchema = z
-  .object({
-    projectId: uuidSchema,
-    branch: z
-      .string()
-      .min(1, "Branch is required")
-      .max(255, "Branch name is too long")
-      .regex(/^[a-zA-Z0-9_/$.-]+$/, "Branch name contains invalid characters")
-      .refine(
-        (name) =>
-          !name.startsWith("-") &&
-          !name.startsWith("/") &&
-          !name.endsWith("/") &&
-          !name.includes(".."),
-        "Branch name cannot start with '-' or '/', end with '/', or contain '..'"
-      )
-      .optional(),
-    commitMessage: z
-      .string()
-      .min(1, "Commit message is required")
-      .max(500, "Commit message is too long"),
-  })
-  .strict();
-
-export type ExportToGitlabInput = z.infer<typeof exportToGitlabSchema>;
-
-// ============================================================================
-// Additional GitLab Schemas (Wave 2 — VULN-003)
-// ============================================================================
-
-/**
- * Shared branch-name validation. Mirrors the rules in
- * createGitLabIntegrationSchema.branchName: only the characters
- * /^[a-zA-Z0-9_/$.-]+$/, no leading `-` or `/`, no trailing `/`, no `..`.
+ * Shared branch-name validation
+ * Only allows /^[a-zA-Z0-9_/$.-]+$/, no leading `-` or `/`, no trailing `/`, no `..`.
  */
 const gitBranchNameSchema = z
   .string()
@@ -1207,10 +1065,84 @@ const gitBranchNameSchema = z
     "Branch name cannot start with '-' or '/', end with '/', or contain '..'"
   );
 
+/**
+ * GitLab integration request validation
+ */
+export const createGitLabIntegrationSchema = z
+  .object({
+    projectId: uuidSchema,
+    gitlabUrl: gitlabUrlSchema,
+    accessToken: gitlabTokenSchema,
+    branchName: gitBranchNameSchema,
+  })
+  .strict();
+
+export type CreateGitLabIntegrationInput = z.infer<
+  typeof createGitLabIntegrationSchema
+>;
+
+/**
+ * Import project request validation
+ */
+export const importProjectSchema = z
+  .object({
+    projectName: requiredString(200, "Project name is too long"),
+    projectDescription: optionalString(2000, "Project description is too long"),
+    gitlabProjectId: z
+      .number()
+      .int()
+      .positive("GitLab project ID must be positive"),
+    gitlabProjectName: requiredString(500, "GitLab project name is too long"),
+    branch: gitBranchNameSchema,
+    conflictResolution: conflictResolutionSchema,
+  })
+  .strict();
+
+export type ImportProjectInput = z.infer<typeof importProjectSchema>;
+
+/**
+ * GitLab file content update request validation (Script Mode editing)
+ * Mirrors updateFileContentSchema but without expectedContentHash, because
+ * the GitLab sync path tracks conflicts via a separate in-flight mechanism
+ * (see updateGitLabFileContent service).
+ */
+export const updateGitLabFileContentSchema = z
+  .object({
+    content: z
+      .string()
+      .min(1, "File content is required")
+      .max(FILE_CONTENT_MAX_SIZE, "File content too large (max 10MB)"),
+  })
+  .strict();
+
+export type UpdateGitLabFileContentInput = z.infer<
+  typeof updateGitLabFileContentSchema
+>;
+
+/**
+ * GitLab export request validation
+ */
+export const exportToGitlabSchema = z
+  .object({
+    projectId: uuidSchema,
+    branch: gitBranchNameSchema.optional(),
+    commitMessage: z
+      .string()
+      .min(1, "Commit message is required")
+      .max(500, "Commit message is too long"),
+  })
+  .strict();
+
+export type ExportToGitlabInput = z.infer<typeof exportToGitlabSchema>;
+
+// ============================================================================
+// Additional GitLab Schemas (Wave 2 — VULN-003)
+// ============================================================================
+
 /** Validate a GitLab token + optional URL. Reuse for /gitlab/validate and /gitlab/integration. */
 export const validateGitlabTokenSchema = z
   .object({
-    token: nonEmptyStringSchema.min(20, "Access token is too short").max(100),
+    token: gitlabTokenSchema,
     gitlabUrl: gitlabUrlSchema.optional(),
   })
   .strict();
@@ -1277,22 +1209,9 @@ export type OperationIdParams = z.infer<typeof operationIdParamsSchema>;
 // ============================================================================
 
 /**
- * Export request validation
- */
-export const exportRequestSchema = z.object({
-  projectId: uuidSchema,
-  labelIds: z
-    .array(uuidSchema)
-    .min(1, "At least one label is required")
-    .max(500),
-});
-
-/**
  * Export params validation (projectId in URL params)
  */
-export const exportProjectIdParamsSchema = z.object({
-  projectId: uuidSchema,
-});
+export const exportProjectIdParamsSchema = projectIdParamsSchema;
 
 /**
  * Export download params validation (projectId + exportId in URL params)
@@ -1300,17 +1219,6 @@ export const exportProjectIdParamsSchema = z.object({
 export const exportDownloadParamsSchema = z.object({
   projectId: uuidSchema,
   exportId: uuidSchema,
-});
-
-/**
- * Import request validation
- */
-export const importRequestSchema = z.object({
-  projectId: uuidSchema,
-  labelIds: z
-    .array(uuidSchema)
-    .min(1, "At least one label is required")
-    .max(500),
 });
 
 // ============================================================================
@@ -1325,39 +1233,8 @@ export const paginationQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
-// ============================================================================
-// Type Exports
-// ============================================================================
-
-// Export inferred types for use in route handlers
-export type RegisterInput = z.infer<typeof registerSchema>;
-export type LoginInput = z.infer<typeof loginSchema>;
-export type CreateProjectInput = z.infer<typeof createProjectSchema>;
-export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
-export type ListLabelsQuery = z.infer<typeof listLabelsQuerySchema>;
-export type CreateLabelInput = z.infer<typeof createLabelSchema>;
-export type UpdateLabelInput = z.infer<typeof updateLabelSchema>;
-export type UpdateLabelDialogueInput = z.infer<
-  typeof updateLabelDialogueBodySchema
->;
-export type CreateCharacterInput = z.infer<typeof createCharacterSchema>;
-export type UpdateCharacterInput = z.infer<typeof updateCharacterSchema>;
-export type ImportCharactersInput = z.infer<typeof importCharactersSchema>;
-export type ProjectSettingsInput = z.infer<typeof projectSettingsSchema>;
-export type VisualSystemConfigInput = z.infer<typeof visualSystemConfigSchema>;
-export type DetectedCharacterInput = z.infer<typeof detectedCharacterSchema>;
-export type CreateGitLabIntegrationInput = z.infer<
-  typeof createGitLabIntegrationSchema
->;
-export type ExportRequestInput = z.infer<typeof exportRequestSchema>;
-export type ImportRequestInput = z.infer<typeof importRequestSchema>;
 export type PaginationQuery = z.infer<typeof paginationQuerySchema>;
-export type CreateRouteConfigInput = z.infer<typeof createRouteConfigSchema>;
-export type UpdateRouteConfigInput = z.infer<typeof updateRouteConfigSchema>;
-export type CreateVariableInput = z.infer<typeof createVariableSchema>;
-export type UpdateVariableInput = z.infer<typeof updateVariableSchema>;
-export type CreateWorldElementInput = z.infer<typeof createWorldElementSchema>;
-export type UpdateWorldElementInput = z.infer<typeof updateWorldElementSchema>;
+
 // ============================================================================
 // User Settings Schemas
 // ============================================================================
@@ -1457,7 +1334,7 @@ export const languageSchema = z
  * Theme validation schema
  * Uses THEME_PALETTES from shared package as single source of truth
  */
-export const themeSchema = z.enum(THEME_PALETTES as [string, ...string[]], {
+export const themeSchema = z.enum(THEME_PALETTES, {
   message: "Theme must be forest, periwinkle, dark-amethyst, or graphite",
 });
 
@@ -1491,8 +1368,6 @@ export const updateUserProfileSchema = z
   .strict();
 
 export type UpdateUserProfileInput = z.infer<typeof updateUserProfileSchema>;
-export type ConflictResolutionValue = z.infer<typeof conflictResolutionSchema>;
-export type ImportProjectInput = z.infer<typeof importProjectSchema>;
 
 // ============================================================================
 // Helper Functions
@@ -1529,6 +1404,37 @@ export function validateData<T extends z.ZodTypeAny>(
     }
     throw new ValidationError(errorMessage, error);
   }
+}
+
+/**
+ * Safely validate data without throwing
+ * Returns a result object with success status and data or error
+ *
+ * @param data - The data to validate
+ * @param schema - The Zod schema to validate against
+ * @returns Result object with success status and data/error
+ *
+ * @example
+ * ```ts
+ * const result = safeValidateData(input, registerSchema);
+ * if (result.success) {
+ *   console.log(result.data.email);
+ * } else {
+ *   console.log(result.error);
+ * }
+ * ```
+ */
+export function safeValidateData<T extends z.ZodTypeAny>(
+  data: unknown,
+  schema: T
+): { success: true; data: z.infer<T> } | { success: false; error: z.ZodError } {
+  const result = schema.safeParse(data);
+
+  if (result.success) {
+    return { success: true, data: result.data };
+  }
+
+  return { success: false, error: result.error };
 }
 
 // ============================================================================
@@ -1605,34 +1511,3 @@ export const sessionDataSchema = z
   );
 
 export type SessionData = z.infer<typeof sessionDataSchema>;
-
-/**
- * Safely validate data without throwing
- * Returns a result object with success status and data or error
- *
- * @param data - The data to validate
- * @param schema - The Zod schema to validate against
- * @returns Result object with success status and data/error
- *
- * @example
- * ```ts
- * const result = safeValidateData(input, registerSchema);
- * if (result.success) {
- *   console.log(result.data.email);
- * } else {
- *   console.log(result.error);
- * }
- * ```
- */
-export function safeValidateData<T extends z.ZodTypeAny>(
-  data: unknown,
-  schema: T
-): { success: true; data: z.infer<T> } | { success: false; error: z.ZodError } {
-  const result = schema.safeParse(data);
-
-  if (result.success) {
-    return { success: true, data: result.data };
-  }
-
-  return { success: false, error: result.error };
-}
