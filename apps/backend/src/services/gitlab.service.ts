@@ -155,6 +155,7 @@ async function fetchWithTimeout(
         {
           hostname: parsedUrl.hostname,
           path: parsedUrl.pathname + parsedUrl.search,
+          port: parsedUrl.port ? parseInt(parsedUrl.port, 10) : undefined,
           method: (options.method as string) || "GET",
           headers: requestHeaders,
           body: options.body as string | undefined,

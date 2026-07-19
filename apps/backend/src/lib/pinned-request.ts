@@ -9,10 +9,12 @@
  */
 
 import https from "node:https";
+import net from "node:net";
 
 export interface PinnedRequestOptions {
   hostname: string;
   path: string;
+  port?: number;
   method?: string;
   headers?: Record<string, string>;
   body?: string | Buffer;
@@ -30,14 +32,22 @@ export async function pinnedHttpsRequest(
   options: PinnedRequestOptions,
   pinnedIp: string
 ): Promise<Response> {
+  const family = net.isIP(pinnedIp);
+  if (family === 0) {
+    throw new TypeError(
+      `Invalid pinned IP address: ${JSON.stringify(pinnedIp)}`
+    );
+  }
+
   return new Promise<Response>((resolve, reject) => {
     const req = https.request(
       {
         hostname: options.hostname,
         path: options.path,
+        port: options.port,
         method: options.method || "GET",
         headers: options.headers,
-        lookup: (_hostname, _opts, cb) => cb(null, pinnedIp, 4),
+        lookup: (_hostname, _opts, cb) => cb(null, pinnedIp, family),
         signal: options.signal,
         rejectUnauthorized: true,
       },

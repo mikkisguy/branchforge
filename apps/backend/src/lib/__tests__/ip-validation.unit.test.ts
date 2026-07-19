@@ -126,11 +126,19 @@ describe("isAllowedGitlabHost", () => {
     expect(isAllowedGitlabHost("my-project.gitlab.io")).toBe(false);
   });
 
-  it("should allow hosts from ALLOWED_GITLAB_HOSTS env var", () => {
+  it("should allow hosts from ALLOWED_GITLAB_HOSTS env var", async () => {
+    const original = process.env.ALLOWED_GITLAB_HOSTS;
     process.env.ALLOWED_GITLAB_HOSTS = "example.gitlab.io,custom.host";
-    // Re-import won't re-evaluate the top-level constant, so this test
-    // verifies that the *concept* is documented.  The env-var extension
-    // path is exercised by integration tests.
+    vi.resetModules();
+    const mod = await import("../ip-validation.js");
+    try {
+      expect(mod.isAllowedGitlabHost("example.gitlab.io")).toBe(true);
+      expect(mod.isAllowedGitlabHost("custom.host")).toBe(true);
+      expect(mod.isAllowedGitlabHost("unlisted.gitlab.io")).toBe(false);
+    } finally {
+      process.env.ALLOWED_GITLAB_HOSTS = original;
+      vi.resetModules();
+    }
   });
 
   it("should reject unrelated hosts", () => {

@@ -207,6 +207,7 @@ export async function validateAndGetUsername(
       {
         hostname: url.hostname,
         path: url.pathname + url.search,
+        port: url.port ? parseInt(url.port, 10) : undefined,
         method: "GET",
         headers: { "PRIVATE-TOKEN": token },
         signal: controller.signal,

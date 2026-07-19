@@ -31,6 +31,7 @@ import {
   validateAndGetUsername,
 } from "../encryption.service.js";
 import * as pinnedRequest from "../../lib/pinned-request.js";
+import * as ipValidation from "../../lib/ip-validation.js";
 
 describe("EncryptionService", () => {
   const testToken = "glpat-123456789abcdefghijklmn";
@@ -267,6 +268,15 @@ describe("EncryptionService", () => {
       const result = await validateAndGetUsername(validPat, testGitlabUrl);
 
       expect(result).toBeNull();
+    });
+
+    it("should return null when resolver refuses the host", async () => {
+      vi.mocked(ipValidation.resolvePublicHost).mockResolvedValueOnce(null);
+
+      const result = await validateAndGetUsername(validPat, testGitlabUrl);
+
+      expect(result).toBeNull();
+      expect(pinnedRequest.pinnedHttpsRequest).not.toHaveBeenCalled();
     });
   });
 
