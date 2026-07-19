@@ -66,7 +66,7 @@ export type ConflictResolutionValue = z.infer<typeof conflictResolutionSchema>;
  * @returns Array of valid conflict resolution values
  */
 export function getValidConflictResolutions(): ConflictResolutionValue[] {
-  return ["branchforge_wins", "gitlab_wins", "manual_review"];
+  return [...conflictResolutionSchema.options];
 }
 
 /**

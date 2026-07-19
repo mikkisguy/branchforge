@@ -23,20 +23,26 @@ export const routeConfigKeySchema = z
   );
 
 /**
+ * Jump prefix schema
+ * Validates jump prefix format (alphanumeric, underscores, hyphens)
+ */
+export const jumpPrefixSchema = z
+  .string()
+  .min(1, "Jump prefix is required")
+  .max(50, "Jump prefix is too long")
+  .regex(
+    JUMP_PREFIX_REGEX,
+    "Jump prefix must contain only letters, numbers, underscores, and hyphens"
+  );
+
+/**
  * Create route configuration request validation
  */
 export const createRouteConfigSchema = z
   .object({
     routeKey: routeConfigKeySchema,
     routeName: requiredString(200, "Route name is too long"),
-    jumpPrefix: z
-      .string()
-      .min(1, "Jump prefix is required")
-      .max(50, "Jump prefix is too long")
-      .regex(
-        JUMP_PREFIX_REGEX,
-        "Jump prefix must contain only letters, numbers, underscores, and hyphens"
-      ),
+    jumpPrefix: jumpPrefixSchema,
     sortOrder: z.number().int().min(0).max(9999).optional(),
     isShared: z.boolean().optional(),
   })
@@ -50,15 +56,7 @@ export type CreateRouteConfigInput = z.infer<typeof createRouteConfigSchema>;
 export const updateRouteConfigSchema = z
   .object({
     routeName: requiredString(200, "Route name is too long").optional(),
-    jumpPrefix: z
-      .string()
-      .min(1, "Jump prefix is required")
-      .max(50, "Jump prefix is too long")
-      .regex(
-        JUMP_PREFIX_REGEX,
-        "Jump prefix must contain only letters, numbers, underscores, and hyphens"
-      )
-      .optional(),
+    jumpPrefix: jumpPrefixSchema.optional(),
     sortOrder: z.number().int().min(0).max(9999).optional(),
     isShared: z.boolean().optional(),
   })

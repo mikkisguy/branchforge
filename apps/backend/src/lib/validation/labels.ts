@@ -111,31 +111,38 @@ export type UpdateLabelInput = z.infer<typeof updateLabelSchema>;
 /**
  * Update label dialogue request validation
  */
-const menuOptionSchema = z.object({
-  label: z.string().trim().min(1, "Choice label cannot be empty"),
-  targetLabelId: z.string().uuid(),
-  targetLabelName: z.string(),
-  conditionFlags: z.array(z.string()).optional(),
-  effects: z.object({ stats: z.record(z.string(), z.number()) }).optional(),
-});
+const menuOptionSchema = z
+  .object({
+    label: z.string().trim().min(1, "Choice label cannot be empty"),
+    targetLabelId: z.string().uuid(),
+    targetLabelName: z.string(),
+    conditionFlags: z.array(z.string()).optional(),
+    effects: z.object({ stats: z.record(z.string(), z.number()) }).optional(),
+  })
+  .strict();
 
-const menuBlockSchema = z.object({
-  lineId: z.string().uuid(),
-  menuOptions: z.array(menuOptionSchema),
-});
+const menuBlockSchema = z
+  .object({
+    lineId: z.string().uuid(),
+    menuOptions: z.array(menuOptionSchema),
+  })
+  .strict();
 
 export const updateLabelDialogueBodySchema = z
   .object({
     dialogue: z.array(
-      z.object({
-        speakerId: z.string().uuid().nullable(),
-        text: z.string().trim().min(1, "Dialogue text cannot be empty"),
-      })
+      z
+        .object({
+          speakerId: z.string().uuid().nullable(),
+          text: z.string().trim().min(1, "Dialogue text cannot be empty"),
+        })
+        .strict()
     ),
     menuBlocks: z.array(menuBlockSchema).optional(),
     expectedVersion: z.number().int().min(1).optional(),
     expectedContentHash: expectedContentHashSchema,
   })
+  .strict()
   .refine(
     (data) =>
       (data.dialogue?.length ?? 0) > 0 || (data.menuBlocks?.length ?? 0) > 0,

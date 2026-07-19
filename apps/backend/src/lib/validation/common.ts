@@ -22,7 +22,7 @@ export const FILE_CONTENT_MAX_SIZE = 10_000_000;
  * UUID validation schema
  * Validates UUID v4 format
  */
-export const uuidSchema = z.string().uuid({
+export const uuidSchema = z.uuid({
   message: "Invalid UUID format",
 });
 
@@ -33,10 +33,10 @@ export const uuidSchema = z.string().uuid({
 export const emailSchema = z
   .string()
   .trim()
-  .toLowerCase()
   .min(1, "Email is required")
   .max(254, "Email is too long")
-  .email("Invalid email format");
+  .email({ message: "Invalid email format" })
+  .toLowerCase();
 
 /**
  * Non-empty string schema
@@ -65,8 +65,8 @@ export function requiredString(max: number, message?: string) {
  */
 export const optionalStringSchema = z
   .string()
-  .max(1000, "This field is too long")
   .trim()
+  .max(1000, "This field is too long")
   .optional();
 
 /**
@@ -75,8 +75,8 @@ export const optionalStringSchema = z
 export function optionalString(max: number, message?: string) {
   return z
     .string()
-    .max(max, message || `Must be ${max} characters or less`)
     .trim()
+    .max(max, message || `Must be ${max} characters or less`)
     .optional();
 }
 
@@ -161,7 +161,7 @@ export function validateData<T extends z.ZodTypeAny>(
         issues: error.issues,
       });
     }
-    throw new ValidationError(errorMessage, error);
+    throw new ValidationError(errorMessage);
   }
 }
 

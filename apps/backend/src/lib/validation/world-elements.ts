@@ -17,8 +17,8 @@ export const createWorldElementSchema = z
     type: elementTypeSchema,
     description: z
       .string()
-      .max(2000, "Description is too long")
       .trim()
+      .max(2000, "Description is too long")
       .nullable()
       .optional(),
     tags: z
@@ -39,8 +39,8 @@ export const updateWorldElementSchema = z
     type: elementTypeSchema.optional(),
     description: z
       .string()
-      .max(2000, "Description is too long")
       .trim()
+      .max(2000, "Description is too long")
       .nullable()
       .optional(),
     tags: z

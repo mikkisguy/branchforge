@@ -52,7 +52,18 @@ export const updateStatSchema = z
     description: optionalString(500, "Description is too long"),
   })
   .strict()
-  .partial();
+  .partial()
+  .refine(
+    (data) => {
+      if (data.minValue === undefined || data.maxValue === undefined)
+        return true;
+      return data.minValue <= data.maxValue;
+    },
+    {
+      message: "Minimum value must be less than or equal to maximum value",
+      path: ["minValue"],
+    }
+  );
 
 export type UpdateStatInput = z.infer<typeof updateStatSchema>;
 
