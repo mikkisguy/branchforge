@@ -28,6 +28,7 @@ import {
   gitlabUrlSchema,
   validateData,
   safeValidateData,
+  sessionDataSchema,
   updateLabelDialogueBodySchema,
   updateLabelSchema,
   createWorldElementSchema,
@@ -344,15 +345,15 @@ describe("GitLab URL Schema (SSRF Protection)", () => {
       }
     });
 
-    it("should accept valid HTTPS *.gitlab.io URLs", () => {
-      const validUrls = [
+    it("should reject *.gitlab.io URLs (user-controlled GitLab Pages)", () => {
+      const invalidUrls = [
         "https://example.gitlab.io",
         "https://my-project.gitlab.io/path",
       ];
 
-      for (const url of validUrls) {
+      for (const url of invalidUrls) {
         const result = gitlabUrlSchema.safeParse(url);
-        expect(result.success).toBe(true);
+        expect(result.success).toBe(false);
       }
     });
 
@@ -1483,6 +1484,43 @@ describe("Helper Functions", () => {
       if (!result.success) {
         expect(result.error).toBeDefined();
       }
+    });
+  });
+
+  describe("sessionDataSchema", () => {
+    it("should accept valid session data", () => {
+      const data = {
+        user: { sub: "user-123" },
+        flash: "welcome back",
+      };
+      const result = sessionDataSchema.safeParse(data);
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject string values exceeding 4096 characters", () => {
+      const longString = "a".repeat(4097);
+      const data = {
+        flash: longString,
+      };
+      const result = sessionDataSchema.safeParse(data);
+      expect(result.success).toBe(false);
+    });
+
+    it("should accept nested objects with valid strings", () => {
+      const data = {
+        user: { sub: "user-123" },
+      };
+      const result = sessionDataSchema.safeParse(data);
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject nested object string values exceeding 4096", () => {
+      const longString = "a".repeat(4097);
+      const data = {
+        user: { sub: longString },
+      };
+      const result = sessionDataSchema.safeParse(data);
+      expect(result.success).toBe(false);
     });
   });
 });

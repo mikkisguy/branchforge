@@ -15,7 +15,10 @@ import crypto from "node:crypto";
 import {
   isPrivateOrLocalHostname,
   isAllowedGitlabHost,
+  resolvePublicHost,
 } from "../lib/ip-validation.js";
+import { pinnedHttpsRequest } from "../lib/pinned-request.js";
+import { logWarn, LogEventType } from "../lib/logger.js";
 
 // GitLab PAT format: glpat- followed by alphanumeric characters, hyphens, underscores, and dots
 const GITLAB_PAT_REGEX = /^glpat-[a-zA-Z0-9_.-]+$/;
@@ -187,19 +190,30 @@ export async function validateAndGetUsername(
   try {
     const url = new URL("/api/v4/user", validatedUrl);
 
-    const response = await fetch(url.toString(), {
-      method: "GET",
-      headers: {
-        "PRIVATE-TOKEN": token,
+    // Resolve DNS to a known-public IP and pin the TCP connection
+    // via https.request's `lookup` option, closing the DNS rebinding
+    // TOCTOU window between hostname validation (validateGitLabUrl)
+    // and the outbound call.
+    const pinnedIps = await resolvePublicHost(url.hostname);
+    if (!pinnedIps) {
+      logWarn(LogEventType.SECURITY_SSRF_REFUSAL, {
+        hostname: url.hostname,
+      });
+      return null;
+    }
+    const pinnedIp = pinnedIps[0];
+
+    const response = await pinnedHttpsRequest(
+      {
+        hostname: url.hostname,
+        path: url.pathname + url.search,
+        port: url.port ? parseInt(url.port, 10) : undefined,
+        method: "GET",
+        headers: { "PRIVATE-TOKEN": token },
+        signal: controller.signal,
       },
-      // Never follow redirects automatically: a 3xx could point to an
-      // internal host or cloud-metadata endpoint and would carry the
-      // PAT header. A redirect on /api/v4/user is treated as a
-      // validation failure (response.ok is false for 3xx) rather than
-      // risking token leakage off the allowlisted host.
-      redirect: "manual",
-      signal: controller.signal,
-    });
+      pinnedIp
+    );
 
     if (!response.ok) {
       return null;
