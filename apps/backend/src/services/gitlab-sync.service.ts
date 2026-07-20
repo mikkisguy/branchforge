@@ -16,7 +16,7 @@ import {
   stats,
   variables,
 } from "../db/schema/index.js";
-import { eq, and, desc, inArray, isNull, sql } from "drizzle-orm";
+import { eq, and, desc, inArray, isNull, lt, sql } from "drizzle-orm";
 import {
   listRpyFiles,
   getFileContent,
@@ -48,6 +48,11 @@ import { mapEntriesToLabelLineValues } from "./label-line-mapper.js";
 import { logError, logWarn } from "../lib/logger.js";
 import type { ProjectFile } from "../db/schema/tables/project-files.js";
 import { ConcurrencyLimiter } from "./concurrency-limiter.js";
+
+// Staleness threshold for sync operations: if a sync operation has been
+// IN_PROGRESS for longer than this without completing, it is considered
+// stale. Same value as SYNC_LEASE_TIMEOUT_MS in labels/sync-state.ts.
+const SYNC_OPERATION_STALE_MS = 5 * 60 * 1000; // 5 minutes
 
 // Type definitions
 export type ConflictResolution =
@@ -1038,12 +1043,18 @@ export async function listSyncOperations(
 /**
  * Cleanup stale IN_PROGRESS sync operations on startup.
  *
- * On server restart, any sync operations that were left IN_PROGRESS
- * (due to crash or unclean shutdown) are marked as FAILED so they
- * don't remain permanently stuck.
+ * On server restart, sync operations left IN_PROGRESS due to a crash
+ * or unclean shutdown are marked as FAILED so they don't remain
+ * permanently stuck.
+ *
+ * Uses a staleness threshold (SYNC_OPERATION_STALE_MS) on `startedAt`
+ * so that a new instance does not mark operations still running on
+ * another instance as FAILED in multi-instance deployments.
  */
 export async function cleanupStaleSyncOperations(): Promise<void> {
   const db = getDb();
+
+  const staleThreshold = new Date(Date.now() - SYNC_OPERATION_STALE_MS);
 
   const result = await db
     .update(gitlabSyncOperations)
@@ -1052,7 +1063,12 @@ export async function cleanupStaleSyncOperations(): Promise<void> {
       errorMessage: "Server restarted while sync was in progress",
       completedAt: new Date(),
     })
-    .where(eq(gitlabSyncOperations.status, "IN_PROGRESS"))
+    .where(
+      and(
+        eq(gitlabSyncOperations.status, "IN_PROGRESS"),
+        lt(gitlabSyncOperations.startedAt, staleThreshold)
+      )
+    )
     .returning({ id: gitlabSyncOperations.id });
 
   if (result.length > 0) {
