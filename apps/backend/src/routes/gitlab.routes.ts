@@ -163,16 +163,13 @@ async function storeIntegrationHandler(
   const { token, gitlabUrl } = request.body;
 
   try {
-    // Validate token before storing
-    const username = await validateGitlabPAT(token, gitlabUrl);
-    if (!username) {
-      reply.status(400).send({ error: "Invalid GitLab token" });
-      return;
-    }
-
     await storeGitlabIntegration(userId, token, gitlabUrl);
     reply.status(201).send();
   } catch (err) {
+    if (err instanceof ValidationError) {
+      reply.status(400).send({ error: "Invalid GitLab token" });
+      return;
+    }
     request.log.error(
       { err },
       "storeIntegrationHandler: Failed to store GitLab integration"
@@ -662,10 +659,6 @@ async function importProjectHandler(
       });
     } else if (err instanceof NotFoundError) {
       reply.status(404).send({ error: "Not Found", message: err.message });
-    } else if (err instanceof ValidationError) {
-      reply
-        .status(400)
-        .send({ error: "Validation Error", message: err.message });
     } else {
       request.log.error(
         { err },

@@ -25,6 +25,7 @@ import {
   NotFoundError,
   ConflictError,
   RepositoryNotLinkedError,
+  ValidationError,
 } from "../middleware/error-handler.middleware.js";
 import { isPostgresError } from "../lib/db.js";
 import {
@@ -289,7 +290,7 @@ export async function storeGitlabIntegration(
   // Validate token and get username
   const username = await validateGitlabPAT(token, gitlabUrl);
   if (!username) {
-    throw new Error("Invalid GitLab token");
+    throw new ValidationError("Invalid GitLab token");
   }
 
   // Sanitize the GitLab URL before storing
@@ -676,6 +677,9 @@ export async function getBranchCommitSha(
   });
 
   if (!response.ok) {
+    if (response.status === 404) {
+      throw new NotFoundError(`Branch '${branch}' not found`);
+    }
     throw new Error(`GitLab API error: ${response.status}`);
   }
 
@@ -736,8 +740,13 @@ async function listAllFiles(
     });
 
     if (!response.ok) {
-      // Branch may not exist yet or repo is empty - return empty list
-      return [];
+      // Only return empty list for 404 (branch doesn't exist / repo empty);
+      // propagate all other API errors (401, 403, 429, 500, etc.)
+      if (response.status === 404) {
+        return [];
+      }
+      const errorText = await response.text();
+      throw new Error(`GitLab API error: ${response.status} - ${errorText}`);
     }
 
     const items = (await response.json()) as GitlabTreeItem[];
@@ -930,7 +939,8 @@ export async function createOrUpdateFile(
   // First try PUT (update), then POST (create) if needed
   const methods: Array<"PUT" | "POST"> = ["PUT", "POST"];
   const maxRetries = 3;
-  let lastError: Error | null = null;
+  const failures: Array<{ method: string; status: number; message: string }> =
+    [];
   let response: Response | null = null;
 
   for (let retry = 0; retry < maxRetries && !response; retry++) {
@@ -961,9 +971,11 @@ export async function createOrUpdateFile(
 
       // If PUT fails with 404, file doesn't exist - try POST next
       if (method === "PUT" && attemptResponse.status === 404) {
-        lastError = new Error(
-          `GitLab API error: ${attemptResponse.status} - ${errorText}`
-        );
+        failures.push({
+          method,
+          status: attemptResponse.status,
+          message: errorText,
+        });
         continue;
       }
 
@@ -973,9 +985,11 @@ export async function createOrUpdateFile(
         attemptResponse.status === 400 &&
         errorText.includes("file with same name")
       ) {
-        lastError = new Error(
-          `GitLab API error: ${attemptResponse.status} - ${errorText}`
-        );
+        failures.push({
+          method,
+          status: attemptResponse.status,
+          message: errorText,
+        });
         break; // Break inner loop to retry from PUT
       }
 
@@ -987,7 +1001,22 @@ export async function createOrUpdateFile(
   }
 
   if (!response) {
-    throw lastError || new Error("Failed to create or update file");
+    const summary = failures.map((f) => `${f.method} ${f.status}`).join(", ");
+    logError(
+      LogEventType.SERVICE_ERROR,
+      {
+        filePath,
+        branch,
+        failures,
+        retries: maxRetries,
+      },
+      new Error(
+        `Failed to create or update file after ${maxRetries} retries (${summary})`
+      )
+    );
+    throw new Error(
+      `Failed to create or update file after ${maxRetries} retries (${summary})`
+    );
   }
 
   return (await response.json()) as { file_path: string; branch: string };
@@ -1041,7 +1070,7 @@ export async function batchCommitFiles(
     await getBranchCommitSha(projectId, userId, branch, gitlabUrl);
     branchExists = true;
   } catch (err) {
-    if (err instanceof Error && err.message.includes("404")) {
+    if (err instanceof NotFoundError) {
       // Branch doesn't exist yet — all files will be "create" actions
     } else {
       throw err;

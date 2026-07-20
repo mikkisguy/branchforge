@@ -51,9 +51,7 @@ import { ConcurrencyLimiter } from "./concurrency-limiter.js";
 
 // Type definitions
 export type ConflictResolution =
-  | "branchforge_wins"
-  | "gitlab_wins"
-  | "manual_review";
+  "branchforge_wins" | "gitlab_wins" | "manual_review";
 
 export interface SyncOperation {
   id: string;
@@ -1035,6 +1033,33 @@ export async function listSyncOperations(
     .limit(limit || 100);
 
   return (await query) as SyncOperation[];
+}
+
+/**
+ * Cleanup stale IN_PROGRESS sync operations on startup.
+ *
+ * On server restart, any sync operations that were left IN_PROGRESS
+ * (due to crash or unclean shutdown) are marked as FAILED so they
+ * don't remain permanently stuck.
+ */
+export async function cleanupStaleSyncOperations(): Promise<void> {
+  const db = getDb();
+
+  const result = await db
+    .update(gitlabSyncOperations)
+    .set({
+      status: "FAILED",
+      errorMessage: "Server restarted while sync was in progress",
+      completedAt: new Date(),
+    })
+    .where(eq(gitlabSyncOperations.status, "IN_PROGRESS"))
+    .returning({ id: gitlabSyncOperations.id });
+
+  if (result.length > 0) {
+    logWarn("CLEANUP_STALE_SYNC_OPERATIONS", {
+      message: `Marked ${result.length} stale IN_PROGRESS sync operation(s) as FAILED`,
+    });
+  }
 }
 
 // Re-export detectConflicts from conflict-detection service for backward compatibility

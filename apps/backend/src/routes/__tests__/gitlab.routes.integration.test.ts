@@ -34,6 +34,7 @@ import * as db from "../../db/index.js";
 import {
   NotFoundError,
   ForbiddenError,
+  ValidationError,
 } from "../../middleware/error-handler.middleware.js";
 
 // Mock drizzle-orm's eq function
@@ -309,7 +310,9 @@ describe("GitLab Routes (Integration)", () => {
     });
 
     it("should return 400 if validation fails", async () => {
-      vi.spyOn(gitlabService, "validateGitlabPAT").mockResolvedValue(null);
+      vi.spyOn(gitlabService, "storeGitlabIntegration").mockRejectedValue(
+        new ValidationError("Invalid GitLab token")
+      );
 
       const response = await fastify.inject({
         method: "POST",
