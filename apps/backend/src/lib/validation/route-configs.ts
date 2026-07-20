@@ -28,6 +28,7 @@ export const routeConfigKeySchema = z
  */
 export const jumpPrefixSchema = z
   .string()
+  .trim()
   .min(1, "Jump prefix is required")
   .max(50, "Jump prefix is too long")
   .regex(
