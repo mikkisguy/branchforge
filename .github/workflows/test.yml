@@ -55,7 +55,7 @@ jobs:
     container: node:24-alpine
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_DB: branchforge_test
           POSTGRES_USER: test_user
