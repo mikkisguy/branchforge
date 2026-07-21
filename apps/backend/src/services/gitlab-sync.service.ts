@@ -5,7 +5,7 @@
  * Handles conflict detection and resolution for bidirectional sync.
  */
 
-import { getDb, type Db } from "../db/index.js";
+import { getDb } from "../db/index.js";
 import { requireProjectOwnership } from "./authz.service.js";
 import {
   gitlabSyncOperations,
@@ -37,6 +37,11 @@ import {
 } from "./rpy-generator.service.js";
 import { calculateLinesHash, calculateContentHash } from "../lib/hash.js";
 import { type DetectedCharacter } from "./character-parser.service.js";
+import type {
+  ConflictResolution,
+  SyncOperation,
+  Transaction,
+} from "./gitlab.types.js";
 import {
   computeCommonDirectoryPrefix,
   extractAndStripRpySymbols,
@@ -53,32 +58,6 @@ import { ConcurrencyLimiter } from "./concurrency-limiter.js";
 // IN_PROGRESS for longer than this without completing, it is considered
 // stale. Same value as SYNC_LEASE_TIMEOUT_MS in labels/sync-state.ts.
 const SYNC_OPERATION_STALE_MS = 5 * 60 * 1000; // 5 minutes
-
-// Type definitions
-export type ConflictResolution =
-  "branchforge_wins" | "gitlab_wins" | "manual_review";
-
-export interface SyncOperation {
-  id: string;
-  projectId: string;
-  operation: "EXPORT" | "IMPORT";
-  status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "FAILED";
-  branch: string | null;
-  conflictCount: number;
-  errorMessage: string | null;
-  startedAt: Date;
-  completedAt: Date | null;
-  detectedCharacters?: DetectedCharacter[];
-}
-
-// Type for Drizzle transaction - flexible interface to accept both typed and generic transactions
-// This avoids schema type inference issues while maintaining type safety for query methods
-interface Transaction {
-  select: Db["select"];
-  insert: Db["insert"];
-  update: Db["update"];
-  delete: Db["delete"];
-}
 
 /**
  * Helper function to fetch characters and build a Map of renpyTag -> id

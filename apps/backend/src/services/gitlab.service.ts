@@ -46,8 +46,13 @@ import {
 } from "../lib/logger.js";
 import type {
   ConflictResolution,
+  GitlabBranch,
+  GitlabFile,
+  GitlabRepository,
+  GitlabRepositoryFull,
+  GitlabTreeItem,
   SyncOperation,
-} from "./gitlab-sync.service.js";
+} from "./gitlab.types.js";
 
 const DEFAULT_TIMEOUT_MS = 30000;
 
@@ -198,52 +203,6 @@ async function fetchWithTimeout(
   throw new Error("Too many GitLab redirects");
 }
 
-// GitLab API response types
-export interface GitlabUser {
-  id: number;
-  username: string;
-  name: string;
-  email: string;
-}
-
-// Full GitLab repository data (from API)
-export interface GitlabRepositoryFull {
-  id: number;
-  name: string;
-  path_with_namespace: string;
-  default_branch: string;
-  http_url_to_repo?: string;
-}
-
-// Lightweight repository data for repository selection UI
-export interface GitlabRepository {
-  id: number;
-  name: string;
-  path_with_namespace: string;
-}
-
-export interface GitlabBranch {
-  name: string;
-  commit: {
-    id: string;
-  };
-}
-
-export interface GitlabFile {
-  file_name: string;
-  file_path: string;
-  size: number;
-  encoding: string;
-  content: string;
-  ref: string;
-}
-
-export interface GitlabTreeItem {
-  name: string;
-  path: string;
-  type: "blob" | "tree";
-}
-
 /**
  * Validate a GitLab Personal Access Token by calling GitLab API
  * @param token - The PAT to validate
@@ -359,7 +318,7 @@ export async function listGitlabRepositories(
     gitlabUrl || integration.gitlabUrl || undefined
   );
 
-  const gitlabRepositories: GitlabRepository[] = [];
+  const repos: GitlabRepository[] = [];
   let page = 1;
   const perPage = 100;
 
@@ -381,7 +340,7 @@ export async function listGitlabRepositories(
 
     const pageProjects = (await response.json()) as GitlabRepositoryFull[];
     // Extract only fields needed for repository selection UI
-    gitlabRepositories.push(
+    repos.push(
       ...pageProjects.map((p) => ({
         id: p.id,
         name: p.name,
@@ -398,7 +357,7 @@ export async function listGitlabRepositories(
     }
   } while (true); // eslint-disable-line no-constant-condition -- Valid pagination pattern with break condition inside loop
 
-  return gitlabRepositories;
+  return repos;
 }
 
 /**
