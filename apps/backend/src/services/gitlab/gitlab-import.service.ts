@@ -5,7 +5,8 @@
  * Handles file fetching, parsing, label creation, and project creation.
  */
 
-import { getDb, type Db } from "../../db/index.js";
+import { getDb } from "../../db/index.js";
+import type { Db } from "../../db/index.js";
 import { requireProjectOwnership } from "../authz.service.js";
 import {
   projectFiles,

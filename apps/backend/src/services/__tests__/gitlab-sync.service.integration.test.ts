@@ -916,6 +916,97 @@ describe("GitLabSyncService (Integration)", () => {
         new Date("2024-01-01").getTime()
       );
     });
+
+    it("should skip labels with null contentHash (regression: F11)", async () => {
+      // Insert a label with non-null contentHash (control)
+      const initialContentHash = "control-content-hash";
+      await db.insert(labelsTable).values({
+        ...testScene,
+        contentHash: initialContentHash,
+        lastSyncedHash: "old-baseline",
+        syncStatus: "MODIFIED_LOCAL",
+      });
+
+      // Insert a second label with null contentHash
+      const nullHashLabelId = testUuid("26000000", 2);
+      await db.insert(labelsTable).values({
+        id: nullHashLabelId,
+        projectId: testProjectId,
+        title: "null_hash_label",
+        labelName: "null_hash_label",
+        labelPosition: 1,
+        labelNumber: 2,
+        sequenceOrder: 1,
+        status: "DRAFT" as const,
+        conditions: {},
+        effects: {},
+        projectFileId: testGitlabFileId,
+        contentHash: null,
+        lastSyncedHash: null,
+        syncStatus: "MODIFIED_LOCAL",
+        route: "COMMON" as const,
+      });
+
+      // Insert a label line for the null-hash label
+      await db.insert(labelLines).values({
+        id: testUuid("46000000", 9),
+        labelId: nullHashLabelId,
+        sequence: 1,
+        contentType: "NARRATION" as const,
+        content: "Null hash line content",
+        contentHash: "null-hash-line-ch",
+        lastSyncedHash: null,
+        isDirty: true,
+        visualType: "GENERATED" as const,
+      });
+
+      // Mock the GitLab service
+      vi.spyOn(gitlabFileService, "batchCommitFiles").mockResolvedValue(
+        undefined
+      );
+
+      const result = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "Test export"
+      );
+
+      expect(result.status).toBe("COMPLETED");
+
+      // Verify: null-hash label was NOT synced
+      const [nullHashLabel] = await db
+        .select()
+        .from(labelsTable)
+        .where(eq(labelsTable.id, nullHashLabelId));
+      expect(nullHashLabel).toBeDefined();
+      expect(nullHashLabel?.lastSyncedHash).toBeNull();
+      expect(nullHashLabel?.syncStatus).toBe("MODIFIED_LOCAL");
+
+      // Verify: null-hash label's line baseline was NOT cleared
+      const [nullHashLine] = await db
+        .select()
+        .from(labelLines)
+        .where(eq(labelLines.labelId, nullHashLabelId));
+      expect(nullHashLine).toBeDefined();
+      expect(nullHashLine?.lastSyncedHash).toBeNull();
+      expect(nullHashLine?.isDirty).toBe(true);
+
+      // Verify: control label with non-null contentHash WAS synced
+      const [controlLabel] = await db
+        .select()
+        .from(labelsTable)
+        .where(eq(labelsTable.id, testScene.id));
+      expect(controlLabel).toBeDefined();
+      expect(controlLabel?.lastSyncedHash).toBe(initialContentHash);
+      expect(controlLabel?.syncStatus).toBe("SYNCED");
+
+      // Cleanup the additional data
+      await db
+        .delete(labelLines)
+        .where(eq(labelLines.labelId, nullHashLabelId));
+      await db.delete(labelsTable).where(eq(labelsTable.id, nullHashLabelId));
+    });
   });
 
   describe("importFromGitlab", () => {
