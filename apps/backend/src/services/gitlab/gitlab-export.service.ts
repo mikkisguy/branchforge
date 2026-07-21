@@ -129,16 +129,40 @@ export async function exportToGitlab(
       }
     }
 
-    // Generate variables.rpy if variables exist
-    const projectVariables = await db
-      .select({
-        key: variables.key,
-        description: variables.description,
-        category: variables.category,
-      })
-      .from(variables)
-      .where(eq(variables.projectId, projectId));
+    // Run independent queries concurrently to reduce export latency.
+    const [projectVariables, projectStats, projectCharacters] =
+      await Promise.all([
+        db
+          .select({
+            key: variables.key,
+            description: variables.description,
+            category: variables.category,
+          })
+          .from(variables)
+          .where(eq(variables.projectId, projectId)),
+        db
+          .select({
+            key: stats.key,
+            name: stats.name,
+            minValue: stats.minValue,
+            maxValue: stats.maxValue,
+            description: stats.description,
+          })
+          .from(stats)
+          .where(eq(stats.projectId, projectId))
+          .orderBy(stats.key),
+        db
+          .select({
+            renpyTag: characters.renpyTag,
+            displayName: characters.displayName,
+            color: characters.color,
+            isNarrator: characters.isNarrator,
+          })
+          .from(characters)
+          .where(eq(characters.projectId, projectId)),
+      ]);
 
+    // Generate variables.rpy if variables exist
     if (projectVariables.length > 0) {
       filesToExport.push({
         filePath: `${fileDirPrefix}branchforge_variables.rpy`,
@@ -147,18 +171,6 @@ export async function exportToGitlab(
     }
 
     // Generate stats.rpy if stats exist
-    const projectStats = await db
-      .select({
-        key: stats.key,
-        name: stats.name,
-        minValue: stats.minValue,
-        maxValue: stats.maxValue,
-        description: stats.description,
-      })
-      .from(stats)
-      .where(eq(stats.projectId, projectId))
-      .orderBy(stats.key);
-
     if (projectStats.length > 0) {
       filesToExport.push({
         filePath: `${fileDirPrefix}branchforge_stats.rpy`,
@@ -167,16 +179,6 @@ export async function exportToGitlab(
     }
 
     // Generate definitions.rpy from characters
-    const projectCharacters = await db
-      .select({
-        renpyTag: characters.renpyTag,
-        displayName: characters.displayName,
-        color: characters.color,
-        isNarrator: characters.isNarrator,
-      })
-      .from(characters)
-      .where(eq(characters.projectId, projectId));
-
     if (projectCharacters.length > 0) {
       filesToExport.push({
         filePath: `${fileDirPrefix}branchforge_definitions.rpy`,

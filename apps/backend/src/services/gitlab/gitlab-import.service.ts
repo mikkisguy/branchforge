@@ -268,8 +268,13 @@ export async function importFromGitlab(
       )
     );
 
-    // Track if any file fetch succeeded and capture first error
+    // Track if any file fetch succeeded and capture first error.
+    // Distinguish successful fetches (fetchedSuccessfully) from
+    // fetches that returned importable content (anySuccess) so that
+    // the blockade message accurately reflects which files could
+    // not be fetched vs. which were empty after successful fetch.
     let anySuccess = false;
+    let fetchedSuccessfully = false;
     // We narrow `firstError` to its eventual assignment site below;
     // the type annotation is broader than the inferred type so that
     // the closure that captures it (the db.transaction callback)
@@ -320,6 +325,7 @@ export async function importFromGitlab(
           }
           continue;
         }
+        fetchedSuccessfully = true;
         if (!result.value.content) {
           // Skip files with no content
           continue;
@@ -678,8 +684,19 @@ export async function importFromGitlab(
 
     // If all file fetches failed, mark operation as failed and skip
     // the incomingJumps sweep (no new labels to compute for).
+    // Blockade: distinguish rejected fetches from successfully-fetched
+    // files that happened to be empty.
     if (!anySuccess && rpyFiles.length > 0) {
-      const errorMessage = firstError?.message || "All file fetches failed";
+      let errorMessage: string;
+      if (!fetchedSuccessfully) {
+        // Every file fetch rejected — use the captured error.
+        errorMessage = firstError?.message || "All file fetches failed";
+      } else {
+        // Some (or all) files were fetched successfully but none contained
+        // importable content (e.g. all were empty).
+        errorMessage =
+          "No importable content found in the fetched files. Each file was either empty or contained only whitespace.";
+      }
       await updateSyncOperation(operation.id, {
         status: "FAILED",
         errorMessage,
@@ -749,13 +766,12 @@ export async function importFromGitlab(
         detectedCharacters,
       };
     } else {
-      // Partial success: some files succeeded, some failed
-      const failureSummary = fileProcessingFailures
-        .map((f) => f.projectFileId)
-        .join(", ");
+      // Partial success: some files succeeded, some failed.
+      // Do not leak internal projectFileId values into the
+      // client-facing errorMessage; log them server-side instead.
       const errorMessage =
         `${successfulFiles}/${totalFiles} file(s) imported successfully. ` +
-        `Failed file(s): ${failureSummary}`;
+        `${fileProcessingFailures.length} file(s) were skipped due to errors.`;
       logWarn("gitlab_sync.partial_import", {
         projectId,
         successfulFiles,
