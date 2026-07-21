@@ -20,6 +20,8 @@ import {
 } from "vitest";
 import nock from "nock";
 import * as gitlabService from "../gitlab.service.js";
+import * as gitlabRepoService from "../gitlab/gitlab-repository.service.js";
+import * as gitlabFileService from "../gitlab/gitlab-file.service.js";
 import * as rpyParserService from "../rpy-parser.service.js";
 import { getDb } from "../../db/index.js";
 import {
@@ -194,7 +196,7 @@ describe("GitLabSyncService (Integration)", () => {
       });
 
       // Mock GitLab API to return the same content (for getFileContent)
-      vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
+      vi.spyOn(gitlabRepoService, "getFileContent").mockResolvedValue(
         'label start:\n    "Same content"\n    return'
       );
 
@@ -239,7 +241,7 @@ describe("GitLabSyncService (Integration)", () => {
       });
 
       // Mock GitLab API to return different content (for getFileContent)
-      vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
+      vi.spyOn(gitlabRepoService, "getFileContent").mockResolvedValue(
         'label start:\n    "Remote content"\n    return'
       );
 
@@ -287,7 +289,7 @@ describe("GitLabSyncService (Integration)", () => {
       await db.insert(projectFiles).values(newGitlabFile);
 
       // Mock GitLab API to return the new label content
-      vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
+      vi.spyOn(gitlabRepoService, "getFileContent").mockResolvedValue(
         'label chapter2:\n    "New chapter"\n    return'
       );
 
@@ -333,7 +335,7 @@ describe("GitLabSyncService (Integration)", () => {
       // Mock GitLab API to return empty content (file deleted or label removed)
       // We need to mock the getFileContent to return a file with different labels
       let callCount = 0;
-      vi.spyOn(gitlabService, "getFileContent").mockImplementation(() => {
+      vi.spyOn(gitlabRepoService, "getFileContent").mockImplementation(() => {
         callCount++;
         if (callCount === 1) {
           // First call for testGitlabFile - return different label
@@ -397,7 +399,7 @@ describe("GitLabSyncService (Integration)", () => {
       ]);
 
       // Mock GitLab API to return different dialogue
-      vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
+      vi.spyOn(gitlabRepoService, "getFileContent").mockResolvedValue(
         'label start:\n    s "Remote dialogue"\n    return'
       );
 
@@ -450,7 +452,7 @@ describe("GitLabSyncService (Integration)", () => {
       ]);
 
       // Mock GitLab API to return the same dialogue
-      vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
+      vi.spyOn(gitlabRepoService, "getFileContent").mockResolvedValue(
         'label start:\n    s "Same dialogue"\n    return'
       );
 
@@ -501,7 +503,7 @@ describe("GitLabSyncService (Integration)", () => {
       await db.insert(projectFiles).values(newGitlabFile);
 
       // Mock GitLab API to return different content based on file path (order-independent)
-      vi.spyOn(gitlabService, "getFileContent").mockImplementation(
+      vi.spyOn(gitlabRepoService, "getFileContent").mockImplementation(
         async (_projectId, _userId, filePath) => {
           if (filePath === "game/script.rpy") {
             return 'label start:\n    "Remote change"\n    return';
@@ -579,7 +581,7 @@ describe("GitLabSyncService (Integration)", () => {
       await db.insert(labelsTable).values(testScene);
 
       // Mock GitLab API to throw error
-      vi.spyOn(gitlabService, "getFileContent").mockRejectedValue(
+      vi.spyOn(gitlabRepoService, "getFileContent").mockRejectedValue(
         new Error("API Error")
       );
 
@@ -652,7 +654,7 @@ describe("GitLabSyncService (Integration)", () => {
       ]);
 
       // Mock GitLab API to return matching content based on file path (order-independent)
-      vi.spyOn(gitlabService, "getFileContent").mockImplementation(
+      vi.spyOn(gitlabRepoService, "getFileContent").mockImplementation(
         async (_projectId, _userId, filePath) => {
           if (filePath === "game/script.rpy") {
             return 'label start:\n    "Line 1"\n    "Line 2"\n    return';
@@ -727,7 +729,9 @@ describe("GitLabSyncService (Integration)", () => {
   describe("exportToGitlab", () => {
     it("should export files to GitLab when files exist", async () => {
       // Mock the GitLab service
-      vi.spyOn(gitlabService, "batchCommitFiles").mockResolvedValue(undefined);
+      vi.spyOn(gitlabFileService, "batchCommitFiles").mockResolvedValue(
+        undefined
+      );
 
       const result = await exportToGitlab(
         testProjectId,
@@ -743,7 +747,7 @@ describe("GitLabSyncService (Integration)", () => {
         branch: testBranch,
         conflictCount: 0,
       });
-      expect(gitlabService.batchCommitFiles).toHaveBeenCalledWith(
+      expect(gitlabFileService.batchCommitFiles).toHaveBeenCalledWith(
         testProjectId,
         testUserId,
         testBranch,
@@ -782,7 +786,7 @@ describe("GitLabSyncService (Integration)", () => {
 
     it("should handle GitLab API errors", async () => {
       // Mock the GitLab service to throw error
-      vi.spyOn(gitlabService, "batchCommitFiles").mockRejectedValue(
+      vi.spyOn(gitlabFileService, "batchCommitFiles").mockRejectedValue(
         new Error("GitLab API Error")
       );
 
@@ -802,12 +806,14 @@ describe("GitLabSyncService (Integration)", () => {
     });
 
     it("should generate default commit message when not provided", async () => {
-      vi.spyOn(gitlabService, "batchCommitFiles").mockResolvedValue(undefined);
+      vi.spyOn(gitlabFileService, "batchCommitFiles").mockResolvedValue(
+        undefined
+      );
 
       await exportToGitlab(testProjectId, testUserId, testBranch);
 
-      expect(gitlabService.batchCommitFiles).toHaveBeenCalled();
-      const calls = (gitlabService.batchCommitFiles as any).mock.calls;
+      expect(gitlabFileService.batchCommitFiles).toHaveBeenCalled();
+      const calls = (gitlabFileService.batchCommitFiles as any).mock.calls;
       // batchCommitFiles(projectId, userId, branch, commitMessage, files)
       // The commit message is at index 3
       expect(calls.length).toBeGreaterThan(0);
@@ -874,7 +880,9 @@ describe("GitLabSyncService (Integration)", () => {
       });
 
       // Mock the GitLab service
-      vi.spyOn(gitlabService, "batchCommitFiles").mockResolvedValue(undefined);
+      vi.spyOn(gitlabFileService, "batchCommitFiles").mockResolvedValue(
+        undefined
+      );
 
       // Perform export
       const result = await exportToGitlab(
@@ -913,14 +921,14 @@ describe("GitLabSyncService (Integration)", () => {
   describe("importFromGitlab", () => {
     it("should import files from GitLab", async () => {
       // Mock the GitLab service
-      vi.spyOn(gitlabService, "getBranchCommitSha").mockResolvedValue(
+      vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockResolvedValue(
         "abc123def456"
       );
-      vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([
+      vi.spyOn(gitlabRepoService, "listRpyFiles").mockResolvedValue([
         { name: "script.rpy", path: "game/script.rpy" } as any,
       ]);
 
-      vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
+      vi.spyOn(gitlabRepoService, "getFileContent").mockResolvedValue(
         'label start:\n    "Imported content"\n    return'
       );
 
@@ -985,10 +993,10 @@ describe("GitLabSyncService (Integration)", () => {
     });
 
     it("should handle import from empty repository", async () => {
-      vi.spyOn(gitlabService, "getBranchCommitSha").mockResolvedValue(
+      vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockResolvedValue(
         "abc123def456"
       );
-      vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([]);
+      vi.spyOn(gitlabRepoService, "listRpyFiles").mockResolvedValue([]);
 
       const result = await importFromGitlab(
         testProjectId,
@@ -1007,14 +1015,14 @@ describe("GitLabSyncService (Integration)", () => {
       // Create an existing scene
       await db.insert(labelsTable).values(testScene);
 
-      vi.spyOn(gitlabService, "getBranchCommitSha").mockResolvedValue(
+      vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockResolvedValue(
         "abc123def456"
       );
-      vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([
+      vi.spyOn(gitlabRepoService, "listRpyFiles").mockResolvedValue([
         { name: "script.rpy", path: "game/script.rpy" } as any,
       ]);
 
-      vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
+      vi.spyOn(gitlabRepoService, "getFileContent").mockResolvedValue(
         'label start:\n    "Updated from GitLab"\n    return'
       );
 
@@ -1049,14 +1057,14 @@ describe("GitLabSyncService (Integration)", () => {
       // Create an existing scene
       await db.insert(labelsTable).values(testScene);
 
-      vi.spyOn(gitlabService, "getBranchCommitSha").mockResolvedValue(
+      vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockResolvedValue(
         "abc123def456"
       );
-      vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([
+      vi.spyOn(gitlabRepoService, "listRpyFiles").mockResolvedValue([
         { name: "script.rpy", path: "game/script.rpy" } as any,
       ]);
 
-      vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
+      vi.spyOn(gitlabRepoService, "getFileContent").mockResolvedValue(
         'label start:\n    "Conflicting content"\n    return'
       );
 
@@ -1088,10 +1096,10 @@ describe("GitLabSyncService (Integration)", () => {
     });
 
     it("should handle API errors", async () => {
-      vi.spyOn(gitlabService, "getBranchCommitSha").mockResolvedValue(
+      vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockResolvedValue(
         "abc123def456"
       );
-      vi.spyOn(gitlabService, "listRpyFiles").mockRejectedValue(
+      vi.spyOn(gitlabRepoService, "listRpyFiles").mockRejectedValue(
         new Error("API Error")
       );
 
@@ -1109,14 +1117,14 @@ describe("GitLabSyncService (Integration)", () => {
     });
 
     it("should handle invalid RPY content gracefully", async () => {
-      vi.spyOn(gitlabService, "getBranchCommitSha").mockResolvedValue(
+      vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockResolvedValue(
         "abc123def456"
       );
-      vi.spyOn(gitlabService, "listRpyFiles").mockResolvedValue([
+      vi.spyOn(gitlabRepoService, "listRpyFiles").mockResolvedValue([
         { name: "script.rpy", path: "game/script.rpy" } as any,
       ]);
 
-      vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
+      vi.spyOn(gitlabRepoService, "getFileContent").mockResolvedValue(
         "invalid rpy content"
       );
 

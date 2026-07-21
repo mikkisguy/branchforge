@@ -759,7 +759,7 @@ describe("GitLabService (HTTP Operations)", () => {
   // SSRF defense-in-depth
   // fetchWithTimeout must reject URLs that bypass the allowlist, even if a
   // caller forgets to call validateGitLabUrl. This guards against the
-  // CodeQL js/request-forgery finding at gitlab.service.ts:fetch().
+  // CodeQL js/request-forgery finding at gitlab-api.client.ts:fetchWithTimeout().
   // ============================================================================
 
   describe("SSRF guard on initial fetch URL", () => {

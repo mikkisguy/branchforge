@@ -14,7 +14,7 @@ import {
   characters,
 } from "../db/schema/index.js";
 import { eq, and, inArray, asc, isNull } from "drizzle-orm";
-import { getFileContent } from "./gitlab.service.js";
+import { getFileContent } from "./gitlab/gitlab-repository.service.js";
 import { parseRPYFileWithLabels } from "./rpy-parser.service.js";
 import { ConcurrencyLimiter } from "./concurrency-limiter.js";
 

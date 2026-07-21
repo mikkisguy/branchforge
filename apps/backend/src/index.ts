@@ -29,7 +29,7 @@ import { worldElementsRoutes } from "./routes/world-elements.routes.js";
 import { pairGroupsRoutes } from "./routes/pair-groups.routes.js";
 import { createDrizzleSessionStore } from "./services/session-store.service.js";
 import { setupShutdownHandlers } from "./lib/shutdown.js";
-import { cleanupStaleSyncOperations } from "./services/gitlab-sync.service.js";
+import { cleanupStaleSyncOperations } from "./services/gitlab/index.js";
 import { globalErrorHandler } from "./middleware/error-handler.middleware.js";
 import { validateCsrfToken } from "./middleware/csrf.middleware.js";
 import { SESSION_COOKIE_NAME } from "./lib/session.js";
