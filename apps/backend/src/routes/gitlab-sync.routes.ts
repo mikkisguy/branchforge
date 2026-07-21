@@ -14,6 +14,7 @@ import {
 import {
   ConflictError,
   NotFoundError,
+  RateLimitError,
 } from "../middleware/error-handler.middleware.js";
 import { checkRateLimit } from "../services/rate-limiter.service.js";
 import {
@@ -36,6 +37,7 @@ import {
   type ImportProjectInput,
   type DetectConflictsInput,
   type OperationIdParams,
+  type ProjectIdParams,
 } from "../lib/validation.js";
 import {
   getAuthenticatedUserId,
@@ -135,11 +137,7 @@ async function importProjectHandler(
       { ip: clientIp, retryAfter: rateLimit.retryAfter },
       "importProjectHandler: Rate limit exceeded"
     );
-    reply.status(429).send({
-      error: "Too many import requests. Please try again later.",
-      retryAfter: rateLimit.retryAfter,
-    });
-    return;
+    throw new RateLimitError(rateLimit.retryAfter);
   }
 
   const userId = getAuthenticatedUserId(request);
@@ -169,7 +167,9 @@ async function importProjectHandler(
       return;
     }
     if (err instanceof NotFoundError) {
-      reply.status(404).send({ error: "Not Found", message: err.message });
+      reply
+        .status(404)
+        .send({ error: "Not Found", message: "Resource not found" });
       return;
     }
     request.log.error(
@@ -229,7 +229,7 @@ async function getOperationHandler(
  * Returns a list of sync operations for a project.
  */
 async function listOperationsHandler(
-  request: FastifyRequest<{ Params: { projectId: string } }>,
+  request: FastifyRequest<{ Params: ProjectIdParams }>,
   reply: FastifyReply
 ): Promise<void> {
   const userId = getAuthenticatedUserId(request);
@@ -322,7 +322,7 @@ export async function gitlabSyncRoutes(
     getOperationHandler
   );
 
-  fastify.get<{ Params: { projectId: string } }>(
+  fastify.get<{ Params: ProjectIdParams }>(
     "/gitlab/projects/:projectId/operations",
     {
       onRequest: [authenticate],

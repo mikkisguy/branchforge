@@ -86,6 +86,22 @@ async function storeIntegrationHandler(
   request: FastifyRequest<{ Body: ValidateGitlabTokenInput }>,
   reply: FastifyReply
 ): Promise<void> {
+  const clientIp = request.ip;
+
+  // Check rate limit to prevent brute-force/DoS attacks
+  const rateLimit = checkRateLimit(`gitlabStoreIntegration:${clientIp}`);
+  if (!rateLimit.allowed) {
+    request.log.warn(
+      { ip: clientIp, retryAfter: rateLimit.retryAfter },
+      "storeIntegrationHandler: Rate limit exceeded"
+    );
+    reply.status(429).send({
+      error: "Too many requests. Please try again later.",
+      retryAfter: rateLimit.retryAfter,
+    });
+    return;
+  }
+
   const userId = getAuthenticatedUserId(request);
   const { token, gitlabUrl } = request.body;
 

@@ -179,12 +179,12 @@ async function listBranchesHandler(
       return;
     }
 
+    if (handleKnownRouteErrors(err, reply)) return;
+
     request.log.error(
       { err, projectId },
       "listBranchesHandler: Failed to list branches"
     );
-
-    if (handleKnownRouteErrors(err, reply)) return;
 
     if (err instanceof Error && err.message.startsWith("GitLab API error:")) {
       reply.status(502).send({
@@ -230,12 +230,12 @@ async function listFilesHandler(
       return;
     }
 
+    if (handleKnownRouteErrors(err, reply)) return;
+
     request.log.error(
       { err, projectId, branch },
       "listFilesHandler: Failed to list RPY files"
     );
-
-    if (handleKnownRouteErrors(err, reply)) return;
 
     if (err instanceof Error && err.message.startsWith("GitLab API error:")) {
       reply.status(502).send({

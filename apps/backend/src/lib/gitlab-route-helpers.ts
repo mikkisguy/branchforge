@@ -9,6 +9,7 @@ import type { FastifyRequest, FastifyReply } from "fastify";
 import {
   NotFoundError,
   ForbiddenError,
+  UnauthorizedError,
 } from "../middleware/error-handler.middleware.js";
 
 /**
@@ -17,8 +18,12 @@ import {
  * which guarantees that request.user is defined.
  */
 export function getAuthenticatedUserId(request: FastifyRequest): string {
-  // The authenticate middleware guarantees user is set
-  return request.user!.id;
+  if (!request.user) {
+    throw new UnauthorizedError(
+      "Authentication required. Please log in to access this resource."
+    );
+  }
+  return request.user.id;
 }
 
 /**
