@@ -22,7 +22,7 @@ import { getDecryptedToken } from "./gitlab-integration.service.js";
 import {
   getRepositoryLink,
   getBranchCommitSha,
-  listRpyFiles,
+  _listFilesWithAuth,
 } from "./gitlab-repository.service.js";
 import { fetchWithTimeout } from "./gitlab-api.client.js";
 
@@ -210,12 +210,11 @@ export async function batchCommitFiles(
   }
 
   if (branchExists) {
-    const existingFiles = await listRpyFiles(
-      projectId,
+    const existingFiles = await _listFilesWithAuth(
+      token,
+      url,
+      String(repoLink.gitlabProjectId),
       branch,
-      userId,
-      gitlabUrl,
-      { token, url, gitlabProjectId: String(repoLink.gitlabProjectId) },
       (_item: { name: string; path: string }) => true
     );
     existingFilePaths = new Set(existingFiles.map((f) => f.path));

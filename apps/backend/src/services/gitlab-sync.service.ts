@@ -7,7 +7,6 @@ export {
   listSyncOperations,
   cleanupStaleSyncOperations,
   detectConflicts,
-  computeCommonDirectoryPrefix,
 } from "./gitlab/index.js";
 
 export type { ConflictInfo, ConflictDetectionResult } from "./gitlab/index.js";

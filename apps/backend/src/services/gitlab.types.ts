@@ -1,4 +1,3 @@
-import type { Db } from "../db/index.js";
 import type { DetectedCharacter } from "./character-parser.service.js";
 
 // GitLab API response types
@@ -66,11 +65,4 @@ export interface SyncOperation {
   detectedCharacters?: DetectedCharacter[];
 }
 
-// Type for Drizzle transaction - flexible interface to accept both typed and generic transactions
-// This avoids schema type inference issues while maintaining type safety for query methods
-export interface Transaction {
-  select: Db["select"];
-  insert: Db["insert"];
-  update: Db["update"];
-  delete: Db["delete"];
-}
+export type { Transaction } from "../db/types.js";

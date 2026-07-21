@@ -6,6 +6,7 @@
  */
 
 import { getDb } from "../../db/index.js";
+import type { Db } from "../../db/index.js";
 import { requireProjectOwnership } from "../authz.service.js";
 import {
   projectFiles,
@@ -32,6 +33,7 @@ import type {
 } from "../gitlab.types.js";
 import {
   extractAndStripRpySymbols,
+  DEFAULT_EXCLUDED_RENPY_TAGS,
   type DetectedCharacterStatement,
   type DetectedDefaultStatement,
 } from "../rpy-statements.service.js";
@@ -63,7 +65,7 @@ import { NotFoundError } from "../../middleware/error-handler.middleware.js";
  * Accepts a transaction context to ensure transactional consistency
  */
 async function fetchCharactersByTag(
-  tx: Transaction,
+  tx: Db | Transaction,
   projectId: string
 ): Promise<Map<string, string>> {
   const projectCharacters = await tx
@@ -208,8 +210,17 @@ export async function importFromGitlab(
   const operation = await createSyncOperation(projectId, "IMPORT", branch);
 
   try {
-    // Get the commit SHA for this branch at import time
-    const importCommitSha = await getBranchCommitSha(projectId, userId, branch);
+    // Get the commit SHA for this branch at import time (non-fatal — metadata only)
+    let importCommitSha: string | null = null;
+    try {
+      importCommitSha = await getBranchCommitSha(projectId, userId, branch);
+    } catch (shaError) {
+      logWarn("gitlab_sync.branch_sha_fetch_failed", {
+        projectId,
+        branch,
+        error: shaError instanceof Error ? shaError.message : String(shaError),
+      });
+    }
 
     // List RPY files in the repository, excluding BranchForge-generated files
     // (branchforge_variables.rpy, branchforge_stats.rpy,
@@ -249,7 +260,7 @@ export async function importFromGitlab(
       .limit(1);
 
     const excludedTags = new Set(
-      settings?.excludedCharacterTags || ["n", "u", "narrator", "extend"]
+      settings?.excludedCharacterTags || DEFAULT_EXCLUDED_RENPY_TAGS
     );
 
     // Fetch file contents in parallel with concurrency limit
