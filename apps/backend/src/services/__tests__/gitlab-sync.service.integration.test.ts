@@ -36,8 +36,8 @@ import {
   detectConflicts,
   exportToGitlab,
   importFromGitlab,
-  type ConflictResolution,
 } from "../gitlab-sync.service.js";
+import type { ConflictResolution } from "../gitlab.types.js";
 import { testEmail, testUuid } from "../../utils/test-ids.js";
 
 describe("GitLabSyncService (Integration)", () => {
