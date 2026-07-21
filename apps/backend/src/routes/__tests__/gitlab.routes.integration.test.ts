@@ -272,6 +272,13 @@ describe("GitLab Routes (Integration)", () => {
   });
 
   describe("POST /api/gitlab/integration", () => {
+    beforeEach(() => {
+      vi.mocked(rateLimiter.checkRateLimit).mockReturnValue({
+        allowed: true,
+        remainingAttempts: 4,
+      });
+    });
+
     it("should store GitLab integration", async () => {
       vi.spyOn(gitlabService, "validateGitlabPAT").mockResolvedValue(
         "testuser"

@@ -49,6 +49,8 @@ export const projectIdParamsSchema = z.object({
   projectId: uuidSchema,
 });
 
+export type ProjectIdParams = z.infer<typeof projectIdParamsSchema>;
+
 /**
  * Project files query validation
  */
