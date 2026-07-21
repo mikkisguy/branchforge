@@ -212,8 +212,12 @@ export async function exportToGitlab(
         )
       );
 
-    if (exportedLabels.length > 0) {
-      const exportedLabelIds = exportedLabels.map((l) => l.id);
+    const labelsWithContentHash = exportedLabels.filter(
+      (l) => l.contentHash !== null
+    );
+
+    if (labelsWithContentHash.length > 0) {
+      const exportedLabelIds = labelsWithContentHash.map((l) => l.id);
 
       // Update labels: advance lastSyncedHash to current contentHash, establishing new baseline
       await db

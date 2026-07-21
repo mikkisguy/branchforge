@@ -16,6 +16,9 @@
 
 import { countCharOutsideStrings } from "./rpy-helpers.js";
 
+/** Default Ren'Py special tags excluded from character import. */
+export const DEFAULT_EXCLUDED_RENPY_TAGS = ["n", "u", "narrator", "extend"];
+
 /**
  * A character definition detected in RPY content.
  *

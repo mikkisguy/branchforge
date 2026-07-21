@@ -152,8 +152,3 @@ export type {
   ConflictInfo,
   ConflictDetectionResult,
 } from "../conflict-detection.service.js";
-
-// Re-export the shared directory-prefix helper so existing tests and
-// downstream importers keep working. The implementation lives in
-// `rpy-statements.service.ts` so the zip exporter can share it.
-export { computeCommonDirectoryPrefix } from "../rpy-statements.service.js";

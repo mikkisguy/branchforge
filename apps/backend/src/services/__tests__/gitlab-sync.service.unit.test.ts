@@ -7,10 +7,10 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
-  computeCommonDirectoryPrefix,
   getSyncOperation,
   listSyncOperations,
 } from "../gitlab-sync.service.js";
+import { computeCommonDirectoryPrefix } from "../rpy-statements.service.js";
 
 // Mock the database at module level
 vi.mock("../../db/index.js", () => ({

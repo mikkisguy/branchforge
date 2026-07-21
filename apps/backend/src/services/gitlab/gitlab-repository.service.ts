@@ -372,56 +372,27 @@ export async function getBranchCommitSha(
 }
 
 /**
- * List files in a GitLab repository (recursive), filtered by the
- * provided `fileFilter` callback.
+ * Internal helper: list files in a GitLab repository (recursive) using
+ * pre-resolved auth credentials. Used internally by `listRpyFiles` and
+ * by `batchCommitFiles` to avoid repeating API calls.
  *
- * When `preResolved` is provided the function skips the ownership check
- * and repository-link lookup, using the pre-resolved token/URL/project-id
- * directly.  This is used internally by `batchCommitFiles` so it can
- * determine create vs. update actions without repeating API calls.
- *
- * @param projectId - The BranchForge project ID
+ * @param token - GitLab personal access token
+ * @param url - GitLab instance URL
+ * @param gitlabProjectId - GitLab project ID
  * @param branch - The branch to search
- * @param userId - The user ID making the request (for authorization)
- * @param gitlabUrl - Optional GitLab URL override
- * @param preResolved - Pre-resolved auth/URL values for internal callers
  * @param fileFilter - Optional filter predicate (default: name ends with ".rpy")
  * @returns Array of file info
- * @throws NotFoundError if project not found or repository not linked
- * @throws ForbiddenError if user lacks permission
  */
-export async function listRpyFiles(
-  projectId: string,
+export async function _listFilesWithAuth(
+  token: string,
+  url: string,
+  gitlabProjectId: string,
   branch: string,
-  userId: string,
-  gitlabUrl?: string,
-  preResolved?: { token: string; url: string; gitlabProjectId: string },
   fileFilter?: (item: { name: string; path: string }) => boolean
 ): Promise<Array<{ name: string; path: string }>> {
   const effectiveFilter =
     fileFilter ||
     ((item: { name: string; path: string }) => item.name.endsWith(".rpy"));
-
-  let token: string;
-  let url: string;
-  let gitlabProjectId: string;
-
-  if (preResolved) {
-    token = preResolved.token;
-    url = preResolved.url;
-    gitlabProjectId = preResolved.gitlabProjectId;
-  } else {
-    await requireProjectOwnership(projectId, userId);
-
-    const repoLink = await getRepositoryLink(projectId);
-    if (!repoLink) {
-      throw new RepositoryNotLinkedError();
-    }
-
-    token = await getDecryptedToken(userId);
-    url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
-    gitlabProjectId = String(repoLink.gitlabProjectId);
-  }
 
   const files: Array<{ name: string; path: string }> = [];
   let page = 1;
@@ -465,6 +436,40 @@ export async function listRpyFiles(
   } while (true); // eslint-disable-line no-constant-condition -- Valid pagination pattern with break condition inside loop
 
   return files;
+}
+
+/**
+ * List files in a GitLab repository (recursive), filtered by the
+ * provided `fileFilter` callback.
+ *
+ * @param projectId - The BranchForge project ID
+ * @param branch - The branch to search
+ * @param userId - The user ID making the request (for authorization)
+ * @param gitlabUrl - Optional GitLab URL override
+ * @param fileFilter - Optional filter predicate (default: name ends with ".rpy")
+ * @returns Array of file info
+ * @throws NotFoundError if project not found or repository not linked
+ * @throws ForbiddenError if user lacks permission
+ */
+export async function listRpyFiles(
+  projectId: string,
+  branch: string,
+  userId: string,
+  gitlabUrl?: string,
+  fileFilter?: (item: { name: string; path: string }) => boolean
+): Promise<Array<{ name: string; path: string }>> {
+  await requireProjectOwnership(projectId, userId);
+
+  const repoLink = await getRepositoryLink(projectId);
+  if (!repoLink) {
+    throw new RepositoryNotLinkedError();
+  }
+
+  const token = await getDecryptedToken(userId);
+  const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
+  const gitlabProjectId = String(repoLink.gitlabProjectId);
+
+  return _listFilesWithAuth(token, url, gitlabProjectId, branch, fileFilter);
 }
 
 /**
