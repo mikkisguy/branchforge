@@ -13,7 +13,7 @@ import {
   beforeAll,
   vi,
 } from "vitest";
-import * as gitlabService from "../gitlab.service.js";
+import * as gitlabRepoService from "../gitlab/gitlab-repository.service.js";
 import * as rpyParserService from "../rpy-parser.service.js";
 import { getDb } from "../../db/index.js";
 import {
@@ -158,7 +158,7 @@ describe("ConflictDetectionService (Integration)", () => {
       });
 
       // Mock GitLab API to return same content (for getFileContent)
-      vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
+      vi.spyOn(gitlabRepoService, "getFileContent").mockResolvedValue(
         'label start:\n    "Same content"\n    return'
       );
 
@@ -203,7 +203,7 @@ describe("ConflictDetectionService (Integration)", () => {
       });
 
       // Mock GitLab API to return different content (for getFileContent)
-      vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
+      vi.spyOn(gitlabRepoService, "getFileContent").mockResolvedValue(
         'label start:\n    "Remote content"\n    return'
       );
 
@@ -251,7 +251,7 @@ describe("ConflictDetectionService (Integration)", () => {
       await db.insert(projectFiles).values(newGitlabFile);
 
       // Mock GitLab API to return the new label content
-      vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
+      vi.spyOn(gitlabRepoService, "getFileContent").mockResolvedValue(
         'label chapter2:\n    "New chapter"\n    return'
       );
 
@@ -295,7 +295,7 @@ describe("ConflictDetectionService (Integration)", () => {
       await db.insert(labels).values(testScene);
 
       // Mock GitLab API to return a file with different labels
-      vi.spyOn(gitlabService, "getFileContent").mockImplementation(
+      vi.spyOn(gitlabRepoService, "getFileContent").mockImplementation(
         async (_projectId, _userId, filePath) => {
           if (filePath === "game/script.rpy") {
             return 'label other:\n    "Other content"\n    return';
@@ -357,7 +357,7 @@ describe("ConflictDetectionService (Integration)", () => {
       ]);
 
       // Mock GitLab API to return different dialogue
-      vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
+      vi.spyOn(gitlabRepoService, "getFileContent").mockResolvedValue(
         'label start:\n    s "Remote dialogue"\n    return'
       );
 
@@ -410,7 +410,7 @@ describe("ConflictDetectionService (Integration)", () => {
       ]);
 
       // Mock GitLab API to return same dialogue
-      vi.spyOn(gitlabService, "getFileContent").mockResolvedValue(
+      vi.spyOn(gitlabRepoService, "getFileContent").mockResolvedValue(
         'label start:\n    s "Same dialogue"\n    return'
       );
 
@@ -461,7 +461,7 @@ describe("ConflictDetectionService (Integration)", () => {
       await db.insert(projectFiles).values(newGitlabFile);
 
       // Mock GitLab API to return different content based on file path (order-independent)
-      vi.spyOn(gitlabService, "getFileContent").mockImplementation(
+      vi.spyOn(gitlabRepoService, "getFileContent").mockImplementation(
         async (_projectId, _userId, filePath) => {
           if (filePath === "game/script.rpy") {
             return 'label start:\n    "Remote change"\n    return';
@@ -539,7 +539,7 @@ describe("ConflictDetectionService (Integration)", () => {
       await db.insert(labels).values(testScene);
 
       // Mock GitLab API to throw error
-      vi.spyOn(gitlabService, "getFileContent").mockRejectedValue(
+      vi.spyOn(gitlabRepoService, "getFileContent").mockRejectedValue(
         new Error("API Error")
       );
 
@@ -612,7 +612,7 @@ describe("ConflictDetectionService (Integration)", () => {
       ]);
 
       // Mock GitLab API to return matching content based on file path (order-independent)
-      vi.spyOn(gitlabService, "getFileContent").mockImplementation(
+      vi.spyOn(gitlabRepoService, "getFileContent").mockImplementation(
         async (_projectId, _userId, filePath) => {
           if (filePath === "game/script.rpy") {
             return 'label start:\n    "Line 1"\n    "Line 2"\n    return';

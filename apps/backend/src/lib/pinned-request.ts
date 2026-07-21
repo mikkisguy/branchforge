@@ -47,7 +47,12 @@ export async function pinnedHttpsRequest(
         port: options.port,
         method: options.method || "GET",
         headers: options.headers,
-        lookup: (_hostname, _opts, cb) => cb(null, pinnedIp, family),
+        lookup: (_hostname, _opts, cb) =>
+          cb(
+            null,
+            _opts.all ? [{ address: pinnedIp, family }] : pinnedIp,
+            family
+          ),
         signal: options.signal,
         rejectUnauthorized: true,
       },
