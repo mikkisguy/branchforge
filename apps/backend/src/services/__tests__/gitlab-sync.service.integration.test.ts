@@ -972,40 +972,42 @@ describe("GitLabSyncService (Integration)", () => {
         "Test export"
       );
 
-      expect(result.status).toBe("COMPLETED");
+      try {
+        expect(result.status).toBe("COMPLETED");
 
-      // Verify: null-hash label was NOT synced
-      const [nullHashLabel] = await db
-        .select()
-        .from(labelsTable)
-        .where(eq(labelsTable.id, nullHashLabelId));
-      expect(nullHashLabel).toBeDefined();
-      expect(nullHashLabel?.lastSyncedHash).toBeNull();
-      expect(nullHashLabel?.syncStatus).toBe("MODIFIED_LOCAL");
+        // Verify: null-hash label was NOT synced
+        const [nullHashLabel] = await db
+          .select()
+          .from(labelsTable)
+          .where(eq(labelsTable.id, nullHashLabelId));
+        expect(nullHashLabel).toBeDefined();
+        expect(nullHashLabel?.lastSyncedHash).toBeNull();
+        expect(nullHashLabel?.syncStatus).toBe("MODIFIED_LOCAL");
 
-      // Verify: null-hash label's line baseline was NOT cleared
-      const [nullHashLine] = await db
-        .select()
-        .from(labelLines)
-        .where(eq(labelLines.labelId, nullHashLabelId));
-      expect(nullHashLine).toBeDefined();
-      expect(nullHashLine?.lastSyncedHash).toBeNull();
-      expect(nullHashLine?.isDirty).toBe(true);
+        // Verify: null-hash label's line baseline was NOT cleared
+        const [nullHashLine] = await db
+          .select()
+          .from(labelLines)
+          .where(eq(labelLines.labelId, nullHashLabelId));
+        expect(nullHashLine).toBeDefined();
+        expect(nullHashLine?.lastSyncedHash).toBeNull();
+        expect(nullHashLine?.isDirty).toBe(true);
 
-      // Verify: control label with non-null contentHash WAS synced
-      const [controlLabel] = await db
-        .select()
-        .from(labelsTable)
-        .where(eq(labelsTable.id, testScene.id));
-      expect(controlLabel).toBeDefined();
-      expect(controlLabel?.lastSyncedHash).toBe(initialContentHash);
-      expect(controlLabel?.syncStatus).toBe("SYNCED");
-
-      // Cleanup the additional data
-      await db
-        .delete(labelLines)
-        .where(eq(labelLines.labelId, nullHashLabelId));
-      await db.delete(labelsTable).where(eq(labelsTable.id, nullHashLabelId));
+        // Verify: control label with non-null contentHash WAS synced
+        const [controlLabel] = await db
+          .select()
+          .from(labelsTable)
+          .where(eq(labelsTable.id, testScene.id));
+        expect(controlLabel).toBeDefined();
+        expect(controlLabel?.lastSyncedHash).toBe(initialContentHash);
+        expect(controlLabel?.syncStatus).toBe("SYNCED");
+      } finally {
+        // Cleanup the additional data — always runs, even on assertion failures
+        await db
+          .delete(labelLines)
+          .where(eq(labelLines.labelId, nullHashLabelId));
+        await db.delete(labelsTable).where(eq(labelsTable.id, nullHashLabelId));
+      }
     });
   });
 
