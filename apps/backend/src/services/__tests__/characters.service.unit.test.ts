@@ -35,6 +35,13 @@ vi.mock("../../db/index.js", () => ({
     select: mockSelect,
     insert: mockInsert,
     update: mockUpdate,
+    transaction: vi.fn((cb: (tx: unknown) => unknown) =>
+      cb({
+        select: mockSelect,
+        insert: mockInsert,
+        update: mockUpdate,
+      })
+    ),
   })),
 }));
 

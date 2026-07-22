@@ -9,6 +9,7 @@
  */
 
 import { getDb } from "../db/index.js";
+import type { Transaction } from "../db/types.js";
 import {
   labelLines,
   characters,
@@ -76,9 +77,10 @@ class CharacterLinkerService {
   async linkSpeakersToLines(
     projectId: string,
     labelIds: string[],
-    excludedTags: Set<string> = new Set()
+    excludedTags: Set<string> = new Set(),
+    tx?: Transaction
   ): Promise<SpeakerLinkResult> {
-    const db = getDb();
+    const db = tx ?? getDb();
 
     if (labelIds.length === 0) {
       return { linked: 0, unmatched: [], conflicts: [] };
