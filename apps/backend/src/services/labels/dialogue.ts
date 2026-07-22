@@ -89,20 +89,50 @@ export async function updateLabelDialogue(params: {
   } = params;
 
   return getDb().transaction(async (tx) => {
-    // 1. Lock the label row to serialize concurrent updates
-    await tx.execute(
-      sql`SELECT id FROM labels WHERE id = ${labelId} FOR UPDATE`
-    );
-
-    // 2. Read the locked label
-    const [lockedLabel] = await tx
+    // 1. Read label to get projectFileId (no lock yet — re-read under lock
+    //    after the project_file lock to match deleteLabel's lock ordering).
+    const [label] = await tx
       .select({
         id: labels.id,
         projectId: labels.projectId,
         projectFileId: labels.projectFileId,
+      })
+      .from(labels)
+      .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
+      .limit(1);
+
+    if (!label || !label.projectFileId) {
+      throw new NotFoundError("Label or file not found");
+    }
+
+    // 2. Lock the project file row FIRST (matches updateLabel / deleteLabel
+    //    lock ordering of project_files → labels, preventing deadlock).
+    await tx.execute(
+      sql`SELECT id FROM project_files WHERE id = ${label.projectFileId} FOR UPDATE`
+    );
+
+    // 3. Read the locked project file
+    const [lockedProjectFile] = await tx
+      .select()
+      .from(projectFiles)
+      .where(eq(projectFiles.id, label.projectFileId))
+      .limit(1);
+
+    if (!lockedProjectFile) {
+      throw new NotFoundError("File");
+    }
+
+    // 4. Lock the label row to serialize concurrent updates
+    await tx.execute(
+      sql`SELECT id FROM labels WHERE id = ${labelId} FOR UPDATE`
+    );
+
+    // 5. Re-read the label under lock to get current version/contentHash
+    const [lockedLabel] = await tx
+      .select({
         version: labels.version,
         contentHash: labels.contentHash,
-        labelPosition: labels.labelPosition,
+        projectFileId: labels.projectFileId,
       })
       .from(labels)
       .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
@@ -112,24 +142,8 @@ export async function updateLabelDialogue(params: {
       throw new NotFoundError("Label or file not found");
     }
 
-    // 3. Lock the project file row
-    await tx.execute(
-      sql`SELECT id FROM project_files WHERE id = ${lockedLabel.projectFileId} FOR UPDATE`
-    );
-
-    // 4. Read the locked project file
-    const [lockedProjectFile] = await tx
-      .select()
-      .from(projectFiles)
-      .where(eq(projectFiles.id, lockedLabel.projectFileId))
-      .limit(1);
-
-    if (!lockedProjectFile) {
-      throw new NotFoundError("File");
-    }
-
-    // 5. Verify user owns the project (uses tx to stay inside the transaction)
-    await requireProjectOwnership(lockedLabel.projectId, userId, tx);
+    // 6. Verify user owns the project (uses tx to stay inside the transaction)
+    await requireProjectOwnership(label.projectId, userId, tx);
 
     // 6. Validate that all speakerIds exist in the characters table for this project
     const speakerIdsInDialogue = dialogue
@@ -144,7 +158,7 @@ export async function updateLabelDialogue(params: {
         .from(characters)
         .where(
           and(
-            eq(characters.projectId, lockedLabel.projectId),
+            eq(characters.projectId, label.projectId),
             inArray(characters.id, uniqueSpeakerIds)
           )
         );
@@ -202,7 +216,7 @@ export async function updateLabelDialogue(params: {
       };
     }
 
-    // 8. Fetch existing lines (with FOR UPDATE to prevent concurrent modifications)
+    // 8. Fetch existing lines — concurrency serialized by the label-row lock in step 1
     const existingLines = await tx
       .select()
       .from(labelLines)
