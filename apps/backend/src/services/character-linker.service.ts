@@ -73,6 +73,10 @@ class CharacterLinkerService {
    * 2. Parse RPY files to extract dialogue entries with speakers
    * 3. Match speakers to characters by renpyTag
    * 4. Update label_lines.speakerId for each dialogue line
+   *
+   * @param tx - Optional transaction. When provided, all DB operations use
+   *   this transaction instead of starting a new connection, allowing the
+   *   caller to wrap speaker linking in an atomic unit of work.
    */
   async linkSpeakersToLines(
     projectId: string,

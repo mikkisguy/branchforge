@@ -12,37 +12,69 @@ vi.mock("../authz.service.js", () => ({
   requireProjectOwnership: vi.fn(() => Promise.resolve()),
 }));
 
-// Chain builders for DB operations
-const createSelectChain = (resolveValue: unknown[]) => ({
-  from: vi.fn(() => ({
-    where: vi.fn(() => Promise.resolve(resolveValue)),
-  })),
-});
+// Hoist all mock variables so vi.mock factories can access them
+const {
+  createSelectChain,
+  mockSelect,
+  mockInsert,
+  mockUpdate,
+  mockGetDb,
+  mockTransactionFn,
+  mockLinkSpeakersToLines,
+} = vi.hoisted(() => {
+  const createSelectChain = (resolveValue: unknown[]) => ({
+    from: vi.fn(() => ({
+      where: vi.fn(() => Promise.resolve(resolveValue)),
+    })),
+  });
 
-const createInsertChain = () => ({
-  values: vi.fn(() => ({
-    onConflictDoUpdate: vi.fn(() => Promise.resolve()),
-  })),
-});
+  const createInsertChain = () => ({
+    values: vi.fn(() => ({
+      onConflictDoUpdate: vi.fn(() => Promise.resolve()),
+      returning: vi.fn(() => Promise.resolve([] as unknown[])),
+    })),
+  });
 
-// Mock DB functions
-const mockSelect = vi.fn(() => createSelectChain([]));
-const mockInsert = vi.fn(createInsertChain);
-const mockUpdate = vi.fn();
-
-vi.mock("../../db/index.js", () => ({
-  getDb: vi.fn(() => ({
+  const mockSelect = vi.fn(() => createSelectChain([]));
+  const mockInsert = vi.fn(createInsertChain);
+  const mockUpdate = vi.fn();
+  const mockTransactionFn = vi.fn((cb: (tx: unknown) => unknown) =>
+    cb({
+      select: mockSelect,
+      insert: mockInsert,
+      update: mockUpdate,
+    })
+  );
+  const mockGetDb = vi.fn(() => ({
     select: mockSelect,
     insert: mockInsert,
     update: mockUpdate,
-    transaction: vi.fn((cb: (tx: unknown) => unknown) =>
-      cb({
-        select: mockSelect,
-        insert: mockInsert,
-        update: mockUpdate,
-      })
-    ),
-  })),
+    transaction: mockTransactionFn,
+  }));
+  const mockLinkSpeakersToLines = vi.fn(() =>
+    Promise.resolve({ linked: 0, unmatched: [], conflicts: [] })
+  );
+
+  return {
+    createSelectChain,
+    mockSelect,
+    mockInsert,
+    mockUpdate,
+    mockGetDb,
+    mockTransactionFn,
+    mockLinkSpeakersToLines,
+  };
+});
+
+// Mock characterLinkerService to capture calls
+vi.mock("../character-linker.service.js", () => ({
+  characterLinkerService: {
+    linkSpeakersToLines: mockLinkSpeakersToLines,
+  },
+}));
+
+vi.mock("../../db/index.js", () => ({
+  getDb: mockGetDb,
 }));
 
 // ============================================================================
@@ -60,6 +92,24 @@ describe("CharactersService.importCharacters", () => {
     displayName: "Eileen",
     renpyTag: "eileen",
     color: "#888888",
+    routeAffiliation: null,
+    isLoveInterest: false,
+    isNarrator: false,
+    pairGroupId: null,
+    notes: null,
+    conditionalPrefix: null,
+    avatarUrl: null,
+    createdAt: new Date("2024-01-01"),
+    updatedAt: new Date("2024-01-01"),
+  };
+
+  const newCharacter = {
+    id: "char-new",
+    projectId,
+    name: "New",
+    displayName: "New",
+    renpyTag: "new",
+    color: "#FFFFFF",
     routeAffiliation: null,
     isLoveInterest: false,
     isNarrator: false,
@@ -93,9 +143,23 @@ describe("CharactersService.importCharacters", () => {
     mockSelect.mockImplementation(() => createSelectChain([existingCharacter]));
   }
 
+  /** Stub the DB insert to return a new character (creating path). */
+  function stubNewCharacter() {
+    // select returns empty → no existing match, so create path is taken
+    mockSelect.mockImplementation(() => createSelectChain([]));
+    // insert.returning returns the new character
+    mockInsert.mockReturnValue({
+      values: vi.fn(() => ({
+        onConflictDoUpdate: vi.fn(() => Promise.resolve()),
+        returning: vi.fn(() => Promise.resolve([newCharacter])),
+      })),
+    });
+  }
+
   /** Build an import input with sensible defaults, overriding as needed. */
   function buildInput(
-    charOverrides: Partial<ImportCharactersInput["characters"][number]> = {}
+    charOverrides: Partial<ImportCharactersInput["characters"][number]> = {},
+    importOverrides: Partial<ImportCharactersInput> = {}
   ): ImportCharactersInput {
     return {
       characters: [
@@ -110,6 +174,7 @@ describe("CharactersService.importCharacters", () => {
       excludedTags: [],
       narratorTags: [],
       linkToLines: false,
+      ...importOverrides,
     };
   }
 
@@ -117,6 +182,21 @@ describe("CharactersService.importCharacters", () => {
   function getUpdatesArg(): Record<string, unknown> {
     return updateSetFn.mock.calls[0][0] as Record<string, unknown>;
   }
+
+  // --------------------------------------------------------------------------
+  // Transaction wrapping
+  // --------------------------------------------------------------------------
+
+  describe("transaction wrapping", () => {
+    it("should wrap import in a transaction", async () => {
+      stubExistingCharacter();
+
+      await charactersService.importCharacters(projectId, userId, buildInput());
+
+      expect(mockGetDb).toHaveBeenCalled();
+      expect(mockTransactionFn).toHaveBeenCalledTimes(1);
+    });
+  });
 
   // --------------------------------------------------------------------------
   // isNarrator behavior
@@ -233,6 +313,62 @@ describe("CharactersService.importCharacters", () => {
       expect(arg.isNarrator).toBe(true);
       expect(arg).toHaveProperty("isLoveInterest");
       expect(arg.isLoveInterest).toBe(false);
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // New character creation (tag not found)
+  // --------------------------------------------------------------------------
+
+  describe("new character creation", () => {
+    it("should create a new character when tag is not found", async () => {
+      stubNewCharacter();
+
+      const result = await charactersService.importCharacters(
+        projectId,
+        userId,
+        buildInput()
+      );
+
+      expect(mockInsert).toHaveBeenCalledWith(characters);
+      expect(result.characters).toHaveLength(1);
+      expect(result.characters[0]).toMatchObject({
+        id: "char-new",
+        tag: "new",
+        name: "New",
+        displayName: "New",
+      });
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // Transaction passing to linker
+  // --------------------------------------------------------------------------
+
+  describe("linker integration", () => {
+    it("should pass transaction to linker when linkToLines is true", async () => {
+      stubExistingCharacter();
+      // Labels select must return at least one label for the linker path
+      mockSelect.mockImplementation((_table?: unknown) => {
+        // The second select call in the import flow is for labels
+        // Return one label to trigger the linker call
+        return createSelectChain([{ id: "label-1" }]);
+      });
+
+      await charactersService.importCharacters(
+        projectId,
+        userId,
+        buildInput({}, { linkToLines: true })
+      );
+
+      expect(mockLinkSpeakersToLines).toHaveBeenCalledTimes(1);
+      // Verify the 4th argument (tx) is truthy — it's the transaction object
+      const calls = mockLinkSpeakersToLines.mock.calls[0] as unknown[];
+      const txArg = calls[3];
+      expect(txArg).toBeDefined();
+      expect(txArg).toHaveProperty("select");
+      expect(txArg).toHaveProperty("insert");
+      expect(txArg).toHaveProperty("update");
     });
   });
 });

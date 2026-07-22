@@ -8,6 +8,7 @@
 
 import { eq } from "drizzle-orm";
 import { promises as fs } from "node:fs";
+import crypto from "node:crypto";
 import {
   validateAndProcessAvatar,
   deleteAvatar as deleteAvatarFile,
@@ -19,6 +20,7 @@ import {
 } from "../../lib/storage.js";
 import { getBasePath } from "../../lib/config.js";
 import { logWarn, LogEventType } from "../../lib/logger.js";
+import { NotFoundError } from "../../middleware/error-handler.middleware.js";
 import { characters } from "../../db/schema/index.js";
 import type { Character } from "../../db/schema/index.js";
 import type { Db } from "../../db/index.js";
@@ -60,20 +62,25 @@ export async function uploadAvatar(
 
   // Backup existing avatar file
   let previousAvatarBackupPath: string | undefined;
+  let previousAvatarPath: string | undefined;
   if (character.avatarUrl) {
-    const previousAvatarPath = getAvatarFullPath(character.avatarUrl);
+    previousAvatarPath = getAvatarFullPath(character.avatarUrl);
     try {
       await fs.access(previousAvatarPath);
-      previousAvatarBackupPath = `${previousAvatarPath}.backup-${Date.now()}-${
-        process.pid
-      }`;
+      previousAvatarBackupPath = `${previousAvatarPath}.backup-${crypto.randomUUID()}`;
       await fs.copyFile(previousAvatarPath, previousAvatarBackupPath);
     } catch (accessError) {
-      if ((accessError as NodeJS.ErrnoException).code !== "ENOENT") {
-        throw new Error(
-          `Failed to backup existing avatar file: ${(accessError as Error).message}`,
-          { cause: accessError }
-        );
+      if (
+        !(accessError instanceof Error && "code" in accessError) ||
+        accessError.code !== "ENOENT"
+      ) {
+        const message =
+          accessError instanceof Error
+            ? accessError.message
+            : String(accessError);
+        throw new Error(`Failed to backup existing avatar file: ${message}`, {
+          cause: accessError,
+        });
       }
       // File doesn't exist — proceed without backup
     }
@@ -103,6 +110,10 @@ export async function uploadAvatar(
       .where(eq(characters.id, characterId))
       .returning();
 
+    if (!updatedCharacter) {
+      throw new NotFoundError("Character");
+    }
+
     // Clean up backup on success
     if (previousAvatarBackupPath) {
       try {
@@ -123,8 +134,7 @@ export async function uploadAvatar(
     return { avatarUrl };
   } catch (error) {
     // DB update failed — restore backup and clean up new file
-    if (previousAvatarBackupPath) {
-      const previousAvatarPath = getAvatarFullPath(character.avatarUrl!);
+    if (previousAvatarBackupPath && previousAvatarPath) {
       try {
         await fs.copyFile(previousAvatarBackupPath, previousAvatarPath);
       } catch {
