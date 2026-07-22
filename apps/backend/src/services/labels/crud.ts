@@ -14,6 +14,7 @@ import {
   stats,
   variables,
   pairGroups,
+  userSettings,
 } from "../../db/schema/index.js";
 import { eq, and, isNull, sql, inArray, ne } from "drizzle-orm";
 import { sanitizeLabelName, type StatCondition } from "@branchforge/shared";
@@ -797,4 +798,28 @@ export async function deleteLabel(
     // to prevent later appends from colliding with stale positions.
     await resyncLabelPositions(tx, lockedLabel.projectFileId!);
   });
+}
+
+/**
+ * Clean up labelWordCounts in userSettings after a label is deleted.
+ * This prevents orphaned entries from accumulating over time.
+ * Non-critical: the caller should wrap in try/catch and not fail the
+ * primary operation if cleanup fails.
+ *
+ * @param labelId - The ID of the deleted label
+ * @param userId - The user ID
+ * @param db - Optional database context (defaults to getDb())
+ */
+export async function cleanupLabelWordCounts(
+  labelId: string,
+  userId: string,
+  db?: ReturnType<typeof getDb>
+): Promise<void> {
+  const ctx = db ?? getDb();
+  await ctx
+    .update(userSettings)
+    .set({
+      labelWordCounts: sql`COALESCE(label_word_counts, '{}'::jsonb) - ${labelId}`,
+    })
+    .where(eq(userSettings.userId, userId));
 }

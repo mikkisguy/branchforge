@@ -54,9 +54,17 @@ export {
   mapToPublicLabel,
 } from "./labels/index.js";
 
-export { createLabel, updateLabel, deleteLabel } from "./labels/index.js";
+export {
+  createLabel,
+  updateLabel,
+  deleteLabel,
+  cleanupLabelWordCounts,
+} from "./labels/index.js";
 
 export { reconstructFileForLabel } from "./labels/index.js";
+
+export { updateLabelDialogue } from "./labels/index.js";
+export type { UpdateLabelDialogueResult } from "./labels/index.js";
 
 export { updateIncomingJumpsForLabels } from "./labels/index.js";
 

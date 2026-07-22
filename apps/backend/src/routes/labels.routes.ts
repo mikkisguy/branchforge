@@ -14,13 +14,13 @@ import {
   updateLabel,
   deleteLabel,
   getLabelCharacters,
-  reconstructFileForLabel,
+  updateLabelDialogue,
+  cleanupLabelWordCounts,
   type PublicLabel,
   type LabelDetail,
   type ListLabelsFilters,
   type LabelCharacterWithInfo,
 } from "../services/labels.service.js";
-import { requireProjectOwnership } from "../services/authz.service.js";
 import { authenticate } from "../middleware/auth.middleware.js";
 import {
   validateQuery,
@@ -43,19 +43,7 @@ import {
   type CreateLabelInput,
   type UpdateLabelInput,
 } from "../lib/validation.js";
-import { getDb } from "../db/index.js";
-import {
-  labels,
-  labelLines,
-  projectFiles,
-  userSettings,
-  characters,
-} from "../db/schema/index.js";
-import { eq, asc, inArray, isNull, and, sql } from "drizzle-orm";
-import { calculateLinesHash, calculateContentHash } from "../lib/hash.js";
-import { updateAuditFields } from "../lib/audit.js";
 import { trackWordsForLabel } from "../services/word-count.service.js";
-import { planDialogueLineUpdates } from "../services/rpy/plan-dialogue-updates.js";
 
 // ============================================================================
 // Types
@@ -75,21 +63,6 @@ interface GetLabelResponse {
 
 interface ErrorResponse {
   error: string;
-}
-
-// UpdateLabelDialogueBody is now imported from validation.ts as UpdateLabelDialogueInput
-
-interface UpdateLabelDialogueResponse {
-  success: boolean;
-  version: number;
-  contentHash: string;
-  fileContentHash: string;
-  fileUpdatedAt: string;
-  conflict?: {
-    reason: "STALE_LABEL_VERSION" | "STALE_CONTENT_HASH";
-    currentVersion: number;
-    currentContentHash: string | null;
-  };
 }
 
 interface LabelCharactersResponse {
@@ -182,342 +155,21 @@ async function updateLabelDialogueHandler(
   const user = request.user!;
 
   try {
-    const db = getDb();
-
-    // Get label with file info and current version
-    const [label] = await db
-      .select({
-        id: labels.id,
-        projectId: labels.projectId,
-        projectFileId: labels.projectFileId,
-        version: labels.version,
-        contentHash: labels.contentHash,
-        labelPosition: labels.labelPosition,
-      })
-      .from(labels)
-      .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
-      .limit(1);
-
-    if (!label || !label.projectFileId) {
-      reply
-        .status(404)
-        .send({ error: "Label or file not found" } as ErrorResponse);
-      return;
-    }
-
-    // Get the project file
-    const [projectFile] = await db
-      .select()
-      .from(projectFiles)
-      .where(eq(projectFiles.id, label.projectFileId))
-      .limit(1);
-
-    if (!projectFile) {
-      reply.status(404).send({ error: "File not found" } as ErrorResponse);
-      return;
-    }
-
-    // Verify user owns the project
-    await requireProjectOwnership(label.projectId, user.id);
-
-    // Validate that all speakerIds exist in the characters table for this project
-    const speakerIdsInDialogue = dialogue
-      .map((entry) => entry.speakerId)
-      .filter((id): id is string => id !== null);
-
-    if (speakerIdsInDialogue.length > 0) {
-      const uniqueSpeakerIds = Array.from(new Set(speakerIdsInDialogue));
-
-      const existingCharacters = await db
-        .select({ id: characters.id })
-        .from(characters)
-        .where(
-          and(
-            eq(characters.projectId, label.projectId),
-            inArray(characters.id, uniqueSpeakerIds)
-          )
-        );
-
-      const existingCharacterIds = new Set(existingCharacters.map((c) => c.id));
-      const invalidSpeakerIds = uniqueSpeakerIds.filter(
-        (id) => !existingCharacterIds.has(id)
-      );
-
-      if (invalidSpeakerIds.length > 0) {
-        reply.status(400).send({
-          error: `Invalid speakerId(s): ${invalidSpeakerIds.join(
-            ", "
-          )}. Character(s) not found in this project.`,
-        } as ErrorResponse);
-        return;
-      }
-    }
-
-    const updateResult = await db.transaction(async (tx) => {
-      // Serialize concurrent updates for the same label to avoid duplicate rows
-      // from overlapping delete + insert operations.
-      await tx.execute(
-        sql`SELECT id FROM labels WHERE id = ${labelId} FOR UPDATE`
-      );
-
-      const [lockedLabel] = await tx
-        .select({
-          version: labels.version,
-          contentHash: labels.contentHash,
-          projectFileId: labels.projectFileId,
-          labelPosition: labels.labelPosition,
-        })
-        .from(labels)
-        .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
-        .limit(1);
-
-      if (!lockedLabel || !lockedLabel.projectFileId) {
-        throw new NotFoundError("Label or file not found");
-      }
-
-      await tx.execute(
-        sql`SELECT id FROM project_files WHERE id = ${lockedLabel.projectFileId} FOR UPDATE`
-      );
-
-      const [lockedProjectFile] = await tx
-        .select()
-        .from(projectFiles)
-        .where(eq(projectFiles.id, lockedLabel.projectFileId))
-        .limit(1);
-
-      if (!lockedProjectFile) {
-        throw new NotFoundError("File");
-      }
-
-      const lockedCurrentVersion = lockedLabel.version ?? 1;
-      if (
-        expectedVersion !== undefined &&
-        expectedVersion !== lockedCurrentVersion
-      ) {
-        return {
-          conflictPayload: {
-            success: false,
-            version: lockedCurrentVersion,
-            contentHash: lockedLabel.contentHash ?? "",
-            fileContentHash: lockedProjectFile.contentHash,
-            fileUpdatedAt: lockedProjectFile.updatedAt.toISOString(),
-            conflict: {
-              reason: "STALE_LABEL_VERSION",
-              currentVersion: lockedCurrentVersion,
-              currentContentHash: lockedLabel.contentHash,
-            },
-          } satisfies UpdateLabelDialogueResponse,
-          nextVersion: lockedCurrentVersion,
-          nextContentHash: lockedLabel.contentHash ?? "",
-          nextFileContentHash: lockedProjectFile.contentHash,
-          fileUpdatedAt: lockedProjectFile.updatedAt,
-        };
-      }
-
-      if (
-        expectedContentHash !== undefined &&
-        (lockedLabel.contentHash ?? null) !== expectedContentHash
-      ) {
-        return {
-          conflictPayload: {
-            success: false,
-            version: lockedCurrentVersion,
-            contentHash: lockedLabel.contentHash ?? "",
-            fileContentHash: lockedProjectFile.contentHash,
-            fileUpdatedAt: lockedProjectFile.updatedAt.toISOString(),
-            conflict: {
-              reason: "STALE_CONTENT_HASH",
-              currentVersion: lockedCurrentVersion,
-              currentContentHash: lockedLabel.contentHash,
-            },
-          } satisfies UpdateLabelDialogueResponse,
-          nextVersion: lockedCurrentVersion,
-          nextContentHash: lockedLabel.contentHash ?? "",
-          nextFileContentHash: lockedProjectFile.contentHash,
-          fileUpdatedAt: lockedProjectFile.updatedAt,
-        };
-      }
-
-      // 1. Fetch existing lines with FOR UPDATE to preserve IDs and handle updates/inserts/deletes
-      const existingLines = await tx
-        .select()
-        .from(labelLines)
-        .where(
-          and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt))
-        )
-        .orderBy(asc(labelLines.sequence));
-
-      // Align prose against the incoming list so mid-list inserts/deletes keep
-      // VISUAL/MENU rows interleaved correctly (not appended at max sequence).
-      const plan = planDialogueLineUpdates(
-        existingLines.map((line) => ({
-          id: line.id,
-          sequence: line.sequence,
-          contentType: line.contentType,
-          content: line.content,
-          speakerId: line.speakerId,
-        })),
-        dialogue
-      );
-
-      // 2. Delete removed prose rows (structural MENU/JUMP/VISUAL are never deleted)
-      if (plan.deleteIds.length > 0) {
-        await tx
-          .delete(labelLines)
-          .where(inArray(labelLines.id, plan.deleteIds));
-      }
-
-      // 3. Update matched prose rows in place (independent writes)
-      await Promise.all(
-        plan.updates.map((update) =>
-          tx
-            .update(labelLines)
-            .set({
-              contentType: (update.speakerId ? "DIALOGUE" : "NARRATION") as
-                "DIALOGUE" | "NARRATION",
-              content: update.text,
-              speakerId: update.speakerId,
-              demoNotes: null,
-              isDirty: true,
-              projectFileId: lockedProjectFile.id,
-              contentHash: calculateContentHash(update.text),
-              lastSyncedHash: null,
-              sequence: plan.sequenceByKey.get(update.id)!,
-            })
-            .where(eq(labelLines.id, update.id))
-        )
-      );
-
-      // 4. Insert new prose rows at planned sequences (bulk)
-      if (plan.inserts.length > 0) {
-        await tx.insert(labelLines).values(
-          plan.inserts.map((insert) => ({
-            labelId,
-            sequence: insert.sequence,
-            contentType: (insert.speakerId ? "DIALOGUE" : "NARRATION") as
-              "DIALOGUE" | "NARRATION",
-            content: insert.text,
-            speakerId: insert.speakerId,
-            demoNotes: null,
-            isDirty: true,
-            projectFileId: lockedProjectFile.id,
-            contentHash: calculateContentHash(insert.text),
-            lastSyncedHash: null,
-          }))
-        );
-      }
-
-      // 5. Reindex non-prose rows that shifted due to inserts/deletes
-      const structuralReindexes = existingLines.filter((line) => {
-        if (
-          line.contentType === "DIALOGUE" ||
-          line.contentType === "NARRATION"
-        ) {
-          return false;
-        }
-        const newSequence = plan.sequenceByKey.get(line.id);
-        return newSequence !== undefined && newSequence !== line.sequence;
-      });
-      await Promise.all(
-        structuralReindexes.map((line) =>
-          tx
-            .update(labelLines)
-            .set({
-              sequence: plan.sequenceByKey.get(line.id)!,
-              projectFileId: lockedProjectFile.id,
-              isDirty: true,
-              lastSyncedHash: null,
-            })
-            .where(eq(labelLines.id, line.id))
-        )
-      );
-
-      // 6. Process menu blocks - update MENU lines' menuOptions
-      if (menuBlocks && menuBlocks.length > 0) {
-        for (const block of menuBlocks) {
-          const menuContentHash = calculateContentHash(
-            JSON.stringify(block.menuOptions)
-          );
-          const result = await tx
-            .update(labelLines)
-            .set({
-              menuOptions: block.menuOptions,
-              contentHash: menuContentHash,
-              isDirty: true,
-              lastSyncedHash: null,
-            })
-            .where(
-              and(
-                eq(labelLines.id, block.lineId),
-                eq(labelLines.labelId, labelId),
-                eq(labelLines.contentType, "MENU"),
-                isNull(labelLines.deletedAt)
-              )
-            );
-          if (result.rowCount === 0) {
-            throw new NotFoundError(
-              `Menu line ${block.lineId} not found in label ${labelId}`
-            );
-          }
-        }
-      }
-
-      // 7. Compute content hash from the actual persisted label_lines
-      // (includes MENU/JUMP rows preserved during prose edits) so the hash
-      // stays consistent with sync/import flows that use calculateLinesHash.
-      const finalLines = await tx
-        .select()
-        .from(labelLines)
-        .where(
-          and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt))
-        )
-        .orderBy(asc(labelLines.sequence));
-      const contentHash = calculateLinesHash(finalLines);
-
-      // 8. Update label with audit fields and sync status
-      const auditFields = updateAuditFields(lockedCurrentVersion, user.id);
-      await tx
-        .update(labels)
-        .set({
-          ...auditFields,
-          contentHash,
-          syncStatus: "MODIFIED_LOCAL",
-          updatedAt: new Date(),
-        })
-        .where(eq(labels.id, labelId));
-
-      const newContent = await reconstructFileForLabel(
-        lockedProjectFile.id,
-        tx
-      );
-      const newContentHash = calculateContentHash(newContent);
-      const fileUpdatedAt = new Date();
-
-      await tx
-        .update(projectFiles)
-        .set({
-          content: newContent,
-          contentHash: newContentHash,
-          updatedAt: fileUpdatedAt,
-        })
-        .where(eq(projectFiles.id, lockedProjectFile.id));
-
-      return {
-        conflictPayload: null,
-        nextVersion: (auditFields.version ?? lockedCurrentVersion) as number,
-        nextContentHash: contentHash,
-        nextFileContentHash: newContentHash,
-        fileUpdatedAt,
-      };
+    const result = await updateLabelDialogue({
+      labelId,
+      dialogue,
+      menuBlocks,
+      expectedVersion,
+      expectedContentHash,
+      userId: user.id,
     });
 
-    if (updateResult.conflictPayload) {
-      reply.status(409).send(updateResult.conflictPayload);
+    if (result.type === "conflict") {
+      reply.status(409).send(result);
       return;
     }
 
-    // Track word counts for daily writing goals
-    // This is non-critical: if tracking fails, the dialogue save is still successful
+    // Track word counts for daily writing goals (non-critical)
     try {
       await trackWordsForLabel({
         labelId,
@@ -525,34 +177,33 @@ async function updateLabelDialogueHandler(
         dialogue,
       });
     } catch (error) {
-      // Log the error but don't fail the request - the dialogue was already saved successfully
       request.log.error(
-        {
-          error,
-          userId: user.id,
-          labelId,
-        },
+        { error, userId: user.id, labelId },
         "Failed to track word count for daily writing goal"
       );
     }
 
     reply.send({
       success: true,
-      version: updateResult.nextVersion,
-      contentHash: updateResult.nextContentHash,
-      fileContentHash: updateResult.nextFileContentHash,
-      fileUpdatedAt: updateResult.fileUpdatedAt.toISOString(),
-    } as UpdateLabelDialogueResponse);
+      version: result.version,
+      contentHash: result.contentHash,
+      fileContentHash: result.fileContentHash,
+      fileUpdatedAt: result.fileUpdatedAt,
+    });
   } catch (error) {
     request.log.error(error);
-
-    // Handle known error types
     if (error instanceof NotFoundError) {
       reply.status(404).send({ error: "Project not found" } as ErrorResponse);
       return;
     }
     if (error instanceof ForbiddenError) {
       reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      return;
+    }
+    if (error instanceof ValidationError) {
+      reply
+        .status(400)
+        .send({ error: (error as Error).message } as ErrorResponse);
       return;
     }
     reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
@@ -654,25 +305,13 @@ async function deleteLabelHandler(
   try {
     await deleteLabel(labelId, user.id);
 
-    // Clean up labelWordCounts in userSettings when a label is deleted
-    // This prevents orphaned entries from accumulating over time
-    // This is non-critical: if cleanup fails, the delete is still successful
+    // Clean up labelWordCounts in userSettings after label deletion
+    // Non-critical: if cleanup fails, the delete is still successful
     try {
-      const db = getDb();
-      await db
-        .update(userSettings)
-        .set({
-          labelWordCounts: sql`COALESCE(label_word_counts, '{}'::jsonb) - ${labelId}`,
-        })
-        .where(eq(userSettings.userId, user.id));
+      await cleanupLabelWordCounts(labelId, user.id);
     } catch (error) {
-      // Log the error but don't fail the request - the label was already deleted successfully
       request.log.error(
-        {
-          error,
-          userId: user.id,
-          labelId,
-        },
+        { error, userId: user.id, labelId },
         "Failed to clean up labelWordCounts after label deletion"
       );
     }

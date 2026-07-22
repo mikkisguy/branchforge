@@ -54,10 +54,19 @@ export {
 } from "./queries.js";
 
 // CRUD
-export { createLabel, updateLabel, deleteLabel } from "./crud.js";
+export {
+  createLabel,
+  updateLabel,
+  deleteLabel,
+  cleanupLabelWordCounts,
+} from "./crud.js";
 
 // Reconstruction
 export { reconstructFileForLabel } from "./reconstruct.js";
+
+// Dialogue
+export { updateLabelDialogue } from "./dialogue.js";
+export type { UpdateLabelDialogueResult } from "./dialogue.js";
 
 // Incoming Jumps
 export { updateIncomingJumpsForLabels } from "./incoming-jumps.js";
