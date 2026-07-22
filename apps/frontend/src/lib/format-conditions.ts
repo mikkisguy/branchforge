@@ -5,8 +5,7 @@ import type {
 } from "@branchforge/shared";
 
 export type FormattedConditionPart =
-  | { type: "keyword"; text: string }
-  | { type: "value"; text: string };
+  { type: "keyword"; text: string } | { type: "value"; text: string };
 
 export function formatVariableCondition(
   varName: string,
