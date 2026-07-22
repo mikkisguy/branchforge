@@ -65,24 +65,21 @@ export async function uploadAvatar(
   let previousAvatarPath: string | undefined;
   if (character.avatarUrl) {
     previousAvatarPath = getAvatarFullPath(character.avatarUrl);
+    previousAvatarBackupPath = `${previousAvatarPath}.backup-${crypto.randomUUID()}`;
     try {
-      await fs.access(previousAvatarPath);
-      previousAvatarBackupPath = `${previousAvatarPath}.backup-${crypto.randomUUID()}`;
       await fs.copyFile(previousAvatarPath, previousAvatarBackupPath);
-    } catch (accessError) {
+    } catch (copyError) {
       if (
-        !(accessError instanceof Error && "code" in accessError) ||
-        accessError.code !== "ENOENT"
+        !(copyError instanceof Error && "code" in copyError) ||
+        copyError.code !== "ENOENT"
       ) {
         const message =
-          accessError instanceof Error
-            ? accessError.message
-            : String(accessError);
+          copyError instanceof Error ? copyError.message : String(copyError);
         throw new Error(`Failed to backup existing avatar file: ${message}`, {
-          cause: accessError,
+          cause: copyError,
         });
       }
-      // File doesn't exist — proceed without backup
+      // Source file doesn't exist — proceed without backup
     }
   }
 

@@ -370,5 +370,23 @@ describe("CharactersService.importCharacters", () => {
       expect(txArg).toHaveProperty("insert");
       expect(txArg).toHaveProperty("update");
     });
+
+    it("should propagate linker errors when linkToLines is true", async () => {
+      stubExistingCharacter();
+      mockSelect.mockImplementation((_table?: unknown) => {
+        return createSelectChain([{ id: "label-1" }]);
+      });
+      mockLinkSpeakersToLines.mockRejectedValueOnce(
+        new Error("Speaker linking failed")
+      );
+
+      await expect(
+        charactersService.importCharacters(
+          projectId,
+          userId,
+          buildInput({}, { linkToLines: true })
+        )
+      ).rejects.toThrow("Speaker linking failed");
+    });
   });
 });

@@ -392,63 +392,69 @@ export class CharactersService {
         existingCharacters.map((c) => [c.renpyTag, c])
       );
 
-      const createdCharacters = await Promise.all(
-        charactersToImport.map(async (charData) => {
-          const existing = existingByTag.get(charData.tag);
+      const createdCharacters: Array<{
+        id: string;
+        tag: string;
+        name: string;
+        displayName: string;
+      }> = [];
 
-          if (existing) {
-            // Update existing character — only set boolean flags when
-            // explicitly provided to avoid clobbering existing DB values
-            // during re-import of conflict characters.
-            const updates: Record<string, unknown> = {
-              name: charData.name ?? charData.tag,
-              displayName: charData.displayName,
-              color: charData.color,
-              routeAffiliation: charData.routeAffiliation,
-              updatedAt: new Date(),
-            };
-            if (charData.isLoveInterest !== undefined) {
-              updates.isLoveInterest = charData.isLoveInterest;
-            }
-            if (charData.isNarrator !== undefined) {
-              updates.isNarrator = charData.isNarrator;
-            }
-            await tx
-              .update(characters)
-              .set(updates)
-              .where(eq(characters.id, existing.id));
+      for (const charData of charactersToImport) {
+        const existing = existingByTag.get(charData.tag);
 
-            return {
-              id: existing.id,
-              tag: existing.renpyTag,
-              name: charData.name ?? charData.tag,
-              displayName: charData.displayName,
-            };
-          }
-
-          // Create new character
-          const [newChar] = await tx
-            .insert(characters)
-            .values({
-              projectId,
-              name: charData.name ?? charData.tag,
-              displayName: charData.displayName,
-              renpyTag: charData.tag,
-              color: charData.color,
-              routeAffiliation: charData.routeAffiliation,
-              isLoveInterest: charData.isLoveInterest ?? false,
-              isNarrator: charData.isNarrator ?? false,
-            })
-            .returning();
-
-          return {
-            id: newChar.id,
-            tag: newChar.renpyTag,
-            name: newChar.name,
-            displayName: newChar.displayName,
+        if (existing) {
+          // Update existing character — only set boolean flags when
+          // explicitly provided to avoid clobbering existing DB values
+          // during re-import of conflict characters.
+          const updates: Record<string, unknown> = {
+            name: charData.name ?? charData.tag,
+            displayName: charData.displayName,
+            color: charData.color,
+            routeAffiliation: charData.routeAffiliation,
+            updatedAt: new Date(),
           };
-        })
-      );
+          if (charData.isLoveInterest !== undefined) {
+            updates.isLoveInterest = charData.isLoveInterest;
+          }
+          if (charData.isNarrator !== undefined) {
+            updates.isNarrator = charData.isNarrator;
+          }
+          await tx
+            .update(characters)
+            .set(updates)
+            .where(eq(characters.id, existing.id));
+
+          createdCharacters.push({
+            id: existing.id,
+            tag: existing.renpyTag,
+            name: charData.name ?? charData.tag,
+            displayName: charData.displayName,
+          });
+          continue;
+        }
+
+        // Create new character
+        const [newChar] = await tx
+          .insert(characters)
+          .values({
+            projectId,
+            name: charData.name ?? charData.tag,
+            displayName: charData.displayName,
+            renpyTag: charData.tag,
+            color: charData.color,
+            routeAffiliation: charData.routeAffiliation,
+            isLoveInterest: charData.isLoveInterest ?? false,
+            isNarrator: charData.isNarrator ?? false,
+          })
+          .returning();
+
+        createdCharacters.push({
+          id: newChar.id,
+          tag: newChar.renpyTag,
+          name: newChar.name,
+          displayName: newChar.displayName,
+        });
+      }
 
       let linked = 0;
       let unmatched: string[] = [];
