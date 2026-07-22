@@ -14,9 +14,7 @@ import { getCsrfHeader } from "./csrf";
 // ============================================================================
 
 export type ConflictResolution =
-  | "branchforge_wins"
-  | "gitlab_wins"
-  | "manual_review";
+  "branchforge_wins" | "gitlab_wins" | "manual_review";
 
 export interface ValidateTokenResponse {
   valid: boolean;

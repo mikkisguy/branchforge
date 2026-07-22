@@ -79,8 +79,7 @@ interface UncontrolledSettingsProps extends LeftSidebarPropsBase {
 }
 
 export type LeftSidebarProps =
-  | ControlledSettingsProps
-  | UncontrolledSettingsProps;
+  ControlledSettingsProps | UncontrolledSettingsProps;
 
 type ModalKey =
   | "themeDropdown"

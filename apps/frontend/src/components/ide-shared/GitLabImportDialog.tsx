@@ -44,11 +44,7 @@ export interface GitLabImportDialogProps {
 }
 
 type ImportStateStatus =
-  | "idle"
-  | "selecting"
-  | "importing"
-  | "success"
-  | "error";
+  "idle" | "selecting" | "importing" | "success" | "error";
 
 interface ImportState {
   status: ImportStateStatus;

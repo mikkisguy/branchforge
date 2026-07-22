@@ -11,21 +11,22 @@
 > - `needs-triage` — not yet reviewed
 >
 > Key feature issues:
-> | Feature | Issue |
-> |---------|-------|
-> | Route Visualization / Flow View | #136 |
-> | Stat Management | #13 |
-> | Pair Groups | #23 |
-> | World Elements | #26 |
-> | AI Suggestions | #18 |
-> | Visual System Config | #25 |
-> | Zip Export | #11 |
-> | User Settings UI | #24 |
-> | Beta Reader Management | #56 |
-> | Project Update/Delete | #133 |
-> | Ren'Py Snippets | #134 |
-> | Ren'Py Definitions Import Wizard | #135 |
-> | Narrator Character Marking | #52 |
+>
+> | Feature                          | Issue |
+> | -------------------------------- | ----- |
+> | Route Visualization / Flow View  | #136  |
+> | Stat Management                  | #13   |
+> | Pair Groups                      | #23   |
+> | World Elements                   | #26   |
+> | AI Suggestions                   | #18   |
+> | Visual System Config             | #25   |
+> | Zip Export                       | #11   |
+> | User Settings UI                 | #24   |
+> | Beta Reader Management           | #56   |
+> | Project Update/Delete            | #133  |
+> | Ren'Py Snippets                  | #134  |
+> | Ren'Py Definitions Import Wizard | #135  |
+> | Narrator Character Marking       | #52   |
 >
 > Accessibility & responsiveness issues: #6–#10, #15–#21, #130
 >

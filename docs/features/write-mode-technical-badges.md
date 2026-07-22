@@ -181,7 +181,7 @@ pnpm --filter @branchforge/frontend test apps/frontend/src/components/write-mode
 | ---------- | ---- | ------------------- |
 | Conditions | ❓   | `BadgeQuestionMark` |
 | Jump       | ↗    | `ArrowUpRight`      |
-| Visuals    | 🖼   | `Image`             |
+| Visuals    | 🖼    | `Image`             |
 
 ### Data Flow
 

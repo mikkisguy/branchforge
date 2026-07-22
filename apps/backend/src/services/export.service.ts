@@ -185,13 +185,9 @@ export async function generateExport(
       title: label.title,
       labelName: label.labelName,
       conditions: label.conditions as
-        | LabelWithConditions["conditions"]
-        | undefined
-        | null,
+        LabelWithConditions["conditions"] | undefined | null,
       effects: label.effects as
-        | LabelWithConditions["effects"]
-        | undefined
-        | null,
+        LabelWithConditions["effects"] | undefined | null,
     });
     labelsByFileId.set(label.projectFileId, fileLabels);
   }

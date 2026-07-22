@@ -33,15 +33,7 @@ export type RenpyToken =
 
 /** Tags that have a matching close tag (`{/tag}`). */
 export type RenpyTag =
-  | "b"
-  | "i"
-  | "u"
-  | "s"
-  | "color"
-  | "size"
-  | "font"
-  | "alpha"
-  | "cps";
+  "b" | "i" | "u" | "s" | "color" | "size" | "font" | "alpha" | "cps";
 
 /** Tags that stand alone (no close form). */
 export type RenpySelfTag = "w" | "p" | "nw" | "fast" | "clear" | "done";
@@ -240,15 +232,13 @@ function findInterpolationClose(input: string, start: number): number {
       // Must have at least one char of name and not be empty `[]`.
       return j > start ? j : -1;
     }
-    if (
-      !(
-        (c >= "a" && c <= "z") ||
-        (c >= "A" && c <= "Z") ||
-        (c >= "0" && c <= "9") ||
-        c === "_" ||
-        c === "."
-      )
-    ) {
+    if (!(
+      (c >= "a" && c <= "z") ||
+      (c >= "A" && c <= "Z") ||
+      (c >= "0" && c <= "9") ||
+      c === "_" ||
+      c === "."
+    )) {
       return -1;
     }
   }
@@ -260,26 +250,22 @@ function isValidInterpolationName(name: string): boolean {
   // First char must be a letter or underscore (matches Python identifier rules
   // for what Ren'Py authors typically use).
   const first = name[0]!;
-  if (
-    !(
-      (first >= "a" && first <= "z") ||
-      (first >= "A" && first <= "Z") ||
-      first === "_"
-    )
-  ) {
+  if (!(
+    (first >= "a" && first <= "z") ||
+    (first >= "A" && first <= "Z") ||
+    first === "_"
+  )) {
     return false;
   }
   for (let k = 1; k < name.length; k++) {
     const c = name[k]!;
-    if (
-      !(
-        (c >= "a" && c <= "z") ||
-        (c >= "A" && c <= "Z") ||
-        (c >= "0" && c <= "9") ||
-        c === "_" ||
-        c === "."
-      )
-    ) {
+    if (!(
+      (c >= "a" && c <= "z") ||
+      (c >= "A" && c <= "Z") ||
+      (c >= "0" && c <= "9") ||
+      c === "_" ||
+      c === "."
+    )) {
       return false;
     }
   }
@@ -333,13 +319,11 @@ function isBareTagName(s: string): boolean {
   if (s.length === 0) return false;
   for (let k = 0; k < s.length; k++) {
     const c = s[k]!;
-    if (
-      !(
-        (c >= "a" && c <= "z") ||
-        (c >= "A" && c <= "Z") ||
-        (c >= "0" && c <= "9")
-      )
-    ) {
+    if (!(
+      (c >= "a" && c <= "z") ||
+      (c >= "A" && c <= "Z") ||
+      (c >= "0" && c <= "9")
+    )) {
       return false;
     }
   }

@@ -604,8 +604,7 @@ export interface ImportProjectFromZipFailure {
 }
 
 export type ImportProjectFromZipResult =
-  | ImportProjectFromZipSuccess
-  | ImportProjectFromZipFailure;
+  ImportProjectFromZipSuccess | ImportProjectFromZipFailure;
 
 /**
  * Create a new project from a zip file. Handles the full lifecycle:

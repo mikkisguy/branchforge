@@ -50,9 +50,7 @@ function toConfig(row: VisualSystem): VisualSystemConfigResult {
   // level; the application always writes a `Record<string, Record<string, string>>`
   // there (validated by the Zod schema), so the cast is safe.
   const groupPrefixes = row.groupPrefixes as
-    | Record<string, Record<string, string>>
-    | null
-    | undefined;
+    Record<string, Record<string, string>> | null | undefined;
   return {
     namingTemplate: row.namingTemplate,
     // Strip `null` → `undefined` so the wire shape matches the
