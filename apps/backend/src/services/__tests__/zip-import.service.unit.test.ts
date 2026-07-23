@@ -48,7 +48,10 @@ vi.mock("../rpy-parser.service.js", () => ({
 }));
 
 // Mock labels.service
-import { syncLabelsFromFile } from "../labels.service.js";
+import {
+  syncLabelsFromFile,
+  updateIncomingJumpsForLabels,
+} from "../labels.service.js";
 
 vi.mock("../labels.service.js", () => ({
   syncLabelsFromFile: vi.fn().mockResolvedValue({
@@ -60,6 +63,7 @@ vi.mock("../labels.service.js", () => ({
     errors: [],
     skipped: false,
     affectedLabelIds: [],
+    dbLabelCount: 1,
   }),
   updateIncomingJumpsForLabels: vi.fn().mockResolvedValue(undefined),
 }));
@@ -337,6 +341,7 @@ describe("ZipImportService", () => {
         errors: [{ label: "start", error: "Failed to process label" }],
         skipped: false,
         affectedLabelIds: [],
+        dbLabelCount: 0,
       });
 
       const result = await importZipFile(mockProjectId, mockBuffer);
@@ -649,6 +654,102 @@ describe("ZipImportService", () => {
       expect(result).toHaveProperty("labelsCreated");
       expect(result).toHaveProperty("filesSkipped");
       expect(result).toHaveProperty("filesUpdated");
+    });
+
+    it("does NOT promote symbols when the per-file savepoint rolls back", async () => {
+      // Two files: the first will fail label sync (triggering a
+      // savepoint rollback), the second will succeed. Symbols from
+      // the failed file must not appear in the promoteSymbols calls.
+      const file1Content = [
+        'define e = Character("Eileen", color="#c8ffc8")',
+        "",
+        "label start:",
+        '    e "Hello."',
+        "    return",
+      ].join("\n");
+
+      const file2Content = [
+        'define s = Character("Sylvie", color="#ff0000")',
+        "",
+        "label start:",
+        '    s "Hi."',
+        "    return",
+      ].join("\n");
+
+      const mockBuffer = Buffer.from("mock zip");
+      const mockZip = {
+        files: {
+          "game/fail.rpy": createMockFile("game/fail.rpy", file1Content),
+          "game/ok.rpy": createMockFile("game/ok.rpy", file2Content),
+        },
+      };
+      vi.mocked(JSZip.loadAsync).mockResolvedValue(mockZip as any);
+
+      // Make label sync throw for the first file only.
+      vi.mocked(syncLabelsFromFile)
+        .mockRejectedValueOnce(new Error("Label sync failed"))
+        .mockResolvedValueOnce({
+          success: true,
+          labelsCreated: 1,
+          labelsUpdated: 0,
+          labelsDeleted: 0,
+          linesProcessed: 1,
+          errors: [],
+          skipped: false,
+          affectedLabelIds: ["label-id"],
+          dbLabelCount: 1,
+        });
+
+      const result = await importZipFile(mockProjectId, mockBuffer);
+
+      expect(result).toMatchObject({
+        success: true,
+        filesFailed: 1,
+        filesImported: 1,
+      });
+
+      // Collect all rows passed to tx.values() — these include both
+      // the project_file inserts and the symbol-promotion inserts.
+      const allRows = mockTx.values.mock.calls.map(
+        (c) => c[0] as Record<string, unknown>
+      );
+      const characterRows = allRows.filter((r) => "renpyTag" in r);
+
+      // Eileen's character (from the failed file) must NOT be promoted.
+      const eileenRow = characterRows.find((r) => r.renpyTag === "e");
+      expect(eileenRow).toBeUndefined();
+
+      // Sylvie's character (from the succeeding file) MUST be promoted.
+      const sylvieRow = characterRows.find((r) => r.renpyTag === "s");
+      expect(sylvieRow).toMatchObject({
+        projectId: mockProjectId,
+        renpyTag: "s",
+        name: "Sylvie",
+        displayName: "Sylvie",
+        color: "#ff0000",
+      });
+    });
+
+    it("calls updateIncomingJumpsForLabels with the transaction object", async () => {
+      const mockContent = 'label start:\n    "Hello"';
+      const mockBuffer = Buffer.from("mock zip");
+      const mockZip = {
+        files: {
+          "game/script.rpy": createMockFile("game/script.rpy", mockContent),
+        },
+      };
+      vi.mocked(JSZip.loadAsync).mockResolvedValue(mockZip as any);
+
+      await importZipFile(mockProjectId, mockBuffer);
+
+      // updateIncomingJumpsForLabels must be called with the same
+      // transaction (tx) that the file inserts and symbol promotion
+      // ran in — not via a separate db.transaction call.
+      expect(vi.mocked(updateIncomingJumpsForLabels)).toHaveBeenCalledWith(
+        mockTx,
+        expect.any(Array),
+        mockProjectId
+      );
     });
   });
 });
