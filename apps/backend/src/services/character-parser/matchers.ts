@@ -133,7 +133,7 @@ export function tryMultiLineStart(
     rawName,
     nameForm,
     nameResolved,
-    color: normalizeColor(color),
+    color: color,
     isMultiLine: true,
   };
 }

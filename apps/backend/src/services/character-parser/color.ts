@@ -30,7 +30,7 @@ export function extractColor(options: string | undefined): string | undefined {
   if (!options) return undefined;
   const whoColorMatch = options.match(/who_color\s*=\s*["']?([^"')\s]+)/);
   if (whoColorMatch) return whoColorMatch[1];
-  const colorMatch = options.match(/color\s*=\s*["']?([^"')\s]+)/);
+  const colorMatch = options.match(/\bcolor\s*=\s*["']?([^"')\s]+)/);
   if (colorMatch) return colorMatch[1];
   return undefined;
 }
