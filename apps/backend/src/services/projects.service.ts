@@ -22,6 +22,7 @@ import type {
 } from "@branchforge/shared";
 import {
   NotFoundError,
+  ForbiddenError,
   ValidationError,
   ConflictError,
 } from "../middleware/error-handler.middleware.js";
@@ -489,7 +490,7 @@ async function validateFileAccess(
   const [fileWithProject] = await db
     .select({
       file: projectFiles,
-      projectId: projects.id,
+      projectOwnerId: projects.userId,
     })
     .from(projectFiles)
     .innerJoin(projects, eq(projectFiles.projectId, projects.id))
@@ -500,8 +501,9 @@ async function validateFileAccess(
     throw new NotFoundError("File");
   }
 
-  // Verify user owns the project
-  await requireProjectOwnership(fileWithProject.projectId, userId);
+  if (fileWithProject.projectOwnerId !== userId) {
+    throw new ForbiddenError("You do not have access to this project");
+  }
 
   return fileWithProject.file;
 }
@@ -512,6 +514,7 @@ async function validateFileAccess(
  */
 async function applyFileUpdate(
   fileId: string,
+  userId: string,
   content: string,
   expectedContentHash: string | undefined,
   file: typeof projectFiles.$inferSelect,
@@ -526,13 +529,15 @@ async function applyFileUpdate(
   const newContentHash = calculateContentHash(content);
 
   const result = await db.transaction(async (tx) => {
+    // Defensive ownership verification at write time (TOCTOU safety net)
     const [lockedFile] = await tx
       .select({
         contentHash: projectFiles.contentHash,
         updatedAt: projectFiles.updatedAt,
       })
       .from(projectFiles)
-      .where(eq(projectFiles.id, fileId))
+      .innerJoin(projects, eq(projectFiles.projectId, projects.id))
+      .where(and(eq(projectFiles.id, fileId), eq(projects.userId, userId)))
       .for("update")
       .limit(1);
 
@@ -659,6 +664,7 @@ export async function updateFileContent(
   const { newContentHash, fileUpdatedAt, syncResultForFile, deletedCount } =
     await applyFileUpdate(
       fileId,
+      userId,
       content,
       expectedContentHash,
       file,
