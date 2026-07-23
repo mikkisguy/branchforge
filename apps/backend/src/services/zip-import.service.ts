@@ -589,53 +589,62 @@ async function promoteSymbols(
   const allCharacters = Array.from(charactersByTag.values());
   const allVariables = Array.from(variablesByKey.values());
   const allStats = Array.from(statsByKey.values());
-  if (
-    allCharacters.length > 0 ||
-    allVariables.length > 0 ||
-    allStats.length > 0
-  ) {
-    for (const c of allCharacters) {
-      await tx
-        .insert(characters)
-        .values({
+  // Batch-insert each collection in a single round-trip per table.
+  // `onConflictDoNothing` preserves existing rows and user edits on
+  // re-import.
+  if (allCharacters.length > 0) {
+    await tx
+      .insert(characters)
+      .values(
+        allCharacters.map((c) => ({
           projectId,
           name: c.name ?? c.tag,
           displayName: c.name ?? c.tag,
           renpyTag: c.tag,
           color: c.color || "#cfcfcf",
           updatedAt: new Date(),
-        })
-        .onConflictDoNothing({
-          target: [characters.projectId, characters.renpyTag],
-        });
-    }
-    for (const v of allVariables) {
-      await tx
-        .insert(variables)
-        .values({
+        }))
+      )
+      .onConflictDoNothing({
+        target: [characters.projectId, characters.renpyTag],
+      });
+  }
+  if (allVariables.length > 0) {
+    await tx
+      .insert(variables)
+      .values(
+        allVariables.map((v) => ({
           projectId,
           key: v.key,
+        }))
+      )
+      .onConflictDoNothing({
+        target: [variables.projectId, variables.key],
+      });
+  }
+  if (allStats.length > 0) {
+    await tx
+      .insert(stats)
+      .values(
+        allStats.map((s) => {
+          // Clamp parsed value to the valid [0, 100] range so a
+          // `default some_stat = 999` line produces minValue=100
+          // rather than silently exceeding the hard-coded maxValue.
+          const parsed = Math.round(Number.parseFloat(s.value)) || 0;
+          const minValue = Math.max(0, Math.min(parsed, 100));
+          return {
+            projectId,
+            key: s.key,
+            name: s.key,
+            minValue,
+            maxValue: 100,
+            updatedAt: new Date(),
+          };
         })
-        .onConflictDoNothing({
-          target: [variables.projectId, variables.key],
-        });
-    }
-    for (const s of allStats) {
-      const minValue = Math.round(Number.parseFloat(s.value)) || 0;
-      await tx
-        .insert(stats)
-        .values({
-          projectId,
-          key: s.key,
-          name: s.key,
-          minValue,
-          maxValue: 100,
-          updatedAt: new Date(),
-        })
-        .onConflictDoNothing({
-          target: [stats.projectId, stats.key],
-        });
-    }
+      )
+      .onConflictDoNothing({
+        target: [stats.projectId, stats.key],
+      });
   }
 }
 

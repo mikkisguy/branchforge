@@ -571,8 +571,10 @@ describe("ZipImportService", () => {
       // promotion transaction. The mock chain is shared by both
       // transactions (they both run via the same `mockTx`), so this
       // captures inserts into all relevant tables.
-      const allRows = mockTx.values.mock.calls.map(
-        (c) => c[0] as Record<string, unknown>
+      // Batch inserts pass arrays to values(); flatten to inspect rows.
+      const allRows = mockTx.values.mock.calls.flatMap(
+        (c) =>
+          (Array.isArray(c[0]) ? c[0] : [c[0]]) as Record<string, unknown>[]
       );
 
       // The character row was inserted with the right tag and color.
@@ -606,6 +608,41 @@ describe("ZipImportService", () => {
       // The `onConflictDoNothing` upsert path was used for all three
       // symbol inserts.
       expect(mockTx.onConflictDoNothing).toHaveBeenCalled();
+    });
+
+    it("clamps stat default values above 100 to maxValue", async () => {
+      // `default overachiever = 999` should produce minValue=100
+      // rather than 999 which would exceed the hard-coded maxValue.
+      const fileContent = [
+        "default overachiever = 999",
+        "",
+        "label start:",
+        "    return",
+      ].join("\n");
+
+      const mockBuffer = Buffer.from("mock zip");
+      const mockZip = {
+        files: {
+          "game/script.rpy": createMockFile("game/script.rpy", fileContent),
+        },
+      };
+      vi.mocked(JSZip.loadAsync).mockResolvedValue(mockZip as any);
+
+      const result = await importZipFile(mockProjectId, mockBuffer);
+      expect(result.success).toBe(true);
+
+      const allRows = mockTx.values.mock.calls.flatMap(
+        (c) =>
+          (Array.isArray(c[0]) ? c[0] : [c[0]]) as Record<string, unknown>[]
+      );
+      const statRow = allRows.find((r) => "minValue" in r && "maxValue" in r);
+      expect(statRow).toBeDefined();
+      expect(statRow).toMatchObject({
+        projectId: mockProjectId,
+        key: "overachiever",
+        minValue: 100,
+        maxValue: 100,
+      });
     });
 
     it("is idempotent: re-importing the same RPY files does not duplicate symbols", async () => {
@@ -710,8 +747,10 @@ describe("ZipImportService", () => {
 
       // Collect all rows passed to tx.values() — these include both
       // the project_file inserts and the symbol-promotion inserts.
-      const allRows = mockTx.values.mock.calls.map(
-        (c) => c[0] as Record<string, unknown>
+      // Batch inserts pass arrays to values(); flatten to inspect rows.
+      const allRows = mockTx.values.mock.calls.flatMap(
+        (c) =>
+          (Array.isArray(c[0]) ? c[0] : [c[0]]) as Record<string, unknown>[]
       );
       const characterRows = allRows.filter((r) => "renpyTag" in r);
 
