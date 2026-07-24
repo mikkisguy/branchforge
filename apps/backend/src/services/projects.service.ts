@@ -22,6 +22,7 @@ import type {
 } from "@branchforge/shared";
 import {
   NotFoundError,
+  ForbiddenError,
   ValidationError,
   ConflictError,
 } from "../middleware/error-handler.middleware.js";
@@ -137,6 +138,18 @@ export type UpdateFileContentResult = {
 };
 
 /**
+ * Internal type for grouping labels by project file.
+ * Used by getProjectFiles to attach labels to their files.
+ */
+type LabelForGrouping = {
+  id: string;
+  labelName: string | null;
+  title: string;
+  status: string | null;
+  projectFileId: string;
+};
+
+/**
  * List all projects for a user
  * @param userId - The user ID to fetch projects for
  * @returns Array of public projects
@@ -144,45 +157,46 @@ export type UpdateFileContentResult = {
 export async function listProjects(userId: string): Promise<PublicProject[]> {
   const db = getDb();
 
-  // Get projects owned by the user (visibility will be set to 'OWNER')
-  const userProjects = await db
-    .select()
-    .from(projects)
-    .where(eq(projects.userId, userId))
-    .orderBy(projects.createdAt);
-
-  // Get projects shared with the user via project_users junction table
-  // Include the user's role from the junction table
-  const sharedProjectsResult = (await db
-    .select({
-      id: projects.id,
-      name: projects.name,
-      description: projects.description,
-      maxStatDelta: projects.maxStatDelta,
-      duoEndingEnabled: projects.duoEndingEnabled,
-      source: projects.source,
-      role: projectUsers.role, // User's role from project_users
-      createdAt: projects.createdAt,
-      updatedAt: projects.updatedAt,
-    })
-    .from(projects)
-    .innerJoin(projectUsers, eq(projectUsers.projectId, projects.id))
-    .where(eq(projectUsers.userId, userId))
-    .orderBy(projects.createdAt)) as SharedProjectRow[];
+  // Run owned and shared queries in parallel
+  const [userProjects, sharedProjectsResult] = await Promise.all([
+    db
+      .select()
+      .from(projects)
+      .where(eq(projects.userId, userId))
+      .orderBy(projects.createdAt),
+    db
+      .select({
+        id: projects.id,
+        name: projects.name,
+        description: projects.description,
+        maxStatDelta: projects.maxStatDelta,
+        duoEndingEnabled: projects.duoEndingEnabled,
+        source: projects.source,
+        role: projectUsers.role,
+        createdAt: projects.createdAt,
+        updatedAt: projects.updatedAt,
+      })
+      .from(projects)
+      .innerJoin(projectUsers, eq(projectUsers.projectId, projects.id))
+      .where(eq(projectUsers.userId, userId))
+      .orderBy(projects.createdAt) as Promise<SharedProjectRow[]>,
+  ]);
 
   // Combine both lists, removing duplicates
   // Owned projects take priority over shared projects
   const result: PublicProject[] = [];
+  const ownedIds = new Set<string>();
 
   // First add owned projects with 'OWNER' visibility
   for (const project of userProjects) {
     result.push(toPublicProject(project, "OWNER"));
+    ownedIds.add(project.id);
   }
 
   // Then add shared projects (only if not already added as owned)
   // Use the user's role from project_users as visibility
   for (const shared of sharedProjectsResult) {
-    if (!result.find((p) => p.id === shared.id)) {
+    if (!ownedIds.has(shared.id)) {
       // Runtime guard: role should always be present due to inner join
       if (shared.role == null) {
         throw new Error(
@@ -208,43 +222,43 @@ export async function getProject(
 ): Promise<PublicProject | null> {
   const db = getDb();
 
-  // Check if user is the owner
-  const ownerProject = await db
-    .select({
-      id: projects.id,
-      name: projects.name,
-      description: projects.description,
-      maxStatDelta: projects.maxStatDelta,
-      duoEndingEnabled: projects.duoEndingEnabled,
-      source: projects.source,
-      createdAt: projects.createdAt,
-      updatedAt: projects.updatedAt,
-    })
-    .from(projects)
-    .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
-    .limit(1);
+  // Run owner and shared access checks in parallel
+  const [ownerProject, sharedProject] = await Promise.all([
+    db
+      .select({
+        id: projects.id,
+        name: projects.name,
+        description: projects.description,
+        maxStatDelta: projects.maxStatDelta,
+        duoEndingEnabled: projects.duoEndingEnabled,
+        source: projects.source,
+        createdAt: projects.createdAt,
+        updatedAt: projects.updatedAt,
+      })
+      .from(projects)
+      .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
+      .limit(1),
+    db
+      .select({
+        id: projects.id,
+        name: projects.name,
+        description: projects.description,
+        maxStatDelta: projects.maxStatDelta,
+        duoEndingEnabled: projects.duoEndingEnabled,
+        source: projects.source,
+        role: projectUsers.role,
+        createdAt: projects.createdAt,
+        updatedAt: projects.updatedAt,
+      })
+      .from(projects)
+      .innerJoin(projectUsers, eq(projectUsers.projectId, projects.id))
+      .where(and(eq(projects.id, projectId), eq(projectUsers.userId, userId)))
+      .limit(1),
+  ]);
 
   if (ownerProject.length > 0) {
     return toPublicProject(ownerProject[0]!, "OWNER");
   }
-
-  // Check if user has access via project_users
-  const sharedProject = await db
-    .select({
-      id: projects.id,
-      name: projects.name,
-      description: projects.description,
-      maxStatDelta: projects.maxStatDelta,
-      duoEndingEnabled: projects.duoEndingEnabled,
-      source: projects.source,
-      role: projectUsers.role,
-      createdAt: projects.createdAt,
-      updatedAt: projects.updatedAt,
-    })
-    .from(projects)
-    .innerJoin(projectUsers, eq(projectUsers.projectId, projects.id))
-    .where(and(eq(projects.id, projectId), eq(projectUsers.userId, userId)))
-    .limit(1);
 
   if (sharedProject.length > 0) {
     const project = sharedProject[0]!;
@@ -254,12 +268,6 @@ export async function getProject(
   return null;
 }
 
-/**
- * Create a new project
- * @param userId - The user ID creating the project
- * @param body - The project data
- * @returns The created project
- */
 /**
  * Create a new project (internal helper).
  *
@@ -328,6 +336,9 @@ export async function updateProject(
 ): Promise<PublicProject> {
   const db = getDb();
 
+  // Verify user owns the project (shared users cannot update)
+  await requireProjectOwnership(projectId, userId);
+
   const updateData: {
     name?: string;
     description?: string | null;
@@ -350,6 +361,7 @@ export async function updateProject(
   const result = await db
     .update(projects)
     .set(updateData)
+    // userId filter is a defensive safety net in addition to requireProjectOwnership above
     .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
     .returning();
 
@@ -433,15 +445,6 @@ export async function getProjectFiles(
   // Get labels that are associated with these files
   const fileIds = files.map((f) => f.id);
 
-  // Internal type for grouping - includes projectFileId for lookup
-  type LabelForGrouping = {
-    id: string;
-    labelName: string | null;
-    title: string;
-    status: string | null;
-    projectFileId: string;
-  };
-
   const allLabels: LabelForGrouping[] = await db
     .select({
       id: labels.id,
@@ -475,34 +478,19 @@ export async function getProjectFiles(
 }
 
 /**
- * Update file content and sync labels from the updated content.
- *
- * This is the unified service for both Script Mode and Write Mode editing.
- * It verifies project ownership, parses the RPY content, updates the file
- * in a transaction, and syncs labels.
- *
- * @param fileId - The file ID to update
- * @param userId - The user ID making the request (for authorization)
- * @param content - The new file content
- * @param expectedContentHash - Optional hash for optimistic concurrency control
- * @returns A discriminated union: success with contentHash/updatedAt/syncResult, or conflict
- * @throws NotFoundError if the file or project doesn't exist
- * @throws ForbiddenError if the user lacks project ownership
- * @throws ValidationError if the RPY content is invalid
+ * Validate that a file exists and the user owns its project.
+ * Returns the file row for use by subsequent operations.
  */
-export async function updateFileContent(
+async function validateFileAccess(
   fileId: string,
-  userId: string,
-  content: string,
-  expectedContentHash?: string
-): Promise<UpdateFileContentResult> {
+  userId: string
+): Promise<typeof projectFiles.$inferSelect> {
   const db = getDb();
 
-  // Get the file with project information for ownership verification
   const [fileWithProject] = await db
     .select({
       file: projectFiles,
-      projectId: projects.id,
+      projectOwnerId: projects.userId,
     })
     .from(projectFiles)
     .innerJoin(projects, eq(projectFiles.projectId, projects.id))
@@ -513,33 +501,43 @@ export async function updateFileContent(
     throw new NotFoundError("File");
   }
 
-  // Verify user owns the project
-  await requireProjectOwnership(fileWithProject.projectId, userId);
-
-  const { file } = fileWithProject;
-
-  // Re-evaluate file type from the latest content so files can transition
-  // from SETTINGS -> STORY when labels are added in Script Mode.
-  let nextFileType: typeof file.fileType;
-  try {
-    const parsed = parseRPYFileWithLabels(content, file.filePath);
-    nextFileType = parsed.fileType;
-  } catch (err) {
-    throw new ValidationError("Invalid RPY file content", err);
+  if (fileWithProject.projectOwnerId !== userId) {
+    throw new ForbiddenError("You do not have access to this project");
   }
 
-  // Calculate new content hash
+  return fileWithProject.file;
+}
+
+/**
+ * Apply a file content update within a database transaction.
+ * Handles optimistic concurrency, file update, label sync, and file-type transitions.
+ */
+async function applyFileUpdate(
+  fileId: string,
+  userId: string,
+  content: string,
+  expectedContentHash: string | undefined,
+  file: typeof projectFiles.$inferSelect,
+  fileType: typeof file.fileType
+): Promise<{
+  newContentHash: string;
+  fileUpdatedAt: Date;
+  syncResultForFile: SyncLabelsResult | undefined;
+  deletedCount: number;
+}> {
+  const db = getDb();
   const newContentHash = calculateContentHash(content);
 
-  // Update file content and sync labels in a single transaction for atomicity
-  const syncResult = await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
+    // Defensive ownership verification at write time (TOCTOU safety net)
     const [lockedFile] = await tx
       .select({
         contentHash: projectFiles.contentHash,
         updatedAt: projectFiles.updatedAt,
       })
       .from(projectFiles)
-      .where(eq(projectFiles.id, fileId))
+      .innerJoin(projects, eq(projectFiles.projectId, projects.id))
+      .where(and(eq(projectFiles.id, fileId), eq(projects.userId, userId)))
       .for("update")
       .limit(1);
 
@@ -567,7 +565,7 @@ export async function updateFileContent(
       .update(projectFiles)
       .set({
         content,
-        fileType: nextFileType,
+        fileType,
         contentHash: newContentHash,
         updatedAt: fileUpdatedAt,
       })
@@ -575,10 +573,10 @@ export async function updateFileContent(
 
     // Sync labels from updated content (only for STORY files)
     const syncResultForFile =
-      nextFileType === "STORY"
+      fileType === "STORY"
         ? await syncLabelsFromFile(
             file.projectId,
-            { filePath: file.filePath, fileType: nextFileType },
+            { filePath: file.filePath, fileType },
             content,
             fileId,
             { skipCleanup: false, tx }
@@ -588,8 +586,7 @@ export async function updateFileContent(
     // When file type transitions away from STORY, soft-delete existing labels
     let deletedCount = 0;
 
-    if (nextFileType !== "STORY") {
-      // Find all non-deleted label IDs for this file
+    if (fileType !== "STORY") {
       const fileLabelIds = await tx
         .select({ id: labels.id })
         .from(labels)
@@ -601,7 +598,6 @@ export async function updateFileContent(
         const ids = fileLabelIds.map((l) => l.id);
         const deletedAt = new Date();
 
-        // Soft delete label lines
         await tx
           .update(labelLines)
           .set({ deletedAt })
@@ -609,7 +605,6 @@ export async function updateFileContent(
             and(inArray(labelLines.labelId, ids), isNull(labelLines.deletedAt))
           );
 
-        // Soft delete labels
         await tx
           .update(labels)
           .set({ deletedAt })
@@ -625,17 +620,67 @@ export async function updateFileContent(
   });
 
   return {
+    newContentHash,
+    ...result,
+  };
+}
+
+/**
+ * Update file content and sync labels from the updated content.
+ *
+ * This is the unified service for both Script Mode and Write Mode editing.
+ * It verifies project ownership, parses the RPY content, updates the file
+ * in a transaction, and syncs labels.
+ *
+ * @param fileId - The file ID to update
+ * @param userId - The user ID making the request (for authorization)
+ * @param content - The new file content
+ * @param expectedContentHash - Optional hash for optimistic concurrency control
+ * @returns Result with contentHash, updatedAt, and sync summary
+ * @throws NotFoundError if the file or project doesn't exist
+ * @throws ForbiddenError if the user lacks project ownership
+ * @throws ValidationError if the RPY content is invalid
+ * @throws ConflictError if the content hash doesn't match (optimistic concurrency)
+ */
+export async function updateFileContent(
+  fileId: string,
+  userId: string,
+  content: string,
+  expectedContentHash?: string
+): Promise<UpdateFileContentResult> {
+  // Phase 1: Validate file access and project ownership
+  const file = await validateFileAccess(fileId, userId);
+
+  // Phase 2: Determine file type from content
+  let nextFileType: typeof file.fileType;
+  try {
+    const parsed = parseRPYFileWithLabels(content, file.filePath);
+    nextFileType = parsed.fileType;
+  } catch (err) {
+    throw new ValidationError("Invalid RPY file content", err);
+  }
+
+  // Phase 3: Apply the update in a transaction
+  const { newContentHash, fileUpdatedAt, syncResultForFile, deletedCount } =
+    await applyFileUpdate(
+      fileId,
+      userId,
+      content,
+      expectedContentHash,
+      file,
+      nextFileType
+    );
+
+  return {
     success: true,
     contentHash: newContentHash,
-    updatedAt: syncResult.fileUpdatedAt.toISOString(),
+    updatedAt: fileUpdatedAt.toISOString(),
     syncResult: {
-      labelsCreated: syncResult.syncResultForFile?.labelsCreated ?? 0,
-      labelsUpdated: syncResult.syncResultForFile?.labelsUpdated ?? 0,
-      labelsDeleted:
-        (syncResult.syncResultForFile?.labelsDeleted ?? 0) +
-        syncResult.deletedCount,
-      linesProcessed: syncResult.syncResultForFile?.linesProcessed ?? 0,
-      errors: syncResult.syncResultForFile?.errors ?? [],
+      labelsCreated: syncResultForFile?.labelsCreated ?? 0,
+      labelsUpdated: syncResultForFile?.labelsUpdated ?? 0,
+      labelsDeleted: (syncResultForFile?.labelsDeleted ?? 0) + deletedCount,
+      linesProcessed: syncResultForFile?.linesProcessed ?? 0,
+      errors: syncResultForFile?.errors ?? [],
     },
   };
 }

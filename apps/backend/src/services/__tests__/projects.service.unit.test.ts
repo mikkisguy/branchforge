@@ -239,6 +239,7 @@ describe("ProjectsService", () => {
 
     beforeEach(() => {
       mockUpdate.mockReturnValue(updateChain);
+      mockSelect.mockImplementation(createEmptyMockChain);
     });
 
     it("should update project name and description successfully", async () => {
@@ -279,6 +280,8 @@ describe("ProjectsService", () => {
         name: "New Name",
       };
 
+      mockSelect.mockImplementation(() => createMockChain([{ userId }]));
+
       updateChain.set.mockReturnValue({
         where: vi.fn(() => ({
           returning: vi.fn(() => Promise.resolve([updatedProject])),
@@ -295,6 +298,8 @@ describe("ProjectsService", () => {
         name: "Updated Project",
       };
 
+      mockSelect.mockImplementation(() => createMockChain([{ userId }]));
+
       updateChain.set.mockReturnValue({
         where: vi.fn(() => ({
           returning: vi.fn(() => Promise.resolve([])),
@@ -306,11 +311,15 @@ describe("ProjectsService", () => {
       );
     });
 
-    it("should throw NotFoundError when user is not the owner", async () => {
+    it("should throw ForbiddenError when user is not the owner", async () => {
       const otherUserId = "other-user-456";
       const body: UpdateProjectBody = {
         name: "Updated Project",
       };
+
+      mockSelect.mockImplementation(() =>
+        createMockChain([{ userId: "owner-456" }])
+      );
 
       updateChain.set.mockReturnValue({
         where: vi.fn(() => ({
@@ -319,7 +328,7 @@ describe("ProjectsService", () => {
       });
 
       await expect(updateProject(otherUserId, projectId, body)).rejects.toThrow(
-        "Project not found"
+        "You do not have access to this project"
       );
     });
   });
