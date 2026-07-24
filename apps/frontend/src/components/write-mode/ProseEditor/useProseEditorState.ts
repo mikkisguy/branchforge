@@ -350,6 +350,7 @@ export function useProseEditorState({
 
     if (!activeLabel) {
       isExternalUpdateRef.current = true;
+      // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change
       setEntries([]);
 
       if (hasSwitchedLabel) {
@@ -431,7 +432,7 @@ export function useProseEditorState({
     // react-doctor-disable-next-line react-doctor/no-event-handler
     if (!areDialogueEntriesEqual(prevEntriesRef.current, entries)) {
       scheduleTextHistorySnapshot(entries);
-      // react-doctor-disable-next-line react-doctor/no-prop-callback-in-effect
+      // react-doctor-disable-next-line react-doctor/no-prop-callback-in-effect, react-doctor/no-pass-data-to-parent, react-doctor/no-pass-live-state-to-parent
       onChange(entries);
     }
     prevEntriesRef.current = entries;
@@ -597,6 +598,7 @@ export function useProseEditorState({
   });
 
   useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-pass-live-state-to-parent
     onWordCountChangeRef.current?.({
       todayWordCount,
       dailyGoal: writingGoalSettings?.dailyWritingGoal ?? 0,

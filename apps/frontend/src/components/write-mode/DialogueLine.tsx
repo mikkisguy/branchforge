@@ -170,22 +170,24 @@ export const DialogueLine = memo(function DialogueLine({
   );
 
   const handleSpeakerToggle = useCallback(() => {
-    setIsDropdownOpen((prev) => {
-      if (prev) {
-        setFocusedOptionIndex(-1);
-        return false;
-      }
+    setIsDropdownOpen((prev) => !prev);
+  }, []);
+
+  useEffect(() => {
+    if (isDropdownOpen) {
       setOpenUpward(getShouldOpenUpward(estimateDropdownHeight()));
       setFocusedOptionIndex(
         entry.speakerId
           ? characters.findIndex((c) => c.id === entry.speakerId) + 1
           : 0
       );
-      return true;
-    });
+    } else {
+      setFocusedOptionIndex(-1);
+    }
   }, [
-    estimateDropdownHeight,
+    isDropdownOpen,
     getShouldOpenUpward,
+    estimateDropdownHeight,
     entry.speakerId,
     characters,
   ]);

@@ -55,7 +55,7 @@ export function ProseEditorEmpty({
         <button
           type="button"
           onClick={onCreateFirstEntry}
-          className="group px-6 py-3 rounded-lg bg-[var(--theme-color)] text-white hover:bg-[var(--theme-color-hover)] transition-all duration-200 hover:shadow-lg hover:shadow-[var(--theme-color)]/20 focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)] focus:ring-offset-2 focus:ring-offset-background"
+          className="group px-6 py-3 rounded-lg bg-[var(--theme-color)] text-white hover:bg-[var(--theme-color-hover)] transition-colors transition-shadow duration-200 hover:shadow-lg hover:shadow-[var(--theme-color)]/20 focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)] focus:ring-offset-2 focus:ring-offset-background"
         >
           <span className="flex items-center gap-2">
             <PenLine className="size-4 group-hover:scale-110 transition-transform duration-200" />

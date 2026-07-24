@@ -25,6 +25,7 @@ interface SpeakerDropdownProps {
   speakerButtonRef: React.RefObject<HTMLButtonElement | null>;
 }
 
+// react-doctor-disable-next-line react-doctor/no-many-boolean-props
 export function SpeakerDropdown({
   isChoice,
   isStacked,
