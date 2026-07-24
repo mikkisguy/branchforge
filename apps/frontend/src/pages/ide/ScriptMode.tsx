@@ -1,26 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { StatusBar } from "@/components/script-mode";
-import { GitLabSyncDialog } from "@/components/script-mode/GitLabSyncDialog";
-import { ZipImportFilesDialog } from "@/components/ide-shared/ZipImportFilesDialog";
-import { useLabels } from "@/hooks/useLabels";
-import { useFocusModeKeyboardHandler } from "@/hooks/useFocusModeKeyboardHandler";
-import { useFocusModeState } from "@/hooks/useFocusModeState";
-import { useGitLab } from "@/hooks/useGitLab";
-import { useCharacters } from "@/hooks/useCharacters";
-import { useProjectFiles } from "@/hooks/useProjectFiles";
-import { useFileEditor } from "@/hooks/useFileEditor";
-import { useFileTabs } from "@/hooks/useFileTabs";
-import { useLabelFileSync } from "@/hooks/useLabelFileSync";
-import { useProjectReset } from "@/hooks/useProjectReset";
-import { useScriptModeRefresh } from "@/hooks/useScriptModeRefresh";
-import { useToast } from "@/contexts/ToastContext";
-import type { SourceOrigin } from "@branchforge/shared";
-import type { ScriptEditorRef } from "@/components/script-mode/ScriptEditor";
-import { useResponsiveSidebarState } from "@/hooks/useResponsiveSidebarState";
 import { ScriptModeEditorLayout } from "./components/ScriptModeEditorLayout";
 import { ScriptModeEmptyState } from "./components/ScriptModeEmptyState";
-import { useTextUndo } from "@/hooks/useTextUndo";
-import type { LabelTitleMap } from "@/lib/codemirror/label-title-decoration";
+import { ScriptModeDialogs } from "./components/ScriptModeDialogs";
+import { useScriptMode } from "./components/useScriptMode";
+import { StatusBar } from "@/components/script-mode";
 
 interface ScriptModeProps {
   projectId?: string;
@@ -33,310 +15,49 @@ export function ScriptMode({
   projectName,
   onOpenSettings,
 }: ScriptModeProps) {
-  const { error: showErrorToast } = useToast();
   const {
-    labels,
+    isLoadingLabels,
+    isLoadingFiles,
+    projectFiles,
     activeLabel,
     activeLabelId,
-    setActiveLabelId,
-    isLoadingLabels,
-  } = useLabels();
-
-  const { isProjectLinked, getLinkedRepository } = useGitLab();
-  const {
-    files: projectFiles,
-    isLoadingFiles,
-    updateFileContent,
-    refreshFiles,
-  } = useProjectFiles(projectId);
-
-  const [showSyncDialog, setShowSyncDialog] = useState(false);
-  const [showZipImportDialog, setShowZipImportDialog] = useState(false);
-
-  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed, isMobile] =
-    useResponsiveSidebarState("script:left-sidebar-collapsed");
-  const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] =
-    useResponsiveSidebarState("script:right-sidebar-collapsed");
-
-  const focusModeState = useFocusModeState("script:focus-mode");
-  const {
-    isFocusMode,
-    setIsFocusMode,
-    preFocusSidebarStates,
-    setPreFocusSidebarStates,
-    preFocusElementRef,
-    focusToggleRef,
-  } = focusModeState;
-
-  const editorRef = useRef<ScriptEditorRef>(null);
-  const isResettingRef = useRef(false);
-  const skipSaveRef = useRef(false);
-  const previousEditFileIdRef = useRef<string | null>(null);
-
-  const [scrollToLine, setScrollToLine] = useState<number | null>(null);
-
-  const handleFocusModeToggle = useCallback(() => {
-    if (!isFocusMode) {
-      preFocusElementRef.current =
-        document.activeElement instanceof HTMLElement
-          ? document.activeElement
-          : null;
-      setPreFocusSidebarStates({
-        leftCollapsed: isLeftSidebarCollapsed,
-        rightCollapsed: isRightSidebarCollapsed,
-      });
-      setIsFocusMode(true);
-      editorRef.current?.focus();
-      return;
-    }
-
-    setIsFocusMode(false);
-    if (preFocusSidebarStates) {
-      setIsLeftSidebarCollapsed(preFocusSidebarStates.leftCollapsed);
-      setIsRightSidebarCollapsed(preFocusSidebarStates.rightCollapsed);
-    }
-    if (preFocusElementRef.current) {
-      preFocusElementRef.current.focus();
-    } else {
-      focusToggleRef.current?.focus();
-    }
-  }, [
-    focusToggleRef,
-    isFocusMode,
+    showSyncDialog,
+    setShowSyncDialog,
+    showZipImportDialog,
+    setShowZipImportDialog,
     isLeftSidebarCollapsed,
-    isRightSidebarCollapsed,
-    preFocusElementRef,
-    preFocusSidebarStates,
-    setIsFocusMode,
     setIsLeftSidebarCollapsed,
+    isRightSidebarCollapsed,
     setIsRightSidebarCollapsed,
-    setPreFocusSidebarStates,
-  ]);
-
-  const {
-    fileSaveStatus,
-    isFileDirty,
-    editedFileContent,
-    currentEditFileId,
-    hasSaveConflict,
-    setEditedFileContent,
-    triggerFileSave,
-    retryFileSave,
-    switchToFile,
-    clearEditorState,
-  } = useFileEditor({
-    projectId,
-    projectFiles,
-    updateFileContent,
-    showErrorToast,
-    skipSaveRef,
-  });
-
-  const handleScriptFileSelect = useCallback(
-    async (fileId: string) => {
-      const file = projectFiles.find(
-        (projectFile) => projectFile.id === fileId
-      );
-      if (!file) {
-        return false;
-      }
-      return await switchToFile(file);
-    },
-    [projectFiles, switchToFile]
-  );
-
-  const handleNoTabsRemaining = useCallback(() => {
-    void clearEditorState();
-    setActiveLabelId(null);
-    setScrollToLine(null);
-  }, [clearEditorState, setActiveLabelId]);
-
-  const handleFileActivated = useCallback(() => {
-    setScrollToLine(null);
-    setActiveLabelId(null);
-  }, [setActiveLabelId]);
-
-  const {
+    isMobile,
+    focusModeState,
+    handleFocusModeToggle,
+    editorRef,
     activeFileId,
-    tabItems,
-    selectFileTab,
-    handleCloseFileTab,
-    clearTabsState,
-  } = useFileTabs({
-    projectId,
-    projectFiles,
-    isLoadingFiles,
-    isResettingRef,
-    onFileSelect: handleScriptFileSelect,
-    onFileActivated: handleFileActivated,
-    onNoTabsRemaining: handleNoTabsRemaining,
-  });
-
-  const { resetRefreshState } = useScriptModeRefresh({
-    projectId,
-    isLoadingFiles,
-    refreshFiles,
-  });
-
-  const hasPendingSave =
-    !!currentEditFileId && (isFileDirty || fileSaveStatus === "error");
-
-  const handleResetState = useCallback(() => {
-    resetRefreshState();
-    clearTabsState();
-    void clearEditorState();
-    setScrollToLine(null);
-  }, [clearEditorState, clearTabsState, resetRefreshState]);
-
-  const setSkipSave = useCallback((value: boolean) => {
-    skipSaveRef.current = value;
-  }, []);
-
-  useProjectReset({
-    projectId,
-    isResettingRef,
-    hasPendingSave,
-    triggerSave: triggerFileSave,
-    showErrorToast,
-    setSkipSave,
-    onReset: handleResetState,
-  });
-
-  const handleLabelDrivenFileSelect = useCallback(
-    async (fileId: string) => {
-      return await selectFileTab(fileId, { notify: false });
-    },
-    [selectFileTab]
-  );
-
-  useLabelFileSync({
-    projectFiles,
-    activeLabelId,
-    onFileSelect: handleLabelDrivenFileSelect,
-    onSetScrollToLine: setScrollToLine,
-  });
-
-  useFocusModeKeyboardHandler(handleFocusModeToggle);
-
-  const activeProjectFile = useMemo(
-    () => projectFiles.find((file) => file.id === activeFileId) || null,
-    [activeFileId, projectFiles]
-  );
-
-  // Build labelName → title map for CodeMirror decorations
-  const labelTitles: LabelTitleMap = useMemo(() => {
-    const map = new Map<string, string>();
-    if (activeProjectFile) {
-      for (const label of labels) {
-        if (label.projectFileId === activeProjectFile.id && label.labelName) {
-          map.set(label.labelName, label.title);
-        }
-      }
-    }
-    return map;
-  }, [labels, activeProjectFile]);
-
-  useEffect(() => {
-    if (!activeProjectFile) {
-      return;
-    }
-
-    if (currentEditFileId === activeProjectFile.id) {
-      return;
-    }
-
-    previousEditFileIdRef.current = currentEditFileId;
-
-    (async () => {
-      const success = await switchToFile(activeProjectFile);
-      if (!success && previousEditFileIdRef.current) {
-        void selectFileTab(previousEditFileIdRef.current, { notify: false });
-      }
-    })();
-  }, [activeProjectFile, currentEditFileId, switchToFile, selectFileTab]);
-
-  const { characters: projectCharacters } = useCharacters(projectId ?? "");
-
-  const activeFileContent =
-    activeProjectFile && currentEditFileId === activeProjectFile.id
-      ? editedFileContent
-      : activeProjectFile?.content || "";
-
-  const handleUndoRedoChange = useCallback(
-    (content: string) => {
-      setEditedFileContent(content);
-    },
-    [setEditedFileContent]
-  );
-
-  const { canUndo, canRedo, undo, redo, recordChange, clear } = useTextUndo(
+    activeProjectFile,
     activeFileContent,
-    handleUndoRedoChange
-  );
-
-  const handleContentChange = useCallback(
-    (value: string) => {
-      setEditedFileContent(value);
-      recordChange(value);
-    },
-    [recordChange, setEditedFileContent]
-  );
-
-  const previousUndoFileIdRef = useRef<string | null>(activeFileId);
-
-  useEffect(() => {
-    if (activeFileId && previousUndoFileIdRef.current !== activeFileId) {
-      previousUndoFileIdRef.current = activeFileId;
-      // react-doctor-disable-next-line react-doctor/no-pass-data-to-parent
-      clear(activeFileContent);
-    }
-  }, [activeFileId, activeFileContent, clear]);
-
-  const handleGitLabFileSelect = useCallback(
-    (fileId: string) => {
-      void selectFileTab(fileId);
-    },
-    [selectFileTab]
-  );
-
-  const handleSelectFileTab = useCallback(
-    async (fileId: string) => {
-      await selectFileTab(fileId);
-    },
-    [selectFileTab]
-  );
-
-  const handleGitLabSceneSelect = useCallback(
-    (sceneId: string) => {
-      setActiveLabelId(sceneId);
-    },
-    [setActiveLabelId]
-  );
-
-  const initialExpandedFolders = useMemo(() => {
-    const folders = new Set<string>();
-    for (const file of projectFiles) {
-      const parts = file.filePath.split("/");
-      if (parts.length > 1) {
-        folders.add(parts[0]);
-      }
-    }
-    return Array.from(folders);
-  }, [projectFiles]);
-
-  const isLinked = projectId ? isProjectLinked(projectId) : false;
-  const linkedRepo = projectId ? getLinkedRepository(projectId) : null;
-
-  const primaryFileSourceType: SourceOrigin | undefined = useMemo(() => {
-    if (projectFiles.length === 0) {
-      if (isLinked) {
-        return "GITLAB";
-      }
-      return undefined;
-    }
-
-    return projectFiles[0].source;
-  }, [projectFiles, isLinked]);
+    tabItems,
+    handleSelectFileTab,
+    handleCloseFileTab,
+    handleGitLabFileSelect,
+    handleGitLabSceneSelect,
+    handleContentChange,
+    canUndo,
+    canRedo,
+    onUndo,
+    onRedo,
+    scrollToLine,
+    fileSaveStatus,
+    onSaveRequest,
+    labelTitles,
+    initialExpandedFolders,
+    projectCharacters,
+    refreshFiles,
+    isLinked,
+    linkedRepo,
+    primaryFileSourceType,
+    saveConflict,
+  } = useScriptMode({ projectId, projectName });
 
   if (isLoadingLabels || isLoadingFiles) {
     return (
@@ -399,11 +120,11 @@ export function ScriptMode({
         onRefreshFiles={refreshFiles}
         canUndo={canUndo}
         canRedo={canRedo}
-        onUndo={undo}
-        onRedo={redo}
+        onUndo={onUndo}
+        onRedo={onRedo}
         saveStatus={activeProjectFile ? fileSaveStatus : undefined}
-        saveConflict={activeProjectFile ? hasSaveConflict : undefined}
-        onSaveRequest={activeProjectFile ? retryFileSave : undefined}
+        saveConflict={saveConflict}
+        onSaveRequest={onSaveRequest}
         labelTitles={labelTitles}
       />
 
@@ -412,29 +133,20 @@ export function ScriptMode({
         projectName={projectName}
         gitlabBranch={linkedRepo?.defaultBranch}
         fileSourceType={primaryFileSourceType}
-        isFocusMode={isFocusMode}
+        isFocusMode={focusModeState.isFocusMode}
         onOpenZipImportDialog={() => setShowZipImportDialog(true)}
       />
 
-      {projectId && isLinked && linkedRepo && (
-        <GitLabSyncDialog
-          open={showSyncDialog}
-          onOpenChange={setShowSyncDialog}
-          operationType="import"
-          projectId={projectId}
-          projectName={projectName}
-          defaultBranch={linkedRepo.defaultBranch}
-        />
-      )}
-
-      {projectId && (
-        <ZipImportFilesDialog
-          open={showZipImportDialog}
-          onOpenChange={setShowZipImportDialog}
-          projectId={projectId}
-          projectName={projectName}
-        />
-      )}
+      <ScriptModeDialogs
+        projectId={projectId}
+        projectName={projectName}
+        isLinked={isLinked}
+        linkedRepo={linkedRepo}
+        showSyncDialog={showSyncDialog}
+        onSyncDialogChange={setShowSyncDialog}
+        showZipImportDialog={showZipImportDialog}
+        onZipImportDialogChange={setShowZipImportDialog}
+      />
     </div>
   );
 }

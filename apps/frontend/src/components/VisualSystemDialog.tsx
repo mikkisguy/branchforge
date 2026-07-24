@@ -11,7 +11,7 @@
  */
 
 import { useMemo, useState } from "react";
-import { Loader2, Wand2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,10 +20,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { FormErrorMessage } from "@/components/ui/form-error-message";
-import { Select } from "@/components/ui/select";
 import { useVisualSystem } from "@/hooks/useVisualSystem";
 import {
   generateVisualName,
@@ -35,6 +31,12 @@ import {
   toVisualSystemFormState,
   type VisualSystemFormState,
 } from "@/components/visual-system.helpers";
+import { VisualSystemNamingTemplate } from "./VisualSystemNamingTemplate";
+import { VisualSystemPaddingSelects } from "./VisualSystemPaddingSelects";
+import { VisualSystemJumpPrefixInput } from "./VisualSystemJumpPrefixInput";
+import { VisualSystemOptionalInputs } from "./VisualSystemOptionalInputs";
+import { VisualSystemGroupPrefixesEditor } from "./VisualSystemGroupPrefixesEditor";
+import { VisualSystemPreviewPanel } from "./VisualSystemPreviewPanel";
 
 // ============================================================================
 // Types
@@ -206,213 +208,48 @@ export function VisualSystemFormContent({
 
   return (
     <div className="space-y-4">
-      <div className="space-y-1">
-        <Label htmlFor="vs-naming-template" className="text-xs">
-          Naming Template *
-        </Label>
-        <Input
-          id="vs-naming-template"
-          type="text"
-          placeholder="{route}{group}_{label}_{counter}_{slug}"
-          value={form.namingTemplate}
-          onChange={(event) =>
-            handleChange("namingTemplate", event.target.value)
-          }
-          disabled={isSaving}
-          aria-required="true"
-          aria-invalid={!!errors.namingTemplate}
-          aria-describedby={
-            errors.namingTemplate
-              ? "vs-naming-template-hint vs-naming-template-error"
-              : "vs-naming-template-hint"
-          }
-        />
-        <p
-          id="vs-naming-template-hint"
-          className="text-xs text-muted-foreground"
-        >
-          Tokens: <code>{`{route}`}</code>, <code>{`{group}`}</code>,{" "}
-          <code>{`{label}`}</code> (or legacy <code>{`{scene}`}</code>),{" "}
-          <code>{`{counter}`}</code>, <code>{`{slug}`}</code>
-        </p>
-        <FormErrorMessage
-          id="vs-naming-template-error"
-          message={errors.namingTemplate}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
-        <div className="space-y-1">
-          <Label htmlFor="vs-label-padding" className="text-xs">
-            Label Padding *
-          </Label>
-          <Select
-            id="vs-label-padding"
-            value={String(form.labelPadding) as "1" | "2"}
-            onChange={(value) =>
-              handleChange("labelPadding", Number(value) as 1 | 2)
-            }
-            disabled={isSaving}
-            options={[
-              { value: "1", label: "1 (e.g. 1, 2, 3)" },
-              { value: "2", label: "2 (e.g. 01, 02, 03)" },
-            ]}
-            aria-required="true"
-            aria-invalid={!!errors.labelPadding}
-            aria-describedby={
-              errors.labelPadding ? "vs-label-padding-error" : undefined
-            }
-          />
-          <FormErrorMessage
-            id="vs-label-padding-error"
-            message={errors.labelPadding}
-          />
-        </div>
-
-        <div className="space-y-1">
-          <Label htmlFor="vs-counter-padding" className="text-xs">
-            Counter Padding *
-          </Label>
-          <Select
-            id="vs-counter-padding"
-            value={String(form.counterPadding) as "1" | "2"}
-            onChange={(value) =>
-              handleChange("counterPadding", Number(value) as 1 | 2)
-            }
-            disabled={isSaving}
-            options={[
-              { value: "1", label: "1 (e.g. 1, 2, 3)" },
-              { value: "2", label: "2 (e.g. 01, 02, 03)" },
-            ]}
-            aria-required="true"
-            aria-invalid={!!errors.counterPadding}
-            aria-describedby={
-              errors.counterPadding ? "vs-counter-padding-error" : undefined
-            }
-          />
-          <FormErrorMessage
-            id="vs-counter-padding-error"
-            message={errors.counterPadding}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <Label htmlFor="vs-jump-prefix" className="text-xs">
-          Shared Jump Prefix *
-        </Label>
-        <Input
-          id="vs-jump-prefix"
-          type="text"
-          placeholder="shared_"
-          value={form.jumpPrefixShared}
-          onChange={(event) =>
-            handleChange("jumpPrefixShared", event.target.value)
-          }
-          disabled={isSaving}
-          aria-required="true"
-          aria-invalid={!!errors.jumpPrefixShared}
-          aria-describedby={
-            errors.jumpPrefixShared ? "vs-jump-prefix-error" : undefined
-          }
-        />
-        <FormErrorMessage
-          id="vs-jump-prefix-error"
-          message={errors.jumpPrefixShared}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
-        <div className="space-y-1">
-          <Label htmlFor="vs-default-group" className="text-xs">
-            Default Group Type
-          </Label>
-          <Input
-            id="vs-default-group"
-            type="text"
-            placeholder="act"
-            value={form.defaultGroupType}
-            onChange={(event) =>
-              handleChange("defaultGroupType", event.target.value)
-            }
-            disabled={isSaving}
-          />
-          <p className="text-xs text-muted-foreground">
-            Optional. e.g. <code>act</code>, <code>chapter</code>
-          </p>
-        </div>
-
-        <div className="space-y-1">
-          <Label htmlFor="vs-placeholder" className="text-xs">
-            Placeholder Base URL
-          </Label>
-          <Input
-            id="vs-placeholder"
-            type="text"
-            placeholder="https://example.com/img/"
-            value={form.placeholderBaseUrl}
-            onChange={(event) =>
-              handleChange("placeholderBaseUrl", event.target.value)
-            }
-            disabled={isSaving}
-            aria-invalid={!!errors.placeholderBaseUrl}
-            aria-describedby={
-              errors.placeholderBaseUrl ? "vs-placeholder-error" : undefined
-            }
-          />
-          <FormErrorMessage
-            id="vs-placeholder-error"
-            message={errors.placeholderBaseUrl}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <Label htmlFor="vs-group-prefixes" className="text-xs">
-          Group Prefixes (JSON)
-        </Label>
-        <textarea
-          id="vs-group-prefixes"
-          aria-label="Group Prefixes JSON"
-          className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-          placeholder='{ "act": { "I": "ai" }, "chapter": { "1": "ch1" } }'
-          value={form.groupPrefixesJson}
-          onChange={(event) =>
-            handleChange("groupPrefixesJson", event.target.value)
-          }
-          disabled={isSaving}
-          rows={4}
-          aria-invalid={!!errors.groupPrefixesJson}
-          aria-describedby={
-            errors.groupPrefixesJson
-              ? "vs-group-prefixes-hint vs-group-prefixes-error"
-              : "vs-group-prefixes-hint"
-          }
-        />
-        <p
-          id="vs-group-prefixes-hint"
-          className="text-xs text-muted-foreground"
-        >
-          Map of group type to value→prefix. Empty or <code>{`{}`}</code> for
-          none.
-        </p>
-        <FormErrorMessage
-          id="vs-group-prefixes-error"
-          message={errors.groupPrefixesJson}
-        />
-      </div>
-
-      <div className="rounded-md border border-border/50 bg-muted/40 p-3 text-xs">
-        <div className="flex items-center gap-1.5 font-medium text-foreground">
-          <Wand2 className="size-3.5" />
-          Preview
-        </div>
-        <p className="mt-1 text-muted-foreground">
-          Sample generated name (route <code>hero</code>, group <code>I</code>,
-          label <code>1</code>, counter <code>1</code>, slug <code>cafe</code>):
-        </p>
-        <p className="mt-1 font-mono text-foreground">{samplePreview}</p>
-      </div>
+      <VisualSystemNamingTemplate
+        value={form.namingTemplate}
+        error={errors.namingTemplate}
+        disabled={isSaving}
+        onChange={(value) => handleChange("namingTemplate", value)}
+      />
+      <VisualSystemPaddingSelects
+        labelPadding={form.labelPadding}
+        counterPadding={form.counterPadding}
+        labelPaddingError={errors.labelPadding}
+        counterPaddingError={errors.counterPadding}
+        disabled={isSaving}
+        onLabelPaddingChange={(value) => handleChange("labelPadding", value)}
+        onCounterPaddingChange={(value) =>
+          handleChange("counterPadding", value)
+        }
+      />
+      <VisualSystemJumpPrefixInput
+        value={form.jumpPrefixShared}
+        error={errors.jumpPrefixShared}
+        disabled={isSaving}
+        onChange={(value) => handleChange("jumpPrefixShared", value)}
+      />
+      <VisualSystemOptionalInputs
+        defaultGroupType={form.defaultGroupType}
+        placeholderBaseUrl={form.placeholderBaseUrl}
+        placeholderBaseUrlError={errors.placeholderBaseUrl}
+        disabled={isSaving}
+        onDefaultGroupTypeChange={(value) =>
+          handleChange("defaultGroupType", value)
+        }
+        onPlaceholderBaseUrlChange={(value) =>
+          handleChange("placeholderBaseUrl", value)
+        }
+      />
+      <VisualSystemGroupPrefixesEditor
+        value={form.groupPrefixesJson}
+        error={errors.groupPrefixesJson}
+        disabled={isSaving}
+        onChange={(value) => handleChange("groupPrefixesJson", value)}
+      />
+      <VisualSystemPreviewPanel samplePreview={samplePreview} />
 
       <div className="flex justify-end gap-2">
         {/* No Cancel button — the dialog's X / the outer Close
