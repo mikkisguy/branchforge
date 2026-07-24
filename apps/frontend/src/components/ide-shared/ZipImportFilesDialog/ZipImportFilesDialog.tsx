@@ -7,7 +7,7 @@
 
 import { X, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { CharacterImportWizard } from "@/components/CharacterImportWizard.lazy";
 import { useZipImportFilesDialog } from "./useZipImportFilesDialog";
 import { ZipImportFilesDialogDropZone } from "./ZipImportFilesDialogDropZone";
@@ -60,104 +60,110 @@ export function ZipImportFilesDialog({
   // ============================================================================
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={handleDialogOpenChange}
-      aria-label="Import Zip File"
-    >
-      <DialogContent className="max-w-md w-full p-0 gap-0">
-        {/* Header */}
-        <div className="p-6 border-b border-border/30 flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-muted rounded-md">
-              <Package className="size-5" />
+    <>
+      <Dialog
+        open={open}
+        onOpenChange={handleDialogOpenChange}
+        aria-label="Import Zip File"
+      >
+        <DialogContent className="max-w-md w-full p-0 gap-0">
+          <DialogTitle className="sr-only">Import Zip File</DialogTitle>
+          {/* Header */}
+          <div className="p-6 border-b border-border/30 flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-muted rounded-md">
+                <Package className="size-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-medium">Import Zip File</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  {projectName
+                    ? `Import files into "${projectName}"`
+                    : "Import a Ren'Py project from a zip archive"}
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-lg font-medium">Import Zip File</h2>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {projectName
-                  ? `Import files into "${projectName}"`
-                  : "Import a Ren'Py project from a zip archive"}
-              </p>
-            </div>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={handleClose}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            disabled={importState.status === "uploading" || showCharacterWizard}
-            aria-label="Close dialog"
-          >
-            <X className="size-5" />
-          </Button>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 space-y-4">
-          {importState.status === "idle" && (
-            <ZipImportFilesDialogDropZone
-              selectedFile={selectedFile}
-              onFileChange={handleFileChange}
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onRemove={handleRemoveFile}
-              fileInputRef={fileInputRef}
-            />
-          )}
-
-          {/* Progress */}
-          <ZipImportFilesDialogProgress importState={importState} />
-
-          {/* Success */}
-          <ZipImportFilesDialogSuccess importState={importState} />
-
-          {/* Error */}
-          <ZipImportFilesDialogError importState={importState} />
-        </div>
-
-        {/* Footer */}
-        <div className="p-6 border-t border-border/30 flex justify-end gap-2">
-          {importState.status === "idle" && (
-            <>
-              <Button type="button" variant="outline" onClick={handleClose}>
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={handleImport}
-                disabled={!selectedFile}
-              >
-                Import
-              </Button>
-            </>
-          )}
-          {(importState.status === "uploading" ||
-            importState.status === "processing") && (
-            <Button type="button" variant="outline" disabled>
-              Importing…
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={handleClose}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              disabled={
+                importState.status === "uploading" || showCharacterWizard
+              }
+              aria-label="Close dialog"
+            >
+              <X className="size-5" />
             </Button>
-          )}
-          {importState.status === "error" && (
-            <>
-              <Button type="button" variant="outline" onClick={handleRetry}>
-                Try Again
+          </div>
+
+          {/* Content */}
+          <div className="p-6 space-y-4">
+            {importState.status === "idle" && (
+              <ZipImportFilesDialogDropZone
+                selectedFile={selectedFile}
+                onFileChange={handleFileChange}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onRemove={handleRemoveFile}
+                fileInputRef={fileInputRef}
+              />
+            )}
+
+            {/* Progress */}
+            <ZipImportFilesDialogProgress importState={importState} />
+
+            {/* Success */}
+            <ZipImportFilesDialogSuccess importState={importState} />
+
+            {/* Error */}
+            <ZipImportFilesDialogError importState={importState} />
+          </div>
+
+          {/* Footer */}
+          <div className="p-6 border-t border-border/30 flex justify-end gap-2">
+            {importState.status === "idle" && (
+              <>
+                <Button type="button" variant="outline" onClick={handleClose}>
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleImport}
+                  disabled={!selectedFile}
+                >
+                  Import
+                </Button>
+              </>
+            )}
+            {(importState.status === "uploading" ||
+              importState.status === "processing") && (
+              <Button type="button" variant="outline" disabled>
+                Importing…
               </Button>
-              <Button type="button" variant="outline" onClick={handleClose}>
+            )}
+            {importState.status === "error" && (
+              <>
+                <Button type="button" variant="outline" onClick={handleRetry}>
+                  Try Again
+                </Button>
+                <Button type="button" variant="outline" onClick={handleClose}>
+                  Close
+                </Button>
+              </>
+            )}
+            {importState.status === "success" && (
+              <Button type="button" onClick={handleClose}>
                 Close
               </Button>
-            </>
-          )}
-          {importState.status === "success" && (
-            <Button type="button" onClick={handleClose}>
-              Close
-            </Button>
-          )}
-        </div>
-      </DialogContent>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
-      {/* Character Import Wizard */}
+      {/* Character Import Wizard — rendered as sibling to avoid nested
+          Radix Dialog conflicts */}
       {showCharacterWizard && detectedCharacters && (
         <CharacterImportWizard
           open={showCharacterWizard}
@@ -178,6 +184,6 @@ export function ZipImportFilesDialog({
           }}
         />
       )}
-    </Dialog>
+    </>
   );
 }

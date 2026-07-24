@@ -125,10 +125,7 @@ export function useWriteModeView(
       duoPairId?: string | null;
     }) => {
       if (editDialog.label) {
-        await onUpdateLabel(
-          editDialog.label.id,
-          data as unknown as Record<string, unknown>
-        );
+        await onUpdateLabel(editDialog.label.id, data);
         setEditDialog({ open: false, label: null });
       }
     },

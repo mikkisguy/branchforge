@@ -93,6 +93,8 @@ export function useZipImportFilesDialog(
       return;
     }
 
+    const currentImportId = importIdRef.current;
+
     dispatch({
       type: "SET_IMPORT_STATE",
       importState: {
@@ -115,7 +117,7 @@ export function useZipImportFilesDialog(
       });
 
       if (result.success) {
-        const currentImportId = importIdRef.current;
+        if (currentImportId !== importIdRef.current) return;
 
         try {
           await Promise.all([

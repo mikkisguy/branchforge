@@ -54,43 +54,46 @@ export function GitLabImportDialog({
   // ============================================================================
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="w-[700px] max-w-[95vw] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <GitFork className="size-5" />
-            Import from GitLab
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="w-[700px] max-w-[95vw] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GitFork className="size-5" />
+              Import from GitLab
+            </DialogTitle>
+          </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          {/* Status panels (idle/no-integration, checking, importing, success, error) */}
-          <GitLabImportDialogStatusPanels
-            importState={state.importState}
-            hasIntegration={hasIntegration}
-            checkingIntegration={checkingIntegration}
-            onConfigureClick={handleConfigureClick}
-            onRetry={handleRetry}
-          />
-
-          {/* Repository selection */}
-          {state.importState.status === "selecting" && (
-            <GitLabImportDialogStepSelect
-              projectName={state.projectName}
-              projectDescription={state.projectDescription}
-              searchQuery={state.searchQuery}
-              selectedRepository={state.selectedRepository}
-              isLoadingRepos={state.isLoadingRepos}
-              filteredRepositories={filteredRepositories}
-              branch={state.branch}
-              dispatch={dispatch}
-              onImport={handleImport}
+          <div className="space-y-6 py-4">
+            {/* Status panels (idle/no-integration, checking, importing, success, error) */}
+            <GitLabImportDialogStatusPanels
+              importState={state.importState}
+              hasIntegration={hasIntegration}
+              checkingIntegration={checkingIntegration}
+              onConfigureClick={handleConfigureClick}
+              onRetry={handleRetry}
             />
-          )}
-        </div>
-      </DialogContent>
 
-      {/* Character Import Wizard */}
+            {/* Repository selection */}
+            {state.importState.status === "selecting" && (
+              <GitLabImportDialogStepSelect
+                projectName={state.projectName}
+                projectDescription={state.projectDescription}
+                searchQuery={state.searchQuery}
+                selectedRepository={state.selectedRepository}
+                isLoadingRepos={state.isLoadingRepos}
+                filteredRepositories={filteredRepositories}
+                branch={state.branch}
+                dispatch={dispatch}
+                onImport={handleImport}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Character Import Wizard — rendered as sibling to avoid nested
+          Radix Dialog conflicts */}
       {state.showCharacterWizard &&
         state.detectedCharacters &&
         state.importedProject && (
@@ -116,6 +119,6 @@ export function GitLabImportDialog({
             }}
           />
         )}
-    </Dialog>
+    </>
   );
 }

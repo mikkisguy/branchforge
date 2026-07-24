@@ -124,6 +124,8 @@ export function useGitLabImportDialog(
       return;
     }
 
+    const currentImportId = importIdRef.current;
+
     dispatch({
       type: "SET_IMPORT_STATE",
       payload: { status: "importing", message: "Importing project..." },
@@ -139,6 +141,8 @@ export function useGitLabImportDialog(
         conflictResolution: "branchforge_wins",
       });
 
+      if (currentImportId !== importIdRef.current) return;
+
       dispatch({ type: "SET_IMPORTED_PROJECT", payload: result.project });
 
       await Promise.all([
@@ -150,8 +154,6 @@ export function useGitLabImportDialog(
           queryKey: labelKeys.scoped(result.project.id),
         }),
       ]);
-
-      const currentImportId = importIdRef.current;
 
       try {
         // react-doctor-disable-next-line react-doctor/async-defer-await

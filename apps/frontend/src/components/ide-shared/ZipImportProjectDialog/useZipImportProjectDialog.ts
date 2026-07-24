@@ -91,6 +91,8 @@ export function useZipImportProjectDialog(
       return;
     }
 
+    const currentImportId = importIdRef.current;
+
     dispatch({
       type: "SET_IMPORT_STATE",
       importState: {
@@ -110,6 +112,8 @@ export function useZipImportProjectDialog(
         throw new Error(data.error || "Failed to import project");
       }
 
+      if (currentImportId !== importIdRef.current) return;
+
       dispatch({
         type: "SET_CHARACTER_WIZARD",
         show: false,
@@ -119,8 +123,6 @@ export function useZipImportProjectDialog(
 
       importSucceededRef.current = true;
       didCallOnSuccessRef.current = false;
-
-      const currentImportId = importIdRef.current;
 
       try {
         // react-doctor-disable-next-line react-doctor/async-defer-await

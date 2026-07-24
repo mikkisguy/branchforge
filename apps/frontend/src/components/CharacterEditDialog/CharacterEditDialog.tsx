@@ -63,6 +63,9 @@ export function CharacterEditDialog({
   // Track preview URL for cleanup
   const previewUrlRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // Track id of a just-created character so retries after partial avatar
+  // failures enter the update branch instead of creating duplicates
+  const createdCharIdRef = useRef<string | null>(null);
 
   // Track if form has been initialized for current character to prevent
   // re-initialization when the characters array changes due to other characters being updated
@@ -86,6 +89,7 @@ export function CharacterEditDialog({
       }
       initializedForCharacterIdRef.current = null;
       hasInitializedRef.current = false;
+      createdCharIdRef.current = null;
     } else if (!isLoadingCharacters) {
       if (characterId && characterId !== initializedForCharacterIdRef.current) {
         hasInitializedRef.current = false;
@@ -189,7 +193,7 @@ export function CharacterEditDialog({
         conditionalPrefix: form.conditionalPrefix.trim() || undefined,
       };
 
-      let targetCharId = characterId;
+      let targetCharId = characterId ?? createdCharIdRef.current;
 
       if (characterId) {
         await updateCharacter(characterId, {
@@ -205,6 +209,7 @@ export function CharacterEditDialog({
       } else {
         const created = await createCharacter(payload);
         targetCharId = created.id;
+        createdCharIdRef.current = created.id;
       }
 
       // Upload avatar if new file
@@ -223,6 +228,7 @@ export function CharacterEditDialog({
         previewUrlRef.current = null;
       }
 
+      createdCharIdRef.current = null;
       onOpenChange(false);
     } catch {
       // Hook's mutation.onError already shows toast

@@ -28,8 +28,6 @@ export type ConflictAction =
       choice: "local" | "remote" | "skip";
     }
   | { type: "SET_LOADING"; isLoading: boolean }
-  | { type: "SET_CONFLICTS"; conflicts: ConflictInfo[] }
-  | { type: "SET_FETCH_ERROR"; error: string | null }
   | { type: "RESET_FOR_NEW_FETCH" }
   | { type: "FETCH_SUCCESS"; conflicts: ConflictInfo[] }
   | { type: "FETCH_ERROR"; error: string }
@@ -65,12 +63,15 @@ export function conflictReducer(
     }
     case "SET_LOADING":
       return { ...state, isLoading: action.isLoading };
-    case "SET_CONFLICTS":
-      return { ...state, conflicts: action.conflicts };
-    case "SET_FETCH_ERROR":
-      return { ...state, fetchError: action.error };
     case "RESET_FOR_NEW_FETCH":
-      return { ...state, isLoading: true, fetchError: null };
+      return {
+        ...state,
+        isLoading: true,
+        fetchError: null,
+        conflicts: [],
+        currentIndex: 0,
+        resolutions: new Map(),
+      };
     case "FETCH_SUCCESS":
       return {
         ...state,

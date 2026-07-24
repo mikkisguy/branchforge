@@ -36,7 +36,9 @@ interface ConflictReviewDialogProps {
   projectId: string;
   branch: string;
   userRole?: UserRole;
-  onApplyResolutions?: (resolutions: ConflictResolution[]) => void;
+  onApplyResolutions?: (
+    resolutions: ConflictResolution[]
+  ) => void | Promise<void>;
 }
 
 // ============================================================================
@@ -215,9 +217,7 @@ export function ConflictReviewDialog({
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 max-sm:p-4">
           {/* Empty states before first conflict loaded */}
-          {(state.isLoading && state.conflicts.length === 0) ||
-          (state.fetchError && state.conflicts.length === 0) ||
-          state.conflicts.length === 0 ? (
+          {state.conflicts.length === 0 ? (
             <ConflictReviewDialogStates
               isLoading={state.isLoading}
               fetchError={state.fetchError}
