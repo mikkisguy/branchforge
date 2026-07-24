@@ -1,8 +1,8 @@
 /**
- * ProseEditor Component
+ * useProseEditorState Hook
  *
- * Main prose editor with line-by-line editing for dialogue and narration.
- * Matches app design system with theme colors and simple styling.
+ * Manages all internal state, refs, effects, and callbacks for ProseEditor.
+ * Extracted to keep the parent component lean.
  */
 
 import {
@@ -12,235 +12,102 @@ import {
   useRef,
   useMemo,
   useImperativeHandle,
-  lazy,
-  Suspense,
 } from "react";
 import type React from "react";
-import { DialogueLine } from "./DialogueLine";
 import {
   areDialogueEntriesEqual,
-  menuLineToChoiceEntries,
   findDialogueInsertIndex,
 } from "@/lib/prose-converter";
-import { WritingGoalPill } from "./WritingGoalPill";
-const WritingStatsDialog = lazy(() =>
-  import("./WritingStatsDialog").then((m) => ({
-    default: m.WritingStatsDialog,
-  }))
-);
-import { SaveIndicator } from "./SaveIndicator";
-import { FontSizeSwitcher } from "../FontSizeSwitcher";
-import { FontFamilySwitcher } from "./FontFamilySwitcher";
 import { useWritingGoals } from "@/hooks/useWritingGoals";
 import { useEntriesUndo } from "@/hooks/useEntriesUndo";
-import { UndoRedoControls } from "@/components/ide-shared";
 import { useTechnicalInfo } from "@/hooks/useTechnicalInfo";
-import { BookOpen, PenLine, PanelTop, Eye, EyeOff } from "lucide-react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import {
+  convertLabelLinesToEntries,
+  cloneEntries,
+  countWordsFromEntries,
+  getWritingDateKey,
+} from "./utils/proseEditorUtils";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { Character, LabelDetail } from "@branchforge/shared";
-import type { SaveStatus } from "@/hooks/useAutosave";
+import type { LineLayoutMode, ProseEditorRef } from "./ProseEditor";
 
-interface ProseEditorProps {
+// ============================================================================
+// Constants
+// ============================================================================
+
+const LINE_LAYOUT_STORAGE_KEY = "write:line-layout";
+const NEW_LINE_BOTTOM_SAFE_OFFSET = 96;
+const TEXT_HISTORY_DEBOUNCE_MS = 450;
+
+// ============================================================================
+// Hook Input & Return Types
+// ============================================================================
+
+interface UseProseEditorStateParams {
   activeLabel: LabelDetail | undefined;
   characters: Character[];
   onChange: (entries: DialogueEntry[]) => void;
-  isFocusMode?: boolean;
-  isSaving?: boolean;
-  lastSaved?: Date | null;
-  saveError?: boolean;
-  saveConflict?: boolean;
-  /** Callback when undo/redo availability changes. Used by mobile FAB. */
   onUndoStateChange?: (state: { canUndo: boolean; canRedo: boolean }) => void;
-  /** Callback when today's word count or daily goal changes. Used by mobile FAB. */
   onWordCountChange?: (stats: {
     todayWordCount: number;
     dailyGoal: number;
   }) => void;
-  /** Controlled badge visibility. When provided, overrides internal state. */
-  showBadges?: boolean;
+  propsShowBadges?: boolean;
   onShowBadgesChange?: (showBadges: boolean) => void;
-  /** Controlled line layout mode. When provided, overrides internal state. */
-  layoutMode?: LineLayoutMode;
+  propsLayoutMode?: LineLayoutMode;
   onLayoutModeChange?: (mode: LineLayoutMode) => void;
-  /** Controlled font size (px). When provided, FontSizeSwitcher uses this value instead of internal localStorage. */
-  fontSizeValue?: number;
-  onFontSizeChange?: (value: number) => void;
-  /** Controlled font family. When provided, FontFamilySwitcher uses this value instead of internal localStorage. */
-  fontFamilyValue?: string;
-  onFontFamilyChange?: (value: string) => void;
+  ref?: React.Ref<ProseEditorRef>;
 }
 
-export interface ProseEditorRef {
-  focus: () => void;
-  /** Trigger in-memory undo (mirrors Ctrl+Z inside the editor). */
-  undo: () => void;
-  /** Trigger in-memory redo (mirrors Ctrl+Y / Ctrl+Shift+Z inside the editor). */
-  redo: () => void;
-  /** Open the writing stats dialog. Used by mobile FAB. */
-  openWritingStats: () => void;
+export interface UseProseEditorStateReturn {
+  entries: DialogueEntry[];
+  characters: Character[];
+  activeLabel: LabelDetail | undefined;
+  handleCreateFirstEntry: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  handleUndo: () => void;
+  handleRedo: () => void;
+  layoutMode: LineLayoutMode;
+  showBadges: boolean;
+  wordCount: number;
+  lineCount: number;
+  isBottomBarHovered: boolean;
+  setIsBottomBarHovered: (v: boolean) => void;
+  todayWordCount: number;
+  writingGoalSettings: ReturnType<typeof useWritingGoals>["settings"];
+  statsDialogOpen: boolean;
+  setStatsDialogOpen: (v: boolean) => void;
+  textareaRefs: React.MutableRefObject<Map<number, HTMLTextAreaElement> | null>;
+  handleEntryChange: (index: number, updatedEntry: DialogueEntry) => void;
+  handleAddLine: (index: number) => void;
+  handleDeleteLine: (index: number) => void;
+  handleMoveUp: (index: number) => void;
+  handleMoveDown: (index: number) => void;
+  getTechnicalInfoForLine: ReturnType<
+    typeof useTechnicalInfo
+  >["getTechnicalInfoForLine"];
+  setLayoutMode: (mode: LineLayoutMode) => void;
+  setShowBadges: (v: boolean) => void;
 }
 
-type LineLayoutMode = "inline" | "stacked";
-const LINE_LAYOUT_STORAGE_KEY = "write:line-layout";
-const NEW_LINE_BOTTOM_SAFE_OFFSET = 96;
-const TEXT_HISTORY_DEBOUNCE_MS = 450;
-const EMPTY_ARRAY: { date: string; count: number }[] = [];
+// ============================================================================
+// Hook
+// ============================================================================
 
-interface TimezoneDateParts {
-  year: number;
-  month: number;
-  day: number;
-  hour: number;
-}
-
-// Helper function to convert label lines to dialogue entries
-function convertLabelLinesToEntries(
-  activeLabel: LabelDetail | undefined
-): DialogueEntry[] {
-  if (!activeLabel?.lines) return [];
-  const result: DialogueEntry[] = [];
-  for (const line of activeLabel.lines) {
-    if (line.contentType === "DIALOGUE" || line.contentType === "NARRATION") {
-      result.push({
-        id: line.id,
-        speakerId: line.speakerId,
-        text: line.content,
-      });
-    } else if (
-      line.contentType === "MENU" &&
-      line.menuOptions &&
-      line.menuOptions.length > 0
-    ) {
-      result.push(...menuLineToChoiceEntries(line));
-    }
-  }
-  return result;
-}
-
-function cloneEntries(entries: DialogueEntry[]): DialogueEntry[] {
-  return entries.map((entry) => ({ ...entry }));
-}
-
-function countWordsFromEntries(entries: DialogueEntry[]): number {
-  return entries.reduce((count, entry) => {
-    const trimmed = entry.text?.trim();
-    const words = trimmed
-      ? trimmed.split(/\s+/).filter((word) => word.length > 0).length
-      : 0;
-    return count + words;
-  }, 0);
-}
-
-function formatDateKey(year: number, month: number, day: number): string {
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(
-    2,
-    "0"
-  )}`;
-}
-
-const utcDateFormatter = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "UTC",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  hourCycle: "h23",
-});
-
-const dateTimeFormatCache = new Map<string, Intl.DateTimeFormat>([
-  ["UTC", utcDateFormatter],
-]);
-
-function getDatePartsInTimezone(
-  date: Date,
-  timezone: string
-): TimezoneDateParts {
-  let formatter = dateTimeFormatCache.get(timezone);
-  if (!formatter) {
-    // FP: formatter is cached in dateTimeFormatCache above — built once per timezone
-    // react-doctor-disable-next-line react-doctor/js-hoist-intl
-    formatter = new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      hourCycle: "h23",
-    });
-    dateTimeFormatCache.set(timezone, formatter);
-  }
-
-  const parts = formatter.formatToParts(date);
-
-  const year = Number(parts.find((part) => part.type === "year")?.value) || 0;
-  const month = Number(parts.find((part) => part.type === "month")?.value) || 1;
-  const day = Number(parts.find((part) => part.type === "day")?.value) || 1;
-  const hour = Number(parts.find((part) => part.type === "hour")?.value) || 0;
-
-  return {
-    year,
-    month,
-    day,
-    hour,
-  };
-}
-
-function getWritingDateKey(resetHour: number, timezone: string): string {
-  const now = new Date();
-  const tz = timezone || "UTC";
-
-  let dateParts: TimezoneDateParts;
-  try {
-    dateParts = getDatePartsInTimezone(now, tz);
-  } catch {
-    dateParts = getDatePartsInTimezone(now, "UTC");
-  }
-
-  if (dateParts.hour >= resetHour) {
-    return formatDateKey(dateParts.year, dateParts.month, dateParts.day);
-  }
-
-  const previousDate = new Date(
-    Date.UTC(dateParts.year, dateParts.month - 1, dateParts.day)
-  );
-  previousDate.setUTCDate(previousDate.getUTCDate() - 1);
-
-  return formatDateKey(
-    previousDate.getUTCFullYear(),
-    previousDate.getUTCMonth() + 1,
-    previousDate.getUTCDate()
-  );
-}
-
-// Convert old ProseEditor props to SaveStatus for SaveIndicator
-function propsToSaveStatus(isSaving: boolean, saveError: boolean): SaveStatus {
-  if (saveError) return "error";
-  if (isSaving) return "saving";
-  return "saved";
-}
-
-export const ProseEditor = function ProseEditor({
+export function useProseEditorState({
   activeLabel,
   characters,
   onChange,
-  isFocusMode = false,
-  isSaving = false,
-  lastSaved = null,
-  saveError = false,
-  saveConflict = false,
   onUndoStateChange,
   onWordCountChange,
-  showBadges: propsShowBadges,
+  propsShowBadges,
   onShowBadgesChange,
-  layoutMode: propsLayoutMode,
+  propsLayoutMode,
   onLayoutModeChange,
-  fontSizeValue,
-  onFontSizeChange,
-  fontFamilyValue,
-  onFontFamilyChange,
   ref,
-}: ProseEditorProps & { ref?: React.Ref<ProseEditorRef> }) {
+}: UseProseEditorStateParams): UseProseEditorStateReturn {
   const labelId = activeLabel?.id ?? "none";
 
   // Writing goals from backend
@@ -736,219 +603,37 @@ export const ProseEditor = function ProseEditor({
     });
   }, [todayWordCount, writingGoalSettings?.dailyWritingGoal]);
 
-  if (!activeLabel) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-        <div className="size-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-          <BookOpen className="size-8 opacity-40" />
-        </div>
-        <p className="text-lg">Create new or select a label to start writing</p>
-      </div>
-    );
-  }
+  // ==========================================================================
+  // Return
+  // ==========================================================================
 
-  if (entries.length === 0) {
-    return (
-      <div className="bg-card border border-border rounded-lg h-full flex flex-col items-center justify-center gap-6 text-muted-foreground">
-        <div className="size-20 rounded-full bg-gradient-to-br from-[var(--theme-color)]/10 to-[var(--theme-color)]/5 flex items-center justify-center">
-          <PenLine className="size-10 text-[var(--theme-color)]/60" />
-        </div>
-        <div className="text-center space-y-1">
-          <p className="text-lg font-medium text-foreground">
-            This label is empty
-          </p>
-          <p className="text-sm opacity-70">Start writing your story</p>
-        </div>
-        <button
-          type="button"
-          onClick={handleCreateFirstEntry}
-          className="group px-6 py-3 rounded-lg bg-[var(--theme-color)] text-white hover:bg-[var(--theme-color-hover)] transition-all duration-200 hover:shadow-lg hover:shadow-[var(--theme-color)]/20 focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)] focus:ring-offset-2 focus:ring-offset-background"
-        >
-          <span className="flex items-center gap-2">
-            <PenLine className="size-4 group-hover:scale-110 transition-transform duration-200" />
-            Add your first line
-          </span>
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col h-full tracking-normal pb-3">
-      {/* Top Bar */}
-      {!isFocusMode && (
-        <div className="px-4 py-3 border-b border-border bg-card rounded-t-lg flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
-            {/* Label title */}
-            <span className="text-sm font-medium text-foreground truncate">
-              {activeLabel.title}
-            </span>
-            {/* Scene status badge */}
-            <span
-              className={`px-2 py-0.4 rounded-full text-xs font-medium border shrink-0 ${
-                activeLabel.status === "FINAL"
-                  ? "bg-[var(--theme-final-color)]/20 text-[var(--theme-final-color)] border-[var(--theme-final-color)]/30"
-                  : activeLabel.status === "REVIEW"
-                    ? "bg-[var(--theme-review-color)]/20 text-[var(--theme-review-color)] border-[var(--theme-review-color)]/30"
-                    : "bg-[var(--theme-draft-color)]/20 text-[var(--theme-draft-color)] border-[var(--theme-draft-color)]/30"
-              }`}
-            >
-              {activeLabel.status?.toLowerCase() || "draft"}
-            </span>
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="max-md:hidden">
-              <UndoRedoControls
-                canUndo={inMemoryUndo.canUndo}
-                canRedo={inMemoryUndo.canRedo}
-                onUndo={handleUndo}
-                onRedo={handleRedo}
-              />
-            </div>
-            <SaveIndicator
-              saveStatus={propsToSaveStatus(isSaving, saveError)}
-              displayMode="compact"
-              lastSaved={lastSaved}
-              saveConflict={saveConflict}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Editor Content */}
-      <div
-        data-prose-editor-scroll="true"
-        className={`flex-1 overflow-y-auto px-4 sm:p-6 bg-background scroll-pb-24 ${
-          isFocusMode ? "border-t border-border" : ""
-        }`}
-      >
-        <div className="mx-auto w-full max-w-[75ch] space-y-1 pb-20">
-          {entries.map((entry, index) => {
-            const technicalInfo = getTechnicalInfoForLine(entry.id);
-            return (
-              <DialogueLine
-                key={entry.id}
-                entry={entry}
-                characters={characters}
-                layoutMode={layoutMode}
-                index={index}
-                totalEntries={entries.length}
-                onChange={(updatedEntry) =>
-                  handleEntryChange(index, updatedEntry)
-                }
-                onDelete={() => handleDeleteLine(index)}
-                onMoveUp={() => handleMoveUp(index)}
-                onMoveDown={() => handleMoveDown(index)}
-                onAddLine={() => handleAddLine(index)}
-                technicalInfo={technicalInfo}
-                showBadges={showBadges}
-                textareaRef={(el: HTMLTextAreaElement | null) => {
-                  if (el) {
-                    textareaRefs.current!.set(index, el);
-                  } else {
-                    textareaRefs.current!.delete(index);
-                  }
-                }}
-              />
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Goal Pill */}
-      {writingGoalSettings?.dailyWritingGoal != null && (
-        <div
-          className="relative z-10 -mt-12 px-4 pt-10 pb-2 border-b border-border bg-gradient-to-b from-transparent via-card/30 to-card/80 transition-opacity duration-300 ease-out flex justify-end max-md:hidden"
-          style={{
-            opacity: isFocusMode ? (isBottomBarHovered ? 1 : 0.4) : 1,
-          }}
-          onMouseEnter={() => setIsBottomBarHovered(true)}
-          onMouseLeave={() => setIsBottomBarHovered(false)}
-          onFocusCapture={() => setIsBottomBarHovered(true)}
-          onBlurCapture={() => setIsBottomBarHovered(false)}
-        >
-          <WritingGoalPill
-            current={todayWordCount}
-            goal={writingGoalSettings.dailyWritingGoal}
-            onClick={() => setStatsDialogOpen(true)}
-          />
-        </div>
-      )}
-
-      {/* Status Bar */}
-      <div
-        className="px-4 py-2 border-t border-border bg-card rounded-b-lg transition-opacity duration-300 ease-out max-md:hidden"
-        style={{
-          opacity: isFocusMode ? (isBottomBarHovered ? 1 : 0.4) : 1,
-        }}
-        onMouseEnter={() => setIsBottomBarHovered(true)}
-        onMouseLeave={() => setIsBottomBarHovered(false)}
-        onFocusCapture={() => setIsBottomBarHovered(true)}
-        onBlurCapture={() => setIsBottomBarHovered(false)}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() =>
-                setLayoutMode(layoutMode === "inline" ? "stacked" : "inline")
-              }
-              className="px-2 py-1 rounded border border-[hsl(var(--border)/0.6)] hover:bg-[hsl(var(--muted)/0.4)] text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
-              title="Toggle line layout"
-            >
-              <PanelTop className="size-3" aria-hidden="true" />
-              <span>{layoutMode === "inline" ? "Inline" : "Stacked"}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowBadges(!showBadges)}
-              className="px-2 py-1 rounded border border-[hsl(var(--border)/0.6)] hover:bg-[hsl(var(--muted)/0.4)] text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
-              title="Toggle technical badges (jumps, menus, etc.)"
-              aria-pressed={showBadges}
-            >
-              {showBadges ? (
-                <Eye className="size-3" aria-hidden="true" />
-              ) : (
-                <EyeOff className="size-3" aria-hidden="true" />
-              )}
-              <span>Badges: {showBadges ? "On" : "Off"}</span>
-            </button>
-            <FontFamilySwitcher
-              direction="up"
-              value={fontFamilyValue}
-              onChange={onFontFamilyChange}
-            />
-            <FontSizeSwitcher
-              mode="write"
-              direction="up"
-              value={fontSizeValue}
-              onChange={onFontSizeChange}
-            />
-          </div>
-
-          <div className="flex items-center gap-4 text-sm max-md:hidden">
-            <span className="text-muted-foreground">
-              <span className="text-foreground font-medium">{wordCount}</span>{" "}
-              word{wordCount !== 1 ? "s" : ""}
-            </span>
-            <span className="w-px h-4 bg-border" />
-            <span className="text-muted-foreground">
-              <span className="text-foreground font-medium">{lineCount}</span>{" "}
-              line{lineCount !== 1 ? "s" : ""}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Writing Stats Dialog */}
-      <Suspense fallback={null}>
-        <WritingStatsDialog
-          open={statsDialogOpen}
-          onOpenChange={setStatsDialogOpen}
-          dailyGoal={writingGoalSettings?.dailyWritingGoal ?? 500}
-          dailyWordCounts={writingGoalSettings?.dailyWordCounts ?? EMPTY_ARRAY}
-        />
-      </Suspense>
-    </div>
-  );
-};
+  return {
+    entries,
+    characters,
+    activeLabel,
+    handleCreateFirstEntry,
+    canUndo: inMemoryUndo.canUndo,
+    canRedo: inMemoryUndo.canRedo,
+    handleUndo,
+    handleRedo,
+    layoutMode,
+    showBadges,
+    wordCount,
+    lineCount,
+    isBottomBarHovered,
+    setIsBottomBarHovered,
+    todayWordCount,
+    writingGoalSettings,
+    statsDialogOpen,
+    setStatsDialogOpen,
+    textareaRefs,
+    handleEntryChange,
+    handleAddLine,
+    handleDeleteLine,
+    handleMoveUp,
+    handleMoveDown,
+    getTechnicalInfoForLine,
+    setLayoutMode,
+    setShowBadges,
+  };
+}
