@@ -17,17 +17,21 @@ import type {
 } from "react";
 import type { CreateLabelInput, UpdateLabelInput } from "@/lib/api/labels";
 
+export interface SidebarState {
+  isLeftCollapsed: boolean;
+  setIsLeftCollapsed: Dispatch<SetStateAction<boolean>>;
+  isRightCollapsed: boolean;
+  setIsRightCollapsed: Dispatch<SetStateAction<boolean>>;
+}
+
 export interface WriteModeViewProps {
   // Focus mode
   isFocusMode: boolean;
   focusToggleRef: RefObject<HTMLButtonElement | null>;
   onFocusModeToggle: () => void;
 
-  // Sidebar state
-  isLeftSidebarCollapsed: boolean;
-  setIsLeftSidebarCollapsed: Dispatch<SetStateAction<boolean>>;
-  isRightSidebarCollapsed: boolean;
-  setIsRightSidebarCollapsed: Dispatch<SetStateAction<boolean>>;
+  // Sidebar state (grouped to satisfy react-doctor no-many-boolean-props)
+  sidebarState: SidebarState;
   isMobile: boolean;
 
   // Labels

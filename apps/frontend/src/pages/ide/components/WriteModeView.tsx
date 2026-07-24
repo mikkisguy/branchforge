@@ -22,10 +22,7 @@ export function WriteModeView({
   isFocusMode,
   focusToggleRef,
   onFocusModeToggle,
-  isLeftSidebarCollapsed,
-  setIsLeftSidebarCollapsed,
-  isRightSidebarCollapsed,
-  setIsRightSidebarCollapsed,
+  sidebarState,
   isMobile,
   labels,
   activeLabelId,
@@ -58,6 +55,13 @@ export function WriteModeView({
   wordCountState,
   duoEndingEnabled,
 }: WriteModeViewProps) {
+  const {
+    isLeftCollapsed: isLeftSidebarCollapsed,
+    setIsLeftCollapsed: setIsLeftSidebarCollapsed,
+    isRightCollapsed: isRightSidebarCollapsed,
+    setIsRightCollapsed: setIsRightSidebarCollapsed,
+  } = sidebarState;
+
   const {
     writeFontSize,
     setWriteFontSize,

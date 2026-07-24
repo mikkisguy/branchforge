@@ -205,10 +205,12 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
         isFocusMode={isFocusMode}
         focusToggleRef={focusToggleRef}
         onFocusModeToggle={handleFocusModeToggle}
-        isLeftSidebarCollapsed={isLeftSidebarCollapsed}
-        setIsLeftSidebarCollapsed={setIsLeftSidebarCollapsed}
-        isRightSidebarCollapsed={isRightSidebarCollapsed}
-        setIsRightSidebarCollapsed={setIsRightSidebarCollapsed}
+        sidebarState={{
+          isLeftCollapsed: isLeftSidebarCollapsed,
+          setIsLeftCollapsed: setIsLeftSidebarCollapsed,
+          isRightCollapsed: isRightSidebarCollapsed,
+          setIsRightCollapsed: setIsRightSidebarCollapsed,
+        }}
         isMobile={isMobile}
         labels={labels}
         activeLabelId={activeLabelId}

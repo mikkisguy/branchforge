@@ -13,10 +13,8 @@ import { gitlabApi, type ConflictDetectionResult } from "@/lib/api/gitlab";
 import { useToast } from "@/contexts/ToastContext";
 import type { UserRole } from "@branchforge/shared";
 import { ConflictReviewDialogDiffViewer } from "./ConflictReviewDialogDiffViewer";
-import {
-  ConflictReviewDialogStates,
-  MOCK_CONFLICTS,
-} from "./ConflictReviewDialogStates";
+import { ConflictReviewDialogStates } from "./ConflictReviewDialogStates";
+import { MOCK_CONFLICTS } from "./ConflictReviewDialog.mock";
 import { ConflictReviewDialogFooter } from "./ConflictReviewDialogFooter";
 import {
   conflictReducer,

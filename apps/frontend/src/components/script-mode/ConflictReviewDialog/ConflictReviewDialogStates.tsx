@@ -10,39 +10,6 @@ import { Button } from "@/components/ui/button";
 import type { UserRole } from "@branchforge/shared";
 
 // ============================================================================
-// Mock Data for UI Development
-// ============================================================================
-
-import type { ConflictInfo } from "@/lib/api/gitlab";
-
-export const MOCK_CONFLICTS: ConflictInfo[] = [
-  {
-    label: "start",
-    type: "dialogue_mismatch",
-    localContent: [
-      { speaker: null, text: "The story begins in a small village..." },
-      { speaker: "eileen", text: "Hello there, traveler!" },
-    ],
-    remoteContent: [
-      { speaker: null, text: "The story begins in a bustling city..." },
-      { speaker: "eileen", text: "Greetings, weary traveler!" },
-    ],
-  },
-  {
-    label: "ending_a",
-    type: "dialogue_mismatch",
-    localContent: [
-      { speaker: "protagonist", text: "I choose to follow my heart." },
-      { speaker: null, text: "She walked into the sunset, hopeful." },
-    ],
-    remoteContent: [
-      { speaker: "protagonist", text: "I choose to follow my dreams." },
-      { speaker: null, text: "She walked into the sunset, determined." },
-    ],
-  },
-];
-
-// ============================================================================
 // Types
 // ============================================================================
 

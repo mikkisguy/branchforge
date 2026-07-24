@@ -82,7 +82,7 @@ export function GitLabSyncDialogProgress({
             <span className="font-medium">{progress}%</span>
           </div>
           <progress
-            className="h-2 w-full rounded-full bg-muted [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-value]:bg-primary [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:transition-all [&::-webkit-progress-value]:duration-300 [&::-moz-progress-bar]:bg-primary [&::-moz-progress-bar]:rounded-full"
+            className="h-2 w-full rounded-full bg-muted [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-value]:bg-primary [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:transition-[width] [&::-webkit-progress-value]:duration-300 [&::-moz-progress-bar]:bg-primary [&::-moz-progress-bar]:rounded-full"
             value={progress}
             max={100}
             aria-label="GitLab sync progress"

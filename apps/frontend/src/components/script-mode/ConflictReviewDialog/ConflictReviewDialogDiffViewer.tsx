@@ -92,6 +92,7 @@ export function ConflictReviewDialogDiffViewer({
             onClick={onGoPrevious}
             disabled={currentIndex === 0 || isLoading}
             className="p-1 hover:bg-muted rounded transition-colors disabled:opacity-50"
+            aria-label="Previous conflict"
           >
             <ChevronLeft className="size-5" />
           </button>
@@ -103,6 +104,7 @@ export function ConflictReviewDialogDiffViewer({
             onClick={onGoNext}
             disabled={currentIndex === totalCount - 1 || isLoading}
             className="p-1 hover:bg-muted rounded transition-colors disabled:opacity-50"
+            aria-label="Next conflict"
           >
             <ChevronRight className="size-5" />
           </button>
