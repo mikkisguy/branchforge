@@ -39,11 +39,13 @@ describe("resolveJumpTargets", () => {
       label: "Choice 1",
       targetLabelId: "label-2",
       targetLabelName: "luna_scene_2",
+      targetType: "id",
     });
     expect(result[0].menuOptions[1]).toEqual({
       label: "Choice 2",
       targetLabelId: "label-1",
       targetLabelName: "start",
+      targetType: "id",
     });
     expect(result[0].menuOptions[2]).toEqual({
       label: "Choice 3",
@@ -103,5 +105,61 @@ describe("resolveJumpTargets", () => {
     const result = resolveJumpTargets(lines, allLabels);
 
     expect(result[0].menuOptions[0].targetLabelId).toBe("label-1");
+  });
+
+  it("respects targetType name even when value is UUID-shaped", () => {
+    const allLabels = [
+      { id: "label-1", labelName: "550e8400-e29b-41d4-a716-446655440000" },
+    ];
+
+    const lines = [
+      {
+        id: "line-1",
+        menuOptions: [
+          {
+            label: "Named like UUID",
+            targetLabelId: "550e8400-e29b-41d4-a716-446655440000",
+            targetLabelName: "uuid-named-label",
+            targetType: "name" as const,
+          },
+        ],
+      },
+    ];
+
+    const result = resolveJumpTargets(lines, allLabels);
+
+    expect(result[0].menuOptions[0]).toEqual({
+      label: "Named like UUID",
+      targetLabelId: "label-1",
+      targetLabelName: "uuid-named-label",
+      targetType: "id",
+    });
+  });
+
+  it("preserves already-resolved target with targetType id", () => {
+    const allLabels = [{ id: "label-1", labelName: "some-label" }];
+
+    const lines = [
+      {
+        id: "line-1",
+        menuOptions: [
+          {
+            label: "Already ID",
+            targetLabelId: "550e8400-e29b-41d4-a716-446655440000",
+            targetLabelName: "some-label",
+            targetType: "id" as const,
+          },
+        ],
+      },
+    ];
+
+    const result = resolveJumpTargets(lines, allLabels);
+
+    expect(result[0].menuOptions[0]).toEqual({
+      label: "Already ID",
+      targetLabelId: "550e8400-e29b-41d4-a716-446655440000",
+      targetLabelName: "some-label",
+      targetType: "id",
+    });
   });
 });

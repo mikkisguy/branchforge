@@ -17,12 +17,7 @@ import { eq, and, inArray, asc, isNull } from "drizzle-orm";
 import { getFileContent } from "./gitlab/gitlab-repository.service.js";
 import { parseRPYFileWithLabels } from "./rpy-parser.service.js";
 import { ConcurrencyLimiter } from "./concurrency-limiter.js";
-
-// ============================================================================
-// Shared Concurrency Limiter
-// ============================================================================
-
-const sharedLimiter = new ConcurrencyLimiter(5);
+import { HttpError } from "../middleware/error-handler.middleware.js";
 
 // ============================================================================
 // Types
@@ -139,7 +134,7 @@ export async function detectConflicts(
       );
 
     // Fetch file contents in parallel with concurrency limit
-    const limiter = sharedLimiter;
+    const limiter = new ConcurrencyLimiter(5);
     const fileFetchResults = await Promise.allSettled(
       files.map((projectFile) =>
         limiter.run(async () => {
@@ -158,15 +153,35 @@ export async function detectConflicts(
     let anySuccess = false;
     let firstError: Error | null = null;
 
+    // Build a Map for O(1) local scene lookup by (projectFileId, labelName).
+    // Built once before the per-file loop — keyed by (fileId, labelName).
+    const localSceneMap = new Map<string, (typeof localScenes)[number]>();
+    for (const s of localScenes) {
+      if (s.projectFileId && s.labelName) {
+        localSceneMap.set(`${s.projectFileId}:${s.labelName}`, s);
+      }
+    }
+
     // Process fetched results, handling errors per-file
     for (const result of fileFetchResults) {
       if (result.status === "rejected") {
-        // Capture the first error for reporting
+        // Re-throw HTTP errors so the error-handler middleware can produce
+        // proper status codes. Also re-throw programming errors (TypeError,
+        // ReferenceError) that should never be silently swallowed.
+        const reason =
+          result.reason instanceof Error
+            ? result.reason
+            : new Error(String(result.reason));
+        if (
+          reason instanceof HttpError ||
+          reason instanceof TypeError ||
+          reason instanceof ReferenceError
+        ) {
+          throw reason;
+        }
+        // Capture the first operational error for reporting
         if (!firstError) {
-          firstError =
-            result.reason instanceof Error
-              ? result.reason
-              : new Error(String(result.reason));
+          firstError = reason;
         }
         continue;
       }
@@ -193,9 +208,8 @@ export async function detectConflicts(
           });
         } else {
           // Compare local and remote content
-          const localScene = localScenes.find(
-            (s) =>
-              s.projectFileId === projectFile.id && s.labelName === label.label
+          const localScene = localSceneMap.get(
+            `${projectFile.id}:${label.label}`
           );
           if (localScene) {
             // Use pre-fetched scene lines from map to avoid N+1 queries
@@ -260,6 +274,17 @@ export async function detectConflicts(
       conflicts,
     };
   } catch (error) {
+    // Re-throw HTTP errors so the error-handler middleware can produce
+    // proper status codes. Also re-throw programming errors (TypeError,
+    // ReferenceError) that should never be silently swallowed.
+    if (
+      error instanceof HttpError ||
+      error instanceof TypeError ||
+      error instanceof ReferenceError
+    ) {
+      throw error;
+    }
+    // Catch only true operational errors (DB failures, API errors, etc.)
     return {
       hasConflicts: false,
       conflicts: [],
