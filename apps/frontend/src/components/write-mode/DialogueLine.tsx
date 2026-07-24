@@ -52,6 +52,7 @@ export const DialogueLine = memo(function DialogueLine({
   const dropdownMenuRef = useRef<HTMLDivElement>(null);
   const speakerButtonRef = useRef<HTMLButtonElement>(null);
   const wasDropdownOpenRef = useRef(false);
+  const isDropdownOpenRef = useRef(false);
   const dropdownId = useId();
   const textOnChangeRef = useRef(onChange);
   const previousTextRef = useRef(entry.text);
@@ -170,11 +171,8 @@ export const DialogueLine = memo(function DialogueLine({
   );
 
   const handleSpeakerToggle = useCallback(() => {
-    setIsDropdownOpen((prev) => !prev);
-  }, []);
-
-  useEffect(() => {
-    if (isDropdownOpen) {
+    const nextOpen = !isDropdownOpenRef.current;
+    if (nextOpen) {
       setOpenUpward(getShouldOpenUpward(estimateDropdownHeight()));
       setFocusedOptionIndex(
         entry.speakerId
@@ -184,8 +182,9 @@ export const DialogueLine = memo(function DialogueLine({
     } else {
       setFocusedOptionIndex(-1);
     }
+    isDropdownOpenRef.current = nextOpen;
+    setIsDropdownOpen(nextOpen);
   }, [
-    isDropdownOpen,
     getShouldOpenUpward,
     estimateDropdownHeight,
     entry.speakerId,
