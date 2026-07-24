@@ -1,4 +1,8 @@
+// ScriptEditor is lazy-loaded; keep static imports so highlight state can
+// share the same CodeMirror chunk instead of a separate dynamic import.
+// react-doctor-disable-next-line react-doctor/prefer-dynamic-import
 import { EditorView, Decoration, DecorationSet } from "@codemirror/view";
+// react-doctor-disable-next-line react-doctor/prefer-dynamic-import
 import { StateField, StateEffect } from "@codemirror/state";
 
 export const TARGET_LINE_HIGHLIGHT_MS = 920;

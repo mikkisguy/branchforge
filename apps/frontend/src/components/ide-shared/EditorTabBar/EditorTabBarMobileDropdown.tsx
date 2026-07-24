@@ -83,8 +83,6 @@ export function EditorTabBarMobileDropdown({
               return (
                 <div
                   key={item.id}
-                  role="option"
-                  aria-selected={isActive}
                   className={cn(
                     "flex items-center gap-2 px-3 py-2.5 text-sm",
                     isActive ? "bg-muted/50" : "hover:bg-muted/30"
@@ -92,6 +90,8 @@ export function EditorTabBarMobileDropdown({
                 >
                   <button
                     type="button"
+                    role="option"
+                    aria-selected={isActive}
                     onClick={() => {
                       void onSelect(item.id);
                       onRequestClose();

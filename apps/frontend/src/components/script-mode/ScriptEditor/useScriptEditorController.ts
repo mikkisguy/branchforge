@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
+// ScriptEditor is lazy-loaded; keep static imports so the controller can
+// share the same CodeMirror chunk instead of a separate dynamic import.
+// react-doctor-disable-next-line react-doctor/prefer-dynamic-import
 import { EditorView } from "@codemirror/view";
 import type { StateEffectType } from "@codemirror/state";
 import { setLabelTitlesEffect } from "@/lib/codemirror/label-title-decoration";
