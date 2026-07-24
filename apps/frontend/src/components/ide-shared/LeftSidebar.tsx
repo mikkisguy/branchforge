@@ -1,48 +1,24 @@
-import {
-  useCallback,
-  useEffect,
-  useEffectEvent,
-  useReducer,
-  useRef,
-  useState,
-} from "react";
-import {
-  BookOpen,
-  SquarePen,
-  Menu,
-  Palette,
-  Settings,
-  LogOut,
-  ChevronsLeft,
-  ChevronsRight,
-  FolderOpen,
-  Network,
-  SlidersHorizontal,
-  Sun,
-  Moon,
-} from "lucide-react";
+import { useCallback, useEffect, useReducer, useRef } from "react";
 import type { ThemePalette } from "@/contexts/ThemeContext";
 import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 import type { Tab } from "./settings-types";
+import type { ThemePaletteOption } from "./ThemeSwitcher";
 import { SettingsModal } from "./SettingsModal";
 import { ProjectSettingsDialog } from "@/components/ProjectSettingsDialog";
 import { GitLabImportDialog } from "./GitLabImportDialog.lazy";
 import { ZipImportProjectDialog } from "./ZipImportProjectDialog.lazy";
 import { FlowDialog } from "@/components/flow/FlowDialog";
-import { Select } from "@/components/ui/select";
 import { Logo } from "@/components/ui/logo";
-import { IconButton } from "@/components/ui/icon-button";
+import { ModeSwitcher } from "./ModeSwitcher";
+import { ProjectSelector } from "./ProjectSelector";
+import { NavButtons } from "./NavButtons";
+import { ThemeSwitcher } from "./ThemeSwitcher";
+import { CollapseButton } from "./CollapseButton";
+import { DarkModeToggle } from "./DarkModeToggle";
+import { UserActions } from "./UserActions";
+import { SidebarMobileMenu } from "./SidebarMobileMenu";
 
-// ============================================================================
 // Types
-// ============================================================================
-
-interface ThemePaletteOption {
-  name: string;
-  key: ThemePalette;
-  color: string;
-}
-
 interface LeftSidebarPropsBase {
   mode: "write" | "script";
   setMode: (mode: "write" | "script") => void;
@@ -65,19 +41,16 @@ interface LeftSidebarPropsBase {
   deleteProject?: (projectId: string) => Promise<void>;
   refetchProjects?: () => Promise<void>;
 }
-
 interface ControlledSettingsProps extends LeftSidebarPropsBase {
   isSettingsOpenExternally: boolean;
   onSettingsOpenChangeExternally: (open: boolean) => void;
   initialSettingsTab?: Tab;
 }
-
 interface UncontrolledSettingsProps extends LeftSidebarPropsBase {
   isSettingsOpenExternally?: never;
   onSettingsOpenChangeExternally?: never;
   initialSettingsTab?: never;
 }
-
 export type LeftSidebarProps =
   ControlledSettingsProps | UncontrolledSettingsProps;
 
@@ -89,7 +62,6 @@ type ModalKey =
   | "gitLabImport"
   | "zipImport"
   | "flow";
-
 interface ModalState {
   themeDropdown: boolean;
   settings: boolean;
@@ -99,7 +71,6 @@ interface ModalState {
   zipImport: boolean;
   flow: boolean;
 }
-
 type ModalAction =
   | { type: "OPEN"; key: ModalKey }
   | { type: "CLOSE"; key: ModalKey }
@@ -128,539 +99,7 @@ function modalReducer(state: ModalState, action: ModalAction): ModalState {
   }
 }
 
-// ============================================================================
-// Sub-components
-// ============================================================================
-
-interface ModeSwitcherProps {
-  mode: "write" | "script";
-  setMode: (mode: "write" | "script") => void;
-  isCollapsed: boolean;
-  showLabel: boolean;
-}
-
-/** Write / Script mode toggle. Vertical when collapsed, horizontal when expanded. */
-function ModeSwitcher({
-  mode,
-  setMode,
-  isCollapsed,
-  showLabel,
-}: ModeSwitcherProps) {
-  return (
-    <div
-      className={`${
-        isCollapsed ? "flex-col gap-1" : "flex"
-      } bg-muted/50 rounded-md p-0.5`}
-    >
-      <button
-        type="button"
-        onClick={() => setMode("write")}
-        className={`flex ${
-          isCollapsed ? "w-full p-3.5" : "flex-1 px-2 py-1.5"
-        } items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-all ${
-          mode === "write"
-            ? "text-white bg-[var(--theme-color)]"
-            : "text-muted-foreground hover:text-foreground"
-        }`}
-        title="Write Mode"
-        aria-label="Write Mode"
-      >
-        <BookOpen className="size-4 flex-shrink-0" />
-        {showLabel && <span>Write</span>}
-      </button>
-      <button
-        type="button"
-        onClick={() => setMode("script")}
-        className={`flex ${
-          isCollapsed ? "w-full p-3.5" : "flex-1 px-2 py-1.5"
-        } items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-all ${
-          mode === "script"
-            ? "text-white bg-[var(--theme-color)]"
-            : "text-muted-foreground hover:text-foreground"
-        }`}
-        title="Script Mode"
-        aria-label="Script Mode"
-      >
-        <SquarePen className="size-4 flex-shrink-0" />
-        {showLabel && <span>Script</span>}
-      </button>
-    </div>
-  );
-}
-
-interface ProjectSelectorProps {
-  projectId?: string;
-  projects: Project[];
-  isLoadingProjects?: boolean;
-  setCurrentProject: (project: Project | null) => void;
-  isCollapsed: boolean;
-  isOpen: boolean;
-  onToggle: () => void;
-  onClose: () => void;
-  /** When true, popover opens as a full-width panel from the bottom (for mobile bottom bar) */
-  bottomPopover?: boolean;
-}
-
-/** Project picker. When collapsed, a button that opens a popover.
- *  When expanded, a native Select. Click-outside dismisses the popover. */
-function ProjectSelector({
-  projectId,
-  projects,
-  isLoadingProjects,
-  setCurrentProject,
-  isCollapsed,
-  isOpen,
-  onToggle,
-  onClose,
-  bottomPopover = false,
-}: ProjectSelectorProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  // `onClose` is read inside the click-outside handler but isn't
-  // part of the effect's subscription surface — wrap it in
-  // `useEffectEvent` so the listener isn't re-bound on every
-  // parent render (React 19+).
-  const onCloseEffect = useEffectEvent(onClose);
-
-  useEffect(() => {
-    // The popover is only rendered in the collapsed branch below;
-    // expanded mode shows a native <Select> which manages its own
-    // open/close state. So we only need the click-outside handler
-    // when `isOpen` is true — the `isCollapsed` check is unnecessary
-    // (it was inverted, registering the handler only in the mode
-    // that has no popover to dismiss).
-    if (!isOpen) return;
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        onCloseEffect();
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen]);
-
-  if (isCollapsed) {
-    return (
-      <div className="relative" ref={containerRef}>
-        <button
-          type="button"
-          onClick={onToggle}
-          disabled={isLoadingProjects}
-          className={`flex items-center justify-center p-3.5 rounded-md text-sm font-medium transition-colors ${
-            isOpen
-              ? "text-foreground bg-muted/50"
-              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-          }`}
-          title="Select Project"
-          aria-label="Select Project"
-        >
-          <FolderOpen className="size-4 flex-shrink-0" />
-        </button>
-        {isOpen && (
-          <div
-            className={`${
-              bottomPopover
-                ? "fixed bottom-14 left-0 right-0 bg-popover border-t border-border/70 shadow-xl shadow-black/25 ring-1 ring-white/5 z-[100] md:hidden"
-                : "absolute bg-popover border border-border/70 rounded-lg shadow-xl shadow-black/25 ring-1 ring-white/5 min-w-[300px] max-w-[400px] z-50 left-full top-0 ml-2"
-            }`}
-          >
-            {bottomPopover ? (
-              <div className="p-2 max-h-[400px] overflow-y-auto">
-                {isLoadingProjects ? (
-                  <div className="p-2 border-b border-muted/60">
-                    <div className="p-3 text-sm text-muted-foreground">
-                      Loading…
-                    </div>
-                  </div>
-                ) : projects.length === 0 ? (
-                  <div className="p-2 border-b border-muted/60">
-                    <div className="p-3 text-sm text-muted-foreground">
-                      No projects found. Create a new project to get started.
-                    </div>
-                  </div>
-                ) : (
-                  projects.map((project) => (
-                    <div
-                      key={project.id}
-                      className="p-2 border-b border-muted/60 last:border-b-0"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCurrentProject(project);
-                          onClose();
-                        }}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium w-full text-left transition-colors ${
-                          projectId === project.id
-                            ? "text-foreground bg-muted/50"
-                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                        }`}
-                      >
-                        <FolderOpen className="size-4 flex-shrink-0" />
-                        {project.name}
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            ) : (
-              <div className="p-2 max-h-[400px] overflow-y-auto">
-                {isLoadingProjects ? (
-                  <div className="px-3 py-2 text-sm text-muted-foreground">
-                    Loading…
-                  </div>
-                ) : projects.length === 0 ? (
-                  <div className="px-3 py-2 text-sm text-muted-foreground">
-                    No projects found. Create a new project to get started.
-                  </div>
-                ) : (
-                  projects.map((project) => (
-                    <button
-                      type="button"
-                      key={project.id}
-                      onClick={() => {
-                        setCurrentProject(project);
-                        onClose();
-                      }}
-                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-left transition-colors ${
-                        projectId === project.id
-                          ? "bg-accent text-accent-foreground font-medium"
-                          : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                      }`}
-                    >
-                      {project.name}
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative" ref={containerRef}>
-      <Select
-        value={projectId ?? undefined}
-        onChange={(selectedProjectId) => {
-          const project = projects.find((p) => p.id === selectedProjectId);
-          if (project) setCurrentProject(project);
-        }}
-        disabled={isLoadingProjects || projects.length === 0}
-        placeholder={
-          isLoadingProjects
-            ? "Loading…"
-            : projects.length === 0
-              ? "No projects"
-              : "Select project"
-        }
-        options={projects.map((p) => ({
-          value: p.id,
-          label: p.name,
-        }))}
-      />
-    </div>
-  );
-}
-
-interface NavButtonsProps {
-  projectId?: string;
-  isCollapsed: boolean;
-  showLabel: boolean;
-  onOpenProjectSettings: () => void;
-  onOpenFlow: () => void;
-  /** Render buttons in a horizontal row (for mobile bottom bar) */
-  horizontal?: boolean;
-}
-
-/** Project Settings + Flow navigation entries. */
-function NavButtons({
-  projectId,
-  isCollapsed,
-  showLabel,
-  onOpenProjectSettings,
-  onOpenFlow,
-  horizontal = false,
-}: NavButtonsProps) {
-  const disabled = !projectId;
-  return (
-    <nav className={`flex gap-3 ${horizontal ? "flex-row" : "flex-col"}`}>
-      <button
-        type="button"
-        onClick={onOpenProjectSettings}
-        disabled={disabled}
-        className={`flex items-center ${
-          isCollapsed ? "justify-center p-3.5" : "gap-3 p-2"
-        } rounded-md text-sm font-medium transition-colors ${
-          disabled
-            ? "text-muted-foreground/50 cursor-not-allowed"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-        }`}
-        title="Project settings"
-        aria-label="Project settings"
-      >
-        <SlidersHorizontal className="size-4 flex-shrink-0" />
-        {showLabel && <span>Project Settings</span>}
-      </button>
-      <button
-        type="button"
-        onClick={onOpenFlow}
-        disabled={disabled}
-        className={`flex items-center ${
-          isCollapsed ? "justify-center p-3.5" : "gap-3 p-2"
-        } rounded-md text-sm font-medium transition-colors ${
-          disabled
-            ? "text-muted-foreground/50 cursor-not-allowed"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-        }`}
-        title="Flow Graph"
-        aria-label="Flow Graph"
-      >
-        <Network className="size-4 flex-shrink-0" />
-        {showLabel && <span>Flow Graph</span>}
-      </button>
-    </nav>
-  );
-}
-
-interface ThemeSwitcherProps {
-  theme: string;
-  setTheme: (theme: ThemePalette) => void;
-  themePalettes: ThemePaletteOption[];
-  isCollapsed: boolean;
-  isOpen: boolean;
-  onToggle: () => void;
-  onClose: () => void;
-  /** When true, popover opens above the button (for mobile bottom bar) */
-  bottomPopover?: boolean;
-}
-
-/** Theme palette picker. When collapsed, a button that opens a popover.
- *  When expanded, the palettes render inline. Click-outside dismisses the popover. */
-function ThemeSwitcher({
-  theme,
-  setTheme,
-  themePalettes,
-  isCollapsed,
-  isOpen,
-  onToggle,
-  onClose,
-  bottomPopover = false,
-}: ThemeSwitcherProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  // `onClose` is read inside the click-outside handler but isn't
-  // part of the effect's subscription surface — wrap it in
-  // `useEffectEvent` so the listener isn't re-bound on every
-  // parent render (React 19+).
-  const onCloseEffect = useEffectEvent(onClose);
-
-  useEffect(() => {
-    // The theme popover is only rendered in the collapsed branch
-    // below. Expanded mode renders the palettes inline and doesn't
-    // need a click-outside handler. See the matching comment in
-    // `ProjectSelector` for context.
-    if (!isOpen) return;
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        onCloseEffect();
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen]);
-
-  if (isCollapsed) {
-    return (
-      <div className="relative" ref={containerRef}>
-        <button
-          type="button"
-          onClick={onToggle}
-          className={`flex items-center justify-center p-3.5 rounded-md text-sm font-medium transition-colors ${
-            isOpen
-              ? "text-foreground bg-muted/50"
-              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-          }`}
-          title="Theme"
-          aria-label="Theme"
-        >
-          <Palette className="size-4 flex-shrink-0" />
-        </button>
-        {isOpen && (
-          <div
-            className={`absolute bg-popover border border-border/70 rounded-lg p-3 shadow-xl shadow-black/25 ring-1 ring-white/5 z-50 ${
-              bottomPopover
-                ? "bottom-full left-1/2 -translate-x-1/2 mb-2"
-                : "left-full top-0 ml-2"
-            }`}
-          >
-            <div className="flex gap-2">
-              {themePalettes.map((palette) => (
-                <button
-                  type="button"
-                  key={palette.key}
-                  onClick={() => {
-                    setTheme(palette.key);
-                    onClose();
-                  }}
-                  className={`size-7 rounded transition-all ${
-                    theme === palette.key
-                      ? "scale-110 ring-2 ring-foreground/30 ring-offset-2 ring-offset-background"
-                      : "opacity-60 hover:opacity-100 hover:scale-105"
-                  }`}
-                  style={{ background: palette.color }}
-                  title={palette.name}
-                  aria-label={palette.name}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-center p-2">
-      <div className="flex gap-1.5 flex-1">
-        {themePalettes.map((palette) => (
-          <button
-            type="button"
-            key={palette.key}
-            onClick={() => setTheme(palette.key)}
-            className={`flex-1 h-7 rounded transition-all ${
-              theme === palette.key
-                ? "scale-110 ring-2 ring-foreground/30 ring-offset-2 ring-offset-background"
-                : "opacity-60 hover:opacity-100 hover:scale-105"
-            }`}
-            style={{ background: palette.color }}
-            title={palette.name}
-            aria-label={palette.name}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-interface CollapseButtonProps {
-  isCollapsed: boolean;
-  onToggle: () => void;
-}
-
-/** Sidebar expand/collapse toggle. */
-function CollapseButton({ isCollapsed, onToggle }: CollapseButtonProps) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className={`flex items-center ${
-        isCollapsed ? "justify-center p-3.5" : "gap-3 p-2"
-      } rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors`}
-      title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-      aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-    >
-      {isCollapsed ? (
-        <ChevronsRight className="size-4 flex-shrink-0" />
-      ) : (
-        <>
-          <ChevronsLeft className="size-4 flex-shrink-0" />
-          {!isCollapsed && <span>Collapse</span>}
-        </>
-      )}
-    </button>
-  );
-}
-
-interface DarkModeToggleProps {
-  isDarkMode: boolean;
-  onToggle: () => void;
-  isCollapsed: boolean;
-  showLabel: boolean;
-}
-
-/** Dark/light mode toggle. Icon and label reflect the active mode. */
-function DarkModeToggle({
-  isDarkMode,
-  onToggle,
-  isCollapsed,
-  showLabel,
-}: DarkModeToggleProps) {
-  const label = isDarkMode ? "Dark" : "Light";
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
-      title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
-      className={`flex items-center ${
-        isCollapsed ? "justify-center p-3.5" : "gap-3 p-2"
-      } rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors`}
-    >
-      {isDarkMode ? (
-        <Moon className="size-4 flex-shrink-0" />
-      ) : (
-        <Sun className="size-4 flex-shrink-0" />
-      )}
-      {showLabel && <span>{label}</span>}
-    </button>
-  );
-}
-
-interface UserActionsProps {
-  isCollapsed: boolean;
-  showLabel: boolean;
-  onOpenSettings: () => void;
-  onLogout: () => void;
-}
-
-/** App-level settings + logout buttons. */
-function UserActions({
-  isCollapsed,
-  showLabel,
-  onOpenSettings,
-  onLogout,
-}: UserActionsProps) {
-  return (
-    <>
-      <button
-        type="button"
-        onClick={onOpenSettings}
-        className={`flex items-center ${
-          isCollapsed ? "justify-center p-3.5" : "gap-3 p-2"
-        } rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors`}
-        title="Settings"
-        aria-label="Settings"
-      >
-        <Settings className="size-4 flex-shrink-0" />
-        {showLabel && <span>Settings</span>}
-      </button>
-      <button
-        type="button"
-        onClick={onLogout}
-        className={`flex items-center ${
-          isCollapsed ? "justify-center p-3.5" : "gap-3 p-2"
-        } rounded-md text-sm font-medium text-muted-foreground hover:text-destructive-muted hover:bg-destructive/10 transition-colors`}
-        title="Logout"
-        aria-label="Logout"
-      >
-        <LogOut className="size-4 flex-shrink-0" />
-        {showLabel && <span>Logout</span>}
-      </button>
-    </>
-  );
-}
-
-// ============================================================================
 // Main component
-// ============================================================================
-
 export function LeftSidebar(props: LeftSidebarProps) {
   const {
     mode,
@@ -682,84 +121,44 @@ export function LeftSidebar(props: LeftSidebarProps) {
     refetchProjects,
     initialSettingsTab,
   } = props;
-
   const isSettingsOpenExternally = props.isSettingsOpenExternally;
   const onSettingsOpenChangeExternally = props.onSettingsOpenChangeExternally;
   const [modals, dispatchModal] = useReducer(modalReducer, initialModalState);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const mobileMenuRef = useRef<HTMLDivElement>(null);
-  const mobileMenuBtnRef = useRef<HTMLButtonElement>(null);
-  const closeMobileMenuEvent = useEffectEvent(() => setMobileMenuOpen(false));
-
-  // Click-outside dismiss for mobile hamburger menu popover
-  useEffect(() => {
-    if (!mobileMenuOpen) return;
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        mobileMenuRef.current &&
-        !mobileMenuRef.current.contains(event.target as Node) &&
-        mobileMenuBtnRef.current &&
-        !mobileMenuBtnRef.current.contains(event.target as Node)
-      ) {
-        closeMobileMenuEvent();
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [mobileMenuOpen]);
   const projectsRef = useRef(projects);
 
   const isSettingsOpen = isSettingsOpenExternally ?? modals.settings;
   const setSettingsOpen = useCallback(
     (value: boolean) => {
-      if (onSettingsOpenChangeExternally) {
-        onSettingsOpenChangeExternally(value);
-      } else {
-        dispatchModal({ type: value ? "OPEN" : "CLOSE", key: "settings" });
-      }
+      if (onSettingsOpenChangeExternally) onSettingsOpenChangeExternally(value);
+      else dispatchModal({ type: value ? "OPEN" : "CLOSE", key: "settings" });
     },
     [onSettingsOpenChangeExternally]
   );
 
-  const handleToggleCollapse = () => {
-    onCollapsedChange(!isCollapsed);
-  };
+  const handleToggleCollapse = () => onCollapsedChange(!isCollapsed);
 
-  // Keep projectsRef in sync with projects
   useEffect(() => {
     projectsRef.current = projects;
   }, [projects]);
 
-  // Helper for handling successful project imports
   const handleImportSuccess = useCallback(
     async (importedProject?: { id: string }) => {
       try {
-        // Refetch projects to get the latest list
         await refetchProjects?.();
-
-        // If a project was provided, switch to it
         if (importedProject?.id) {
-          // Try to find the full project object in the updated list
-          // Use projectsRef.current to access the latest projects array after refetch
           const latestProjects = projectsRef.current;
           if (latestProjects) {
             const fullProject = latestProjects.find(
               (p) => p.id === importedProject.id
             );
-            if (fullProject) {
-              setCurrentProject(fullProject);
-            } else {
-              // Project not found in list yet (race condition), will be available after refetch completes
-              // The refetch above should have updated the cache, so trigger a re-render
-              // Next render cycle should have the project in the list
+            if (fullProject) setCurrentProject(fullProject);
+            else
               console.warn(
                 "Imported project not found in list, will retry on next render"
               );
-            }
           }
         }
       } catch {
-        // Refetch failure is non-critical; user can manually refresh
         console.warn("Failed to refresh projects after import");
       }
     },
@@ -775,20 +174,16 @@ export function LeftSidebar(props: LeftSidebarProps) {
         aria-label="Main navigation"
         className={`max-md:hidden fixed left-0 top-0 h-screen pl-[env(safe-area-inset-left)] ${width} bg-card/95 backdrop-blur border-r border-border/30 flex flex-col transition-all duration-300 z-50`}
       >
-        {/* Top Section */}
         <div className="flex-1 flex flex-col p-2 gap-2">
-          {/* Logo */}
           <div className="flex items-center justify-center h-12">
             <Logo compact={isCollapsed} size="sm" />
           </div>
-
           <ModeSwitcher
             mode={mode}
             setMode={setMode}
             isCollapsed={isCollapsed}
             showLabel={showLabel}
           />
-
           <ProjectSelector
             projectId={projectId}
             projects={projects}
@@ -803,10 +198,7 @@ export function LeftSidebar(props: LeftSidebarProps) {
               dispatchModal({ type: "CLOSE", key: "projectPopover" })
             }
           />
-
-          {/* Divider */}
           <div className="h-px bg-border/30 my-1" />
-
           <NavButtons
             projectId={projectId}
             isCollapsed={isCollapsed}
@@ -817,21 +209,17 @@ export function LeftSidebar(props: LeftSidebarProps) {
             onOpenFlow={() => dispatchModal({ type: "OPEN", key: "flow" })}
           />
         </div>
-
-        {/* Bottom Section */}
         <div className="flex flex-col p-2 gap-1 border-t border-border/30">
           <CollapseButton
             isCollapsed={isCollapsed}
             onToggle={handleToggleCollapse}
           />
-
           <DarkModeToggle
             isDarkMode={isDarkMode}
             onToggle={onToggleDarkMode}
             isCollapsed={isCollapsed}
             showLabel={showLabel}
           />
-
           <ThemeSwitcher
             theme={theme}
             setTheme={setTheme}
@@ -845,7 +233,6 @@ export function LeftSidebar(props: LeftSidebarProps) {
               dispatchModal({ type: "CLOSE", key: "themeDropdown" })
             }
           />
-
           <UserActions
             isCollapsed={isCollapsed}
             showLabel={showLabel}
@@ -854,141 +241,34 @@ export function LeftSidebar(props: LeftSidebarProps) {
           />
         </div>
       </nav>
-      <div className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-card/95 backdrop-blur border-t border-border/30 flex items-center justify-center gap-3 px-4 pb-[env(safe-area-inset-bottom)] z-50">
-        {/* Mode switcher – horizontal, icon-only */}
-        <div className="flex bg-muted/50 rounded-md p-0.5">
-          <button
-            type="button"
-            onClick={() => setMode("write")}
-            className={`p-3.5 rounded-md transition-all ${
-              mode === "write"
-                ? "text-white bg-[var(--theme-color)]"
-                : "text-muted-foreground"
-            }`}
-            aria-label="Write Mode"
-            title="Write Mode"
-          >
-            <BookOpen className="size-4 flex-shrink-0" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("script")}
-            className={`p-3.5 rounded-md transition-all ${
-              mode === "script"
-                ? "text-white bg-[var(--theme-color)]"
-                : "text-muted-foreground"
-            }`}
-            aria-label="Script Mode"
-            title="Script Mode"
-          >
-            <SquarePen className="size-4 flex-shrink-0" />
-          </button>
-        </div>
 
-        <ProjectSelector
-          projectId={projectId}
-          projects={projects}
-          isLoadingProjects={isLoadingProjects}
-          setCurrentProject={setCurrentProject}
-          isCollapsed={true}
-          isOpen={modals.projectPopover}
-          onToggle={() =>
-            dispatchModal({ type: "TOGGLE", key: "projectPopover" })
-          }
-          onClose={() =>
-            dispatchModal({ type: "CLOSE", key: "projectPopover" })
-          }
-          bottomPopover
-        />
+      <SidebarMobileMenu
+        mode={mode}
+        setMode={setMode}
+        projectId={projectId}
+        projects={projects}
+        isLoadingProjects={isLoadingProjects}
+        setCurrentProject={setCurrentProject}
+        isProjectPopoverOpen={modals.projectPopover}
+        onToggleProjectPopover={() =>
+          dispatchModal({ type: "TOGGLE", key: "projectPopover" })
+        }
+        onCloseProjectPopover={() =>
+          dispatchModal({ type: "CLOSE", key: "projectPopover" })
+        }
+        onOpenProjectSettings={() =>
+          dispatchModal({ type: "OPEN", key: "projectSettings" })
+        }
+        onOpenFlow={() => dispatchModal({ type: "OPEN", key: "flow" })}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onLogout={onLogout}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={onToggleDarkMode}
+        theme={theme}
+        setTheme={setTheme}
+        themePalettes={themePalettes}
+      />
 
-        <div className="flex p-0.5">
-          <NavButtons
-            projectId={projectId}
-            isCollapsed={true}
-            showLabel={false}
-            horizontal
-            onOpenProjectSettings={() =>
-              dispatchModal({ type: "OPEN", key: "projectSettings" })
-            }
-            onOpenFlow={() => dispatchModal({ type: "OPEN", key: "flow" })}
-          />
-        </div>
-
-        {/* Hamburger menu – replaces dark mode, theme, settings, logout */}
-        <span ref={mobileMenuBtnRef}>
-          <IconButton
-            icon={<Menu className="size-4 flex-shrink-0" />}
-            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-            variant="ghost"
-            className={`p-3.5 h-auto w-auto rounded-md text-sm font-medium transition-colors ${
-              mobileMenuOpen
-                ? "text-foreground bg-muted/50"
-                : "text-muted-foreground"
-            }`}
-            onClick={() => setMobileMenuOpen((prev) => !prev)}
-          />
-        </span>
-      </div>
-
-      {/* Mobile hamburger menu popover */}
-      {mobileMenuOpen && (
-        <div
-          ref={mobileMenuRef}
-          className="md:hidden fixed bottom-14 left-0 right-0 bg-popover border-t border-border/70 shadow-xl shadow-black/25 ring-1 ring-white/5 z-[100]"
-        >
-          <div className="flex flex-col">
-            <div className="p-2 rounded-md text-sm font-medium text-muted-foreground border-b border-muted/60 transition-colors">
-              <DarkModeToggle
-                isDarkMode={isDarkMode}
-                onToggle={onToggleDarkMode}
-                isCollapsed={false}
-                showLabel={true}
-              />
-            </div>
-
-            <div className="p-2 rounded-md text-sm font-medium text-muted-foreground border-b border-muted/60 transition-colors">
-              <ThemeSwitcher
-                theme={theme}
-                setTheme={setTheme}
-                themePalettes={themePalettes}
-                isCollapsed={false}
-                isOpen={false}
-                onToggle={() => {}}
-                onClose={() => {}}
-              />
-            </div>
-
-            <div className="p-2 rounded-md text-sm font-medium text-muted-foreground border-b border-muted/60 transition-colors">
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  setSettingsOpen(true);
-                }}
-                className="flex items-center gap-3 p-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                title="Settings"
-              >
-                <Settings className="size-4 flex-shrink-0" />
-                <span>Settings</span>
-              </button>
-            </div>
-
-            <div className="p-2 rounded-md text-sm font-medium text-muted-foreground transition-colors">
-              <button
-                type="button"
-                onClick={onLogout}
-                className="flex items-center gap-3 p-2 rounded-md text-sm font-medium text-muted-foreground hover:text-destructive-muted hover:bg-destructive/10 transition-colors"
-                title="Logout"
-              >
-                <LogOut className="size-4 flex-shrink-0" />
-                <span>Logout</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modals */}
       <SettingsModal
         open={isSettingsOpen}
         onOpenChange={setSettingsOpen}
@@ -1017,8 +297,6 @@ export function LeftSidebar(props: LeftSidebarProps) {
           projectId={projectId}
         />
       )}
-
-      {/* GitLab Import Dialog */}
       <GitLabImportDialog
         open={modals.gitLabImport}
         onOpenChange={(open: boolean) =>
@@ -1026,8 +304,6 @@ export function LeftSidebar(props: LeftSidebarProps) {
         }
         onSuccess={handleImportSuccess}
       />
-
-      {/* ZIP Import Dialog */}
       <ZipImportProjectDialog
         open={modals.zipImport}
         onOpenChange={(open: boolean) =>
@@ -1035,8 +311,6 @@ export function LeftSidebar(props: LeftSidebarProps) {
         }
         onSuccess={handleImportSuccess}
       />
-
-      {/* Flow Graph Dialog */}
       {projectId && (
         <FlowDialog
           open={modals.flow}
