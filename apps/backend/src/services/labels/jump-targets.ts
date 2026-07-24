@@ -45,7 +45,8 @@ export function resolveJumpTargets<
         if (
           choice.targetLabelId &&
           choice.targetLabelId !== "" &&
-          !UUID_REGEX.test(choice.targetLabelId)
+          (choice.targetType === "name" ||
+            !UUID_REGEX.test(choice.targetLabelId))
         ) {
           targetNames.push(choice.targetLabelId);
         }
@@ -68,7 +69,30 @@ export function resolveJumpTargets<
         if (!choice.targetLabelId || choice.targetLabelId === "") {
           return { ...choice, targetLabelId: "" };
         }
-        // Already a UUID, mark as resolved ID
+        // Explicit discriminator: targetType tells us how to interpret the value
+        if (choice.targetType === "name") {
+          // Treat as a label name regardless of UUID shape
+          const resolvedId = resolvedMap[choice.targetLabelId] ?? "";
+          return {
+            ...choice,
+            targetLabelId: resolvedId,
+            ...(resolvedId ? ({ targetType: "id" } as const) : {}),
+          };
+        }
+        if (choice.targetType === "id") {
+          // Treat as an ID — validate it's a UUID
+          if (UUID_REGEX.test(choice.targetLabelId)) {
+            return { ...choice };
+          }
+          // Non-UUID "id" — try resolving as name as fallback
+          const resolvedId = resolvedMap[choice.targetLabelId] ?? "";
+          return {
+            ...choice,
+            targetLabelId: resolvedId,
+            ...(resolvedId ? ({ targetType: "id" } as const) : {}),
+          };
+        }
+        // No explicit targetType — use UUID shape heuristic
         if (UUID_REGEX.test(choice.targetLabelId)) {
           return { ...choice, targetType: "id" };
         }

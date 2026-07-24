@@ -331,23 +331,27 @@ class CharacterLinkerService {
   ): Promise<void> {
     if (updates.length === 0) return;
 
-    // Build CASE expression for single bulk UPDATE
-    const caseClauses = sql.join(
-      updates.map((u) => sql`WHEN ${u.lineId} THEN ${u.speakerId}`),
-      sql` `
-    );
-    await db
-      .update(labelLines)
-      .set({
-        speakerId: sql`CASE ${labelLines.id} ${caseClauses} END`,
-        updatedAt: new Date(),
-      })
-      .where(
-        inArray(
-          labelLines.id,
-          updates.map((u) => u.lineId)
-        )
+    // Chunk to stay under PostgreSQL parameter limit (~65535)
+    const CHUNK_SIZE = 2000;
+    for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
+      const chunk = updates.slice(i, i + CHUNK_SIZE);
+      const caseClauses = sql.join(
+        chunk.map((u) => sql`WHEN ${u.lineId} THEN ${u.speakerId}`),
+        sql` `
       );
+      await db
+        .update(labelLines)
+        .set({
+          speakerId: sql`CASE ${labelLines.id} ${caseClauses} END`,
+          updatedAt: new Date(),
+        })
+        .where(
+          inArray(
+            labelLines.id,
+            chunk.map((u) => u.lineId)
+          )
+        );
+    }
   }
 
   /**
@@ -400,12 +404,13 @@ class CharacterLinkerService {
       return { linked: 0, unmatched: [], conflicts: [] };
     }
 
-    const { characterByTag, characterByTagLower } =
-      await this.buildCharacterMaps(projectId, db);
-    const { labelsWithFiles, linesByLabel } = await this.loadLabelsAndLines(
-      labelIds,
-      db
-    );
+    const [
+      { characterByTag, characterByTagLower },
+      { labelsWithFiles, linesByLabel },
+    ] = await Promise.all([
+      this.buildCharacterMaps(projectId, db),
+      this.loadLabelsAndLines(labelIds, db),
+    ]);
     const { projectFileMap, parsedFileCache } =
       await this.loadAndParseProjectFiles(labelsWithFiles, db);
     const { updates, linkedCount, unmatchedTagCounts } =

@@ -165,12 +165,23 @@ export async function detectConflicts(
     // Process fetched results, handling errors per-file
     for (const result of fileFetchResults) {
       if (result.status === "rejected") {
-        // Capture the first error for reporting
+        // Re-throw HTTP errors so the error-handler middleware can produce
+        // proper status codes. Also re-throw programming errors (TypeError,
+        // ReferenceError) that should never be silently swallowed.
+        const reason =
+          result.reason instanceof Error
+            ? result.reason
+            : new Error(String(result.reason));
+        if (
+          reason instanceof HttpError ||
+          reason instanceof TypeError ||
+          reason instanceof ReferenceError
+        ) {
+          throw reason;
+        }
+        // Capture the first operational error for reporting
         if (!firstError) {
-          firstError =
-            result.reason instanceof Error
-              ? result.reason
-              : new Error(String(result.reason));
+          firstError = reason;
         }
         continue;
       }
