@@ -1,0 +1,1 @@
+export { LabelPropertiesPanel } from "./LabelPropertiesPanel";

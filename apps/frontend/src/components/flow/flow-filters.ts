@@ -125,3 +125,34 @@ export function filterFlowNodes(
     return true;
   });
 }
+
+/**
+ * Prune filter selections that no longer reference valid keys.
+ * Derived during render to avoid an extra render cascade from a useEffect.
+ */
+export function pruneFlowFilters(
+  filters: FlowGraphFilters,
+  validRouteKeys: ReadonlySet<string | null>,
+  validCharacterIds: ReadonlySet<string>
+): FlowGraphFilters {
+  const nextRouteKeys = new Set<string | null>();
+  for (const k of filters.routeKeys) {
+    if (validRouteKeys.has(k)) nextRouteKeys.add(k);
+  }
+  const nextCharacterIds = new Set<string>();
+  for (const id of filters.characterIds) {
+    if (validCharacterIds.has(id)) nextCharacterIds.add(id);
+  }
+
+  if (
+    nextRouteKeys.size === filters.routeKeys.size &&
+    nextCharacterIds.size === filters.characterIds.size
+  ) {
+    return filters;
+  }
+  return {
+    ...filters,
+    routeKeys: nextRouteKeys,
+    characterIds: nextCharacterIds,
+  };
+}
