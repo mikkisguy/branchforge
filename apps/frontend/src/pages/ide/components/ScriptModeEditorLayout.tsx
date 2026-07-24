@@ -28,7 +28,7 @@ import {
   UndoRedoControls,
 } from "@/components/ide-shared";
 import { Button } from "@/components/ui/button";
-import { CharacterEditDialog } from "@/components/CharacterEditDialog.lazy";
+import { CharacterEditDialog } from "@/components/CharacterEditDialog/CharacterEditDialog.lazy";
 import type { LabelDetail } from "@branchforge/shared";
 import type { Character } from "@branchforge/shared";
 import type { ScriptEditorRef } from "@/components/script-mode/ScriptEditor";

@@ -36,7 +36,7 @@ vi.mock("@/hooks/useCharacters", () => ({
 }));
 
 // Mock the lazy CharacterEditDialog wrapper to render immediately
-vi.mock("../CharacterEditDialog.lazy", () => {
+vi.mock("../CharacterEditDialog/CharacterEditDialog.lazy", () => {
   const MockCharacterEditDialog = ({
     open,
     onOpenChange,

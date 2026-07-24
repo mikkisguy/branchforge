@@ -9,6 +9,7 @@ import type {
   FlowNode,
   FlowEdge,
   FlowGraphPositions,
+  RouteConfig,
 } from "@branchforge/shared";
 
 // Node dimensions used by all layout algorithms. Kept in sync with the
@@ -25,6 +26,43 @@ const NODE_HEIGHT = 120;
 // left-to-right.
 const NODE_GAP_X = 80; // horizontal gap between nodes within a row
 const ROW_GAP_Y = 160; // vertical gap between rows (node height + padding)
+
+/**
+ * Build route options for the filters panel from flow nodes and configs.
+ * Always includes an "Unassigned" bucket if any node lacks a routeKey.
+ */
+export function buildRouteOptions(
+  flowNodes: readonly FlowNode[],
+  routeConfigs: readonly RouteConfig[]
+): Array<{ key: string | null; label: string }> {
+  const presentKeys = new Set<string>();
+  let hasUnassigned = false;
+  for (const node of flowNodes) {
+    if (node.routeKey) {
+      presentKeys.add(node.routeKey);
+    } else {
+      hasUnassigned = true;
+    }
+  }
+  const fromConfigs: Array<{ key: string; label: string }> = [];
+  for (const c of routeConfigs) {
+    if (presentKeys.has(c.routeKey)) {
+      fromConfigs.push({ key: c.routeKey, label: c.routeName });
+    }
+  }
+  const known = new Set(fromConfigs.map((r) => r.key));
+  for (const k of presentKeys) {
+    if (!known.has(k)) fromConfigs.push({ key: k, label: k });
+  }
+  fromConfigs.sort((a, b) => a.label.localeCompare(b.label));
+  const options: Array<{ key: string | null; label: string }> = [
+    ...fromConfigs,
+  ];
+  if (hasUnassigned) {
+    options.push({ key: null, label: "Unassigned" });
+  }
+  return options;
+}
 
 export function getRouteColor(
   routeKey: string | null,
