@@ -1,4 +1,4 @@
-import { useReducer, useCallback, useId } from "react";
+import { useMemo, useReducer, useCallback, useId } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -10,6 +10,7 @@ import { labelKeys, characterKeys } from "@/lib/query-keys";
 import {
   type EditableCharacter,
   type CharacterGroup,
+  type CharacterGroups,
   createInitialWizardState,
   wizardReducer,
 } from "./wizard-store";
@@ -70,7 +71,7 @@ export function CharacterImportWizard({
 
   const updateCharacter = useCallback(
     (
-      group: keyof CharacterGroup,
+      group: CharacterGroups,
       index: number,
       updates: Partial<EditableCharacter>
     ) => {
@@ -79,13 +80,14 @@ export function CharacterImportWizard({
     []
   );
 
+  const excludedTagSet = useMemo(() => new Set(excludedTags), [excludedTags]);
+
   const handleImport = useCallback(async () => {
     dispatch({ type: "SET_IMPORTING", value: true });
     try {
       const charactersToImport = [
         ...state.groups.new.filter((c) => !c.excluded),
       ];
-      const excludedTagSet = new Set(excludedTags);
       for (const c of state.groups.existing) {
         if (!excludedTagSet.has(c.tag)) {
           charactersToImport.push({
@@ -156,6 +158,7 @@ export function CharacterImportWizard({
     }
   }, [
     state,
+    excludedTagSet,
     excludedTags,
     narratorTags,
     projectId,
@@ -198,7 +201,6 @@ export function CharacterImportWizard({
   const newCount = state.groups.new.length;
   const existingCount = state.groups.existing.length;
   const specialCount = state.groups.special.length;
-  const excludedTagSet = new Set(excludedTags);
   const selectedCount =
     state.groups.new.filter((c) => !c.excluded).length +
     state.groups.existing.filter((c) => !excludedTagSet.has(c.tag)).length +

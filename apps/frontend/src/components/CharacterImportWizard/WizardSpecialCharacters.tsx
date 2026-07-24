@@ -1,12 +1,12 @@
 import { Ban, ChevronDown, ChevronUp, BookOpen } from "lucide-react";
-import type { EditableCharacter, CharacterGroup } from "./wizard-store";
+import type { EditableCharacter, CharacterGroups } from "./wizard-store";
 
 interface WizardSpecialCharactersProps {
   characters: EditableCharacter[];
   expanded: boolean;
   onToggle: () => void;
   updateCharacter: (
-    group: keyof CharacterGroup,
+    group: CharacterGroups,
     index: number,
     updates: Partial<EditableCharacter>
   ) => void;
@@ -83,6 +83,11 @@ export function WizardSpecialCharacters({
                 {!char.excluded && (
                   <button
                     type="button"
+                    aria-label={
+                      char.isNarrator
+                        ? "Remove narrator mark"
+                        : "Mark as narrator"
+                    }
                     onClick={() =>
                       updateCharacter("special", index, {
                         isNarrator: !char.isNarrator,

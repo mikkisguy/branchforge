@@ -1,10 +1,10 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import type { WizardAction } from "./wizard-store";
+import type { NewCharacterDraft, WizardAction } from "./wizard-store";
 
 interface WizardAddFormProps {
-  newCharacter: { tag: string; displayName: string; color: string };
+  newCharacter: NewCharacterDraft;
   isImporting: boolean;
   dispatch: React.Dispatch<WizardAction>;
   addCharacter: () => void;

@@ -15,11 +15,19 @@ export interface EditableCharacter extends DetectedCharacter {
   routeAffiliation?: string;
 }
 
+export interface NewCharacterDraft {
+  tag: string;
+  displayName: string;
+  color: string;
+}
+
 export interface CharacterGroup {
   new: EditableCharacter[];
   existing: CharacterConflict[];
   special: EditableCharacter[];
 }
+
+export type CharacterGroups = Exclude<keyof CharacterGroup, "existing">;
 
 export interface WizardState {
   groups: CharacterGroup;
@@ -27,13 +35,13 @@ export interface WizardState {
   expandedGroups: Set<keyof CharacterGroup>;
   isImporting: boolean;
   showAddForm: boolean;
-  newCharacter: { tag: string; displayName: string; color: string };
+  newCharacter: NewCharacterDraft;
 }
 
 export type WizardAction =
   | {
       type: "UPDATE_CHARACTER";
-      group: keyof CharacterGroup;
+      group: CharacterGroups;
       index: number;
       updates: Partial<EditableCharacter>;
     }
@@ -44,7 +52,7 @@ export type WizardAction =
   | { type: "SET_SHOW_ADD_FORM"; value: boolean }
   | {
       type: "UPDATE_NEW_CHARACTER";
-      updates: Partial<{ tag: string; displayName: string; color: string }>;
+      updates: Partial<NewCharacterDraft>;
     }
   | { type: "RESET_NEW_CHARACTER" };
 

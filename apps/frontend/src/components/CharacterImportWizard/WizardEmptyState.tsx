@@ -2,11 +2,11 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { WizardAction } from "./wizard-store";
+import type { NewCharacterDraft, WizardAction } from "./wizard-store";
 
 interface WizardEmptyStateProps {
   showAddForm: boolean;
-  newCharacter: { tag: string; displayName: string; color: string };
+  newCharacter: NewCharacterDraft;
   isImporting: boolean;
   dispatch: React.Dispatch<WizardAction>;
   addCharacter: () => void;

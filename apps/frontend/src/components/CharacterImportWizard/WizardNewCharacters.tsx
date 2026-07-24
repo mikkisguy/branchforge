@@ -9,14 +9,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getNameTypeBadge, type EditableCharacter } from "./wizard-store";
-import type { CharacterGroup } from "./wizard-store";
+import type { CharacterGroups } from "./wizard-store";
 
 interface WizardNewCharactersProps {
   characters: EditableCharacter[];
   expanded: boolean;
   onToggle: () => void;
   updateCharacter: (
-    group: keyof CharacterGroup,
+    group: CharacterGroups,
     index: number,
     updates: Partial<EditableCharacter>
   ) => void;

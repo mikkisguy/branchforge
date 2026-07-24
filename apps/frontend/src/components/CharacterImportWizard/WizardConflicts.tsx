@@ -18,6 +18,7 @@ export function WizardConflicts({
         onClick={onToggle}
         className="w-full p-3 bg-amber-50 dark:bg-amber-950/20 flex items-center justify-between hover:bg-amber-100/50 dark:hover:bg-amber-950/30 transition-colors"
         type="button"
+        aria-expanded={expanded}
       >
         <div className="flex items-center gap-2">
           <AlertCircle className="size-4 text-amber-600" />

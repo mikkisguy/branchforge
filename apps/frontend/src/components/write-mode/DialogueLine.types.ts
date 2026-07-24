@@ -34,6 +34,8 @@ export function areDialogueLinePropsEqual(
     prev.entry.choiceData?.lineId === next.entry.choiceData?.lineId &&
     prev.entry.choiceData?.targetLabelId ===
       next.entry.choiceData?.targetLabelId &&
+    prev.entry.choiceData?.targetLabelName ===
+      next.entry.choiceData?.targetLabelName &&
     prev.entry.choiceData?.optionIndex === next.entry.choiceData?.optionIndex &&
     isEqualJson(
       prev.entry.choiceData?.conditionFlags,
@@ -48,12 +50,6 @@ export function areDialogueLinePropsEqual(
     prev.totalEntries === next.totalEntries &&
     prev.layoutMode === next.layoutMode &&
     prev.characters === next.characters &&
-    prev.onChange === next.onChange &&
-    prev.onDelete === next.onDelete &&
-    prev.onMoveUp === next.onMoveUp &&
-    prev.onMoveDown === next.onMoveDown &&
-    prev.onAddLine === next.onAddLine &&
-    prev.textareaRef === next.textareaRef &&
     prev.technicalInfo === next.technicalInfo &&
     prev.showBadges === next.showBadges
   );

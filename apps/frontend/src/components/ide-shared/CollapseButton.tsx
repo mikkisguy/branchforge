@@ -22,7 +22,7 @@ export function CollapseButton({ isCollapsed, onToggle }: CollapseButtonProps) {
       ) : (
         <>
           <ChevronsLeft className="size-4 flex-shrink-0" />
-          {!isCollapsed && <span>Collapse</span>}
+          <span>Collapse</span>
         </>
       )}
     </button>
