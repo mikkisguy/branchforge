@@ -604,6 +604,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
           <div className="flex-1 flex justify-center min-h-0 min-w-0">
             <div className="w-full max-w-3xl min-h-0">
               <ProseEditor
+                key={activeLabel?.id ?? "__no_label__"}
                 ref={editorRef}
                 activeLabel={activeLabel}
                 characters={characters}
