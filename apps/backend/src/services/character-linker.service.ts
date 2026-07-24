@@ -9,6 +9,7 @@
  */
 
 import { getDb } from "../db/index.js";
+import type { Db } from "../db/index.js";
 import type { Transaction } from "../db/types.js";
 import {
   labelLines,
@@ -21,6 +22,9 @@ import {
   parseRPYFileWithLabels,
   convertToBranchForgeFormatFromLabels,
 } from "./rpy-parser.service.js";
+
+/** Union type for database connection (regular or transactional) */
+type DatabaseConnection = Db | Transaction;
 
 /**
  * Conflict information for speaker linking
@@ -63,40 +67,20 @@ class CharacterLinkerService {
   }
 
   /**
-   * Link speakers to lines for labels in a project
-   *
-   * This method parses the original RPY files to extract speaker information,
-   * then links speakers to label_lines by matching character tags.
-   *
-   * Process:
-   * 1. Get all labels and their project_files
-   * 2. Parse RPY files to extract dialogue entries with speakers
-   * 3. Match speakers to characters by renpyTag
-   * 4. Update label_lines.speakerId for each dialogue line
-   *
-   * @param tx - Optional transaction. When provided, all DB operations use
-   *   this transaction instead of starting a new connection, allowing the
-   *   caller to wrap speaker linking in an atomic unit of work.
+   * Build character lookup maps from project characters
    */
-  async linkSpeakersToLines(
+  private async buildCharacterMaps(
     projectId: string,
-    labelIds: string[],
-    excludedTags: Set<string> = new Set(),
-    tx?: Transaction
-  ): Promise<SpeakerLinkResult> {
-    const db = tx ?? getDb();
-
-    if (labelIds.length === 0) {
-      return { linked: 0, unmatched: [], conflicts: [] };
-    }
-
-    // Get all characters for this project
+    db: DatabaseConnection
+  ): Promise<{
+    characterByTag: Map<string, string>;
+    characterByTagLower: Map<string, string>;
+  }> {
     const projectCharacters = await db
       .select()
       .from(characters)
       .where(eq(characters.projectId, projectId));
 
-    // Build character map by tag for fast lookups
     const characterByTag = new Map<string, string>();
     const characterByTagLower = new Map<string, string>();
 
@@ -105,7 +89,13 @@ class CharacterLinkerService {
       characterByTagLower.set(char.renpyTag.toLowerCase(), char.id);
     }
 
-    // Get all labels with their project files
+    return { characterByTag, characterByTagLower };
+  }
+
+  /**
+   * Load labels with their project files and group dialogue lines by label
+   */
+  private async loadLabelsAndLines(labelIds: string[], db: DatabaseConnection) {
     const labelsWithFiles = await db
       .select({
         labelId: labels.id,
@@ -140,13 +130,20 @@ class CharacterLinkerService {
       }
     }
 
-    // Track unmatched speaker tags and their occurrence counts
-    const unmatchedTagCounts = new Map<string, number>();
-    let linkedCount = 0;
+    return { labelsWithFiles, linesByLabel };
+  }
 
-    // Build updates in batch
-    const updates: Array<{ lineId: string; speakerId: string | null }> = [];
-
+  /**
+   * Fetch unique project files in a single query and parse each once
+   */
+  private async loadAndParseProjectFiles(
+    labelsWithFiles: Array<{
+      labelId: string;
+      labelName: string | null;
+      projectFileId: string | null;
+    }>,
+    db: DatabaseConnection
+  ) {
     // Collect unique project file IDs to avoid N+1 queries
     const uniqueProjectFileIds = Array.from(
       new Set(
@@ -192,6 +189,46 @@ class CharacterLinkerService {
       parsedFileCache.set(fileId, parsed);
     }
 
+    return { projectFileMap, parsedFileCache };
+  }
+
+  /**
+   * Process each label: match speakers to characters using parsed file data
+   */
+  private async processLabelSpeakers(
+    labelsWithFiles: Array<{
+      labelId: string;
+      labelName: string | null;
+      projectFileId: string | null;
+    }>,
+    projectFileMap: Map<string, { content: string; filePath: string }>,
+    parsedFileCache: Map<string, ReturnType<typeof parseRPYFileWithLabels>>,
+    linesByLabel: Map<
+      string,
+      Array<{
+        id: string;
+        labelId: string;
+        rpyLineNumber: number | null;
+        contentType: string;
+        speakerId: string | null;
+      }>
+    >,
+    characterByTag: Map<string, string>,
+    characterByTagLower: Map<string, string>,
+    excludedTags: Set<string>
+  ) {
+    // Track unmatched speaker tags and their occurrence counts
+    const unmatchedTagCounts = new Map<string, number>();
+    let linkedCount = 0;
+    const updates: Array<{ lineId: string; speakerId: string | null }> = [];
+
+    // Cache conversion results per (fileId, labelName) to avoid redundant
+    // calls to convertToBranchForgeFormatFromLabels on the same parsed data.
+    const conversionCache = new Map<
+      string,
+      ReturnType<typeof convertToBranchForgeFormatFromLabels>
+    >();
+
     // Process each label
     for (const labelInfo of labelsWithFiles) {
       if (!labelInfo.projectFileId || !labelInfo.labelName) continue;
@@ -208,12 +245,17 @@ class CharacterLinkerService {
       );
       if (!parsedLabel) continue;
 
-      // Convert to BranchForge format to get entries
-      const labelData = convertToBranchForgeFormatFromLabels(
-        parsed,
-        labelInfo.labelName,
-        projectFileData.content
-      );
+      // Convert to BranchForge format to get entries (with caching)
+      const cacheKey = `${labelInfo.projectFileId}:${labelInfo.labelName}`;
+      let labelData = conversionCache.get(cacheKey);
+      if (!labelData) {
+        labelData = convertToBranchForgeFormatFromLabels(
+          parsed,
+          labelInfo.labelName,
+          projectFileData.content
+        );
+        conversionCache.set(cacheKey, labelData);
+      }
 
       // Build a map of RPY line number -> speaker for this label
       const speakerByLineNumber = new Map<number, string | null>();
@@ -277,31 +319,44 @@ class CharacterLinkerService {
       }
     }
 
-    // Apply updates in batch - group by speakerId to avoid N+1 queries
-    if (updates.length > 0) {
-      // Group updates by speakerId (including null/unmatched)
-      const updatesBySpeakerId = new Map<string | null, string[]>();
-      for (const update of updates) {
-        const speakerId = update.speakerId;
-        if (!updatesBySpeakerId.has(speakerId)) {
-          updatesBySpeakerId.set(speakerId, []);
-        }
-        updatesBySpeakerId.get(speakerId)!.push(update.lineId);
-      }
+    return { updates, linkedCount, unmatchedTagCounts };
+  }
 
-      // Execute one UPDATE per distinct speakerId in parallel
-      const updatePromises = Array.from(updatesBySpeakerId.entries()).map(
-        ([speakerId, lineIds]) =>
-          db
-            .update(labelLines)
-            .set({ speakerId, updatedAt: new Date() })
-            .where(inArray(labelLines.id, lineIds))
+  /**
+   * Apply batched speakerId updates using a single CASE-based UPDATE
+   */
+  private async applySpeakerUpdates(
+    updates: Array<{ lineId: string; speakerId: string | null }>,
+    db: DatabaseConnection
+  ): Promise<void> {
+    if (updates.length === 0) return;
+
+    // Build CASE expression for single bulk UPDATE
+    const caseClauses = sql.join(
+      updates.map((u) => sql`WHEN ${u.lineId} THEN ${u.speakerId}`),
+      sql` `
+    );
+    await db
+      .update(labelLines)
+      .set({
+        speakerId: sql`CASE ${labelLines.id} ${caseClauses} END`,
+        updatedAt: new Date(),
+      })
+      .where(
+        inArray(
+          labelLines.id,
+          updates.map((u) => u.lineId)
+        )
       );
+  }
 
-      await Promise.all(updatePromises);
-    }
-
-    // Build conflict info for unmatched tags
+  /**
+   * Build the SpeakerLinkResult from unmatched tags and linked count
+   */
+  private buildLinkResult(
+    unmatchedTagCounts: Map<string, number>,
+    linkedCount: number
+  ): SpeakerLinkResult {
     const conflicts: SpeakerLinkConflict[] = Array.from(
       unmatchedTagCounts.keys()
     ).map((speakerTag) => ({
@@ -315,6 +370,56 @@ class CharacterLinkerService {
       unmatched: Array.from(unmatchedTagCounts.keys()),
       conflicts,
     };
+  }
+
+  /**
+   * Link speakers to lines for labels in a project
+   *
+   * This method parses the original RPY files to extract speaker information,
+   * then links speakers to label_lines by matching character tags.
+   *
+   * Process:
+   * 1. Get all labels and their project_files
+   * 2. Parse RPY files to extract dialogue entries with speakers
+   * 3. Match speakers to characters by renpyTag
+   * 4. Update label_lines.speakerId for each dialogue line
+   *
+   * @param tx - Optional transaction. When provided, all DB operations use
+   *   this transaction instead of starting a new connection, allowing the
+   *   caller to wrap speaker linking in an atomic unit of work.
+   */
+  async linkSpeakersToLines(
+    projectId: string,
+    labelIds: string[],
+    excludedTags: Set<string> = new Set(),
+    tx?: Transaction
+  ): Promise<SpeakerLinkResult> {
+    const db = tx ?? getDb();
+
+    if (labelIds.length === 0) {
+      return { linked: 0, unmatched: [], conflicts: [] };
+    }
+
+    const { characterByTag, characterByTagLower } =
+      await this.buildCharacterMaps(projectId, db);
+    const { labelsWithFiles, linesByLabel } = await this.loadLabelsAndLines(
+      labelIds,
+      db
+    );
+    const { projectFileMap, parsedFileCache } =
+      await this.loadAndParseProjectFiles(labelsWithFiles, db);
+    const { updates, linkedCount, unmatchedTagCounts } =
+      await this.processLabelSpeakers(
+        labelsWithFiles,
+        projectFileMap,
+        parsedFileCache,
+        linesByLabel,
+        characterByTag,
+        characterByTagLower,
+        excludedTags
+      );
+    await this.applySpeakerUpdates(updates, db);
+    return this.buildLinkResult(unmatchedTagCounts, linkedCount);
   }
 
   /**

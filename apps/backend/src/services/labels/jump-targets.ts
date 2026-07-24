@@ -24,6 +24,7 @@ export function resolveJumpTargets<
       label: string;
       targetLabelId: string;
       targetLabelName: string;
+      targetType?: "id" | "name";
       conditionFlags?: string[];
       effects?: {
         stats?: Record<string, number>;
@@ -67,13 +68,15 @@ export function resolveJumpTargets<
         if (!choice.targetLabelId || choice.targetLabelId === "") {
           return { ...choice, targetLabelId: "" };
         }
-        // Already a UUID, preserve it
+        // Already a UUID, mark as resolved ID
         if (UUID_REGEX.test(choice.targetLabelId)) {
-          return choice;
+          return { ...choice, targetType: "id" };
         }
+        const resolvedId = resolvedMap[choice.targetLabelId] ?? "";
         return {
           ...choice,
-          targetLabelId: resolvedMap[choice.targetLabelId] ?? "",
+          targetLabelId: resolvedId,
+          ...(resolvedId ? ({ targetType: "id" } as const) : {}),
         };
       }),
     };

@@ -27,6 +27,9 @@ import { requireProjectAccess } from "./authz.service.js";
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Type discriminator for resolving targetLabelId as UUID or label name. */
+type TargetType = "id" | "name";
+
 /**
  * Regex for matching jump statements in label line content
  */
@@ -114,6 +117,7 @@ export async function getFlowGraph(
       label: string;
       targetLabelId: string;
       targetLabelName: string;
+      targetType?: "id" | "name";
       conditionFlags?: string[];
       effects?: {
         stats?: Record<string, number>;
@@ -149,12 +153,22 @@ export async function getFlowGraph(
     `${source}|${target}`;
 
   // Resolve target label ID (UUID or name)
-  const resolveTargetId = (targetLabelId: string): string | null => {
-    if (UUID_REGEX.test(targetLabelId)) {
-      // It's already a UUID - check if it's in our project labels
+  const resolveTargetId = (
+    targetLabelId: string,
+    targetType?: TargetType
+  ): string | null => {
+    // Use explicit type discriminator when available
+    if (targetType === "id") {
       return labelIdSet.has(targetLabelId) ? targetLabelId : null;
     }
-    // It's a label name - resolve via map
+    if (targetType === "name") {
+      return labelNameToId.get(targetLabelId.toLowerCase()) ?? null;
+    }
+    // Fallback: guess using UUID regex for backward compatibility
+    // with existing menuOptions that lack the targetType field.
+    if (UUID_REGEX.test(targetLabelId)) {
+      return labelIdSet.has(targetLabelId) ? targetLabelId : null;
+    }
     return labelNameToId.get(targetLabelId.toLowerCase()) ?? null;
   };
 
@@ -162,7 +176,10 @@ export async function getFlowGraph(
   for (const line of linesRows) {
     if (line.contentType === "MENU" && line.menuOptions) {
       for (const option of line.menuOptions) {
-        const targetId = resolveTargetId(option.targetLabelId);
+        const targetId = resolveTargetId(
+          option.targetLabelId,
+          option.targetType
+        );
         if (targetId) {
           const key = edgeKey(line.labelId, targetId);
           if (!existingEdgeKeys.has(key)) {
@@ -259,9 +276,8 @@ export async function getFlowGraph(
       }
       set.add(line.speakerId);
     }
-    // Count words from text-bearing line types. The `word_count` column
-    // on label_lines has no database trigger to populate it, so we compute
-    // from the `content` field at query time.
+    // Count words from text-bearing line types. Word counts are computed
+    // from the `content` field at query time — there is no persisted column.
     if (line.contentType === "DIALOGUE" || line.contentType === "NARRATION") {
       const trimmed = line.content?.trim();
       const words = trimmed ? trimmed.split(/\s+/).length : 0;

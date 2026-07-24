@@ -39,11 +39,13 @@ describe("resolveJumpTargets", () => {
       label: "Choice 1",
       targetLabelId: "label-2",
       targetLabelName: "luna_scene_2",
+      targetType: "id",
     });
     expect(result[0].menuOptions[1]).toEqual({
       label: "Choice 2",
       targetLabelId: "label-1",
       targetLabelName: "start",
+      targetType: "id",
     });
     expect(result[0].menuOptions[2]).toEqual({
       label: "Choice 3",

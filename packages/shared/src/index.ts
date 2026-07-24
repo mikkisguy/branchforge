@@ -503,6 +503,8 @@ export interface LabelLine {
     label: string;
     targetLabelId: string;
     targetLabelName: string;
+    /** Discriminator for UUID vs label-name resolution. Set to "id" after resolution. */
+    targetType?: "id" | "name";
     conditionFlags?: string[];
     effects?: {
       stats?: Record<string, number>;
