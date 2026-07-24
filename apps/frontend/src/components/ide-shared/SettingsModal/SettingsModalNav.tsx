@@ -3,6 +3,19 @@ import { TabScrollArea } from "@/components/ui/tab-scroll-area";
 import { APP_NAME, APP_VERSION } from "@/lib/version";
 import type { Tab } from "../settings-types";
 
+function getTabClassName(isActive: boolean, variant: "desktop" | "mobile") {
+  const base =
+    variant === "desktop"
+      ? "w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors"
+      : "shrink-0 whitespace-nowrap px-3 py-2 my-1.5 rounded-md text-sm font-medium transition-colors";
+  return cn(
+    base,
+    isActive
+      ? "bg-accent text-accent-foreground"
+      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+  );
+}
+
 interface SettingsModalNavProps {
   tabs: { id: Tab; label: string }[];
   activeTab: Tab;
@@ -23,12 +36,7 @@ export function SettingsModalNav({
             type="button"
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={cn(
-              "w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors",
-              activeTab === tab.id
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            )}
+            className={getTabClassName(activeTab === tab.id, "desktop")}
           >
             {tab.label}
           </button>
@@ -42,12 +50,7 @@ export function SettingsModalNav({
             type="button"
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={cn(
-              "shrink-0 whitespace-nowrap px-3 py-2 my-1.5 rounded-md text-sm font-medium transition-colors",
-              activeTab === tab.id
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            )}
+            className={getTabClassName(activeTab === tab.id, "mobile")}
           >
             {tab.label}
           </button>

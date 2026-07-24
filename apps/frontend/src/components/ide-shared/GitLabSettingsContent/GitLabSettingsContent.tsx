@@ -6,7 +6,7 @@
  * Repository linking is now handled in the import flow, not here.
  */
 
-import { useReducer, useCallback } from "react";
+import { useReducer, useCallback, useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { useGitLab } from "@/hooks/useGitLab";
 import { useToast } from "@/contexts/ToastContext";
@@ -33,18 +33,43 @@ export function GitLabSettingsContent() {
 
   const [state, dispatch] = useReducer(settingsReducer, initialSettingsState);
 
+  const latestCredentialsRef = useRef({
+    token: state.token,
+    gitlabUrl: state.gitlabUrl,
+  });
+  useEffect(() => {
+    latestCredentialsRef.current = {
+      token: state.token,
+      gitlabUrl: state.gitlabUrl,
+    };
+  }, [state.token, state.gitlabUrl]);
+
   const handleValidate = useCallback(async () => {
     if (!state.token.trim()) {
       error("Token is required");
       return;
     }
 
+    const token = state.token;
+    const gitlabUrl = state.gitlabUrl;
+
     dispatch({ type: "SET_VALIDATING", value: true });
     dispatch({ type: "SET_VALIDATION_RESULT", result: null });
 
     try {
-      const result = await validateToken(state.token, state.gitlabUrl);
-      dispatch({ type: "SET_VALIDATION_RESULT", result });
+      const result = await validateToken(token, gitlabUrl);
+      dispatch({
+        type: "SET_VALIDATION_RESULT",
+        result,
+        token,
+        gitlabUrl,
+      });
+
+      const latest = latestCredentialsRef.current;
+      if (latest.token !== token || latest.gitlabUrl !== gitlabUrl) {
+        return;
+      }
+
       if (result.valid) {
         success(
           `Token validated successfully for ${result.username || "user"}`
@@ -54,8 +79,16 @@ export function GitLabSettingsContent() {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Validation failed";
-      error(message);
-      dispatch({ type: "SET_VALIDATION_RESULT", result: { valid: false } });
+      const latest = latestCredentialsRef.current;
+      if (latest.token === token && latest.gitlabUrl === gitlabUrl) {
+        error(message);
+      }
+      dispatch({
+        type: "SET_VALIDATION_RESULT",
+        result: { valid: false },
+        token,
+        gitlabUrl,
+      });
     } finally {
       dispatch({ type: "SET_VALIDATING", value: false });
     }

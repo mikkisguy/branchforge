@@ -56,36 +56,40 @@ export function EditorTabBarDesktopTabs({
           return (
             <div
               key={item.id}
-              id={`${idPrefix}${item.id}`}
-              role="tab"
-              aria-selected={isActive}
-              tabIndex={isActive ? 0 : -1}
-              onMouseDown={handleTabMouseDown}
-              onClick={() => handleSelectItem(item.id)}
-              onKeyDown={(event) => handleTabKeyDown(event, index)}
               className={cn(
-                "group relative flex h-9 shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-md px-3 text-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                "group relative flex h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-md pl-3 pr-1.5 text-sm transition-all",
                 isActive
                   ? "border border-border/90 bg-background/85 text-foreground font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
                   : "border border-transparent text-muted-foreground hover:border-border/70 hover:bg-muted/40 hover:text-foreground"
               )}
             >
-              <span className={cn("truncate", titleMaxWidthClassName)}>
-                {item.title}
-              </span>
-
-              {item.meta ? (
-                <span
-                  className={cn(
-                    "rounded px-1.5 py-0.5 text-[11px] font-semibold tracking-wide",
-                    isActive
-                      ? "bg-muted/70 text-foreground/90"
-                      : "bg-muted/55 text-muted-foreground/80"
-                  )}
-                >
-                  {item.meta}
+              <div
+                id={`${idPrefix}${item.id}`}
+                role="tab"
+                aria-selected={isActive}
+                tabIndex={isActive ? 0 : -1}
+                onMouseDown={handleTabMouseDown}
+                onClick={() => handleSelectItem(item.id)}
+                onKeyDown={(event) => handleTabKeyDown(event, index)}
+                className="flex min-w-0 cursor-pointer items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              >
+                <span className={cn("truncate", titleMaxWidthClassName)}>
+                  {item.title}
                 </span>
-              ) : null}
+
+                {item.meta ? (
+                  <span
+                    className={cn(
+                      "rounded px-1.5 py-0.5 text-[11px] font-semibold tracking-wide",
+                      isActive
+                        ? "bg-muted/70 text-foreground/90"
+                        : "bg-muted/55 text-muted-foreground/80"
+                    )}
+                  >
+                    {item.meta}
+                  </span>
+                ) : null}
+              </div>
 
               <button
                 type="button"
@@ -101,7 +105,7 @@ export function EditorTabBarDesktopTabs({
                   }
                 }}
                 className={cn(
-                  "ml-1 rounded p-0.5 opacity-25 transition group-hover:opacity-100 focus:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                  "rounded p-0.5 opacity-25 transition group-hover:opacity-100 focus:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
                   isActive
                     ? "text-foreground/65 hover:bg-muted/70 hover:text-foreground"
                     : "text-muted-foreground/45 hover:bg-muted/60 hover:text-muted-foreground"

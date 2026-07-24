@@ -57,7 +57,7 @@ export function ScriptMode({
     linkedRepo,
     primaryFileSourceType,
     saveConflict,
-  } = useScriptMode({ projectId, projectName });
+  } = useScriptMode({ projectId });
 
   if (isLoadingLabels || isLoadingFiles) {
     return (

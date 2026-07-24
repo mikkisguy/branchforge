@@ -37,7 +37,7 @@ export function GitLabSettingsSetupForm({
             onChange={(e) =>
               dispatch({ type: "SET_GITLAB_URL", value: e.target.value })
             }
-            disabled={state.isStoring}
+            disabled={state.isStoring || state.isValidating}
           />
           <p className="text-xs text-muted-foreground">
             Leave default for gitlab.com or provide your self-hosted URL.
@@ -58,7 +58,7 @@ export function GitLabSettingsSetupForm({
                 onChange={(e) =>
                   dispatch({ type: "SET_TOKEN", value: e.target.value })
                 }
-                disabled={state.isStoring}
+                disabled={state.isStoring || state.isValidating}
                 className="pr-10"
               />
               <Button

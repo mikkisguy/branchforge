@@ -9,12 +9,7 @@ import type { LabelTitleMap } from "@/lib/codemirror/label-title-decoration";
 import type { SourceOrigin } from "@branchforge/shared";
 import { useScriptModeData } from "./useScriptModeData";
 
-export function useScriptMode({
-  projectId,
-}: {
-  projectId?: string;
-  projectName?: string;
-}) {
+export function useScriptMode({ projectId }: { projectId?: string }) {
   const data = useScriptModeData({ projectId });
   const { setActiveLabelId, projectFiles, skipSaveRef, labels } = data;
 
@@ -146,14 +141,22 @@ export function useScriptMode({
     if (!activeProjectFile) return;
     if (currentEditFileId === activeProjectFile.id) return;
 
-    previousEditFileIdRef.current = currentEditFileId;
+    const targetFile = activeProjectFile;
+    const previousFileId = currentEditFileId;
+    previousEditFileIdRef.current = previousFileId;
+    let cancelled = false;
 
     (async () => {
-      const success = await switchToFile(activeProjectFile);
-      if (!success && previousEditFileIdRef.current) {
-        void selectFileTab(previousEditFileIdRef.current, { notify: false });
+      const success = await switchToFile(targetFile);
+      if (cancelled) return;
+      if (!success && previousFileId) {
+        void selectFileTab(previousFileId, { notify: false });
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [activeProjectFile, currentEditFileId, switchToFile, selectFileTab]);
 
   const activeFileContent =

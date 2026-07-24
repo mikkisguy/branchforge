@@ -53,6 +53,7 @@ export function ScriptEditorToolbar({
         <button
           type="button"
           onClick={() => setShowLabelTitles(!showLabelTitles)}
+          aria-pressed={showLabelTitles}
           className={`px-3 py-1.5 text-xs font-code border rounded flex items-center gap-2 transition-colors ${
             showLabelTitles
               ? "bg-accent/50 hover:bg-accent border-border"

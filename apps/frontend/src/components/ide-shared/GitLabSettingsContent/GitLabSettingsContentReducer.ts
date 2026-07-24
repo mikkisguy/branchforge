@@ -23,6 +23,8 @@ export type SettingsAction =
   | {
       type: "SET_VALIDATION_RESULT";
       result: { valid: boolean; username?: string } | null;
+      token?: string;
+      gitlabUrl?: string;
     }
   | { type: "SET_REMOVE_CONFIRM_DIALOG"; value: boolean }
   | { type: "RESET_FORM" };
@@ -44,9 +46,19 @@ export function settingsReducer(
 ): SettingsState {
   switch (action.type) {
     case "SET_TOKEN":
-      return { ...state, token: action.value, validationResult: null };
+      return {
+        ...state,
+        token: action.value,
+        validationResult: null,
+        isValidating: false,
+      };
     case "SET_GITLAB_URL":
-      return { ...state, gitlabUrl: action.value, validationResult: null };
+      return {
+        ...state,
+        gitlabUrl: action.value,
+        validationResult: null,
+        isValidating: false,
+      };
     case "TOGGLE_SHOW_TOKEN":
       return { ...state, showToken: !state.showToken };
     case "SET_VALIDATING":
@@ -56,6 +68,14 @@ export function settingsReducer(
     case "SET_REMOVING":
       return { ...state, isRemoving: action.value };
     case "SET_VALIDATION_RESULT":
+      if (
+        action.result !== null &&
+        action.token !== undefined &&
+        (action.token !== state.token || action.gitlabUrl !== state.gitlabUrl)
+      ) {
+        // Ignore stale validation responses for credentials that changed mid-flight.
+        return state;
+      }
       return { ...state, validationResult: action.result };
     case "SET_REMOVE_CONFIRM_DIALOG":
       return { ...state, showRemoveConfirmDialog: action.value };

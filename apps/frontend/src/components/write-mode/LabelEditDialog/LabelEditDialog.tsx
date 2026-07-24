@@ -12,10 +12,9 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { INITIAL_FORM_STATE, formReducer } from "./LabelEditDialogReducer";
-import type { FormAction } from "./LabelEditDialogReducer";
-import { LabelEditDialogFields } from "./LabelEditDialogFields";
-import { LabelEditDialogFooter } from "./LabelEditDialogFooter";
+import { INITIAL_FORM_STATE, formReducer } from "./LabelEditDialogReducer.js";
+import { LabelEditDialogFields } from "./LabelEditDialogFields.js";
+import { LabelEditDialogFooter } from "./LabelEditDialogFooter.js";
 
 export interface LabelEditDialogProps {
   /** Whether the dialog is open */
@@ -210,7 +209,7 @@ export function LabelEditDialog({
         <div className="space-y-4 mt-4">
           <LabelEditDialogFields
             form={form}
-            dispatch={dispatch as React.Dispatch<FormAction>}
+            dispatch={dispatch}
             isSaving={isSaving}
             currentLabelName={currentLabelName}
             routeConfigs={routeConfigs}

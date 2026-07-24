@@ -8,7 +8,7 @@ import {
 import { useLabels } from "@/hooks/useLabels";
 import { useFocusModeKeyboardHandler } from "@/hooks/useFocusModeKeyboardHandler";
 import { useFocusModeState } from "@/hooks/useFocusModeState";
-import { useGitLab } from "@/hooks/useGitLab";
+import { useGitLab, type UseGitLabReturn } from "@/hooks/useGitLab";
 import { useCharacters } from "@/hooks/useCharacters";
 import { useProjectFiles } from "@/hooks/useProjectFiles";
 import { useToast } from "@/contexts/ToastContext";
@@ -36,20 +36,7 @@ export interface UseScriptModeDataReturn {
   updateFileContent: UseProjectFilesReturn["updateFileContent"];
   refreshFiles: () => Promise<unknown>;
   isProjectLinked: (projectId: string) => boolean;
-  getLinkedRepository: (
-    projectId: string
-  ) =>
-    | {
-        id: string;
-        projectId: string;
-        gitlabProjectId: number;
-        repositoryName: string;
-        gitlabUrl: string;
-        defaultBranch: string;
-        lastSyncedAt: string | null;
-        createdAt: string;
-      }
-    | undefined;
+  getLinkedRepository: UseGitLabReturn["getLinkedRepository"];
   showSyncDialog: boolean;
   setShowSyncDialog: (open: boolean) => void;
   showZipImportDialog: boolean;

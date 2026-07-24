@@ -30,8 +30,15 @@ export function ScriptReferenceStatsSection({
       }
     >
       {isLoading ? (
-        <div className="flex items-center justify-center py-4">
-          <Loader2 className="size-4 animate-spin text-muted-foreground" />
+        <div
+          role="status"
+          aria-label="Loading stats"
+          className="flex items-center justify-center py-4"
+        >
+          <Loader2
+            aria-hidden="true"
+            className="size-4 animate-spin text-muted-foreground"
+          />
         </div>
       ) : stats.length === 0 ? (
         <div className="text-center py-3">

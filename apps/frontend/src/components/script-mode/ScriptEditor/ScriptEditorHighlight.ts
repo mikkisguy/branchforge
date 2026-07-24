@@ -17,7 +17,9 @@ export const createHighlightExtension = () => {
   const highlightStateField = StateField.define<DecorationSet>({
     create: () => Decoration.none,
     update: (decorations, transaction) => {
-      // Check if there's a setHighlightEffect in the transaction
+      // Keep highlight positions in sync with document edits.
+      const nextDecorations = decorations.map(transaction.changes);
+
       for (const effect of transaction.effects) {
         if (effect.is(setHighlightEffect)) {
           const line = effect.value;
@@ -35,7 +37,7 @@ export const createHighlightExtension = () => {
           }
         }
       }
-      return decorations;
+      return nextDecorations;
     },
     provide: (f) => EditorView.decorations.from(f),
   });
