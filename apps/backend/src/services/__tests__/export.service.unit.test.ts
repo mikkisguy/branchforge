@@ -849,6 +849,24 @@ describe("ExportService", () => {
   // =========================================================================
 
   describe("getExportPreview", () => {
+    it("should throw RateLimitError when rate limited", async () => {
+      vi.mocked(checkRateLimit).mockReturnValueOnce({
+        allowed: false,
+        remainingAttempts: 0,
+        retryAfter: 5000,
+      });
+
+      await expect(getExportPreview(PROJECT_ID, USER_ID)).rejects.toThrow(
+        RateLimitError
+      );
+
+      expect(requireProjectAccess).not.toHaveBeenCalled();
+      expect(checkRateLimit).toHaveBeenCalledWith(
+        `export-preview:${USER_ID}`,
+        expect.objectContaining({ maxAttempts: 60 })
+      );
+    });
+
     it("should call requireProjectAccess", async () => {
       // All empty — 3 dequeue calls: variables, stats, characters
       resolveQueue.push([]);
@@ -858,6 +876,10 @@ describe("ExportService", () => {
       await getExportPreview(PROJECT_ID, USER_ID);
 
       expect(requireProjectAccess).toHaveBeenCalledWith(PROJECT_ID, USER_ID);
+      expect(checkRateLimit).toHaveBeenCalledWith(
+        `export-preview:${USER_ID}`,
+        expect.objectContaining({ maxAttempts: 60 })
+      );
     });
 
     it("should return isEmpty true with emptyReason when all sources are empty", async () => {

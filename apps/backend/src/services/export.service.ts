@@ -89,6 +89,48 @@ function sanitizeZipEntryPath(filePath: string): string | null {
   return normalized;
 }
 
+/**
+ * Fetch variables, stats, and characters used by export generation/preview.
+ * Shared so both paths keep identical projections and projectId filters.
+ */
+async function fetchSupportingFileSources(projectId: string) {
+  const db = getDb();
+
+  const [projectVariables, projectStats, projectCharacters] = await Promise.all(
+    [
+      db
+        .select({
+          key: variables.key,
+          description: variables.description,
+          category: variables.category,
+        })
+        .from(variables)
+        .where(eq(variables.projectId, projectId)),
+      db
+        .select({
+          key: stats.key,
+          name: stats.name,
+          minValue: stats.minValue,
+          maxValue: stats.maxValue,
+          description: stats.description,
+        })
+        .from(stats)
+        .where(eq(stats.projectId, projectId)),
+      db
+        .select({
+          renpyTag: characters.renpyTag,
+          displayName: characters.displayName,
+          color: characters.color,
+          isNarrator: characters.isNarrator,
+        })
+        .from(characters)
+        .where(eq(characters.projectId, projectId)),
+    ]
+  );
+
+  return { projectVariables, projectStats, projectCharacters };
+}
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -103,6 +145,15 @@ const MAX_EXPORTS_PER_PROJECT = 10;
  * Rate limit: max exports per user per time window
  */
 const EXPORT_RATE_LIMIT = { maxAttempts: 10, windowMs: 60 * 60 * 1000 }; // 10 per hour
+
+/**
+ * Rate limit: max export previews per user per time window.
+ * More generous than full exports — preview is read-only and lightweight.
+ */
+const EXPORT_PREVIEW_RATE_LIMIT = {
+  maxAttempts: 60,
+  windowMs: 15 * 60 * 1000,
+}; // 60 per 15 minutes
 
 // ============================================================================
 // Export Generation
@@ -247,37 +298,8 @@ export async function generateExport(
   }
 
   // Generate supporting files in parallel
-  const [projectVariables, projectStats, projectCharacters] = await Promise.all(
-    [
-      db
-        .select({
-          key: variables.key,
-          description: variables.description,
-          category: variables.category,
-        })
-        .from(variables)
-        .where(eq(variables.projectId, projectId)),
-      db
-        .select({
-          key: stats.key,
-          name: stats.name,
-          minValue: stats.minValue,
-          maxValue: stats.maxValue,
-          description: stats.description,
-        })
-        .from(stats)
-        .where(eq(stats.projectId, projectId)),
-      db
-        .select({
-          renpyTag: characters.renpyTag,
-          displayName: characters.displayName,
-          color: characters.color,
-          isNarrator: characters.isNarrator,
-        })
-        .from(characters)
-        .where(eq(characters.projectId, projectId)),
-    ]
-  );
+  const { projectVariables, projectStats, projectCharacters } =
+    await fetchSupportingFileSources(projectId);
 
   // Determine the directory prefix for generated files (e.g. "game/")
   // by computing a shared top-level directory segment from the
@@ -368,7 +390,7 @@ export async function generateExport(
  * in an export: variables, stats, and character definitions.
  *
  * This is a read-only preview that returns the generated RPY content
- * without creating a zip or any database records. It is not rate-limited.
+ * without creating a zip or any database records.
  *
  * @param projectId - The project to preview
  * @param userId - The requesting user (for authorization)
@@ -378,43 +400,24 @@ export async function getExportPreview(
   projectId: string,
   userId: string
 ): Promise<ExportPreviewResponse> {
+  // Rate limit check (preview operation, keyed by requesting user)
+  const rateLimitResult = checkRateLimit(
+    `export-preview:${userId}`,
+    EXPORT_PREVIEW_RATE_LIMIT
+  );
+  if (!rateLimitResult.allowed) {
+    throw new RateLimitError(
+      rateLimitResult.retryAfter,
+      "Too many export preview requests. Please try again later."
+    );
+  }
+
   // Verify project access
   await requireProjectAccess(projectId, userId);
 
-  const db = getDb();
-
   // Parallel DB selects — same field projections as generateExport
-  const [projectVariables, projectStats, projectCharacters] = await Promise.all(
-    [
-      db
-        .select({
-          key: variables.key,
-          description: variables.description,
-          category: variables.category,
-        })
-        .from(variables)
-        .where(eq(variables.projectId, projectId)),
-      db
-        .select({
-          key: stats.key,
-          name: stats.name,
-          minValue: stats.minValue,
-          maxValue: stats.maxValue,
-          description: stats.description,
-        })
-        .from(stats)
-        .where(eq(stats.projectId, projectId)),
-      db
-        .select({
-          renpyTag: characters.renpyTag,
-          displayName: characters.displayName,
-          color: characters.color,
-          isNarrator: characters.isNarrator,
-        })
-        .from(characters)
-        .where(eq(characters.projectId, projectId)),
-    ]
-  );
+  const { projectVariables, projectStats, projectCharacters } =
+    await fetchSupportingFileSources(projectId);
 
   const variablesEmpty = projectVariables.length === 0;
   const statsEmpty = projectStats.length === 0;

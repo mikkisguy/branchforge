@@ -1,7 +1,10 @@
 import { useState, useMemo } from "react";
 import { ChevronRight, ChevronDown, Folder, FileCode } from "lucide-react";
 import type { ProjectFileNode } from "@/hooks/useProjectFiles";
-import type { LabelStatus } from "@branchforge/shared";
+import type {
+  GeneratedExportPreviewFile,
+  LabelStatus,
+} from "@branchforge/shared";
 import { CollapsibleSection } from "@/components/ide-shared/CollapsibleSection";
 import { Tooltip } from "@/components/ui/tooltip";
 
@@ -11,11 +14,10 @@ const STATUS_COLORS: Record<LabelStatus, string> = {
   DRAFT: "var(--theme-draft-color)",
 };
 
-interface GeneratedFileInfo {
-  fileName: string;
-  isEmpty: boolean;
-  emptyReason: string | null;
-}
+export type GeneratedFileInfo = Pick<
+  GeneratedExportPreviewFile,
+  "fileName" | "isEmpty" | "emptyReason"
+>;
 
 interface ProjectFileTreeProps {
   files: ProjectFileNode[];

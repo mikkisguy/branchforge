@@ -13,7 +13,10 @@ import {
 } from "lucide-react";
 import { cva } from "class-variance-authority";
 import { ScriptReferencePanel, ScriptEditor } from "@/components/script-mode";
-import { ProjectFileTree } from "@/components/script-mode/ProjectFileTree";
+import {
+  ProjectFileTree,
+  type GeneratedFileInfo,
+} from "@/components/script-mode/ProjectFileTree";
 import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
 import { EDITOR_FONT_SIZE_CHANGED } from "@/components/FontSizeSwitcher";
 import {
@@ -65,12 +68,6 @@ const sidebarVariants = cva(
     },
   }
 );
-
-interface GeneratedFileInfo {
-  fileName: string;
-  isEmpty: boolean;
-  emptyReason: string | null;
-}
 
 interface ScriptModeEditorLayoutProps {
   projectName?: string;

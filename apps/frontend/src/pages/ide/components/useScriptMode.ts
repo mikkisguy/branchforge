@@ -57,6 +57,9 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     [projectFiles, switchToFile]
   );
 
+  const hasPendingSave =
+    !!currentEditFileId && (isFileDirty || fileSaveStatus === "error");
+
   const handleGeneratedFileSelect = useCallback(
     async (fileName: string) => {
       if (!previewQuery.data) return;
@@ -65,7 +68,7 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
       if (!file || file.isEmpty) return;
 
       // If there's a dirty save pending, save before switching
-      if (!!currentEditFileId && (isFileDirty || fileSaveStatus === "error")) {
+      if (hasPendingSave) {
         const saved = await triggerFileSave();
         if (!saved) {
           showErrorToast(
@@ -81,9 +84,7 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     },
     [
       previewQuery.data,
-      currentEditFileId,
-      isFileDirty,
-      fileSaveStatus,
+      hasPendingSave,
       triggerFileSave,
       showErrorToast,
       setActiveLabelId,
@@ -123,9 +124,6 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     isLoadingFiles: data.isLoadingFiles,
     refreshFiles: data.refreshFiles,
   });
-
-  const hasPendingSave =
-    !!currentEditFileId && (isFileDirty || fileSaveStatus === "error");
 
   const handleResetState = useCallback(() => {
     resetRefreshState();
@@ -205,11 +203,16 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     };
   }, [activeProjectFile, currentEditFileId, switchToFile, selectFileTab]);
 
-  const activeFileContent = generatedPreview
-    ? generatedPreview.content
-    : activeProjectFile && currentEditFileId === activeProjectFile.id
+  const editableFileContent =
+    activeProjectFile && currentEditFileId === activeProjectFile.id
       ? editedFileContent
       : activeProjectFile?.content || "";
+
+  const isGeneratedPreview = !!generatedPreview;
+
+  const activeFileContent = generatedPreview
+    ? generatedPreview.content
+    : editableFileContent;
 
   const handleUndoRedoChange = useCallback(
     (content: string) => {
@@ -219,9 +222,19 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
   );
 
   const { canUndo, canRedo, undo, redo, recordChange, clear } = useTextUndo(
-    activeFileContent,
+    editableFileContent,
     handleUndoRedoChange
   );
+
+  const onUndo = useCallback(() => {
+    if (isGeneratedPreview) return;
+    undo();
+  }, [isGeneratedPreview, undo]);
+
+  const onRedo = useCallback(() => {
+    if (isGeneratedPreview) return;
+    redo();
+  }, [isGeneratedPreview, redo]);
 
   const handleContentChange = useCallback(
     (value: string) => {
@@ -237,9 +250,9 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     if (activeFileId && previousUndoFileIdRef.current !== activeFileId) {
       previousUndoFileIdRef.current = activeFileId;
       // react-doctor-disable-next-line react-doctor/no-pass-data-to-parent
-      clear(activeFileContent);
+      clear(editableFileContent);
     }
-  }, [activeFileId, activeFileContent, clear]);
+  }, [activeFileId, editableFileContent, clear]);
 
   const handleGitLabFileSelect = useCallback(
     (fileId: string) => {
@@ -352,7 +365,6 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
   }, [previewQuery.isError, showErrorToast]);
 
   const activeGeneratedFileId = generatedPreview?.fileName ?? null;
-  const isGeneratedPreview = !!generatedPreview;
   const generatedFileName = generatedPreview?.fileName;
 
   return {
@@ -384,10 +396,10 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     handleGitLabFileSelect,
     handleGitLabSceneSelect,
     handleContentChange,
-    canUndo,
-    canRedo,
-    onUndo: undo,
-    onRedo: redo,
+    canUndo: isGeneratedPreview ? false : canUndo,
+    canRedo: isGeneratedPreview ? false : canRedo,
+    onUndo,
+    onRedo,
     scrollToLine,
     fileSaveStatus,
     onSaveRequest,
