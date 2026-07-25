@@ -112,7 +112,12 @@ function VariableFormContent({
 
   const handleChange = (field: keyof VariableFormState, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
-    setErrors({});
+    setErrors((prev) => {
+      if (!(field in prev)) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
   };
 
   const handleSave = async () => {

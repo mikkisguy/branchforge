@@ -45,7 +45,7 @@ interface PairGroupsDialogProps {
 // Component
 // ============================================================================
 
-// react-doctor-disable-next-line react-doctor/prefer-useReducer -- local UI mode flags, not a reducer candidate
+// react-doctor-disable-next-line react-doctor/prefer-useReducer, react-doctor/no-giant-component -- local UI mode flags; dialog owns toggle/list/inline-edit/create flows
 export function PairGroupsDialog(props: PairGroupsDialogProps) {
   const { open, onOpenChange, projectId, characters } = props;
   const { currentProject, updateProject } = useProject();
