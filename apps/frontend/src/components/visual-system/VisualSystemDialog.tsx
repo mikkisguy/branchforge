@@ -17,7 +17,7 @@ import {
   parseGroupPrefixes,
   toVisualSystemFormState,
   type VisualSystemFormState,
-} from "@/components/visual-system.helpers";
+} from "./visual-system.helpers";
 import { VisualSystemNamingTemplate } from "./VisualSystemNamingTemplate";
 import { VisualSystemPaddingSelects } from "./VisualSystemPaddingSelects";
 import { VisualSystemJumpPrefixInput } from "./VisualSystemJumpPrefixInput";

@@ -3,8 +3,8 @@ import { Plus, Loader2 } from "lucide-react";
 import { DialogShell } from "@/components/ui/DialogShell";
 import { InlineMessage } from "@/components/ui/inline-error";
 import { Button } from "@/components/ui/button";
-import { VariablesList } from "@/components/VariablesList";
-import { VariableEditDialog } from "@/components/VariableEditDialog";
+import { VariablesList } from "@/components/variables/VariablesList";
+import { VariableEditDialog } from "@/components/variables/VariableEditDialog";
 import { useVariables } from "@/hooks/useVariables";
 
 interface VariablesDialogProps {

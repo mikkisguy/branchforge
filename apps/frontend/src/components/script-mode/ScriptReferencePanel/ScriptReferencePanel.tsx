@@ -4,7 +4,7 @@ import { cva } from "class-variance-authority";
 import type { Character } from "@branchforge/shared";
 import { VariablesDialog } from "@/components/script-mode/VariablesDialog";
 import { StatManagementDialog } from "@/components/script-mode/StatManagementDialog";
-import { WorldElementsDialog } from "@/components/WorldElementsDialog";
+import { WorldElementsDialog } from "@/components/world-elements/WorldElementsDialog";
 import { useVariables } from "@/hooks/useVariables";
 import { useStats } from "@/hooks/useStats";
 import { useWorldElements } from "@/hooks/useWorldElements";

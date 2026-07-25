@@ -12,8 +12,8 @@ import { useState } from "react";
 import { Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InlineMessage } from "@/components/ui/inline-error";
-import { WorldElementsList } from "@/components/WorldElementsList";
-import { WorldElementEditDialog } from "@/components/WorldElementEditDialog";
+import { WorldElementsList } from "./WorldElementsList";
+import { WorldElementEditDialog } from "./WorldElementEditDialog";
 import { useWorldElements } from "@/hooks/useWorldElements";
 
 interface WorldElementsSettingsContentProps {

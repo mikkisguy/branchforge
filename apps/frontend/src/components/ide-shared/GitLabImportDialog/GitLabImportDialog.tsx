@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CharacterImportWizard } from "@/components/CharacterImportWizard.lazy";
+import { CharacterImportWizard } from "@/components/CharacterImportWizard/CharacterImportWizard.lazy";
 import { useGitLabImportDialog } from "./useGitLabImportDialog";
 import { GitLabImportDialogStepSelect } from "./GitLabImportDialogStepSelect";
 import { GitLabImportDialogStatusPanels } from "./GitLabImportDialogStatusPanels";

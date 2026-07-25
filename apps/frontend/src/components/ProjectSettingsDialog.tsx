@@ -29,15 +29,15 @@ import {
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsPanel } from "@/components/ui/tabs";
-import { CharacterSettingsContent } from "@/components/CharacterSettingsContent";
-import { RouteSettingsContent } from "@/components/RouteSettingsContent";
-import { VisualSystemFormContent } from "@/components/VisualSystemDialog";
-import { WorldElementsSettingsContent } from "@/components/WorldElementsSettingsContent";
+import { CharacterSettingsContent } from "@/components/characters/CharacterSettingsContent";
+import { RouteSettingsContent } from "@/components/routes/RouteSettingsContent";
+import { VisualSystemFormContent } from "@/components/visual-system/VisualSystemDialog";
+import { WorldElementsSettingsContent } from "@/components/world-elements/WorldElementsSettingsContent";
 import { useVisualSystem } from "@/hooks/useVisualSystem";
 import {
   parseGroupPrefixes,
   type VisualSystemFormState,
-} from "@/components/visual-system.helpers";
+} from "@/components/visual-system/visual-system.helpers";
 
 // ============================================================================
 // Types

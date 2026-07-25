@@ -12,8 +12,8 @@ import { useState } from "react";
 import { Loader2, Plus } from "lucide-react";
 import { InlineMessage } from "@/components/ui/inline-error";
 import { Button } from "@/components/ui/button";
-import { RouteList } from "@/components/RouteList";
-import { RouteEditDialog } from "@/components/RouteEditDialog.lazy";
+import { RouteList } from "./RouteList";
+import { RouteEditDialog } from "./RouteEditDialog.lazy";
 import { useRouteConfigs } from "@/hooks/useRouteConfigs";
 
 interface RouteSettingsContentProps {

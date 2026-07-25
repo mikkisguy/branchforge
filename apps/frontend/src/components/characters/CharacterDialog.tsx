@@ -14,7 +14,7 @@
 import { X } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CharacterSettingsContent } from "@/components/CharacterSettingsContent";
+import { CharacterSettingsContent } from "./CharacterSettingsContent";
 
 interface CharacterDialogProps {
   open: boolean;
