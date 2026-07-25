@@ -118,9 +118,17 @@ export function useProseEditorState({
 
   // Hover state for focus mode dimming
   const [isBottomBarHovered, setIsBottomBarHovered] = useState(false);
-  const [entries, setEntries] = useState<DialogueEntry[]>(() =>
-    convertLabelLinesToEntries(activeLabel)
-  );
+
+  // entries + initialWordCount share one state object so the label-switch
+  // effect can update both in a single setState (avoids cascading renders).
+  const [content, setContent] = useState<{
+    entries: DialogueEntry[];
+    initialWordCount: number;
+  }>(() => ({
+    entries: convertLabelLinesToEntries(activeLabel),
+    initialWordCount: 0,
+  }));
+  const { entries, initialWordCount } = content;
   const [internalLayoutMode, setInternalLayoutMode] =
     useLocalStorage<LineLayoutMode>(LINE_LAYOUT_STORAGE_KEY, "inline", {
       serializer: (value) => value,
@@ -155,9 +163,6 @@ export function useProseEditorState({
   const prevEntriesRef = useRef<DialogueEntry[]>([]);
   const isInitialMountRef = useRef(true);
 
-  // Track initial word count for the current label to calculate real-time progress
-  const [initialWordCount, setInitialWordCount] = useState<number>(0);
-
   useEffect(() => {
     entriesRef.current = entries;
   }, [entries]);
@@ -169,7 +174,7 @@ export function useProseEditorState({
   const handleInMemoryHistoryChange = useCallback(
     (nextEntries: DialogueEntry[]) => {
       isExternalUpdateRef.current = true;
-      setEntries(nextEntries);
+      setContent((prev) => ({ ...prev, entries: nextEntries }));
       // Propagate undo/redo to parent so autosave picks up the change
       onChangeRef.current(nextEntries);
     },
@@ -296,7 +301,7 @@ export function useProseEditorState({
       },
     ];
     recordImmediateHistorySnapshot(newEntries);
-    setEntries(newEntries);
+    setContent((prev) => ({ ...prev, entries: newEntries }));
   }, [characters, recordImmediateHistorySnapshot]);
 
   // Process pending immediate snapshots after entries have been updated
@@ -361,17 +366,9 @@ export function useProseEditorState({
     }
 
     const newEntries = convertLabelLinesToEntries(activeLabel);
-
-    // Calculate initial word count for this label (only on first load, not on subsequent updates)
-    if (hasSwitchedLabel) {
-      setInitialWordCount(countWordsFromEntries(newEntries));
-    } else {
-      const newWordCount = countWordsFromEntries(newEntries);
-
-      // Update baseline to latest persisted content from server.
-      // Any unsaved local edits remain represented by (wordCount - initialWordCount).
-      setInitialWordCount(newWordCount);
-    }
+    // Update baseline to latest persisted content from server.
+    // Any unsaved local edits remain represented by (wordCount - initialWordCount).
+    const newWordCount = countWordsFromEntries(newEntries);
 
     flushPendingTextHistory();
 
@@ -379,22 +376,29 @@ export function useProseEditorState({
       // Always reset undo history when switching labels, even if content is identical
       // This prevents undo history of one label bleeding into another
       isExternalUpdateRef.current = true;
-      setEntries(newEntries);
+      setContent({ entries: newEntries, initialWordCount: newWordCount });
       inMemoryUndo.clear(cloneEntries(newEntries));
     } else {
-      // Only update state if content actually changed (handles external updates)
-      if (areDialogueEntriesEqual(entriesRef.current, newEntries)) {
-        return;
-      }
+      // Only update entries if content actually changed (handles external updates).
+      // Still refresh initialWordCount so the session delta stays accurate.
+      const entriesUnchanged = areDialogueEntriesEqual(
+        entriesRef.current,
+        newEntries
+      );
 
       // Ignore server echo updates while a textarea is focused to avoid remount-driven blur.
       // Local editor state remains the source of truth during active typing.
-      if (isEditorTextareaFocused()) {
+      if (entriesUnchanged || isEditorTextareaFocused()) {
+        setContent((prev) =>
+          prev.initialWordCount === newWordCount
+            ? prev
+            : { ...prev, initialWordCount: newWordCount }
+        );
         return;
       }
 
       isExternalUpdateRef.current = true;
-      setEntries(newEntries);
+      setContent({ entries: newEntries, initialWordCount: newWordCount });
       inMemoryUndo.updatePresent(cloneEntries(newEntries));
     }
 
@@ -439,10 +443,10 @@ export function useProseEditorState({
 
   const handleEntryChange = useCallback(
     (index: number, updatedEntry: DialogueEntry) => {
-      setEntries((prev) => {
-        const newEntries = [...prev];
+      setContent((prev) => {
+        const newEntries = [...prev.entries];
         newEntries[index] = updatedEntry;
-        return newEntries;
+        return { ...prev, entries: newEntries };
       });
     },
     []
@@ -450,53 +454,46 @@ export function useProseEditorState({
 
   const handleAddLine = useCallback(
     (index: number) => {
-      setEntries((prev) => {
-        const newEntries = [...prev];
-        const currentEntry = prev[index];
-        // Always insert dialogue/narration. Never create CHOICE rows here —
-        // Script Mode owns menu structure, and empty choice labels fail API
-        // validation. Enter on a menu prompt or choice jumps past the block.
-        const insertAt = findDialogueInsertIndex(prev, index);
-        const speakerId =
-          currentEntry?.contentType === "CHOICE"
-            ? null
-            : (currentEntry?.speakerId ?? null);
-        const newEntry: DialogueEntry = {
-          id: crypto.randomUUID(),
-          speakerId,
-          text: "",
-        };
-        newEntries.splice(insertAt, 0, newEntry);
+      // Compute next entries outside the updater so history/focus side
+      // effects stay pure (react-doctor/no-impure-state-updater).
+      const currentEntries = entriesRef.current;
+      const newEntries = [...currentEntries];
+      const currentEntry = currentEntries[index];
+      // Always insert dialogue/narration. Never create CHOICE rows here —
+      // Script Mode owns menu structure, and empty choice labels fail API
+      // validation. Enter on a menu prompt or choice jumps past the block.
+      const insertAt = findDialogueInsertIndex(currentEntries, index);
+      const speakerId =
+        currentEntry?.contentType === "CHOICE"
+          ? null
+          : (currentEntry?.speakerId ?? null);
+      const newEntry: DialogueEntry = {
+        id: crypto.randomUUID(),
+        speakerId,
+        text: "",
+      };
+      newEntries.splice(insertAt, 0, newEntry);
 
-        // Record history snapshot
-        recordImmediateHistorySnapshot(newEntries);
-
-        // Queue focus operation
-        pendingFocusRef.current = { index: insertAt, scrollIntoView: true };
-
-        return newEntries;
-      });
+      recordImmediateHistorySnapshot(newEntries);
+      pendingFocusRef.current = { index: insertAt, scrollIntoView: true };
+      entriesRef.current = newEntries;
+      setContent((prev) => ({ ...prev, entries: newEntries }));
     },
     [recordImmediateHistorySnapshot]
   );
 
   const handleDeleteLine = useCallback(
     (index: number) => {
-      setEntries((prev) => {
-        const newEntries = prev.filter((_, i) => i !== index);
-        const focusIndex = index > 0 ? index - 1 : 0;
+      const newEntries = entriesRef.current.filter((_, i) => i !== index);
+      const focusIndex = index > 0 ? index - 1 : 0;
 
-        // Record history snapshot
-        recordImmediateHistorySnapshot(newEntries);
-
-        // Queue focus operation
-        pendingFocusRef.current = {
-          index: focusIndex,
-          scrollIntoView: false,
-        };
-
-        return newEntries;
-      });
+      recordImmediateHistorySnapshot(newEntries);
+      pendingFocusRef.current = {
+        index: focusIndex,
+        scrollIntoView: false,
+      };
+      entriesRef.current = newEntries;
+      setContent((prev) => ({ ...prev, entries: newEntries }));
     },
     [recordImmediateHistorySnapshot]
   );
@@ -504,31 +501,30 @@ export function useProseEditorState({
   const handleMoveUp = useCallback(
     (index: number) => {
       if (index === 0) return;
-      setEntries((prev) => {
-        const newEntries = [...prev];
-        [newEntries[index - 1], newEntries[index]] = [
-          newEntries[index],
-          newEntries[index - 1],
-        ];
-        recordImmediateHistorySnapshot(newEntries);
-        return newEntries;
-      });
+      const newEntries = [...entriesRef.current];
+      [newEntries[index - 1], newEntries[index]] = [
+        newEntries[index],
+        newEntries[index - 1],
+      ];
+      recordImmediateHistorySnapshot(newEntries);
+      entriesRef.current = newEntries;
+      setContent((prev) => ({ ...prev, entries: newEntries }));
     },
     [recordImmediateHistorySnapshot]
   );
 
   const handleMoveDown = useCallback(
     (index: number) => {
-      setEntries((prev) => {
-        if (index >= prev.length - 1) return prev;
-        const newEntries = [...prev];
-        [newEntries[index], newEntries[index + 1]] = [
-          newEntries[index + 1],
-          newEntries[index],
-        ];
-        recordImmediateHistorySnapshot(newEntries);
-        return newEntries;
-      });
+      const currentEntries = entriesRef.current;
+      if (index >= currentEntries.length - 1) return;
+      const newEntries = [...currentEntries];
+      [newEntries[index], newEntries[index + 1]] = [
+        newEntries[index + 1],
+        newEntries[index],
+      ];
+      recordImmediateHistorySnapshot(newEntries);
+      entriesRef.current = newEntries;
+      setContent((prev) => ({ ...prev, entries: newEntries }));
     },
     [recordImmediateHistorySnapshot]
   );

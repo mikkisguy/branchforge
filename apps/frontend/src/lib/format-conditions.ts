@@ -4,8 +4,11 @@ import type {
   VariableCondition,
 } from "@branchforge/shared";
 
+// `id` is a stable role key within one condition (left/op/right/name),
+// scoped to FormattedCondition's sibling list — not a global unique id.
 export type FormattedConditionPart =
-  { type: "keyword"; text: string } | { type: "value"; text: string };
+  | { type: "keyword"; text: string; id: string }
+  | { type: "value"; text: string; id: string };
 
 export function formatVariableCondition(
   varName: string,
@@ -13,14 +16,14 @@ export function formatVariableCondition(
 ): FormattedConditionPart[] {
   if (condition.operator === "truthy") {
     return [
-      { type: "keyword", text: "is" },
-      { type: "value", text: varName },
+      { type: "keyword", text: "is", id: "op" },
+      { type: "value", text: varName, id: "name" },
     ];
   }
   if (condition.operator === "falsy") {
     return [
-      { type: "keyword", text: "not" },
-      { type: "value", text: varName },
+      { type: "keyword", text: "not", id: "op" },
+      { type: "value", text: varName, id: "name" },
     ];
   }
   const val =
@@ -29,16 +32,16 @@ export function formatVariableCondition(
       : String(condition.value);
   if (condition.operator === "==") {
     return [
-      { type: "value", text: varName },
-      { type: "keyword", text: "is" },
-      { type: "value", text: val },
+      { type: "value", text: varName, id: "left" },
+      { type: "keyword", text: "is", id: "op" },
+      { type: "value", text: val, id: "right" },
     ];
   }
   // operator === "!="
   return [
-    { type: "value", text: varName },
-    { type: "keyword", text: "is not" },
-    { type: "value", text: val },
+    { type: "value", text: varName, id: "left" },
+    { type: "keyword", text: "is not", id: "op" },
+    { type: "value", text: val, id: "right" },
   ];
 }
 
@@ -56,8 +59,12 @@ export function formatStatCondition(
   condition: StatCondition
 ): FormattedConditionPart[] {
   return [
-    { type: "value", text: statName },
-    { type: "keyword", text: STAT_OPERATOR_WORDS[condition.operator] },
-    { type: "value", text: String(condition.value) },
+    { type: "value", text: statName, id: "left" },
+    {
+      type: "keyword",
+      text: STAT_OPERATOR_WORDS[condition.operator],
+      id: "op",
+    },
+    { type: "value", text: String(condition.value), id: "right" },
   ];
 }

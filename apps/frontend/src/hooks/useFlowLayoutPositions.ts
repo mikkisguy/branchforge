@@ -21,7 +21,7 @@
  * caller should show a loading indicator instead of rendering ReactFlow.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef } from "react";
 import type { FlowLayoutMode, FlowNode, FlowEdge } from "@branchforge/shared";
 import { computeAutoLayout } from "@/components/flow/flow-graph-utils";
 import { FLOW_VIRTUALIZATION_THRESHOLD } from "@/lib/constants";
@@ -132,6 +132,42 @@ function mapToRecord(map: PositionMap): PositionRecord {
   return obj;
 }
 
+// ── Worker layout state ───────────────────────────────────────────────
+// Combined into one reducer so the async worker message handler (which
+// runs outside React's automatic batching) only triggers a single render.
+
+type WorkerLayoutState = {
+  positions: PositionMap;
+  isComputing: boolean;
+};
+
+type WorkerLayoutAction =
+  | { type: "cache_hit"; positions: PositionMap }
+  | { type: "start" }
+  | { type: "done"; positions: PositionMap }
+  | { type: "idle" };
+
+function workerLayoutReducer(
+  state: WorkerLayoutState,
+  action: WorkerLayoutAction
+): WorkerLayoutState {
+  switch (action.type) {
+    case "cache_hit":
+      return { positions: action.positions, isComputing: false };
+    case "start":
+      return state.isComputing ? state : { ...state, isComputing: true };
+    case "done":
+      return { positions: action.positions, isComputing: false };
+    case "idle":
+      return state.isComputing ? { ...state, isComputing: false } : state;
+    default: {
+      const _exhaustive: never = action;
+      void _exhaustive;
+      return state;
+    }
+  }
+}
+
 // ── Hook ──────────────────────────────────────────────────────────────
 
 export function useFlowLayoutPositions(
@@ -164,15 +200,18 @@ export function useFlowLayoutPositions(
   }, [useWorker, cacheKey, mode, nodes, edges]);
 
   // Async path — Web Worker for large graphs.
-  const [workerPositions, setWorkerPositions] = useState<PositionMap>(() => {
-    // Initialize from cache so the first render after mount is instant.
-    const cached = getCached(cacheKey);
-    return cached ? recordToMap(cached) : new Map();
-  });
-  const [isComputing, setIsComputing] = useState(() => {
-    if (!useWorker) return false;
-    return getCached(cacheKey) === null;
-  });
+  const [workerLayout, dispatchWorkerLayout] = useReducer(
+    workerLayoutReducer,
+    undefined,
+    (): WorkerLayoutState => {
+      // Initialize from cache so the first render after mount is instant.
+      const cached = getCached(cacheKey);
+      return {
+        positions: cached ? recordToMap(cached) : new Map(),
+        isComputing: useWorker && cached === null,
+      };
+    }
+  );
   const workerRef = useRef<Worker | null>(null);
   // Monotonically-increasing job id. The worker is shared, processes
   // messages in order, and we can't cancel a queued message — so each
@@ -184,19 +223,21 @@ export function useFlowLayoutPositions(
 
   useEffect(() => {
     if (!useWorker) {
-      setIsComputing(false);
+      dispatchWorkerLayout({ type: "idle" });
       return;
     }
 
     // Cache hit — skip the worker entirely.
     const cached = getCached(cacheKey);
     if (cached) {
-      setWorkerPositions(recordToMap(cached));
-      setIsComputing(false);
+      dispatchWorkerLayout({
+        type: "cache_hit",
+        positions: recordToMap(cached),
+      });
       return;
     }
 
-    setIsComputing(true);
+    dispatchWorkerLayout({ type: "start" });
 
     // Lazily create the worker (reused across re-computations).
     if (!workerRef.current) {
@@ -216,8 +257,10 @@ export function useFlowLayoutPositions(
       };
       if (responseJobId !== jobIdRef.current) return; // superseded — discard
       setCached(cacheKey, positions);
-      setWorkerPositions(recordToMap(positions));
-      setIsComputing(false);
+      dispatchWorkerLayout({
+        type: "done",
+        positions: recordToMap(positions),
+      });
     };
     worker.addEventListener("message", handler);
     worker.postMessage({ jobId, mode, nodes, edges });
@@ -240,7 +283,7 @@ export function useFlowLayoutPositions(
   }, []);
 
   return {
-    positions: useWorker ? workerPositions : syncPositions,
-    isComputing: useWorker ? isComputing : false,
+    positions: useWorker ? workerLayout.positions : syncPositions,
+    isComputing: useWorker ? workerLayout.isComputing : false,
   };
 }
