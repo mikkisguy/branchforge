@@ -44,13 +44,13 @@ interface PairGroupsDialogProps {
 // Component
 // ============================================================================
 
-// react-doctor-disable-next-line react-doctor/prefer-useReducer -- local UI mode flags, not a reducer candidate
 export function PairGroupsDialog({
   open,
   onOpenChange,
   projectId,
   characters,
 }: PairGroupsDialogProps) {
+  // react-doctor-disable-line react-doctor/prefer-useReducer -- local UI mode flags, not a reducer candidate
   const { currentProject, updateProject } = useProject();
   const { error: showErrorToast } = useToast();
   const duoEndingEnabled = currentProject?.duoEndingEnabled ?? false;
