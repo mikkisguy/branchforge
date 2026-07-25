@@ -131,6 +131,9 @@ describe("rpy-statements.service", () => {
         { tag: "e", name: "Eileen", color: "#c8ffc8" },
       ]);
       expect(result.cleanedContent).not.toContain("define e = Character");
+      expect(result.cleanedContent).toContain(
+        "# [BranchForge] Character 'e' moved to Characters → exported as branchforge_definitions.rpy"
+      );
       expect(result.cleanedContent).toContain("label start:");
       expect(result.cleanedContent).toContain('e "Hello."');
     });
@@ -153,10 +156,13 @@ describe("rpy-statements.service", () => {
         // who_color wins over color when both are present
         { tag: "e", name: "Eileen", color: "#c8c8c8" },
       ]);
-      // The four lines of the multi-line definition are all gone.
+      // The multi-line definition is replaced by a single breadcrumb.
       expect(result.cleanedContent).not.toContain("define e = Character");
       expect(result.cleanedContent).not.toContain('"Eileen",');
       expect(result.cleanedContent).not.toContain("who_color=");
+      expect(result.cleanedContent).toContain(
+        "# [BranchForge] Character 'e' moved to Characters → exported as branchforge_definitions.rpy"
+      );
       expect(result.cleanedContent).toContain("label start:");
     });
 
@@ -236,6 +242,12 @@ describe("rpy-statements.service", () => {
       expect(result.stats).toEqual([]);
       expect(result.cleanedContent).not.toContain("default met_alex");
       expect(result.cleanedContent).not.toContain("default has_key");
+      expect(result.cleanedContent).toContain(
+        "# [BranchForge] Variable 'met_alex' moved to Variables → exported as branchforge_variables.rpy"
+      );
+      expect(result.cleanedContent).toContain(
+        "# [BranchForge] Variable 'has_key' moved to Variables → exported as branchforge_variables.rpy"
+      );
     });
 
     it("classifies numeric default as stats", () => {
@@ -255,6 +267,10 @@ describe("rpy-statements.service", () => {
         { key: "max_value", value: "100", kind: "stat" },
       ]);
       expect(result.variables).toEqual([]);
+      expect(result.cleanedContent).not.toContain("default affection");
+      expect(result.cleanedContent).toContain(
+        "# [BranchForge] Stat 'affection' moved to Stats → exported as branchforge_stats.rpy"
+      );
     });
 
     it("preserves default statements with unknown values rather than stripping them", () => {
@@ -330,11 +346,30 @@ describe("rpy-statements.service", () => {
         [
           "# header comment",
           "",
+          "# [BranchForge] Character 'e' moved to Characters → exported as branchforge_definitions.rpy",
           "",
           "# body comment",
           "label start:",
           "    return",
         ].join("\n")
+      );
+    });
+
+    it("preserves indentation on breadcrumb comments", () => {
+      const content = [
+        '  define e = Character("Eileen", color="#c8ffc8")',
+        "  default affection = 0",
+        "",
+        "label start:",
+        "    return",
+      ].join("\n");
+
+      const result = extractAndStripRpySymbols(content);
+      expect(result.cleanedContent).toContain(
+        "  # [BranchForge] Character 'e' moved to Characters → exported as branchforge_definitions.rpy"
+      );
+      expect(result.cleanedContent).toContain(
+        "  # [BranchForge] Stat 'affection' moved to Stats → exported as branchforge_stats.rpy"
       );
     });
 

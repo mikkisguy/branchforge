@@ -1058,6 +1058,34 @@ export interface ImportProjectFailure {
 export type ImportProjectResponse = ImportProjectSuccess | ImportProjectFailure;
 
 // ============================================================================
+// Export Preview Types
+// ============================================================================
+
+/**
+ * Kind of generated export preview file
+ */
+export type GeneratedExportFileKind = "variables" | "stats" | "definitions";
+
+/**
+ * A single generated file in an export preview
+ */
+export interface GeneratedExportPreviewFile {
+  kind: GeneratedExportFileKind;
+  fileName: string;
+  content: string;
+  isEmpty: boolean;
+  emptyReason: string | null;
+}
+
+/**
+ * Response from the export preview endpoint
+ * GET /projects/:projectId/export-preview
+ */
+export interface ExportPreviewResponse {
+  files: GeneratedExportPreviewFile[];
+}
+
+// ============================================================================
 // Flow Graph Types (Route Visualization)
 // ============================================================================
 

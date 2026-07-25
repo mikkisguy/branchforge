@@ -8,14 +8,25 @@ import { useTextUndo } from "@/hooks/useTextUndo";
 import type { LabelTitleMap } from "@/lib/codemirror/label-title-decoration";
 import type { SourceOrigin } from "@branchforge/shared";
 import { useScriptModeData } from "./useScriptModeData";
+import { useExportPreview } from "@/hooks/useExportPreview";
 
 export function useScriptMode({ projectId }: { projectId?: string }) {
   const data = useScriptModeData({ projectId });
-  const { setActiveLabelId, projectFiles, skipSaveRef, labels } = data;
-
+  const {
+    setActiveLabelId,
+    projectFiles,
+    skipSaveRef,
+    labels,
+    showErrorToast,
+  } = data;
   const previousEditFileIdRef = useRef<string | null>(null);
   const [scrollToLine, setScrollToLine] = useState<number | null>(null);
 
+  const [generatedPreview, setGeneratedPreview] = useState<{
+    fileName: string;
+    content: string;
+  } | null>(null);
+  const previewQuery = useExportPreview(projectId);
   const {
     fileSaveStatus,
     isFileDirty,
@@ -46,10 +57,44 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     [projectFiles, switchToFile]
   );
 
+  const handleGeneratedFileSelect = useCallback(
+    async (fileName: string) => {
+      if (!previewQuery.data) return;
+
+      const file = previewQuery.data.files.find((f) => f.fileName === fileName);
+      if (!file || file.isEmpty) return;
+
+      // If there's a dirty save pending, save before switching
+      if (!!currentEditFileId && (isFileDirty || fileSaveStatus === "error")) {
+        const saved = await triggerFileSave();
+        if (!saved) {
+          showErrorToast(
+            "Could not save changes before preview. Please resolve conflicts and try again.",
+            "Save failed"
+          );
+          return;
+        }
+      }
+
+      setGeneratedPreview({ fileName: file.fileName, content: file.content });
+      setActiveLabelId(null);
+    },
+    [
+      previewQuery.data,
+      currentEditFileId,
+      isFileDirty,
+      fileSaveStatus,
+      triggerFileSave,
+      showErrorToast,
+      setActiveLabelId,
+    ]
+  );
+
   const handleNoTabsRemaining = useCallback(() => {
     void clearEditorState();
     setActiveLabelId(null);
     setScrollToLine(null);
+    setGeneratedPreview(null);
   }, [clearEditorState, setActiveLabelId]);
 
   const handleFileActivated = useCallback(() => {
@@ -87,6 +132,7 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     clearTabsState();
     void clearEditorState();
     setScrollToLine(null);
+    setGeneratedPreview(null);
   }, [clearEditorState, clearTabsState, resetRefreshState]);
 
   const setSkipSave = useCallback(
@@ -159,8 +205,9 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     };
   }, [activeProjectFile, currentEditFileId, switchToFile, selectFileTab]);
 
-  const activeFileContent =
-    activeProjectFile && currentEditFileId === activeProjectFile.id
+  const activeFileContent = generatedPreview
+    ? generatedPreview.content
+    : activeProjectFile && currentEditFileId === activeProjectFile.id
       ? editedFileContent
       : activeProjectFile?.content || "";
 
@@ -196,6 +243,7 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
 
   const handleGitLabFileSelect = useCallback(
     (fileId: string) => {
+      setGeneratedPreview(null);
       void selectFileTab(fileId);
     },
     [selectFileTab]
@@ -203,6 +251,7 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
 
   const handleSelectFileTab = useCallback(
     async (fileId: string) => {
+      setGeneratedPreview(null);
       await selectFileTab(fileId);
     },
     [selectFileTab]
@@ -210,6 +259,7 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
 
   const handleGitLabSceneSelect = useCallback(
     (sceneId: string) => {
+      setGeneratedPreview(null);
       setActiveLabelId(sceneId);
     },
     [setActiveLabelId]
@@ -244,6 +294,66 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
   const onSaveRequest: (() => Promise<boolean>) | undefined = activeProjectFile
     ? retryFileSave
     : undefined;
+
+  // Always expose the three generated files so the filetree section is
+  // visible even while the preview request is in flight.
+  const generatedFiles = useMemo(() => {
+    if (previewQuery.isError) {
+      return [
+        {
+          fileName: "branchforge_variables.rpy",
+          isEmpty: true,
+          emptyReason: "Failed to load generated preview",
+        },
+        {
+          fileName: "branchforge_stats.rpy",
+          isEmpty: true,
+          emptyReason: "Failed to load generated preview",
+        },
+        {
+          fileName: "branchforge_definitions.rpy",
+          isEmpty: true,
+          emptyReason: "Failed to load generated preview",
+        },
+      ];
+    }
+    if (previewQuery.data?.files?.length) {
+      return previewQuery.data.files.map((f) => ({
+        fileName: f.fileName,
+        isEmpty: f.isEmpty,
+        emptyReason: f.emptyReason,
+      }));
+    }
+    return [
+      {
+        fileName: "branchforge_variables.rpy",
+        isEmpty: true,
+        emptyReason: "Loading generated preview…",
+      },
+      {
+        fileName: "branchforge_stats.rpy",
+        isEmpty: true,
+        emptyReason: "Loading generated preview…",
+      },
+      {
+        fileName: "branchforge_definitions.rpy",
+        isEmpty: true,
+        emptyReason: "Loading generated preview…",
+      },
+    ];
+  }, [previewQuery.data, previewQuery.isError]);
+
+  const previewErrorShownRef = useRef(false);
+  useEffect(() => {
+    if (previewQuery.isError && !previewErrorShownRef.current) {
+      previewErrorShownRef.current = true;
+      showErrorToast("Failed to load generated preview", "Preview Error");
+    }
+  }, [previewQuery.isError, showErrorToast]);
+
+  const activeGeneratedFileId = generatedPreview?.fileName ?? null;
+  const isGeneratedPreview = !!generatedPreview;
+  const generatedFileName = generatedPreview?.fileName;
 
   return {
     isLoadingLabels: data.isLoadingLabels,
@@ -288,5 +398,11 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     linkedRepo: linkedRepoInfo,
     primaryFileSourceType,
     saveConflict,
+    // Generated preview
+    generatedFiles,
+    activeGeneratedFileId,
+    onGeneratedFileSelect: handleGeneratedFileSelect,
+    isGeneratedPreview,
+    generatedFileName,
   };
 }

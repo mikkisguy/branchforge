@@ -55,7 +55,8 @@ export interface DetectedDefaultStatement {
  */
 export interface RpySymbolExtraction {
   /** Content with all `define <tag> = Character(...)` and
-   *  `default <key> = <value>` lines removed (other content is
+   *  managed `default <key> = <value>` lines replaced by
+   *  `# [BranchForge] ...` breadcrumb comments (other content is
    *  preserved verbatim, including blank lines and indentation). */
   cleanedContent: string;
   /** Unique characters detected across the file (first occurrence
@@ -121,6 +122,9 @@ export function computeCommonDirectoryPrefix(filePaths: string[]): string {
  * - Recognises single-line `default <key> = <value>` statements.
  * - Leaves everything else (labels, dialogue, comments, blank lines)
  *   untouched.
+ * - Replaces each stripped statement with a `# [BranchForge] ...`
+ *   breadcrumb comment so Script Mode shows where the symbol moved
+ *   (Characters / Variables / Stats → `branchforge_*.rpy` on export).
  * - De-duplicates results by `tag` / `key` (first occurrence wins).
  *
  * The function is intentionally permissive: it does not filter by
@@ -191,6 +195,13 @@ export function extractAndStripRpySymbols(
       if (character && !charactersByTag.has(character.tag)) {
         charactersByTag.set(character.tag, character);
       }
+      // Leave a breadcrumb so Script Mode shows where the define went
+      // instead of looking like the line was silently deleted. See the
+      // import split UX discussion around issues #244 / #345 / #135.
+      const indent = line.match(/^\s*/)?.[0] ?? "";
+      output.push(
+        `${indent}# [BranchForge] Character '${tag}' moved to Characters → exported as branchforge_definitions.rpy`
+      );
       // Skip past the consumed lines (j may equal i for single-line).
       i = j + 1;
       continue;
@@ -225,6 +236,18 @@ export function extractAndStripRpySymbols(
       const bucket = detected.kind === "variable" ? variablesByKey : statsByKey;
       if (!bucket.has(key)) {
         bucket.set(key, detected);
+      }
+      // Same breadcrumb pattern as characters: the managed symbol is
+      // gone from this file, but the destination should be obvious.
+      const indent = line.match(/^\s*/)?.[0] ?? "";
+      if (detected.kind === "variable") {
+        output.push(
+          `${indent}# [BranchForge] Variable '${key}' moved to Variables → exported as branchforge_variables.rpy`
+        );
+      } else {
+        output.push(
+          `${indent}# [BranchForge] Stat '${key}' moved to Stats → exported as branchforge_stats.rpy`
+        );
       }
       i += 1;
       continue;
@@ -304,7 +327,7 @@ function extractColorFromOptions(options: string): string {
  * Classify a `default <key> = <value>` RHS:
  * - `True` / `False` -> variable
  * - integer / decimal number -> stat
- * - anything else -> unknown (still stripped, but not stored)
+ * - anything else -> unknown (preserved verbatim, not stored)
  */
 function classifyDefaultStatement(
   key: string,

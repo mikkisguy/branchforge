@@ -37,6 +37,10 @@ import {
 } from "./rpy-statements.service.js";
 import { checkRateLimit } from "./rate-limiter.service.js";
 import { logInfo, logError, logWarn, LogEventType } from "../lib/logger.js";
+import type {
+  ExportPreviewResponse,
+  GeneratedExportPreviewFile,
+} from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -353,6 +357,100 @@ export async function generateExport(
     format: exportRecord.format,
     createdAt: exportRecord.createdAt.toISOString(),
   };
+}
+
+// ============================================================================
+// Export Preview
+// ============================================================================
+
+/**
+ * Generate a preview of the three supporting files that would be included
+ * in an export: variables, stats, and character definitions.
+ *
+ * This is a read-only preview that returns the generated RPY content
+ * without creating a zip or any database records. It is not rate-limited.
+ *
+ * @param projectId - The project to preview
+ * @param userId - The requesting user (for authorization)
+ * @returns Preview of the generated export files
+ */
+export async function getExportPreview(
+  projectId: string,
+  userId: string
+): Promise<ExportPreviewResponse> {
+  // Verify project access
+  await requireProjectAccess(projectId, userId);
+
+  const db = getDb();
+
+  // Parallel DB selects — same field projections as generateExport
+  const [projectVariables, projectStats, projectCharacters] = await Promise.all(
+    [
+      db
+        .select({
+          key: variables.key,
+          description: variables.description,
+          category: variables.category,
+        })
+        .from(variables)
+        .where(eq(variables.projectId, projectId)),
+      db
+        .select({
+          key: stats.key,
+          name: stats.name,
+          minValue: stats.minValue,
+          maxValue: stats.maxValue,
+          description: stats.description,
+        })
+        .from(stats)
+        .where(eq(stats.projectId, projectId)),
+      db
+        .select({
+          renpyTag: characters.renpyTag,
+          displayName: characters.displayName,
+          color: characters.color,
+          isNarrator: characters.isNarrator,
+        })
+        .from(characters)
+        .where(eq(characters.projectId, projectId)),
+    ]
+  );
+
+  const variablesEmpty = projectVariables.length === 0;
+  const statsEmpty = projectStats.length === 0;
+  const definitionsEmpty = projectCharacters.length === 0;
+
+  const files: GeneratedExportPreviewFile[] = [
+    {
+      kind: "variables",
+      fileName: "branchforge_variables.rpy",
+      content: generateVariablesFile(projectVariables),
+      isEmpty: variablesEmpty,
+      emptyReason: variablesEmpty
+        ? "No variables defined — this file will not be included in the export"
+        : null,
+    },
+    {
+      kind: "stats",
+      fileName: "branchforge_stats.rpy",
+      content: generateStatsFile(projectStats),
+      isEmpty: statsEmpty,
+      emptyReason: statsEmpty
+        ? "No stats defined — this file will not be included in the export"
+        : null,
+    },
+    {
+      kind: "definitions",
+      fileName: "branchforge_definitions.rpy",
+      content: generateCharacterDefinitionsFile(projectCharacters),
+      isEmpty: definitionsEmpty,
+      emptyReason: definitionsEmpty
+        ? "No characters defined — this file will not be included in the export"
+        : null,
+    },
+  ];
+
+  return { files };
 }
 
 // ============================================================================

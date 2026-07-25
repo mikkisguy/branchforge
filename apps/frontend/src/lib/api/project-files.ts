@@ -6,7 +6,11 @@
  */
 
 import { API_BASE, request, getApiErrorMessage } from "./client.js";
-import type { ProjectFile, ImportZipResponse } from "@branchforge/shared";
+import type {
+  ProjectFile,
+  ImportZipResponse,
+  ExportPreviewResponse,
+} from "@branchforge/shared";
 import type { SourceOrigin } from "@branchforge/shared";
 import { isValidSourceOrigin } from "@branchforge/shared";
 
@@ -309,6 +313,17 @@ export const projectFilesApi = {
       {
         method: "POST",
       }
+    );
+  },
+
+  /**
+   * Get export preview (generated file contents) for a project
+   */
+  async getExportPreview(projectId: string): Promise<ExportPreviewResponse> {
+    validateRequired(projectId, "Project ID");
+
+    return request<ExportPreviewResponse>(
+      `/projects/${projectId}/export-preview`
     );
   },
 

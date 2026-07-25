@@ -1,13 +1,21 @@
 import { useState, useMemo } from "react";
-import { ChevronRight, ChevronDown, Folder } from "lucide-react";
+import { ChevronRight, ChevronDown, Folder, FileCode } from "lucide-react";
 import type { ProjectFileNode } from "@/hooks/useProjectFiles";
 import type { LabelStatus } from "@branchforge/shared";
+import { CollapsibleSection } from "@/components/ide-shared/CollapsibleSection";
+import { Tooltip } from "@/components/ui/tooltip";
 
 const STATUS_COLORS: Record<LabelStatus, string> = {
   FINAL: "var(--theme-final-color)",
   REVIEW: "var(--theme-review-color)",
   DRAFT: "var(--theme-draft-color)",
 };
+
+interface GeneratedFileInfo {
+  fileName: string;
+  isEmpty: boolean;
+  emptyReason: string | null;
+}
 
 interface ProjectFileTreeProps {
   files: ProjectFileNode[];
@@ -17,6 +25,9 @@ interface ProjectFileTreeProps {
   onSceneSelect: (sceneId: string) => void;
   initialExpandedFolders?: string[];
   initialExpandedFiles?: string[];
+  generatedFiles?: GeneratedFileInfo[];
+  activeGeneratedFileId?: string | null;
+  onGeneratedFileSelect?: (fileName: string) => void;
 }
 
 /**
@@ -45,7 +56,6 @@ function getFileName(filePath: string): string {
   const parts = filePath.split("/");
   return parts[parts.length - 1] || filePath;
 }
-
 export function ProjectFileTree({
   files,
   activeFileId,
@@ -54,8 +64,10 @@ export function ProjectFileTree({
   onSceneSelect,
   initialExpandedFolders,
   initialExpandedFiles,
+  generatedFiles,
+  activeGeneratedFileId,
+  onGeneratedFileSelect,
 }: ProjectFileTreeProps) {
-  // Track expanded folders and files
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
     () => new Set(initialExpandedFolders ?? [])
   );
@@ -91,6 +103,51 @@ export function ProjectFileTree({
 
   return (
     <div className="space-y-2" role="tree">
+      {generatedFiles && generatedFiles.length > 0 && (
+        <CollapsibleSection title="Generated">
+          <div className="space-y-0.5" role="group">
+            {generatedFiles.map((file) => {
+              const isSelected = activeGeneratedFileId === file.fileName;
+              // Use aria-disabled (not disabled) so Tooltip hover/focus still works.
+              const btn = (
+                <button
+                  type="button"
+                  role="treeitem"
+                  aria-selected={isSelected}
+                  aria-level={1}
+                  aria-disabled={file.isEmpty}
+                  onClick={() => {
+                    if (file.isEmpty || !onGeneratedFileSelect) return;
+                    onGeneratedFileSelect(file.fileName);
+                  }}
+                  className={`w-full flex items-center gap-2 py-1.5 px-2 rounded-md text-sm text-left transition-colors italic opacity-70 ${
+                    isSelected
+                      ? "bg-[var(--theme-color)]/10 text-foreground font-medium"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
+                  } ${file.isEmpty ? "cursor-not-allowed opacity-50" : ""}`}
+                >
+                  <FileCode className="size-3.5 shrink-0" />
+                  <span className="truncate">{file.fileName}</span>
+                  {file.isEmpty && (
+                    <span className="text-[10px] text-muted-foreground/60 ml-auto shrink-0">
+                      empty
+                    </span>
+                  )}
+                </button>
+              );
+
+              return file.isEmpty ? (
+                <Tooltip key={file.fileName} content={file.emptyReason ?? ""}>
+                  {btn}
+                </Tooltip>
+              ) : (
+                <div key={file.fileName}>{btn}</div>
+              );
+            })}
+          </div>
+        </CollapsibleSection>
+      )}
+
       {Array.from(groupedFiles.entries()).map(([folder, folderFiles]) => (
         <div key={folder} className="mb-2">
           {folder && (

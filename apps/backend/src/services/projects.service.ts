@@ -12,7 +12,7 @@ import {
   labels,
   labelLines,
 } from "../db/schema/index.js";
-import { eq, and, inArray, isNull } from "drizzle-orm";
+import { eq, and, asc, inArray, isNull } from "drizzle-orm";
 import type { NewProject } from "../db/schema/tables/projects.js";
 import type { ProjectFile } from "../db/schema/tables/project-files.js";
 import type {
@@ -456,7 +456,8 @@ export async function getProjectFiles(
     .from(labels)
     .where(
       and(inArray(labels.projectFileId, fileIds), isNull(labels.deletedAt))
-    );
+    )
+    .orderBy(asc(labels.labelPosition));
 
   // Create a lookup keyed by projectFileId, storing only public label fields
   const labelsByFileId = new Map<string, PublicLabelSlim[]>();
