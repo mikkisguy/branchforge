@@ -24,6 +24,19 @@ export interface SidebarState {
   setIsRightCollapsed: Dispatch<SetStateAction<boolean>>;
 }
 
+export interface LabelMutationState {
+  isCreatingLabel: boolean;
+  isUpdatingLabel: boolean;
+  isDeletingLabel: boolean;
+}
+
+export interface EditorSaveState {
+  isSaving: boolean;
+  lastSaved: Date | null;
+  saveError: boolean;
+  saveConflict: boolean;
+}
+
 export interface WriteModeViewProps {
   // Focus mode
   isFocusMode: boolean;
@@ -47,24 +60,19 @@ export interface WriteModeViewProps {
   projectId: string;
   projectLabelCount: number;
   onCreateLabel: (data: CreateLabelInput) => Promise<unknown>;
-  isCreatingLabel: boolean;
   onUpdateLabel: (
     labelId: string,
     data: UpdateLabelInput
   ) => Promise<PublicLabel>;
-  isUpdatingLabel: boolean;
   onDeleteLabel: (labelId: string) => Promise<void>;
-  isDeletingLabel: boolean;
+  labelMutationState: LabelMutationState;
 
   // Editor
   editorRef: RefObject<ProseEditorRef | null>;
   activeLabel: LabelDetail | undefined;
   characters: Character[];
   onChange: (entries: DialogueEntry[]) => void;
-  isSaving: boolean;
-  lastSaved: Date | null;
-  saveError: boolean;
-  saveConflict: boolean;
+  editorSaveState: EditorSaveState;
   onUndoStateChange: Dispatch<
     SetStateAction<{ canUndo: boolean; canRedo: boolean }>
   >;

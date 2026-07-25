@@ -39,9 +39,9 @@ export function LabelPropertiesPanelIncomingJumps({
         <p className="text-xs text-muted-foreground">No incoming jumps</p>
       ) : (
         <div className="space-y-2">
-          {incomingJumps.map((jump, i) => (
+          {incomingJumps.map((jump) => (
             <div
-              key={`${jump.sourceLabelId}-${jump.choiceText}-${i}`}
+              key={`${jump.sourceLabelId}-${jump.choiceText}`}
               className="p-2 rounded-lg bg-muted/30 border border-border/50 text-xs"
             >
               <div className="font-medium text-foreground truncate">

@@ -146,33 +146,37 @@ export function useLocalStorage<T>(
   const [state, setState] = useState<T>(() =>
     readStorageValue(prefixedKey, defaultValue, deserializer, validate, ssrSafe)
   );
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   // Re-read from localStorage when key changes
   useEffect(() => {
-    // react-doctor-disable-next-line react-doctor/no-derived-state
-    setState(
-      readStorageValue(
-        prefixedKey,
-        defaultValueRef.current,
-        deserializerRef.current,
-        validateRef.current,
-        ssrSafeRef.current
-      )
+    const next = readStorageValue(
+      prefixedKey,
+      defaultValueRef.current,
+      deserializerRef.current,
+      validateRef.current,
+      ssrSafeRef.current
     );
+    stateRef.current = next;
+    // react-doctor-disable-next-line react-doctor/no-derived-state
+    setState(next);
   }, [prefixedKey]);
 
   const setItem = useCallback(
     (value: SetStateAction<T>) => {
-      setState((previousValue) => {
-        const nextValue =
-          typeof value === "function"
-            ? (value as (prev: T) => T)(previousValue)
-            : value;
+      const nextValue =
+        typeof value === "function"
+          ? (value as (prev: T) => T)(stateRef.current)
+          : value;
 
-        if (ssrSafe && !isStorageAvailable()) {
-          return nextValue;
-        }
+      // Keep ref in sync immediately so chained functional updaters see
+      // the latest value before the next render flushes state.
+      stateRef.current = nextValue;
 
+      if (!(ssrSafe && !isStorageAvailable())) {
         try {
           if (nextValue === undefined) {
             window.localStorage.removeItem(prefixedKey);
@@ -185,15 +189,16 @@ export function useLocalStorage<T>(
         } catch (error) {
           logStorageWarning("save", prefixedKey, error);
         }
+      }
 
-        return nextValue;
-      });
+      setState(nextValue);
     },
     [prefixedKey, ssrSafe]
   );
 
   const removeItem = useCallback(() => {
     if (ssrSafe && !isStorageAvailable()) {
+      stateRef.current = defaultValueRef.current;
       setState(defaultValueRef.current);
       return;
     }
@@ -204,6 +209,7 @@ export function useLocalStorage<T>(
       logStorageWarning("remove", prefixedKey, error);
     }
 
+    stateRef.current = defaultValueRef.current;
     setState(defaultValueRef.current);
   }, [prefixedKey, ssrSafe]);
 

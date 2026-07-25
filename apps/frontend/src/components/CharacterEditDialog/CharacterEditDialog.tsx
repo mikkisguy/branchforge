@@ -146,6 +146,7 @@ export function CharacterEditDialog({
       previewUrlRef.current = null;
     }
 
+    // react-doctor-disable-next-line react-doctor/no-create-object-url-without-revoke -- URL revoked on replace, remove, dialog close, unmount cleanup, and before successful save close; analyzer misses cross-function pairing
     const preview = URL.createObjectURL(file);
     previewUrlRef.current = preview;
 

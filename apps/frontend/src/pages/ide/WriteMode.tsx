@@ -174,18 +174,18 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
     [handleSelectLabel]
   );
 
-  const editorSaveProps = useMemo(
+  // react-doctor-disable-next-line react-doctor/no-usememo-simple-expression -- referential stability for editorSaveState passed to WriteModeView
+  const editorSaveState = useMemo(
     () => ({
       isSaving: saveStatus === "saving",
       lastSaved: saveStatus === "saved" ? lastSaved : null,
       saveError: saveStatus === "error",
+      saveConflict: activeLabelId
+        ? (conflictByLabel.get(activeLabelId) ?? false)
+        : false,
     }),
-    [lastSaved, saveStatus]
+    [lastSaved, saveStatus, activeLabelId, conflictByLabel]
   );
-
-  const hasConflict = activeLabelId
-    ? conflictByLabel.get(activeLabelId)
-    : false;
 
   if (!currentProject) {
     return <NoProjectSelected onOpenSettings={onOpenSettings} />;
@@ -221,19 +221,18 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
         projectId={currentProject.id}
         projectLabelCount={labels.length}
         onCreateLabel={createLabel}
-        isCreatingLabel={isCreatingLabel}
         onUpdateLabel={updateLabel}
-        isUpdatingLabel={isUpdatingLabel}
         onDeleteLabel={deleteLabel}
-        isDeletingLabel={isDeletingLabel}
+        labelMutationState={{
+          isCreatingLabel,
+          isUpdatingLabel,
+          isDeletingLabel,
+        }}
         editorRef={editorRef}
         activeLabel={activeLabel}
         characters={characters}
         onChange={handleContentChange}
-        isSaving={editorSaveProps.isSaving}
-        lastSaved={editorSaveProps.lastSaved}
-        saveError={editorSaveProps.saveError}
-        saveConflict={Boolean(hasConflict)}
+        editorSaveState={editorSaveState}
         onUndoStateChange={setProseUndoState}
         onWordCountChange={setWordCountState}
         stats={stats}

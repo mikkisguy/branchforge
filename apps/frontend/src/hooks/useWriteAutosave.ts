@@ -297,11 +297,16 @@ export function useWriteAutosave({
     prevProjectIdRef.current = projectId;
   }, [projectId]);
 
+  const hashFn = useCallback(
+    (nextDraft: LabelDialogueDraft) =>
+      `${nextDraft.labelId ?? "none"}:${hashDialogueEntries(nextDraft.entries)}`,
+    []
+  );
+
   const { saveStatus, isDirty, triggerSave, resetSavedHash } =
     useAutosave<LabelDialogueDraft>({
       data: draft,
-      hashFn: (nextDraft) =>
-        `${nextDraft.labelId ?? "none"}:${hashDialogueEntries(nextDraft.entries)}`,
+      hashFn,
       debounceMs: 1000,
       skipSaveRef,
       onSave: useCallback(

@@ -6,7 +6,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { ThemeProvider, themeConfigs } from "../ThemeContext";
+import { ThemeProvider } from "../ThemeContext";
+import { themeConfigs } from "../themeConfigs";
 import { useTheme, type ThemePalette } from "../useTheme";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ToastProvider } from "@/contexts/ToastContext";
