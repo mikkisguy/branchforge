@@ -174,6 +174,9 @@ describe("LoginPage", () => {
         expect(document.getElementById("login-error")).toHaveTextContent(
           "Invalid credentials"
         );
+        expect(
+          document.querySelector('[aria-live="assertive"]')
+        ).toHaveTextContent("Invalid credentials");
       });
     });
 
