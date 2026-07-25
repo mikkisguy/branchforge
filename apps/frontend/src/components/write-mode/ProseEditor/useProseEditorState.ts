@@ -454,54 +454,46 @@ export function useProseEditorState({
 
   const handleAddLine = useCallback(
     (index: number) => {
-      setContent((prev) => {
-        const entries = prev.entries;
-        const newEntries = [...entries];
-        const currentEntry = entries[index];
-        // Always insert dialogue/narration. Never create CHOICE rows here —
-        // Script Mode owns menu structure, and empty choice labels fail API
-        // validation. Enter on a menu prompt or choice jumps past the block.
-        const insertAt = findDialogueInsertIndex(entries, index);
-        const speakerId =
-          currentEntry?.contentType === "CHOICE"
-            ? null
-            : (currentEntry?.speakerId ?? null);
-        const newEntry: DialogueEntry = {
-          id: crypto.randomUUID(),
-          speakerId,
-          text: "",
-        };
-        newEntries.splice(insertAt, 0, newEntry);
+      // Compute next entries outside the updater so history/focus side
+      // effects stay pure (react-doctor/no-impure-state-updater).
+      const currentEntries = entriesRef.current;
+      const newEntries = [...currentEntries];
+      const currentEntry = currentEntries[index];
+      // Always insert dialogue/narration. Never create CHOICE rows here —
+      // Script Mode owns menu structure, and empty choice labels fail API
+      // validation. Enter on a menu prompt or choice jumps past the block.
+      const insertAt = findDialogueInsertIndex(currentEntries, index);
+      const speakerId =
+        currentEntry?.contentType === "CHOICE"
+          ? null
+          : (currentEntry?.speakerId ?? null);
+      const newEntry: DialogueEntry = {
+        id: crypto.randomUUID(),
+        speakerId,
+        text: "",
+      };
+      newEntries.splice(insertAt, 0, newEntry);
 
-        // Record history snapshot
-        recordImmediateHistorySnapshot(newEntries);
-
-        // Queue focus operation
-        pendingFocusRef.current = { index: insertAt, scrollIntoView: true };
-
-        return { ...prev, entries: newEntries };
-      });
+      recordImmediateHistorySnapshot(newEntries);
+      pendingFocusRef.current = { index: insertAt, scrollIntoView: true };
+      entriesRef.current = newEntries;
+      setContent((prev) => ({ ...prev, entries: newEntries }));
     },
     [recordImmediateHistorySnapshot]
   );
 
   const handleDeleteLine = useCallback(
     (index: number) => {
-      setContent((prev) => {
-        const newEntries = prev.entries.filter((_, i) => i !== index);
-        const focusIndex = index > 0 ? index - 1 : 0;
+      const newEntries = entriesRef.current.filter((_, i) => i !== index);
+      const focusIndex = index > 0 ? index - 1 : 0;
 
-        // Record history snapshot
-        recordImmediateHistorySnapshot(newEntries);
-
-        // Queue focus operation
-        pendingFocusRef.current = {
-          index: focusIndex,
-          scrollIntoView: false,
-        };
-
-        return { ...prev, entries: newEntries };
-      });
+      recordImmediateHistorySnapshot(newEntries);
+      pendingFocusRef.current = {
+        index: focusIndex,
+        scrollIntoView: false,
+      };
+      entriesRef.current = newEntries;
+      setContent((prev) => ({ ...prev, entries: newEntries }));
     },
     [recordImmediateHistorySnapshot]
   );
@@ -509,31 +501,30 @@ export function useProseEditorState({
   const handleMoveUp = useCallback(
     (index: number) => {
       if (index === 0) return;
-      setContent((prev) => {
-        const newEntries = [...prev.entries];
-        [newEntries[index - 1], newEntries[index]] = [
-          newEntries[index],
-          newEntries[index - 1],
-        ];
-        recordImmediateHistorySnapshot(newEntries);
-        return { ...prev, entries: newEntries };
-      });
+      const newEntries = [...entriesRef.current];
+      [newEntries[index - 1], newEntries[index]] = [
+        newEntries[index],
+        newEntries[index - 1],
+      ];
+      recordImmediateHistorySnapshot(newEntries);
+      entriesRef.current = newEntries;
+      setContent((prev) => ({ ...prev, entries: newEntries }));
     },
     [recordImmediateHistorySnapshot]
   );
 
   const handleMoveDown = useCallback(
     (index: number) => {
-      setContent((prev) => {
-        if (index >= prev.entries.length - 1) return prev;
-        const newEntries = [...prev.entries];
-        [newEntries[index], newEntries[index + 1]] = [
-          newEntries[index + 1],
-          newEntries[index],
-        ];
-        recordImmediateHistorySnapshot(newEntries);
-        return { ...prev, entries: newEntries };
-      });
+      const currentEntries = entriesRef.current;
+      if (index >= currentEntries.length - 1) return;
+      const newEntries = [...currentEntries];
+      [newEntries[index], newEntries[index + 1]] = [
+        newEntries[index + 1],
+        newEntries[index],
+      ];
+      recordImmediateHistorySnapshot(newEntries);
+      entriesRef.current = newEntries;
+      setContent((prev) => ({ ...prev, entries: newEntries }));
     },
     [recordImmediateHistorySnapshot]
   );
