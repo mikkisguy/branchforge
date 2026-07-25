@@ -5,9 +5,10 @@
  * around it. Used by `ProjectSettingsDialog` (as a tab panel).
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useDirtyForm } from "@/hooks/useDirtyForm";
 import {
   generateVisualName,
   type VisualSystemConfig,
@@ -88,12 +89,12 @@ function validateForm(form: VisualSystemFormState): VisualSystemFormErrors {
 // ============================================================================
 // Form content
 // ============================================================================
-
 interface VisualSystemFormContentProps {
   initialConfig: VisualSystemConfig | null;
   isSaving: boolean;
   onSave: (form: VisualSystemFormState) => Promise<void>;
   onClose: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 /**
@@ -105,6 +106,7 @@ export function VisualSystemFormContent({
   isSaving,
   onSave,
   onClose,
+  onDirtyChange,
 }: VisualSystemFormContentProps) {
   const [form, setForm] = useState<VisualSystemFormState>(
     initialConfig
@@ -129,6 +131,19 @@ export function VisualSystemFormContent({
     }
   }
 
+  // Track dirty state so the outer dialog can guard against accidental
+  // dismissal when the form has unsaved changes.
+  const initialSnapshot = useMemo(
+    () =>
+      initialConfig
+        ? toVisualSystemFormState(initialConfig)
+        : INITIAL_VISUAL_SYSTEM_FORM,
+    [initialConfig]
+  );
+  const { isDirty, resetDirty } = useDirtyForm(initialSnapshot, form);
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
   const handleChange = <K extends keyof VisualSystemFormState>(
     field: K,
     value: VisualSystemFormState[K]
@@ -145,6 +160,7 @@ export function VisualSystemFormContent({
     }
     try {
       await onSave(form);
+      resetDirty();
       onClose();
     } catch {
       // Error handled by hook toast
@@ -235,7 +251,11 @@ export function VisualSystemFormContent({
         {/* No Cancel button — the dialog's X / the outer Close
             button (in `ProjectSettingsDialog`) is the equivalent.
             Save persists; close discards unsaved changes. */}
-        <Button type="button" onClick={handleSave} disabled={isSaving}>
+        <Button
+          type="button"
+          onClick={handleSave}
+          disabled={!isDirty || isSaving}
+        >
           {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
           Save
         </Button>

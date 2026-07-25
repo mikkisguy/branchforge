@@ -12,6 +12,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FormErrorMessage } from "@/components/ui/form-error-message";
 import type { Project, UpdateProjectBody } from "@/lib/api/projects";
+import { useDirtyForm } from "@/hooks/useDirtyForm";
+import { useDirtyDialogWarning } from "@/hooks/useDirtyDialogWarning";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface ProjectEditDialogProps {
   open: boolean;
@@ -74,6 +77,20 @@ export function ProjectEditDialog({
   const [isSaving, setIsSaving] = useState(false);
   const previousOpenRef = useRef(false);
   const previousProjectIdRef = useRef<string | null>(null);
+  const projectSnapshot = project
+    ? { name: project.name, description: (project.description ?? "").trim() }
+    : { name: "", description: "" };
+  const formSnapshot = {
+    name: formState.name.trim(),
+    description: formState.description.trim(),
+  };
+  const { isDirty } = useDirtyForm(projectSnapshot, formSnapshot);
+  const {
+    handleOpenChange,
+    confirmDiscard,
+    discardDialogOpen,
+    setDiscardDialogOpen,
+  } = useDirtyDialogWarning(isDirty, onOpenChange);
 
   const nameErrorId = "edit-project-name-error";
 
@@ -104,11 +121,6 @@ export function ProjectEditDialog({
       previousProjectIdRef.current = null;
     }
   }, [open, project]);
-
-  const hasChanges =
-    project &&
-    (formState.name.trim() !== project.name ||
-      formState.description.trim() !== (project.description ?? "").trim());
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -168,87 +180,101 @@ export function ProjectEditDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[500px] max-w-[95vw]">
-        <DialogHeader className="flex flex-row items-center justify-between gap-y-0 pb-4">
-          <DialogTitle>Edit Project</DialogTitle>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => onOpenChange(false)}
-            aria-label="Close"
-          >
-            <X className="size-5" />
-          </Button>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="w-[500px] max-w-[95vw]">
+          <DialogHeader className="flex flex-row items-center justify-between gap-y-0 pb-4">
+            <DialogTitle>Edit Project</DialogTitle>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => handleOpenChange(false)}
+              aria-label="Close"
+            >
+              <X className="size-5" />
+            </Button>
+          </DialogHeader>
 
-        {!isProjectOwner ? (
-          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-600 dark:text-amber-400">
-            This project is read-only. Only the project owner can edit project
-            details.
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-            <div className="space-y-2">
-              <Label htmlFor="edit-project-name">Project name *</Label>
-              <Input
-                id="edit-project-name"
-                value={formState.name}
-                onChange={(e) =>
-                  dispatch({ type: "SET_NAME", payload: e.target.value })
-                }
-                disabled={isSaving}
-                maxLength={200}
-                aria-required="true"
-                aria-invalid={formState.error ? true : undefined}
-                aria-describedby={formState.error ? nameErrorId : undefined}
+          {!isProjectOwner ? (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-600 dark:text-amber-400">
+              This project is read-only. Only the project owner can edit project
+              details.
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+              <div className="space-y-2">
+                <Label htmlFor="edit-project-name">Project name *</Label>
+                <Input
+                  id="edit-project-name"
+                  value={formState.name}
+                  onChange={(e) =>
+                    dispatch({ type: "SET_NAME", payload: e.target.value })
+                  }
+                  disabled={isSaving}
+                  maxLength={200}
+                  aria-required="true"
+                  aria-invalid={formState.error ? true : undefined}
+                  aria-describedby={formState.error ? nameErrorId : undefined}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-project-description">Description</Label>
+                <Textarea
+                  id="edit-project-description"
+                  value={formState.description}
+                  onChange={(e) =>
+                    dispatch({
+                      type: "SET_DESCRIPTION",
+                      payload: e.target.value,
+                    })
+                  }
+                  disabled={isSaving}
+                  maxLength={2000}
+                  rows={4}
+                  className="resize-y"
+                />
+              </div>
+
+              <FormErrorMessage
+                id={nameErrorId}
+                message={formState.error ?? undefined}
               />
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-project-description">Description</Label>
-              <Textarea
-                id="edit-project-description"
-                value={formState.description}
-                onChange={(e) =>
-                  dispatch({ type: "SET_DESCRIPTION", payload: e.target.value })
-                }
-                disabled={isSaving}
-                maxLength={2000}
-                rows={4}
-                className="resize-y"
-              />
-            </div>
-
-            <FormErrorMessage
-              id={nameErrorId}
-              message={formState.error ?? undefined}
-            />
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={isSaving}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSaving || !hasChanges}>
-                {isSaving ? (
-                  <>
-                    <Loader2 className="mr-2 size-4 animate-spin" />
-                    Saving…
-                  </>
-                ) : (
-                  "Save Changes"
-                )}
-              </Button>
-            </div>
-          </form>
-        )}
-      </DialogContent>
-    </Dialog>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleOpenChange(false)}
+                  disabled={isSaving}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSaving || !isDirty}>
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                      Saving…
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        open={discardDialogOpen}
+        onOpenChange={setDiscardDialogOpen}
+        onConfirm={confirmDiscard}
+        title="Discard unsaved changes?"
+        description="You have unsaved changes. Are you sure you want to discard them?"
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+      />
+    </>
   );
 }

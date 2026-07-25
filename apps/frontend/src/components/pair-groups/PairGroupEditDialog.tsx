@@ -5,7 +5,7 @@
  * Pattern matches RouteEditDialog — standalone dialog with form.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -24,6 +24,9 @@ import { usePairGroups } from "@/hooks/usePairGroups";
 import { useCharacters } from "@/hooks/useCharacters";
 import type { PairGroupWithNames } from "@branchforge/shared";
 import { trimRequiredDuoEndingLabel } from "./pair-group-label";
+import { useDirtyForm } from "@/hooks/useDirtyForm";
+import { useDirtyDialogWarning } from "@/hooks/useDirtyDialogWarning";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 // ============================================================================
 // Types
@@ -80,12 +83,14 @@ function CreateForm({
   characters,
   isSaving,
   onSave,
-  onCancel,
+  onClose,
+  onDirtyChange,
 }: {
   characters: Array<{ id: string; displayName: string }>;
   isSaving: boolean;
   onSave: (form: PairGroupFormState) => Promise<void>;
-  onCancel: () => void;
+  onClose: () => void;
+  onDirtyChange: (dirty: boolean) => void;
 }) {
   const [form, setForm] = useState<PairGroupFormState>({
     characterAId: "",
@@ -93,6 +98,15 @@ function CreateForm({
     duoEndingLabel: "",
   });
   const [errors, setErrors] = useState<PairGroupFormErrors>({});
+
+  const { isDirty } = useDirtyForm(
+    { characterAId: "", characterBId: "", duoEndingLabel: "" },
+    form
+  );
+
+  useEffect(() => {
+    onDirtyChange(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   const handleChange = (field: keyof PairGroupFormState, value: string) => {
     setForm((prev) => {
@@ -205,12 +219,16 @@ function CreateForm({
         <Button
           type="button"
           variant="outline"
-          onClick={onCancel}
+          onClick={onClose}
           disabled={isSaving}
         >
           Cancel
         </Button>
-        <Button type="button" onClick={handleSave} disabled={isSaving}>
+        <Button
+          type="button"
+          onClick={handleSave}
+          disabled={!isDirty || isSaving}
+        >
           {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
           Create Pair Group
         </Button>
@@ -227,17 +245,28 @@ function EditForm({
   pairGroup,
   isSaving,
   onSave,
-  onCancel,
+  onClose,
+  onDirtyChange,
 }: {
   pairGroup: PairGroupWithNames;
   isSaving: boolean;
   onSave: (data: { duoEndingLabel?: string }) => Promise<void>;
-  onCancel: () => void;
+  onClose: () => void;
+  onDirtyChange: (dirty: boolean) => void;
 }) {
   const [form, setForm] = useState({
     duoEndingLabel: pairGroup.duoEndingLabel,
   });
   const [error, setError] = useState<string | null>(null);
+
+  const { isDirty } = useDirtyForm(
+    { duoEndingLabel: pairGroup.duoEndingLabel },
+    form
+  );
+
+  useEffect(() => {
+    onDirtyChange(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   const handleSave = async () => {
     const labelResult = trimRequiredDuoEndingLabel(form.duoEndingLabel);
@@ -289,12 +318,16 @@ function EditForm({
         <Button
           type="button"
           variant="outline"
-          onClick={onCancel}
+          onClick={onClose}
           disabled={isSaving}
         >
           Cancel
         </Button>
-        <Button type="button" onClick={handleSave} disabled={isSaving}>
+        <Button
+          type="button"
+          onClick={handleSave}
+          disabled={!isDirty || isSaving}
+        >
           {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
           Save
         </Button>
@@ -326,6 +359,13 @@ export function PairGroupEditDialog({
 
   const isEditMode = !!pairGroupId;
   const isSaving = isCreating || isUpdating;
+  const [isDirty, setIsDirty] = useState(false);
+  const {
+    handleOpenChange,
+    confirmDiscard,
+    discardDialogOpen,
+    setDiscardDialogOpen,
+  } = useDirtyDialogWarning(isDirty, onOpenChange);
 
   const sortedCharacters = characters
     .toSorted((a, b) => a.displayName.localeCompare(b.displayName))
@@ -369,7 +409,7 @@ export function PairGroupEditDialog({
 
   if (isEditMode && isLoadingPairGroups) {
     return (
-      <Dialog open={effectiveOpen} onOpenChange={onOpenChange}>
+      <Dialog open={effectiveOpen} onOpenChange={handleOpenChange}>
         <DialogContent className="max-w-md w-full">
           <DialogHeader>
             <DialogTitle>Edit Pair Group</DialogTitle>
@@ -384,37 +424,50 @@ export function PairGroupEditDialog({
   }
 
   return (
-    <Dialog open={effectiveOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md w-full">
-        <DialogHeader>
-          <DialogTitle>
-            {isEditMode ? "Edit Pair Group" : "Add Pair Group"}
-          </DialogTitle>
-          <DialogDescription>
-            {isEditMode
-              ? "Update the duo ending settings."
-              : "Create a new pair group for duo ending tracking."}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={effectiveOpen} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-w-md w-full">
+          <DialogHeader>
+            <DialogTitle>
+              {isEditMode ? "Edit Pair Group" : "Add Pair Group"}
+            </DialogTitle>
+            <DialogDescription>
+              {isEditMode
+                ? "Update the duo ending settings."
+                : "Create a new pair group for duo ending tracking."}
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="mt-4">
-          {isEditMode && existingPairGroup ? (
-            <EditForm
-              pairGroup={existingPairGroup}
-              isSaving={isSaving}
-              onSave={handleUpdate}
-              onCancel={() => onOpenChange(false)}
-            />
-          ) : (
-            <CreateForm
-              characters={sortedCharacters}
-              isSaving={isSaving}
-              onSave={handleCreate}
-              onCancel={() => onOpenChange(false)}
-            />
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+          <div className="mt-4">
+            {isEditMode && existingPairGroup ? (
+              <EditForm
+                pairGroup={existingPairGroup}
+                isSaving={isSaving}
+                onSave={handleUpdate}
+                onClose={() => handleOpenChange(false)}
+                onDirtyChange={setIsDirty}
+              />
+            ) : (
+              <CreateForm
+                characters={sortedCharacters}
+                isSaving={isSaving}
+                onSave={handleCreate}
+                onClose={() => handleOpenChange(false)}
+                onDirtyChange={setIsDirty}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        open={discardDialogOpen}
+        onOpenChange={setDiscardDialogOpen}
+        onConfirm={confirmDiscard}
+        title="Discard unsaved changes?"
+        description="You have unsaved changes. Are you sure you want to discard them?"
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+      />
+    </>
   );
 }

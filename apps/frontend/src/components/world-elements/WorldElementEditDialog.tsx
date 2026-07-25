@@ -4,7 +4,7 @@
  * Modal for creating or editing a single world element.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Loader2, Plus, X } from "lucide-react";
 import {
   Dialog,
@@ -20,6 +20,9 @@ import { FormErrorMessage } from "@/components/ui/form-error-message";
 import { Select, type SelectOption } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useWorldElements } from "@/hooks/useWorldElements";
+import { useDirtyForm } from "@/hooks/useDirtyForm";
+import { useDirtyDialogWarning } from "@/hooks/useDirtyDialogWarning";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { WorldElement, WorldElementType } from "@branchforge/shared";
 
 interface WorldElementEditDialogProps {
@@ -85,14 +88,15 @@ interface ElementFormContentProps {
     form: ElementFormState
   ) => Promise<void>;
   onClose: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }
-
 function ElementFormContent({
   elementId,
   elements,
   isSaving,
   onSave,
   onClose,
+  onDirtyChange,
 }: ElementFormContentProps) {
   const [form, setForm] = useState<ElementFormState>(() => {
     if (!elementId) return INITIAL_FORM;
@@ -107,6 +111,31 @@ function ElementFormContent({
   });
   const [errors, setErrors] = useState<ElementFormErrors>({});
   const [newTag, setNewTag] = useState("");
+
+  const [initialSnapshot] = useState<ElementFormState>(() => {
+    if (!elementId) return INITIAL_FORM;
+    const element = elements.find((e) => e.id === elementId);
+    return element
+      ? {
+          name: element.name,
+          type: element.type,
+          description: element.description ?? "",
+          tags: element.tags ?? [],
+        }
+      : INITIAL_FORM;
+  });
+
+  const snapshot = {
+    name: form.name,
+    type: form.type,
+    description: form.description,
+    tags: form.tags,
+  };
+  const { isDirty, resetDirty } = useDirtyForm(initialSnapshot, snapshot);
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   const handleChange = (
     field: keyof ElementFormState,
@@ -145,6 +174,7 @@ function ElementFormContent({
 
     try {
       await onSave(elementId, form);
+      resetDirty();
       onClose();
     } catch {
       // Error handled by hook toast
@@ -276,7 +306,11 @@ function ElementFormContent({
         >
           Cancel
         </Button>
-        <Button type="button" onClick={handleSave} disabled={isSaving}>
+        <Button
+          type="button"
+          onClick={handleSave}
+          disabled={!isDirty || isSaving}
+        >
           {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
           Save
         </Button>
@@ -303,6 +337,15 @@ export function WorldElementEditDialog({
   const isSaving = isCreatingElement || isUpdatingElement;
   const isEditMode = !!elementId;
 
+  const [isDirty, setIsDirty] = useState(false);
+
+  const {
+    handleOpenChange,
+    confirmDiscard,
+    discardDialogOpen,
+    setDiscardDialogOpen,
+  } = useDirtyDialogWarning(isDirty, onOpenChange);
+
   const handleSave = async (id: string | undefined, form: ElementFormState) => {
     if (id) {
       await updateElement(id, {
@@ -322,34 +365,46 @@ export function WorldElementEditDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl w-full">
-        <DialogHeader>
-          <DialogTitle>
-            {isEditMode ? "Edit World Element" : "Add World Element"}
-          </DialogTitle>
-          <DialogDescription>
-            {isEditMode
-              ? "Update world element details."
-              : "Create a new entry for your world bible."}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-w-xl w-full">
+          <DialogHeader>
+            <DialogTitle>
+              {isEditMode ? "Edit World Element" : "Add World Element"}
+            </DialogTitle>
+            <DialogDescription>
+              {isEditMode
+                ? "Update world element details."
+                : "Create a new entry for your world bible."}
+            </DialogDescription>
+          </DialogHeader>
 
-        {isEditMode && isLoadingElements ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="size-6 animate-spin" />
-          </div>
-        ) : (
-          <ElementFormContent
-            key={`${elementId ?? "new"}-${open}`}
-            elementId={elementId}
-            elements={elements}
-            isSaving={isSaving}
-            onSave={handleSave}
-            onClose={() => onOpenChange(false)}
-          />
-        )}
-      </DialogContent>
-    </Dialog>
+          {isEditMode && isLoadingElements ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="size-6 animate-spin" />
+            </div>
+          ) : (
+            <ElementFormContent
+              key={`${elementId ?? "new"}-${open}`}
+              elementId={elementId}
+              elements={elements}
+              isSaving={isSaving}
+              onSave={handleSave}
+              onClose={() => handleOpenChange(false)}
+              onDirtyChange={setIsDirty}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        open={discardDialogOpen}
+        onOpenChange={setDiscardDialogOpen}
+        onConfirm={confirmDiscard}
+        title="Discard unsaved changes?"
+        description="You have unsaved changes. Are you sure you want to discard them?"
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+      />
+    </>
   );
 }

@@ -29,6 +29,8 @@ import {
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsPanel } from "@/components/ui/tabs";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useDirtyDialogWarning } from "@/hooks/useDirtyDialogWarning";
 import { CharacterSettingsContent } from "@/components/characters/CharacterSettingsContent";
 import { RouteSettingsContent } from "@/components/routes/RouteSettingsContent";
 import { VisualSystemFormContent } from "@/components/visual-system/VisualSystemDialog";
@@ -108,82 +110,104 @@ export function ProjectSettingsDialog({
     }
   }
 
+  const [visualSystemDirty, setVisualSystemDirty] = useState(false);
+  const {
+    handleOpenChange,
+    confirmDiscard,
+    discardDialogOpen,
+    setDiscardDialogOpen,
+  } = useDirtyDialogWarning(visualSystemDirty, onOpenChange);
+
   return (
-    <Dialog
-      open={open}
-      onOpenChange={onOpenChange}
-      aria-label="Project Settings"
-    >
-      <DialogContent className="max-w-3xl w-full max-h-[80vh] min-h-[500px] max-md:min-h-0 p-0 gap-0 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="p-6 max-sm:p-4 border-b border-border/30 flex items-start justify-between shrink-0">
-          <div>
-            <h2 className="text-lg font-medium">Project Settings</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Configure characters, routes, visual system, and world bible
-              elements.
-            </p>
+    <>
+      <Dialog
+        open={open}
+        onOpenChange={handleOpenChange}
+        aria-label="Project Settings"
+      >
+        <DialogContent className="max-w-3xl w-full max-h-[80vh] min-h-[500px] max-md:min-h-0 p-0 gap-0 flex flex-col overflow-hidden">
+          {/* Header */}
+          <div className="p-6 max-sm:p-4 border-b border-border/30 flex items-start justify-between shrink-0">
+            <div>
+              <h2 className="text-lg font-medium">Project Settings</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Configure characters, routes, visual system, and world bible
+                elements.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleOpenChange(false)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Close project settings"
+            >
+              <X className="size-5" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Close project settings"
+
+          {/* Tabs */}
+          <Tabs
+            value={activeTab}
+            onValueChange={(next) => setActiveTab(next as SettingsTab)}
+            className="flex flex-col flex-1 min-h-0"
           >
-            <X className="size-5" />
-          </button>
-        </div>
+            <div className="px-3 pt-2 pb-3 shrink-0 sm:px-6">
+              <TabsList ariaLabel="Project settings sections" scrollable>
+                {TAB_ORDER.map((tab) => {
+                  const Icon = TAB_ICONS[tab];
+                  return (
+                    <TabsTrigger key={tab} value={tab}>
+                      <span className="inline-flex items-center gap-1.5">
+                        <Icon className="size-3.5" />
+                        {TAB_LABELS[tab]}
+                      </span>
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+            </div>
 
-        {/* Tabs */}
-        <Tabs
-          value={activeTab}
-          onValueChange={(next) => setActiveTab(next as SettingsTab)}
-          className="flex flex-col flex-1 min-h-0"
-        >
-          <div className="px-3 pt-2 pb-3 shrink-0 sm:px-6">
-            <TabsList ariaLabel="Project settings sections" scrollable>
-              {TAB_ORDER.map((tab) => {
-                const Icon = TAB_ICONS[tab];
-                return (
-                  <TabsTrigger key={tab} value={tab}>
-                    <span className="inline-flex items-center gap-1.5">
-                      <Icon className="size-3.5" />
-                      {TAB_LABELS[tab]}
-                    </span>
-                  </TabsTrigger>
-                );
-              })}
-            </TabsList>
+            <div className="flex-1 overflow-y-auto p-6 max-sm:p-4">
+              <TabsPanel value="characters" className="space-y-4">
+                <CharactersTabContent projectId={projectId} />
+              </TabsPanel>
+              <TabsPanel value="routes" className="space-y-4">
+                <RouteSettingsContent projectId={projectId} columns={2} />
+              </TabsPanel>
+              <TabsPanel value="world" className="space-y-4">
+                <WorldElementsSettingsContent projectId={projectId} />
+              </TabsPanel>
+              <TabsPanel value="visual" className="space-y-4">
+                <VisualSystemTabContent
+                  projectId={projectId}
+                  onDirtyChange={setVisualSystemDirty}
+                />
+              </TabsPanel>
+            </div>
+          </Tabs>
+
+          {/* Footer */}
+          <div className="p-6 max-sm:p-4 border-t border-border/30 flex justify-end shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleOpenChange(false)}
+            >
+              Close
+            </Button>
           </div>
-
-          <div className="flex-1 overflow-y-auto p-6 max-sm:p-4">
-            <TabsPanel value="characters" className="space-y-4">
-              <CharactersTabContent projectId={projectId} />
-            </TabsPanel>
-            <TabsPanel value="routes" className="space-y-4">
-              <RouteSettingsContent projectId={projectId} columns={2} />
-            </TabsPanel>
-            <TabsPanel value="world" className="space-y-4">
-              <WorldElementsSettingsContent projectId={projectId} />
-            </TabsPanel>
-            <TabsPanel value="visual" className="space-y-4">
-              <VisualSystemTabContent projectId={projectId} />
-            </TabsPanel>
-          </div>
-        </Tabs>
-
-        {/* Footer */}
-        <div className="p-6 max-sm:p-4 border-t border-border/30 flex justify-end shrink-0">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-          >
-            Close
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        open={discardDialogOpen}
+        onOpenChange={setDiscardDialogOpen}
+        onConfirm={confirmDiscard}
+        title="Discard unsaved changes?"
+        description="You have unsaved changes. Are you sure you want to discard them?"
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+      />
+    </>
   );
 }
 
@@ -214,9 +238,13 @@ function CharactersTabContent({ projectId }: CharactersTabContentProps) {
 
 interface VisualSystemTabContentProps {
   projectId: string;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
-function VisualSystemTabContent({ projectId }: VisualSystemTabContentProps) {
+function VisualSystemTabContent({
+  projectId,
+  onDirtyChange,
+}: VisualSystemTabContentProps) {
   const { config, isLoading, isError, isSaving, updateConfig, refetch } =
     useVisualSystem(projectId);
 
@@ -287,6 +315,7 @@ function VisualSystemTabContent({ projectId }: VisualSystemTabContentProps) {
       // button (or the X in the header). Keeping Cancel visible
       // preserves visual parity with the standalone dialog.
       onClose={() => {}}
+      onDirtyChange={onDirtyChange}
     />
   );
 }

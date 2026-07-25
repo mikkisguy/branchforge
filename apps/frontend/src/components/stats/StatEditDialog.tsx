@@ -4,7 +4,7 @@
  * Modal for creating or editing a single stat.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -19,6 +19,9 @@ import { Label } from "@/components/ui/label";
 import { FormErrorMessage } from "@/components/ui/form-error-message";
 import { useStats } from "@/hooks/useStats";
 import type { Stat } from "@branchforge/shared";
+import { useDirtyForm } from "@/hooks/useDirtyForm";
+import { useDirtyDialogWarning } from "@/hooks/useDirtyDialogWarning";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface StatEditDialogProps {
   open: boolean;
@@ -81,6 +84,7 @@ interface StatFormContentProps {
   stats: Stat[];
   isSaving: boolean;
   onSave: (statId: string | undefined, form: StatFormState) => Promise<void>;
+  onDirtyChange: (dirty: boolean) => void;
   onClose: () => void;
 }
 
@@ -90,6 +94,7 @@ function StatFormContent({
   isSaving,
   onSave,
   onClose,
+  onDirtyChange,
 }: StatFormContentProps) {
   const [form, setForm] = useState<StatFormState>(() => {
     if (!statId) return initialForm;
@@ -104,6 +109,25 @@ function StatFormContent({
     };
   });
   const [errors, setErrors] = useState<StatFormErrors>({});
+
+  const initialSnapshot = useMemo(() => {
+    if (!statId) return initialForm;
+    const stat = stats.find((item: Stat) => item.id === statId);
+    if (!stat) return initialForm;
+    return {
+      key: stat.key,
+      name: stat.name,
+      minValue: stat.minValue,
+      maxValue: stat.maxValue,
+      description: stat.description ?? "",
+    };
+  }, [statId, stats]);
+
+  const { isDirty } = useDirtyForm(initialSnapshot, form);
+
+  useEffect(() => {
+    onDirtyChange(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   // react-doctor-disable-next-line react-doctor/no-event-handler
   const isEditMode = !!statId;
@@ -151,7 +175,6 @@ function StatFormContent({
 
     try {
       await onSave(statId, form);
-      onClose();
     } catch {
       // Error handled by hook toast
     }
@@ -259,7 +282,11 @@ function StatFormContent({
         >
           Cancel
         </Button>
-        <Button type="button" onClick={handleSave} disabled={isSaving}>
+        <Button
+          type="button"
+          onClick={handleSave}
+          disabled={!isDirty || isSaving}
+        >
           {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
           Save
         </Button>
@@ -288,6 +315,14 @@ export function StatEditDialog({
   const isSaving = isCreatingStat || isUpdatingStat;
   const isEditMode = !!statId;
 
+  const [isDirty, setIsDirty] = useState(false);
+  const {
+    handleOpenChange,
+    confirmDiscard,
+    discardDialogOpen,
+    setDiscardDialogOpen,
+  } = useDirtyDialogWarning(isDirty, onOpenChange);
+
   const handleSave = async (id: string | undefined, form: StatFormState) => {
     if (id) {
       await updateStat(id, {
@@ -305,40 +340,48 @@ export function StatEditDialog({
         description: form.description.trim() || undefined,
       });
     }
+    onOpenChange(false);
   };
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(newOpen) => {
-        if (!newOpen) onOpenChange(false);
-      }}
-    >
-      <DialogContent className="max-w-xl w-full">
-        <DialogHeader>
-          <DialogTitle>{isEditMode ? "Edit Stat" : "Add Stat"}</DialogTitle>
-          <DialogDescription>
-            {isEditMode
-              ? "Update the stat settings."
-              : "Create a new stat for your project."}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-w-xl w-full">
+          <DialogHeader>
+            <DialogTitle>{isEditMode ? "Edit Stat" : "Add Stat"}</DialogTitle>
+            <DialogDescription>
+              {isEditMode
+                ? "Update the stat settings."
+                : "Create a new stat for your project."}
+            </DialogDescription>
+          </DialogHeader>
 
-        {isEditMode && isLoadingStats ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="size-6 animate-spin" />
-          </div>
-        ) : (
-          <StatFormContent
-            key={`${statId ?? "new"}-${open}`}
-            statId={statId}
-            stats={stats}
-            isSaving={isSaving}
-            onSave={handleSave}
-            onClose={() => onOpenChange(false)}
-          />
-        )}
-      </DialogContent>
-    </Dialog>
+          {isEditMode && isLoadingStats ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="size-6 animate-spin" />
+            </div>
+          ) : (
+            <StatFormContent
+              key={`${statId ?? "new"}-${open}`}
+              statId={statId}
+              stats={stats}
+              isSaving={isSaving}
+              onSave={handleSave}
+              onDirtyChange={setIsDirty}
+              onClose={() => handleOpenChange(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        open={discardDialogOpen}
+        onOpenChange={setDiscardDialogOpen}
+        onConfirm={confirmDiscard}
+        title="Discard unsaved changes?"
+        description="You have unsaved changes. Are you sure you want to discard them?"
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+      />
+    </>
   );
 }

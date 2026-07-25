@@ -4,7 +4,7 @@
  * Modal for creating or editing a single variable.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -19,6 +19,9 @@ import { Label } from "@/components/ui/label";
 import { FormErrorMessage } from "@/components/ui/form-error-message";
 import { useVariables } from "@/hooks/useVariables";
 import type { Variable } from "@branchforge/shared";
+import { useDirtyForm } from "@/hooks/useDirtyForm";
+import { useDirtyDialogWarning } from "@/hooks/useDirtyDialogWarning";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface VariableEditDialogProps {
   open: boolean;
@@ -77,6 +80,7 @@ interface VariableFormContentProps {
     form: VariableFormState
   ) => Promise<void>;
   onClose: () => void;
+  onDirtyChange: (dirty: boolean) => void;
 }
 
 function VariableFormContent({
@@ -85,6 +89,7 @@ function VariableFormContent({
   isSaving,
   onSave,
   onClose,
+  onDirtyChange,
 }: VariableFormContentProps) {
   const [form, setForm] = useState<VariableFormState>(() => {
     if (!variableId) return initialForm;
@@ -96,6 +101,21 @@ function VariableFormContent({
       category: variable.category ?? "",
     };
   });
+  const initialSnapshot: VariableFormState = useMemo(() => {
+    if (!variableId) return initialForm;
+    const variable = variables.find((v) => v.id === variableId);
+    if (!variable) return initialForm;
+    return {
+      key: variable.key,
+      description: variable.description ?? "",
+      category: variable.category ?? "",
+    };
+  }, [variableId, variables]);
+  const { isDirty } = useDirtyForm(initialSnapshot, form);
+  useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-prop-callback-in-effect
+    onDirtyChange(isDirty);
+  }, [isDirty, onDirtyChange]);
   const [errors, setErrors] = useState<VariableFormErrors>({});
 
   // react-doctor-disable-next-line react-doctor/no-event-handler
@@ -129,7 +149,6 @@ function VariableFormContent({
 
     try {
       await onSave(variableId, form);
-      onClose();
     } catch {
       // Error handled by hook toast
     }
@@ -215,7 +234,11 @@ function VariableFormContent({
         >
           Cancel
         </Button>
-        <Button type="button" onClick={handleSave} disabled={isSaving}>
+        <Button
+          type="button"
+          onClick={handleSave}
+          disabled={!isDirty || isSaving}
+        >
           {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
           Save
         </Button>
@@ -242,6 +265,14 @@ export function VariableEditDialog({
   const isSaving = isCreatingVariable || isUpdatingVariable;
   const isEditMode = !!variableId;
 
+  const [isDirty, setIsDirty] = useState(false);
+  const {
+    handleOpenChange,
+    confirmDiscard,
+    discardDialogOpen,
+    setDiscardDialogOpen,
+  } = useDirtyDialogWarning(isDirty, onOpenChange);
+
   const handleSave = async (
     id: string | undefined,
     form: VariableFormState
@@ -258,37 +289,51 @@ export function VariableEditDialog({
         category: form.category.trim() || undefined,
       });
     }
+    onOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl w-full">
-        <DialogHeader>
-          <DialogTitle>
-            {isEditMode ? "Edit Variable" : "Add Variable"}
-          </DialogTitle>
-          <DialogDescription>
-            {isEditMode
-              ? "Update variable details."
-              : "Create a new variable for branching logic."}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-w-xl w-full">
+          <DialogHeader>
+            <DialogTitle>
+              {isEditMode ? "Edit Variable" : "Add Variable"}
+            </DialogTitle>
+            <DialogDescription>
+              {isEditMode
+                ? "Update variable details."
+                : "Create a new variable for branching logic."}
+            </DialogDescription>
+          </DialogHeader>
 
-        {isEditMode && isLoadingVariables ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="size-6 animate-spin" />
-          </div>
-        ) : (
-          <VariableFormContent
-            key={`${variableId ?? "new"}-${open}`}
-            variableId={variableId}
-            variables={variables}
-            isSaving={isSaving}
-            onSave={handleSave}
-            onClose={() => onOpenChange(false)}
-          />
-        )}
-      </DialogContent>
-    </Dialog>
+          {isEditMode && isLoadingVariables ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="size-6 animate-spin" />
+            </div>
+          ) : (
+            <VariableFormContent
+              key={`${variableId ?? "new"}-${open}`}
+              variableId={variableId}
+              variables={variables}
+              isSaving={isSaving}
+              onSave={handleSave}
+              onClose={() => handleOpenChange(false)}
+              onDirtyChange={setIsDirty}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={discardDialogOpen}
+        onOpenChange={setDiscardDialogOpen}
+        onConfirm={confirmDiscard}
+        title="Discard unsaved changes?"
+        description="You have unsaved changes. Are you sure you want to discard them?"
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+      />
+    </>
   );
 }

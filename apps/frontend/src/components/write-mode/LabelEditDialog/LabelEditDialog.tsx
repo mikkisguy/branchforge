@@ -4,7 +4,7 @@
  * Modal for editing label metadata, routing, and duo pair configuration.
  */
 
-import { useEffect, useReducer, useRef } from "react";
+import { useEffect, useMemo, useReducer, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,9 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useDirtyForm } from "@/hooks/useDirtyForm";
+import { useDirtyDialogWarning } from "@/hooks/useDirtyDialogWarning";
 import { INITIAL_FORM_STATE, formReducer } from "./LabelEditDialogReducer.js";
 import { LabelEditDialogFields } from "./LabelEditDialogFields.js";
 import { LabelEditDialogFooter } from "./LabelEditDialogFooter.js";
@@ -73,8 +76,54 @@ export function LabelEditDialog({
   isSaving,
 }: LabelEditDialogProps) {
   const [form, dispatch] = useReducer(formReducer, INITIAL_FORM_STATE);
-
   const initializedForOpenRef = useRef(false);
+
+  const comparableSnapshot = useMemo(
+    () => ({
+      title: form.title,
+      labelName: form.labelName,
+      route: form.route,
+      status: form.status,
+      visibility: form.visibility,
+      duoPairId: form.duoPairId,
+    }),
+    [
+      form.title,
+      form.labelName,
+      form.route,
+      form.status,
+      form.visibility,
+      form.duoPairId,
+    ]
+  );
+
+  const initialSnapshot = useMemo(
+    () => ({
+      title: currentTitle,
+      labelName: currentLabelName ?? "",
+      route: currentRoute ?? "",
+      status: currentStatus ?? "DRAFT",
+      visibility: currentVisibility ?? "EXCLUSIVE",
+      duoPairId: currentDuoPairId ?? "",
+    }),
+    [
+      currentTitle,
+      currentLabelName,
+      currentRoute,
+      currentStatus,
+      currentVisibility,
+      currentDuoPairId,
+    ]
+  );
+
+  const { isDirty } = useDirtyForm(initialSnapshot, comparableSnapshot);
+
+  const {
+    handleOpenChange,
+    confirmDiscard,
+    discardDialogOpen,
+    setDiscardDialogOpen,
+  } = useDirtyDialogWarning(isDirty, onOpenChange);
 
   // Initialize form state when dialog opens
   useEffect(() => {
@@ -99,6 +148,12 @@ export function LabelEditDialog({
     currentVisibility,
     currentDuoPairId,
   ]);
+  // Reset init guard when dialog closes so it re-initializes on next open
+  useEffect(() => {
+    if (!open) {
+      initializedForOpenRef.current = false;
+    }
+  }, [open]);
 
   const handleSave = async () => {
     if (!form.title.trim()) {
@@ -176,54 +231,59 @@ export function LabelEditDialog({
     }
 
     if (Object.keys(changes).length === 0) {
-      initializedForOpenRef.current = false;
       onOpenChange(false);
       return;
     }
 
     await onSave(changes);
-    initializedForOpenRef.current = false;
-  };
-
-  const handleCancel = () => {
-    initializedForOpenRef.current = false;
     onOpenChange(false);
   };
 
+  const handleCancel = () => {
+    handleOpenChange(false);
+  };
+
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(newOpen) => {
-        if (!newOpen) initializedForOpenRef.current = false;
-        onOpenChange(newOpen);
-      }}
-    >
-      <DialogContent className="w-[560px] max-w-[95vw] max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Edit Label</DialogTitle>
-          <DialogDescription>
-            Update the label metadata and routing configuration.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="w-[560px] max-w-[95vw] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Label</DialogTitle>
+            <DialogDescription>
+              Update the label metadata and routing configuration.
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-4 mt-4">
-          <LabelEditDialogFields
-            form={form}
-            dispatch={dispatch}
-            isSaving={isSaving}
-            currentLabelName={currentLabelName}
-            routeConfigs={routeConfigs}
-            pairGroups={pairGroups}
-            duoEndingEnabled={duoEndingEnabled}
-          />
+          <div className="space-y-4 mt-4">
+            <LabelEditDialogFields
+              form={form}
+              dispatch={dispatch}
+              isSaving={isSaving}
+              currentLabelName={currentLabelName}
+              routeConfigs={routeConfigs}
+              pairGroups={pairGroups}
+              duoEndingEnabled={duoEndingEnabled}
+            />
 
-          <LabelEditDialogFooter
-            isSaving={isSaving}
-            onCancel={handleCancel}
-            onSave={handleSave}
-          />
-        </div>
-      </DialogContent>
-    </Dialog>
+            <LabelEditDialogFooter
+              isSaving={isSaving}
+              saveDisabled={!isDirty}
+              onCancel={handleCancel}
+              onSave={handleSave}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        title="Discard unsaved changes?"
+        description="You have unsaved changes. Are you sure you want to discard them?"
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+        open={discardDialogOpen}
+        onOpenChange={setDiscardDialogOpen}
+        onConfirm={confirmDiscard}
+      />
+    </>
   );
 }

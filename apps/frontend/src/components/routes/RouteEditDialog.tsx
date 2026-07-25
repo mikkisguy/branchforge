@@ -21,6 +21,9 @@ import { FormErrorMessage } from "@/components/ui/form-error-message";
 import { useRouteConfigs } from "@/hooks/useRouteConfigs";
 import { isValidJumpPrefix, isValidRouteKey } from "@branchforge/shared";
 import type { RouteConfig } from "@branchforge/shared";
+import { useDirtyForm } from "@/hooks/useDirtyForm";
+import { useDirtyDialogWarning } from "@/hooks/useDirtyDialogWarning";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export interface RouteEditDialogProps {
   open: boolean;
@@ -79,14 +82,18 @@ function RouteFormContent({
   isSaving,
   onSave,
   onClose,
+  onDirtyChange,
+  onSaveSuccess,
 }: {
   routeId: string | undefined;
   routeConfigs: RouteConfig[];
   isSaving: boolean;
   onSave: (routeId: string | undefined, form: RouteFormState) => Promise<void>;
   onClose: () => void;
+  onDirtyChange: (dirty: boolean) => void;
+  onSaveSuccess: () => void;
 }) {
-  const [form, setForm] = useState<RouteFormState>(() => {
+  const [initialFormSnapshot] = useState<RouteFormState>(() => {
     if (!routeId) return INITIAL_FORM;
     const route = routeConfigs.find((item: RouteConfig) => item.id === routeId);
     if (!route) return INITIAL_FORM;
@@ -97,7 +104,13 @@ function RouteFormContent({
       isShared: route.isShared,
     };
   });
+  const [form, setForm] = useState<RouteFormState>(initialFormSnapshot);
   const [errors, setErrors] = useState<RouteFormErrors>({});
+  const { isDirty } = useDirtyForm(initialFormSnapshot, form);
+
+  useEffect(() => {
+    onDirtyChange(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   // react-doctor-disable-next-line react-doctor/no-event-handler
   const isEditMode = !!routeId;
@@ -133,7 +146,7 @@ function RouteFormContent({
 
     try {
       await onSave(routeId, form);
-      onClose();
+      onSaveSuccess();
     } catch {
       // Error handled by hook toast
     }
@@ -260,7 +273,11 @@ function RouteFormContent({
           >
             Cancel
           </Button>
-          <Button type="button" onClick={handleSave} disabled={isSaving}>
+          <Button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving || !isDirty}
+          >
             {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
             Save
           </Button>
@@ -286,10 +303,17 @@ export function RouteEditDialog({
   } = useRouteConfigs(projectId);
 
   const isSaving = isCreatingRouteConfig || isUpdatingRouteConfig;
+  const [isDirty, setIsDirty] = useState(false);
+  const {
+    handleOpenChange,
+    confirmDiscard,
+    discardDialogOpen,
+    setDiscardDialogOpen,
+  } = useDirtyDialogWarning(isDirty, onOpenChange);
 
   if (isLoadingRouteConfigs) {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="max-w-xl w-full">
           <DialogHeader>
             <DialogTitle>{routeId ? "Edit Route" : "Add Route"}</DialogTitle>
@@ -304,32 +328,45 @@ export function RouteEditDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl w-full">
-        <RouteFormContent
-          key={`${routeId ?? "new"}-${open}`}
-          routeId={routeId}
-          routeConfigs={routeConfigs}
-          isSaving={isSaving}
-          onSave={async (id, formData) => {
-            if (id) {
-              await updateRouteConfig(id, {
-                routeName: formData.routeName.trim(),
-                jumpPrefix: formData.jumpPrefix.trim(),
-                isShared: formData.isShared,
-              });
-            } else {
-              await createRouteConfig({
-                routeKey: formData.routeKey.trim(),
-                routeName: formData.routeName.trim(),
-                jumpPrefix: formData.jumpPrefix.trim(),
-                isShared: formData.isShared,
-              });
-            }
-          }}
-          onClose={() => onOpenChange(false)}
-        />
-      </DialogContent>
-    </Dialog>
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-w-xl w-full">
+          <RouteFormContent
+            key={`${routeId ?? "new"}-${open}`}
+            routeId={routeId}
+            routeConfigs={routeConfigs}
+            isSaving={isSaving}
+            onSave={async (id, formData) => {
+              if (id) {
+                await updateRouteConfig(id, {
+                  routeName: formData.routeName.trim(),
+                  jumpPrefix: formData.jumpPrefix.trim(),
+                  isShared: formData.isShared,
+                });
+              } else {
+                await createRouteConfig({
+                  routeKey: formData.routeKey.trim(),
+                  routeName: formData.routeName.trim(),
+                  jumpPrefix: formData.jumpPrefix.trim(),
+                  isShared: formData.isShared,
+                });
+              }
+            }}
+            onClose={() => handleOpenChange(false)}
+            onDirtyChange={setIsDirty}
+            onSaveSuccess={() => onOpenChange(false)}
+          />
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        open={discardDialogOpen}
+        onOpenChange={setDiscardDialogOpen}
+        onConfirm={confirmDiscard}
+        title="Discard unsaved changes?"
+        description="You have unsaved changes. Are you sure you want to discard them?"
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+      />
+    </>
   );
 }
