@@ -172,4 +172,25 @@ describe("ProjectEditDialog — dirty form guard (SF-1)", () => {
     // The dialog closed (onOpenChange(false) was called from handleSubmit)
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
+
+  it("shows discard confirmation when Escape is pressed with dirty form", async () => {
+    const user = userEvent.setup({ delay: null });
+    render(
+      <ProjectEditDialog
+        open
+        project={mockProject}
+        isProjectOwner
+        onOpenChange={onOpenChange}
+        onUpdate={onUpdate}
+      />
+    );
+
+    const nameInput = screen.getByLabelText(/project name/i);
+    await user.type(nameInput, "2");
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.getByText(/discard unsaved changes/i)).toBeInTheDocument();
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
 });

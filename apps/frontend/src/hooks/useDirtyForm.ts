@@ -26,6 +26,8 @@ export function useDirtyForm<T>(
 ): {
   isDirty: boolean;
   resetDirty: () => void;
+  /** Compare arbitrary values against the current baseline (e.g. next form). */
+  checkDirty: (values: T) => boolean;
 } {
   const initialSerialized = serialize(initialValues);
   const [baselineSerialized, setBaselineSerialized] =
@@ -47,5 +49,10 @@ export function useDirtyForm<T>(
     setBaselineSerialized(serialize(currentValues));
   }, [currentValues]);
 
-  return { isDirty, resetDirty };
+  const checkDirty = useCallback(
+    (values: T) => serialize(values) !== baselineSerialized,
+    [baselineSerialized]
+  );
+
+  return { isDirty, resetDirty, checkDirty };
 }

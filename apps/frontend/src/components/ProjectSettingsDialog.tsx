@@ -120,6 +120,13 @@ export function ProjectSettingsDialog({
     setDiscardDialogOpen,
   } = useDirtyDialogWarning(visualSystemDirty, onOpenChange);
 
+  const handleConfirmDiscard = () => {
+    // Clear lifted dirty flag before close so a reopen does not inherit a
+    // stale dirty=true while the remounted form is clean.
+    setVisualSystemDirty(false);
+    confirmDiscard();
+  };
+
   return (
     <>
       <Dialog
@@ -206,7 +213,7 @@ export function ProjectSettingsDialog({
       <ConfirmDialog
         open={discardDialogOpen}
         onOpenChange={setDiscardDialogOpen}
-        onConfirm={confirmDiscard}
+        onConfirm={handleConfirmDiscard}
         title="Discard unsaved changes?"
         description="You have unsaved changes. Are you sure you want to discard them?"
         confirmLabel="Discard"

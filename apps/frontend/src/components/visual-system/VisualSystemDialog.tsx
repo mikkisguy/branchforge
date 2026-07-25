@@ -140,7 +140,10 @@ export function VisualSystemFormContent({
         : INITIAL_VISUAL_SYSTEM_FORM,
     [initialConfig]
   );
-  const { isDirty, resetDirty } = useDirtyForm(initialSnapshot, form);
+  const { isDirty, resetDirty, checkDirty } = useDirtyForm(
+    initialSnapshot,
+    form
+  );
   const handleChange = <K extends keyof VisualSystemFormState>(
     field: K,
     value: VisualSystemFormState[K]
@@ -148,7 +151,9 @@ export function VisualSystemFormContent({
     const next = { ...form, [field]: value };
     setForm(next);
     setErrors((prev) => ({ ...prev, [field]: undefined }));
-    onDirtyChange?.(JSON.stringify(next) !== JSON.stringify(initialSnapshot));
+    // Notify parent from the hook baseline (survives resetDirty), not a
+    // separate JSON compare against the prop snapshot.
+    onDirtyChange?.(checkDirty(next));
   };
 
   const handleSave = async () => {

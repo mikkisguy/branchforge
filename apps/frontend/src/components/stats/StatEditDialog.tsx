@@ -134,13 +134,15 @@ function StatFormContent({
   // react-doctor-disable-next-line react-doctor/no-event-handler
   const isEditMode = !!statId;
 
-  // Close dialog if editing a stat that no longer exists
+  // Close dialog if editing a stat that no longer exists (unguarded —
+  // discard prompt would be wrong for a deleted entity).
   useEffect(() => {
     // react-doctor-disable-next-line react-doctor/no-event-handler
     if (isEditMode && !stats.find((item) => item.id === statId)) {
-      handleOpenChange(false);
+      // react-doctor-disable-next-line react-doctor/no-prop-callback-in-effect
+      onOpenChange(false);
     }
-  }, [isEditMode, statId, stats, handleOpenChange]);
+  }, [isEditMode, statId, stats, onOpenChange]);
 
   const handleChange = (field: keyof StatFormState, value: string) => {
     setForm((prev) => {

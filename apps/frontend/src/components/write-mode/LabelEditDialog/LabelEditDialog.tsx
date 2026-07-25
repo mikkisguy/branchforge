@@ -4,7 +4,7 @@
  * Modal for editing label metadata, routing, and duo pair configuration.
  */
 
-import { useEffect, useMemo, useReducer, useRef } from "react";
+import { useMemo, useReducer, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -76,7 +76,25 @@ export function LabelEditDialog({
   isSaving,
 }: LabelEditDialogProps) {
   const [form, dispatch] = useReducer(formReducer, INITIAL_FORM_STATE);
-  const initializedForOpenRef = useRef(false);
+  // Gate dirty until the open-time RESET has been applied. Without this,
+  // the first render still has INITIAL_FORM_STATE and would look dirty
+  // (Save enabled / discard on dismiss) before the init commit.
+  // react-doctor-disable-next-line react-doctor/no-derived-useState, react-doctor/rerender-state-only-in-handlers
+  const [hasInitialized, setHasInitialized] = useState(false);
+  if (open && !hasInitialized) {
+    setHasInitialized(true);
+    dispatch({
+      type: "RESET",
+      title: currentTitle,
+      labelName: currentLabelName ?? "",
+      route: currentRoute ?? "",
+      status: currentStatus ?? "DRAFT",
+      visibility: currentVisibility ?? "EXCLUSIVE",
+      duoPairId: currentDuoPairId ?? "",
+    });
+  } else if (!open && hasInitialized) {
+    setHasInitialized(false);
+  }
 
   const comparableSnapshot = useMemo(
     () => ({
@@ -116,7 +134,11 @@ export function LabelEditDialog({
     ]
   );
 
-  const { isDirty } = useDirtyForm(initialSnapshot, comparableSnapshot);
+  const { isDirty: formDirty } = useDirtyForm(
+    initialSnapshot,
+    comparableSnapshot
+  );
+  const isDirty = hasInitialized && formDirty;
 
   const {
     handleOpenChange,
@@ -124,36 +146,6 @@ export function LabelEditDialog({
     discardDialogOpen,
     setDiscardDialogOpen,
   } = useDirtyDialogWarning(isDirty, onOpenChange);
-
-  // Initialize form state when dialog opens
-  useEffect(() => {
-    if (open && !initializedForOpenRef.current) {
-      initializedForOpenRef.current = true;
-      dispatch({
-        type: "RESET",
-        title: currentTitle,
-        labelName: currentLabelName ?? "",
-        route: currentRoute ?? "",
-        status: currentStatus ?? "DRAFT",
-        visibility: currentVisibility ?? "EXCLUSIVE",
-        duoPairId: currentDuoPairId ?? "",
-      });
-    }
-  }, [
-    open,
-    currentTitle,
-    currentLabelName,
-    currentRoute,
-    currentStatus,
-    currentVisibility,
-    currentDuoPairId,
-  ]);
-  // Reset init guard when dialog closes so it re-initializes on next open
-  useEffect(() => {
-    if (!open) {
-      initializedForOpenRef.current = false;
-    }
-  }, [open]);
 
   const handleSave = async () => {
     if (!form.title.trim()) {

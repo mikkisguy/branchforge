@@ -1,5 +1,13 @@
 import * as React from "react";
-import { useId, useEffect, useEffectEvent, useMemo, useRef, use } from "react";
+import {
+  useId,
+  useEffect,
+  useLayoutEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  use,
+} from "react";
 import { cn } from "@/lib/utils";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { nativeDialogOverlayClassName } from "@/components/ui/native-dialog-overlay";
@@ -37,23 +45,30 @@ export function Dialog({
   "aria-labelledby": ariaLabelledBy,
 }: DialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  // When the controlled `open` prop becomes false we call dialog.close(),
+  // which fires a native `close` event. Ignore that event so dirty-guarded
+  // onOpenChange(false) from confirmDiscard / successful save is not
+  // re-entered while the form is still dirty.
+  const ignoreNextCloseRef = useRef(false);
 
   const handleClose = useEffectEvent(() => onOpenChange?.(false));
 
   // Trap focus within the dialog when open
   useFocusTrap(dialogRef, open ?? false);
 
-  // Sync open prop with native dialog showModal/close API via ref callback
-  // (runs at commit time, same timing as event handlers)
-  const syncDialogRef = (el: HTMLDialogElement | null) => {
-    dialogRef.current = el;
+  // Sync open prop with native dialog showModal/close API. useLayoutEffect
+  // (not a render-time ref write) keeps lint clean while still running
+  // before paint; the close listener below consults ignoreNextCloseRef.
+  useLayoutEffect(() => {
+    const el = dialogRef.current;
     if (!el) return;
     if (open && !el.open) {
       el.showModal?.();
     } else if (!open && el.open) {
+      ignoreNextCloseRef.current = true;
       el.close?.();
     }
-  };
+  }, [open]);
 
   // Listen for native close event (Escape key, programmatic close)
   // Also handle backdrop click via the native click event on the dialog element
@@ -61,7 +76,13 @@ export function Dialog({
     const dialog = dialogRef.current;
     if (!dialog) return;
 
-    const onClose = () => handleClose();
+    const onClose = () => {
+      if (ignoreNextCloseRef.current) {
+        ignoreNextCloseRef.current = false;
+        return;
+      }
+      handleClose();
+    };
     const onClick = (e: MouseEvent) => {
       // Backdrop click: target is the dialog element itself (not its children)
       if (closeOnBackdropClick && e.target === dialog) {
@@ -93,7 +114,7 @@ export function Dialog({
   return (
     <DialogContext.Provider value={contextValue}>
       <dialog
-        ref={syncDialogRef}
+        ref={dialogRef}
         aria-label={ariaLabel}
         aria-labelledby={ariaLabel ? undefined : titleId}
         aria-modal="true"

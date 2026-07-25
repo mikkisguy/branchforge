@@ -83,4 +83,23 @@ describe("useDirtyForm", () => {
     const { result } = renderHook(() => useDirtyForm(initial, current));
     expect(result.current.isDirty).toBe(true);
   });
+
+  it("checkDirty compares against the current baseline, including after resetDirty", () => {
+    const initial = { name: "Alice" };
+    const { result, rerender } = renderHook(
+      ({ current }) => useDirtyForm(initial, current),
+      { initialProps: { current: { name: "Alice" } } }
+    );
+
+    expect(result.current.checkDirty({ name: "Alice" })).toBe(false);
+    expect(result.current.checkDirty({ name: "Bob" })).toBe(true);
+
+    rerender({ current: { name: "Bob" } });
+    act(() => {
+      result.current.resetDirty();
+    });
+
+    expect(result.current.checkDirty({ name: "Bob" })).toBe(false);
+    expect(result.current.checkDirty({ name: "Carol" })).toBe(true);
+  });
 });

@@ -91,16 +91,6 @@ function VariableFormContent({
   isSaving,
   onSave,
 }: VariableFormContentProps) {
-  const [form, setForm] = useState<VariableFormState>(() => {
-    if (!variableId) return initialForm;
-    const variable = variables.find((item: Variable) => item.id === variableId);
-    if (!variable) return initialForm;
-    return {
-      key: variable.key,
-      description: variable.description ?? "",
-      category: variable.category ?? "",
-    };
-  });
   const initialSnapshot: VariableFormState = useMemo(() => {
     if (!variableId) return initialForm;
     const variable = variables.find((v) => v.id === variableId);
@@ -111,6 +101,7 @@ function VariableFormContent({
       category: variable.category ?? "",
     };
   }, [variableId, variables]);
+  const [form, setForm] = useState<VariableFormState>(initialSnapshot);
   const { isDirty } = useDirtyForm(initialSnapshot, form);
   const {
     handleOpenChange,

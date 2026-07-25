@@ -342,7 +342,9 @@ export function PairGroupsDialog(props: PairGroupsDialogProps) {
                             setEditLabelError(null);
                             setDeleteTarget(pg);
                           }}
-                          disabled={isDeletingPairGroup || isEditing}
+                          disabled={
+                            isDeletingPairGroup || editingLabelId !== null
+                          }
                           className="text-destructive hover:text-destructive"
                           aria-label={`Delete pair group ${pg.duoEndingLabel}`}
                         >

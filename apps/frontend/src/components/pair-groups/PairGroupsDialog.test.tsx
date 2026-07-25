@@ -132,4 +132,49 @@ describe("PairGroupsDialog", () => {
     // Assert discard ConfirmDialog appears
     expect(screen.getByText(/discard unsaved changes/i)).toBeInTheDocument();
   });
+
+  it("disables delete on other rows while any inline label edit is active", async () => {
+    const user = userEvent.setup({ delay: null });
+    const second: PairGroupWithNames = {
+      ...mockPairGroup,
+      id: "pg-2",
+      duoEndingLabel: "rivals_ending",
+      characterAName: "Casey",
+      characterBName: "Drew",
+    };
+
+    vi.mocked(usePairGroups).mockReturnValue({
+      pairGroups: [mockPairGroup, second],
+      isLoading: false,
+      error: null,
+      isDeleting: false,
+      isUpdating: false,
+      refresh: vi.fn(),
+      createPairGroup: vi.fn(),
+      updatePairGroup,
+      deletePairGroup: vi.fn(),
+      isCreating: false,
+    } as never);
+
+    render(
+      <PairGroupsDialog
+        open
+        onOpenChange={vi.fn()}
+        projectId="project-1"
+        characters={["Alex", "Blake", "Casey", "Drew"]}
+      />
+    );
+
+    await user.click(
+      screen.getByRole("button", {
+        name: /edit pair group best_friends_ending/i,
+      })
+    );
+
+    expect(
+      screen.getByRole("button", {
+        name: /delete pair group rivals_ending/i,
+      })
+    ).toBeDisabled();
+  });
 });

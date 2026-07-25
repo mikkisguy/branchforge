@@ -125,13 +125,7 @@ function ElementFormContent({
       : INITIAL_FORM;
   });
 
-  const snapshot = {
-    name: form.name,
-    type: form.type,
-    description: form.description,
-    tags: form.tags,
-  };
-  const { isDirty } = useDirtyForm(initialSnapshot, snapshot);
+  const { isDirty } = useDirtyForm(initialSnapshot, form);
 
   const {
     handleOpenChange,

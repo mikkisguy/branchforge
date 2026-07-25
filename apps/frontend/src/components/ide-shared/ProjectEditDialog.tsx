@@ -78,7 +78,10 @@ export function ProjectEditDialog({
   const previousOpenRef = useRef(false);
   const previousProjectIdRef = useRef<string | null>(null);
   const projectSnapshot = project
-    ? { name: project.name, description: (project.description ?? "").trim() }
+    ? {
+        name: (project.name ?? "").trim(),
+        description: (project.description ?? "").trim(),
+      }
     : { name: "", description: "" };
   const formSnapshot = {
     name: formState.name.trim(),

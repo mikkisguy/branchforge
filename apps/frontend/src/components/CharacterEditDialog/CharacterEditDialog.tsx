@@ -42,7 +42,19 @@ export interface CharacterEditDialogProps {
   characterId?: string;
 }
 
-type CharacterSnapshot = Record<string, unknown>;
+interface CharacterSnapshot {
+  name: string;
+  displayName: string;
+  renpyTag: string;
+  color: string;
+  routeAffiliation: string;
+  conditionalPrefix: string;
+  notes: string;
+  isLoveInterest: boolean;
+  isNarrator: boolean;
+  avatarUrl?: string;
+  hasAvatarFile: boolean;
+}
 
 function buildSnapshot(f: CharacterFormState): CharacterSnapshot {
   return {
@@ -71,6 +83,7 @@ function buildSnapshotFromChar(char: Character): CharacterSnapshot {
     notes: char.notes ?? "",
     isLoveInterest: char.isLoveInterest,
     isNarrator: char.isNarrator,
+    // Match RESET_EXISTING / INITIAL_EMPTY (undefined, not null/"").
     avatarUrl: char.avatarUrl ?? undefined,
     hasAvatarFile: false,
   };
