@@ -1,0 +1,15 @@
+{
+  "$schema": "https://react.doctor/schema/config.json",
+  "ignore": {
+    "overrides": [
+      {
+        "files": [
+          "src/contexts/ToastContext.tsx",
+          "src/components/ide-shared/RouteSettingsDialog.tsx",
+          "src/copy/**"
+        ],
+        "rules": ["deslop/unused-file"]
+      }
+    ]
+  }
+}

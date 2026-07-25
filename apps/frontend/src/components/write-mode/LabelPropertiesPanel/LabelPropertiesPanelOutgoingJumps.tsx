@@ -136,9 +136,9 @@ export function LabelPropertiesPanelOutgoingJumps({
           <p className="text-xs text-muted-foreground">No outgoing jumps</p>
         ) : (
           <div className="space-y-2">
-            {outgoingJumps.map((jump, i) => (
+            {outgoingJumps.map((jump) => (
               <OutgoingJumpItem
-                key={`${jump.targetLabelId}-${jump.choiceText}-${i}`}
+                key={`${jump.targetLabelId}-${jump.choiceText}`}
                 jump={jump}
                 statByKey={statByKey}
               />

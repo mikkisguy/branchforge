@@ -13,6 +13,7 @@
  * Intentionally retained orphan (deslop/unused-file): react-doctor
  * reports unused-file at line 0, so inline disable comments cannot
  * suppress it. Same intentional-keep class as `src/copy/*` (#222).
+ * The `deslop/unused-file` rule is also ignored via doctor.config.json.
  */
 
 import { DialogShell } from "@/components/ui/DialogShell";

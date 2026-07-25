@@ -33,19 +33,14 @@ export function WriteModeView({
   projectId,
   projectLabelCount,
   onCreateLabel,
-  isCreatingLabel,
   onUpdateLabel,
-  isUpdatingLabel,
   onDeleteLabel,
-  isDeletingLabel,
+  labelMutationState,
   editorRef,
   activeLabel,
   characters,
   onChange,
-  isSaving,
-  lastSaved,
-  saveError,
-  saveConflict,
+  editorSaveState,
   onUndoStateChange,
   onWordCountChange,
   stats,
@@ -150,11 +145,11 @@ export function WriteModeView({
               onCreateLabel={async (data) => {
                 await onCreateLabel({ projectId, ...data });
               }}
-              isCreatingLabel={isCreatingLabel}
+              isCreatingLabel={labelMutationState.isCreatingLabel}
               onUpdateLabel={async (labelId, data) => {
                 return onUpdateLabel(labelId, data);
               }}
-              isUpdatingLabel={isUpdatingLabel}
+              isUpdatingLabel={labelMutationState.isUpdatingLabel}
               onEditLabel={handleEditLabel}
               onDeleteRequest={handleDeleteRequest}
             />
@@ -231,10 +226,10 @@ export function WriteModeView({
                 characters={characters}
                 onChange={onChange}
                 isFocusMode={isFocusMode}
-                isSaving={isSaving}
-                lastSaved={lastSaved}
-                saveError={saveError}
-                saveConflict={saveConflict}
+                isSaving={editorSaveState.isSaving}
+                lastSaved={editorSaveState.lastSaved}
+                saveError={editorSaveState.saveError}
+                saveConflict={editorSaveState.saveConflict}
                 onUndoStateChange={onUndoStateChange}
                 onWordCountChange={onWordCountChange}
                 showBadges={showBadges}
@@ -293,8 +288,8 @@ export function WriteModeView({
           projectId={projectId}
           onEditSave={handleEditSave}
           onDeleteConfirmAction={handleDeleteConfirmAction}
-          isUpdatingLabel={isUpdatingLabel}
-          isDeletingLabel={isDeletingLabel}
+          isUpdatingLabel={labelMutationState.isUpdatingLabel}
+          isDeletingLabel={labelMutationState.isDeletingLabel}
         />
       </div>
     </>

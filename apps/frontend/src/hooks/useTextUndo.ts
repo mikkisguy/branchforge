@@ -17,6 +17,7 @@ export function useTextUndo(
     future: [],
   };
 
+  // react-doctor-disable-next-line react-doctor/no-derived-state -- undo stack owns present; initial state derived from content prop by design
   const [state, setState] = useState<UndoState>(initialState);
   const stateRef = useRef<UndoState>(initialState);
 
@@ -24,6 +25,7 @@ export function useTextUndo(
 
   const commitState = useCallback((nextState: UndoState) => {
     stateRef.current = nextState;
+    // react-doctor-disable-next-line react-doctor/no-derived-state -- commit helper for intentional undo-owned present; not prop-derived render state
     setState(nextState);
   }, []);
 
@@ -125,6 +127,7 @@ export function useTextUndo(
   );
 
   // Sync internal state with content prop when it changes from external sources
+  // react-doctor-disable-next-line react-doctor/no-derived-state-effect -- undo stack must own present and sync when external content changes
   useEffect(() => {
     if (content !== lastSyncedContentRef.current) {
       const nextState: UndoState = {
@@ -132,7 +135,7 @@ export function useTextUndo(
         present: content,
         future: [],
       };
-      // react-doctor-disable-next-line react-doctor/no-derived-state
+      // react-doctor-disable-next-line react-doctor/no-derived-state -- reset present from external content change through undo-owned commit path
       commitState(nextState);
       lastSyncedContentRef.current = content;
     }

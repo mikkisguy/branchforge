@@ -14,7 +14,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "doctor": "pnpx react-doctor@0.4.2 --verbose",
+    "doctor": "pnpx react-doctor@latest --verbose",
     "doctor:empty": "rm -rf node_modules/.cache/react-doctor"
   },
   "dependencies": {
