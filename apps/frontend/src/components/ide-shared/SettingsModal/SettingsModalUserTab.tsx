@@ -107,6 +107,7 @@ export function SettingsModalUserTab({ user }: SettingsModalUserTabProps) {
 
             <div className="flex shrink-0 gap-2">
               <input
+                aria-label="Choose avatar image"
                 ref={avatarInputRef}
                 type="file"
                 accept="image/*"

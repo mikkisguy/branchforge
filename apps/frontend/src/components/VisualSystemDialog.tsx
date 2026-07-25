@@ -1,26 +1,13 @@
 /**
- * Visual System Dialog
+ * Visual System Form Content
  *
- * Modal for editing the per-project visual system configuration
- * (template tokens, group prefixes, padding, shared jump prefix,
- * placeholder base URL).
- *
- * The dialog previews how a sample visual name is generated with the
- * current form values by feeding them into `generateVisualName()`,
- * so the user gets immediate feedback on their template edits.
+ * The form body of the visual-system settings, with no dialog chrome
+ * around it. Used by `ProjectSettingsDialog` (as a tab panel).
  */
 
 import { useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useVisualSystem } from "@/hooks/useVisualSystem";
 import {
   generateVisualName,
   type VisualSystemConfig,
@@ -42,12 +29,6 @@ import { VisualSystemPreviewPanel } from "./VisualSystemPreviewPanel";
 // Types
 // ============================================================================
 
-export interface VisualSystemDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  projectId: string;
-}
-
 export type { VisualSystemFormState };
 
 interface VisualSystemFormErrors {
@@ -65,7 +46,7 @@ interface VisualSystemFormErrors {
 //
 // `toVisualSystemFormState`, `parseGroupPrefixes`, and
 // `INITIAL_VISUAL_SYSTEM_FORM` live in `./visual-system.helpers` so
-// both this dialog and the project-settings tab can share them.
+// both `ProjectSettingsDialog` and this form content can share them.
 
 /** Validate the form and return a flat error object. */
 function validateForm(form: VisualSystemFormState): VisualSystemFormErrors {
@@ -117,8 +98,7 @@ interface VisualSystemFormContentProps {
 
 /**
  * The form body of the visual-system settings, with no dialog chrome
- * around it. Used by `VisualSystemDialog` (standalone) and by
- * `ProjectSettingsDialog` (as a tab panel).
+ * around it. Used by `ProjectSettingsDialog` (as a tab panel).
  */
 export function VisualSystemFormContent({
   initialConfig,
@@ -261,65 +241,5 @@ export function VisualSystemFormContent({
         </Button>
       </div>
     </div>
-  );
-}
-
-// ============================================================================
-// Public component
-// ============================================================================
-
-export function VisualSystemDialog({
-  open,
-  onOpenChange,
-  projectId,
-}: VisualSystemDialogProps) {
-  const { config, isLoading, isSaving, updateConfig } =
-    useVisualSystem(projectId);
-
-  const handleSave = async (form: VisualSystemFormState) => {
-    const parsed = parseGroupPrefixes(form.groupPrefixesJson);
-    // Always include all fields. The PATCH semantics on the server
-    // mean that *omitting* a key would leave the existing value
-    // untouched, so to *clear* optional fields we have to send the
-    // explicit empty-string / empty-object sentinel. The service
-    // converts these to NULL on write.
-    await updateConfig({
-      namingTemplate: form.namingTemplate.trim(),
-      labelPadding: form.labelPadding,
-      counterPadding: form.counterPadding,
-      jumpPrefixShared: form.jumpPrefixShared.trim(),
-      defaultGroupType: form.defaultGroupType.trim(),
-      placeholderBaseUrl: form.placeholderBaseUrl.trim(),
-      // `parsed.value` is `null` for empty input. The service treats
-      // `{}` as "clear to NULL", so always pass either the parsed
-      // object or `{}` (never `undefined`).
-      groupPrefixes: parsed.value ?? {},
-    });
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange} aria-label="Visual System">
-      <DialogContent className="max-w-2xl w-full">
-        <DialogHeader>
-          <DialogTitle>Visual System</DialogTitle>
-          <DialogDescription>
-            Configure how generated Ren'Py visual filenames are produced.
-          </DialogDescription>
-        </DialogHeader>
-        {isLoading || !config ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="size-6 animate-spin" />
-          </div>
-        ) : (
-          <VisualSystemFormContent
-            key={`visual-system-${open}`}
-            initialConfig={config}
-            isSaving={isSaving}
-            onSave={handleSave}
-            onClose={() => onOpenChange(false)}
-          />
-        )}
-      </DialogContent>
-    </Dialog>
   );
 }

@@ -30,19 +30,6 @@ export function parseHSLTuple(str: string): HSL {
   };
 }
 
-/** Parse "hsl(h, s%, l%)" format */
-export function parseHSL(str: string): HSL {
-  const match = str.match(/hsl\(\s*(\d+)\s*[,]\s*(\d+)%\s*[,]\s*(\d+)%\s*\)/);
-  if (match) {
-    return {
-      h: parseFloat(match[1]),
-      s: parseFloat(match[2]),
-      l: parseFloat(match[3]),
-    };
-  }
-  return parseHSLTuple(str);
-}
-
 // ---------------------------------------------------------------------------
 // Color conversion
 // ---------------------------------------------------------------------------
@@ -94,17 +81,6 @@ export function hexToRgb(hex: string): RGB {
   };
 }
 
-/** Parse "rgba(r, g, b, a)" string to RGB */
-export function rgbaToRgb(rgba: string): RGB {
-  const match = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-  if (!match) throw new Error(`Invalid rgba: "${rgba}"`);
-  return {
-    r: parseInt(match[1]),
-    g: parseInt(match[2]),
-    b: parseInt(match[3]),
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Luminance and contrast
 // ---------------------------------------------------------------------------
@@ -116,7 +92,7 @@ function linearize(c: number): number {
 }
 
 /** WCAG relative luminance. */
-export function relativeLuminance(rgb: RGB): number {
+function relativeLuminance(rgb: RGB): number {
   return (
     0.2126 * linearize(rgb.r) +
     0.7152 * linearize(rgb.g) +
@@ -125,7 +101,7 @@ export function relativeLuminance(rgb: RGB): number {
 }
 
 /** WCAG contrast ratio between two luminances. Lighter must be first arg. */
-export function contrastRatio(l1: number, l2: number): number {
+function contrastRatio(l1: number, l2: number): number {
   const lighter = Math.max(l1, l2);
   const darker = Math.min(l1, l2);
   return (lighter + 0.05) / (darker + 0.05);
@@ -134,48 +110,4 @@ export function contrastRatio(l1: number, l2: number): number {
 /** Contrast ratio between two RGB colors. */
 export function contrastRatioRgb(a: RGB, b: RGB): number {
   return contrastRatio(relativeLuminance(a), relativeLuminance(b));
-}
-
-/** Contrast ratio on a background color, for a foreground expressed as an HSL tuple string. */
-export function contrastOnBg(
-  bg: { r: number; g: number; b: number },
-  fgHslTuple: string
-): number {
-  const fgRgb = hslToRgb(parseHSLTuple(fgHslTuple));
-  return contrastRatioRgb(fgRgb, bg);
-}
-
-// ---------------------------------------------------------------------------
-// WCAG thresholds
-// ---------------------------------------------------------------------------
-
-export const WCAG_AA_NORMAL = 4.5;
-export const WCAG_AA_LARGE = 3.0;
-
-export interface ContrastCheck {
-  pair: string; // "foreground / background"
-  fg: string; // foreground token name
-  bg: string; // background token name
-  ratio: number;
-  passes: boolean;
-}
-
-/** Check foreground/background pairs and return a report. */
-export function checkPairs(
-  bgToken: string,
-  bgRgb: RGB,
-  pairs: { token: string; hslTuple: string; threshold: number }[],
-  _mode: string
-): ContrastCheck[] {
-  return pairs.map(({ token, hslTuple, threshold }) => {
-    const fgRgb = hslToRgb(parseHSLTuple(hslTuple));
-    const ratio = contrastRatioRgb(fgRgb, bgRgb);
-    return {
-      pair: `${token} / ${bgToken}`,
-      fg: token,
-      bg: bgToken,
-      ratio: Math.round(ratio * 100) / 100,
-      passes: ratio >= threshold,
-    };
-  });
 }

@@ -9,6 +9,10 @@
  * modal is the primary entry. This component is kept so future
  * call sites (e.g. a deep-link from the flow graph) can open
  * just the Routes section without the full settings chrome.
+ *
+ * Intentionally retained orphan (deslop/unused-file): react-doctor
+ * reports unused-file at line 0, so inline disable comments cannot
+ * suppress it. Same intentional-keep class as `src/copy/*` (#222).
  */
 
 import { DialogShell } from "@/components/ui/DialogShell";

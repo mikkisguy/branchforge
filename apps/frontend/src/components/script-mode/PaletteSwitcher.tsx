@@ -272,13 +272,14 @@ export function PaletteSwitcher({
                 >
                   {groupName}
                 </div>
+                {/* eslint-disable jsx-a11y/click-events-have-key-events -- Listbox handles keyboard navigation via aria-activedescendant */}
                 {palettes.map((palette) => {
                   const flatIdx = flatItems.findIndex(
                     (item) => item.originalIndex === palette.originalIndex
                   );
                   return (
                     // Keyboard navigation is handled at listbox level via onKeyDown
-                    // eslint-disable-next-line jsx-a11y/click-events-have-key-events
+                    // react-doctor-disable-next-line react-doctor/click-events-have-key-events, react-doctor/prefer-tag-over-role -- Parent listbox handles keys via aria-activedescendant; option role is required for listbox pattern
                     <div
                       key={palette.originalIndex}
                       id={`palette-option-${flatIdx}`}
@@ -309,6 +310,7 @@ export function PaletteSwitcher({
                     </div>
                   );
                 })}
+                {/* eslint-enable jsx-a11y/click-events-have-key-events */}
               </div>
             ))}
           </div>

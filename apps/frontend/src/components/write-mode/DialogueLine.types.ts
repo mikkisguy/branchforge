@@ -17,7 +17,7 @@ export interface DialogueLineProps {
   showBadges?: boolean;
 }
 
-export function isEqualJson(a: unknown, b: unknown): boolean {
+function isEqualJson(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a == null || b == null) return a === b;
   return JSON.stringify(a) === JSON.stringify(b);

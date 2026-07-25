@@ -292,8 +292,9 @@ export function Select<T extends string = string>({
               style={menuStyle}
               onKeyDown={handleKeyDown}
             >
+              {/* eslint-disable jsx-a11y/click-events-have-key-events -- Listbox handles keyboard navigation via aria-activedescendant */}
               {options.map((option, index) => (
-                // eslint-disable-next-line jsx-a11y/click-events-have-key-events -- Listbox handles keyboard navigation via aria-activedescendant
+                // react-doctor-disable-next-line react-doctor/click-events-have-key-events, react-doctor/prefer-tag-over-role -- Parent listbox handles keys via aria-activedescendant; option role is required for listbox pattern
                 <div
                   key={option.value}
                   id={`select-option-${index}`}
@@ -314,6 +315,7 @@ export function Select<T extends string = string>({
                   {option.label}
                 </div>
               ))}
+              {/* eslint-enable jsx-a11y/click-events-have-key-events */}
             </div>
           </>,
           portalTarget
