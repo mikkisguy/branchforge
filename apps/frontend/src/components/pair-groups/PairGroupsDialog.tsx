@@ -22,6 +22,7 @@ import { InlineMessage } from "@/components/ui/inline-error";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
+import { FormErrorMessage } from "@/components/ui/form-error-message";
 import { PairGroupEditDialog } from "@/components/pair-groups/PairGroupEditDialog.lazy";
 import { trimRequiredDuoEndingLabel } from "@/components/pair-groups/pair-group-label";
 import { useProject } from "@/hooks/useProject";
@@ -65,6 +66,7 @@ export function PairGroupsDialog(props: PairGroupsDialogProps) {
   const [creatingNew, setCreatingNew] = useState(false);
   const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
   const [editLabelValue, setEditLabelValue] = useState("");
+  const [editLabelError, setEditLabelError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PairGroupWithNames | null>(
     null
   );
@@ -90,6 +92,7 @@ export function PairGroupsDialog(props: PairGroupsDialogProps) {
       setCreatingNew(false);
       setEditingLabelId(null);
       setEditLabelValue("");
+      setEditLabelError(null);
       setDeleteTarget(null);
     }
     onOpenChange(nextOpen);
@@ -106,14 +109,17 @@ export function PairGroupsDialog(props: PairGroupsDialogProps) {
   const handleStartEditLabel = (pg: PairGroupWithNames) => {
     setEditingLabelId(pg.id);
     setEditLabelValue(pg.duoEndingLabel);
+    setEditLabelError(null);
   };
 
   const handleSaveLabel = async () => {
     if (!editingLabelId) return;
     const labelResult = trimRequiredDuoEndingLabel(editLabelValue);
     if ("error" in labelResult) {
+      setEditLabelError(labelResult.error);
       return;
     }
+    setEditLabelError(null);
     try {
       await updatePairGroup(editingLabelId, {
         duoEndingLabel: labelResult.value,
@@ -126,6 +132,7 @@ export function PairGroupsDialog(props: PairGroupsDialogProps) {
 
   const handleCancelLabel = () => {
     setEditingLabelId(null);
+    setEditLabelError(null);
   };
 
   const handleLabelKeyDown = (e: React.KeyboardEvent) => {
@@ -241,40 +248,53 @@ export function PairGroupsDialog(props: PairGroupsDialogProps) {
                           </Badge>
                         </div>
                         {isEditing ? (
-                          <div className="flex items-center gap-1.5">
-                            <Input
-                              ref={editInputRef}
-                              value={editLabelValue}
-                              onChange={(e) =>
-                                setEditLabelValue(e.target.value)
-                              }
-                              onKeyDown={handleLabelKeyDown}
-                              disabled={isUpdatingPairGroup}
-                              className="h-7 text-sm"
-                              size="sm"
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <Input
+                                ref={editInputRef}
+                                value={editLabelValue}
+                                onChange={(e) => {
+                                  setEditLabelValue(e.target.value);
+                                  if (editLabelError) setEditLabelError(null);
+                                }}
+                                onKeyDown={handleLabelKeyDown}
+                                disabled={isUpdatingPairGroup}
+                                className="h-7 text-sm"
+                                size="sm"
+                                aria-invalid={!!editLabelError}
+                                aria-describedby={
+                                  editLabelError
+                                    ? "pair-group-edit-label-error"
+                                    : undefined
+                                }
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => void handleSaveLabel()}
+                                disabled={isUpdatingPairGroup}
+                                className="size-7 p-0"
+                                aria-label="Save label"
+                              >
+                                <Check className="size-3.5" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleCancelLabel}
+                                disabled={isUpdatingPairGroup}
+                                className="size-7 p-0"
+                                aria-label="Cancel editing"
+                              >
+                                <X className="size-3.5" />
+                              </Button>
+                            </div>
+                            <FormErrorMessage
+                              id="pair-group-edit-label-error"
+                              message={editLabelError ?? undefined}
                             />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => void handleSaveLabel()}
-                              disabled={isUpdatingPairGroup}
-                              className="size-7 p-0"
-                              aria-label="Save label"
-                            >
-                              <Check className="size-3.5" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={handleCancelLabel}
-                              disabled={isUpdatingPairGroup}
-                              className="size-7 p-0"
-                              aria-label="Cancel editing"
-                            >
-                              <X className="size-3.5" />
-                            </Button>
                           </div>
                         ) : (
                           <p className="text-sm font-medium truncate">
