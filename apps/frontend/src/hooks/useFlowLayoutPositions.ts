@@ -23,7 +23,7 @@
 
 import { useEffect, useMemo, useReducer, useRef } from "react";
 import type { FlowLayoutMode, FlowNode, FlowEdge } from "@branchforge/shared";
-import { computeAutoLayout } from "@/components/flow/flow-graph-utils";
+import { computeAutoLayout } from "@/components/flow/flow-graph-layout";
 import { FLOW_VIRTUALIZATION_THRESHOLD } from "@/lib/constants";
 
 type PositionMap = Map<string, { x: number; y: number }>;

@@ -17,12 +17,9 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useRouteConfigs } from "@/hooks/useRouteConfigs";
 import { useCharacters } from "@/hooks/useCharacters";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import {
-  buildRouteColorMap,
-  buildEdges,
-  buildLayoutNodes,
-  buildRouteOptions,
-} from "./flow-graph-utils";
+import { buildRouteColorMap, buildRouteOptions } from "./flow-graph-routes";
+import { buildEdges } from "./flow-graph-edges";
+import { buildLayoutNodes } from "./flow-graph-layout";
 import { useFlowLayoutPositions } from "@/hooks/useFlowLayoutPositions";
 import { LAYOUT_MODE_STORAGE_KEY, isFlowLayoutMode } from "./flow-layout-mode";
 import type { FlowLayoutMode } from "@branchforge/shared";

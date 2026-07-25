@@ -1,13 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { MarkerType } from "@xyflow/react";
-import {
-  buildRouteColorMap,
-  buildEdges,
-  getEdgeColor,
-  getEdgeWidth,
-  getRouteColor,
-  layoutNodes,
-} from "../flow-graph-utils";
+import { buildRouteColorMap, getRouteColor } from "../flow-graph-routes";
+import { buildEdges, getEdgeColor, getEdgeWidth } from "../flow-graph-edges";
+import { layoutNodes } from "../flow-graph-layout";
 import type { FlowNode, FlowEdge } from "@branchforge/shared";
 
 const mockFlowNodes: FlowNode[] = [
