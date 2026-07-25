@@ -9,12 +9,14 @@ import { Button } from "@/components/ui/button";
 
 export interface LabelEditDialogFooterProps {
   isSaving: boolean;
+  saveDisabled: boolean;
   onCancel: () => void;
   onSave: () => void;
 }
 
 export function LabelEditDialogFooter({
   isSaving,
+  saveDisabled,
   onCancel,
   onSave,
 }: LabelEditDialogFooterProps) {
@@ -32,7 +34,7 @@ export function LabelEditDialogFooter({
         type="button"
         variant="default"
         onClick={onSave}
-        disabled={isSaving}
+        disabled={saveDisabled || isSaving}
       >
         {isSaving ? (
           <>

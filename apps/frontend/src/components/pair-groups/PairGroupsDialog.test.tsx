@@ -97,4 +97,84 @@ describe("PairGroupsDialog", () => {
       screen.getByRole("button", { name: /save label/i })
     ).toBeInTheDocument();
   });
+
+  it("shows discard confirmation when closing while inline edit has unsaved changes", async () => {
+    const user = userEvent.setup({ delay: null });
+    const onOpenChange = vi.fn();
+
+    render(
+      <PairGroupsDialog
+        open
+        onOpenChange={onOpenChange}
+        projectId="project-1"
+        characters={["Alex", "Blake"]}
+      />
+    );
+
+    // Start inline edit on the pair group
+    await user.click(
+      screen.getByRole("button", {
+        name: /edit pair group best_friends_ending/i,
+      })
+    );
+
+    // Change the label value to make inline form dirty
+    const input = screen.getByDisplayValue("best_friends_ending");
+    await user.clear(input);
+    await user.type(input, "changed_label");
+
+    // Click the dialog backdrop to trigger close (simulates Escape/backdrop)
+    const dialog = document.querySelector(
+      'dialog[aria-label="Pair Groups"]'
+    ) as HTMLElement;
+    await user.click(dialog);
+
+    // Assert discard ConfirmDialog appears
+    expect(screen.getByText(/discard unsaved changes/i)).toBeInTheDocument();
+  });
+
+  it("disables delete on other rows while any inline label edit is active", async () => {
+    const user = userEvent.setup({ delay: null });
+    const second: PairGroupWithNames = {
+      ...mockPairGroup,
+      id: "pg-2",
+      duoEndingLabel: "rivals_ending",
+      characterAName: "Casey",
+      characterBName: "Drew",
+    };
+
+    vi.mocked(usePairGroups).mockReturnValue({
+      pairGroups: [mockPairGroup, second],
+      isLoading: false,
+      error: null,
+      isDeleting: false,
+      isUpdating: false,
+      refresh: vi.fn(),
+      createPairGroup: vi.fn(),
+      updatePairGroup,
+      deletePairGroup: vi.fn(),
+      isCreating: false,
+    } as never);
+
+    render(
+      <PairGroupsDialog
+        open
+        onOpenChange={vi.fn()}
+        projectId="project-1"
+        characters={["Alex", "Blake", "Casey", "Drew"]}
+      />
+    );
+
+    await user.click(
+      screen.getByRole("button", {
+        name: /edit pair group best_friends_ending/i,
+      })
+    );
+
+    expect(
+      screen.getByRole("button", {
+        name: /delete pair group rivals_ending/i,
+      })
+    ).toBeDisabled();
+  });
 });

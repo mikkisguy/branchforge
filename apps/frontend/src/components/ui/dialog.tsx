@@ -1,7 +1,16 @@
 import * as React from "react";
-import { useId, useEffect, useEffectEvent, useMemo, useRef, use } from "react";
+import {
+  useId,
+  useEffect,
+  useLayoutEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  use,
+} from "react";
 import { cn } from "@/lib/utils";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { nativeDialogOverlayClassName } from "@/components/ui/native-dialog-overlay";
 
 interface DialogContextValue {
   titleId: string;
@@ -36,23 +45,30 @@ export function Dialog({
   "aria-labelledby": ariaLabelledBy,
 }: DialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  // When the controlled `open` prop becomes false we call dialog.close(),
+  // which fires a native `close` event. Ignore that event so dirty-guarded
+  // onOpenChange(false) from confirmDiscard / successful save is not
+  // re-entered while the form is still dirty.
+  const ignoreNextCloseRef = useRef(false);
 
   const handleClose = useEffectEvent(() => onOpenChange?.(false));
 
   // Trap focus within the dialog when open
   useFocusTrap(dialogRef, open ?? false);
 
-  // Sync open prop with native dialog showModal/close API via ref callback
-  // (runs at commit time, same timing as event handlers)
-  const syncDialogRef = (el: HTMLDialogElement | null) => {
-    dialogRef.current = el;
+  // Sync open prop with native dialog showModal/close API. useLayoutEffect
+  // (not a render-time ref write) keeps lint clean while still running
+  // before paint; the close listener below consults ignoreNextCloseRef.
+  useLayoutEffect(() => {
+    const el = dialogRef.current;
     if (!el) return;
     if (open && !el.open) {
       el.showModal?.();
     } else if (!open && el.open) {
+      ignoreNextCloseRef.current = true;
       el.close?.();
     }
-  };
+  }, [open]);
 
   // Listen for native close event (Escape key, programmatic close)
   // Also handle backdrop click via the native click event on the dialog element
@@ -60,19 +76,31 @@ export function Dialog({
     const dialog = dialogRef.current;
     if (!dialog) return;
 
-    const onClose = () => handleClose();
+    const onClose = () => {
+      if (ignoreNextCloseRef.current) {
+        ignoreNextCloseRef.current = false;
+        return;
+      }
+      handleClose();
+    };
     const onClick = (e: MouseEvent) => {
       // Backdrop click: target is the dialog element itself (not its children)
       if (closeOnBackdropClick && e.target === dialog) {
         handleClose();
       }
     };
+    const onCancel = (e: Event) => {
+      e.preventDefault();
+      handleClose();
+    };
 
     dialog.addEventListener("close", onClose);
     dialog.addEventListener("click", onClick);
+    dialog.addEventListener("cancel", onCancel);
     return () => {
       dialog.removeEventListener("close", onClose);
       dialog.removeEventListener("click", onClick);
+      dialog.removeEventListener("cancel", onCancel);
     };
   }, [closeOnBackdropClick, dialogRef]);
 
@@ -86,43 +114,14 @@ export function Dialog({
   return (
     <DialogContext.Provider value={contextValue}>
       <dialog
-        ref={syncDialogRef}
+        ref={dialogRef}
         aria-label={ariaLabel}
         aria-labelledby={ariaLabel ? undefined : titleId}
         aria-modal="true"
-        // Center the dialog content with a full-viewport flex overlay,
-        // scoped to the `open` variant (targets `&[open]`). Four
-        // constraints drive the exact class set:
-        //
-        //   1. Keep closed dialogs hidden. The UA
-        //      `dialog:not([open]) { display: none }` is a user-agent
-        //      rule, which any *unconditional* author `display` utility
-        //      (e.g. a bare `flex`) always wins over regardless of
-        //      specificity — silently making every closed <dialog>
-        //      visible. So `hidden` by default, `open:flex` only when
-        //      `[open]`.
-        //
-        //   2. Make the dialog actually fill the viewport so flexbox can
-        //      center. The UA gives `<dialog>` `width: fit-content`, so
-        //      `inset:0` alone does NOT stretch it (it shrink-wraps and
-        //      sits at the top-left). We need an explicit size —
-        //      `open:w-full open:h-full` — to claim the full viewport.
-        //      (`open:fixed open:inset-0` pins it at 0,0.)
-        //
-        //   3. Defeat the UA size cap. The UA also sets `max-width` /
-        //      `max-height` on the dialog that clip it short of the
-        //      viewport (observed ~38px inset), which throws off the
-        //      flex centering by ~19px each axis. `open:max-w-none
-        //      open:max-h-none` removes that cap so the box is the full
-        //      viewport and content centers exactly.
-        //
-        //   4. NO `transform`. A transform (the previous
-        //      `-translate-x/y-1/2` centering) establishes a containing
-        //      block for `position: fixed` descendants, breaking portaled
-        //      tooltips/selects that rely on viewport-relative fixed
-        //      positioning. None of the classes above have that side
-        //      effect, so those portals keep anchoring to the viewport.
-        className="hidden open:flex open:fixed open:inset-0 open:w-full open:h-full open:max-w-none open:max-h-none open:items-center open:justify-center backdrop:bg-black/30 backdrop:backdrop-blur-sm m-0 border-0 p-0 bg-transparent text-[hsl(var(--foreground))]"
+        className={cn(
+          nativeDialogOverlayClassName,
+          "backdrop:bg-black/30 backdrop:backdrop-blur-sm"
+        )}
       >
         {children}
       </dialog>

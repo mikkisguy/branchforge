@@ -21,6 +21,9 @@ import { FormErrorMessage } from "@/components/ui/form-error-message";
 import { useRouteConfigs } from "@/hooks/useRouteConfigs";
 import { isValidJumpPrefix, isValidRouteKey } from "@branchforge/shared";
 import type { RouteConfig } from "@branchforge/shared";
+import { useDirtyForm } from "@/hooks/useDirtyForm";
+import { useDirtyDialogWarning } from "@/hooks/useDirtyDialogWarning";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export interface RouteEditDialogProps {
   open: boolean;
@@ -78,15 +81,17 @@ function RouteFormContent({
   routeConfigs,
   isSaving,
   onSave,
-  onClose,
+  open,
+  onOpenChange,
 }: {
   routeId: string | undefined;
   routeConfigs: RouteConfig[];
   isSaving: boolean;
   onSave: (routeId: string | undefined, form: RouteFormState) => Promise<void>;
-  onClose: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const [form, setForm] = useState<RouteFormState>(() => {
+  const [initialFormSnapshot] = useState<RouteFormState>(() => {
     if (!routeId) return INITIAL_FORM;
     const route = routeConfigs.find((item: RouteConfig) => item.id === routeId);
     if (!route) return INITIAL_FORM;
@@ -97,7 +102,15 @@ function RouteFormContent({
       isShared: route.isShared,
     };
   });
+  const [form, setForm] = useState<RouteFormState>(initialFormSnapshot);
   const [errors, setErrors] = useState<RouteFormErrors>({});
+  const { isDirty } = useDirtyForm(initialFormSnapshot, form);
+  const {
+    handleOpenChange,
+    confirmDiscard,
+    discardDialogOpen,
+    setDiscardDialogOpen,
+  } = useDirtyDialogWarning(isDirty, onOpenChange);
 
   // react-doctor-disable-next-line react-doctor/no-event-handler
   const isEditMode = !!routeId;
@@ -107,9 +120,9 @@ function RouteFormContent({
     // react-doctor-disable-next-line react-doctor/no-event-handler
     if (isEditMode && !routeConfigs.find((item) => item.id === routeId)) {
       // react-doctor-disable-next-line react-doctor/no-prop-callback-in-effect
-      onClose();
+      onOpenChange(false);
     }
-  }, [isEditMode, routeId, routeConfigs, onClose]);
+  }, [isEditMode, routeId, routeConfigs, onOpenChange]);
 
   const handleChange = (
     field: keyof RouteFormState,
@@ -133,7 +146,7 @@ function RouteFormContent({
 
     try {
       await onSave(routeId, form);
-      onClose();
+      onOpenChange(false);
     } catch {
       // Error handled by hook toast
     }
@@ -141,131 +154,158 @@ function RouteFormContent({
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle>{isEditMode ? "Edit Route" : "Add Route"}</DialogTitle>
-        <DialogDescription>
-          {isEditMode
-            ? "Update the route settings."
-            : "Create a new route for your project."}
-        </DialogDescription>
-      </DialogHeader>
-
-      <div className="space-y-4 mt-4">
-        <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
-          <div className="space-y-1">
-            <Label htmlFor="route-key" className="text-xs">
-              Route Key *
-            </Label>
-            <Input
-              id="route-key"
-              type="text"
-              placeholder="hero"
-              value={form.routeKey}
-              onChange={(event) => handleChange("routeKey", event.target.value)}
-              disabled={isSaving || isEditMode}
-              aria-required="true"
-              aria-invalid={!!errors.routeKey}
-              aria-describedby={
-                errors.routeKey
-                  ? "route-key-hint route-key-error"
-                  : "route-key-hint"
-              }
-            />
-            <p id="route-key-hint" className="text-xs text-muted-foreground">
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-w-xl w-full">
+          <DialogHeader>
+            <DialogTitle>{isEditMode ? "Edit Route" : "Add Route"}</DialogTitle>
+            <DialogDescription>
               {isEditMode
-                ? "Route key cannot be changed after creation"
-                : "Unique identifier (letters, numbers, underscores, hyphens)"}
-            </p>
-            <FormErrorMessage id="route-key-error" message={errors.routeKey} />
-          </div>
+                ? "Update the route settings."
+                : "Create a new route for your project."}
+            </DialogDescription>
+          </DialogHeader>
 
-          <div className="space-y-1">
-            <Label htmlFor="route-name" className="text-xs">
-              Route Name *
-            </Label>
-            <Input
-              id="route-name"
-              type="text"
-              placeholder="Hero's Route"
-              value={form.routeName}
-              onChange={(event) =>
-                handleChange("routeName", event.target.value)
-              }
-              disabled={isSaving}
-              aria-required="true"
-              aria-invalid={!!errors.routeName}
-              aria-describedby={
-                errors.routeName ? "route-name-error" : undefined
-              }
-            />
-            <FormErrorMessage
-              id="route-name-error"
-              message={errors.routeName}
-            />
-          </div>
-        </div>
+          <div className="space-y-4 mt-4">
+            <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="route-key" className="text-xs">
+                  Route Key *
+                </Label>
+                <Input
+                  id="route-key"
+                  type="text"
+                  placeholder="hero"
+                  value={form.routeKey}
+                  onChange={(event) =>
+                    handleChange("routeKey", event.target.value)
+                  }
+                  disabled={isSaving || isEditMode}
+                  aria-required="true"
+                  aria-invalid={!!errors.routeKey}
+                  aria-describedby={
+                    errors.routeKey
+                      ? "route-key-hint route-key-error"
+                      : "route-key-hint"
+                  }
+                />
+                <p
+                  id="route-key-hint"
+                  className="text-xs text-muted-foreground"
+                >
+                  {isEditMode
+                    ? "Route key cannot be changed after creation"
+                    : "Unique identifier (letters, numbers, underscores, hyphens)"}
+                </p>
+                <FormErrorMessage
+                  id="route-key-error"
+                  message={errors.routeKey}
+                />
+              </div>
 
-        <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
-          <div className="space-y-1">
-            <Label htmlFor="jump-prefix" className="text-xs">
-              Jump Prefix *
-            </Label>
-            <Input
-              id="jump-prefix"
-              type="text"
-              placeholder="hero_"
-              value={form.jumpPrefix}
-              onChange={(event) =>
-                handleChange("jumpPrefix", event.target.value)
-              }
-              disabled={isSaving}
-              aria-required="true"
-              aria-invalid={!!errors.jumpPrefix}
-              aria-describedby={
-                errors.jumpPrefix ? "jump-prefix-error" : undefined
-              }
-            />
-            <FormErrorMessage
-              id="jump-prefix-error"
-              message={errors.jumpPrefix}
-            />
-          </div>
+              <div className="space-y-1">
+                <Label htmlFor="route-name" className="text-xs">
+                  Route Name *
+                </Label>
+                <Input
+                  id="route-name"
+                  type="text"
+                  placeholder="Hero's Route"
+                  value={form.routeName}
+                  onChange={(event) =>
+                    handleChange("routeName", event.target.value)
+                  }
+                  disabled={isSaving}
+                  aria-required="true"
+                  aria-invalid={!!errors.routeName}
+                  aria-describedby={
+                    errors.routeName ? "route-name-error" : undefined
+                  }
+                />
+                <FormErrorMessage
+                  id="route-name-error"
+                  message={errors.routeName}
+                />
+              </div>
+            </div>
 
-          <div className="space-y-1">
-            <Label htmlFor="route-type" className="text-xs">
-              Route Type
-            </Label>
-            <Select
-              id="route-type"
-              value={form.isShared ? "shared" : "exclusive"}
-              onChange={(value) => handleChange("isShared", value === "shared")}
-              disabled={isSaving}
-              options={[
-                { value: "exclusive", label: "Exclusive Route" },
-                { value: "shared", label: "Shared/Common Route" },
-              ]}
-            />
-            <p className="text-xs text-muted-foreground">
-              Shared routes appear in all story branches
-            </p>
-          </div>
-        </div>
+            <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="jump-prefix" className="text-xs">
+                  Jump Prefix *
+                </Label>
+                <Input
+                  id="jump-prefix"
+                  type="text"
+                  placeholder="hero_"
+                  value={form.jumpPrefix}
+                  onChange={(event) =>
+                    handleChange("jumpPrefix", event.target.value)
+                  }
+                  disabled={isSaving}
+                  aria-required="true"
+                  aria-invalid={!!errors.jumpPrefix}
+                  aria-describedby={
+                    errors.jumpPrefix ? "jump-prefix-error" : undefined
+                  }
+                />
+                <FormErrorMessage
+                  id="jump-prefix-error"
+                  message={errors.jumpPrefix}
+                />
+              </div>
 
-        <div className="flex justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            disabled={isSaving}
-          >
-            Cancel
-          </Button>
-          <Button type="button" onClick={handleSave} disabled={isSaving}>
-            {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
-            Save
-          </Button>
-        </div>
-      </div>
+              <div className="space-y-1">
+                <Label htmlFor="route-type" className="text-xs">
+                  Route Type
+                </Label>
+                <Select
+                  id="route-type"
+                  value={form.isShared ? "shared" : "exclusive"}
+                  onChange={(value) =>
+                    handleChange("isShared", value === "shared")
+                  }
+                  disabled={isSaving}
+                  options={[
+                    { value: "exclusive", label: "Exclusive Route" },
+                    { value: "shared", label: "Shared/Common Route" },
+                  ]}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Shared routes appear in all story branches
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleOpenChange(false)}
+                disabled={isSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving || !isDirty}
+              >
+                {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
+                Save
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        open={discardDialogOpen}
+        onOpenChange={setDiscardDialogOpen}
+        onConfirm={confirmDiscard}
+        title="Discard unsaved changes?"
+        description="You have unsaved changes. Are you sure you want to discard them?"
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+      />
     </>
   );
 }
@@ -304,32 +344,29 @@ export function RouteEditDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl w-full">
-        <RouteFormContent
-          key={`${routeId ?? "new"}-${open}`}
-          routeId={routeId}
-          routeConfigs={routeConfigs}
-          isSaving={isSaving}
-          onSave={async (id, formData) => {
-            if (id) {
-              await updateRouteConfig(id, {
-                routeName: formData.routeName.trim(),
-                jumpPrefix: formData.jumpPrefix.trim(),
-                isShared: formData.isShared,
-              });
-            } else {
-              await createRouteConfig({
-                routeKey: formData.routeKey.trim(),
-                routeName: formData.routeName.trim(),
-                jumpPrefix: formData.jumpPrefix.trim(),
-                isShared: formData.isShared,
-              });
-            }
-          }}
-          onClose={() => onOpenChange(false)}
-        />
-      </DialogContent>
-    </Dialog>
+    <RouteFormContent
+      key={`${routeId ?? "new"}-${open}`}
+      routeId={routeId}
+      routeConfigs={routeConfigs}
+      isSaving={isSaving}
+      onSave={async (id, formData) => {
+        if (id) {
+          await updateRouteConfig(id, {
+            routeName: formData.routeName.trim(),
+            jumpPrefix: formData.jumpPrefix.trim(),
+            isShared: formData.isShared,
+          });
+        } else {
+          await createRouteConfig({
+            routeKey: formData.routeKey.trim(),
+            routeName: formData.routeName.trim(),
+            jumpPrefix: formData.jumpPrefix.trim(),
+            isShared: formData.isShared,
+          });
+        }
+      }}
+      open={open}
+      onOpenChange={onOpenChange}
+    />
   );
 }

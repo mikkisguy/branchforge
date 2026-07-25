@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useEffectEvent, useId, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { nativeDialogOverlayClassName } from "@/components/ui/native-dialog-overlay";
 import { Button } from "@/components/ui/button";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { Loader2 } from "lucide-react";
@@ -135,11 +136,14 @@ export function ConfirmDialog({
       aria-labelledby={titleId}
       aria-describedby={descriptionId}
       aria-modal="true"
-      className="backdrop:bg-black/50 m-auto border-0 p-0 bg-transparent text-[hsl(var(--foreground))]"
+      className={cn(
+        nativeDialogOverlayClassName,
+        "backdrop:bg-black/50 backdrop:backdrop-blur-sm"
+      )}
     >
       <div
         className={cn(
-          "bg-background rounded-lg shadow-lg max-w-md w-full",
+          "bg-background rounded-lg shadow-lg max-w-md w-full max-sm:w-[calc(100%-16px)] max-sm:max-w-[calc(100%-16px)]",
           className
         )}
       >

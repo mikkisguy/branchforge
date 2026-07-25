@@ -24,6 +24,9 @@ import { usePairGroups } from "@/hooks/usePairGroups";
 import { useCharacters } from "@/hooks/useCharacters";
 import type { PairGroupWithNames } from "@branchforge/shared";
 import { trimRequiredDuoEndingLabel } from "./pair-group-label";
+import { useDirtyForm } from "@/hooks/useDirtyForm";
+import { useDirtyDialogWarning } from "@/hooks/useDirtyDialogWarning";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 // ============================================================================
 // Types
@@ -80,12 +83,14 @@ function CreateForm({
   characters,
   isSaving,
   onSave,
-  onCancel,
+  open,
+  onOpenChange,
 }: {
   characters: Array<{ id: string; displayName: string }>;
   isSaving: boolean;
   onSave: (form: PairGroupFormState) => Promise<void>;
-  onCancel: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   const [form, setForm] = useState<PairGroupFormState>({
     characterAId: "",
@@ -93,6 +98,18 @@ function CreateForm({
     duoEndingLabel: "",
   });
   const [errors, setErrors] = useState<PairGroupFormErrors>({});
+
+  const { isDirty } = useDirtyForm(
+    { characterAId: "", characterBId: "", duoEndingLabel: "" },
+    form
+  );
+
+  const {
+    handleOpenChange,
+    confirmDiscard,
+    discardDialogOpen,
+    setDiscardDialogOpen,
+  } = useDirtyDialogWarning(isDirty, onOpenChange);
 
   const handleChange = (field: keyof PairGroupFormState, value: string) => {
     setForm((prev) => {
@@ -117,7 +134,12 @@ function CreateForm({
       setErrors(validationErrors);
       return;
     }
-    await onSave(form);
+    try {
+      await onSave(form);
+      onOpenChange(false);
+    } catch {
+      // Keep dialog open on error
+    }
   };
 
   const charOptions = characters.map((c) => ({
@@ -129,93 +151,124 @@ function CreateForm({
   );
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-1">
-        <Label htmlFor="pair-char-a" className="text-xs">
-          Character A *
-        </Label>
-        <Select
-          id="pair-char-a"
-          options={charOptions}
-          value={form.characterAId || undefined}
-          onChange={(value: string) => handleChange("characterAId", value)}
-          placeholder="Select character A..."
-          disabled={isSaving || characters.length === 0}
-          aria-required="true"
-          aria-invalid={!!errors.characterAId}
-          aria-describedby={
-            errors.characterAId ? "pair-char-a-error" : undefined
-          }
-        />
-        <FormErrorMessage
-          id="pair-char-a-error"
-          message={errors.characterAId}
-        />
-      </div>
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-w-md w-full">
+          <DialogHeader>
+            <DialogTitle>Add Pair Group</DialogTitle>
+            <DialogDescription>
+              Create a new pair group for duo ending tracking.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <Label htmlFor="pair-char-a" className="text-xs">
+                  Character A *
+                </Label>
+                <Select
+                  id="pair-char-a"
+                  options={charOptions}
+                  value={form.characterAId || undefined}
+                  onChange={(value: string) =>
+                    handleChange("characterAId", value)
+                  }
+                  placeholder="Select character A..."
+                  disabled={isSaving || characters.length === 0}
+                  aria-required="true"
+                  aria-invalid={!!errors.characterAId}
+                  aria-describedby={
+                    errors.characterAId ? "pair-char-a-error" : undefined
+                  }
+                />
+                <FormErrorMessage
+                  id="pair-char-a-error"
+                  message={errors.characterAId}
+                />
+              </div>
 
-      <div className="space-y-1">
-        <Label htmlFor="pair-char-b" className="text-xs">
-          Character B *
-        </Label>
-        <Select
-          id="pair-char-b"
-          options={availableB}
-          value={form.characterBId || undefined}
-          onChange={(value: string) => handleChange("characterBId", value)}
-          placeholder="Select character B..."
-          disabled={isSaving || !form.characterAId}
-          aria-required="true"
-          aria-invalid={!!errors.characterBId}
-          aria-describedby={
-            errors.characterBId ? "pair-char-b-error" : undefined
-          }
-        />
-        <FormErrorMessage
-          id="pair-char-b-error"
-          message={errors.characterBId}
-        />
-      </div>
+              <div className="space-y-1">
+                <Label htmlFor="pair-char-b" className="text-xs">
+                  Character B *
+                </Label>
+                <Select
+                  id="pair-char-b"
+                  options={availableB}
+                  value={form.characterBId || undefined}
+                  onChange={(value: string) =>
+                    handleChange("characterBId", value)
+                  }
+                  placeholder="Select character B..."
+                  disabled={isSaving || !form.characterAId}
+                  aria-required="true"
+                  aria-invalid={!!errors.characterBId}
+                  aria-describedby={
+                    errors.characterBId ? "pair-char-b-error" : undefined
+                  }
+                />
+                <FormErrorMessage
+                  id="pair-char-b-error"
+                  message={errors.characterBId}
+                />
+              </div>
 
-      <div className="space-y-1">
-        <Label htmlFor="pair-duo-label" className="text-xs">
-          Duo Ending Label *
-        </Label>
-        <Input
-          id="pair-duo-label"
-          type="text"
-          placeholder="e.g., best_friends_ending"
-          value={form.duoEndingLabel}
-          onChange={(event) =>
-            handleChange("duoEndingLabel", event.target.value)
-          }
-          disabled={isSaving}
-          aria-required="true"
-          aria-invalid={!!errors.duoEndingLabel}
-          aria-describedby={
-            errors.duoEndingLabel ? "pair-duo-label-error" : undefined
-          }
-        />
-        <FormErrorMessage
-          id="pair-duo-label-error"
-          message={errors.duoEndingLabel}
-        />
-      </div>
+              <div className="space-y-1">
+                <Label htmlFor="pair-duo-label" className="text-xs">
+                  Duo Ending Label *
+                </Label>
+                <Input
+                  id="pair-duo-label"
+                  type="text"
+                  placeholder="e.g., best_friends_ending"
+                  value={form.duoEndingLabel}
+                  onChange={(event) =>
+                    handleChange("duoEndingLabel", event.target.value)
+                  }
+                  disabled={isSaving}
+                  aria-required="true"
+                  aria-invalid={!!errors.duoEndingLabel}
+                  aria-describedby={
+                    errors.duoEndingLabel ? "pair-duo-label-error" : undefined
+                  }
+                />
+                <FormErrorMessage
+                  id="pair-duo-label-error"
+                  message={errors.duoEndingLabel}
+                />
+              </div>
 
-      <div className="flex justify-end gap-2 pt-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={isSaving}
-        >
-          Cancel
-        </Button>
-        <Button type="button" onClick={handleSave} disabled={isSaving}>
-          {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
-          Create Pair Group
-        </Button>
-      </div>
-    </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleOpenChange(false)}
+                  disabled={isSaving}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={!isDirty || isSaving}
+                >
+                  {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
+                  Create Pair Group
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        open={discardDialogOpen}
+        onOpenChange={setDiscardDialogOpen}
+        onConfirm={confirmDiscard}
+        title="Discard unsaved changes?"
+        description="You have unsaved changes. Are you sure you want to discard them?"
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+      />
+    </>
   );
 }
 
@@ -227,17 +280,31 @@ function EditForm({
   pairGroup,
   isSaving,
   onSave,
-  onCancel,
+  open,
+  onOpenChange,
 }: {
   pairGroup: PairGroupWithNames;
   isSaving: boolean;
   onSave: (data: { duoEndingLabel?: string }) => Promise<void>;
-  onCancel: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   const [form, setForm] = useState({
     duoEndingLabel: pairGroup.duoEndingLabel,
   });
   const [error, setError] = useState<string | null>(null);
+
+  const { isDirty } = useDirtyForm(
+    { duoEndingLabel: pairGroup.duoEndingLabel },
+    form
+  );
+
+  const {
+    handleOpenChange,
+    confirmDiscard,
+    discardDialogOpen,
+    setDiscardDialogOpen,
+  } = useDirtyDialogWarning(isDirty, onOpenChange);
 
   const handleSave = async () => {
     const labelResult = trimRequiredDuoEndingLabel(form.duoEndingLabel);
@@ -247,59 +314,93 @@ function EditForm({
     }
     setError(null);
 
-    await onSave({
-      duoEndingLabel: labelResult.value,
-    });
+    try {
+      await onSave({
+        duoEndingLabel: labelResult.value,
+      });
+      onOpenChange(false);
+    } catch {
+      // Keep dialog open on error
+    }
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3 py-2">
-        <Badge variant="outline">{pairGroup.characterAName}</Badge>
-        <span className="text-muted-foreground text-sm">&amp;</span>
-        <Badge variant="outline">{pairGroup.characterBName}</Badge>
-      </div>
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-w-md w-full">
+          <DialogHeader>
+            <DialogTitle>Edit Pair Group</DialogTitle>
+            <DialogDescription>
+              Update the duo ending settings.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 py-2">
+                <Badge variant="outline">{pairGroup.characterAName}</Badge>
+                <span className="text-muted-foreground text-sm">&amp;</span>
+                <Badge variant="outline">{pairGroup.characterBName}</Badge>
+              </div>
 
-      <div className="space-y-1">
-        <Label htmlFor="edit-pair-duo-label" className="text-xs">
-          Duo Ending Label *
-        </Label>
-        <Input
-          id="edit-pair-duo-label"
-          type="text"
-          value={form.duoEndingLabel}
-          onChange={(event) =>
-            setForm((prev) => ({
-              ...prev,
-              duoEndingLabel: event.target.value,
-            }))
-          }
-          disabled={isSaving}
-          aria-required="true"
-          aria-invalid={!!error}
-          aria-describedby={error ? "edit-pair-duo-label-error" : undefined}
-        />
-        <FormErrorMessage
-          id="edit-pair-duo-label-error"
-          message={error ?? undefined}
-        />
-      </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-pair-duo-label" className="text-xs">
+                  Duo Ending Label *
+                </Label>
+                <Input
+                  id="edit-pair-duo-label"
+                  type="text"
+                  value={form.duoEndingLabel}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      duoEndingLabel: event.target.value,
+                    }))
+                  }
+                  disabled={isSaving}
+                  aria-required="true"
+                  aria-invalid={!!error}
+                  aria-describedby={
+                    error ? "edit-pair-duo-label-error" : undefined
+                  }
+                />
+                <FormErrorMessage
+                  id="edit-pair-duo-label-error"
+                  message={error ?? undefined}
+                />
+              </div>
 
-      <div className="flex justify-end gap-2 pt-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={isSaving}
-        >
-          Cancel
-        </Button>
-        <Button type="button" onClick={handleSave} disabled={isSaving}>
-          {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
-          Save
-        </Button>
-      </div>
-    </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleOpenChange(false)}
+                  disabled={isSaving}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={!isDirty || isSaving}
+                >
+                  {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
+                  Save
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        open={discardDialogOpen}
+        onOpenChange={setDiscardDialogOpen}
+        onConfirm={confirmDiscard}
+        title="Discard unsaved changes?"
+        description="You have unsaved changes. Are you sure you want to discard them?"
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+      />
+    </>
   );
 }
 
@@ -345,26 +446,16 @@ export function PairGroupEditDialog({
   const effectiveOpen = open && pairGroupStillExists;
 
   const handleCreate = async (form: PairGroupFormState) => {
-    try {
-      await createPairGroup({
-        characterAId: form.characterAId,
-        characterBId: form.characterBId,
-        duoEndingLabel: form.duoEndingLabel.trim(),
-      });
-      onOpenChange(false);
-    } catch {
-      // Error toast shown by hook — keep dialog open
-    }
+    await createPairGroup({
+      characterAId: form.characterAId,
+      characterBId: form.characterBId,
+      duoEndingLabel: form.duoEndingLabel.trim(),
+    });
   };
 
   const handleUpdate = async (data: { duoEndingLabel?: string }) => {
     if (!pairGroupId) return;
-    try {
-      await updatePairGroup(pairGroupId, data);
-      onOpenChange(false);
-    } catch {
-      // Error toast shown by hook — keep dialog open
-    }
+    await updatePairGroup(pairGroupId, data);
   };
 
   if (isEditMode && isLoadingPairGroups) {
@@ -383,38 +474,21 @@ export function PairGroupEditDialog({
     );
   }
 
-  return (
-    <Dialog open={effectiveOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md w-full">
-        <DialogHeader>
-          <DialogTitle>
-            {isEditMode ? "Edit Pair Group" : "Add Pair Group"}
-          </DialogTitle>
-          <DialogDescription>
-            {isEditMode
-              ? "Update the duo ending settings."
-              : "Create a new pair group for duo ending tracking."}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="mt-4">
-          {isEditMode && existingPairGroup ? (
-            <EditForm
-              pairGroup={existingPairGroup}
-              isSaving={isSaving}
-              onSave={handleUpdate}
-              onCancel={() => onOpenChange(false)}
-            />
-          ) : (
-            <CreateForm
-              characters={sortedCharacters}
-              isSaving={isSaving}
-              onSave={handleCreate}
-              onCancel={() => onOpenChange(false)}
-            />
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+  return isEditMode && existingPairGroup ? (
+    <EditForm
+      open={effectiveOpen}
+      onOpenChange={onOpenChange}
+      pairGroup={existingPairGroup}
+      isSaving={isSaving}
+      onSave={handleUpdate}
+    />
+  ) : (
+    <CreateForm
+      open={effectiveOpen}
+      onOpenChange={onOpenChange}
+      characters={sortedCharacters}
+      isSaving={isSaving}
+      onSave={handleCreate}
+    />
   );
 }

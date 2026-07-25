@@ -5,7 +5,7 @@
  * Used by CharacterDialog (list view) and reference panels.
  */
 
-import { useEffect, useReducer, useRef } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -16,16 +16,21 @@ import {
 import { Button } from "@/components/ui/button";
 import { useCharacters } from "@/hooks/useCharacters";
 import { useToast } from "@/contexts/ToastContext";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useDirtyForm } from "@/hooks/useDirtyForm";
+import { useDirtyDialogWarning } from "@/hooks/useDirtyDialogWarning";
 import {
   AVATAR_MAX_SIZE,
   AVATAR_MAX_SIZE_MB,
   isValidAvatarMimeType,
+  type Character,
 } from "@branchforge/shared";
 import {
   INITIAL_EMPTY,
   formReducer,
   validateForm,
 } from "./CharacterEditDialog.utils";
+import type { CharacterFormState } from "./CharacterEditDialog.utils";
 import { CharacterEditDialogBasicSection } from "./CharacterEditDialogBasicSection";
 import { CharacterEditDialogAvatarSection } from "./CharacterEditDialogAvatarSection";
 import { CharacterEditDialogDetailsSection } from "./CharacterEditDialogDetailsSection";
@@ -35,6 +40,53 @@ export interface CharacterEditDialogProps {
   onOpenChange: (open: boolean) => void;
   projectId: string;
   characterId?: string;
+}
+
+interface CharacterSnapshot {
+  name: string;
+  displayName: string;
+  renpyTag: string;
+  color: string;
+  routeAffiliation: string;
+  conditionalPrefix: string;
+  notes: string;
+  isLoveInterest: boolean;
+  isNarrator: boolean;
+  avatarUrl?: string;
+  hasAvatarFile: boolean;
+}
+
+function buildSnapshot(f: CharacterFormState): CharacterSnapshot {
+  return {
+    name: f.name,
+    displayName: f.displayName,
+    renpyTag: f.renpyTag,
+    color: f.color,
+    routeAffiliation: f.routeAffiliation,
+    conditionalPrefix: f.conditionalPrefix,
+    notes: f.notes,
+    isLoveInterest: f.isLoveInterest,
+    isNarrator: f.isNarrator,
+    avatarUrl: f.avatarUrl,
+    hasAvatarFile: !!f.avatarFile,
+  };
+}
+
+function buildSnapshotFromChar(char: Character): CharacterSnapshot {
+  return {
+    name: char.name,
+    displayName: char.displayName,
+    renpyTag: char.renpyTag,
+    color: char.color,
+    routeAffiliation: char.routeAffiliation ?? "",
+    conditionalPrefix: char.conditionalPrefix ?? "",
+    notes: char.notes ?? "",
+    isLoveInterest: char.isLoveInterest,
+    isNarrator: char.isNarrator,
+    // Match RESET_EXISTING / INITIAL_EMPTY (undefined, not null/"").
+    avatarUrl: char.avatarUrl ?? undefined,
+    hasAvatarFile: false,
+  };
 }
 
 export function CharacterEditDialog({
@@ -60,6 +112,9 @@ export function CharacterEditDialog({
   const { error } = useToast();
 
   const [form, dispatch] = useReducer(formReducer, INITIAL_EMPTY);
+  const [initialSnapshot, setInitialSnapshot] = useState<CharacterSnapshot>(
+    () => buildSnapshot(INITIAL_EMPTY)
+  );
   // Track preview URL for cleanup
   const previewUrlRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -78,6 +133,15 @@ export function CharacterEditDialog({
     isUploadingAvatar ||
     isDeletingAvatar;
 
+  const currentSnapshot = buildSnapshot(form);
+  const { isDirty } = useDirtyForm(initialSnapshot, currentSnapshot);
+  const {
+    handleOpenChange,
+    confirmDiscard,
+    discardDialogOpen,
+    setDiscardDialogOpen,
+  } = useDirtyDialogWarning(isDirty, onOpenChange);
+
   // Initialize form state when dialog opens/closes
   useEffect(() => {
     if (!open) {
@@ -90,6 +154,7 @@ export function CharacterEditDialog({
       initializedForCharacterIdRef.current = null;
       hasInitializedRef.current = false;
       createdCharIdRef.current = null;
+      setInitialSnapshot(buildSnapshot(INITIAL_EMPTY));
     } else if (!isLoadingCharacters) {
       if (characterId && characterId !== initializedForCharacterIdRef.current) {
         hasInitializedRef.current = false;
@@ -101,6 +166,7 @@ export function CharacterEditDialog({
           initializedForCharacterIdRef.current = characterId;
           hasInitializedRef.current = true;
           dispatch({ type: "RESET_EXISTING", char });
+          setInitialSnapshot(buildSnapshotFromChar(char));
         }
       }
     }
@@ -239,60 +305,75 @@ export function CharacterEditDialog({
   const isEditMode = !!characterId;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl w-full max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="p-6 max-sm:p-4 border-b border-border/30 shrink-0">
-          <DialogTitle>
-            {isEditMode ? "Edit Character" : "Add Character"}
-          </DialogTitle>
-          <DialogDescription>
-            {isEditMode
-              ? "Update character details and avatar."
-              : "Create a new character for your project."}
-          </DialogDescription>
-        </div>
-
-        {/* Scrollable form content */}
-        <div className="flex-1 overflow-y-auto p-6 max-sm:p-4">
-          <div className="space-y-4">
-            <CharacterEditDialogBasicSection
-              form={form}
-              handleFieldChange={handleFieldChange}
-              isSaving={isSaving}
-              isEditMode={isEditMode}
-            />
-            <CharacterEditDialogAvatarSection
-              form={form}
-              handleAvatarSelect={handleAvatarSelect}
-              handleAvatarRemove={handleAvatarRemove}
-              isSaving={isSaving}
-              fileInputRef={fileInputRef}
-            />
-            <CharacterEditDialogDetailsSection
-              form={form}
-              handleFieldChange={handleFieldChange}
-              isSaving={isSaving}
-            />
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-w-2xl w-full max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
+          {/* Header */}
+          <div className="p-6 max-sm:p-4 border-b border-border/30 shrink-0">
+            <DialogTitle>
+              {isEditMode ? "Edit Character" : "Add Character"}
+            </DialogTitle>
+            <DialogDescription>
+              {isEditMode
+                ? "Update character details and avatar."
+                : "Create a new character for your project."}
+            </DialogDescription>
           </div>
-        </div>
 
-        {/* Footer — sticky on mobile */}
-        <div className="p-6 max-sm:p-4 border-t border-border/30 flex justify-end gap-2 shrink-0">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isSaving}
-          >
-            Cancel
-          </Button>
-          <Button type="button" onClick={handleSave} disabled={isSaving}>
-            {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
-            Save
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+          {/* Scrollable form content */}
+          <div className="flex-1 overflow-y-auto p-6 max-sm:p-4">
+            <div className="space-y-4">
+              <CharacterEditDialogBasicSection
+                form={form}
+                handleFieldChange={handleFieldChange}
+                isSaving={isSaving}
+                isEditMode={isEditMode}
+              />
+              <CharacterEditDialogAvatarSection
+                form={form}
+                handleAvatarSelect={handleAvatarSelect}
+                handleAvatarRemove={handleAvatarRemove}
+                isSaving={isSaving}
+                fileInputRef={fileInputRef}
+              />
+              <CharacterEditDialogDetailsSection
+                form={form}
+                handleFieldChange={handleFieldChange}
+                isSaving={isSaving}
+              />
+            </div>
+          </div>
+
+          {/* Footer — sticky on mobile */}
+          <div className="p-6 max-sm:p-4 border-t border-border/30 flex justify-end gap-2 shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleOpenChange(false)}
+              disabled={isSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={!isDirty || isSaving}
+            >
+              {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
+              Save
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        open={discardDialogOpen}
+        onOpenChange={setDiscardDialogOpen}
+        onConfirm={confirmDiscard}
+        title="Discard unsaved changes?"
+        description="You have unsaved changes. Are you sure you want to discard them?"
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+      />
+    </>
   );
 }

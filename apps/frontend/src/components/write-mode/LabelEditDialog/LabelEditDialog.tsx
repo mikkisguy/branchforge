@@ -4,7 +4,7 @@
  * Modal for editing label metadata, routing, and duo pair configuration.
  */
 
-import { useEffect, useReducer, useRef } from "react";
+import { useMemo, useReducer, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,9 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useDirtyForm } from "@/hooks/useDirtyForm";
+import { useDirtyDialogWarning } from "@/hooks/useDirtyDialogWarning";
 import { INITIAL_FORM_STATE, formReducer } from "./LabelEditDialogReducer.js";
 import { LabelEditDialogFields } from "./LabelEditDialogFields.js";
 import { LabelEditDialogFooter } from "./LabelEditDialogFooter.js";
@@ -73,32 +76,76 @@ export function LabelEditDialog({
   isSaving,
 }: LabelEditDialogProps) {
   const [form, dispatch] = useReducer(formReducer, INITIAL_FORM_STATE);
+  // Gate dirty until the open-time RESET has been applied. Without this,
+  // the first render still has INITIAL_FORM_STATE and would look dirty
+  // (Save enabled / discard on dismiss) before the init commit.
+  // react-doctor-disable-next-line react-doctor/no-derived-useState, react-doctor/rerender-state-only-in-handlers
+  const [hasInitialized, setHasInitialized] = useState(false);
+  if (open && !hasInitialized) {
+    setHasInitialized(true);
+    dispatch({
+      type: "RESET",
+      title: currentTitle,
+      labelName: currentLabelName ?? "",
+      route: currentRoute ?? "",
+      status: currentStatus ?? "DRAFT",
+      visibility: currentVisibility ?? "EXCLUSIVE",
+      duoPairId: currentDuoPairId ?? "",
+    });
+  } else if (!open && hasInitialized) {
+    setHasInitialized(false);
+  }
 
-  const initializedForOpenRef = useRef(false);
+  const comparableSnapshot = useMemo(
+    () => ({
+      title: form.title,
+      labelName: form.labelName,
+      route: form.route,
+      status: form.status,
+      visibility: form.visibility,
+      duoPairId: form.duoPairId,
+    }),
+    [
+      form.title,
+      form.labelName,
+      form.route,
+      form.status,
+      form.visibility,
+      form.duoPairId,
+    ]
+  );
 
-  // Initialize form state when dialog opens
-  useEffect(() => {
-    if (open && !initializedForOpenRef.current) {
-      initializedForOpenRef.current = true;
-      dispatch({
-        type: "RESET",
-        title: currentTitle,
-        labelName: currentLabelName ?? "",
-        route: currentRoute ?? "",
-        status: currentStatus ?? "DRAFT",
-        visibility: currentVisibility ?? "EXCLUSIVE",
-        duoPairId: currentDuoPairId ?? "",
-      });
-    }
-  }, [
-    open,
-    currentTitle,
-    currentLabelName,
-    currentRoute,
-    currentStatus,
-    currentVisibility,
-    currentDuoPairId,
-  ]);
+  const initialSnapshot = useMemo(
+    () => ({
+      title: currentTitle,
+      labelName: currentLabelName ?? "",
+      route: currentRoute ?? "",
+      status: currentStatus ?? "DRAFT",
+      visibility: currentVisibility ?? "EXCLUSIVE",
+      duoPairId: currentDuoPairId ?? "",
+    }),
+    [
+      currentTitle,
+      currentLabelName,
+      currentRoute,
+      currentStatus,
+      currentVisibility,
+      currentDuoPairId,
+    ]
+  );
+
+  const { isDirty: formDirty } = useDirtyForm(
+    initialSnapshot,
+    comparableSnapshot
+  );
+  const isDirty = hasInitialized && formDirty;
+
+  const {
+    handleOpenChange,
+    confirmDiscard,
+    discardDialogOpen,
+    setDiscardDialogOpen,
+  } = useDirtyDialogWarning(isDirty, onOpenChange);
 
   const handleSave = async () => {
     if (!form.title.trim()) {
@@ -176,54 +223,63 @@ export function LabelEditDialog({
     }
 
     if (Object.keys(changes).length === 0) {
-      initializedForOpenRef.current = false;
       onOpenChange(false);
       return;
     }
 
-    await onSave(changes);
-    initializedForOpenRef.current = false;
+    try {
+      await onSave(changes);
+      onOpenChange(false);
+    } catch {
+      // Error handled by hook toast
+    }
   };
 
   const handleCancel = () => {
-    initializedForOpenRef.current = false;
-    onOpenChange(false);
+    handleOpenChange(false);
   };
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(newOpen) => {
-        if (!newOpen) initializedForOpenRef.current = false;
-        onOpenChange(newOpen);
-      }}
-    >
-      <DialogContent className="w-[560px] max-w-[95vw] max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Edit Label</DialogTitle>
-          <DialogDescription>
-            Update the label metadata and routing configuration.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="w-[560px] max-w-[95vw] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Label</DialogTitle>
+            <DialogDescription>
+              Update the label metadata and routing configuration.
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-4 mt-4">
-          <LabelEditDialogFields
-            form={form}
-            dispatch={dispatch}
-            isSaving={isSaving}
-            currentLabelName={currentLabelName}
-            routeConfigs={routeConfigs}
-            pairGroups={pairGroups}
-            duoEndingEnabled={duoEndingEnabled}
-          />
+          <div className="space-y-4 mt-4">
+            <LabelEditDialogFields
+              form={form}
+              dispatch={dispatch}
+              isSaving={isSaving}
+              currentLabelName={currentLabelName}
+              routeConfigs={routeConfigs}
+              pairGroups={pairGroups}
+              duoEndingEnabled={duoEndingEnabled}
+            />
 
-          <LabelEditDialogFooter
-            isSaving={isSaving}
-            onCancel={handleCancel}
-            onSave={handleSave}
-          />
-        </div>
-      </DialogContent>
-    </Dialog>
+            <LabelEditDialogFooter
+              isSaving={isSaving}
+              saveDisabled={!isDirty}
+              onCancel={handleCancel}
+              onSave={handleSave}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        title="Discard unsaved changes?"
+        description="You have unsaved changes. Are you sure you want to discard them?"
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+        open={discardDialogOpen}
+        onOpenChange={setDiscardDialogOpen}
+        onConfirm={confirmDiscard}
+      />
+    </>
   );
 }

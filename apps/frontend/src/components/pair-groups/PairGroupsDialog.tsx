@@ -13,7 +13,7 @@
  * opens the PairGroupEditDialog.
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Loader2, Plus, Pencil, Trash2, X, Check } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ import { trimRequiredDuoEndingLabel } from "@/components/pair-groups/pair-group-
 import { useProject } from "@/hooks/useProject";
 import { usePairGroups } from "@/hooks/usePairGroups";
 import { useToast } from "@/contexts/ToastContext";
+import { useDirtyDialogWarning } from "@/hooks/useDirtyDialogWarning";
 import type { PairGroupWithNames } from "@branchforge/shared";
 
 // ============================================================================
@@ -73,6 +74,11 @@ export function PairGroupsDialog(props: PairGroupsDialogProps) {
   const [isDeletingConfirm, setIsDeletingConfirm] = useState(false);
 
   const editInputRef = useRef<HTMLInputElement>(null);
+  // Dirty form detection for inline label editing.
+  const isDirty =
+    editingLabelId !== null &&
+    editLabelValue !==
+      (pairGroups.find((pg) => pg.id === editingLabelId)?.duoEndingLabel ?? "");
 
   // Focus/select once when an inline edit session starts — not on every
   // keystroke via a recreated ref callback.
@@ -83,20 +89,29 @@ export function PairGroupsDialog(props: PairGroupsDialogProps) {
     input.focus();
     input.select();
   }, [editingLabelId]);
-
   // Reset transient UI state when the dialog closes, handled in the
   // onOpenChange event handler (not a useEffect) so state resets
   // happen in the same synchronous event as the close action.
-  const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen) {
-      setCreatingNew(false);
-      setEditingLabelId(null);
-      setEditLabelValue("");
-      setEditLabelError(null);
-      setDeleteTarget(null);
-    }
-    onOpenChange(nextOpen);
-  };
+  const handleClose = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen) {
+        setCreatingNew(false);
+        setEditingLabelId(null);
+        setEditLabelValue("");
+        setEditLabelError(null);
+        setDeleteTarget(null);
+      }
+      onOpenChange(nextOpen);
+    },
+    [onOpenChange]
+  );
+
+  const {
+    handleOpenChange,
+    confirmDiscard,
+    discardDialogOpen,
+    setDiscardDialogOpen,
+  } = useDirtyDialogWarning(isDirty, handleClose);
 
   const handleToggleDuoEnding = async (checked: boolean) => {
     try {
@@ -321,8 +336,15 @@ export function PairGroupsDialog(props: PairGroupsDialogProps) {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={() => setDeleteTarget(pg)}
-                          disabled={isDeletingPairGroup || isEditing}
+                          onClick={() => {
+                            setEditingLabelId(null);
+                            setEditLabelValue("");
+                            setEditLabelError(null);
+                            setDeleteTarget(pg);
+                          }}
+                          disabled={
+                            isDeletingPairGroup || editingLabelId !== null
+                          }
                           className="text-destructive hover:text-destructive"
                           aria-label={`Delete pair group ${pg.duoEndingLabel}`}
                         >
@@ -365,6 +387,17 @@ export function PairGroupsDialog(props: PairGroupsDialogProps) {
         confirmLabel="Delete Pair Group"
         isLoading={isDeletingConfirm}
         loadingLabel="Deleting..."
+      />
+
+      {/* Discard unsaved changes confirmation */}
+      <ConfirmDialog
+        open={discardDialogOpen}
+        onOpenChange={setDiscardDialogOpen}
+        onConfirm={confirmDiscard}
+        title="Discard unsaved changes?"
+        description="You have unsaved changes. Are you sure you want to discard them?"
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
       />
     </Dialog>
   );
