@@ -14,11 +14,9 @@
  */
 
 import { describe, it, expect } from "vitest";
-import {
-  buildRouteColorMap,
-  buildEdges,
-  layoutNodes,
-} from "../flow-graph-utils";
+import { buildRouteColorMap } from "../flow-graph-routes";
+import { buildEdges } from "../flow-graph-edges";
+import { layoutNodes } from "../flow-graph-layout";
 import { filterFlowNodes } from "../flow-filters";
 import type { FlowNode, FlowEdge } from "@branchforge/shared";
 

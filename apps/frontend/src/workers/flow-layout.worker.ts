@@ -15,7 +15,7 @@
 import dagre from "dagre";
 import type { FlowLayoutMode, FlowNode, FlowEdge } from "@branchforge/shared";
 
-// Node dimensions — kept in sync with flow-graph-utils.ts and LabelNode.
+// Node dimensions — kept in sync with flow-graph-layout.ts and LabelNode.
 const NODE_WIDTH = 240;
 const NODE_HEIGHT = 120;
 const NODE_GAP_X = 80;
