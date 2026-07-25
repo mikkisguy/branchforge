@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useState } from "react";
@@ -98,5 +98,15 @@ describe("Dialog keyboard navigation", () => {
     expect(screen.getByTestId("middle-button")).toBeInTheDocument();
     expect(screen.getByTestId("last-button")).toBeInTheDocument();
     expect(screen.getByTestId("outside-button")).toBeInTheDocument();
+  });
+
+  it("prevents default on native cancel event to block native dialog Escape close", () => {
+    render(<TestDialogWrapper />);
+    const dialog = document.querySelector("dialog")!;
+    const cancelEvent = new Event("cancel", { cancelable: true });
+    act(() => {
+      dialog.dispatchEvent(cancelEvent);
+    });
+    expect(cancelEvent.defaultPrevented).toBe(true);
   });
 });

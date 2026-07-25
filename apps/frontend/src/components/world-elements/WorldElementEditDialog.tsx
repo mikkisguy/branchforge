@@ -131,7 +131,7 @@ function ElementFormContent({
     description: form.description,
     tags: form.tags,
   };
-  const { isDirty, resetDirty } = useDirtyForm(initialSnapshot, snapshot);
+  const { isDirty } = useDirtyForm(initialSnapshot, snapshot);
 
   const {
     handleOpenChange,
@@ -177,7 +177,6 @@ function ElementFormContent({
 
     try {
       await onSave(elementId, form);
-      resetDirty();
       onOpenChange(false);
     } catch {
       // Error handled by hook toast

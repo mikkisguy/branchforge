@@ -99,6 +99,7 @@ export function ProjectSettingsDialog({
   // tracker produces is the cost of this pattern.)
   const [activeTab, setActiveTab] = useState<SettingsTab>(defaultTab);
   const [visualSystemDirty, setVisualSystemDirty] = useState(false);
+  const [visualFormSession, setVisualFormSession] = useState(0);
   // react-doctor-disable-next-line react-doctor/no-derived-useState, react-doctor/rerender-state-only-in-handlers
   const [prevOpen, setPrevOpen] = useState(open);
   // react-doctor-disable-next-line react-doctor/no-derived-useState, react-doctor/rerender-state-only-in-handlers
@@ -108,8 +109,7 @@ export function ProjectSettingsDialog({
     setPrevDefaultTab(defaultTab);
     if (open) {
       setActiveTab(defaultTab);
-    } else {
-      setVisualSystemDirty(false);
+      setVisualFormSession((s) => s + 1);
     }
   }
 
@@ -151,7 +151,6 @@ export function ProjectSettingsDialog({
           <Tabs
             value={activeTab}
             onValueChange={(next) => {
-              if (next !== "visual") setVisualSystemDirty(false);
               setActiveTab(next as SettingsTab);
             }}
             className="flex flex-col flex-1 min-h-0"
@@ -184,6 +183,7 @@ export function ProjectSettingsDialog({
               </TabsPanel>
               <TabsPanel value="visual" className="space-y-4">
                 <VisualSystemTabContent
+                  key={visualFormSession}
                   projectId={projectId}
                   onDirtyChange={setVisualSystemDirty}
                 />
@@ -311,7 +311,6 @@ function VisualSystemTabContent({
 
   return (
     <VisualSystemFormContent
-      key="visual-system-tab"
       initialConfig={config}
       isSaving={isSaving}
       onSave={handleSave}

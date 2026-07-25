@@ -5,6 +5,11 @@
  * values). Call `resetDirty()` after a successful save to re-baseline so
  * Save can disable again without closing the dialog.
  *
+ * **Close-as-reset pattern**: Dialogs that close after save do NOT need
+ * `resetDirty()` — the next open remounts/re-inits the form, establishing a
+ * fresh baseline. Only stay-open saves (e.g. VisualSystem) call resetDirty()
+ * to keep the save button disabled until the next edit.
+ *
  * Comparison uses JSON.stringify — pass flat/plain form shapes (exclude
  * File objects, error-message fields, and other non-serializable values).
  */

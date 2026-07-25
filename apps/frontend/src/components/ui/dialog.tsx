@@ -68,12 +68,18 @@ export function Dialog({
         handleClose();
       }
     };
+    const onCancel = (e: Event) => {
+      e.preventDefault();
+      handleClose();
+    };
 
     dialog.addEventListener("close", onClose);
     dialog.addEventListener("click", onClick);
+    dialog.addEventListener("cancel", onCancel);
     return () => {
       dialog.removeEventListener("close", onClose);
       dialog.removeEventListener("click", onClick);
+      dialog.removeEventListener("cancel", onCancel);
     };
   }, [closeOnBackdropClick, dialogRef]);
 

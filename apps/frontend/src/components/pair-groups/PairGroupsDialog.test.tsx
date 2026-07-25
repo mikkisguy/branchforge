@@ -97,4 +97,39 @@ describe("PairGroupsDialog", () => {
       screen.getByRole("button", { name: /save label/i })
     ).toBeInTheDocument();
   });
+
+  it("shows discard confirmation when closing while inline edit has unsaved changes", async () => {
+    const user = userEvent.setup({ delay: null });
+    const onOpenChange = vi.fn();
+
+    render(
+      <PairGroupsDialog
+        open
+        onOpenChange={onOpenChange}
+        projectId="project-1"
+        characters={["Alex", "Blake"]}
+      />
+    );
+
+    // Start inline edit on the pair group
+    await user.click(
+      screen.getByRole("button", {
+        name: /edit pair group best_friends_ending/i,
+      })
+    );
+
+    // Change the label value to make inline form dirty
+    const input = screen.getByDisplayValue("best_friends_ending");
+    await user.clear(input);
+    await user.type(input, "changed_label");
+
+    // Click the dialog backdrop to trigger close (simulates Escape/backdrop)
+    const dialog = document.querySelector(
+      'dialog[aria-label="Pair Groups"]'
+    ) as HTMLElement;
+    await user.click(dialog);
+
+    // Assert discard ConfirmDialog appears
+    expect(screen.getByText(/discard unsaved changes/i)).toBeInTheDocument();
+  });
 });

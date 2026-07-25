@@ -336,7 +336,12 @@ export function PairGroupsDialog(props: PairGroupsDialogProps) {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={() => setDeleteTarget(pg)}
+                          onClick={() => {
+                            setEditingLabelId(null);
+                            setEditLabelValue("");
+                            setEditLabelError(null);
+                            setDeleteTarget(pg);
+                          }}
                           disabled={isDeletingPairGroup || isEditing}
                           className="text-destructive hover:text-destructive"
                           aria-label={`Delete pair group ${pg.duoEndingLabel}`}
