@@ -13,7 +13,7 @@
  * opens the PairGroupEditDialog.
  */
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Loader2, Plus, Pencil, Trash2, X, Check } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,8 @@ import { InlineMessage } from "@/components/ui/inline-error";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { PairGroupEditDialog } from "./PairGroupEditDialog.lazy";
+import { PairGroupEditDialog } from "@/components/pair-groups/PairGroupEditDialog.lazy";
+import { trimRequiredDuoEndingLabel } from "@/components/pair-groups/pair-group-label";
 import { useProject } from "@/hooks/useProject";
 import { usePairGroups } from "@/hooks/usePairGroups";
 import { useToast } from "@/contexts/ToastContext";
@@ -36,7 +37,7 @@ interface PairGroupsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;
-  /** Character names for the pair group editor dropdowns. */
+  /** Character collection used for the create-availability count gate. */
   characters: string[];
 }
 
@@ -71,6 +72,16 @@ export function PairGroupsDialog(props: PairGroupsDialogProps) {
 
   const editInputRef = useRef<HTMLInputElement>(null);
 
+  // Focus/select once when an inline edit session starts — not on every
+  // keystroke via a recreated ref callback.
+  useEffect(() => {
+    if (!editingLabelId) return;
+    const input = editInputRef.current;
+    if (!input) return;
+    input.focus();
+    input.select();
+  }, [editingLabelId]);
+
   // Reset transient UI state when the dialog closes, handled in the
   // onOpenChange event handler (not a useEffect) so state resets
   // happen in the same synchronous event as the close action.
@@ -99,9 +110,13 @@ export function PairGroupsDialog(props: PairGroupsDialogProps) {
 
   const handleSaveLabel = async () => {
     if (!editingLabelId) return;
+    const labelResult = trimRequiredDuoEndingLabel(editLabelValue);
+    if ("error" in labelResult) {
+      return;
+    }
     try {
       await updatePairGroup(editingLabelId, {
-        duoEndingLabel: editLabelValue.trim(),
+        duoEndingLabel: labelResult.value,
       });
       setEditingLabelId(null);
     } catch {
@@ -228,11 +243,7 @@ export function PairGroupsDialog(props: PairGroupsDialogProps) {
                         {isEditing ? (
                           <div className="flex items-center gap-1.5">
                             <Input
-                              ref={(el) => {
-                                editInputRef.current = el;
-                                el?.focus();
-                                el?.select();
-                              }}
+                              ref={editInputRef}
                               value={editLabelValue}
                               onChange={(e) =>
                                 setEditLabelValue(e.target.value)

@@ -34,10 +34,8 @@ import { RouteSettingsContent } from "@/components/routes/RouteSettingsContent";
 import { VisualSystemFormContent } from "@/components/visual-system/VisualSystemDialog";
 import { WorldElementsSettingsContent } from "@/components/world-elements/WorldElementsSettingsContent";
 import { useVisualSystem } from "@/hooks/useVisualSystem";
-import {
-  parseGroupPrefixes,
-  type VisualSystemFormState,
-} from "@/components/visual-system/visual-system.helpers";
+import { parseGroupPrefixes } from "@/components/visual-system/visual-system.helpers";
+import type { VisualSystemFormState } from "@/components/visual-system/visual-system.helpers";
 
 // ============================================================================
 // Types

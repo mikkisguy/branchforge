@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
-import { CharacterDialog } from "../characters/CharacterDialog";
+import { CharacterDialog } from "@/components/characters/CharacterDialog";
 import type { CharacterEditDialogProps } from "../CharacterEditDialog";
 import type { Character } from "@branchforge/shared";
 import { createTestQueryClient } from "@/test/query-client";

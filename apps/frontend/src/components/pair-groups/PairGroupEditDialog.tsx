@@ -23,6 +23,7 @@ import { Select } from "@/components/ui/select";
 import { usePairGroups } from "@/hooks/usePairGroups";
 import { useCharacters } from "@/hooks/useCharacters";
 import type { PairGroupWithNames } from "@branchforge/shared";
+import { trimRequiredDuoEndingLabel } from "./pair-group-label";
 
 // ============================================================================
 // Types
@@ -63,8 +64,9 @@ function validateForm(form: PairGroupFormState): PairGroupFormErrors {
   ) {
     errors.characterBId = "Character B must be different from Character A";
   }
-  if (!form.duoEndingLabel.trim()) {
-    errors.duoEndingLabel = "Duo ending label is required";
+  const labelResult = trimRequiredDuoEndingLabel(form.duoEndingLabel);
+  if ("error" in labelResult) {
+    errors.duoEndingLabel = labelResult.error;
   }
 
   return errors;
@@ -80,7 +82,7 @@ function CreateForm({
   onSave,
   onCancel,
 }: {
-  characters: Array<{ id: string; name: string; displayName: string }>;
+  characters: Array<{ id: string; displayName: string }>;
   isSaving: boolean;
   onSave: (form: PairGroupFormState) => Promise<void>;
   onCancel: () => void;
@@ -93,8 +95,20 @@ function CreateForm({
   const [errors, setErrors] = useState<PairGroupFormErrors>({});
 
   const handleChange = (field: keyof PairGroupFormState, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-    setErrors({});
+    setForm((prev) => {
+      const next = { ...prev, [field]: value };
+      if (field === "characterAId" && value === prev.characterBId) {
+        next.characterBId = "";
+      }
+      return next;
+    });
+    setErrors((prev) => {
+      const next = { ...prev, [field]: undefined };
+      if (field === "characterAId" && value === form.characterBId) {
+        next.characterBId = undefined;
+      }
+      return next;
+    });
   };
 
   const handleSave = async () => {
@@ -226,14 +240,15 @@ function EditForm({
   const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
-    if (!form.duoEndingLabel.trim()) {
-      setError("Duo ending label is required");
+    const labelResult = trimRequiredDuoEndingLabel(form.duoEndingLabel);
+    if ("error" in labelResult) {
+      setError(labelResult.error);
       return;
     }
     setError(null);
 
     await onSave({
-      duoEndingLabel: form.duoEndingLabel.trim(),
+      duoEndingLabel: labelResult.value,
     });
   };
 
@@ -316,7 +331,6 @@ export function PairGroupEditDialog({
     .toSorted((a, b) => a.displayName.localeCompare(b.displayName))
     .map((c) => ({
       id: c.id,
-      name: c.name,
       displayName: c.displayName,
     }));
 
@@ -331,18 +345,26 @@ export function PairGroupEditDialog({
   const effectiveOpen = open && pairGroupStillExists;
 
   const handleCreate = async (form: PairGroupFormState) => {
-    await createPairGroup({
-      characterAId: form.characterAId,
-      characterBId: form.characterBId,
-      duoEndingLabel: form.duoEndingLabel,
-    });
-    onOpenChange(false);
+    try {
+      await createPairGroup({
+        characterAId: form.characterAId,
+        characterBId: form.characterBId,
+        duoEndingLabel: form.duoEndingLabel.trim(),
+      });
+      onOpenChange(false);
+    } catch {
+      // Error toast shown by hook — keep dialog open
+    }
   };
 
   const handleUpdate = async (data: { duoEndingLabel?: string }) => {
     if (!pairGroupId) return;
-    await updatePairGroup(pairGroupId, data);
-    onOpenChange(false);
+    try {
+      await updatePairGroup(pairGroupId, data);
+      onOpenChange(false);
+    } catch {
+      // Error toast shown by hook — keep dialog open
+    }
   };
 
   if (isEditMode && isLoadingPairGroups) {

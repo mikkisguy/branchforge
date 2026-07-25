@@ -46,6 +46,8 @@ export function CharacterList({
     try {
       await onDelete(deleteTarget.id);
       setDeleteTarget(null);
+    } catch {
+      // Keep the confirmation dialog open on failure so the user can retry.
     } finally {
       setIsDeleting(false);
     }

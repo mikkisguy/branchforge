@@ -59,10 +59,17 @@ export function StatList({
                 isActive ? "bg-muted/30 border-border/60" : "border-border/30"
               }`}
             >
-              <button
-                type="button"
+              <div
+                role="button"
+                tabIndex={0}
                 onClick={() => onSelect(stat.key)}
-                className={`w-full text-left p-3 transition-colors ${
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onSelect(stat.key);
+                  }
+                }}
+                className={`w-full text-left p-3 transition-colors cursor-pointer ${
                   isActive ? "hover:bg-muted/40" : "hover:bg-muted/20"
                 }`}
                 aria-pressed={isActive}
@@ -120,7 +127,7 @@ export function StatList({
                     </Button>
                   </div>
                 </div>
-              </button>
+              </div>
             </div>
           );
         })}

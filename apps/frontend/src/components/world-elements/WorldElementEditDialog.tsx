@@ -113,7 +113,12 @@ function ElementFormContent({
     value: string | string[]
   ) => {
     setForm((prev) => ({ ...prev, [field]: value }));
-    setErrors({});
+    setErrors((prev) => {
+      if (!(field in prev)) return prev;
+      const next = { ...prev };
+      delete next[field as keyof ElementFormErrors];
+      return next;
+    });
   };
 
   const handleAddTag = () => {
