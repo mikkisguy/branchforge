@@ -2,15 +2,18 @@ import { useMemo } from "react";
 import { CollapsibleSection } from "@/components/ide-shared/CollapsibleSection";
 import type { LabelDetail, Stat } from "@branchforge/shared";
 
+interface JumpData {
+  id: string;
+  targetLabelId: string;
+  targetLabelName: string;
+  jumpType: "MENU_CHOICE" | "AUTOMATIC";
+  choiceText: string;
+  conditionFlags?: string[];
+  effects?: Record<string, number>;
+}
+
 interface OutgoingJumpItemProps {
-  jump: {
-    targetLabelId: string;
-    targetLabelName: string;
-    jumpType: "MENU_CHOICE" | "AUTOMATIC";
-    choiceText: string;
-    conditionFlags?: string[];
-    effects?: Record<string, number>;
-  };
+  jump: JumpData;
   statByKey: Map<string, Stat>;
 }
 
@@ -80,20 +83,14 @@ export function LabelPropertiesPanelOutgoingJumps({
 
   const outgoingJumps = useMemo(() => {
     if (!activeLabel?.lines) return [];
-    const jumps: Array<{
-      targetLabelId: string;
-      targetLabelName: string;
-      jumpType: "MENU_CHOICE" | "AUTOMATIC";
-      choiceText: string;
-      conditionFlags?: string[];
-      effects?: Record<string, number>;
-    }> = [];
+    const jumps: JumpData[] = [];
 
     for (const line of activeLabel.lines) {
       if (line.menuOptions) {
-        for (const opt of line.menuOptions) {
+        for (const [optIndex, opt] of line.menuOptions.entries()) {
           if (!opt.targetLabelId) continue;
           jumps.push({
+            id: `${line.id}:menu:${optIndex}`,
             targetLabelId: opt.targetLabelId,
             targetLabelName: opt.targetLabelName,
             jumpType: "MENU_CHOICE",
@@ -107,6 +104,7 @@ export function LabelPropertiesPanelOutgoingJumps({
         const match = line.content.match(/jump\s+(\S+)/);
         if (match) {
           jumps.push({
+            id: `${line.id}:jump`,
             targetLabelId: match[1],
             targetLabelName: match[1],
             jumpType: "AUTOMATIC",
@@ -138,7 +136,7 @@ export function LabelPropertiesPanelOutgoingJumps({
           <div className="space-y-2">
             {outgoingJumps.map((jump) => (
               <OutgoingJumpItem
-                key={`${jump.targetLabelId}-${jump.choiceText}`}
+                key={jump.id}
                 jump={jump}
                 statByKey={statByKey}
               />

@@ -153,16 +153,16 @@ export function useLocalStorage<T>(
 
   // Re-read from localStorage when key changes
   useEffect(() => {
-    // react-doctor-disable-next-line react-doctor/no-derived-state
-    setState(
-      readStorageValue(
-        prefixedKey,
-        defaultValueRef.current,
-        deserializerRef.current,
-        validateRef.current,
-        ssrSafeRef.current
-      )
+    const next = readStorageValue(
+      prefixedKey,
+      defaultValueRef.current,
+      deserializerRef.current,
+      validateRef.current,
+      ssrSafeRef.current
     );
+    stateRef.current = next;
+    // react-doctor-disable-next-line react-doctor/no-derived-state
+    setState(next);
   }, [prefixedKey]);
 
   const setItem = useCallback(
@@ -198,6 +198,7 @@ export function useLocalStorage<T>(
 
   const removeItem = useCallback(() => {
     if (ssrSafe && !isStorageAvailable()) {
+      stateRef.current = defaultValueRef.current;
       setState(defaultValueRef.current);
       return;
     }
@@ -208,6 +209,7 @@ export function useLocalStorage<T>(
       logStorageWarning("remove", prefixedKey, error);
     }
 
+    stateRef.current = defaultValueRef.current;
     setState(defaultValueRef.current);
   }, [prefixedKey, ssrSafe]);
 

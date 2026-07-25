@@ -36,6 +36,11 @@ export function useDialogueLineSpeaker(
   const wasDropdownOpenRef = useRef(false);
   const isDropdownOpenRef = useRef(false);
   const dropdownId = useId();
+  const closeDropdown = useCallback(() => {
+    isDropdownOpenRef.current = false;
+    setIsDropdownOpen(false);
+    setFocusedOptionIndex(-1);
+  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -44,13 +49,13 @@ export function useDialogueLineSpeaker(
         dropdownRef.current &&
         !dropdownRef.current.contains(e.target as Node)
       )
-        setIsDropdownOpen(false);
+        closeDropdown();
     };
     if (isDropdownOpen) {
       document.addEventListener("mousedown", handler);
       return () => document.removeEventListener("mousedown", handler);
     }
-  }, [isDropdownOpen]);
+  }, [isDropdownOpen, closeDropdown]);
 
   const computeDropdownSpaces = useCallback(() => {
     const trigger = dropdownRef.current;
@@ -163,10 +168,16 @@ export function useDialogueLineSpeaker(
         contentType: entry.contentType,
         choiceData: entry.choiceData,
       });
-      setIsDropdownOpen(false);
-      setFocusedOptionIndex(-1);
+      closeDropdown();
     },
-    [onChange, entry.id, entry.text, entry.contentType, entry.choiceData]
+    [
+      onChange,
+      entry.id,
+      entry.text,
+      entry.contentType,
+      entry.choiceData,
+      closeDropdown,
+    ]
   );
 
   const handleDropdownKeyDown = useCallback(
@@ -175,8 +186,7 @@ export function useDialogueLineSpeaker(
       switch (e.key) {
         case "Escape":
           e.preventDefault();
-          setIsDropdownOpen(false);
-          setFocusedOptionIndex(-1);
+          closeDropdown();
           break;
         case "ArrowDown":
           e.preventDefault();
@@ -205,18 +215,17 @@ export function useDialogueLineSpeaker(
           break;
       }
     },
-    [characters, focusedOptionIndex, handleSpeakerSelect]
+    [characters, focusedOptionIndex, handleSpeakerSelect, closeDropdown]
   );
 
   const handleDropdownBlur = useCallback(
     (e: React.FocusEvent<HTMLDivElement>) => {
       if (!e.currentTarget.contains(e.relatedTarget))
         setTimeout(() => {
-          setIsDropdownOpen(false);
-          setFocusedOptionIndex(-1);
+          closeDropdown();
         }, 0);
     },
-    []
+    [closeDropdown]
   );
 
   return {
