@@ -98,6 +98,7 @@ export function ProjectSettingsDialog({
   // and writing refs during render. The extra render that the
   // tracker produces is the cost of this pattern.)
   const [activeTab, setActiveTab] = useState<SettingsTab>(defaultTab);
+  const [visualSystemDirty, setVisualSystemDirty] = useState(false);
   // react-doctor-disable-next-line react-doctor/no-derived-useState, react-doctor/rerender-state-only-in-handlers
   const [prevOpen, setPrevOpen] = useState(open);
   // react-doctor-disable-next-line react-doctor/no-derived-useState, react-doctor/rerender-state-only-in-handlers
@@ -107,10 +108,11 @@ export function ProjectSettingsDialog({
     setPrevDefaultTab(defaultTab);
     if (open) {
       setActiveTab(defaultTab);
+    } else {
+      setVisualSystemDirty(false);
     }
   }
 
-  const [visualSystemDirty, setVisualSystemDirty] = useState(false);
   const {
     handleOpenChange,
     confirmDiscard,
@@ -148,7 +150,10 @@ export function ProjectSettingsDialog({
           {/* Tabs */}
           <Tabs
             value={activeTab}
-            onValueChange={(next) => setActiveTab(next as SettingsTab)}
+            onValueChange={(next) => {
+              if (next !== "visual") setVisualSystemDirty(false);
+              setActiveTab(next as SettingsTab);
+            }}
             className="flex flex-col flex-1 min-h-0"
           >
             <div className="px-3 pt-2 pb-3 shrink-0 sm:px-6">

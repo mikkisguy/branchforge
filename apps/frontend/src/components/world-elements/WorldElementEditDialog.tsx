@@ -4,7 +4,7 @@
  * Modal for creating or editing a single world element.
  */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Loader2, Plus, X } from "lucide-react";
 import {
   Dialog,
@@ -80,6 +80,8 @@ function validateElement(form: ElementFormState): ElementFormErrors {
 }
 
 interface ElementFormContentProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   elementId: string | undefined;
   elements: WorldElement[];
   isSaving: boolean;
@@ -87,16 +89,14 @@ interface ElementFormContentProps {
     elementId: string | undefined,
     form: ElementFormState
   ) => Promise<void>;
-  onClose: () => void;
-  onDirtyChange?: (dirty: boolean) => void;
 }
 function ElementFormContent({
+  open,
+  onOpenChange,
   elementId,
   elements,
   isSaving,
   onSave,
-  onClose,
-  onDirtyChange,
 }: ElementFormContentProps) {
   const [form, setForm] = useState<ElementFormState>(() => {
     if (!elementId) return INITIAL_FORM;
@@ -133,9 +133,12 @@ function ElementFormContent({
   };
   const { isDirty, resetDirty } = useDirtyForm(initialSnapshot, snapshot);
 
-  useEffect(() => {
-    onDirtyChange?.(isDirty);
-  }, [isDirty, onDirtyChange]);
+  const {
+    handleOpenChange,
+    confirmDiscard,
+    discardDialogOpen,
+    setDiscardDialogOpen,
+  } = useDirtyDialogWarning(isDirty, onOpenChange);
 
   const handleChange = (
     field: keyof ElementFormState,
@@ -175,147 +178,186 @@ function ElementFormContent({
     try {
       await onSave(elementId, form);
       resetDirty();
-      onClose();
+      onOpenChange(false);
     } catch {
       // Error handled by hook toast
     }
   };
 
   return (
-    <div className="space-y-4 mt-4">
-      <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
-        <div className="space-y-1">
-          <Label htmlFor="element-name" className="text-xs">
-            Name *
-          </Label>
-          <Input
-            id="element-name"
-            type="text"
-            placeholder="Castle Blackthorn"
-            value={form.name}
-            onChange={(event) => handleChange("name", event.target.value)}
-            disabled={isSaving}
-            aria-required="true"
-            aria-invalid={!!errors.name}
-            aria-describedby={errors.name ? "element-name-error" : undefined}
-          />
-          <FormErrorMessage id="element-name-error" message={errors.name} />
-        </div>
-
-        <div className="space-y-1">
-          <Label htmlFor="element-type" className="text-xs">
-            Type *
-          </Label>
-          <Select<WorldElementType>
-            id="element-type"
-            options={TYPE_OPTIONS}
-            value={form.type || undefined}
-            onChange={(value) => handleChange("type", value)}
-            placeholder="Select type"
-            disabled={isSaving}
-            aria-required="true"
-            aria-invalid={!!errors.type}
-            aria-describedby={errors.type ? "element-type-error" : undefined}
-          />
-          <FormErrorMessage id="element-type-error" message={errors.type} />
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <Label htmlFor="element-description" className="text-xs">
-          Description
-        </Label>
-        <Textarea
-          id="element-description"
-          placeholder="Describe this world element..."
-          value={form.description}
-          onChange={(event) => handleChange("description", event.target.value)}
-          disabled={isSaving}
-          rows={3}
-          className="resize-none"
-          aria-invalid={!!errors.description}
-          aria-describedby={
-            errors.description ? "element-description-error" : undefined
-          }
-        />
-        <FormErrorMessage
-          id="element-description-error"
-          message={errors.description}
-        />
-      </div>
-
-      <div className="space-y-1">
-        <Label className="text-xs">Tags</Label>
-        <div className="flex gap-2">
-          <Input
-            type="text"
-            placeholder="Add a tag..."
-            value={newTag}
-            onChange={(event) => setNewTag(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                handleAddTag();
-              }
-            }}
-            disabled={isSaving}
-            className="flex-1"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleAddTag}
-            disabled={isSaving || !newTag.trim() || form.tags.length >= 20}
-          >
-            <Plus className="size-4" />
-          </Button>
-        </div>
-        {form.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {form.tags.map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground"
-              >
-                {tag}
-                <button
-                  type="button"
-                  onClick={() => handleRemoveTag(tag)}
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-w-xl w-full">
+          <DialogHeader>
+            <DialogTitle>
+              {elementId ? "Edit World Element" : "Add World Element"}
+            </DialogTitle>
+            <DialogDescription>
+              {elementId
+                ? "Update world element details."
+                : "Create a new entry for your world bible."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="element-name" className="text-xs">
+                  Name *
+                </Label>
+                <Input
+                  id="element-name"
+                  type="text"
+                  placeholder="Castle Blackthorn"
+                  value={form.name}
+                  onChange={(event) => handleChange("name", event.target.value)}
                   disabled={isSaving}
-                  className="hover:text-destructive transition-colors"
-                  aria-label={`Remove tag ${tag}`}
-                >
-                  <X className="size-3" />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-        <p className="text-xs text-muted-foreground">
-          {form.tags.length}/20 tags. Press Enter to add.
-        </p>
-      </div>
+                  aria-required="true"
+                  aria-invalid={!!errors.name}
+                  aria-describedby={
+                    errors.name ? "element-name-error" : undefined
+                  }
+                />
+                <FormErrorMessage
+                  id="element-name-error"
+                  message={errors.name}
+                />
+              </div>
 
-      <div className="flex justify-end gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onClose}
-          disabled={isSaving}
-        >
-          Cancel
-        </Button>
-        <Button
-          type="button"
-          onClick={handleSave}
-          disabled={!isDirty || isSaving}
-        >
-          {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
-          Save
-        </Button>
-      </div>
-    </div>
+              <div className="space-y-1">
+                <Label htmlFor="element-type" className="text-xs">
+                  Type *
+                </Label>
+                <Select<WorldElementType>
+                  id="element-type"
+                  options={TYPE_OPTIONS}
+                  value={form.type || undefined}
+                  onChange={(value) => handleChange("type", value)}
+                  placeholder="Select type"
+                  disabled={isSaving}
+                  aria-required="true"
+                  aria-invalid={!!errors.type}
+                  aria-describedby={
+                    errors.type ? "element-type-error" : undefined
+                  }
+                />
+                <FormErrorMessage
+                  id="element-type-error"
+                  message={errors.type}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="element-description" className="text-xs">
+                Description
+              </Label>
+              <Textarea
+                id="element-description"
+                placeholder="Describe this world element..."
+                value={form.description}
+                onChange={(event) =>
+                  handleChange("description", event.target.value)
+                }
+                disabled={isSaving}
+                rows={3}
+                className="resize-none"
+                aria-invalid={!!errors.description}
+                aria-describedby={
+                  errors.description ? "element-description-error" : undefined
+                }
+              />
+              <FormErrorMessage
+                id="element-description-error"
+                message={errors.description}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Tags</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  placeholder="Add a tag..."
+                  value={newTag}
+                  onChange={(event) => setNewTag(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      handleAddTag();
+                    }
+                  }}
+                  disabled={isSaving}
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddTag}
+                  disabled={
+                    isSaving || !newTag.trim() || form.tags.length >= 20
+                  }
+                >
+                  <Plus className="size-4" />
+                </Button>
+              </div>
+              {form.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {form.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTag(tag)}
+                        disabled={isSaving}
+                        className="hover:text-destructive transition-colors"
+                        aria-label={`Remove tag ${tag}`}
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {form.tags.length}/20 tags. Press Enter to add.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleOpenChange(false)}
+                disabled={isSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSave}
+                disabled={!isDirty || isSaving}
+              >
+                {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
+                Save
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        open={discardDialogOpen}
+        onOpenChange={setDiscardDialogOpen}
+        onConfirm={confirmDiscard}
+        title="Discard unsaved changes?"
+        description="You have unsaved changes. Are you sure you want to discard them?"
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+      />
+    </>
   );
 }
 
@@ -337,15 +379,6 @@ export function WorldElementEditDialog({
   const isSaving = isCreatingElement || isUpdatingElement;
   const isEditMode = !!elementId;
 
-  const [isDirty, setIsDirty] = useState(false);
-
-  const {
-    handleOpenChange,
-    confirmDiscard,
-    discardDialogOpen,
-    setDiscardDialogOpen,
-  } = useDirtyDialogWarning(isDirty, onOpenChange);
-
   const handleSave = async (id: string | undefined, form: ElementFormState) => {
     if (id) {
       await updateElement(id, {
@@ -364,47 +397,31 @@ export function WorldElementEditDialog({
     }
   };
 
-  return (
-    <>
-      <Dialog open={open} onOpenChange={handleOpenChange}>
+  if (isEditMode && isLoadingElements) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-xl w-full">
           <DialogHeader>
-            <DialogTitle>
-              {isEditMode ? "Edit World Element" : "Add World Element"}
-            </DialogTitle>
-            <DialogDescription>
-              {isEditMode
-                ? "Update world element details."
-                : "Create a new entry for your world bible."}
-            </DialogDescription>
+            <DialogTitle>Edit World Element</DialogTitle>
+            <DialogDescription>Update world element details.</DialogDescription>
           </DialogHeader>
-
-          {isEditMode && isLoadingElements ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="size-6 animate-spin" />
-            </div>
-          ) : (
-            <ElementFormContent
-              key={`${elementId ?? "new"}-${open}`}
-              elementId={elementId}
-              elements={elements}
-              isSaving={isSaving}
-              onSave={handleSave}
-              onClose={() => handleOpenChange(false)}
-              onDirtyChange={setIsDirty}
-            />
-          )}
+          <div className="flex justify-center py-8">
+            <Loader2 className="size-6 animate-spin" />
+          </div>
         </DialogContent>
       </Dialog>
-      <ConfirmDialog
-        open={discardDialogOpen}
-        onOpenChange={setDiscardDialogOpen}
-        onConfirm={confirmDiscard}
-        title="Discard unsaved changes?"
-        description="You have unsaved changes. Are you sure you want to discard them?"
-        confirmLabel="Discard"
-        cancelLabel="Keep editing"
-      />
-    </>
+    );
+  }
+
+  return (
+    <ElementFormContent
+      key={`${elementId ?? "new"}-${open}`}
+      open={open}
+      onOpenChange={onOpenChange}
+      elementId={elementId}
+      elements={elements}
+      isSaving={isSaving}
+      onSave={handleSave}
+    />
   );
 }

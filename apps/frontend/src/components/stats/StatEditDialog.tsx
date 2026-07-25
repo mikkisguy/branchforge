@@ -80,21 +80,21 @@ function validateStat(form: StatFormState): StatFormErrors {
 // --- Inner form component (keyed to avoid syncing state with props) ---
 
 interface StatFormContentProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   statId: string | undefined;
   stats: Stat[];
   isSaving: boolean;
   onSave: (statId: string | undefined, form: StatFormState) => Promise<void>;
-  onDirtyChange: (dirty: boolean) => void;
-  onClose: () => void;
 }
 
 function StatFormContent({
+  open,
+  onOpenChange,
   statId,
   stats,
   isSaving,
   onSave,
-  onClose,
-  onDirtyChange,
 }: StatFormContentProps) {
   const [form, setForm] = useState<StatFormState>(() => {
     if (!statId) return initialForm;
@@ -124,10 +124,12 @@ function StatFormContent({
   }, [statId, stats]);
 
   const { isDirty } = useDirtyForm(initialSnapshot, form);
-
-  useEffect(() => {
-    onDirtyChange(isDirty);
-  }, [isDirty, onDirtyChange]);
+  const {
+    handleOpenChange,
+    confirmDiscard,
+    discardDialogOpen,
+    setDiscardDialogOpen,
+  } = useDirtyDialogWarning(isDirty, onOpenChange);
 
   // react-doctor-disable-next-line react-doctor/no-event-handler
   const isEditMode = !!statId;
@@ -136,10 +138,9 @@ function StatFormContent({
   useEffect(() => {
     // react-doctor-disable-next-line react-doctor/no-event-handler
     if (isEditMode && !stats.find((item) => item.id === statId)) {
-      // react-doctor-disable-next-line react-doctor/no-prop-callback-in-effect
-      onClose();
+      handleOpenChange(false);
     }
-  }, [isEditMode, statId, stats, onClose]);
+  }, [isEditMode, statId, stats, handleOpenChange]);
 
   const handleChange = (field: keyof StatFormState, value: string) => {
     setForm((prev) => {
@@ -172,126 +173,159 @@ function StatFormContent({
       setErrors(validationErrors);
       return;
     }
-
     try {
       await onSave(statId, form);
+      onOpenChange(false);
     } catch {
       // Error handled by hook toast
     }
   };
 
   return (
-    <div className="space-y-4 mt-4">
-      <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
-        <div className="space-y-1">
-          <Label htmlFor="stat-key" className="text-xs">
-            Key *
-          </Label>
-          <Input
-            id="stat-key"
-            type="text"
-            placeholder="affection_luna"
-            value={form.key}
-            onChange={(event) => handleChange("key", event.target.value)}
-            disabled={isSaving || isEditMode}
-            aria-required="true"
-            aria-invalid={!!errors.key}
-            aria-describedby={errors.key ? "stat-key-error" : undefined}
-          />
-          <p className="text-xs text-muted-foreground">
-            {isEditMode
-              ? "Key cannot be changed after creation"
-              : "Unique identifier (lowercase, underscores)"}
-          </p>
-          <FormErrorMessage id="stat-key-error" message={errors.key} />
-        </div>
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-w-xl w-full">
+          <DialogHeader>
+            <DialogTitle>{isEditMode ? "Edit Stat" : "Add Stat"}</DialogTitle>
+            <DialogDescription>
+              {isEditMode
+                ? "Update the stat settings."
+                : "Create a new stat for your project."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="stat-key" className="text-xs">
+                  Key *
+                </Label>
+                <Input
+                  id="stat-key"
+                  type="text"
+                  placeholder="affection_luna"
+                  value={form.key}
+                  onChange={(event) => handleChange("key", event.target.value)}
+                  disabled={isSaving || isEditMode}
+                  aria-required="true"
+                  aria-invalid={!!errors.key}
+                  aria-describedby={errors.key ? "stat-key-error" : undefined}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {isEditMode
+                    ? "Key cannot be changed after creation"
+                    : "Unique identifier (lowercase, underscores)"}
+                </p>
+                <FormErrorMessage id="stat-key-error" message={errors.key} />
+              </div>
 
-        <div className="space-y-1">
-          <Label htmlFor="stat-name" className="text-xs">
-            Name *
-          </Label>
-          <Input
-            id="stat-name"
-            type="text"
-            placeholder="Luna Affection"
-            value={form.name}
-            onChange={(event) => handleChange("name", event.target.value)}
-            disabled={isSaving}
-            aria-required="true"
-            aria-invalid={!!errors.name}
-            aria-describedby={errors.name ? "stat-name-error" : undefined}
-          />
-          <FormErrorMessage id="stat-name-error" message={errors.name} />
-        </div>
-      </div>
+              <div className="space-y-1">
+                <Label htmlFor="stat-name" className="text-xs">
+                  Name *
+                </Label>
+                <Input
+                  id="stat-name"
+                  type="text"
+                  placeholder="Luna Affection"
+                  value={form.name}
+                  onChange={(event) => handleChange("name", event.target.value)}
+                  disabled={isSaving}
+                  aria-required="true"
+                  aria-invalid={!!errors.name}
+                  aria-describedby={errors.name ? "stat-name-error" : undefined}
+                />
+                <FormErrorMessage id="stat-name-error" message={errors.name} />
+              </div>
+            </div>
 
-      <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
-        <div className="space-y-1">
-          <Label htmlFor="stat-min" className="text-xs">
-            Min Value
-          </Label>
-          <Input
-            id="stat-min"
-            type="number"
-            value={form.minValue}
-            onChange={(event) => handleChange("minValue", event.target.value)}
-            disabled={isSaving}
-            aria-invalid={!!errors.range}
-            aria-describedby={errors.range ? "stat-range-error" : undefined}
-          />
-        </div>
+            <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="stat-min" className="text-xs">
+                  Min Value
+                </Label>
+                <Input
+                  id="stat-min"
+                  type="number"
+                  value={form.minValue}
+                  onChange={(event) =>
+                    handleChange("minValue", event.target.value)
+                  }
+                  disabled={isSaving}
+                  aria-invalid={!!errors.range}
+                  aria-describedby={
+                    errors.range ? "stat-range-error" : undefined
+                  }
+                />
+              </div>
 
-        <div className="space-y-1">
-          <Label htmlFor="stat-max" className="text-xs">
-            Max Value
-          </Label>
-          <Input
-            id="stat-max"
-            type="number"
-            value={form.maxValue}
-            onChange={(event) => handleChange("maxValue", event.target.value)}
-            disabled={isSaving}
-            aria-invalid={!!errors.range}
-            aria-describedby={errors.range ? "stat-range-error" : undefined}
-          />
-        </div>
-      </div>
+              <div className="space-y-1">
+                <Label htmlFor="stat-max" className="text-xs">
+                  Max Value
+                </Label>
+                <Input
+                  id="stat-max"
+                  type="number"
+                  value={form.maxValue}
+                  onChange={(event) =>
+                    handleChange("maxValue", event.target.value)
+                  }
+                  disabled={isSaving}
+                  aria-invalid={!!errors.range}
+                  aria-describedby={
+                    errors.range ? "stat-range-error" : undefined
+                  }
+                />
+              </div>
+            </div>
 
-      <FormErrorMessage id="stat-range-error" message={errors.range} />
+            <FormErrorMessage id="stat-range-error" message={errors.range} />
 
-      <div className="space-y-1">
-        <Label htmlFor="stat-description" className="text-xs">
-          Description
-        </Label>
-        <Input
-          id="stat-description"
-          type="text"
-          placeholder="Tracks how much Luna trusts the player"
-          value={form.description}
-          onChange={(event) => handleChange("description", event.target.value)}
-          disabled={isSaving}
-        />
-      </div>
+            <div className="space-y-1">
+              <Label htmlFor="stat-description" className="text-xs">
+                Description
+              </Label>
+              <Input
+                id="stat-description"
+                type="text"
+                placeholder="Tracks how much Luna trusts the player"
+                value={form.description}
+                onChange={(event) =>
+                  handleChange("description", event.target.value)
+                }
+                disabled={isSaving}
+              />
+            </div>
 
-      <div className="flex justify-end gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onClose}
-          disabled={isSaving}
-        >
-          Cancel
-        </Button>
-        <Button
-          type="button"
-          onClick={handleSave}
-          disabled={!isDirty || isSaving}
-        >
-          {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
-          Save
-        </Button>
-      </div>
-    </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleOpenChange(false)}
+                disabled={isSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSave}
+                disabled={!isDirty || isSaving}
+              >
+                {isSaving && <Loader2 className="size-4 animate-spin mr-2" />}
+                Save
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        open={discardDialogOpen}
+        onOpenChange={setDiscardDialogOpen}
+        onConfirm={confirmDiscard}
+        title="Discard unsaved changes?"
+        description="You have unsaved changes. Are you sure you want to discard them?"
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+      />
+    </>
   );
 }
 
@@ -315,14 +349,6 @@ export function StatEditDialog({
   const isSaving = isCreatingStat || isUpdatingStat;
   const isEditMode = !!statId;
 
-  const [isDirty, setIsDirty] = useState(false);
-  const {
-    handleOpenChange,
-    confirmDiscard,
-    discardDialogOpen,
-    setDiscardDialogOpen,
-  } = useDirtyDialogWarning(isDirty, onOpenChange);
-
   const handleSave = async (id: string | undefined, form: StatFormState) => {
     if (id) {
       await updateStat(id, {
@@ -340,48 +366,33 @@ export function StatEditDialog({
         description: form.description.trim() || undefined,
       });
     }
-    onOpenChange(false);
   };
 
   return (
     <>
-      <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-w-xl w-full">
-          <DialogHeader>
-            <DialogTitle>{isEditMode ? "Edit Stat" : "Add Stat"}</DialogTitle>
-            <DialogDescription>
-              {isEditMode
-                ? "Update the stat settings."
-                : "Create a new stat for your project."}
-            </DialogDescription>
-          </DialogHeader>
-
-          {isEditMode && isLoadingStats ? (
+      {isEditMode && isLoadingStats ? (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          <DialogContent className="max-w-xl w-full">
+            <DialogHeader>
+              <DialogTitle>Edit Stat</DialogTitle>
+              <DialogDescription>Update the stat settings.</DialogDescription>
+            </DialogHeader>
             <div className="flex justify-center py-8">
               <Loader2 className="size-6 animate-spin" />
             </div>
-          ) : (
-            <StatFormContent
-              key={`${statId ?? "new"}-${open}`}
-              statId={statId}
-              stats={stats}
-              isSaving={isSaving}
-              onSave={handleSave}
-              onDirtyChange={setIsDirty}
-              onClose={() => handleOpenChange(false)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-      <ConfirmDialog
-        open={discardDialogOpen}
-        onOpenChange={setDiscardDialogOpen}
-        onConfirm={confirmDiscard}
-        title="Discard unsaved changes?"
-        description="You have unsaved changes. Are you sure you want to discard them?"
-        confirmLabel="Discard"
-        cancelLabel="Keep editing"
-      />
+          </DialogContent>
+        </Dialog>
+      ) : (
+        <StatFormContent
+          key={`${statId ?? "new"}-${open}`}
+          open={open}
+          onOpenChange={onOpenChange}
+          statId={statId}
+          stats={stats}
+          isSaving={isSaving}
+          onSave={handleSave}
+        />
+      )}
     </>
   );
 }

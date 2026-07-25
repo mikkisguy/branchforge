@@ -5,7 +5,7 @@
  * around it. Used by `ProjectSettingsDialog` (as a tab panel).
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDirtyForm } from "@/hooks/useDirtyForm";
@@ -141,15 +141,14 @@ export function VisualSystemFormContent({
     [initialConfig]
   );
   const { isDirty, resetDirty } = useDirtyForm(initialSnapshot, form);
-  useEffect(() => {
-    onDirtyChange?.(isDirty);
-  }, [isDirty, onDirtyChange]);
   const handleChange = <K extends keyof VisualSystemFormState>(
     field: K,
     value: VisualSystemFormState[K]
   ) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    const next = { ...form, [field]: value };
+    setForm(next);
     setErrors((prev) => ({ ...prev, [field]: undefined }));
+    onDirtyChange?.(JSON.stringify(next) !== JSON.stringify(initialSnapshot));
   };
 
   const handleSave = async () => {
@@ -161,6 +160,7 @@ export function VisualSystemFormContent({
     try {
       await onSave(form);
       resetDirty();
+      onDirtyChange?.(false);
       onClose();
     } catch {
       // Error handled by hook toast
