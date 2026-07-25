@@ -1,5 +1,5 @@
 import { DialogShell } from "@/components/ui/DialogShell";
-import { WorldElementsSettingsContent } from "@/components/WorldElementsSettingsContent";
+import { WorldElementsSettingsContent } from "./WorldElementsSettingsContent";
 
 interface WorldElementsDialogProps {
   open: boolean;

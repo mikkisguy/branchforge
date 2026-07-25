@@ -39,7 +39,7 @@ interface VariableFormErrors {
   category?: string;
 }
 
-const INITIAL_FORM: VariableFormState = {
+const initialForm: VariableFormState = {
   key: "",
   description: "",
   category: "",
@@ -87,9 +87,9 @@ function VariableFormContent({
   onClose,
 }: VariableFormContentProps) {
   const [form, setForm] = useState<VariableFormState>(() => {
-    if (!variableId) return INITIAL_FORM;
+    if (!variableId) return initialForm;
     const variable = variables.find((item: Variable) => item.id === variableId);
-    if (!variable) return INITIAL_FORM;
+    if (!variable) return initialForm;
     return {
       key: variable.key,
       description: variable.description ?? "",
@@ -112,7 +112,12 @@ function VariableFormContent({
 
   const handleChange = (field: keyof VariableFormState, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
-    setErrors({});
+    setErrors((prev) => {
+      if (!(field in prev)) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
   };
 
   const handleSave = async () => {

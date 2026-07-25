@@ -8,7 +8,7 @@
 import { X, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { CharacterImportWizard } from "@/components/CharacterImportWizard.lazy";
+import { CharacterImportWizard } from "@/components/CharacterImportWizard/CharacterImportWizard.lazy";
 import { useZipImportProjectDialog } from "./useZipImportProjectDialog";
 import { ZipImportProjectDialogForm } from "./ZipImportProjectDialogForm";
 import {

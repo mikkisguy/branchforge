@@ -17,7 +17,7 @@
  */
 
 import { DialogShell } from "@/components/ui/DialogShell";
-import { RouteSettingsContent } from "@/components/RouteSettingsContent";
+import { RouteSettingsContent } from "@/components/routes/RouteSettingsContent";
 
 interface RouteSettingsDialogProps {
   open: boolean;

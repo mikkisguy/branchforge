@@ -41,7 +41,7 @@ interface StatFormErrors {
   range?: string;
 }
 
-const INITIAL_FORM: StatFormState = {
+const initialForm: StatFormState = {
   key: "",
   name: "",
   minValue: 0,
@@ -92,9 +92,9 @@ function StatFormContent({
   onClose,
 }: StatFormContentProps) {
   const [form, setForm] = useState<StatFormState>(() => {
-    if (!statId) return INITIAL_FORM;
+    if (!statId) return initialForm;
     const stat = stats.find((item: Stat) => item.id === statId);
-    if (!stat) return INITIAL_FORM;
+    if (!stat) return initialForm;
     return {
       key: stat.key,
       name: stat.name,
@@ -324,7 +324,7 @@ export function StatEditDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {isLoadingStats ? (
+        {isEditMode && isLoadingStats ? (
           <div className="flex justify-center py-8">
             <Loader2 className="size-6 animate-spin" />
           </div>

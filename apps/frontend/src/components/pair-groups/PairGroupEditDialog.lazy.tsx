@@ -13,6 +13,7 @@ const LazyPairGroupEditDialog = lazy(() =>
 );
 
 export function PairGroupEditDialog(props: PairGroupEditDialogProps) {
+  if (!props.open) return null;
   return (
     <Suspense
       fallback={

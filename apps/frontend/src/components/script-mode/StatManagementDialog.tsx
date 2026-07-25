@@ -8,9 +8,9 @@
 
 import { useState } from "react";
 import { DialogShell } from "@/components/ui/DialogShell";
-import { StatProgression } from "@/components/StatProgression";
-import { StatList } from "@/components/StatList";
-import { StatEditDialog } from "@/components/StatEditDialog";
+import { StatProgression } from "@/components/stats/StatProgression";
+import { StatList } from "@/components/stats/StatList";
+import { StatEditDialog } from "@/components/stats/StatEditDialog";
 import { Button } from "@/components/ui/button";
 import { InlineMessage } from "@/components/ui/inline-error";
 import { Loader2, Plus } from "lucide-react";

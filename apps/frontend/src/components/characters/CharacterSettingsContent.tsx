@@ -16,8 +16,8 @@ import { Loader2, Plus, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InlineMessage } from "@/components/ui/inline-error";
 import { CharacterList } from "./CharacterList";
-import { CharacterEditDialog } from "./CharacterEditDialog/CharacterEditDialog.lazy";
-import { PairGroupsDialog } from "./PairGroupsDialog";
+import { CharacterEditDialog } from "@/components/CharacterEditDialog/CharacterEditDialog.lazy";
+import { PairGroupsDialog } from "@/components/pair-groups/PairGroupsDialog";
 import { useCharacters } from "@/hooks/useCharacters";
 
 interface CharacterSettingsContentProps {

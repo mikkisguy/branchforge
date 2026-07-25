@@ -116,7 +116,12 @@ function RouteFormContent({
     value: string | boolean
   ) => {
     setForm((prev) => ({ ...prev, [field]: value }));
-    setErrors({});
+    setErrors((prev) => {
+      if (!(field in prev)) return prev;
+      const next = { ...prev };
+      delete next[field as keyof RouteFormErrors];
+      return next;
+    });
   };
 
   const handleSave = async () => {
