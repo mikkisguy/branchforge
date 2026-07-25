@@ -62,6 +62,7 @@ export function CharacterEditDialogDetailsSection({
         <Label htmlFor="edit-char-notes" className="text-xs">
           Notes
         </Label>
+        {/* react-doctor-disable-next-line react-doctor/control-has-associated-label -- FP: Label htmlFor association already present; react-doctor misses it */}
         <textarea
           id="edit-char-notes"
           rows={4}

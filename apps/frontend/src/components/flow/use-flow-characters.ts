@@ -6,12 +6,12 @@
  * the tooltip simply shows "None" for characters).
  */
 
-import { useContext } from "react";
+import { use } from "react";
 import {
   FlowCharacterContext,
   type FlowCharacterLookup,
 } from "./flow-character-context";
 
 export function useFlowCharacters(): FlowCharacterLookup {
-  return useContext(FlowCharacterContext);
+  return use(FlowCharacterContext);
 }

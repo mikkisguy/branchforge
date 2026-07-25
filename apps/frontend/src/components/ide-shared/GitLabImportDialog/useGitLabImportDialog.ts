@@ -132,6 +132,7 @@ export function useGitLabImportDialog(
     });
 
     try {
+      // react-doctor-disable-next-line react-doctor/async-defer-await
       const result = await gitlabApi.importProject({
         projectName: state.projectName.trim(),
         projectDescription: state.projectDescription.trim() || undefined,

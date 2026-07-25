@@ -4,6 +4,7 @@ import {
   useState,
   useCallback,
   useRef,
+  useSyncExternalStore,
 } from "react";
 import { useLocalStorageBoolean } from "./useLocalStorage";
 
@@ -23,12 +24,28 @@ import { useLocalStorageBoolean } from "./useLocalStorage";
  * subscribing to matchMedia themselves. Existing two-element destructuring
  * `[a, b] = ...` continues to work.
  */
+function subscribeToMediaQuery(callback: () => void) {
+  const mql = window.matchMedia("(min-width: 768px)");
+  mql.addEventListener("change", callback);
+  return () => mql.removeEventListener("change", callback);
+}
+
+function getIsMobileSnapshot() {
+  return !window.matchMedia("(min-width: 768px)").matches;
+}
+
+function getIsMobileServerSnapshot() {
+  return false;
+}
+
 export function useResponsiveSidebarState(key: string, defaultValue = false) {
   const [stored, setStored] = useLocalStorageBoolean(key, defaultValue);
-  const [isMobile, setIsMobile] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return !window.matchMedia("(min-width: 768px)").matches;
-  });
+  const isMobile = useSyncExternalStore(
+    subscribeToMediaQuery,
+    getIsMobileSnapshot,
+    getIsMobileServerSnapshot
+  );
+
   // Mobile-local toggle state – only used when isMobile is true.
   // Always starts collapsed on mobile.
   const [mobileCollapsed, setMobileCollapsed] = useState(true);
@@ -38,20 +55,15 @@ export function useResponsiveSidebarState(key: string, defaultValue = false) {
     isMobileRef.current = isMobile;
   }, [isMobile]);
 
+  // Collapse sidebar when transitioning to mobile, skip initial mount
+  // when already mobile to avoid a redundant set.
+  const prevMobileRef = useRef(isMobile);
   useEffect(() => {
-    const mql = window.matchMedia("(min-width: 768px)");
-    const handler = () => {
-      const nowMobile = !mql.matches;
-      setIsMobile(nowMobile);
-      if (nowMobile) {
-        setMobileCollapsed(true);
-      }
-    };
-    // Set initial – use matchMedia to avoid SSR mismatch
-    handler();
-    mql.addEventListener("change", handler);
-    return () => mql.removeEventListener("change", handler);
-  }, []);
+    if (isMobile && !prevMobileRef.current) {
+      setMobileCollapsed(true);
+    }
+    prevMobileRef.current = isMobile;
+  }, [isMobile]);
 
   // Effective collapsed state:
   //  - Mobile: use mobileCollapsed (local, starts collapsed)

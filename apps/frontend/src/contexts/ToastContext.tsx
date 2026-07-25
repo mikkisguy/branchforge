@@ -4,7 +4,7 @@ import {
   useState,
   useCallback,
   useMemo,
-  useEffect,
+  useSyncExternalStore,
   ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
@@ -39,54 +39,54 @@ function getToastPortalContainer(): HTMLElement {
 }
 
 function useToastPortalContainer(): HTMLElement | null {
-  const [container, setContainer] = useState<HTMLElement | null>(null);
+  return useSyncExternalStore(
+    (onStoreChange) => {
+      const update = () => {
+        if (typeof document === "undefined") return;
+        onStoreChange();
+      };
 
-  useEffect(() => {
-    const update = () => {
-      if (typeof document === "undefined") return;
-      setContainer(getToastPortalContainer());
-    };
+      // Only react to dialog-relevant mutations: new / removed dialog
+      // elements as direct body children, and open-attribute toggles on
+      // any dialog in the subtree (showModal / close).
+      const childListObserver = new MutationObserver((mutations) => {
+        const relevant = mutations.some(
+          (m) =>
+            Array.from(m.addedNodes).some(
+              (n) => n instanceof HTMLDialogElement
+            ) ||
+            Array.from(m.removedNodes).some(
+              (n) => n instanceof HTMLDialogElement
+            )
+        );
+        if (relevant) update();
+      });
+      childListObserver.observe(document.body, { childList: true });
 
-    update();
+      const attrObserver = new MutationObserver((mutations) => {
+        const relevant = mutations.some(
+          (m) =>
+            m.target instanceof HTMLDialogElement && m.attributeName === "open"
+        );
+        if (relevant) update();
+      });
+      attrObserver.observe(document.body, {
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["open"],
+      });
 
-    // Only react to dialog-relevant mutations: new / removed dialog
-    // elements as direct body children, and open-attribute toggles on
-    // any dialog in the subtree (showModal / close).
-    const childListObserver = new MutationObserver((mutations) => {
-      const relevant = mutations.some(
-        (m) =>
-          Array.from(m.addedNodes).some(
-            (n) => n instanceof HTMLDialogElement
-          ) ||
-          Array.from(m.removedNodes).some((n) => n instanceof HTMLDialogElement)
-      );
-      if (relevant) update();
-    });
-    childListObserver.observe(document.body, { childList: true });
+      document.addEventListener("close", update, true);
 
-    const attrObserver = new MutationObserver((mutations) => {
-      const relevant = mutations.some(
-        (m) =>
-          m.target instanceof HTMLDialogElement && m.attributeName === "open"
-      );
-      if (relevant) update();
-    });
-    attrObserver.observe(document.body, {
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["open"],
-    });
-
-    document.addEventListener("close", update, true);
-
-    return () => {
-      childListObserver.disconnect();
-      attrObserver.disconnect();
-      document.removeEventListener("close", update, true);
-    };
-  }, []);
-
-  return container;
+      return () => {
+        childListObserver.disconnect();
+        attrObserver.disconnect();
+        document.removeEventListener("close", update, true);
+      };
+    },
+    getToastPortalContainer,
+    () => null
+  );
 }
 
 export function useToast() {

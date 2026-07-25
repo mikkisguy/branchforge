@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useId, useEffect, useEffectEvent, useMemo, useRef } from "react";
+import { useId, useEffect, useEffectEvent, useMemo, useRef, use } from "react";
 import { cn } from "@/lib/utils";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 
@@ -10,7 +10,7 @@ interface DialogContextValue {
 const DialogContext = React.createContext<DialogContextValue | null>(null);
 
 function useDialogTitleId(): string | undefined {
-  return React.useContext(DialogContext)?.titleId;
+  return use(DialogContext)?.titleId;
 }
 
 interface DialogProps {

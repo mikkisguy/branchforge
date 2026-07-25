@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -28,13 +28,6 @@ export function LoginPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const announceRef = useRef<AnnouncementHandle>(null);
-
-  useEffect(() => {
-    if (error) {
-      announceRef.current?.announce(error);
-    }
-  }, [error]);
-
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
@@ -44,7 +37,9 @@ export function LoginPage() {
       await login(email, password);
       navigate(`${BASE_URL}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      const message = err instanceof Error ? err.message : "Login failed";
+      announceRef.current?.announce(message);
+      setError(message);
     } finally {
       setIsLoading(false);
     }

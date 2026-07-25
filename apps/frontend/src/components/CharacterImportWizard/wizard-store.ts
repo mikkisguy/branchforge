@@ -60,7 +60,7 @@ export type WizardAction =
 // Helper Functions
 // ============================================================================
 
-export function groupCharacters(
+function groupCharacters(
   detected: DetectedCharacter[],
   conflicts: CharacterConflict[],
   excludedTags: string[],
@@ -105,7 +105,7 @@ export function groupCharacters(
   return result;
 }
 
-export function randomColor(): string {
+function randomColor(): string {
   return (
     "#" +
     Math.floor(Math.random() * 16777215)

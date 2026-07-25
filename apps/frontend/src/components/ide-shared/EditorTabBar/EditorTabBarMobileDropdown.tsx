@@ -72,6 +72,7 @@ export function EditorTabBarMobileDropdown({
 
       {open &&
         createPortal(
+          // react-doctor-disable-next-line react-doctor/prefer-tag-over-role -- custom listbox; no native element supports rich option rows
           <div
             ref={dropdownMenuRef}
             role="listbox"

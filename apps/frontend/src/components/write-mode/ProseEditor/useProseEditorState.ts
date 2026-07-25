@@ -125,9 +125,11 @@ export function useProseEditorState({
     entries: DialogueEntry[];
     initialWordCount: number;
   }>(() => ({
+    // react-doctor-disable-next-line react-doctor/no-event-handler -- idiomatic useState lazy initializer, not an event handler
     entries: convertLabelLinesToEntries(activeLabel),
     initialWordCount: 0,
   }));
+  // react-doctor-disable-next-line react-doctor/no-event-handler -- controlled content state destructure; entries must be editable state (#350)
   const { entries, initialWordCount } = content;
   const [internalLayoutMode, setInternalLayoutMode] =
     useLocalStorage<LineLayoutMode>(LINE_LAYOUT_STORAGE_KEY, "inline", {
@@ -353,6 +355,7 @@ export function useProseEditorState({
     const hasSwitchedLabel = previousLabelIdRef.current !== labelId;
     previousLabelIdRef.current = labelId;
 
+    // react-doctor-disable-next-line react-doctor/no-event-handler -- label-change effect; not an event handler
     if (!activeLabel) {
       isExternalUpdateRef.current = true;
       // entries reset naturally via key={labelId} remount; no imperative setState needed
@@ -376,6 +379,7 @@ export function useProseEditorState({
       // Always reset undo history when switching labels, even if content is identical
       // This prevents undo history of one label bleeding into another
       isExternalUpdateRef.current = true;
+      // react-doctor-disable-next-line react-doctor/no-derived-state -- editable entries derived from activeLabel must live in state; not pure derived render values
       setContent({ entries: newEntries, initialWordCount: newWordCount });
       inMemoryUndo.clear(cloneEntries(newEntries));
     } else {
@@ -389,6 +393,7 @@ export function useProseEditorState({
       // Ignore server echo updates while a textarea is focused to avoid remount-driven blur.
       // Local editor state remains the source of truth during active typing.
       if (entriesUnchanged || isEditorTextareaFocused()) {
+        // react-doctor-disable-next-line react-doctor/no-derived-state -- editable entries derived from activeLabel must live in state; not pure derived render values
         setContent((prev) =>
           prev.initialWordCount === newWordCount
             ? prev
@@ -398,6 +403,7 @@ export function useProseEditorState({
       }
 
       isExternalUpdateRef.current = true;
+      // react-doctor-disable-next-line react-doctor/no-derived-state -- editable entries derived from activeLabel must live in state; not pure derived render values
       setContent({ entries: newEntries, initialWordCount: newWordCount });
       inMemoryUndo.updatePresent(cloneEntries(newEntries));
     }

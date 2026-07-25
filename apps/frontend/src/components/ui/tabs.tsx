@@ -247,6 +247,7 @@ export function TabsList({
     scrollRafRef.current = requestAnimationFrame(updateFades);
   }, [updateFades]);
 
+  // react-doctor-disable-next-line react-doctor/advanced-event-handler-refs, react-doctor/exhaustive-deps -- scheduleFadeUpdate transitively stable via refs
   useEffect(() => {
     if (!scrollable) return;
     scheduleFadeUpdate();
@@ -375,8 +376,8 @@ export function TabsTrigger({
   // effect', but the registration callback is the standard pattern
   // for child→parent enumeration — there's no way for the parent
   // to statically know about TabsTrigger children.)
-  // react-doctor-disable-next-line react-doctor/no-pass-data-to-parent
   useEffect(
+    // react-doctor-disable-next-line react-doctor/no-pass-data-to-parent
     () => registerTab(value, !!disabled),
     [registerTab, value, disabled]
   );

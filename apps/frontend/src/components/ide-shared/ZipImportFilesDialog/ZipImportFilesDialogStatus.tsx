@@ -37,6 +37,7 @@ export function ZipImportFilesDialogProgress({
   );
 }
 
+// react-doctor-disable-next-line react-doctor/no-multi-comp -- related variants co-located
 export function ZipImportFilesDialogSuccess({
   importState,
 }: ZipImportFilesDialogStatusProps) {
@@ -76,6 +77,7 @@ export function ZipImportFilesDialogSuccess({
   );
 }
 
+// react-doctor-disable-next-line react-doctor/no-multi-comp -- related variants co-located
 export function ZipImportFilesDialogError({
   importState,
 }: ZipImportFilesDialogStatusProps) {

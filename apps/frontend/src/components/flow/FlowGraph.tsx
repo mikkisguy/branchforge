@@ -134,6 +134,7 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
       if (trimmed.length > 0) {
         const title = node.title.toLowerCase();
         const labelName = node.labelName?.toLowerCase() ?? "";
+        // react-doctor-disable-next-line react-doctor/js-set-map-lookups -- String.prototype.includes FP; react-doctor reports ×2 on same line
         matchesQuery = title.includes(trimmed) || labelName.includes(trimmed);
       }
       map.set(node.id, {

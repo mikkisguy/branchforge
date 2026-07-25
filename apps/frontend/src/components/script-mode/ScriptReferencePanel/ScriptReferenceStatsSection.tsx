@@ -30,6 +30,7 @@ export function ScriptReferenceStatsSection({
       }
     >
       {isLoading ? (
+        // react-doctor-disable-next-line react-doctor/prefer-tag-over-role -- loading status region; output element is wrong
         <div
           role="status"
           aria-label="Loading stats"

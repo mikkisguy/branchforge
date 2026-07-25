@@ -31,6 +31,7 @@ export function ZipImportProjectDialogUploading({
   );
 }
 
+// react-doctor-disable-next-line react-doctor/no-multi-comp -- related variants co-located
 export function ZipImportProjectDialogSuccess({
   importState,
   createdProject,
@@ -60,6 +61,7 @@ export function ZipImportProjectDialogSuccess({
   );
 }
 
+// react-doctor-disable-next-line react-doctor/no-multi-comp -- related variants co-located
 export function ZipImportProjectDialogError({
   importState,
   onRetry,
