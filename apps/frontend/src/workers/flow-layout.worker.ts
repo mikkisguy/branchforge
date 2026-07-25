@@ -67,7 +67,7 @@ function isNullishKey(key: string | null | undefined): boolean {
 }
 
 function sortRowsNullishFirst(keys: string[]): string[] {
-  return [...keys].sort((a, b) => {
+  return keys.toSorted((a, b) => {
     const aNull = isNullishKey(a);
     const bNull = isNullishKey(b);
     if (aNull && !bNull) return -1;

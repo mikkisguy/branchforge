@@ -11,11 +11,11 @@ export function FormattedCondition({
 }: FormattedConditionProps) {
   return (
     <>
-      {parts.map((part, i) =>
+      {parts.map((part) =>
         part.type === "keyword" ? (
-          <span key={i}>{part.text}</span>
+          <span key={part.id}>{part.text}</span>
         ) : (
-          <span key={i} className={valueClassName ?? "font-mono"}>
+          <span key={part.id} className={valueClassName ?? "font-mono"}>
             {part.text}
           </span>
         )
