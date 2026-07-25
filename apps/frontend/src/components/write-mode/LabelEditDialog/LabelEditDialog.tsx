@@ -227,8 +227,12 @@ export function LabelEditDialog({
       return;
     }
 
-    await onSave(changes);
-    onOpenChange(false);
+    try {
+      await onSave(changes);
+      onOpenChange(false);
+    } catch {
+      // Error handled by hook toast
+    }
   };
 
   const handleCancel = () => {
