@@ -68,6 +68,7 @@ export function TabScrollArea({
   }, [updateIndicators]);
 
   // Resize / mutation observer for content changes
+  // react-doctor-disable-next-line react-doctor/advanced-event-handler-refs, react-doctor/exhaustive-deps -- scheduleUpdate transitively stable via refs
   useEffect(() => {
     scheduleUpdate();
     const el = containerRef.current;

@@ -24,6 +24,7 @@ export function NoProjectSelected({ onOpenSettings }: NoProjectSelectedProps) {
   );
 }
 
+// react-doctor-disable-next-line react-doctor/no-multi-comp -- related variants co-located
 export function LoadingLabels() {
   return (
     <div className="h-full flex flex-col items-center justify-center">
@@ -38,6 +39,7 @@ export function LoadingLabels() {
   );
 }
 
+// react-doctor-disable-next-line react-doctor/no-multi-comp -- related variants co-located
 export function NoLabels() {
   return (
     <div className="h-full flex flex-col items-center justify-center">

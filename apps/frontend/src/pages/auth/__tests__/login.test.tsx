@@ -171,7 +171,9 @@ describe("LoginPage", () => {
       await user.click(submitButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Invalid credentials")).toBeInTheDocument();
+        expect(document.getElementById("login-error")).toHaveTextContent(
+          "Invalid credentials"
+        );
       });
     });
 
@@ -216,7 +218,9 @@ describe("LoginPage", () => {
       await user.click(submitButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Login failed")).toBeInTheDocument();
+        expect(document.getElementById("login-error")).toHaveTextContent(
+          "Login failed"
+        );
       });
     });
 
@@ -319,7 +323,9 @@ describe("LoginPage", () => {
 
       // Wait for loading to complete and error to be displayed
       await waitFor(() => {
-        expect(screen.getByText("Login failed")).toBeInTheDocument();
+        expect(document.getElementById("login-error")).toHaveTextContent(
+          "Login failed"
+        );
       });
 
       // Inputs should be re-enabled after failed submission

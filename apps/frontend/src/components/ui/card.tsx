@@ -39,15 +39,16 @@ interface CardTitleProps extends React.HTMLAttributes<HTMLHeadingElement> {
 }
 
 function CardTitle({ className, ref, ...props }: CardTitleProps) {
+  /* eslint-disable jsx-a11y/heading-has-content -- title text is provided by callers */
   return (
     // react-doctor-disable-next-line react-doctor/heading-has-content
-    // eslint-disable-next-line jsx-a11y/heading-has-content
     <h3
       ref={ref}
       className={cn("font-semibold leading-none tracking-tight", className)}
       {...props}
     />
   );
+  /* eslint-enable jsx-a11y/heading-has-content */
 }
 
 interface CardDescriptionProps extends React.HTMLAttributes<HTMLParagraphElement> {

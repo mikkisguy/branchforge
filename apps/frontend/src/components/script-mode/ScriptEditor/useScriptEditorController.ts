@@ -185,13 +185,16 @@ export function useScriptEditorController({
     }
 
     const view = editorViewRef.current;
+    // react-doctor-disable-next-line react-doctor/no-event-handler -- CodeMirror prop→view sync for dynamic scrollToLine
     if (scrollToLine && !hasScrolled.current && view) {
       scrollToLineIfValid(view, scrollToLine);
+      // react-doctor-disable-next-line react-doctor/no-pass-data-to-parent -- highlight scheduling is editor-local, not parent data
       scheduleLineHighlight(view, scrollToLine);
     }
   }, [scrollToLine, scrollToLineIfValid, scheduleLineHighlight]);
 
   // Cleanup highlight timeout on unmount
+  // react-doctor-disable-next-line react-doctor/exhaustive-deps -- unmount cleanup with [] reading refs is correct
   useEffect(() => {
     return () => {
       clearTimeout(highlightTimeoutRef.current);

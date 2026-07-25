@@ -3,7 +3,7 @@ import type { ThemePalette } from "@/contexts/ThemeContext";
 import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 import type { Tab } from "./settings-types";
 import type { ThemePaletteOption } from "./ThemeSwitcher";
-import { SettingsModal } from "./SettingsModal";
+import { SettingsModal } from "./SettingsModal/SettingsModal";
 import { ProjectSettingsDialog } from "@/components/ProjectSettingsDialog";
 import { GitLabImportDialog } from "./GitLabImportDialog/GitLabImportDialog.lazy";
 import { ZipImportProjectDialog } from "./ZipImportProjectDialog/ZipImportProjectDialog.lazy";

@@ -188,6 +188,7 @@ describe("useFocusTrap", () => {
   it("includes links, inputs, textareas, and selects as focusable", () => {
     render(
       <TrapTestComponent>
+        {/* react-doctor-disable-next-line react-doctor/anchor-ambiguous-text */}
         <a href="#test">Link</a>
       </TrapTestComponent>
     );

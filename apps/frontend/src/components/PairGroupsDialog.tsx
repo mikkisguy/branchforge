@@ -44,6 +44,7 @@ interface PairGroupsDialogProps {
 // Component
 // ============================================================================
 
+// react-doctor-disable-next-line react-doctor/prefer-useReducer -- local UI mode flags, not a reducer candidate
 export function PairGroupsDialog({
   open,
   onOpenChange,

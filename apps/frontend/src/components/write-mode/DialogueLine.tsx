@@ -76,8 +76,8 @@ export const DialogueLine = memo(function DialogueLine({
       previousTextRef.current = entry.text;
       resizeTextarea();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // react-doctor-disable-next-line react-doctor/exhaustive-deps -- mount-only initial textarea sync; intentional empty deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const ta = internalTextareaRef.current;
@@ -94,6 +94,7 @@ export const DialogueLine = memo(function DialogueLine({
     }
   }, [entry.id, entry.text, resizeTextarea]);
 
+  // react-doctor-disable-next-line react-doctor/advanced-event-handler-refs -- resizeTextarea is transitively stable via refs
   useEffect(() => {
     window.addEventListener("resize", resizeTextarea);
     return () => window.removeEventListener("resize", resizeTextarea);
@@ -107,6 +108,7 @@ export const DialogueLine = memo(function DialogueLine({
     return () => ro.disconnect();
   }, [resizeTextarea]);
 
+  // react-doctor-disable-next-line react-doctor/exhaustive-deps -- unmount cleanup reading ref.current is correct
   useEffect(() => {
     return () => {
       if (removeHintTimerRef.current) clearTimeout(removeHintTimerRef.current);
@@ -191,6 +193,7 @@ export const DialogueLine = memo(function DialogueLine({
     characters,
   ]);
 
+  // react-doctor-disable-next-line react-doctor/advanced-event-handler-refs -- updateDropdownDirection transitively stable
   useEffect(() => {
     if (!isDropdownOpen) return;
     const scrollArea = dropdownRef.current?.closest(
@@ -209,6 +212,7 @@ export const DialogueLine = memo(function DialogueLine({
   }, [isDropdownOpen, updateDropdownDirection]);
 
   useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-event-handler -- focus option scroll is UI sync for keyboard nav, not a fake event handler
     if (isDropdownOpen && focusedOptionIndex >= 0) {
       const opt = document.getElementById(
         `${dropdownId}-option-${focusedOptionIndex}`

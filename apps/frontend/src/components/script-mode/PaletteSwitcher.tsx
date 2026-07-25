@@ -264,55 +264,58 @@ export function PaletteSwitcher({
             className={`absolute z-50 ${dropdownPositionClasses} bg-popover border border-border/70 rounded-lg shadow-xl shadow-black/25 ring-1 ring-white/5 overflow-hidden min-w-[200px] animate-in fade-in-0 zoom-in-95 duration-150`}
             onKeyDown={handleKeyDown}
           >
-            {Object.entries(groupedPalettes).map(([groupName, palettes]) => (
-              <div key={groupName} role="group" aria-label={groupName}>
-                <div
-                  className="px-3 py-1 text-xs font-semibold text-muted-foreground bg-muted/30"
-                  aria-hidden="true"
-                >
-                  {groupName}
-                </div>
-                {/* eslint-disable jsx-a11y/click-events-have-key-events -- Listbox handles keyboard navigation via aria-activedescendant */}
-                {palettes.map((palette) => {
-                  const flatIdx = flatItems.findIndex(
-                    (item) => item.originalIndex === palette.originalIndex
-                  );
-                  return (
-                    // Keyboard navigation is handled at listbox level via onKeyDown
-                    // react-doctor-disable-next-line react-doctor/click-events-have-key-events, react-doctor/prefer-tag-over-role -- Parent listbox handles keys via aria-activedescendant; option role is required for listbox pattern
-                    <div
-                      key={palette.originalIndex}
-                      id={`palette-option-${flatIdx}`}
-                      role="option"
-                      aria-selected={palette.originalIndex === selectedIndex}
-                      onClick={() => {
-                        closeReasonRef.current = "mouse";
-                        handleSelect(palette.originalIndex);
-                      }}
-                      tabIndex={-1}
-                      className={`w-full px-3 py-2 text-left text-xs font-code hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2 cursor-pointer ${
-                        palette.originalIndex === selectedIndex
-                          ? "bg-accent/50"
-                          : ""
-                      } ${
-                        isKeyboardNav && flatIdx === currentFocusedIndex
-                          ? "outline outline-2 outline-offset-[-2px]"
-                          : ""
-                      }`}
-                    >
-                      <span
-                        className="size-3 rounded-full flex-shrink-0"
-                        style={{
-                          backgroundColor: palette.indicator,
+            {Object.entries(groupedPalettes).map(([groupName, palettes]) => {
+              return (
+                // react-doctor-disable-next-line react-doctor/prefer-tag-over-role -- address suggestion is nonsense; group is correct for listbox groups
+                <div key={groupName} role="group" aria-label={groupName}>
+                  <div
+                    className="px-3 py-1 text-xs font-semibold text-muted-foreground bg-muted/30"
+                    aria-hidden="true"
+                  >
+                    {groupName}
+                  </div>
+                  {/* eslint-disable jsx-a11y/click-events-have-key-events -- Listbox handles keyboard navigation via aria-activedescendant */}
+                  {palettes.map((palette) => {
+                    const flatIdx = flatItems.findIndex(
+                      (item) => item.originalIndex === palette.originalIndex
+                    );
+                    return (
+                      // Keyboard navigation is handled at listbox level via onKeyDown
+                      // react-doctor-disable-next-line react-doctor/click-events-have-key-events, react-doctor/prefer-tag-over-role -- Parent listbox handles keys via aria-activedescendant; option role is required for listbox pattern
+                      <div
+                        key={palette.originalIndex}
+                        id={`palette-option-${flatIdx}`}
+                        role="option"
+                        aria-selected={palette.originalIndex === selectedIndex}
+                        onClick={() => {
+                          closeReasonRef.current = "mouse";
+                          handleSelect(palette.originalIndex);
                         }}
-                      />
-                      <span className="truncate">{palette.name}</span>
-                    </div>
-                  );
-                })}
-                {/* eslint-enable jsx-a11y/click-events-have-key-events */}
-              </div>
-            ))}
+                        tabIndex={-1}
+                        className={`w-full px-3 py-2 text-left text-xs font-code hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2 cursor-pointer ${
+                          palette.originalIndex === selectedIndex
+                            ? "bg-accent/50"
+                            : ""
+                        } ${
+                          isKeyboardNav && flatIdx === currentFocusedIndex
+                            ? "outline outline-2 outline-offset-[-2px]"
+                            : ""
+                        }`}
+                      >
+                        <span
+                          className="size-3 rounded-full flex-shrink-0"
+                          style={{
+                            backgroundColor: palette.indicator,
+                          }}
+                        />
+                        <span className="truncate">{palette.name}</span>
+                      </div>
+                    );
+                  })}
+                  {/* eslint-enable jsx-a11y/click-events-have-key-events */}
+                </div>
+              );
+            })}
           </div>
         </>
       )}

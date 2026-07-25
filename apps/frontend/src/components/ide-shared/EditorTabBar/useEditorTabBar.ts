@@ -121,10 +121,15 @@ export function useEditorTabBar({
     setShowRightScrollIndicator(hasOverflow && canScrollRight);
   }, []);
 
+  // Reset interaction/UI indicators when the tab bar hides (cannot interact with a hidden dropdown).
+  // react-doctor-disable-next-line react-doctor/no-cascading-set-state
   useEffect(() => {
     if (hidden) {
+      // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change
       setShowLeftScrollIndicator(false);
+      // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change
       setShowRightScrollIndicator(false);
+      // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change
       setMobileDropdownOpen(false);
       return;
     }
