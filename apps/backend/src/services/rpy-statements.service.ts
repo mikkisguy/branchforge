@@ -55,8 +55,11 @@ export interface DetectedDefaultStatement {
  */
 export interface RpySymbolExtraction {
   /** Content with managed `define <tag> = Character(...)` and
-   *  `default <key> = <value>` lines removed (non-managed content is
-   *  preserved verbatim, including blank lines and indentation). */
+   *  `default <key> = <value>` lines removed. When anything was
+   *  stripped, a single `# [BranchForge] ...` notice is placed on
+   *  the absolute first line, followed by one blank line
+   *  (idempotent across re-imports). Other
+   *  content is preserved verbatim. */
   cleanedContent: string;
   /** Unique characters detected across the file (first occurrence
    *  wins, in source order). */
@@ -121,6 +124,11 @@ export function computeCommonDirectoryPrefix(filePaths: string[]): string {
  * - Recognises single-line `default <key> = <value>` statements.
  * - Leaves everything else (labels, dialogue, comments, blank lines)
  *   untouched.
+ * - If any managed statement was stripped, prepends a single
+ *   `# [BranchForge] ...` notice as the absolute first line,
+ *   followed by one blank line.
+ * - Drops prior BranchForge import notices so re-import stays
+ *   idempotent (never stacks duplicates).
  * - De-duplicates results by `tag` / `key` (first occurrence wins).
  *
  * The function is intentionally permissive: it does not filter by
@@ -139,15 +147,19 @@ export function extractAndStripRpySymbols(
   const charactersByTag = new Map<string, DetectedCharacterStatement>();
   const variablesByKey = new Map<string, DetectedDefaultStatement>();
   const statsByKey = new Map<string, DetectedDefaultStatement>();
+  let strippedSomething = false;
 
   let i = 0;
   while (i < lines.length) {
     const line = lines[i];
     const trimmed = line.trim();
 
-    // Skip empty lines and comments — preserve them in the output.
+    // Skip empty lines and comments — preserve them in the output,
+    // except prior BranchForge import notices (replaced below if needed).
     if (trimmed === "" || trimmed.startsWith("#")) {
-      output.push(line);
+      if (!isBranchForgeImportNotice(trimmed)) {
+        output.push(line);
+      }
       i += 1;
       continue;
     }
@@ -191,6 +203,7 @@ export function extractAndStripRpySymbols(
       if (character && !charactersByTag.has(character.tag)) {
         charactersByTag.set(character.tag, character);
       }
+      strippedSomething = true;
       // Skip past the consumed lines (j may equal i for single-line).
       i = j + 1;
       continue;
@@ -226,6 +239,7 @@ export function extractAndStripRpySymbols(
       if (!bucket.has(key)) {
         bucket.set(key, detected);
       }
+      strippedSomething = true;
       i += 1;
       continue;
     }
@@ -237,12 +251,40 @@ export function extractAndStripRpySymbols(
     i += 1;
   }
 
+  if (strippedSomething) {
+    // Exactly one blank line after the notice. Collapse any leading
+    // blanks left from a prior import (notice + blank) so re-import
+    // does not stack empty lines.
+    while (output.length > 0 && output[0].trim() === "") {
+      output.shift();
+    }
+    output.unshift(BRANCHFORGE_MANAGED_NOTICE, "");
+  }
+
   return {
     cleanedContent: output.join("\n"),
     characters: Array.from(charactersByTag.values()),
     variables: Array.from(variablesByKey.values()),
     stats: Array.from(statsByKey.values()),
   };
+}
+
+/** Single top-of-file notice when managed symbols were stripped. */
+export const BRANCHFORGE_MANAGED_NOTICE =
+  "# [BranchForge] Managed Character()/default statements were moved to Characters, Variables, and Stats (exported as branchforge_*.rpy).";
+
+/**
+ * True for BranchForge import notices we own — the current top-of-file
+ * notice and legacy per-symbol breadcrumbs from an earlier experiment.
+ */
+function isBranchForgeImportNotice(trimmed: string): boolean {
+  if (trimmed === BRANCHFORGE_MANAGED_NOTICE) return true;
+  if (trimmed.startsWith("# [BranchForge] Managed Character()/default")) {
+    return true;
+  }
+  return /^# \[BranchForge\] (Character|Variable|Stat) '.+' moved to /.test(
+    trimmed
+  );
 }
 
 // ============================================================================
