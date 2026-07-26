@@ -358,10 +358,15 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
 
   const previewErrorShownRef = useRef(false);
   useEffect(() => {
-    if (previewQuery.isError && !previewErrorShownRef.current) {
-      previewErrorShownRef.current = true;
-      showErrorToast("Failed to load generated preview", "Preview Error");
+    if (previewQuery.isError) {
+      if (!previewErrorShownRef.current) {
+        previewErrorShownRef.current = true;
+        showErrorToast("Failed to load generated preview", "Preview Error");
+      }
+      return;
     }
+    // Allow a later failure to toast again after recovery.
+    previewErrorShownRef.current = false;
   }, [previewQuery.isError, showErrorToast]);
 
   const activeGeneratedFileId = generatedPreview?.fileName ?? null;

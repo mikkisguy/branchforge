@@ -138,8 +138,8 @@ export function ProjectFileTree({
                 </button>
               );
 
-              return file.isEmpty ? (
-                <Tooltip key={file.fileName} content={file.emptyReason ?? ""}>
+              return file.isEmpty && file.emptyReason ? (
+                <Tooltip key={file.fileName} content={file.emptyReason}>
                   {btn}
                 </Tooltip>
               ) : (

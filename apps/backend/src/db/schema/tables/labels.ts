@@ -110,6 +110,10 @@ export const labels = pgTable(
   (table) => [
     index("labels_duo_pair_id_idx").on(table.duoPairId),
     index("labels_project_file_id_idx").on(table.projectFileId),
+    // Used by getProjectFiles when ordering labels within a file
+    index("labels_project_file_position_idx")
+      .on(table.projectFileId, table.labelPosition)
+      .where(sql`deleted_at IS NULL`),
     // Composite indexes for common query patterns - partial indexes for active (non-deleted) labels
     // Used by listLabels when filtering by route on active labels
     index("labels_project_route_idx")

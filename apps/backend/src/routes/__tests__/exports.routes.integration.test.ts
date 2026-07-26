@@ -388,6 +388,26 @@ describe("Export Routes (Integration)", () => {
       });
     });
 
+    it("should return 429 when rate limited", async () => {
+      vi.spyOn(exportService, "getExportPreview").mockRejectedValue(
+        new RateLimitError(
+          30,
+          "Too many export preview requests. Please try again later."
+        )
+      );
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: `/projects/${testProjectId}/export-preview`,
+      });
+
+      expect(response.statusCode).toBe(429);
+      expect(response.json()).toEqual({
+        error: "Too many requests, please try again later",
+        retryAfter: 30,
+      });
+    });
+
     it("should return 500 on unexpected error", async () => {
       vi.spyOn(exportService, "getExportPreview").mockRejectedValue(
         new Error("Unexpected database failure")

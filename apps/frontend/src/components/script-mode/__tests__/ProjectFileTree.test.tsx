@@ -140,3 +140,21 @@ describe("ProjectFileTree - Generated section", () => {
     ).toHaveAttribute("aria-selected", "false");
   });
 });
+
+it("does not wrap empty generated files without emptyReason in a tooltip", async () => {
+  render(
+    <ProjectFileTree
+      files={[]}
+      onFileSelect={noopFileSelect}
+      onSceneSelect={noopSceneSelect}
+      generatedFiles={[
+        { fileName: "branchforge_stats.rpy", isEmpty: true, emptyReason: null },
+      ]}
+    />
+  );
+
+  await userEvent.click(screen.getByRole("button", { name: /^Generated$/i }));
+  expect(
+    screen.getByRole("treeitem", { name: /branchforge_stats\.rpy/i })
+  ).toBeInTheDocument();
+});

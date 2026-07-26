@@ -167,6 +167,13 @@ async function exportPreviewHandler(
       reply.status(404).send({ error: error.userMessage });
       return;
     }
+    if (error instanceof RateLimitError) {
+      reply.status(429).send({
+        error: error.userMessage,
+        retryAfter: error.retryAfter,
+      });
+      return;
+    }
     reply.status(500).send({ error: "Internal server error" });
   }
 }

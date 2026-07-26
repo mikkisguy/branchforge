@@ -129,7 +129,10 @@ export function computeCommonDirectoryPrefix(filePaths: string[]): string {
  * - If any managed statement was stripped, prepends a single
  *   `# [BranchForge] ...` notice as the absolute first line,
  *   followed by one blank line, replacing any prior BranchForge
- *   import notices (idempotent across re-imports).
+ *   import notices (idempotent across re-imports). Leading blank
+ *   lines in the remaining content are collapsed as part of that
+ *   idempotency (intentional trade-off vs preserving author-leading
+ *   whitespace before the first managed statement).
  * - If nothing managed was stripped, prior BranchForge notices and
  *   all other content are left unchanged.
  * - De-duplicates results by `tag` / `key` (first occurrence wins).
@@ -289,7 +292,7 @@ export function extractAndStripRpySymbols(
 
 /** Single top-of-file notice when managed symbols were stripped. */
 export const BRANCHFORGE_MANAGED_NOTICE =
-  "# [BranchForge] Managed Character()/default statements were moved to Characters, Variables, and Stats (exported as branchforge_*.rpy).";
+  "# [BranchForge] Managed Character()/default statements were moved out of this file (exported as branchforge_*.rpy).";
 
 /**
  * True for BranchForge import notices we own — the current top-of-file
