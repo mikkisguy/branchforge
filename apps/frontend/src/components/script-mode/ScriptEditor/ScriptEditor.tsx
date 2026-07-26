@@ -1,5 +1,12 @@
 import CodeMirror from "@uiw/react-codemirror";
-import { useMemo, useCallback, useImperativeHandle, useEffect } from "react";
+import {
+  useMemo,
+  useCallback,
+  useImperativeHandle,
+  useEffect,
+  useState,
+  useRef,
+} from "react";
 import type React from "react";
 // react-doctor-disable-next-line react-doctor/prefer-dynamic-import
 import { EditorView } from "@codemirror/view";
@@ -16,6 +23,16 @@ import {
   setLabelTitlesEffect,
   type LabelTitleMap,
 } from "@/lib/codemirror/label-title-decoration";
+import {
+  visualPreviewExtension,
+  setVisualPreviewHandlersEffect,
+  type ParsedVisualStatement,
+} from "@/lib/codemirror/visual-preview-decoration";
+import {
+  VisualPreviewModal,
+  type VisualPreviewSelection,
+} from "@/components/project-images/VisualPreviewModal";
+import { useVisualPreviewLookup } from "@/hooks/useVisualPreviewLookup";
 import { useLocalStorageBoolean } from "@/hooks/useLocalStorage";
 import type { SaveStatus } from "@/hooks/useAutosave";
 import { createHighlightExtension } from "./ScriptEditorHighlight";
@@ -39,9 +56,11 @@ interface ScriptEditorProps {
   /** Controlled line wrap mode. When provided, overrides internal state. */
   lineWrap?: boolean;
   onLineWrapChange?: (wrap: boolean) => void;
-  /** Controlled label titles visibility. When provided, overrides internal state. */
-  showLabelTitles?: boolean;
-  onShowLabelTitlesChange?: (show: boolean) => void;
+  /** Controlled overlays visibility (label titles + image hover previews). When provided, overrides internal state. */
+  showOverlays?: boolean;
+  onShowOverlaysChange?: (show: boolean) => void;
+  /** Project ID for visual statement preview images */
+  projectId?: string | null;
 }
 
 export const ScriptEditor = function ScriptEditor({
@@ -56,8 +75,9 @@ export const ScriptEditor = function ScriptEditor({
   labelTitles,
   lineWrap: propsLineWrap,
   onLineWrapChange,
-  showLabelTitles: propsShowLabelTitles,
-  onShowLabelTitlesChange,
+  showOverlays: propsShowOverlays,
+  onShowOverlaysChange,
+  projectId,
   ref,
 }: ScriptEditorProps & { ref?: React.Ref<ScriptEditorRef> }) {
   const [internalLineWrap, setInternalLineWrap] = useLocalStorageBoolean(
@@ -73,27 +93,86 @@ export const ScriptEditor = function ScriptEditor({
 
   const cleanContent = useMemo(() => stripBOM(content), [content]);
 
-  const [internalShowLabelTitles, setInternalShowLabelTitles] =
+  const [internalShowOverlays, setInternalShowOverlays] =
     useLocalStorageBoolean("script:show-label-titles", true);
-  const showLabelTitles = propsShowLabelTitles ?? internalShowLabelTitles;
-  const setShowLabelTitles =
-    onShowLabelTitlesChange ?? setInternalShowLabelTitles;
+  const showOverlays = propsShowOverlays ?? internalShowOverlays;
+  const setShowOverlays = onShowOverlaysChange ?? setInternalShowOverlays;
 
-  // Create the highlight extension (only once)
+  const [previewSelection, setPreviewSelection] =
+    useState<VisualPreviewSelection | null>(null);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+
+  const { getImageForTarget } = useVisualPreviewLookup(projectId, {
+    enabled: !!projectId,
+  });
+
+  const openVisualPreview = useCallback((parsed: ParsedVisualStatement) => {
+    setPreviewSelection({
+      statementType: parsed.type,
+      target: parsed.target,
+    });
+    setIsPreviewModalOpen(true);
+  }, []);
+
+  // Keep latest handlers in refs so we can dispatch them on editor create
+  // (useEffect often runs while the lazy ScriptEditor fallback is still showing).
+  const getImageForTargetRef = useRef(getImageForTarget);
+  const openVisualPreviewRef = useRef(openVisualPreview);
+  const hoverPreviewsEnabledRef = useRef(showOverlays);
+  useEffect(() => {
+    getImageForTargetRef.current = getImageForTarget;
+  });
+  useEffect(() => {
+    openVisualPreviewRef.current = openVisualPreview;
+  });
+  useEffect(() => {
+    hoverPreviewsEnabledRef.current = showOverlays;
+  });
+
   const { highlightStateField, setHighlightEffect } = useMemo(
     () => createHighlightExtension(),
     []
   );
 
-  // Editor controller (scroll, highlight, font-size listener)
   const { editorViewRef, handleCreateEditor } = useScriptEditorController({
     scrollToLine,
     labelTitles,
-    showLabelTitles,
+    showOverlays,
     setHighlightEffect,
   });
 
-  // Expose focus method to parent via ref
+  const dispatchVisualPreviewHandlers = useCallback(
+    (view: EditorView) => {
+      if (!projectId) {
+        return;
+      }
+
+      view.dispatch({
+        effects: [
+          setVisualPreviewHandlersEffect.of({
+            getImageForTarget: (target) => {
+              const image = getImageForTargetRef.current(target);
+              return image ? { tooltipUrl: image.tooltipUrl } : undefined;
+            },
+            onOpenPreview: (parsed) => {
+              openVisualPreviewRef.current(parsed);
+            },
+            hoverPreviewsEnabled: hoverPreviewsEnabledRef.current,
+          }),
+        ],
+      });
+    },
+    [projectId]
+  );
+
+  const handleCreateEditorWithPreviews = useCallback(
+    (view: EditorView) => {
+      handleCreateEditor(view);
+      dispatchVisualPreviewHandlers(view);
+    },
+    [handleCreateEditor, dispatchVisualPreviewHandlers]
+  );
+
   useImperativeHandle(
     ref,
     () => ({
@@ -122,27 +201,38 @@ export const ScriptEditor = function ScriptEditor({
         updateListener,
         highlightStateField,
         labelTitleExtension,
-        // Explicitly add search extension with default configuration
+        projectId ? visualPreviewExtension : [],
         search({}),
-        // Highlight matches of the current selection
         highlightSelectionMatches(),
       ].flat(),
-    [lineWrapExtension, updateListener, highlightStateField]
+    [lineWrapExtension, updateListener, highlightStateField, projectId]
   );
 
-  // Dispatch label title updates when the map changes or visibility toggles
   useEffect(() => {
     const view = editorViewRef.current;
     if (view) {
       view.dispatch({
         effects: [
           setLabelTitlesEffect.of(
-            showLabelTitles && labelTitles ? labelTitles : new Map()
+            showOverlays && labelTitles ? labelTitles : new Map()
           ),
         ],
       });
     }
-  }, [editorViewRef, labelTitles, showLabelTitles]);
+  }, [editorViewRef, labelTitles, showOverlays]);
+
+  useEffect(() => {
+    const view = editorViewRef.current;
+    if (!view) {
+      return;
+    }
+    dispatchVisualPreviewHandlers(view);
+  }, [
+    editorViewRef,
+    dispatchVisualPreviewHandlers,
+    getImageForTarget,
+    showOverlays,
+  ]);
 
   return (
     <div className="h-full w-full overflow-hidden min-h-0 min-w-0 flex flex-col">
@@ -154,7 +244,7 @@ export const ScriptEditor = function ScriptEditor({
           editable={!readOnly}
           extensions={extensions}
           onChange={onChange}
-          onCreateEditor={handleCreateEditor}
+          onCreateEditor={handleCreateEditorWithPreviews}
           basicSetup={{
             lineNumbers: true,
             highlightActiveLine: true,
@@ -163,7 +253,6 @@ export const ScriptEditor = function ScriptEditor({
             bracketMatching: true,
             closeBrackets: true,
             autocompletion: false,
-            // searchKeymap is removed since we add search extension explicitly
           }}
         />
       </div>
@@ -171,14 +260,20 @@ export const ScriptEditor = function ScriptEditor({
         isFocusMode={isFocusMode}
         lineWrap={lineWrap}
         toggleLineWrap={toggleLineWrap}
-        showLabelTitles={showLabelTitles}
-        setShowLabelTitles={setShowLabelTitles}
+        showOverlays={showOverlays}
+        setShowOverlays={setShowOverlays}
         saveStatus={saveStatus}
         saveConflict={saveConflict}
         onSaveRequest={onSaveRequest}
         cursorPosition={cursorPosition}
         selectionInfo={selectionInfo}
         totalLines={totalLines}
+      />
+      <VisualPreviewModal
+        open={isPreviewModalOpen}
+        onOpenChange={setIsPreviewModalOpen}
+        projectId={projectId}
+        selection={previewSelection}
       />
     </div>
   );

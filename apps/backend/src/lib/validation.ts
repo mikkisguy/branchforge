@@ -18,6 +18,7 @@ export * from "./validation/stats.js";
 export * from "./validation/pair-groups.js";
 export * from "./validation/characters.js";
 export * from "./validation/world-elements.js";
+export * from "./validation/project-images.js";
 export * from "./validation/gitlab.js";
 export * from "./validation/export-import.js";
 export * from "./validation/user-settings.js";

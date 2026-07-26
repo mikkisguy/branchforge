@@ -10,8 +10,8 @@ interface ScriptEditorToolbarProps {
   isFocusMode: boolean;
   lineWrap: boolean;
   toggleLineWrap: () => void;
-  showLabelTitles: boolean;
-  setShowLabelTitles: (show: boolean) => void;
+  showOverlays: boolean;
+  setShowOverlays: (show: boolean) => void;
   saveStatus?: SaveStatus;
   saveConflict?: boolean;
   onSaveRequest?: () => void;
@@ -24,8 +24,8 @@ export function ScriptEditorToolbar({
   isFocusMode,
   lineWrap,
   toggleLineWrap,
-  showLabelTitles,
-  setShowLabelTitles,
+  showOverlays,
+  setShowOverlays,
   saveStatus,
   saveConflict,
   onSaveRequest,
@@ -52,21 +52,25 @@ export function ScriptEditorToolbar({
         <PaletteSwitcher />
         <button
           type="button"
-          onClick={() => setShowLabelTitles(!showLabelTitles)}
-          aria-pressed={showLabelTitles}
+          onClick={() => setShowOverlays(!showOverlays)}
+          aria-pressed={showOverlays}
           className={`px-3 py-1.5 text-xs font-code border rounded flex items-center gap-2 transition-colors ${
-            showLabelTitles
+            showOverlays
               ? "bg-accent/50 hover:bg-accent border-border"
               : "bg-muted/50 hover:bg-muted border-border"
           }`}
-          title={showLabelTitles ? "Hide label titles" : "Show label titles"}
+          title={
+            showOverlays
+              ? "Hide overlays (label titles + image hover previews)"
+              : "Show overlays (label titles + image hover previews)"
+          }
         >
-          {showLabelTitles ? (
+          {showOverlays ? (
             <Eye className="size-3" />
           ) : (
             <EyeOff className="size-3" />
           )}
-          <span>Titles: {showLabelTitles ? "On" : "Off"}</span>
+          <span>Overlays: {showOverlays ? "On" : "Off"}</span>
         </button>
       </div>
       <div className="flex items-center gap-3">

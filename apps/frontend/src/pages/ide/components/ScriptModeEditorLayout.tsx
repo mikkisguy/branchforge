@@ -250,7 +250,7 @@ export function ScriptModeEditorLayout({
     [isMobile, setStoredLineWrap]
   );
 
-  const [showLabelTitles, setShowLabelTitles] = useLocalStorageBoolean(
+  const [showOverlays, setShowOverlays] = useLocalStorageBoolean(
     "script:show-label-titles",
     true
   );
@@ -450,8 +450,9 @@ export function ScriptModeEditorLayout({
                       labelTitles={labelTitles}
                       lineWrap={lineWrap}
                       onLineWrapChange={handleLineWrapChange}
-                      showLabelTitles={showLabelTitles}
-                      onShowLabelTitlesChange={setShowLabelTitles}
+                      showOverlays={showOverlays}
+                      onShowOverlaysChange={setShowOverlays}
+                      projectId={projectId}
                     />
                   </div>
                 </>
@@ -468,8 +469,9 @@ export function ScriptModeEditorLayout({
                   labelTitles={labelTitles}
                   lineWrap={lineWrap}
                   onLineWrapChange={handleLineWrapChange}
-                  showLabelTitles={showLabelTitles}
-                  onShowLabelTitlesChange={setShowLabelTitles}
+                  showOverlays={showOverlays}
+                  onShowOverlaysChange={setShowOverlays}
+                  projectId={projectId}
                 />
               ) : activeLabel ? (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
@@ -559,15 +561,15 @@ export function ScriptModeEditorLayout({
         />
         <FABToggle
           icon={
-            showLabelTitles ? (
+            showOverlays ? (
               <Eye className="size-4" />
             ) : (
               <EyeOff className="size-4" />
             )
           }
-          label="Show Titles"
-          active={showLabelTitles}
-          onClick={() => setShowLabelTitles((v) => !v)}
+          label="Show Overlays"
+          active={showOverlays}
+          onClick={() => setShowOverlays((v) => !v)}
         />
         <div className="h-px bg-border/30 my-1" />
         <FABFocusButton

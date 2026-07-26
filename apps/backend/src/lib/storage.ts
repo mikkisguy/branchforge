@@ -12,8 +12,10 @@ import { randomUUID } from "node:crypto";
 
 export const UPLOADS_DIR = "uploads";
 export const AVATAR_SUBDIR = "avatars";
+export const PROJECT_IMAGE_SUBDIR = "project-images";
 
 export const AVATAR_UPLOAD_DIR = `${UPLOADS_DIR}/${AVATAR_SUBDIR}`;
+export const PROJECT_IMAGE_UPLOAD_DIR = `${UPLOADS_DIR}/${PROJECT_IMAGE_SUBDIR}`;
 export const AVATAR_MAX_WIDTH = 200;
 export const AVATAR_WEBP_QUALITY = 85;
 
@@ -123,6 +125,148 @@ export function getAvatarFullPath(filename: string): string {
     !fullPath.startsWith(normalizedUploadsPath)
   ) {
     throw new AvatarFilenameError(
+      "Resolved path escapes the uploads directory"
+    );
+  }
+
+  return fullPath;
+}
+
+/**
+ * Project image filename validation error
+ */
+export class ProjectImageFilenameError extends Error {
+  constructor(message: string) {
+    super(`Invalid project image filename: ${message}`);
+    this.name = "ProjectImageFilenameError";
+  }
+}
+
+const PROJECT_ID_UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * Validate a project UUID used as an on-disk subdirectory under project-images/.
+ */
+export function validateProjectImageProjectId(projectId: string): string {
+  if (!projectId || typeof projectId !== "string") {
+    throw new ProjectImageFilenameError(
+      "Project ID must be a non-empty string"
+    );
+  }
+
+  if (!PROJECT_ID_UUID_PATTERN.test(projectId)) {
+    throw new ProjectImageFilenameError("Project ID must be a valid UUID");
+  }
+
+  return projectId.toLowerCase();
+}
+
+/**
+ * Validate and sanitize a project image filename to prevent path traversal attacks.
+ */
+export function validateProjectImageFilename(filename: string): string {
+  if (!filename || typeof filename !== "string") {
+    throw new ProjectImageFilenameError("Filename must be a non-empty string");
+  }
+
+  const MAX_FILENAME_LENGTH = 255;
+  if (filename.length > MAX_FILENAME_LENGTH) {
+    throw new ProjectImageFilenameError(
+      `Filename cannot exceed ${MAX_FILENAME_LENGTH} characters`
+    );
+  }
+
+  const sanitized = path.basename(filename);
+
+  if (filename !== sanitized) {
+    throw new ProjectImageFilenameError(
+      "Filename cannot contain path separators"
+    );
+  }
+
+  const validPattern = /^[a-zA-Z0-9._-]+$/;
+  if (!validPattern.test(sanitized)) {
+    throw new ProjectImageFilenameError(
+      "Filename contains invalid characters. Only alphanumeric, dot, dash, and underscore are allowed"
+    );
+  }
+
+  if (sanitized.startsWith(".")) {
+    throw new ProjectImageFilenameError("Filename cannot start with a dot");
+  }
+
+  return sanitized;
+}
+
+/**
+ * Ensure the project-images root directory exists.
+ * When `projectId` is provided, also ensure that project's subdirectory exists.
+ */
+export async function ensureProjectImageDir(projectId?: string): Promise<void> {
+  const rootDir = path.join(getUploadsDirPath(), PROJECT_IMAGE_SUBDIR);
+  if (projectId === undefined) {
+    await fs.mkdir(rootDir, { recursive: true });
+    return;
+  }
+
+  const sanitizedProjectId = validateProjectImageProjectId(projectId);
+  await fs.mkdir(path.join(rootDir, sanitizedProjectId), { recursive: true });
+}
+
+export function generateProjectImageFilename(
+  variant: "tooltip" | "modal",
+  extension: string
+): string {
+  const ext = extension.startsWith(".") ? extension : `.${extension}`;
+  return `${randomUUID()}_${variant}${ext}`;
+}
+
+/**
+ * Get the project image URL path for client access.
+ * Shape: `{basePath}/uploads/project-images/<projectId>/<filename>`
+ */
+export function getProjectImagePath(
+  projectId: string,
+  filename: string,
+  basePath = "/"
+): string {
+  const sanitizedProjectId = validateProjectImageProjectId(projectId);
+  const sanitized = validateProjectImageFilename(filename);
+
+  const cleanBasePath = basePath.endsWith("/")
+    ? basePath.slice(0, -1)
+    : basePath;
+  return `${cleanBasePath}/${PROJECT_IMAGE_UPLOAD_DIR}/${sanitizedProjectId}/${sanitized}`;
+}
+
+/**
+ * Get the absolute filesystem path for a project image file.
+ * Shape: `.../uploads/project-images/<projectId>/<filename>`
+ */
+export function getProjectImageFullPath(
+  projectId: string,
+  filename: string
+): string {
+  const sanitizedProjectId = validateProjectImageProjectId(projectId);
+  const sanitized = validateProjectImageFilename(filename);
+
+  const projectDirPath = path.join(
+    getUploadsDirPath(),
+    PROJECT_IMAGE_SUBDIR,
+    sanitizedProjectId
+  );
+  const fullPath = path.resolve(projectDirPath, sanitized);
+
+  const normalizedProjectDir = projectDirPath.endsWith(path.sep)
+    ? projectDirPath
+    : projectDirPath + path.sep;
+
+  if (
+    fullPath !== projectDirPath &&
+    !fullPath.startsWith(normalizedProjectDir)
+  ) {
+    throw new ProjectImageFilenameError(
       "Resolved path escapes the uploads directory"
     );
   }

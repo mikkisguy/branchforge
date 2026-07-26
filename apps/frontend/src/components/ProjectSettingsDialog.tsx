@@ -24,6 +24,7 @@ import {
   Route as RouteIcon,
   Wand2,
   BookText,
+  Images,
   X,
 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -34,6 +35,7 @@ import { useDirtyDialogWarning } from "@/hooks/useDirtyDialogWarning";
 import { CharacterSettingsContent } from "@/components/characters/CharacterSettingsContent";
 import { RouteSettingsContent } from "@/components/routes/RouteSettingsContent";
 import { VisualSystemFormContent } from "@/components/visual-system/VisualSystemDialog";
+import { ProjectImagesSettingsContent } from "@/components/project-images/ProjectImagesSettingsContent";
 import { WorldElementsSettingsContent } from "@/components/world-elements/WorldElementsSettingsContent";
 import { useVisualSystem } from "@/hooks/useVisualSystem";
 import { parseGroupPrefixes } from "@/components/visual-system/visual-system.helpers";
@@ -51,7 +53,8 @@ export interface ProjectSettingsDialogProps {
   defaultTab?: SettingsTab;
 }
 
-export type SettingsTab = "characters" | "routes" | "visual" | "world";
+export type SettingsTab =
+  "characters" | "routes" | "visual" | "world" | "images";
 
 // ============================================================================
 // Helpers
@@ -61,6 +64,7 @@ const TAB_LABELS: Record<SettingsTab, string> = {
   characters: "Characters",
   routes: "Routes",
   world: "World Bible",
+  images: "Images",
   visual: "Visual System",
 };
 
@@ -71,10 +75,17 @@ const TAB_ICONS: Record<
   characters: Users,
   routes: RouteIcon,
   world: BookText,
+  images: Images,
   visual: Wand2,
 };
 
-const TAB_ORDER: SettingsTab[] = ["characters", "routes", "world", "visual"];
+const TAB_ORDER: SettingsTab[] = [
+  "characters",
+  "routes",
+  "world",
+  "images",
+  "visual",
+];
 
 // ============================================================================
 // Component
@@ -140,8 +151,8 @@ export function ProjectSettingsDialog({
             <div>
               <h2 className="text-lg font-medium">Project Settings</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Configure characters, routes, visual system, and world bible
-                elements.
+                Configure characters, routes, preview images, visual system, and
+                world bible elements.
               </p>
             </div>
             <button
@@ -187,6 +198,9 @@ export function ProjectSettingsDialog({
               </TabsPanel>
               <TabsPanel value="world" className="space-y-4">
                 <WorldElementsSettingsContent projectId={projectId} />
+              </TabsPanel>
+              <TabsPanel value="images" className="space-y-4">
+                <ProjectImagesSettingsContent projectId={projectId} />
               </TabsPanel>
               <TabsPanel value="visual" className="space-y-4">
                 <VisualSystemTabContent
