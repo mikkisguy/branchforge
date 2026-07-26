@@ -39,12 +39,11 @@ export interface CharacterPatternMatch {
  *
  * Field explanations:
  * - tag: The dialogue tag used in RPY files (e.g., "s" for `s "Hello!"`)
- * - name: The raw name as it appeared in the source Character() call,
- *   preserved for reference and possible future round-tripping. The
- *   current BranchForge RPY export emits `displayName`, not `name`, so
- *   do not rely on `name` for export fidelity yet.
+ * - name: The raw name as it appeared in the source Character() call.
+ *   Consumed by RPY export together with `nameType` as the first
+ *   argument to `Character(...)`.
  * - displayName: The human-readable name suggested for use in BranchForge
- *   UI (and emitted by the current RPY export). Tags stripped
+ *   UI only (Writer Mode, character lists). Tags stripped
  *   (e.g., "{color=...}Stranger{/color}" → "Stranger"), variable names
  *   preserved as-is. Empty when the source is `None`/`""`; callers
  *   should derive a fallback (the tag, or `"(unnamed)"`) for display.

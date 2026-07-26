@@ -21,11 +21,13 @@ import {
   generateVariablesFile,
   generateStatsFile,
   generateCharacterDefinitionsFile,
+  normalizeCharacterNameType,
 } from "../rpy-generator.service.js";
 import {
   computeCommonDirectoryPrefix,
   extractAndStripRpySymbols,
 } from "../rpy-statements.service.js";
+
 import type { SyncOperation } from "../gitlab.types.js";
 import {
   createSyncOperation,
@@ -154,9 +156,11 @@ export async function exportToGitlab(
         db
           .select({
             renpyTag: characters.renpyTag,
-            displayName: characters.displayName,
+            name: characters.name,
+            nameType: characters.nameType,
             color: characters.color,
             isNarrator: characters.isNarrator,
+            displayName: characters.displayName,
           })
           .from(characters)
           .where(eq(characters.projectId, projectId)),
@@ -182,7 +186,12 @@ export async function exportToGitlab(
     if (projectCharacters.length > 0) {
       filesToExport.push({
         filePath: `${fileDirPrefix}branchforge_definitions.rpy`,
-        content: generateCharacterDefinitionsFile(projectCharacters),
+        content: generateCharacterDefinitionsFile(
+          projectCharacters.map((c) => ({
+            ...c,
+            nameType: normalizeCharacterNameType(c.nameType),
+          }))
+        ),
       });
     }
 

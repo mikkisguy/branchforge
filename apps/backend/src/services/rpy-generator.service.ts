@@ -7,6 +7,8 @@
 
 import {
   RENPY_LABEL_REGEX,
+  isValidCharacterNameType,
+  type CharacterNameType,
   type VariableCondition,
   type StatCondition,
 } from "@branchforge/shared";
@@ -26,6 +28,11 @@ const RENPY_IDENTIFIER_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const RENPY_HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
 
 /**
+ * Safe unquoted Character() name argument (allows dotted attrs like store.e_name).
+ */
+const VARIABLE_SAFE_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_.]*$/;
+
+/**
  * Type guard to validate a Ren'Py identifier
  * Checks that the name is safe to use in generated RPY code
  *
@@ -34,6 +41,24 @@ const RENPY_HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
  */
 export function isValidRenpyIdentifier(name: string): boolean {
   return RENPY_IDENTIFIER_REGEX.test(name);
+}
+
+/**
+ * Whether a character name is safe to emit as an unquoted Ren'Py variable
+ * reference in `Character(name, ...)`.
+ */
+export function isVariableSafeIdentifier(name: string): boolean {
+  return VARIABLE_SAFE_IDENTIFIER.test(name);
+}
+
+/**
+ * Coerce a stored/raw nameType to a valid CharacterNameType, defaulting
+ * invalid values to `"literal"`.
+ */
+export function normalizeCharacterNameType(
+  nameType: string
+): CharacterNameType {
+  return isValidCharacterNameType(nameType) ? nameType : "literal";
 }
 
 /**
@@ -644,17 +669,18 @@ export function generateStatsFile(
 
 /**
  * Generate a Ren'Py character definitions file
- * Creates branchforge_definitions.rpy with `define` statements from character records
  *
- * @param characters - Array of character objects with renpyTag, displayName, color
- * @returns Complete RPY file content
+ * @param characters - Array of character configurations
+ * @returns A complete Ren'Py definitions file as a string
  */
 export function generateCharacterDefinitionsFile(
   characters: Array<{
     renpyTag: string;
-    displayName: string;
+    name: string | null;
+    nameType: CharacterNameType;
     color: string;
     isNarrator?: boolean;
+    displayName?: string; // warn/logs only — NEVER the Character() arg
   }>
 ): string {
   const lines: string[] = [];
@@ -675,20 +701,56 @@ export function generateCharacterDefinitionsFile(
   for (const char of characters) {
     if (!isValidRenpyIdentifier(char.renpyTag)) {
       console.warn(
-        `Skipping character: invalid renpyTag ${JSON.stringify(char.renpyTag)} (display name: ${JSON.stringify(char.displayName)})`
+        `Skipping character: invalid renpyTag ${JSON.stringify(char.renpyTag)} (name: ${JSON.stringify(char.name)}${char.displayName !== undefined ? `, display name: ${JSON.stringify(char.displayName)}` : ""})`
       );
       continue;
     }
     if (!RENPY_HEX_COLOR_REGEX.test(char.color)) {
       console.warn(
-        `Skipping character: invalid color ${JSON.stringify(char.color)} (tag: ${JSON.stringify(char.renpyTag)}, display name: ${JSON.stringify(char.displayName)})`
+        `Skipping character: invalid color ${JSON.stringify(char.color)} (tag: ${JSON.stringify(char.renpyTag)}, name: ${JSON.stringify(char.name)}${char.displayName !== undefined ? `, display name: ${JSON.stringify(char.displayName)}` : ""})`
       );
       continue;
     }
-    const escapedName = escapeRenpyString(char.displayName);
+
+    let nameArg: string;
+    switch (char.nameType) {
+      case "variable": {
+        // Unquoted — emit raw name only if it matches a safe identifier
+        if (char.name === null || !isVariableSafeIdentifier(char.name)) {
+          console.warn(
+            `Skipping character: variable name ${JSON.stringify(char.name)} is not a safe Ren'Py identifier (tag: ${JSON.stringify(char.renpyTag)})`
+          );
+          continue;
+        }
+        nameArg = char.name;
+        break;
+      }
+      case "none":
+        nameArg = "None";
+        break;
+      case "interpolated":
+      case "literal":
+      case "tagged":
+      case "unknown":
+        nameArg = `"${escapeRenpyString(char.name ?? "")}"`;
+        break;
+      case "empty":
+        nameArg = `""`;
+        break;
+      default: {
+        // Exhaustive safety net — treat unrecognised values as literal
+        const _exhaustive: never = char.nameType;
+        console.warn(
+          `Character ${JSON.stringify(char.renpyTag)} has unknown nameType ${JSON.stringify(char.nameType)}, treating as literal`
+        );
+        nameArg = `"${escapeRenpyString(char.name ?? "")}"`;
+        break;
+      }
+    }
+
     const italicArg = char.isNarrator ? ", what_italic=True" : "";
     lines.push(
-      `define ${char.renpyTag} = Character("${escapedName}", color="${char.color}"${italicArg})`
+      `define ${char.renpyTag} = Character(${nameArg}, color="${char.color}"${italicArg})`
     );
   }
 

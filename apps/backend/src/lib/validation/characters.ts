@@ -48,6 +48,17 @@ export const createCharacterSchema = z
     routeAffiliation: optionalString(50),
     isLoveInterest: z.boolean().default(false),
     isNarrator: z.boolean().default(false),
+    nameType: z
+      .enum([
+        "literal",
+        "variable",
+        "interpolated",
+        "tagged",
+        "none",
+        "empty",
+        "unknown",
+      ])
+      .optional(),
     notes: optionalString(10000),
     conditionalPrefix: optionalString(50),
   })
@@ -66,6 +77,17 @@ export const updateCharacterSchema = z
     routeAffiliation: optionalString(50),
     isLoveInterest: z.boolean().optional(),
     isNarrator: z.boolean().optional(),
+    nameType: z
+      .enum([
+        "literal",
+        "variable",
+        "interpolated",
+        "tagged",
+        "none",
+        "empty",
+        "unknown",
+      ])
+      .optional(),
     notes: optionalString(10000),
     conditionalPrefix: optionalString(50),
   })
@@ -89,6 +111,17 @@ export const importCharactersSchema = z
           isLoveInterest: z.boolean().optional(),
           isNarrator: z.boolean().optional(),
           routeAffiliation: optionalString(50),
+          nameType: z
+            .enum([
+              "literal",
+              "variable",
+              "interpolated",
+              "tagged",
+              "none",
+              "empty",
+              "unknown",
+            ])
+            .optional(),
         })
       )
       .min(1, "At least one character is required"),

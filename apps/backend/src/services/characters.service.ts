@@ -34,6 +34,12 @@ import {
   buildAvatarUrl,
 } from "./characters/avatar.js";
 import type { Character, ProjectSettings } from "../db/schema/index.js";
+import {
+  isValidCharacterNameType,
+  type CharacterNameType,
+} from "@branchforge/shared";
+import { inferNameTypeFromStoredName } from "./character-parser/name-resolution.js";
+import { isVariableSafeIdentifier } from "./rpy-generator.service.js";
 import type {
   CreateCharacterInput,
   UpdateCharacterInput,
@@ -50,6 +56,7 @@ export interface CharacterDetail {
   id: string;
   name: string;
   displayName: string;
+  nameType: CharacterNameType;
   renpyTag: string;
   color: string;
   routeAffiliation: string | null;
@@ -59,7 +66,6 @@ export interface CharacterDetail {
   conditionalPrefix: string | null;
   avatarUrl: string | null;
 }
-
 /** Result of character detection */
 export interface DetectCharactersResult {
   characters: DetectedCharacter[];
@@ -98,6 +104,7 @@ type CharacterFields = Pick<
   | "id"
   | "name"
   | "displayName"
+  | "nameType"
   | "renpyTag"
   | "color"
   | "routeAffiliation"
@@ -110,9 +117,11 @@ type CharacterFields = Pick<
 
 /** Map a character row (or partial) to the public CharacterDetail shape. */
 function toCharacterDetail(character: CharacterFields): CharacterDetail {
+  const rawNameType = character.nameType;
   return {
     id: character.id,
     name: character.name,
+    nameType: isValidCharacterNameType(rawNameType) ? rawNameType : "literal",
     displayName: character.displayName,
     renpyTag: character.renpyTag,
     color: character.color,
@@ -406,9 +415,35 @@ export class CharactersService {
           // Update existing character — only set boolean flags when
           // explicitly provided to avoid clobbering existing DB values
           // during re-import of conflict characters.
+          //
+          // nameType: keep genuinely detected non-literal types, otherwise
+          // infer from the imported name, otherwise preserve the stored type
+          // so CharacterImportWizard's default `"literal"` cannot clobber
+          // variable/interpolated/etc. existing types.
+          const importedName = charData.name ?? charData.tag;
+          const inferredNameType = inferNameTypeFromStoredName(charData.name);
+          let resolvedNameType: CharacterNameType;
+          if (
+            charData.nameType !== undefined &&
+            charData.nameType !== "literal"
+          ) {
+            resolvedNameType = charData.nameType;
+          } else if (inferredNameType !== "literal") {
+            resolvedNameType = inferredNameType;
+          } else if (isValidCharacterNameType(existing.nameType)) {
+            resolvedNameType =
+              existing.nameType === "variable" &&
+              !isVariableSafeIdentifier(importedName)
+                ? "literal"
+                : existing.nameType;
+          } else {
+            resolvedNameType = "literal";
+          }
+
           const updates: Record<string, unknown> = {
-            name: charData.name ?? charData.tag,
+            name: importedName,
             displayName: charData.displayName,
+            nameType: resolvedNameType,
             color: charData.color,
             routeAffiliation: charData.routeAffiliation,
             updatedAt: new Date(),
@@ -438,6 +473,10 @@ export class CharactersService {
           .insert(characters)
           .values({
             projectId,
+            nameType:
+              charData.nameType ??
+              inferNameTypeFromStoredName(charData.name) ??
+              "literal",
             name: charData.name ?? charData.tag,
             displayName: charData.displayName,
             renpyTag: charData.tag,
@@ -501,6 +540,7 @@ export class CharactersService {
         id: characters.id,
         name: characters.name,
         displayName: characters.displayName,
+        nameType: characters.nameType,
         renpyTag: characters.renpyTag,
         color: characters.color,
         routeAffiliation: characters.routeAffiliation,
@@ -543,6 +583,7 @@ export class CharactersService {
         projectId,
         name: input.name,
         displayName: input.displayName,
+        nameType: input.nameType ?? inferNameTypeFromStoredName(input.name),
         renpyTag: input.renpyTag,
         color: input.color,
         routeAffiliation: input.routeAffiliation,
@@ -569,13 +610,43 @@ export class CharactersService {
     userId: string,
     input: UpdateCharacterInput
   ): Promise<CharacterDetail> {
-    await this.requireCharacterAccess(characterId, userId);
+    const current = await this.requireCharacterAccess(characterId, userId);
 
     const db = getDb();
 
+    const updateValues: Record<string, unknown> = {
+      ...input,
+      updatedAt: new Date(),
+    };
+
+    if (input.nameType !== undefined) {
+      // Explicit nameType from input — already in updateValues via spread
+    } else if (input.name !== undefined) {
+      const inferred = inferNameTypeFromStoredName(input.name);
+      if (inferred !== "literal") {
+        updateValues.nameType = inferred;
+      } else if (
+        current.nameType === "interpolated" ||
+        current.nameType === "tagged" ||
+        current.nameType === "empty" ||
+        current.nameType === "none" ||
+        current.nameType === "unknown"
+      ) {
+        updateValues.nameType = "literal";
+      } else if (
+        current.nameType === "variable" &&
+        !isVariableSafeIdentifier(input.name)
+      ) {
+        // Bare identifiers stay variable; unsafe names must become literal.
+        updateValues.nameType = "literal";
+      } else {
+        delete updateValues.nameType;
+      }
+    }
+
     const [updated] = await db
       .update(characters)
-      .set({ ...input, updatedAt: new Date() })
+      .set(updateValues)
       .where(eq(characters.id, characterId))
       .returning();
 

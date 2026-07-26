@@ -12,7 +12,9 @@ import {
   boolean,
   index,
   unique,
+  check,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { projects } from "./projects.js";
 
 export const characters = pgTable(
@@ -24,6 +26,12 @@ export const characters = pgTable(
       .references(() => projects.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     displayName: text("display_name").notNull(),
+    /**
+     * How `name` should be emitted in `Character(...)` (literal/variable/
+     * interpolated/tagged/none/empty/unknown). Defaults to `literal` for
+     * backfill of existing rows; import/create should set the real type.
+     */
+    nameType: text("name_type").notNull().default("literal"),
     renpyTag: text("renpy_tag").notNull(),
     routeAffiliation: text("route_affiliation"),
     isLoveInterest: boolean("is_love_interest").default(false).notNull(),
@@ -45,6 +53,10 @@ export const characters = pgTable(
       table.renpyTag
     ),
     index("characters_pair_group_id_idx").on(table.pairGroupId),
+    check(
+      "characters_name_type_check",
+      sql`${table.nameType} IN ('literal', 'variable', 'interpolated', 'tagged', 'none', 'empty', 'unknown')`
+    ),
   ]
 );
 

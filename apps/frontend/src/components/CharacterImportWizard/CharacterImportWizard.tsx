@@ -116,6 +116,7 @@ export function CharacterImportWizard({
         isLoveInterest: c.isLoveInterest ?? false,
         isNarrator: c.isNarrator ?? false,
         routeAffiliation: c.routeAffiliation,
+        nameType: c.nameType,
       }));
       const newExcludedTags = new Set(excludedTags);
       const newNarratorTags = new Set(narratorTags);

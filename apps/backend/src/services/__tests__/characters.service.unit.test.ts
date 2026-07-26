@@ -22,11 +22,16 @@ const {
   mockTransactionFn,
   mockLinkSpeakersToLines,
 } = vi.hoisted(() => {
-  const createSelectChain = (resolveValue: unknown[]) => ({
-    from: vi.fn(() => ({
-      where: vi.fn(() => Promise.resolve(resolveValue)),
-    })),
-  });
+  const createSelectChain = (resolveValue: unknown[]) => {
+    const whereResult = Object.assign(Promise.resolve(resolveValue), {
+      limit: vi.fn(() => Promise.resolve(resolveValue)),
+    });
+    return {
+      from: vi.fn(() => ({
+        where: vi.fn(() => whereResult),
+      })),
+    };
+  };
 
   const createInsertChain = () => ({
     values: vi.fn(() => ({
@@ -388,5 +393,92 @@ describe("CharactersService.importCharacters", () => {
         )
       ).rejects.toThrow("Speaker linking failed");
     });
+  });
+});
+
+describe("CharactersService.updateCharacter", () => {
+  const characterId = "char-boss";
+  const userId = "user-123";
+
+  const variableCharacter = {
+    id: characterId,
+    projectId: "project-123",
+    name: "Old Boss",
+    displayName: "Old Boss",
+    nameType: "variable",
+    renpyTag: "boss",
+    color: "#ff0000",
+    routeAffiliation: null,
+    isLoveInterest: false,
+    isNarrator: false,
+    pairGroupId: null,
+    notes: null,
+    conditionalPrefix: null,
+    avatarUrl: null,
+    createdAt: new Date("2024-01-01"),
+    updatedAt: new Date("2024-01-01"),
+  };
+
+  let updateSetFn: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    mockSelect.mockImplementation(() => createSelectChain([variableCharacter]));
+
+    updateSetFn = vi.fn(() => ({
+      where: vi.fn(() => ({
+        returning: vi.fn(() =>
+          Promise.resolve([
+            {
+              ...variableCharacter,
+              name: "boss_name",
+              displayName: "boss_name",
+            },
+          ])
+        ),
+      })),
+    }));
+    mockUpdate.mockReturnValue({ set: updateSetFn });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("preserves variable nameType when updating name to a bare identifier without nameType", async () => {
+    await charactersService.updateCharacter(characterId, userId, {
+      name: "boss_name",
+    });
+
+    expect(mockUpdate).toHaveBeenCalledWith(characters);
+    const setArg = updateSetFn.mock.calls[0][0] as Record<string, unknown>;
+    expect(setArg.name).toBe("boss_name");
+    expect(setArg).not.toHaveProperty("nameType");
+  });
+
+  it("downgrades variable nameType to literal when renaming to an unsafe identifier", async () => {
+    updateSetFn = vi.fn(() => ({
+      where: vi.fn(() => ({
+        returning: vi.fn(() =>
+          Promise.resolve([
+            {
+              ...variableCharacter,
+              name: "The Big Boss",
+              displayName: "The Big Boss",
+              nameType: "literal",
+            },
+          ])
+        ),
+      })),
+    }));
+    mockUpdate.mockReturnValue({ set: updateSetFn });
+
+    await charactersService.updateCharacter(characterId, userId, {
+      name: "The Big Boss",
+    });
+
+    expect(mockUpdate).toHaveBeenCalledWith(characters);
+    const setArg = updateSetFn.mock.calls[0][0] as Record<string, unknown>;
+    expect(setArg.name).toBe("The Big Boss");
+    expect(setArg.nameType).toBe("literal");
   });
 });
