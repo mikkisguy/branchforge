@@ -12,7 +12,9 @@ import {
   boolean,
   index,
   unique,
+  check,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { projects } from "./projects.js";
 
 export const characters = pgTable(
@@ -51,6 +53,10 @@ export const characters = pgTable(
       table.renpyTag
     ),
     index("characters_pair_group_id_idx").on(table.pairGroupId),
+    check(
+      "characters_name_type_check",
+      sql`${table.nameType} IN ('literal', 'variable', 'interpolated', 'tagged', 'none', 'empty', 'unknown')`
+    ),
   ]
 );
 

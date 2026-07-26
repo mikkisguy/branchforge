@@ -21,12 +21,12 @@ import {
   generateVariablesFile,
   generateStatsFile,
   generateCharacterDefinitionsFile,
+  normalizeCharacterNameType,
 } from "../rpy-generator.service.js";
 import {
   computeCommonDirectoryPrefix,
   extractAndStripRpySymbols,
 } from "../rpy-statements.service.js";
-import { isValidCharacterNameType } from "@branchforge/shared";
 
 import type { SyncOperation } from "../gitlab.types.js";
 import {
@@ -187,15 +187,10 @@ export async function exportToGitlab(
       filesToExport.push({
         filePath: `${fileDirPrefix}branchforge_definitions.rpy`,
         content: generateCharacterDefinitionsFile(
-          projectCharacters.map((c) => {
-            const rawNameType = c.nameType;
-            return {
-              ...c,
-              nameType: isValidCharacterNameType(rawNameType)
-                ? rawNameType
-                : "literal",
-            };
-          })
+          projectCharacters.map((c) => ({
+            ...c,
+            nameType: normalizeCharacterNameType(c.nameType),
+          }))
         ),
       });
     }

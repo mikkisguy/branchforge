@@ -29,6 +29,7 @@ import {
   generateVariablesFile,
   generateStatsFile,
   generateCharacterDefinitionsFile,
+  normalizeCharacterNameType,
   type LabelWithConditions,
 } from "./rpy-generator.service.js";
 import {
@@ -38,7 +39,6 @@ import {
 import { checkRateLimit } from "./rate-limiter.service.js";
 import { logInfo, logError, logWarn, LogEventType } from "../lib/logger.js";
 import {
-  isValidCharacterNameType,
   type ExportPreviewResponse,
   type GeneratedExportPreviewFile,
 } from "@branchforge/shared";
@@ -326,15 +326,10 @@ export async function generateExport(
   if (projectCharacters.length > 0) {
     patchedFiles[`${fileDirPrefix}branchforge_definitions.rpy`] =
       generateCharacterDefinitionsFile(
-        projectCharacters.map((c) => {
-          const rawNameType = c.nameType;
-          return {
-            ...c,
-            nameType: isValidCharacterNameType(rawNameType)
-              ? rawNameType
-              : "literal",
-          };
-        })
+        projectCharacters.map((c) => ({
+          ...c,
+          nameType: normalizeCharacterNameType(c.nameType),
+        }))
       );
   }
 
@@ -458,15 +453,10 @@ export async function getExportPreview(
       kind: "definitions",
       fileName: "branchforge_definitions.rpy",
       content: generateCharacterDefinitionsFile(
-        projectCharacters.map((c) => {
-          const rawNameType = c.nameType;
-          return {
-            ...c,
-            nameType: isValidCharacterNameType(rawNameType)
-              ? rawNameType
-              : "literal",
-          };
-        })
+        projectCharacters.map((c) => ({
+          ...c,
+          nameType: normalizeCharacterNameType(c.nameType),
+        }))
       ),
       isEmpty: definitionsEmpty,
       emptyReason: definitionsEmpty

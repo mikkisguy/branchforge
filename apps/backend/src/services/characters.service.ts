@@ -39,6 +39,7 @@ import {
   type CharacterNameType,
 } from "@branchforge/shared";
 import { inferNameTypeFromStoredName } from "./character-parser/name-resolution.js";
+import { isVariableSafeIdentifier } from "./rpy-generator.service.js";
 import type {
   CreateCharacterInput,
   UpdateCharacterInput,
@@ -414,13 +415,35 @@ export class CharactersService {
           // Update existing character — only set boolean flags when
           // explicitly provided to avoid clobbering existing DB values
           // during re-import of conflict characters.
+          //
+          // nameType: keep genuinely detected non-literal types, otherwise
+          // infer from the imported name, otherwise preserve the stored type
+          // so CharacterImportWizard's default `"literal"` cannot clobber
+          // variable/interpolated/etc. existing types.
+          const importedName = charData.name ?? charData.tag;
+          const inferredNameType = inferNameTypeFromStoredName(charData.name);
+          let resolvedNameType: CharacterNameType;
+          if (
+            charData.nameType !== undefined &&
+            charData.nameType !== "literal"
+          ) {
+            resolvedNameType = charData.nameType;
+          } else if (inferredNameType !== "literal") {
+            resolvedNameType = inferredNameType;
+          } else if (isValidCharacterNameType(existing.nameType)) {
+            resolvedNameType =
+              existing.nameType === "variable" &&
+              !isVariableSafeIdentifier(importedName)
+                ? "literal"
+                : existing.nameType;
+          } else {
+            resolvedNameType = "literal";
+          }
+
           const updates: Record<string, unknown> = {
-            name: charData.name ?? charData.tag,
+            name: importedName,
             displayName: charData.displayName,
-            nameType:
-              charData.nameType ??
-              inferNameTypeFromStoredName(charData.name) ??
-              "literal",
+            nameType: resolvedNameType,
             color: charData.color,
             routeAffiliation: charData.routeAffiliation,
             updatedAt: new Date(),
@@ -609,6 +632,12 @@ export class CharactersService {
         current.nameType === "none" ||
         current.nameType === "unknown"
       ) {
+        updateValues.nameType = "literal";
+      } else if (
+        current.nameType === "variable" &&
+        !isVariableSafeIdentifier(input.name)
+      ) {
+        // Bare identifiers stay variable; unsafe names must become literal.
         updateValues.nameType = "literal";
       } else {
         delete updateValues.nameType;

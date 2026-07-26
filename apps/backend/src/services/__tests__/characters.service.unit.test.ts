@@ -454,4 +454,31 @@ describe("CharactersService.updateCharacter", () => {
     expect(setArg.name).toBe("boss_name");
     expect(setArg).not.toHaveProperty("nameType");
   });
+
+  it("downgrades variable nameType to literal when renaming to an unsafe identifier", async () => {
+    updateSetFn = vi.fn(() => ({
+      where: vi.fn(() => ({
+        returning: vi.fn(() =>
+          Promise.resolve([
+            {
+              ...variableCharacter,
+              name: "The Big Boss",
+              displayName: "The Big Boss",
+              nameType: "literal",
+            },
+          ])
+        ),
+      })),
+    }));
+    mockUpdate.mockReturnValue({ set: updateSetFn });
+
+    await charactersService.updateCharacter(characterId, userId, {
+      name: "The Big Boss",
+    });
+
+    expect(mockUpdate).toHaveBeenCalledWith(characters);
+    const setArg = updateSetFn.mock.calls[0][0] as Record<string, unknown>;
+    expect(setArg.name).toBe("The Big Boss");
+    expect(setArg.nameType).toBe("literal");
+  });
 });

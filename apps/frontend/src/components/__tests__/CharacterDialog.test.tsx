@@ -63,7 +63,6 @@ vi.mock("../CharacterEditDialog/CharacterEditDialog.lazy", () => {
                 type="text"
                 value={isEditingEileen ? "Eileen" : ""}
                 readOnly
-                aria-label="Ren'Py name *"
               />
             </div>
             <div>
@@ -73,7 +72,6 @@ vi.mock("../CharacterEditDialog/CharacterEditDialog.lazy", () => {
                 type="text"
                 value={isEditingEileen ? "Eileen" : ""}
                 readOnly
-                aria-label="Display Name *"
               />
             </div>
             <div>
@@ -83,7 +81,6 @@ vi.mock("../CharacterEditDialog/CharacterEditDialog.lazy", () => {
                 type="text"
                 value={isEditingEileen ? "a" : ""}
                 readOnly
-                aria-label="Ren'Py Tag *"
               />
             </div>
           </div>

@@ -7,6 +7,7 @@
 
 import {
   RENPY_LABEL_REGEX,
+  isValidCharacterNameType,
   type CharacterNameType,
   type VariableCondition,
   type StatCondition,
@@ -27,6 +28,11 @@ const RENPY_IDENTIFIER_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const RENPY_HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
 
 /**
+ * Safe unquoted Character() name argument (allows dotted attrs like store.e_name).
+ */
+const VARIABLE_SAFE_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_.]*$/;
+
+/**
  * Type guard to validate a Ren'Py identifier
  * Checks that the name is safe to use in generated RPY code
  *
@@ -35,6 +41,24 @@ const RENPY_HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
  */
 export function isValidRenpyIdentifier(name: string): boolean {
   return RENPY_IDENTIFIER_REGEX.test(name);
+}
+
+/**
+ * Whether a character name is safe to emit as an unquoted Ren'Py variable
+ * reference in `Character(name, ...)`.
+ */
+export function isVariableSafeIdentifier(name: string): boolean {
+  return VARIABLE_SAFE_IDENTIFIER.test(name);
+}
+
+/**
+ * Coerce a stored/raw nameType to a valid CharacterNameType, defaulting
+ * invalid values to `"literal"`.
+ */
+export function normalizeCharacterNameType(
+  nameType: string
+): CharacterNameType {
+  return isValidCharacterNameType(nameType) ? nameType : "literal";
 }
 
 /**
@@ -674,8 +698,6 @@ export function generateCharacterDefinitionsFile(
   );
   lines.push("");
 
-  const VARIABLE_SAFE_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_.]*$/;
-
   for (const char of characters) {
     if (!isValidRenpyIdentifier(char.renpyTag)) {
       console.warn(
@@ -694,7 +716,7 @@ export function generateCharacterDefinitionsFile(
     switch (char.nameType) {
       case "variable": {
         // Unquoted — emit raw name only if it matches a safe identifier
-        if (char.name === null || !VARIABLE_SAFE_IDENTIFIER.test(char.name)) {
+        if (char.name === null || !isVariableSafeIdentifier(char.name)) {
           console.warn(
             `Skipping character: variable name ${JSON.stringify(char.name)} is not a safe Ren'Py identifier (tag: ${JSON.stringify(char.renpyTag)})`
           );

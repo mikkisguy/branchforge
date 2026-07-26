@@ -4,4 +4,4 @@
 "@branchforge/backend": patch
 ---
 
-Fixed Character() export to use Ren'Py `name` + `nameType` instead of UI `displayName`
+Fixed a bug in Character() export to use Ren'Py name

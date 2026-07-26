@@ -40,10 +40,12 @@ export function CharacterEditDialogBasicSection({
             aria-required="true"
             aria-invalid={!!form.nameError}
             aria-describedby={
-              form.nameError ? "edit-char-name-error" : undefined
+              form.nameError
+                ? "edit-char-name-hint edit-char-name-error"
+                : "edit-char-name-hint"
             }
           />
-          <p className="text-xs text-muted-foreground">
+          <p id="edit-char-name-hint" className="text-xs text-muted-foreground">
             Used as the first argument to Character(). (e.g. Eileen or
             [first_name])
           </p>
@@ -67,10 +69,15 @@ export function CharacterEditDialogBasicSection({
             aria-required="true"
             aria-invalid={!!form.displayNameError}
             aria-describedby={
-              form.displayNameError ? "edit-char-display-name-error" : undefined
+              form.displayNameError
+                ? "edit-char-display-name-hint edit-char-display-name-error"
+                : "edit-char-display-name-hint"
             }
           />
-          <p className="text-xs text-muted-foreground">
+          <p
+            id="edit-char-display-name-hint"
+            className="text-xs text-muted-foreground"
+          >
             Shown in Writer Mode and character lists on BranchForge.
           </p>
           <FormErrorMessage

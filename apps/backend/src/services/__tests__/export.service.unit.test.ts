@@ -28,6 +28,7 @@ vi.mock("../rpy-generator.service.js", () => ({
   generateVariablesFile: vi.fn(() => "# variables file"),
   generateStatsFile: vi.fn(() => "# stats file"),
   generateCharacterDefinitionsFile: vi.fn(() => "# characters file"),
+  normalizeCharacterNameType: vi.fn((nameType: string) => nameType),
 }));
 
 vi.mock("../../lib/logger.js", () => ({
