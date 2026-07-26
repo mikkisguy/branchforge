@@ -336,7 +336,12 @@ class CharacterLinkerService {
     for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
       const chunk = updates.slice(i, i + CHUNK_SIZE);
       const caseClauses = sql.join(
-        chunk.map((u) => sql`WHEN ${u.lineId} THEN ${u.speakerId}`),
+        // Cast THEN values to uuid: Drizzle binds JS strings as `text`,
+        // and a CASE mixing uuid-looking text with NULL is inferred as
+        // text — which then fails against speaker_id uuid. See import
+        // errors: column "speaker_id" is of type uuid but expression
+        // is of type text.
+        chunk.map((u) => sql`WHEN ${u.lineId} THEN ${u.speakerId}::uuid`),
         sql` `
       );
       await db

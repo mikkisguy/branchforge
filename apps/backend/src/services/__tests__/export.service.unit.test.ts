@@ -58,6 +58,7 @@ import {
   generateExport,
   listExports,
   getExportForDownload,
+  getExportPreview,
 } from "../export.service.js";
 import { checkRateLimit } from "../rate-limiter.service.js";
 import { requireProjectAccess } from "../authz.service.js";
@@ -71,7 +72,7 @@ import {
   generateCharacterDefinitionsFile,
 } from "../rpy-generator.service.js";
 import type { GenerateExportResult, ExportSummary } from "../export.service.js";
-
+import type { ExportPreviewResponse } from "@branchforge/shared";
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -840,6 +841,188 @@ describe("ExportService", () => {
       ).rejects.toThrow(NotFoundError);
 
       expect(requireProjectAccess).toHaveBeenCalledWith(PROJECT_ID, USER_ID);
+    });
+  });
+
+  // =========================================================================
+  // getExportPreview
+  // =========================================================================
+
+  describe("getExportPreview", () => {
+    it("should throw RateLimitError when rate limited", async () => {
+      vi.mocked(checkRateLimit).mockReturnValueOnce({
+        allowed: false,
+        remainingAttempts: 0,
+        retryAfter: 5000,
+      });
+
+      await expect(getExportPreview(PROJECT_ID, USER_ID)).rejects.toThrow(
+        RateLimitError
+      );
+
+      expect(requireProjectAccess).not.toHaveBeenCalled();
+      expect(checkRateLimit).toHaveBeenCalledWith(
+        `export-preview:${USER_ID}`,
+        expect.objectContaining({ maxAttempts: 60 })
+      );
+    });
+
+    it("should call requireProjectAccess", async () => {
+      // All empty — 3 dequeue calls: variables, stats, characters
+      resolveQueue.push([]);
+      resolveQueue.push([]);
+      resolveQueue.push([]);
+
+      await getExportPreview(PROJECT_ID, USER_ID);
+
+      expect(requireProjectAccess).toHaveBeenCalledWith(PROJECT_ID, USER_ID);
+      expect(checkRateLimit).toHaveBeenCalledWith(
+        `export-preview:${USER_ID}`,
+        expect.objectContaining({ maxAttempts: 60 })
+      );
+    });
+
+    it("should return isEmpty true with emptyReason when all sources are empty", async () => {
+      resolveQueue.push([]); // variables
+      resolveQueue.push([]); // stats
+      resolveQueue.push([]); // characters
+
+      const result: ExportPreviewResponse = await getExportPreview(
+        PROJECT_ID,
+        USER_ID
+      );
+
+      expect(result.files).toHaveLength(3);
+
+      expect(result.files[0].isEmpty).toBe(true);
+      expect(result.files[0].emptyReason).toBe(
+        "No variables defined — this file will not be included in the export"
+      );
+
+      expect(result.files[1].isEmpty).toBe(true);
+      expect(result.files[1].emptyReason).toBe(
+        "No stats defined — this file will not be included in the export"
+      );
+
+      expect(result.files[2].isEmpty).toBe(true);
+      expect(result.files[2].emptyReason).toBe(
+        "No characters defined — this file will not be included in the export"
+      );
+    });
+
+    it("should return isEmpty false when sources have data", async () => {
+      const mockVars = [
+        {
+          key: "has_sword",
+          description: "Started with sword",
+          category: "items",
+        },
+      ];
+      const mockStats = [
+        {
+          key: "affection",
+          name: "Affection",
+          minValue: 0,
+          maxValue: 100,
+          description: "Affection stat",
+        },
+      ];
+      const mockChars = [
+        {
+          renpyTag: "e",
+          displayName: "Eileen",
+          color: "#c8ffc8",
+          isNarrator: false,
+        },
+      ];
+
+      resolveQueue.push(mockVars);
+      resolveQueue.push(mockStats);
+      resolveQueue.push(mockChars);
+
+      const result: ExportPreviewResponse = await getExportPreview(
+        PROJECT_ID,
+        USER_ID
+      );
+
+      expect(result.files).toHaveLength(3);
+      expect(result.files[0].isEmpty).toBe(false);
+      expect(result.files[0].emptyReason).toBeNull();
+      expect(result.files[1].isEmpty).toBe(false);
+      expect(result.files[1].emptyReason).toBeNull();
+      expect(result.files[2].isEmpty).toBe(false);
+      expect(result.files[2].emptyReason).toBeNull();
+    });
+
+    it("should return files in order: variables, stats, definitions", async () => {
+      resolveQueue.push([]);
+      resolveQueue.push([]);
+      resolveQueue.push([]);
+
+      const result: ExportPreviewResponse = await getExportPreview(
+        PROJECT_ID,
+        USER_ID
+      );
+
+      expect(result.files[0].kind).toBe("variables");
+      expect(result.files[0].fileName).toBe("branchforge_variables.rpy");
+      expect(result.files[1].kind).toBe("stats");
+      expect(result.files[1].fileName).toBe("branchforge_stats.rpy");
+      expect(result.files[2].kind).toBe("definitions");
+      expect(result.files[2].fileName).toBe("branchforge_definitions.rpy");
+    });
+
+    it("should pass data to generator functions", async () => {
+      const mockVars = [
+        {
+          key: "has_sword",
+          description: "Started with sword",
+          category: "items",
+        },
+      ];
+      const mockStats = [
+        {
+          key: "affection",
+          name: "Affection",
+          minValue: 0,
+          maxValue: 100,
+          description: "Affection stat",
+        },
+      ];
+      const mockChars = [
+        {
+          renpyTag: "e",
+          displayName: "Eileen",
+          color: "#c8ffc8",
+          isNarrator: false,
+        },
+      ];
+
+      resolveQueue.push(mockVars);
+      resolveQueue.push(mockStats);
+      resolveQueue.push(mockChars);
+
+      await getExportPreview(PROJECT_ID, USER_ID);
+
+      expect(generateVariablesFile).toHaveBeenCalledWith(mockVars);
+      expect(generateStatsFile).toHaveBeenCalledWith(mockStats);
+      expect(generateCharacterDefinitionsFile).toHaveBeenCalledWith(mockChars);
+    });
+
+    it("should include generated content even when source is empty", async () => {
+      resolveQueue.push([]);
+      resolveQueue.push([]);
+      resolveQueue.push([]);
+
+      const result: ExportPreviewResponse = await getExportPreview(
+        PROJECT_ID,
+        USER_ID
+      );
+
+      // The mocked generators return "# variables file" etc. regardless
+      expect(result.files[0].content).toBe("# variables file");
+      expect(result.files[1].content).toBe("# stats file");
+      expect(result.files[2].content).toBe("# characters file");
     });
   });
 

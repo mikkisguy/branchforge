@@ -8,14 +8,25 @@ import { useTextUndo } from "@/hooks/useTextUndo";
 import type { LabelTitleMap } from "@/lib/codemirror/label-title-decoration";
 import type { SourceOrigin } from "@branchforge/shared";
 import { useScriptModeData } from "./useScriptModeData";
+import { useExportPreview } from "@/hooks/useExportPreview";
 
 export function useScriptMode({ projectId }: { projectId?: string }) {
   const data = useScriptModeData({ projectId });
-  const { setActiveLabelId, projectFiles, skipSaveRef, labels } = data;
-
+  const {
+    setActiveLabelId,
+    projectFiles,
+    skipSaveRef,
+    labels,
+    showErrorToast,
+  } = data;
   const previousEditFileIdRef = useRef<string | null>(null);
   const [scrollToLine, setScrollToLine] = useState<number | null>(null);
 
+  const [generatedPreview, setGeneratedPreview] = useState<{
+    fileName: string;
+    content: string;
+  } | null>(null);
+  const previewQuery = useExportPreview(projectId);
   const {
     fileSaveStatus,
     isFileDirty,
@@ -46,10 +57,45 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     [projectFiles, switchToFile]
   );
 
+  const hasPendingSave =
+    !!currentEditFileId && (isFileDirty || fileSaveStatus === "error");
+
+  const handleGeneratedFileSelect = useCallback(
+    async (fileName: string) => {
+      if (!previewQuery.data) return;
+
+      const file = previewQuery.data.files.find((f) => f.fileName === fileName);
+      if (!file || file.isEmpty) return;
+
+      // If there's a dirty save pending, save before switching
+      if (hasPendingSave) {
+        const saved = await triggerFileSave();
+        if (!saved) {
+          showErrorToast(
+            "Could not save changes before preview. Please resolve conflicts and try again.",
+            "Save failed"
+          );
+          return;
+        }
+      }
+
+      setGeneratedPreview({ fileName: file.fileName, content: file.content });
+      setActiveLabelId(null);
+    },
+    [
+      previewQuery.data,
+      hasPendingSave,
+      triggerFileSave,
+      showErrorToast,
+      setActiveLabelId,
+    ]
+  );
+
   const handleNoTabsRemaining = useCallback(() => {
     void clearEditorState();
     setActiveLabelId(null);
     setScrollToLine(null);
+    setGeneratedPreview(null);
   }, [clearEditorState, setActiveLabelId]);
 
   const handleFileActivated = useCallback(() => {
@@ -79,14 +125,12 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     refreshFiles: data.refreshFiles,
   });
 
-  const hasPendingSave =
-    !!currentEditFileId && (isFileDirty || fileSaveStatus === "error");
-
   const handleResetState = useCallback(() => {
     resetRefreshState();
     clearTabsState();
     void clearEditorState();
     setScrollToLine(null);
+    setGeneratedPreview(null);
   }, [clearEditorState, clearTabsState, resetRefreshState]);
 
   const setSkipSave = useCallback(
@@ -159,10 +203,16 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     };
   }, [activeProjectFile, currentEditFileId, switchToFile, selectFileTab]);
 
-  const activeFileContent =
+  const editableFileContent =
     activeProjectFile && currentEditFileId === activeProjectFile.id
       ? editedFileContent
       : activeProjectFile?.content || "";
+
+  const isGeneratedPreview = !!generatedPreview;
+
+  const activeFileContent = generatedPreview
+    ? generatedPreview.content
+    : editableFileContent;
 
   const handleUndoRedoChange = useCallback(
     (content: string) => {
@@ -172,9 +222,19 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
   );
 
   const { canUndo, canRedo, undo, redo, recordChange, clear } = useTextUndo(
-    activeFileContent,
+    editableFileContent,
     handleUndoRedoChange
   );
+
+  const onUndo = useCallback(() => {
+    if (isGeneratedPreview) return;
+    undo();
+  }, [isGeneratedPreview, undo]);
+
+  const onRedo = useCallback(() => {
+    if (isGeneratedPreview) return;
+    redo();
+  }, [isGeneratedPreview, redo]);
 
   const handleContentChange = useCallback(
     (value: string) => {
@@ -190,12 +250,13 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     if (activeFileId && previousUndoFileIdRef.current !== activeFileId) {
       previousUndoFileIdRef.current = activeFileId;
       // react-doctor-disable-next-line react-doctor/no-pass-data-to-parent
-      clear(activeFileContent);
+      clear(editableFileContent);
     }
-  }, [activeFileId, activeFileContent, clear]);
+  }, [activeFileId, editableFileContent, clear]);
 
   const handleGitLabFileSelect = useCallback(
     (fileId: string) => {
+      setGeneratedPreview(null);
       void selectFileTab(fileId);
     },
     [selectFileTab]
@@ -203,6 +264,7 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
 
   const handleSelectFileTab = useCallback(
     async (fileId: string) => {
+      setGeneratedPreview(null);
       await selectFileTab(fileId);
     },
     [selectFileTab]
@@ -210,6 +272,7 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
 
   const handleGitLabSceneSelect = useCallback(
     (sceneId: string) => {
+      setGeneratedPreview(null);
       setActiveLabelId(sceneId);
     },
     [setActiveLabelId]
@@ -245,6 +308,70 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     ? retryFileSave
     : undefined;
 
+  // Always expose the three generated files so the filetree section is
+  // visible even while the preview request is in flight.
+  const generatedFiles = useMemo(() => {
+    if (previewQuery.isError) {
+      return [
+        {
+          fileName: "branchforge_variables.rpy",
+          isEmpty: true,
+          emptyReason: "Failed to load generated preview",
+        },
+        {
+          fileName: "branchforge_stats.rpy",
+          isEmpty: true,
+          emptyReason: "Failed to load generated preview",
+        },
+        {
+          fileName: "branchforge_definitions.rpy",
+          isEmpty: true,
+          emptyReason: "Failed to load generated preview",
+        },
+      ];
+    }
+    if (previewQuery.data?.files?.length) {
+      return previewQuery.data.files.map((f) => ({
+        fileName: f.fileName,
+        isEmpty: f.isEmpty,
+        emptyReason: f.emptyReason,
+      }));
+    }
+    return [
+      {
+        fileName: "branchforge_variables.rpy",
+        isEmpty: true,
+        emptyReason: "Loading generated preview…",
+      },
+      {
+        fileName: "branchforge_stats.rpy",
+        isEmpty: true,
+        emptyReason: "Loading generated preview…",
+      },
+      {
+        fileName: "branchforge_definitions.rpy",
+        isEmpty: true,
+        emptyReason: "Loading generated preview…",
+      },
+    ];
+  }, [previewQuery.data, previewQuery.isError]);
+
+  const previewErrorShownRef = useRef(false);
+  useEffect(() => {
+    if (previewQuery.isError) {
+      if (!previewErrorShownRef.current) {
+        previewErrorShownRef.current = true;
+        showErrorToast("Failed to load generated preview", "Preview Error");
+      }
+      return;
+    }
+    // Allow a later failure to toast again after recovery.
+    previewErrorShownRef.current = false;
+  }, [previewQuery.isError, showErrorToast]);
+
+  const activeGeneratedFileId = generatedPreview?.fileName ?? null;
+  const generatedFileName = generatedPreview?.fileName;
+
   return {
     isLoadingLabels: data.isLoadingLabels,
     isLoadingFiles: data.isLoadingFiles,
@@ -274,10 +401,10 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     handleGitLabFileSelect,
     handleGitLabSceneSelect,
     handleContentChange,
-    canUndo,
-    canRedo,
-    onUndo: undo,
-    onRedo: redo,
+    canUndo: isGeneratedPreview ? false : canUndo,
+    canRedo: isGeneratedPreview ? false : canRedo,
+    onUndo,
+    onRedo,
     scrollToLine,
     fileSaveStatus,
     onSaveRequest,
@@ -288,5 +415,11 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     linkedRepo: linkedRepoInfo,
     primaryFileSourceType,
     saveConflict,
+    // Generated preview
+    generatedFiles,
+    activeGeneratedFileId,
+    onGeneratedFileSelect: handleGeneratedFileSelect,
+    isGeneratedPreview,
+    generatedFileName,
   };
 }

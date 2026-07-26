@@ -57,6 +57,11 @@ export function ScriptMode({
     linkedRepo,
     primaryFileSourceType,
     saveConflict,
+    generatedFiles,
+    activeGeneratedFileId,
+    onGeneratedFileSelect,
+    isGeneratedPreview,
+    generatedFileName,
   } = useScriptMode({ projectId });
 
   if (isLoadingLabels || isLoadingFiles) {
@@ -71,7 +76,11 @@ export function ScriptMode({
     );
   }
 
-  if (!projectFiles.length) {
+  if (
+    !projectFiles.length &&
+    !isGeneratedPreview &&
+    !generatedFiles.some((f) => !f.isEmpty)
+  ) {
     return (
       <div className="h-full flex flex-col overflow-hidden">
         <ScriptModeEmptyState
@@ -126,6 +135,11 @@ export function ScriptMode({
         saveConflict={saveConflict}
         onSaveRequest={onSaveRequest}
         labelTitles={labelTitles}
+        generatedFiles={generatedFiles}
+        activeGeneratedFileId={activeGeneratedFileId}
+        onGeneratedFileSelect={onGeneratedFileSelect}
+        isGeneratedPreview={isGeneratedPreview}
+        generatedFileName={generatedFileName}
       />
 
       <StatusBar

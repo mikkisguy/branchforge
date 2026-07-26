@@ -12,6 +12,7 @@ import {
   generateExport,
   listExports,
   getExportForDownload,
+  getExportPreview,
 } from "../services/export.service.js";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { validateParams } from "../middleware/validation.middleware.js";
@@ -134,6 +135,50 @@ async function listExportsHandler(
 }
 
 /**
+ * Preview generated export files (variables, stats, definitions)
+ *
+ * GET /projects/:projectId/export-preview
+ * Requires authentication
+ */
+async function exportPreviewHandler(
+  request: FastifyRequest<{ Params: { projectId: string } }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { projectId } = request.params;
+  const user = request.user!;
+
+  try {
+    const result = await getExportPreview(projectId, user.id);
+
+    reply.status(200).send(result);
+  } catch (error) {
+    request.log.error(
+      { err: error, projectId },
+      `exportPreviewHandler: Failed to get export preview: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+
+    if (error instanceof ForbiddenError) {
+      reply.status(403).send({ error: error.userMessage });
+      return;
+    }
+    if (error instanceof NotFoundError) {
+      reply.status(404).send({ error: error.userMessage });
+      return;
+    }
+    if (error instanceof RateLimitError) {
+      reply.status(429).send({
+        error: error.userMessage,
+        retryAfter: error.retryAfter,
+      });
+      return;
+    }
+    reply.status(500).send({ error: "Internal server error" });
+  }
+}
+
+/**
  * Download an export as a zip file
  *
  * GET /projects/:projectId/exports/:exportId/download
@@ -211,6 +256,15 @@ export async function exportsRoutes(fastify: FastifyInstance): Promise<void> {
       preValidation: validateParams(exportProjectIdParamsSchema),
     },
     listExportsHandler
+  );
+
+  fastify.get<{ Params: { projectId: string } }>(
+    "/projects/:projectId/export-preview",
+    {
+      onRequest: authenticate,
+      preValidation: validateParams(exportProjectIdParamsSchema),
+    },
+    exportPreviewHandler
   );
 
   fastify.get<{

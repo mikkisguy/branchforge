@@ -10,6 +10,7 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  BRANCHFORGE_MANAGED_NOTICE,
   computeCommonDirectoryPrefix,
   extractAndStripRpySymbols,
 } from "../rpy-statements.service.js";
@@ -131,6 +132,10 @@ describe("rpy-statements.service", () => {
         { tag: "e", name: "Eileen", color: "#c8ffc8" },
       ]);
       expect(result.cleanedContent).not.toContain("define e = Character");
+      expect(result.cleanedContent.split("\n")[0]).toBe(
+        BRANCHFORGE_MANAGED_NOTICE
+      );
+      expect(result.cleanedContent.split("\n")[1]).toBe("");
       expect(result.cleanedContent).toContain("label start:");
       expect(result.cleanedContent).toContain('e "Hello."');
     });
@@ -153,10 +158,14 @@ describe("rpy-statements.service", () => {
         // who_color wins over color when both are present
         { tag: "e", name: "Eileen", color: "#c8c8c8" },
       ]);
-      // The four lines of the multi-line definition are all gone.
+      // The multi-line definition is fully removed from cleaned content.
       expect(result.cleanedContent).not.toContain("define e = Character");
       expect(result.cleanedContent).not.toContain('"Eileen",');
       expect(result.cleanedContent).not.toContain("who_color=");
+      expect(result.cleanedContent.split("\n")[0]).toBe(
+        BRANCHFORGE_MANAGED_NOTICE
+      );
+      expect(result.cleanedContent.split("\n")[1]).toBe("");
       expect(result.cleanedContent).toContain("label start:");
     });
 
@@ -236,6 +245,10 @@ describe("rpy-statements.service", () => {
       expect(result.stats).toEqual([]);
       expect(result.cleanedContent).not.toContain("default met_alex");
       expect(result.cleanedContent).not.toContain("default has_key");
+      expect(result.cleanedContent.split("\n")[0]).toBe(
+        BRANCHFORGE_MANAGED_NOTICE
+      );
+      expect(result.cleanedContent.split("\n")[1]).toBe("");
     });
 
     it("classifies numeric default as stats", () => {
@@ -255,6 +268,13 @@ describe("rpy-statements.service", () => {
         { key: "max_value", value: "100", kind: "stat" },
       ]);
       expect(result.variables).toEqual([]);
+      expect(result.cleanedContent).not.toContain("default affection");
+      expect(result.cleanedContent.split("\n")[0]).toBe(
+        BRANCHFORGE_MANAGED_NOTICE
+      );
+      expect(result.cleanedContent.split("\n")[1]).toBe("");
+      expect(result.cleanedContent).not.toContain("default trust");
+      expect(result.cleanedContent).not.toContain("default max_value");
     });
 
     it("preserves default statements with unknown values rather than stripping them", () => {
@@ -328,6 +348,8 @@ describe("rpy-statements.service", () => {
       const result = extractAndStripRpySymbols(content);
       expect(result.cleanedContent).toBe(
         [
+          BRANCHFORGE_MANAGED_NOTICE,
+          "",
           "# header comment",
           "",
           "",
@@ -336,6 +358,99 @@ describe("rpy-statements.service", () => {
           "    return",
         ].join("\n")
       );
+    });
+
+    it("removes indented managed lines while keeping surrounding indented content", () => {
+      const content = [
+        '  define e = Character("Eileen", color="#c8ffc8")',
+        "  default affection = 0",
+        "",
+        "label start:",
+        "    return",
+      ].join("\n");
+
+      const result = extractAndStripRpySymbols(content);
+      expect(result.characters).toEqual([
+        { tag: "e", name: "Eileen", color: "#c8ffc8" },
+      ]);
+      expect(result.stats).toEqual([
+        { key: "affection", value: "0", kind: "stat" },
+      ]);
+      expect(result.cleanedContent).not.toContain("define e = Character");
+      expect(result.cleanedContent).not.toContain("default affection");
+      expect(result.cleanedContent.split("\n")[0]).toBe(
+        BRANCHFORGE_MANAGED_NOTICE
+      );
+      expect(result.cleanedContent.split("\n")[1]).toBe("");
+      expect(result.cleanedContent).toContain("label start:");
+      expect(result.cleanedContent).toContain("    return");
+    });
+
+    it("does not add a notice when nothing managed was stripped", () => {
+      const content = [
+        'default mood = "happy"',
+        "",
+        "label start:",
+        "    return",
+      ].join("\n");
+
+      const result = extractAndStripRpySymbols(content);
+      expect(result.cleanedContent).not.toContain("# [BranchForge]");
+      expect(result.cleanedContent).toContain('default mood = "happy"');
+    });
+
+    it("preserves an existing managed notice when nothing is stripped", () => {
+      // Re-import of already-cleaned content must not wipe the notice.
+      const content = [
+        BRANCHFORGE_MANAGED_NOTICE,
+        "",
+        "label start:",
+        "    return",
+      ].join("\n");
+
+      const result = extractAndStripRpySymbols(content);
+      expect(result.cleanedContent).toBe(content);
+      expect(result.characters).toEqual([]);
+      expect(result.variables).toEqual([]);
+      expect(result.stats).toEqual([]);
+    });
+
+    it("preserves unparseable Character() definitions instead of stripping them", () => {
+      // Bare identifiers (and other non-quoted / non-None forms) are
+      // not safely promotable today — deleting them would lose
+      // author content. Also guards against mistaking color="#..."
+      // for the display name.
+      const content = [
+        'define boss = Character(boss_name, color="#ff0000")',
+        "",
+        "label start:",
+        "    return",
+      ].join("\n");
+
+      const result = extractAndStripRpySymbols(content);
+      expect(result.characters).toEqual([]);
+      expect(result.cleanedContent).toBe(content);
+      expect(result.cleanedContent).not.toContain("# [BranchForge]");
+    });
+
+    it("keeps a single top notice across re-import (idempotent)", () => {
+      const content = [
+        BRANCHFORGE_MANAGED_NOTICE,
+        "# [BranchForge] Character 'e' moved to Characters → exported as branchforge_definitions.rpy",
+        'define e = Character("Eileen", color="#c8ffc8")',
+        "",
+        "label start:",
+        "    return",
+      ].join("\n");
+
+      const result = extractAndStripRpySymbols(content);
+      const lines = result.cleanedContent.split("\n");
+      expect(lines[0]).toBe(BRANCHFORGE_MANAGED_NOTICE);
+      expect(lines[1]).toBe("");
+      expect(lines.filter((l) => l.includes("# [BranchForge]"))).toEqual([
+        BRANCHFORGE_MANAGED_NOTICE,
+      ]);
+      expect(result.cleanedContent).not.toContain("define e = Character");
     });
 
     it("de-duplicates characters within a single file (first occurrence wins)", () => {

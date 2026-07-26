@@ -35,6 +35,7 @@ import type {
   ExportSummary,
 } from "../../services/export.service.js";
 import {
+  ForbiddenError,
   NotFoundError,
   RateLimitError,
 } from "../../middleware/error-handler.middleware.js";
@@ -44,6 +45,7 @@ vi.mock("../../services/export.service.js", () => ({
   generateExport: vi.fn(),
   listExports: vi.fn(),
   getExportForDownload: vi.fn(),
+  getExportPreview: vi.fn(),
 }));
 
 // Mock authz
@@ -304,6 +306,116 @@ describe("Export Routes (Integration)", () => {
       const response = await fastify.inject({
         method: "GET",
         url: `/projects/${testProjectId}/exports/${testExportId}/download`,
+      });
+
+      expect(response.statusCode).toBe(500);
+      expect(response.json()).toEqual({
+        error: "Internal server error",
+      });
+    });
+  });
+  // ===========================================================================
+  // GET /projects/:projectId/export-preview
+  // ===========================================================================
+
+  describe("GET /projects/:projectId/export-preview", () => {
+    const mockPreviewResponse = {
+      files: [
+        {
+          kind: "variables" as const,
+          fileName: "variables.txt",
+          content: "key: description",
+          isEmpty: false,
+          emptyReason: null,
+        },
+        {
+          kind: "stats" as const,
+          fileName: "stats.txt",
+          content: "strength: 10",
+          isEmpty: false,
+          emptyReason: null,
+        },
+      ],
+    };
+
+    it("should return 200 with export preview files", async () => {
+      vi.spyOn(exportService, "getExportPreview").mockResolvedValue(
+        mockPreviewResponse
+      );
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: `/projects/${testProjectId}/export-preview`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual(mockPreviewResponse);
+      expect(exportService.getExportPreview).toHaveBeenCalledWith(
+        testProjectId,
+        testUserId
+      );
+    });
+
+    it("should return 404 when project not found", async () => {
+      vi.spyOn(exportService, "getExportPreview").mockRejectedValue(
+        new NotFoundError("Project")
+      );
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: `/projects/${testProjectId}/export-preview`,
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({
+        error: "Project not found",
+      });
+    });
+
+    it("should return 403 when access denied", async () => {
+      vi.spyOn(exportService, "getExportPreview").mockRejectedValue(
+        new ForbiddenError("Access denied")
+      );
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: `/projects/${testProjectId}/export-preview`,
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({
+        error: "Insufficient permissions",
+      });
+    });
+
+    it("should return 429 when rate limited", async () => {
+      vi.spyOn(exportService, "getExportPreview").mockRejectedValue(
+        new RateLimitError(
+          30,
+          "Too many export preview requests. Please try again later."
+        )
+      );
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: `/projects/${testProjectId}/export-preview`,
+      });
+
+      expect(response.statusCode).toBe(429);
+      expect(response.json()).toEqual({
+        error: "Too many requests, please try again later",
+        retryAfter: 30,
+      });
+    });
+
+    it("should return 500 on unexpected error", async () => {
+      vi.spyOn(exportService, "getExportPreview").mockRejectedValue(
+        new Error("Unexpected database failure")
+      );
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: `/projects/${testProjectId}/export-preview`,
       });
 
       expect(response.statusCode).toBe(500);

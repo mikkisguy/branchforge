@@ -1,0 +1,1 @@
+CREATE INDEX "labels_project_file_position_idx" ON "labels" USING btree ("project_file_id","label_position") WHERE deleted_at IS NULL;

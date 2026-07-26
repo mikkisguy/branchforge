@@ -198,4 +198,5 @@ export const pairGroupKeys = {
 export const exportKeys = {
   all: ["exports"] as const,
   lists: (projectId: string) => ["exports", projectId, "list"] as const,
+  preview: (projectId: string) => ["exports", projectId, "preview"] as const,
 } as const;

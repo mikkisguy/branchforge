@@ -13,7 +13,10 @@ import {
 } from "lucide-react";
 import { cva } from "class-variance-authority";
 import { ScriptReferencePanel, ScriptEditor } from "@/components/script-mode";
-import { ProjectFileTree } from "@/components/script-mode/ProjectFileTree";
+import {
+  ProjectFileTree,
+  type GeneratedFileInfo,
+} from "@/components/script-mode/ProjectFileTree";
 import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
 import { EDITOR_FONT_SIZE_CHANGED } from "@/components/FontSizeSwitcher";
 import {
@@ -102,6 +105,12 @@ interface ScriptModeEditorLayoutProps {
   saveConflict?: boolean;
   onSaveRequest?: () => void;
   labelTitles?: LabelTitleMap;
+  // Generated preview props
+  generatedFiles?: GeneratedFileInfo[];
+  activeGeneratedFileId?: string | null;
+  onGeneratedFileSelect?: (fileName: string) => void;
+  isGeneratedPreview?: boolean;
+  generatedFileName?: string;
 }
 
 // react-doctor-disable-next-line react-doctor/no-many-boolean-props, react-doctor/no-giant-component
@@ -141,6 +150,11 @@ export function ScriptModeEditorLayout({
   saveConflict = false,
   onSaveRequest,
   labelTitles,
+  generatedFiles,
+  activeGeneratedFileId,
+  onGeneratedFileSelect,
+  isGeneratedPreview = false,
+  generatedFileName,
 }: ScriptModeEditorLayoutProps) {
   const { isFocusMode, focusToggleRef } = focusModeState;
   const [editingCharacterId, setEditingCharacterId] = useState<string | null>(
@@ -334,11 +348,16 @@ export function ScriptModeEditorLayout({
 
               <ProjectFileTree
                 files={projectFiles}
-                activeFileId={activeFileId ?? undefined}
+                activeFileId={
+                  isGeneratedPreview ? undefined : (activeFileId ?? undefined)
+                }
                 activeSceneId={activeLabelId ?? undefined}
                 onFileSelect={onFileSelect}
                 onSceneSelect={onSceneSelect}
                 initialExpandedFolders={initialExpandedFolders}
+                generatedFiles={generatedFiles}
+                activeGeneratedFileId={activeGeneratedFileId}
+                onGeneratedFileSelect={onGeneratedFileSelect}
               />
             </div>
           </div>
@@ -375,7 +394,9 @@ export function ScriptModeEditorLayout({
               <div className="flex-1 min-w-0 h-12 overflow-hidden">
                 <EditorTabBar
                   items={tabItems}
-                  activeItemId={activeFileId}
+                  activeItemId={
+                    isGeneratedPreview ? null : (activeFileId ?? null)
+                  }
                   onSelect={onSelectTab}
                   onClose={onCloseTab}
                   idPrefix="script-tab-"
@@ -412,8 +433,29 @@ export function ScriptModeEditorLayout({
           )}
 
           <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
-            <div className="bg-card/50 border border-border rounded-lg h-full overflow-hidden min-h-0 min-w-0">
-              {activeProjectFile ? (
+            <div className="bg-card/50 border border-border rounded-lg h-full overflow-hidden min-h-0 min-w-0 flex flex-col">
+              {isGeneratedPreview && generatedFileName ? (
+                <>
+                  <div className="shrink-0 px-4 py-1.5 text-xs text-muted-foreground border-b border-border/40 bg-muted/10 italic">
+                    Read-only preview · {generatedFileName}
+                  </div>
+                  <div className="flex-1 min-h-0">
+                    <ScriptEditor
+                      content={activeFileContent}
+                      readOnly
+                      onChange={undefined}
+                      isFocusMode={isFocusMode}
+                      saveStatus="saved"
+                      saveConflict={false}
+                      labelTitles={labelTitles}
+                      lineWrap={lineWrap}
+                      onLineWrapChange={handleLineWrapChange}
+                      showLabelTitles={showLabelTitles}
+                      onShowLabelTitlesChange={setShowLabelTitles}
+                    />
+                  </div>
+                </>
+              ) : activeProjectFile ? (
                 <ScriptEditor
                   ref={editorRef}
                   content={activeFileContent}
