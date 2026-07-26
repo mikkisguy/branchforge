@@ -55,11 +55,13 @@ export interface DetectedDefaultStatement {
  */
 export interface RpySymbolExtraction {
   /** Content with managed `define <tag> = Character(...)` and
-   *  `default <key> = <value>` lines removed. When anything was
+   *  managed `default <key> = <value>` lines removed. Only boolean
+   *  (`True`/`False`) and numeric defaults are managed; unknown
+   *  default RHS values remain verbatim. When anything managed was
    *  stripped, a single `# [BranchForge] ...` notice is placed on
    *  the absolute first line, followed by one blank line
-   *  (idempotent across re-imports). Other
-   *  content is preserved verbatim. */
+   *  (idempotent across re-imports). Other content is preserved
+   *  verbatim. */
   cleanedContent: string;
   /** Unique characters detected across the file (first occurrence
    *  wins, in source order). */
@@ -126,9 +128,10 @@ export function computeCommonDirectoryPrefix(filePaths: string[]): string {
  *   untouched.
  * - If any managed statement was stripped, prepends a single
  *   `# [BranchForge] ...` notice as the absolute first line,
- *   followed by one blank line.
- * - Drops prior BranchForge import notices so re-import stays
- *   idempotent (never stacks duplicates).
+ *   followed by one blank line, replacing any prior BranchForge
+ *   import notices (idempotent across re-imports).
+ * - If nothing managed was stripped, prior BranchForge notices and
+ *   all other content are left unchanged.
  * - De-duplicates results by `tag` / `key` (first occurrence wins).
  *
  * The function is intentionally permissive: it does not filter by
@@ -154,12 +157,11 @@ export function extractAndStripRpySymbols(
     const line = lines[i];
     const trimmed = line.trim();
 
-    // Skip empty lines and comments — preserve them in the output,
-    // except prior BranchForge import notices (replaced below if needed).
+    // Skip empty lines and comments — preserve them in the output.
+    // Prior BranchForge import notices stay unless we strip managed
+    // symbols below (then they are replaced with a fresh top notice).
     if (trimmed === "" || trimmed.startsWith("#")) {
-      if (!isBranchForgeImportNotice(trimmed)) {
-        output.push(line);
-      }
+      output.push(line);
       i += 1;
       continue;
     }
@@ -200,11 +202,20 @@ export function extractAndStripRpySymbols(
           countCharOutsideStrings(nextLine, ")");
       }
       const character = parseCharacterBody(tag, body);
-      if (character && !charactersByTag.has(character.tag)) {
-        charactersByTag.set(character.tag, character);
+      if (character) {
+        if (!charactersByTag.has(character.tag)) {
+          charactersByTag.set(character.tag, character);
+        }
+        strippedSomething = true;
+        // Skip past the consumed lines (j may equal i for single-line).
+        i = j + 1;
+        continue;
       }
-      strippedSomething = true;
-      // Skip past the consumed lines (j may equal i for single-line).
+      // Unparseable Character() body (e.g. bare identifier) — keep
+      // the original lines; BranchForge has no safe store for them.
+      for (let k = i; k <= j; k += 1) {
+        output.push(lines[k]);
+      }
       i = j + 1;
       continue;
     }
@@ -252,13 +263,20 @@ export function extractAndStripRpySymbols(
   }
 
   if (strippedSomething) {
-    // Exactly one blank line after the notice. Collapse any leading
-    // blanks left from a prior import (notice + blank) so re-import
-    // does not stack empty lines.
-    while (output.length > 0 && output[0].trim() === "") {
-      output.shift();
+    // Drop prior BranchForge notices (current + legacy breadcrumbs),
+    // then place exactly one fresh notice + blank at the top.
+    // Collapse leading blanks so re-import does not stack empties.
+    const cleaned = output.filter((l) => !isBranchForgeImportNotice(l.trim()));
+    while (cleaned.length > 0 && cleaned[0].trim() === "") {
+      cleaned.shift();
     }
-    output.unshift(BRANCHFORGE_MANAGED_NOTICE, "");
+    cleaned.unshift(BRANCHFORGE_MANAGED_NOTICE, "");
+    return {
+      cleanedContent: cleaned.join("\n"),
+      characters: Array.from(charactersByTag.values()),
+      variables: Array.from(variablesByKey.values()),
+      stats: Array.from(statsByKey.values()),
+    };
   }
 
   return {
@@ -316,7 +334,10 @@ function parseCharacterBody(
   if (/^None\b/.test(afterOpen)) {
     name = null;
   } else {
-    const quotedName = afterOpen.match(/"([^"]*)"/);
+    // Only a quoted first argument counts as a display name. Matching
+    // any later `"..."` (e.g. color="#ff0000") would invent a bogus
+    // name for forms like Character(boss_name, color="...").
+    const quotedName = afterOpen.match(/^"([^"]*)"/);
     if (quotedName) {
       name = quotedName[1];
     } else {

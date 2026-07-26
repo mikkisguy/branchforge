@@ -399,6 +399,40 @@ describe("rpy-statements.service", () => {
       expect(result.cleanedContent).toContain('default mood = "happy"');
     });
 
+    it("preserves an existing managed notice when nothing is stripped", () => {
+      // Re-import of already-cleaned content must not wipe the notice.
+      const content = [
+        BRANCHFORGE_MANAGED_NOTICE,
+        "",
+        "label start:",
+        "    return",
+      ].join("\n");
+
+      const result = extractAndStripRpySymbols(content);
+      expect(result.cleanedContent).toBe(content);
+      expect(result.characters).toEqual([]);
+      expect(result.variables).toEqual([]);
+      expect(result.stats).toEqual([]);
+    });
+
+    it("preserves unparseable Character() definitions instead of stripping them", () => {
+      // Bare identifiers (and other non-quoted / non-None forms) are
+      // not safely promotable today — deleting them would lose
+      // author content. Also guards against mistaking color="#..."
+      // for the display name.
+      const content = [
+        'define boss = Character(boss_name, color="#ff0000")',
+        "",
+        "label start:",
+        "    return",
+      ].join("\n");
+
+      const result = extractAndStripRpySymbols(content);
+      expect(result.characters).toEqual([]);
+      expect(result.cleanedContent).toBe(content);
+      expect(result.cleanedContent).not.toContain("# [BranchForge]");
+    });
+
     it("keeps a single top notice across re-import (idempotent)", () => {
       const content = [
         BRANCHFORGE_MANAGED_NOTICE,
