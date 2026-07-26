@@ -37,9 +37,10 @@ import {
 } from "./rpy-statements.service.js";
 import { checkRateLimit } from "./rate-limiter.service.js";
 import { logInfo, logError, logWarn, LogEventType } from "../lib/logger.js";
-import type {
-  ExportPreviewResponse,
-  GeneratedExportPreviewFile,
+import {
+  isValidCharacterNameType,
+  type ExportPreviewResponse,
+  type GeneratedExportPreviewFile,
 } from "@branchforge/shared";
 
 // ============================================================================
@@ -119,9 +120,11 @@ async function fetchSupportingFileSources(projectId: string) {
       db
         .select({
           renpyTag: characters.renpyTag,
-          displayName: characters.displayName,
+          name: characters.name,
+          nameType: characters.nameType,
           color: characters.color,
           isNarrator: characters.isNarrator,
+          displayName: characters.displayName,
         })
         .from(characters)
         .where(eq(characters.projectId, projectId)),
@@ -320,10 +323,19 @@ export async function generateExport(
     patchedFiles[`${fileDirPrefix}branchforge_stats.rpy`] =
       generateStatsFile(projectStats);
   }
-
   if (projectCharacters.length > 0) {
     patchedFiles[`${fileDirPrefix}branchforge_definitions.rpy`] =
-      generateCharacterDefinitionsFile(projectCharacters);
+      generateCharacterDefinitionsFile(
+        projectCharacters.map((c) => {
+          const rawNameType = c.nameType;
+          return {
+            ...c,
+            nameType: isValidCharacterNameType(rawNameType)
+              ? rawNameType
+              : "literal",
+          };
+        })
+      );
   }
 
   // Serialize all files into a single JSON blob for storage
@@ -445,7 +457,17 @@ export async function getExportPreview(
     {
       kind: "definitions",
       fileName: "branchforge_definitions.rpy",
-      content: generateCharacterDefinitionsFile(projectCharacters),
+      content: generateCharacterDefinitionsFile(
+        projectCharacters.map((c) => {
+          const rawNameType = c.nameType;
+          return {
+            ...c,
+            nameType: isValidCharacterNameType(rawNameType)
+              ? rawNameType
+              : "literal",
+          };
+        })
+      ),
       isEmpty: definitionsEmpty,
       emptyReason: definitionsEmpty
         ? "No characters defined — this file will not be included in the export"

@@ -9,7 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { charactersApi } from "@/lib/api/characters";
 import { characterKeys, flowKeys } from "@/lib/query-keys";
 import { useToast } from "@/contexts/ToastContext";
-import type { Character } from "@branchforge/shared";
+import type { Character, CharacterNameType } from "@branchforge/shared";
 import {
   AVATAR_MAX_SIZE,
   AVATAR_MAX_SIZE_MB,
@@ -30,6 +30,7 @@ interface CreateCharacterInput {
   isNarrator?: boolean;
   notes?: string;
   conditionalPrefix?: string;
+  nameType?: CharacterNameType;
 }
 
 interface UpdateCharacterInput {
@@ -41,6 +42,7 @@ interface UpdateCharacterInput {
   isNarrator?: boolean;
   notes?: string;
   conditionalPrefix?: string;
+  nameType?: CharacterNameType;
 }
 
 export interface UseCharactersReturn {

@@ -28,7 +28,7 @@ export function CharacterEditDialogBasicSection({
       <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
         <div className="space-y-1">
           <Label htmlFor="edit-char-name" className="text-xs">
-            Name *
+            Ren'Py name *
           </Label>
           <Input
             id="edit-char-name"
@@ -43,6 +43,10 @@ export function CharacterEditDialogBasicSection({
               form.nameError ? "edit-char-name-error" : undefined
             }
           />
+          <p className="text-xs text-muted-foreground">
+            Used as the first argument to Character(). (e.g. Eileen or
+            [first_name])
+          </p>
           <FormErrorMessage
             id="edit-char-name-error"
             message={form.nameError}
@@ -66,6 +70,9 @@ export function CharacterEditDialogBasicSection({
               form.displayNameError ? "edit-char-display-name-error" : undefined
             }
           />
+          <p className="text-xs text-muted-foreground">
+            Shown in Writer Mode and character lists on BranchForge.
+          </p>
           <FormErrorMessage
             id="edit-char-display-name-error"
             message={form.displayNameError}

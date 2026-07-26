@@ -694,6 +694,52 @@ export interface LabelDetail extends PublicLabel {
 }
 
 /**
+ * Classification of how a Character's display name was specified in the
+ * source RPY file. Drives the import wizard's warning indicators.
+ *
+ * - `literal` — A plain quoted string with no Ren'Py tags (e.g., `"Sarah"`)
+ * - `variable` — A bare Python identifier (e.g., `boss_name`); the actual
+ *   name can only be known at runtime, so the import wizard must prompt
+ *   the user to provide a placeholder.
+ * - `interpolated` — A bracketed Python expression (e.g., `"[e_name]"`);
+ *   the value depends on a runtime variable, so the wizard must warn.
+ * - `tagged` — A quoted string containing Ren'Py inline tags (e.g.,
+ *   `"{color=#f00}Stranger{/color}"`). The raw form is preserved; the
+ *   display name strips tags for readability.
+ * - `none` — `Character(None, ...)`; the narrator. Already excluded from
+ *   import by default but the wizard may surface it for confirmation.
+ * - `empty` — `Character("", ...)`; the wizard should show "(unnamed)".
+ * - `unknown` — A non-standard value such as `"???"`; usually intentional
+ *   by the author, so the wizard keeps it as-is.
+ */
+export type CharacterNameType =
+  | "literal"
+  | "variable"
+  | "interpolated"
+  | "tagged"
+  | "none"
+  | "empty"
+  | "unknown";
+/**
+ * Validates that a value is a valid CharacterNameType.
+ * @param value - The value to validate
+ * @returns true if the value is a valid CharacterNameType
+ */
+export function isValidCharacterNameType(
+  value: string
+): value is CharacterNameType {
+  return (
+    value === "literal" ||
+    value === "variable" ||
+    value === "interpolated" ||
+    value === "tagged" ||
+    value === "none" ||
+    value === "empty" ||
+    value === "unknown"
+  );
+}
+
+/**
  * Character in a visual novel project
  * Represents a character with dialogue lines and appearance settings
  */
@@ -702,6 +748,8 @@ export interface Character {
   projectId: string;
   name: string;
   displayName: string;
+  /** How `name` is emitted as the Character() first argument. */
+  nameType: CharacterNameType;
   renpyTag: string;
   color: string;
   avatarUrl: string | null;
@@ -756,34 +804,6 @@ export function stripRenpyTextTags(input: string): string {
   return result;
 }
 
-/**
- * Classification of how a Character's display name was specified in the
- * source RPY file. Drives the import wizard's warning indicators.
- *
- * - `literal` — A plain quoted string with no Ren'Py tags (e.g., `"Sarah"`)
- * - `variable` — A bare Python identifier (e.g., `boss_name`); the actual
- *   name can only be known at runtime, so the import wizard must prompt
- *   the user to provide a placeholder.
- * - `interpolated` — A bracketed Python expression (e.g., `"[e_name]"`);
- *   the value depends on a runtime variable, so the wizard must warn.
- * - `tagged` — A quoted string containing Ren'Py inline tags (e.g.,
- *   `"{color=#f00}Stranger{/color}"`). The raw form is preserved; the
- *   display name strips tags for readability.
- * - `none` — `Character(None, ...)`; the narrator. Already excluded from
- *   import by default but the wizard may surface it for confirmation.
- * - `empty` — `Character("", ...)`; the wizard should show "(unnamed)".
- * - `unknown` — A non-standard value such as `"???"`; usually intentional
- *   by the author, so the wizard keeps it as-is.
- */
-export type CharacterNameType =
-  | "literal"
-  | "variable"
-  | "interpolated"
-  | "tagged"
-  | "none"
-  | "empty"
-  | "unknown";
-
 // ============================================================================
 // Character Detection Types
 // ============================================================================
@@ -800,11 +820,9 @@ export interface DetectedCharacter {
    * (e.g. `[e_name]`); for bare identifiers it is the variable name
    * (e.g. `boss_name`); `null` for `None`/narrator.
    *
-   * NOTE: BranchForge's current RPY export does NOT yet consume this
-   * field — it emits `displayName` instead. This field is preserved
-   * for a future round-tripping pass and for diagnostic/debugging
-   * purposes. Until that pass lands, callers should treat `name` as
-   * informational and not rely on it for export fidelity.
+   * Consumed by RPY export together with `nameType` as the first
+   * argument to `Character(...)`. `displayName` is UI-only and must
+   * not be used for the exported Character() arg.
    */
   name: string | null;
   /**

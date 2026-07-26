@@ -13,6 +13,7 @@ const mockCharacters: Character[] = [
     renpyTag: "a",
     color: "#FF6B6B",
     routeAffiliation: "EILEEN",
+    nameType: "literal",
     isLoveInterest: true,
     isNarrator: false,
     notes: "casual notes",

@@ -31,7 +31,8 @@ describe("RPYGeneratorService", () => {
       const characters = [
         {
           renpyTag: "e",
-          displayName: "Eileen",
+          name: "Eileen",
+          nameType: "literal",
           color: "#c8ffc8",
         },
       ];
@@ -49,17 +50,20 @@ describe("RPYGeneratorService", () => {
       const characters = [
         {
           renpyTag: "e",
-          displayName: "Eileen",
+          name: "Eileen",
+          nameType: "literal",
           color: "#c8ffc8",
         },
         {
           renpyTag: "s",
-          displayName: "Sylvie",
+          name: "Sylvie",
+          nameType: "literal",
           color: "#ff0000",
         },
         {
           renpyTag: "l",
-          displayName: "Lucy",
+          name: "Lucy",
+          nameType: "literal",
           color: "#0000ff",
         },
       ];
@@ -87,7 +91,8 @@ describe("RPYGeneratorService", () => {
       const characters = [
         {
           renpyTag: "e",
-          displayName: 'Eileen "The Bold"',
+          name: 'Eileen "The Bold"',
+          nameType: "literal",
           color: "#c8ffc8",
         },
       ];
@@ -104,7 +109,8 @@ describe("RPYGeneratorService", () => {
       const characters = [
         {
           renpyTag: "e",
-          displayName: "C:\\Path",
+          name: "C:\\Path",
+          nameType: "literal",
           color: "#c8ffc8",
         },
       ];
@@ -121,7 +127,8 @@ describe("RPYGeneratorService", () => {
       const characters = [
         {
           renpyTag: "e",
-          displayName: 'Path\\To "File"',
+          name: 'Path\\To "File"',
+          nameType: "literal",
           color: "#c8ffc8",
         },
       ];
@@ -139,7 +146,8 @@ describe("RPYGeneratorService", () => {
       const characters = [
         {
           renpyTag: "e",
-          displayName: "Eileen",
+          name: "Eileen",
+          nameType: "literal",
           color: "#c8ffc8",
         },
       ];
@@ -154,7 +162,8 @@ describe("RPYGeneratorService", () => {
       const characters = [
         {
           renpyTag: "n",
-          displayName: "Narrator",
+          name: "Narrator",
+          nameType: "literal",
           color: "#cfcfcf",
           isNarrator: true,
         },
@@ -171,7 +180,8 @@ describe("RPYGeneratorService", () => {
       const characters = [
         {
           renpyTag: "e",
-          displayName: "Eileen",
+          name: "Eileen",
+          nameType: "literal",
           color: "#c8ffc8",
           isNarrator: false,
         },
@@ -189,7 +199,8 @@ describe("RPYGeneratorService", () => {
       const characters = [
         {
           renpyTag: "s",
-          displayName: "Sylvie",
+          name: "Sylvie",
+          nameType: "literal",
           color: "#ff0000",
         },
       ];
@@ -206,17 +217,20 @@ describe("RPYGeneratorService", () => {
       const characters = [
         {
           renpyTag: "valid_tag",
-          displayName: "Valid",
+          name: "Valid",
+          nameType: "literal",
           color: "#ffffff",
         },
         {
           renpyTag: "bad tag",
-          displayName: "Bad Tag Character",
+          name: "Bad Tag Character",
+          nameType: "literal",
           color: "#ff0000",
         },
         {
           renpyTag: "ok",
-          displayName: "Another Valid",
+          name: "Another Valid",
+          nameType: "literal",
           color: "#0000ff",
         },
       ];
@@ -235,12 +249,14 @@ describe("RPYGeneratorService", () => {
       const characters = [
         {
           renpyTag: "e",
-          displayName: "Eileen",
+          name: "Eileen",
+          nameType: "literal",
           color: "#c8ffc8",
         },
         {
           renpyTag: "h",
-          displayName: "Hacker",
+          name: "Hacker",
+          nameType: "literal",
           color: 'red") $ evil = True #',
         },
       ];
@@ -260,12 +276,14 @@ describe("RPYGeneratorService", () => {
       const characters = [
         {
           renpyTag: "1bad",
-          displayName: "StartsWithDigit",
+          name: "StartsWithDigit",
+          nameType: "literal",
           color: "#ffffff",
         },
         {
           renpyTag: "ok",
-          displayName: "Valid",
+          name: "Valid",
+          nameType: "literal",
           color: "#ffffff",
         },
       ];
@@ -280,17 +298,20 @@ describe("RPYGeneratorService", () => {
       const characters = [
         {
           renpyTag: "a",
-          displayName: "White",
+          name: "White",
+          nameType: "literal",
           color: "#ffffff",
         },
         {
           renpyTag: "b",
-          displayName: "Red",
+          name: "Red",
+          nameType: "literal",
           color: "#ff0000",
         },
         {
           renpyTag: "c",
-          displayName: "Blue",
+          name: "Blue",
+          nameType: "literal",
           color: "#0000ff",
         },
       ];
@@ -302,6 +323,136 @@ describe("RPYGeneratorService", () => {
       );
       expect(result).toContain('define b = Character("Red", color="#ff0000")');
       expect(result).toContain('define c = Character("Blue", color="#0000ff")');
+    });
+
+    it("should emit interpolated nameType as quoted Character() arg (not displayName)", () => {
+      const characters = [
+        {
+          renpyTag: "e",
+          name: "[first_name]",
+          nameType: "interpolated",
+          displayName: "John",
+          color: "#c8ffc8",
+        },
+      ];
+
+      const result = generateCharacterDefinitionsFile(characters);
+
+      // Must use name (bracketed) not displayName (John)
+      expect(result).toContain(
+        'define e = Character("[first_name]", color="#c8ffc8")'
+      );
+      expect(result).not.toContain("John");
+    });
+
+    it("should emit variable nameType as unquoted identifier", () => {
+      const characters = [
+        {
+          renpyTag: "boss",
+          name: "boss_name",
+          nameType: "variable",
+          color: "#ff0000",
+        },
+      ];
+
+      const result = generateCharacterDefinitionsFile(characters);
+
+      expect(result).toContain(
+        'define boss = Character(boss_name, color="#ff0000")'
+      );
+    });
+
+    it("should skip variable nameType when name is not a safe identifier", () => {
+      const characters = [
+        {
+          renpyTag: "e",
+          name: "not a valid ident!",
+          nameType: "variable",
+          color: "#c8ffc8",
+        },
+      ];
+
+      const result = generateCharacterDefinitionsFile(characters);
+
+      expect(result).not.toContain("define e = Character");
+      expect(result).not.toContain("not a valid ident!");
+    });
+
+    it("should skip variable nameType when name is null", () => {
+      const characters = [
+        {
+          renpyTag: "e",
+          name: null,
+          nameType: "variable",
+          color: "#c8ffc8",
+        },
+      ];
+
+      const result = generateCharacterDefinitionsFile(characters);
+
+      expect(result).not.toContain("define e = Character");
+    });
+
+    it("should emit tagged nameType as quoted string preserving tags", () => {
+      const characters = [
+        {
+          renpyTag: "stranger",
+          name: "{color=#f00}Stranger{/color}",
+          nameType: "tagged",
+          color: "#ffffff",
+        },
+      ];
+
+      const result = generateCharacterDefinitionsFile(characters);
+
+      expect(result).toContain(
+        'define stranger = Character("{color=#f00}Stranger{/color}", color="#ffffff")'
+      );
+    });
+
+    it("should emit none nameType as unquoted None", () => {
+      const characters = [
+        {
+          renpyTag: "n",
+          name: null,
+          nameType: "none",
+          color: "#cfcfcf",
+        },
+      ];
+
+      const result = generateCharacterDefinitionsFile(characters);
+
+      expect(result).toContain('define n = Character(None, color="#cfcfcf")');
+    });
+
+    it("should emit empty nameType as empty quoted string", () => {
+      const characters = [
+        {
+          renpyTag: "m",
+          name: "",
+          nameType: "empty",
+          color: "#000000",
+        },
+      ];
+
+      const result = generateCharacterDefinitionsFile(characters);
+
+      expect(result).toContain('define m = Character("", color="#000000")');
+    });
+
+    it("should emit unknown nameType as quoted string", () => {
+      const characters = [
+        {
+          renpyTag: "u",
+          name: "???",
+          nameType: "unknown",
+          color: "#888888",
+        },
+      ];
+
+      const result = generateCharacterDefinitionsFile(characters);
+
+      expect(result).toContain('define u = Character("???", color="#888888")');
     });
   });
 

@@ -30,6 +30,7 @@ import {
   updateIncomingJumpsForLabels,
 } from "./labels.service.js";
 import { createProject, deleteProject } from "./projects.service.js";
+import { inferNameTypeFromStoredName } from "./character-parser/name-resolution.js";
 import {
   MAX_ZIP_BUFFER_BYTES,
   MAX_EXTRACTED_BYTES,
@@ -600,6 +601,7 @@ async function promoteSymbols(
           projectId,
           name: c.name ?? c.tag,
           displayName: c.name ?? c.tag,
+          nameType: inferNameTypeFromStoredName(c.name) ?? "literal",
           renpyTag: c.tag,
           color: c.color || "#cfcfcf",
           updatedAt: new Date(),

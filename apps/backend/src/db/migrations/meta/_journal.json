@@ -386,6 +386,13 @@
       "when": 1785064774330,
       "tag": "0054_thin_the_hunter",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1785072920961,
+      "tag": "0055_lazy_famine",
+      "breakpoints": true
     }
   ]
 }

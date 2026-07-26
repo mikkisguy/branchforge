@@ -120,6 +120,34 @@ export function classifyName(
 }
 
 /**
+ * Derive a CharacterNameType from a stored `name` value, for use when
+ * nameType was not explicitly provided at create/update time.
+ *
+ * This is the inverse of the emit logic in generateCharacterDefinitionsFile:
+ * given the stored name we infer how it would need to be emitted.
+ *
+ * Rules:
+ * - null → "none"
+ * - "" → "empty"
+ * - "???" → "unknown"
+ * - matches `[identifier]` exactly → "interpolated"
+ * - contains `{...}` tags → "tagged"
+ * - contains an interpolation expression → "interpolated"
+ * - else → "literal" (safe default)
+ */
+export function inferNameTypeFromStoredName(
+  name: string | null
+): CharacterNameType {
+  if (name === null) return "none";
+  if (name === "") return "empty";
+  if (name === "???") return "unknown";
+  if (/^\[[a-zA-Z_][a-zA-Z0-9_.]*\]$/.test(name)) return "interpolated";
+  if (/\{[^{}]*\}/.test(name)) return "tagged";
+  if (INTERPOLATION_REGEX.test(name)) return "interpolated";
+  return "literal";
+}
+
+/**
  * Build a DetectedCharacter from a pattern match, deriving nameType and
  * displayName via `classifyName`.
  */

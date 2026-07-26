@@ -5,7 +5,11 @@
  */
 
 import { request } from "./client";
-import type { Character, DetectCharactersResponse } from "@branchforge/shared";
+import type {
+  Character,
+  DetectCharactersResponse,
+  CharacterNameType,
+} from "@branchforge/shared";
 
 // Re-export types for convenience
 export type { DetectCharactersResponse };
@@ -18,6 +22,7 @@ export interface ImportCharacter {
   isLoveInterest?: boolean;
   isNarrator?: boolean;
   routeAffiliation?: string;
+  nameType?: CharacterNameType;
 }
 
 export interface ImportCharactersRequest {
@@ -70,6 +75,7 @@ export interface CreateCharacterBody {
   isNarrator?: boolean;
   notes?: string;
   conditionalPrefix?: string;
+  nameType?: CharacterNameType;
 }
 
 export interface UpdateCharacterBody {
@@ -81,6 +87,7 @@ export interface UpdateCharacterBody {
   isNarrator?: boolean;
   notes?: string;
   conditionalPrefix?: string;
+  nameType?: CharacterNameType;
 }
 
 // ============================================================================

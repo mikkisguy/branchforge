@@ -41,8 +41,8 @@ describe("PairGroupEditDialog — dirty form guard", () => {
 
     vi.mocked(useCharacters).mockReturnValue({
       characters: [
-        { id: "char-a", displayName: "Alex" },
-        { id: "char-b", displayName: "Blake" },
+        { id: "char-a", displayName: "Alex", nameType: "literal" },
+        { id: "char-b", displayName: "Blake", nameType: "literal" },
       ],
     } as never);
 

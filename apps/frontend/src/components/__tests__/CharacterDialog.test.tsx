@@ -57,13 +57,13 @@ vi.mock("../CharacterEditDialog/CharacterEditDialog.lazy", () => {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label htmlFor="name">Name *</label>
+              <label htmlFor="name">Ren'Py name *</label>
               <input
                 id="name"
                 type="text"
                 value={isEditingEileen ? "Eileen" : ""}
                 readOnly
-                aria-label="Name *"
+                aria-label="Ren'Py name *"
               />
             </div>
             <div>
@@ -105,6 +105,7 @@ const mockCharacters: Character[] = [
     displayName: "Eileen",
     renpyTag: "a",
     color: "#FF6B6B",
+    nameType: "literal",
     routeAffiliation: "EILEEN",
     isLoveInterest: true,
     isNarrator: false,
@@ -121,6 +122,7 @@ const mockCharacters: Character[] = [
     displayName: "Lucas",
     renpyTag: "l",
     color: "#4ECDC4",
+    nameType: "literal",
     routeAffiliation: "LUCAS",
     isLoveInterest: true,
     isNarrator: false,
@@ -298,7 +300,7 @@ describe("CharacterDialog", () => {
       ).toBeInTheDocument();
 
       // Character's name should be pre-filled
-      const nameInput = await screen.findByLabelText("Name *");
+      const nameInput = await screen.findByLabelText("Ren'Py name *");
       expect(nameInput).toHaveValue("Eileen");
 
       // Character's display name should be pre-filled

@@ -1,0 +1,1 @@
+ALTER TABLE "characters" ADD COLUMN "name_type" text DEFAULT 'literal' NOT NULL;

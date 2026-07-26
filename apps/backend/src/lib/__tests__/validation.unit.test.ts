@@ -22,6 +22,7 @@ import {
   labelIdParamsSchema,
   createLabelSchema,
   createCharacterSchema,
+  updateCharacterSchema,
   characterIdParamsSchema,
   renpyTagSchema,
   colorHexSchema,
@@ -1399,6 +1400,22 @@ describe("Character Schemas", () => {
 
       const result = createCharacterSchema.safeParse(validData);
       expect(result.success).toBe(false);
+    });
+  });
+
+  describe("updateCharacterSchema", () => {
+    it("should accept conditionalPrefix updates", () => {
+      const result = updateCharacterSchema.safeParse({
+        conditionalPrefix: "x_",
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("should accept nameType updates", () => {
+      const result = updateCharacterSchema.safeParse({
+        nameType: "literal",
+      });
+      expect(result.success).toBe(true);
     });
   });
 

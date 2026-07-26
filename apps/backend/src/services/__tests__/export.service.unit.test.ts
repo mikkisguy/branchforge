@@ -326,7 +326,13 @@ describe("ExportService", () => {
         },
       ];
       const mockChars = [
-        { renpyTag: "e", displayName: "Eileen", color: "#c8ffc8" },
+        {
+          renpyTag: "e",
+          name: "Eileen",
+          nameType: "literal" as const,
+          displayName: "Eileen",
+          color: "#c8ffc8",
+        },
       ];
       const mockExportRecord = {
         id: EXPORT_ID,
@@ -403,7 +409,13 @@ describe("ExportService", () => {
         { key: "s", name: "S", minValue: 0, maxValue: 1, description: null },
       ]);
       resolveQueue.push([
-        { renpyTag: "e", displayName: "Eileen", color: "#c8ffc8" },
+        {
+          renpyTag: "e",
+          name: "Eileen",
+          nameType: "literal" as const,
+          displayName: "Eileen",
+          color: "#c8ffc8",
+        },
       ]);
       resolveQueue.push([]); // cleanup
 
@@ -930,6 +942,8 @@ describe("ExportService", () => {
       const mockChars = [
         {
           renpyTag: "e",
+          name: "Eileen",
+          nameType: "literal" as const,
           displayName: "Eileen",
           color: "#c8ffc8",
           isNarrator: false,
@@ -992,6 +1006,8 @@ describe("ExportService", () => {
       const mockChars = [
         {
           renpyTag: "e",
+          name: "Eileen",
+          nameType: "literal" as const,
           displayName: "Eileen",
           color: "#c8ffc8",
           isNarrator: false,
