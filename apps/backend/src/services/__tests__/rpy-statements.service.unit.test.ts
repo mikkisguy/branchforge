@@ -131,9 +131,7 @@ describe("rpy-statements.service", () => {
         { tag: "e", name: "Eileen", color: "#c8ffc8" },
       ]);
       expect(result.cleanedContent).not.toContain("define e = Character");
-      expect(result.cleanedContent).toContain(
-        "# [BranchForge] Character 'e' moved to Characters → exported as branchforge_definitions.rpy"
-      );
+      expect(result.cleanedContent).not.toContain("# [BranchForge]");
       expect(result.cleanedContent).toContain("label start:");
       expect(result.cleanedContent).toContain('e "Hello."');
     });
@@ -156,13 +154,11 @@ describe("rpy-statements.service", () => {
         // who_color wins over color when both are present
         { tag: "e", name: "Eileen", color: "#c8c8c8" },
       ]);
-      // The multi-line definition is replaced by a single breadcrumb.
+      // The multi-line definition is fully removed from cleaned content.
       expect(result.cleanedContent).not.toContain("define e = Character");
       expect(result.cleanedContent).not.toContain('"Eileen",');
       expect(result.cleanedContent).not.toContain("who_color=");
-      expect(result.cleanedContent).toContain(
-        "# [BranchForge] Character 'e' moved to Characters → exported as branchforge_definitions.rpy"
-      );
+      expect(result.cleanedContent).not.toContain("# [BranchForge]");
       expect(result.cleanedContent).toContain("label start:");
     });
 
@@ -242,12 +238,7 @@ describe("rpy-statements.service", () => {
       expect(result.stats).toEqual([]);
       expect(result.cleanedContent).not.toContain("default met_alex");
       expect(result.cleanedContent).not.toContain("default has_key");
-      expect(result.cleanedContent).toContain(
-        "# [BranchForge] Variable 'met_alex' moved to Variables → exported as branchforge_variables.rpy"
-      );
-      expect(result.cleanedContent).toContain(
-        "# [BranchForge] Variable 'has_key' moved to Variables → exported as branchforge_variables.rpy"
-      );
+      expect(result.cleanedContent).not.toContain("# [BranchForge]");
     });
 
     it("classifies numeric default as stats", () => {
@@ -268,9 +259,9 @@ describe("rpy-statements.service", () => {
       ]);
       expect(result.variables).toEqual([]);
       expect(result.cleanedContent).not.toContain("default affection");
-      expect(result.cleanedContent).toContain(
-        "# [BranchForge] Stat 'affection' moved to Stats → exported as branchforge_stats.rpy"
-      );
+      expect(result.cleanedContent).not.toContain("# [BranchForge]");
+      expect(result.cleanedContent).not.toContain("default trust");
+      expect(result.cleanedContent).not.toContain("default max_value");
     });
 
     it("preserves default statements with unknown values rather than stripping them", () => {
@@ -346,7 +337,6 @@ describe("rpy-statements.service", () => {
         [
           "# header comment",
           "",
-          "# [BranchForge] Character 'e' moved to Characters → exported as branchforge_definitions.rpy",
           "",
           "# body comment",
           "label start:",
@@ -355,7 +345,7 @@ describe("rpy-statements.service", () => {
       );
     });
 
-    it("preserves indentation on breadcrumb comments", () => {
+    it("removes indented managed lines while keeping surrounding indented content", () => {
       const content = [
         '  define e = Character("Eileen", color="#c8ffc8")',
         "  default affection = 0",
@@ -365,12 +355,11 @@ describe("rpy-statements.service", () => {
       ].join("\n");
 
       const result = extractAndStripRpySymbols(content);
-      expect(result.cleanedContent).toContain(
-        "  # [BranchForge] Character 'e' moved to Characters → exported as branchforge_definitions.rpy"
-      );
-      expect(result.cleanedContent).toContain(
-        "  # [BranchForge] Stat 'affection' moved to Stats → exported as branchforge_stats.rpy"
-      );
+      expect(result.cleanedContent).not.toContain("define e = Character");
+      expect(result.cleanedContent).not.toContain("default affection");
+      expect(result.cleanedContent).not.toContain("# [BranchForge]");
+      expect(result.cleanedContent).toContain("label start:");
+      expect(result.cleanedContent).toContain("    return");
     });
 
     it("de-duplicates characters within a single file (first occurrence wins)", () => {

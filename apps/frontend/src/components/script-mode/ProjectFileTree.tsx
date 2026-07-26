@@ -107,6 +107,11 @@ export function ProjectFileTree({
     <div className="space-y-2" role="tree">
       {generatedFiles && generatedFiles.length > 0 && (
         <CollapsibleSection title="Generated">
+          <p className="text-[10px] text-muted-foreground/70 px-2 pb-2 leading-snug">
+            Managed characters, boolean variables, and numeric stats live in the
+            reference sidebar; these files preview what a ZIP export will
+            generate (they are not stored in your authored .rpy files).
+          </p>
           <div className="space-y-0.5" role="group">
             {generatedFiles.map((file) => {
               const isSelected = activeGeneratedFileId === file.fileName;
