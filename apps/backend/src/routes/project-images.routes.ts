@@ -6,10 +6,13 @@
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import type { MultipartFile } from "@fastify/multipart";
+import sharp from "sharp";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { validateParams } from "../middleware/validation.middleware.js";
 import { ValidationError } from "../middleware/error-handler.middleware.js";
 import {
+  validateData,
+  projectImagePlainFieldsSchema,
   projectIdParamsSchema,
   projectImageIdParamsSchema,
   type ProjectIdParams,
@@ -126,7 +129,39 @@ async function readMultipartFile(
     );
   }
 
-  return { buffer, mimeType: part.mimetype };
+  // Detect actual MIME type via sharp metadata
+  let detectedFormat: string | undefined;
+  try {
+    const metadata = await sharp(buffer).metadata();
+    detectedFormat = metadata.format;
+  } catch {
+    throw new ValidationError("Invalid or corrupt image file");
+  }
+
+  const formatToMime: Record<string, string> = {
+    png: "image/png",
+    jpeg: "image/jpeg",
+    webp: "image/webp",
+  };
+
+  const detectedMime = detectedFormat
+    ? formatToMime[detectedFormat]
+    : undefined;
+  if (!detectedMime) {
+    throw new ValidationError("Invalid or corrupt image file");
+  }
+
+  // Normalize claimed MIME and compare to detected
+  const claimedMime = part.mimetype
+    .toLowerCase()
+    .replace("image/jpg", "image/jpeg");
+  if (claimedMime !== detectedMime) {
+    throw new ValidationError(
+      "Uploaded file type does not match expected type"
+    );
+  }
+
+  return { buffer, mimeType: detectedMime };
 }
 
 async function parseProjectImageUpload(
@@ -188,9 +223,8 @@ async function uploadProjectImageHandler(
   const { projectId } = request.params;
   const parsed = await parseProjectImageUpload(request);
 
-  if (!parsed.originalFilename?.trim()) {
-    throw new ValidationError("originalFilename is required");
-  }
+  validateData(parsed, projectImagePlainFieldsSchema, "Invalid upload fields");
+
   if (!parsed.tooltip) {
     throw new ValidationError("tooltip file is required");
   }
@@ -199,7 +233,7 @@ async function uploadProjectImageHandler(
   }
 
   const image = await uploadProjectImage(projectId, request.user!.id, {
-    originalFilename: parsed.originalFilename,
+    originalFilename: parsed.originalFilename!,
     normalizedTarget: parsed.normalizedTarget,
     tooltip: parsed.tooltip,
     modal: parsed.modal,
@@ -215,6 +249,12 @@ async function replaceProjectImageHandler(
 ): Promise<void> {
   const { imageId } = request.params;
   const parsed = await parseProjectImageUpload(request);
+
+  validateData(
+    parsed,
+    projectImagePlainFieldsSchema.partial(),
+    "Invalid upload fields"
+  );
 
   if (!parsed.tooltip) {
     throw new ValidationError("tooltip file is required");

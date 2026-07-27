@@ -144,43 +144,18 @@ function blobToFile(blob: Blob, filename: string): File {
   });
 }
 
-/**
- * Resize an image file into tooltip (200px) and modal (800px) variants.
- *
- * When `expectedTarget` is provided, the normalized filename must match it.
- */
-export async function processProjectImageFile(
-  file: File,
-  expectedTarget?: string
-): Promise<ProcessedProjectImageFiles> {
-  const normalizedTarget = validateProjectImageFile(file, expectedTarget);
-  const image = await loadImageFromFile(file);
-  const [tooltipResult, modalResult] = await Promise.all([
-    resizeToBlob(image, PROJECT_IMAGE_TOOLTIP_SIZE),
-    resizeToBlob(image, PROJECT_IMAGE_MODAL_SIZE),
-  ]);
-
-  const extension = tooltipResult.extension;
-  const baseName = normalizedTarget;
-  const originalFilename = file.name.includes(".")
-    ? file.name
-    : `${baseName}.${extension}`;
-
-  return {
-    originalFilename,
-    normalizedTarget,
-    tooltip: blobToFile(tooltipResult.blob, `${baseName}_tooltip.${extension}`),
-    modal: blobToFile(modalResult.blob, `${baseName}_modal.${extension}`),
-  };
+interface InternalProcessedImage {
+  normalizedTarget: string;
+  originalFilename: string;
+  extension: "webp" | "jpg";
+  tooltipBlob: Blob;
+  modalBlob: Blob;
 }
 
-/**
- * Resize an image file into tooltip/modal blobs without wrapping as File objects.
- */
-export async function processProjectImageBlobs(
+async function processImageFile(
   file: File,
   expectedTarget?: string
-): Promise<ProcessedProjectImageBlobs> {
+): Promise<InternalProcessedImage> {
   const normalizedTarget = validateProjectImageFile(file, expectedTarget);
   const image = await loadImageFromFile(file);
   const [tooltipResult, modalResult] = await Promise.all([
@@ -194,10 +169,62 @@ export async function processProjectImageBlobs(
     : `${normalizedTarget}.${extension}`;
 
   return {
+    normalizedTarget,
+    originalFilename,
+    extension,
+    tooltipBlob: tooltipResult.blob,
+    modalBlob: modalResult.blob,
+  };
+}
+
+/**
+ * Resize an image file into tooltip (200px) and modal (800px) variants.
+ *
+ * When `expectedTarget` is provided, the normalized filename must match it.
+ */
+export async function processProjectImageFile(
+  file: File,
+  expectedTarget?: string
+): Promise<ProcessedProjectImageFiles> {
+  const {
+    normalizedTarget,
+    originalFilename,
+    extension,
+    tooltipBlob,
+    modalBlob,
+  } = await processImageFile(file, expectedTarget);
+
+  return {
     originalFilename,
     normalizedTarget,
-    tooltip: tooltipResult.blob,
-    modal: modalResult.blob,
+    tooltip: blobToFile(
+      tooltipBlob,
+      `${normalizedTarget}_tooltip.${extension}`
+    ),
+    modal: blobToFile(modalBlob, `${normalizedTarget}_modal.${extension}`),
+  };
+}
+
+/**
+ * Resize an image file into tooltip/modal blobs without wrapping as File objects.
+ */
+export async function processProjectImageBlobs(
+  file: File,
+  expectedTarget?: string
+): Promise<ProcessedProjectImageBlobs> {
+  const {
+    normalizedTarget,
+    originalFilename,
+    extension,
+    tooltipBlob,
+    modalBlob,
+  } = await processImageFile(file, expectedTarget);
+
+  return {
+    originalFilename,
+    normalizedTarget,
+    tooltip: tooltipBlob,
+    modal: modalBlob,
     extension,
   };
 }

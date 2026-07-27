@@ -13,3 +13,12 @@ export const projectImageIdParamsSchema = z.object({
 });
 
 export type ProjectImageIdParams = z.infer<typeof projectImageIdParamsSchema>;
+
+/**
+ * Multipart plain fields for project image upload/replace.
+ * originalFilename is required for upload; normalizedTarget is optional.
+ */
+export const projectImagePlainFieldsSchema = z.object({
+  originalFilename: z.string().trim().min(1, "originalFilename is required"),
+  normalizedTarget: z.string().trim().optional(),
+});

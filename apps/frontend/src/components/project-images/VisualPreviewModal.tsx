@@ -17,10 +17,11 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { InlineMessage } from "@/components/ui/inline-error";
-import { ApiRequestError } from "@/lib/api/client";
 import { useVisualPreviewLookup } from "@/hooks/useVisualPreviewLookup";
+import { getProjectImageUploadErrorMessage } from "./project-image-upload-error";
 
 const ACCEPT = PROJECT_IMAGE_ALLOWED_MIME_TYPES.join(",");
+const CONFLICT_HINT = "Use Replace, or delete it first.";
 
 export interface VisualPreviewSelection {
   statementType: string;
@@ -32,18 +33,6 @@ interface VisualPreviewModalProps {
   onOpenChange: (open: boolean) => void;
   projectId: string | null | undefined;
   selection: VisualPreviewSelection | null;
-}
-
-function getUploadErrorMessage(error: unknown, target: string): string {
-  if (error instanceof ApiRequestError && error.status === 409) {
-    return `An image for "${target}" already exists. Use Replace, or delete it first.`;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Upload failed.";
 }
 
 export function VisualPreviewModal({
@@ -93,7 +82,13 @@ export function VisualPreviewModal({
       }
       handleOpenChange(false);
     } catch (error) {
-      setUploadError(getUploadErrorMessage(error, selection.target));
+      setUploadError(
+        getProjectImageUploadErrorMessage(
+          error,
+          selection.target,
+          CONFLICT_HINT
+        )
+      );
     } finally {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";

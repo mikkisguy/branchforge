@@ -11,9 +11,9 @@ import { normalizeImageTarget } from "@branchforge/shared";
 import { InlineMessage } from "@/components/ui/inline-error";
 import { useProjectImages } from "@/hooks/useProjectImages";
 import { processProjectImageFile } from "@/lib/project-image-processing";
-import { ApiRequestError } from "@/lib/api/client";
 import { ProjectImagesList } from "./ProjectImagesList";
 import { ProjectImagesUploadZone } from "./ProjectImagesUploadZone";
+import { getProjectImageUploadErrorMessage } from "./project-image-upload-error";
 
 interface ProjectImagesSettingsContentProps {
   projectId: string;
@@ -37,21 +37,6 @@ function createQueueItem(file: File): UploadQueueItem {
     status: "pending",
     normalizedTarget: normalizeImageTarget(file.name),
   };
-}
-
-function getUploadErrorMessage(
-  error: unknown,
-  normalizedTarget: string
-): string {
-  if (error instanceof ApiRequestError && error.status === 409) {
-    return `An image for target "${normalizedTarget}" already exists. Delete the existing image or rename the file.`;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Upload failed.";
 }
 
 function UploadQueueRow({ item }: { item: UploadQueueItem }) {
@@ -96,6 +81,8 @@ function UploadQueueRow({ item }: { item: UploadQueueItem }) {
     </div>
   );
 }
+
+const CONFLICT_HINT = "Delete the existing image or rename the file.";
 
 export function ProjectImagesSettingsContent({
   projectId,
@@ -143,7 +130,11 @@ export function ProjectImagesSettingsContent({
           } catch (error) {
             updateQueueItem(item.id, {
               status: "error",
-              error: getUploadErrorMessage(error, item.normalizedTarget),
+              error: getProjectImageUploadErrorMessage(
+                error,
+                item.normalizedTarget,
+                CONFLICT_HINT
+              ),
             });
           }
         })
@@ -153,11 +144,9 @@ export function ProjectImagesSettingsContent({
   );
 
   const handleDelete = async (imageId: string) => {
-    try {
-      await deleteImage(imageId);
-    } catch {
-      // Error handled by hook toast
-    }
+    // Suppress hook toast — ConfirmDialog.onError in ProjectImagesList
+    // surfaces the failure with a clear message and keeps the dialog open.
+    await deleteImage(imageId, { showErrorToast: false });
   };
 
   const isBusy = isUploadingImage || isDeletingImage;

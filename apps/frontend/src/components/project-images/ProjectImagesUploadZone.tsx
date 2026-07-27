@@ -2,6 +2,7 @@
  * Project Images Upload Zone
  *
  * Multi-file drag-and-drop and browse UI for preview image uploads.
+ * Filters files by MIME type and size client-side, toasting rejections.
  */
 
 import { useRef } from "react";
@@ -10,10 +11,16 @@ import { Button } from "@/components/ui/button";
 import {
   isValidProjectImageMimeType,
   PROJECT_IMAGE_ALLOWED_MIME_TYPES,
+  PROJECT_IMAGE_MAX_SIZE,
   PROJECT_IMAGE_MAX_SIZE_MB,
 } from "@branchforge/shared";
+import { useToast } from "@/contexts/ToastContext";
 
 const ACCEPT = PROJECT_IMAGE_ALLOWED_MIME_TYPES.join(",");
+
+const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+  event.preventDefault();
+};
 
 interface ProjectImagesUploadZoneProps {
   disabled?: boolean;
@@ -25,21 +32,39 @@ export function ProjectImagesUploadZone({
   onFilesSelected,
 }: ProjectImagesUploadZoneProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const toast = useToast();
 
   const handleFiles = (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) {
       return;
     }
 
-    const accepted = Array.from(fileList).filter((file) =>
-      isValidProjectImageMimeType(file.type)
-    );
+    const accepted: File[] = [];
+    const rejected: { file: File; reason: string }[] = [];
 
-    if (accepted.length === 0) {
-      return;
+    for (const file of Array.from(fileList)) {
+      if (!isValidProjectImageMimeType(file.type)) {
+        rejected.push({
+          file,
+          reason: `${file.name}: Unsupported file type. Use JPEG, PNG, or WebP.`,
+        });
+      } else if (file.size > PROJECT_IMAGE_MAX_SIZE) {
+        rejected.push({
+          file,
+          reason: `${file.name}: File exceeds the ${PROJECT_IMAGE_MAX_SIZE_MB}MB size limit.`,
+        });
+      } else {
+        accepted.push(file);
+      }
     }
 
-    onFilesSelected(accepted);
+    for (const { reason } of rejected) {
+      toast.error(reason, "File rejected");
+    }
+
+    if (accepted.length > 0) {
+      onFilesSelected(accepted);
+    }
   };
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
@@ -49,10 +74,6 @@ export function ProjectImagesUploadZone({
     }
 
     handleFiles(event.dataTransfer.files);
-  };
-
-  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
   };
 
   return (

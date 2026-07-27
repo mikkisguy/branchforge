@@ -30,8 +30,19 @@ vi.mock("../authz.service.js", () => ({
   requireProjectOwnership: vi.fn(() => Promise.resolve()),
 }));
 
-function chain(resolveValue: unknown): any {
-  const fn = ((..._args: unknown[]) => chain(resolveValue)) as any;
+interface Chain {
+  then<TResult1 = unknown, TResult2 = never>(
+    onfulfilled?: ((value: unknown) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+  ): Promise<TResult1 | TResult2>;
+  catch<TResult = never>(
+    onrejected?: ((reason: unknown) => TResult | PromiseLike<TResult>) | null
+  ): Promise<unknown>;
+  [key: string]: (...args: unknown[]) => Chain;
+}
+
+function chain(resolveValue: unknown): Chain {
+  const fn = ((..._args: unknown[]) => chain(resolveValue)) as unknown as Chain;
   return new Proxy(fn, {
     get(_target, prop) {
       if (prop === "then") {

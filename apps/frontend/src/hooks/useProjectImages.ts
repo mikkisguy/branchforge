@@ -5,6 +5,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 import {
   projectImagesApi,
   type UploadProjectImageInput,
@@ -20,6 +21,42 @@ import type { ProjectImage } from "@branchforge/shared";
 export interface ProjectImageMutationOptions {
   showSuccessToast?: boolean;
   showErrorToast?: boolean;
+}
+
+interface ToastLike {
+  success: (message: string, title?: string, duration?: number) => void;
+  error: (message: string, title?: string, duration?: number) => void;
+}
+
+function createImageMutationHandlers(
+  projectId: string,
+  queryClient: QueryClient,
+  toast: ToastLike,
+  actionName: string,
+  successMessage: string
+) {
+  const invalidate = () => {
+    queryClient.invalidateQueries({
+      queryKey: projectImageKeys.lists(projectId),
+    });
+  };
+
+  return {
+    onSuccess: (data: { mutationOptions?: ProjectImageMutationOptions }) => {
+      invalidate();
+      if (data.mutationOptions?.showSuccessToast !== false) {
+        toast.success(successMessage, "Success");
+      }
+    },
+    onError: (
+      error: Error,
+      variables: { mutationOptions?: ProjectImageMutationOptions }
+    ) => {
+      if (variables.mutationOptions?.showErrorToast !== false) {
+        toast.error(`Failed to ${actionName}: ${error.message}`, "Error");
+      }
+    },
+  };
 }
 
 export interface UseProjectImagesReturn {
@@ -76,6 +113,14 @@ export function useProjectImages(
     staleTime: 5 * 60 * 1000,
   });
 
+  const handlers = createImageMutationHandlers(
+    projectId!,
+    queryClient,
+    toast,
+    "upload image",
+    "Preview image uploaded"
+  );
+
   const uploadProcessedImageMutation = useMutation({
     mutationFn: async ({
       processed,
@@ -87,19 +132,7 @@ export function useProjectImages(
       const response = await projectImagesApi.upload(projectId!, processed);
       return { image: response.image, mutationOptions };
     },
-    onSuccess: ({ mutationOptions }) => {
-      queryClient.invalidateQueries({
-        queryKey: projectImageKeys.lists(projectId!),
-      });
-      if (mutationOptions?.showSuccessToast !== false) {
-        toast.success("Preview image uploaded", "Success");
-      }
-    },
-    onError: (error: Error, { mutationOptions }) => {
-      if (mutationOptions?.showErrorToast) {
-        toast.error(`Failed to upload image: ${error.message}`, "Error");
-      }
-    },
+    ...handlers,
   });
 
   const uploadImageMutation = useMutation({
@@ -116,20 +149,16 @@ export function useProjectImages(
       const response = await projectImagesApi.upload(projectId!, processed);
       return { image: response.image, mutationOptions };
     },
-    onSuccess: ({ mutationOptions }) => {
-      queryClient.invalidateQueries({
-        queryKey: projectImageKeys.lists(projectId!),
-      });
-      if (mutationOptions?.showSuccessToast !== false) {
-        toast.success("Preview image uploaded", "Success");
-      }
-    },
-    onError: (error: Error, { mutationOptions }) => {
-      if (mutationOptions?.showErrorToast) {
-        toast.error(`Failed to upload image: ${error.message}`, "Error");
-      }
-    },
+    ...handlers,
   });
+
+  const replaceHandlers = createImageMutationHandlers(
+    projectId!,
+    queryClient,
+    toast,
+    "replace image",
+    "Preview image replaced"
+  );
 
   const replaceImageMutation = useMutation({
     mutationFn: async ({
@@ -151,20 +180,16 @@ export function useProjectImages(
       });
       return { image: response.image, mutationOptions };
     },
-    onSuccess: ({ mutationOptions }) => {
-      queryClient.invalidateQueries({
-        queryKey: projectImageKeys.lists(projectId!),
-      });
-      if (mutationOptions?.showSuccessToast !== false) {
-        toast.success("Preview image replaced", "Success");
-      }
-    },
-    onError: (error: Error, { mutationOptions }) => {
-      if (mutationOptions?.showErrorToast) {
-        toast.error(`Failed to replace image: ${error.message}`, "Error");
-      }
-    },
+    ...replaceHandlers,
   });
+
+  const deleteHandlers = createImageMutationHandlers(
+    projectId!,
+    queryClient,
+    toast,
+    "remove image",
+    "Preview image removed"
+  );
 
   const deleteImageMutation = useMutation({
     mutationFn: async ({
@@ -177,19 +202,7 @@ export function useProjectImages(
       await projectImagesApi.delete(imageId);
       return { mutationOptions };
     },
-    onSuccess: ({ mutationOptions }) => {
-      queryClient.invalidateQueries({
-        queryKey: projectImageKeys.lists(projectId!),
-      });
-      if (mutationOptions?.showSuccessToast !== false) {
-        toast.success("Preview image removed", "Success");
-      }
-    },
-    onError: (error: Error, { mutationOptions }) => {
-      if (mutationOptions?.showErrorToast !== false) {
-        toast.error(`Failed to remove image: ${error.message}`, "Error");
-      }
-    },
+    ...deleteHandlers,
   });
 
   return {

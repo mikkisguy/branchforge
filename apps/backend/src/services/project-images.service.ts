@@ -106,6 +106,42 @@ async function unlinkProjectImageFile(
   }
 }
 
+/**
+ * Write tooltip and modal image files with path containment checks.
+ * Both writes run in parallel via Promise.all.
+ */
+async function writeImageFiles(
+  projectId: string,
+  tooltipBuffer: Buffer,
+  tooltipFilename: string,
+  modalBuffer: Buffer,
+  modalFilename: string
+): Promise<void> {
+  const tooltipPath = getProjectImageFullPath(projectId, tooltipFilename);
+  const modalPath = getProjectImageFullPath(projectId, modalFilename);
+
+  {
+    const rootDir = getProjectImageRootDirPath();
+    const tooltipRelative = path.relative(rootDir, tooltipPath);
+    const modalRelative = path.relative(rootDir, modalPath);
+    if (
+      tooltipRelative.startsWith(".." + path.sep) ||
+      tooltipRelative === ".." ||
+      path.isAbsolute(tooltipRelative) ||
+      modalRelative.startsWith(".." + path.sep) ||
+      modalRelative === ".." ||
+      path.isAbsolute(modalRelative)
+    ) {
+      throw new ValidationError("Invalid project image path");
+    }
+  }
+
+  await Promise.all([
+    fs.writeFile(tooltipPath, tooltipBuffer),
+    fs.writeFile(modalPath, modalBuffer),
+  ]);
+}
+
 function validateOriginalFilename(raw: string): string {
   const originalFilename = raw.trim();
   if (!originalFilename) {
@@ -186,27 +222,13 @@ export async function uploadProjectImage(
   const modalFilename = generateProjectImageFilename("modal", modalExt);
 
   await ensureProjectImageDir(projectId);
-
-  const tooltipPath = getProjectImageFullPath(projectId, tooltipFilename);
-  const modalPath = getProjectImageFullPath(projectId, modalFilename);
-  {
-    const rootDir = getProjectImageRootDirPath();
-    const tooltipRelative = path.relative(rootDir, tooltipPath);
-    const modalRelative = path.relative(rootDir, modalPath);
-    if (
-      tooltipRelative.startsWith(".." + path.sep) ||
-      tooltipRelative === ".." ||
-      path.isAbsolute(tooltipRelative) ||
-      modalRelative.startsWith(".." + path.sep) ||
-      modalRelative === ".." ||
-      path.isAbsolute(modalRelative)
-    ) {
-      throw new ValidationError("Invalid project image path");
-    }
-  }
-
-  await fs.writeFile(tooltipPath, input.tooltip.buffer);
-  await fs.writeFile(modalPath, input.modal.buffer);
+  await writeImageFiles(
+    projectId,
+    input.tooltip.buffer,
+    tooltipFilename,
+    input.modal.buffer,
+    modalFilename
+  );
 
   try {
     const [created] = await getDb()
@@ -282,30 +304,13 @@ export async function replaceProjectImage(
   const modalFilename = generateProjectImageFilename("modal", modalExt);
 
   await ensureProjectImageDir(existing.projectId);
-
-  const tooltipPath = getProjectImageFullPath(
+  await writeImageFiles(
     existing.projectId,
-    tooltipFilename
+    input.tooltip.buffer,
+    tooltipFilename,
+    input.modal.buffer,
+    modalFilename
   );
-  const modalPath = getProjectImageFullPath(existing.projectId, modalFilename);
-  {
-    const rootDir = getProjectImageRootDirPath();
-    const tooltipRelative = path.relative(rootDir, tooltipPath);
-    const modalRelative = path.relative(rootDir, modalPath);
-    if (
-      tooltipRelative.startsWith(".." + path.sep) ||
-      tooltipRelative === ".." ||
-      path.isAbsolute(tooltipRelative) ||
-      modalRelative.startsWith(".." + path.sep) ||
-      modalRelative === ".." ||
-      path.isAbsolute(modalRelative)
-    ) {
-      throw new ValidationError("Invalid project image path");
-    }
-  }
-
-  await fs.writeFile(tooltipPath, input.tooltip.buffer);
-  await fs.writeFile(modalPath, input.modal.buffer);
 
   try {
     const [updated] = await db

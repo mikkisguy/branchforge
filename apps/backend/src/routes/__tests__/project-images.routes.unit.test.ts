@@ -138,6 +138,64 @@ describe("ProjectImagesRoutes", () => {
     );
   });
 
+  it("POST /projects/:projectId/images returns 400 when file exceeds size limit", async () => {
+    const largeBuffer = new Uint8Array(6 * 1024 * 1024); // 6MB > 5MB limit
+    const formData = new FormData();
+    formData.append("originalFilename", "test.png");
+    formData.append(
+      "tooltip",
+      new Blob([largeBuffer], { type: "image/png" }),
+      "tooltip.png"
+    );
+    formData.append(
+      "modal",
+      new Blob([minimalPng], { type: "image/png" }),
+      "modal.png"
+    );
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: `/projects/${PROJECT_ID}/images`,
+      payload: formData as any,
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: "ValidationError",
+    });
+  });
+
+  it("POST /projects/:projectId/images returns 400 when too many files", async () => {
+    const formData = new FormData();
+    formData.append("originalFilename", "test.png");
+    formData.append(
+      "tooltip",
+      new Blob([minimalPng], { type: "image/png" }),
+      "tooltip.png"
+    );
+    formData.append(
+      "modal",
+      new Blob([minimalPng], { type: "image/png" }),
+      "modal.png"
+    );
+    formData.append(
+      "extra",
+      new Blob([minimalPng], { type: "image/png" }),
+      "extra.png"
+    );
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: `/projects/${PROJECT_ID}/images`,
+      payload: formData as any,
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: "ValidationError",
+    });
+  });
+
   it("PUT /project-images/:imageId replaces image", async () => {
     const image = {
       id: IMAGE_ID,

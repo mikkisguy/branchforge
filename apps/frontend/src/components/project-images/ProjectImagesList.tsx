@@ -2,6 +2,7 @@
  * Project Images List
  *
  * Compact grid of uploaded preview images with tooltip thumbnails.
+ * Delete confirmation dialog surfaces failures via toast.
  */
 
 import { useState } from "react";
@@ -9,6 +10,7 @@ import { Trash2 } from "lucide-react";
 import type { ProjectImage } from "@branchforge/shared";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/contexts/ToastContext";
 
 interface ProjectImagesListProps {
   images: ProjectImage[];
@@ -23,6 +25,7 @@ export function ProjectImagesList({
 }: ProjectImagesListProps) {
   const [deleteTarget, setDeleteTarget] = useState<ProjectImage | null>(null);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const toast = useToast();
 
   if (images.length === 0) {
     return null;
@@ -94,6 +97,12 @@ export function ProjectImagesList({
           }
         }}
         onConfirm={handleConfirmDelete}
+        onError={(error) => {
+          toast.error(
+            `Failed to remove image: ${error instanceof Error ? error.message : "Unknown error"}`,
+            "Delete failed"
+          );
+        }}
         title="Delete preview image?"
         description={
           deleteTarget
