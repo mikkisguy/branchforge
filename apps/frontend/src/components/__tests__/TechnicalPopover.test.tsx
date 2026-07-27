@@ -1,9 +1,25 @@
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { TechnicalPopover } from "@/components/write-mode/TechnicalPopover";
+import { ToastProvider } from "@/contexts/ToastContext";
+import { createTestQueryClient } from "@/test/query-client";
 import type { StatCondition } from "@branchforge/shared";
+import type { ReactNode } from "react";
 
 describe("TechnicalPopover", () => {
+  let queryClient: QueryClient;
+
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>{children}</ToastProvider>
+    </QueryClientProvider>
+  );
+
+  beforeEach(() => {
+    queryClient = createTestQueryClient();
+  });
+
   it("renders plain English for stat conditions", () => {
     const data = {
       stats: {
@@ -17,7 +33,8 @@ describe("TechnicalPopover", () => {
         type="conditions"
         onClose={() => undefined}
         data={data}
-      />
+      />,
+      { wrapper }
     );
 
     // Check that the stat names are rendered

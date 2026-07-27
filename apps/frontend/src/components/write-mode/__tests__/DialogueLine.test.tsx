@@ -1,9 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClientProvider } from "@tanstack/react-query";
 import type { Character } from "@branchforge/shared";
 import type { DialogueEntry } from "@/lib/prose-types";
+import { createTestQueryClient } from "@/test/query-client";
 import { DialogueLine } from "../DialogueLine";
+import type { ReactElement } from "react";
 
 const characters: Character[] = [
   {
@@ -42,8 +45,15 @@ const characters: Character[] = [
   },
 ];
 
+function renderWithQueryClient(ui: ReactElement) {
+  const queryClient = createTestQueryClient();
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+  );
+}
+
 const renderDialogueLine = (entry: DialogueEntry) =>
-  render(
+  renderWithQueryClient(
     <DialogueLine
       entry={entry}
       characters={characters}
@@ -65,7 +75,7 @@ describe("DialogueLine", () => {
       text: "Narration text",
     };
 
-    render(
+    renderWithQueryClient(
       <div>
         <DialogueLine
           entry={entry}
@@ -197,7 +207,7 @@ describe("DialogueLine", () => {
       text: "Once upon a time...",
     };
 
-    const { container } = render(
+    const { container } = renderWithQueryClient(
       <DialogueLine
         entry={entry}
         characters={characters}
