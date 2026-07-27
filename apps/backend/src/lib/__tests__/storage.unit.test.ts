@@ -4,7 +4,7 @@ import {
   getAvatarPath,
   getAvatarFullPath,
   AvatarFilenameError,
-} from "../storage";
+} from "../storage.js";
 
 describe("validateAvatarFilename", () => {
   const validFilenames = [
@@ -135,5 +135,69 @@ describe("getAvatarFullPath", () => {
     const result = getAvatarFullPath("safe-avatar.webp");
     const uploadsDir = result.replace(/safe-avatar\.webp$/, "");
     expect(uploadsDir).toMatch(/uploads\/avatars\/$/);
+  });
+});
+
+import {
+  validateProjectImageFilename,
+  validateProjectImageProjectId,
+  getProjectImagePath,
+  getProjectImageFullPath,
+  ProjectImageFilenameError,
+} from "../storage.js";
+
+const PROJECT_ID = "550e8400-e29b-41d4-a716-446655440000";
+
+describe("validateProjectImageFilename", () => {
+  it("accepts safe filenames", () => {
+    expect(validateProjectImageFilename("abc_tooltip.webp")).toBe(
+      "abc_tooltip.webp"
+    );
+  });
+
+  it("rejects path traversal", () => {
+    expect(() => validateProjectImageFilename("../secret.png")).toThrow(
+      ProjectImageFilenameError
+    );
+  });
+});
+
+describe("validateProjectImageProjectId", () => {
+  it("accepts and lowercases UUID project IDs", () => {
+    expect(validateProjectImageProjectId(PROJECT_ID.toUpperCase())).toBe(
+      PROJECT_ID
+    );
+  });
+
+  it("rejects non-UUID project IDs", () => {
+    expect(() => validateProjectImageProjectId("../etc")).toThrow(
+      ProjectImageFilenameError
+    );
+    expect(() => validateProjectImageProjectId("not-a-uuid")).toThrow(
+      ProjectImageFilenameError
+    );
+  });
+});
+
+describe("getProjectImagePath", () => {
+  it("builds project image URL under uploads/project-images/<projectId>", () => {
+    expect(getProjectImagePath(PROJECT_ID, "file.webp", "/api/")).toBe(
+      `/api/uploads/project-images/${PROJECT_ID}/file.webp`
+    );
+  });
+});
+
+describe("getProjectImageFullPath", () => {
+  it("returns absolute path under project subdirectory", () => {
+    const result = getProjectImageFullPath(PROJECT_ID, "file.webp");
+    expect(result).toMatch(
+      new RegExp(`uploads/project-images/${PROJECT_ID}/file\\.webp$`)
+    );
+  });
+
+  it("rejects invalid project IDs", () => {
+    expect(() => getProjectImageFullPath("../etc", "file.webp")).toThrow(
+      ProjectImageFilenameError
+    );
   });
 });

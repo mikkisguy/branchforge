@@ -27,6 +27,7 @@ import { exportsRoutes } from "./routes/exports.routes.js";
 import { visualSystemsRoutes } from "./routes/visual-systems.routes.js";
 import { worldElementsRoutes } from "./routes/world-elements.routes.js";
 import { pairGroupsRoutes } from "./routes/pair-groups.routes.js";
+import { projectImagesRoutes } from "./routes/project-images.routes.js";
 import { createDrizzleSessionStore } from "./services/session-store.service.js";
 import { setupShutdownHandlers } from "./lib/shutdown.js";
 import { cleanupStaleSyncOperations } from "./services/gitlab/index.js";
@@ -36,6 +37,7 @@ import { SESSION_COOKIE_NAME } from "./lib/session.js";
 import { getBasePath, getSessionMaxAge } from "./lib/config.js";
 import {
   ensureAvatarDir,
+  ensureProjectImageDir,
   UPLOADS_DIR,
   getUploadsDirPath,
 } from "./lib/storage.js";
@@ -75,6 +77,7 @@ const basePath = getBasePath();
 
 // Ensure avatar directory exists on startup BEFORE registering static file serving
 await ensureAvatarDir();
+await ensureProjectImageDir();
 
 // Register static file serving for uploads (under base path for consistency)
 await server.register(fastifyStatic, {
@@ -168,6 +171,7 @@ await server.register(exportsRoutes, { prefix: basePath });
 await server.register(visualSystemsRoutes, { prefix: basePath });
 await server.register(worldElementsRoutes, { prefix: basePath });
 await server.register(pairGroupsRoutes, { prefix: basePath });
+await server.register(projectImagesRoutes, { prefix: basePath });
 
 // Register a global preValidation hook that enforces double-submit
 // CSRF protection on every state-changing request. The hook itself

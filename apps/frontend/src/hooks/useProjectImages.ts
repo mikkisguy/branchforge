@@ -1,0 +1,245 @@
+/**
+ * useProjectImages Hook
+ *
+ * Provides project preview image state and operations using TanStack Query.
+ */
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  projectImagesApi,
+  type UploadProjectImageInput,
+} from "@/lib/api/project-images";
+import { projectImageKeys } from "@/lib/query-keys";
+import { useToast } from "@/contexts/ToastContext";
+import {
+  processProjectImageFile,
+  type ProcessedProjectImageFiles,
+} from "@/lib/project-image-processing";
+import type { ProjectImage } from "@branchforge/shared";
+
+export interface ProjectImageMutationOptions {
+  showSuccessToast?: boolean;
+  showErrorToast?: boolean;
+}
+
+interface ToastLike {
+  success: (message: string, title?: string, duration?: number) => void;
+  error: (message: string, title?: string, duration?: number) => void;
+}
+
+function createImageMutationToastHandlers(
+  toast: ToastLike,
+  actionName: string,
+  successMessage: string
+) {
+  return {
+    onSuccessToast: (data: {
+      mutationOptions?: ProjectImageMutationOptions;
+    }) => {
+      if (data.mutationOptions?.showSuccessToast !== false) {
+        toast.success(successMessage, "Success");
+      }
+    },
+    onError: (
+      error: Error,
+      variables: { mutationOptions?: ProjectImageMutationOptions }
+    ) => {
+      if (variables.mutationOptions?.showErrorToast !== false) {
+        toast.error(`Failed to ${actionName}: ${error.message}`, "Error");
+      }
+    },
+  };
+}
+
+export interface UseProjectImagesReturn {
+  images: ProjectImage[];
+  isLoadingImages: boolean;
+  imagesError: Error | null;
+  refreshImages: () => void;
+  isUploadingImage: boolean;
+  isDeletingImage: boolean;
+  uploadImage: (
+    file: File,
+    expectedTarget?: string,
+    options?: ProjectImageMutationOptions
+  ) => Promise<ProjectImage>;
+  uploadProcessedImage: (
+    processed: ProcessedProjectImageFiles | UploadProjectImageInput,
+    options?: ProjectImageMutationOptions
+  ) => Promise<ProjectImage>;
+  replaceImage: (
+    imageId: string,
+    file: File,
+    expectedTarget?: string,
+    options?: ProjectImageMutationOptions
+  ) => Promise<ProjectImage>;
+  deleteImage: (
+    imageId: string,
+    options?: ProjectImageMutationOptions
+  ) => Promise<void>;
+}
+
+export function useProjectImages(
+  projectId: string | null | undefined,
+  options?: { enabled?: boolean }
+): UseProjectImagesReturn {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const enabled =
+    options?.enabled !== undefined
+      ? options.enabled && !!projectId
+      : !!projectId;
+
+  const {
+    data,
+    isLoading: isLoadingImages,
+    error: imagesError,
+    refetch: refreshImages,
+  } = useQuery({
+    queryKey: projectImageKeys.lists(projectId ?? ""),
+    queryFn: async () => {
+      const response = await projectImagesApi.list(projectId!);
+      return response.images;
+    },
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const uploadToasts = createImageMutationToastHandlers(
+    toast,
+    "upload image",
+    "Preview image uploaded"
+  );
+
+  const uploadProcessedImageMutation = useMutation({
+    mutationFn: async ({
+      processed,
+      mutationOptions,
+    }: {
+      processed: ProcessedProjectImageFiles | UploadProjectImageInput;
+      mutationOptions?: ProjectImageMutationOptions;
+    }) => {
+      const response = await projectImagesApi.upload(projectId!, processed);
+      return { image: response.image, mutationOptions };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: projectImageKeys.lists(projectId!),
+      });
+      uploadToasts.onSuccessToast(data);
+    },
+    onError: uploadToasts.onError,
+  });
+
+  const uploadImageMutation = useMutation({
+    mutationFn: async ({
+      file,
+      expectedTarget,
+      mutationOptions,
+    }: {
+      file: File;
+      expectedTarget?: string;
+      mutationOptions?: ProjectImageMutationOptions;
+    }) => {
+      const processed = await processProjectImageFile(file, expectedTarget);
+      const response = await projectImagesApi.upload(projectId!, processed);
+      return { image: response.image, mutationOptions };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: projectImageKeys.lists(projectId!),
+      });
+      uploadToasts.onSuccessToast(data);
+    },
+    onError: uploadToasts.onError,
+  });
+
+  const replaceToasts = createImageMutationToastHandlers(
+    toast,
+    "replace image",
+    "Preview image replaced"
+  );
+
+  const replaceImageMutation = useMutation({
+    mutationFn: async ({
+      imageId,
+      file,
+      expectedTarget,
+      mutationOptions,
+    }: {
+      imageId: string;
+      file: File;
+      expectedTarget?: string;
+      mutationOptions?: ProjectImageMutationOptions;
+    }) => {
+      const processed = await processProjectImageFile(file, expectedTarget);
+      const response = await projectImagesApi.replace(imageId, {
+        originalFilename: processed.originalFilename,
+        tooltip: processed.tooltip,
+        modal: processed.modal,
+      });
+      return { image: response.image, mutationOptions };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: projectImageKeys.lists(projectId!),
+      });
+      replaceToasts.onSuccessToast(data);
+    },
+    onError: replaceToasts.onError,
+  });
+
+  const deleteToasts = createImageMutationToastHandlers(
+    toast,
+    "remove image",
+    "Preview image removed"
+  );
+
+  const deleteImageMutation = useMutation({
+    mutationFn: async ({
+      imageId,
+      mutationOptions,
+    }: {
+      imageId: string;
+      mutationOptions?: ProjectImageMutationOptions;
+    }) => {
+      await projectImagesApi.delete(imageId);
+      return { mutationOptions };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: projectImageKeys.lists(projectId!),
+      });
+      deleteToasts.onSuccessToast(data);
+    },
+    onError: deleteToasts.onError,
+  });
+
+  return {
+    images: data ?? [],
+    isLoadingImages,
+    imagesError: imagesError as Error | null,
+    refreshImages,
+    isUploadingImage:
+      uploadImageMutation.isPending ||
+      uploadProcessedImageMutation.isPending ||
+      replaceImageMutation.isPending,
+    isDeletingImage: deleteImageMutation.isPending,
+    uploadImage: (file, expectedTarget, mutationOptions) =>
+      uploadImageMutation
+        .mutateAsync({ file, expectedTarget, mutationOptions })
+        .then(({ image }) => image),
+    uploadProcessedImage: (processed, mutationOptions) =>
+      uploadProcessedImageMutation
+        .mutateAsync({ processed, mutationOptions })
+        .then(({ image }) => image),
+    replaceImage: (imageId, file, expectedTarget, mutationOptions) =>
+      replaceImageMutation
+        .mutateAsync({ imageId, file, expectedTarget, mutationOptions })
+        .then(({ image }) => image),
+    deleteImage: (imageId, mutationOptions) =>
+      deleteImageMutation
+        .mutateAsync({ imageId, mutationOptions })
+        .then(() => undefined),
+  };
+}

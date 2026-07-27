@@ -400,6 +400,13 @@
       "when": 1785082685438,
       "tag": "0056_known_mongu",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1785092076173,
+      "tag": "0057_slim_vector",
+      "breakpoints": true
     }
   ]
 }

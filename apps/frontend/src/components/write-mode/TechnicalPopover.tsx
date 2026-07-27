@@ -12,6 +12,10 @@ import {
   formatStatCondition,
 } from "@/lib/format-conditions";
 import { FormattedCondition } from "@/components/write-mode/FormattedCondition";
+import { useProject } from "@/hooks/useProject";
+import { useVisualPreviewLookup } from "@/hooks/useVisualPreviewLookup";
+import type { VisualPreviewSelection } from "@/components/project-images/VisualPreviewModal";
+import { VisualPreviewRow } from "@/components/project-images/VisualPreviewRow";
 
 interface ConditionsData {
   stats?: Record<string, StatCondition>;
@@ -40,15 +44,33 @@ interface TechnicalPopoverProps {
   type: "conditions" | "jump" | "visuals" | "menu";
   data: ConditionsData | JumpData | VisualData[] | MenuChoiceData[] | null;
   onClose: () => void;
+  /**
+   * Open the visual preview modal for a statement. Owned by the parent so the
+   * popover can close without unmounting the modal (native dialog is outside
+   * this popover's DOM tree).
+   */
+  onOpenVisualPreview?: (selection: VisualPreviewSelection) => void;
 }
 
 export function TechnicalPopover({
   type,
   data,
   onClose,
+  onOpenVisualPreview,
 }: TechnicalPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
   const [isFlipped, setIsFlipped] = useState(false);
+  const { currentProject } = useProject();
+  const { getImageForTarget } = useVisualPreviewLookup(currentProject?.id, {
+    enabled: type === "visuals" && !!currentProject?.id,
+  });
+
+  const openVisualPreview = (visual: VisualData) => {
+    onOpenVisualPreview?.({
+      statementType: visual.type,
+      target: visual.target,
+    });
+  };
 
   const measureAndSetFlip = useCallback(() => {
     const popover = popoverRef.current;
@@ -58,7 +80,6 @@ export function TechnicalPopover({
     const viewportHeight = window.innerHeight;
     const spaceBelow = viewportHeight - rect.bottom;
 
-    // If less than 16px space below (allow some margin), flip upwards
     if (spaceBelow < 16) {
       setIsFlipped(true);
     } else {
@@ -66,13 +87,17 @@ export function TechnicalPopover({
     }
   }, []);
 
-  // Handle click outside to close
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        popoverRef.current &&
-        !popoverRef.current.contains(event.target as Node)
-      ) {
+      const target = event.target;
+      // Native <dialog> (e.g. visual preview) lives outside this popover DOM.
+      // Ignore those clicks so parents can own nested modals without us
+      // dismissing ourselves first.
+      if (target instanceof Element && target.closest("dialog")) {
+        return;
+      }
+
+      if (popoverRef.current && !popoverRef.current.contains(target as Node)) {
         onClose();
       }
     };
@@ -83,7 +108,6 @@ export function TechnicalPopover({
     };
   }, [onClose]);
 
-  // Calculate position - flip upwards if not enough space below
   useLayoutEffect(() => {
     measureAndSetFlip();
 
@@ -182,20 +206,19 @@ export function TechnicalPopover({
                 <Image className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                 <span className="text-sm font-medium">Visuals</span>
               </div>
-              <ul className="text-xs text-muted-foreground space-y-1.5">
+              <ul className="text-xs text-muted-foreground space-y-1">
                 {visualsData.map((visual, index) => (
-                  // react-doctor-disable-next-line react-doctor/no-array-index-as-key -- type_target can collide; index is local list order tiebreaker
-                  <li
+                  <VisualPreviewRow
+                    // react-doctor-disable-next-line react-doctor/no-array-index-as-key -- type_target can collide; index is local list order tiebreaker
                     key={`${visual.type}_${visual.target}_${index}`}
-                    className="flex items-center gap-1.5"
-                  >
-                    <span>{visual.type}</span>
-                    {visual.target && (
-                      <span className="font-mono text-foreground">
-                        {visual.target}
-                      </span>
-                    )}
-                  </li>
+                    visual={visual}
+                    image={
+                      visual.target
+                        ? getImageForTarget(visual.target)
+                        : undefined
+                    }
+                    onOpenPreview={openVisualPreview}
+                  />
                 ))}
               </ul>
             </div>

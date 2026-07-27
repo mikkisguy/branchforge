@@ -153,6 +153,16 @@ export const variableKeys = {
 } as const;
 
 // ============================================================================
+// Project Image Keys
+// ============================================================================
+
+export const projectImageKeys = {
+  all: ["projectImages"] as const,
+  lists: (projectId: string) => ["projectImages", projectId, "list"] as const,
+  detail: (imageId: string) => ["projectImages", "detail", imageId] as const,
+} as const;
+
+// ============================================================================
 // Character Keys
 // ============================================================================
 

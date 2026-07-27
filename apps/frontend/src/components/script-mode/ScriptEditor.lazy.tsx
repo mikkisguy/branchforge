@@ -34,9 +34,11 @@ interface ScriptEditorProps {
   /** Controlled line wrap mode. When provided, overrides internal state. */
   lineWrap?: boolean;
   onLineWrapChange?: (wrap: boolean) => void;
-  /** Controlled label titles visibility. When provided, overrides internal state. */
-  showLabelTitles?: boolean;
-  onShowLabelTitlesChange?: (show: boolean) => void;
+  /** Controlled overlays visibility (label titles + image hover previews). When provided, overrides internal state. */
+  showOverlays?: boolean;
+  onShowOverlaysChange?: (show: boolean) => void;
+  /** Project ID for visual statement preview images */
+  projectId?: string | null;
   ref?: React.Ref<ScriptEditorRef>;
 }
 

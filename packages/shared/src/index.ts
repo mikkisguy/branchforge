@@ -1188,3 +1188,21 @@ export const FLOW_LAYOUT_MODE_LABELS: Record<FlowLayoutMode, string> = {
   ROUTE: "Route view",
   FILE: "File view",
 };
+
+// ============================================================================
+// Project Images (visual statement previews)
+// ============================================================================
+
+export {
+  PROJECT_IMAGE_ALLOWED_MIME_TYPES,
+  PROJECT_IMAGE_MAX_SIZE_MB,
+  PROJECT_IMAGE_MAX_SIZE,
+  PROJECT_IMAGE_ORIGINAL_FILENAME_MAX,
+  PROJECT_IMAGE_TOOLTIP_SIZE,
+  PROJECT_IMAGE_MODAL_SIZE,
+  isValidProjectImageMimeType,
+  normalizeImageTarget,
+  visualTargetsMatch,
+  findProjectImageForTarget,
+  type ProjectImage,
+} from "./project-images.js";

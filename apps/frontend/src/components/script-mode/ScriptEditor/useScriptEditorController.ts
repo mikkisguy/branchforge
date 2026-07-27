@@ -16,14 +16,14 @@ import { EDITOR_FONT_SIZE_CHANGED } from "../../FontSizeSwitcher";
 interface UseScriptEditorControllerOptions {
   scrollToLine: number | null | undefined;
   labelTitles: LabelTitleMap | undefined;
-  showLabelTitles: boolean;
+  showOverlays: boolean;
   setHighlightEffect: StateEffectType<number | null>;
 }
 
 export function useScriptEditorController({
   scrollToLine,
   labelTitles,
-  showLabelTitles,
+  showOverlays,
   setHighlightEffect,
 }: UseScriptEditorControllerOptions) {
   const hasScrolled = useRef(false);
@@ -45,9 +45,9 @@ export function useScriptEditorController({
   useEffect(() => {
     labelTitlesRef.current = labelTitles;
   });
-  const showLabelTitlesRef = useRef(showLabelTitles);
+  const showOverlaysRef = useRef(showOverlays);
   useEffect(() => {
-    showLabelTitlesRef.current = showLabelTitles;
+    showOverlaysRef.current = showOverlays;
   });
 
   // Track previous scrollToLine to detect changes
@@ -158,11 +158,7 @@ export function useScriptEditorController({
       // Dispatch label titles on initial mount (effect fires while
       // lazy-loaded fallback is still showing, so ref wasn't set yet)
       const currentTitles = labelTitlesRef.current;
-      if (
-        currentTitles &&
-        currentTitles.size > 0 &&
-        showLabelTitlesRef.current
-      ) {
+      if (currentTitles && currentTitles.size > 0 && showOverlaysRef.current) {
         view.dispatch({
           effects: [setLabelTitlesEffect.of(currentTitles)],
         });
