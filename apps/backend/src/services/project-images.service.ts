@@ -5,6 +5,7 @@
  */
 
 import { promises as fs } from "node:fs";
+import path from "node:path";
 import { eq, asc } from "drizzle-orm";
 import { getDb } from "../db/index.js";
 import { projectImages, projects } from "../db/schema/index.js";
@@ -18,6 +19,7 @@ import {
   generateProjectImageFilename,
   getProjectImageFullPath,
   getProjectImagePath,
+  getProjectImageRootDirPath,
 } from "../lib/storage.js";
 import { getBasePath } from "../lib/config.js";
 import { isUniqueConstraintViolation } from "../lib/db.js";
@@ -78,7 +80,19 @@ async function unlinkProjectImageFile(
   filename: string
 ): Promise<void> {
   try {
-    await fs.unlink(getProjectImageFullPath(projectId, filename));
+    const filePath = getProjectImageFullPath(projectId, filename);
+    {
+      const rootDir = getProjectImageRootDirPath();
+      const relative = path.relative(rootDir, filePath);
+      if (
+        relative.startsWith(".." + path.sep) ||
+        relative === ".." ||
+        path.isAbsolute(relative)
+      ) {
+        throw new ValidationError("Invalid project image path");
+      }
+    }
+    await fs.unlink(filePath);
   } catch (error) {
     if (
       !(error instanceof Error && "code" in error) ||
@@ -175,6 +189,21 @@ export async function uploadProjectImage(
 
   const tooltipPath = getProjectImageFullPath(projectId, tooltipFilename);
   const modalPath = getProjectImageFullPath(projectId, modalFilename);
+  {
+    const rootDir = getProjectImageRootDirPath();
+    const tooltipRelative = path.relative(rootDir, tooltipPath);
+    const modalRelative = path.relative(rootDir, modalPath);
+    if (
+      tooltipRelative.startsWith(".." + path.sep) ||
+      tooltipRelative === ".." ||
+      path.isAbsolute(tooltipRelative) ||
+      modalRelative.startsWith(".." + path.sep) ||
+      modalRelative === ".." ||
+      path.isAbsolute(modalRelative)
+    ) {
+      throw new ValidationError("Invalid project image path");
+    }
+  }
 
   await fs.writeFile(tooltipPath, input.tooltip.buffer);
   await fs.writeFile(modalPath, input.modal.buffer);
@@ -259,6 +288,21 @@ export async function replaceProjectImage(
     tooltipFilename
   );
   const modalPath = getProjectImageFullPath(existing.projectId, modalFilename);
+  {
+    const rootDir = getProjectImageRootDirPath();
+    const tooltipRelative = path.relative(rootDir, tooltipPath);
+    const modalRelative = path.relative(rootDir, modalPath);
+    if (
+      tooltipRelative.startsWith(".." + path.sep) ||
+      tooltipRelative === ".." ||
+      path.isAbsolute(tooltipRelative) ||
+      modalRelative.startsWith(".." + path.sep) ||
+      modalRelative === ".." ||
+      path.isAbsolute(modalRelative)
+    ) {
+      throw new ValidationError("Invalid project image path");
+    }
+  }
 
   await fs.writeFile(tooltipPath, input.tooltip.buffer);
   await fs.writeFile(modalPath, input.modal.buffer);

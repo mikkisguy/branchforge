@@ -4,7 +4,7 @@ import {
   getAvatarPath,
   getAvatarFullPath,
   AvatarFilenameError,
-} from "../storage";
+} from "../storage.js";
 
 describe("validateAvatarFilename", () => {
   const validFilenames = [
@@ -144,7 +144,7 @@ import {
   getProjectImagePath,
   getProjectImageFullPath,
   ProjectImageFilenameError,
-} from "../storage";
+} from "../storage.js";
 
 const PROJECT_ID = "550e8400-e29b-41d4-a716-446655440000";
 

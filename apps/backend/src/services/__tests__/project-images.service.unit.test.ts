@@ -82,6 +82,7 @@ vi.mock("../../lib/storage.js", () => ({
   generateProjectImageFilename: vi.fn(
     (variant: string) => `${variant}-file.webp`
   ),
+  getProjectImageRootDirPath: vi.fn(() => "/tmp/project-images"),
   getProjectImageFullPath: vi.fn(
     (projectId: string, filename: string) =>
       `/tmp/project-images/${projectId}/${filename}`
@@ -89,6 +90,9 @@ vi.mock("../../lib/storage.js", () => ({
   getProjectImagePath: vi.fn(
     (projectId: string, filename: string, basePath: string) =>
       `${basePath}uploads/project-images/${projectId}/${filename}`
+  ),
+  resolvePathInsideProjectImageRoot: vi.fn(
+    (...segments: string[]) => `/tmp/project-images/${segments.join("/")}`
   ),
 }));
 

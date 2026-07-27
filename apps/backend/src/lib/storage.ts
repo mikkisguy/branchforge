@@ -200,18 +200,60 @@ export function validateProjectImageFilename(filename: string): string {
 }
 
 /**
+ * Absolute path to the untainted project-images uploads root.
+ */
+export function getProjectImageRootDirPath(): string {
+  return path.join(getUploadsDirPath(), PROJECT_IMAGE_SUBDIR);
+}
+
+/**
+ * CodeQL-recognized containment check (path.relative + ".." prefix guard).
+ * Returns the resolved absolute path when it stays under the project-images root.
+ *
+ * @see https://codeql.github.com/codeql-query-help/javascript/js-path-injection/
+ */
+export function resolvePathInsideProjectImageRoot(
+  ...pathSegments: string[]
+): string {
+  const rootDir = getProjectImageRootDirPath();
+  const resolvedPath = path.resolve(rootDir, ...pathSegments);
+  const relative = path.relative(rootDir, resolvedPath);
+  if (
+    relative.startsWith(".." + path.sep) ||
+    relative === ".." ||
+    path.isAbsolute(relative)
+  ) {
+    throw new ProjectImageFilenameError(
+      "Resolved path escapes the uploads directory"
+    );
+  }
+  return resolvedPath;
+}
+
+/**
  * Ensure the project-images root directory exists.
  * When `projectId` is provided, also ensure that project's subdirectory exists.
  */
 export async function ensureProjectImageDir(projectId?: string): Promise<void> {
-  const rootDir = path.join(getUploadsDirPath(), PROJECT_IMAGE_SUBDIR);
+  const rootDir = getProjectImageRootDirPath();
+  await fs.mkdir(rootDir, { recursive: true });
   if (projectId === undefined) {
-    await fs.mkdir(rootDir, { recursive: true });
     return;
   }
 
   const sanitizedProjectId = validateProjectImageProjectId(projectId);
-  await fs.mkdir(path.join(rootDir, sanitizedProjectId), { recursive: true });
+  const projectDirPath = path.resolve(rootDir, sanitizedProjectId);
+  const relative = path.relative(rootDir, projectDirPath);
+  if (
+    relative.startsWith(".." + path.sep) ||
+    relative === ".." ||
+    path.isAbsolute(relative)
+  ) {
+    throw new ProjectImageFilenameError(
+      "Resolved path escapes the uploads directory"
+    );
+  }
+  await fs.mkdir(projectDirPath, { recursive: true });
 }
 
 export function generateProjectImageFilename(
@@ -250,28 +292,7 @@ export function getProjectImageFullPath(
 ): string {
   const sanitizedProjectId = validateProjectImageProjectId(projectId);
   const sanitized = validateProjectImageFilename(filename);
-
-  const projectDirPath = path.join(
-    getUploadsDirPath(),
-    PROJECT_IMAGE_SUBDIR,
-    sanitizedProjectId
-  );
-  const fullPath = path.resolve(projectDirPath, sanitized);
-
-  const normalizedProjectDir = projectDirPath.endsWith(path.sep)
-    ? projectDirPath
-    : projectDirPath + path.sep;
-
-  if (
-    fullPath !== projectDirPath &&
-    !fullPath.startsWith(normalizedProjectDir)
-  ) {
-    throw new ProjectImageFilenameError(
-      "Resolved path escapes the uploads directory"
-    );
-  }
-
-  return fullPath;
+  return resolvePathInsideProjectImageRoot(sanitizedProjectId, sanitized);
 }
 
 /**
