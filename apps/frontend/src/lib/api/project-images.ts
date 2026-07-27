@@ -83,11 +83,3 @@ export const projectImagesApi = {
     });
   },
 };
-
-export const listProjectImages = projectImagesApi.list.bind(projectImagesApi);
-export const uploadProjectImage =
-  projectImagesApi.upload.bind(projectImagesApi);
-export const deleteProjectImage =
-  projectImagesApi.delete.bind(projectImagesApi);
-export const replaceProjectImage =
-  projectImagesApi.replace.bind(projectImagesApi);

@@ -5,7 +5,6 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { QueryClient } from "@tanstack/react-query";
 import {
   projectImagesApi,
   type UploadProjectImageInput,
@@ -28,22 +27,15 @@ interface ToastLike {
   error: (message: string, title?: string, duration?: number) => void;
 }
 
-function createImageMutationHandlers(
-  projectId: string,
-  queryClient: QueryClient,
+function createImageMutationToastHandlers(
   toast: ToastLike,
   actionName: string,
   successMessage: string
 ) {
-  const invalidate = () => {
-    queryClient.invalidateQueries({
-      queryKey: projectImageKeys.lists(projectId),
-    });
-  };
-
   return {
-    onSuccess: (data: { mutationOptions?: ProjectImageMutationOptions }) => {
-      invalidate();
+    onSuccessToast: (data: {
+      mutationOptions?: ProjectImageMutationOptions;
+    }) => {
       if (data.mutationOptions?.showSuccessToast !== false) {
         toast.success(successMessage, "Success");
       }
@@ -113,9 +105,7 @@ export function useProjectImages(
     staleTime: 5 * 60 * 1000,
   });
 
-  const handlers = createImageMutationHandlers(
-    projectId!,
-    queryClient,
+  const uploadToasts = createImageMutationToastHandlers(
     toast,
     "upload image",
     "Preview image uploaded"
@@ -132,7 +122,13 @@ export function useProjectImages(
       const response = await projectImagesApi.upload(projectId!, processed);
       return { image: response.image, mutationOptions };
     },
-    ...handlers,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: projectImageKeys.lists(projectId!),
+      });
+      uploadToasts.onSuccessToast(data);
+    },
+    onError: uploadToasts.onError,
   });
 
   const uploadImageMutation = useMutation({
@@ -149,12 +145,16 @@ export function useProjectImages(
       const response = await projectImagesApi.upload(projectId!, processed);
       return { image: response.image, mutationOptions };
     },
-    ...handlers,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: projectImageKeys.lists(projectId!),
+      });
+      uploadToasts.onSuccessToast(data);
+    },
+    onError: uploadToasts.onError,
   });
 
-  const replaceHandlers = createImageMutationHandlers(
-    projectId!,
-    queryClient,
+  const replaceToasts = createImageMutationToastHandlers(
     toast,
     "replace image",
     "Preview image replaced"
@@ -180,12 +180,16 @@ export function useProjectImages(
       });
       return { image: response.image, mutationOptions };
     },
-    ...replaceHandlers,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: projectImageKeys.lists(projectId!),
+      });
+      replaceToasts.onSuccessToast(data);
+    },
+    onError: replaceToasts.onError,
   });
 
-  const deleteHandlers = createImageMutationHandlers(
-    projectId!,
-    queryClient,
+  const deleteToasts = createImageMutationToastHandlers(
     toast,
     "remove image",
     "Preview image removed"
@@ -202,7 +206,13 @@ export function useProjectImages(
       await projectImagesApi.delete(imageId);
       return { mutationOptions };
     },
-    ...deleteHandlers,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: projectImageKeys.lists(projectId!),
+      });
+      deleteToasts.onSuccessToast(data);
+    },
+    onError: deleteToasts.onError,
   });
 
   return {

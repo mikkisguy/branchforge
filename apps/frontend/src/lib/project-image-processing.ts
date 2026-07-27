@@ -13,14 +13,6 @@ import {
 
 export { normalizeImageTarget };
 
-export interface ProcessedProjectImageBlobs {
-  originalFilename: string;
-  normalizedTarget: string;
-  tooltip: Blob;
-  modal: Blob;
-  extension: "webp" | "jpg";
-}
-
 export interface ProcessedProjectImageFiles {
   originalFilename: string;
   normalizedTarget: string;
@@ -76,6 +68,7 @@ export function validateProjectImageFile(
 
 function loadImageFromFile(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
+    // react-doctor-disable-next-line react-doctor/no-create-object-url-without-revoke -- revoked in onload and onerror below; analyzer misses same-function callback pairing
     const url = URL.createObjectURL(file);
     const image = new Image();
 
@@ -202,29 +195,5 @@ export async function processProjectImageFile(
       `${normalizedTarget}_tooltip.${extension}`
     ),
     modal: blobToFile(modalBlob, `${normalizedTarget}_modal.${extension}`),
-  };
-}
-
-/**
- * Resize an image file into tooltip/modal blobs without wrapping as File objects.
- */
-export async function processProjectImageBlobs(
-  file: File,
-  expectedTarget?: string
-): Promise<ProcessedProjectImageBlobs> {
-  const {
-    normalizedTarget,
-    originalFilename,
-    extension,
-    tooltipBlob,
-    modalBlob,
-  } = await processImageFile(file, expectedTarget);
-
-  return {
-    originalFilename,
-    normalizedTarget,
-    tooltip: tooltipBlob,
-    modal: modalBlob,
-    extension,
   };
 }
