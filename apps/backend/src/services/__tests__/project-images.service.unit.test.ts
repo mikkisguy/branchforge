@@ -205,6 +205,28 @@ describe("uploadProjectImage", () => {
 
     expect(fs.writeFile).not.toHaveBeenCalled();
   });
+
+  it("unlinks both files when one parallel write fails", async () => {
+    vi.mocked(fs.writeFile)
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("disk full"));
+
+    await expect(
+      uploadProjectImage(projectId, userId, {
+        originalFilename: "eileen_happy.png",
+        tooltip: { buffer: minimalPng, mimeType: "image/png" },
+        modal: { buffer: minimalPng, mimeType: "image/png" },
+      })
+    ).rejects.toThrow("disk full");
+
+    expect(dbInsert).not.toHaveBeenCalled();
+    expect(fs.unlink).toHaveBeenCalledWith(
+      `/tmp/project-images/${projectId}/tooltip-file.webp`
+    );
+    expect(fs.unlink).toHaveBeenCalledWith(
+      `/tmp/project-images/${projectId}/modal-file.webp`
+    );
+  });
 });
 
 describe("replaceProjectImage", () => {

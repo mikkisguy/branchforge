@@ -108,7 +108,7 @@ async function unlinkProjectImageFile(
 
 /**
  * Write tooltip and modal image files with path containment checks.
- * Both writes run in parallel via Promise.all.
+ * Both writes run in parallel; if either fails, unlink both to avoid orphans.
  */
 async function writeImageFiles(
   projectId: string,
@@ -136,10 +136,19 @@ async function writeImageFiles(
     }
   }
 
-  await Promise.all([
+  const results = await Promise.allSettled([
     fs.writeFile(tooltipPath, tooltipBuffer),
     fs.writeFile(modalPath, modalBuffer),
   ]);
+
+  const writeError = results.find(
+    (result): result is PromiseRejectedResult => result.status === "rejected"
+  );
+  if (writeError) {
+    await unlinkProjectImageFile(projectId, tooltipFilename);
+    await unlinkProjectImageFile(projectId, modalFilename);
+    throw writeError.reason;
+  }
 }
 
 function validateOriginalFilename(raw: string): string {

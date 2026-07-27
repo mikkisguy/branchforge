@@ -140,7 +140,8 @@ function blobToFile(blob: Blob, filename: string): File {
 interface InternalProcessedImage {
   normalizedTarget: string;
   originalFilename: string;
-  extension: "webp" | "jpg";
+  tooltipExtension: "webp" | "jpg";
+  modalExtension: "webp" | "jpg";
   tooltipBlob: Blob;
   modalBlob: Blob;
 }
@@ -156,15 +157,15 @@ async function processImageFile(
     resizeToBlob(image, PROJECT_IMAGE_MODAL_SIZE),
   ]);
 
-  const extension = tooltipResult.extension;
   const originalFilename = file.name.includes(".")
     ? file.name
-    : `${normalizedTarget}.${extension}`;
+    : `${normalizedTarget}.${tooltipResult.extension}`;
 
   return {
     normalizedTarget,
     originalFilename,
-    extension,
+    tooltipExtension: tooltipResult.extension,
+    modalExtension: modalResult.extension,
     tooltipBlob: tooltipResult.blob,
     modalBlob: modalResult.blob,
   };
@@ -182,7 +183,8 @@ export async function processProjectImageFile(
   const {
     normalizedTarget,
     originalFilename,
-    extension,
+    tooltipExtension,
+    modalExtension,
     tooltipBlob,
     modalBlob,
   } = await processImageFile(file, expectedTarget);
@@ -192,8 +194,8 @@ export async function processProjectImageFile(
     normalizedTarget,
     tooltip: blobToFile(
       tooltipBlob,
-      `${normalizedTarget}_tooltip.${extension}`
+      `${normalizedTarget}_tooltip.${tooltipExtension}`
     ),
-    modal: blobToFile(modalBlob, `${normalizedTarget}_modal.${extension}`),
+    modal: blobToFile(modalBlob, `${normalizedTarget}_modal.${modalExtension}`),
   };
 }
