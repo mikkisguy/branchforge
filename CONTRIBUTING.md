@@ -72,10 +72,10 @@ When reporting bugs or requesting features:
    # Edit .env with your configuration
    ```
 
-5. Set up the database:
+5. Set up the database (creates DBs if missing, then migrates main + test):
 
    ```bash
-   pnpm --filter @branchforge/backend db:migrate
+   pnpm --filter @branchforge/backend db:bootstrap
    ```
 
 6. Start development servers:
