@@ -147,8 +147,8 @@ pnpm install
 cp .env.example .env
 # Edit .env - required: SESSION_SECRET, ENCRYPTION_KEY (32-byte hex)
 
-# Prepare the database
-pnpm --filter @branchforge/backend db:migrate
+# Prepare the database (creates DBs if missing, then migrates main + test)
+pnpm --filter @branchforge/backend db:bootstrap
 
 # Start writing!
 pnpm dev

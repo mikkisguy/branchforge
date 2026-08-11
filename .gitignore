@@ -54,6 +54,10 @@ plans/
 tmp/
 create-issues.sh
 
+.claude/
+!.claude/CLAUDE.md
+.cursor/
+
 # Security audit notes — PRIVATE, never commit/publish
 docs/security/audit-*.md
 
