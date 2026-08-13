@@ -1,5 +1,12 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import { BookOpen, SquarePen, Menu, Settings, LogOut } from "lucide-react";
+import {
+  BookOpen,
+  SquarePen,
+  Menu,
+  Keyboard,
+  Settings,
+  LogOut,
+} from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { ProjectSelector } from "./ProjectSelector";
 import { NavButtons } from "./NavButtons";
@@ -21,6 +28,7 @@ interface SidebarMobileMenuProps {
   onCloseProjectPopover: () => void;
   onOpenProjectSettings: () => void;
   onOpenFlow: () => void;
+  onOpenKeyboardShortcuts: () => void;
   onOpenSettings: () => void;
   onLogout: () => void;
   isDarkMode: boolean;
@@ -43,6 +51,7 @@ export function SidebarMobileMenu({
   onCloseProjectPopover,
   onOpenProjectSettings,
   onOpenFlow,
+  onOpenKeyboardShortcuts,
   onOpenSettings,
   onLogout,
   isDarkMode,
@@ -172,6 +181,22 @@ export function SidebarMobileMenu({
                 onToggle={() => {}}
                 onClose={() => {}}
               />
+            </div>
+
+            <div className="p-2 rounded-md text-sm font-medium text-muted-foreground border-b border-muted/60 transition-colors">
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenKeyboardShortcuts();
+                }}
+                className="flex items-center gap-3 p-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                title="Keyboard shortcuts"
+                aria-label="Keyboard shortcuts"
+              >
+                <Keyboard className="size-4 flex-shrink-0" />
+                <span>Keyboard shortcuts</span>
+              </button>
             </div>
 
             <div className="p-2 rounded-md text-sm font-medium text-muted-foreground border-b border-muted/60 transition-colors">

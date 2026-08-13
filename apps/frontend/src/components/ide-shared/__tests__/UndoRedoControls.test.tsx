@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { getShortcutActionDescription } from "@/lib/keyboard-shortcuts";
 import { UndoRedoControls } from "../UndoRedoControls";
 
 describe("UndoRedoControls", () => {
@@ -250,16 +251,23 @@ describe("UndoRedoControls", () => {
       expect(redoButton).toHaveAttribute("aria-disabled", "true");
     });
 
-    it("should have proper title attributes for tooltips", () => {
+    it("should show registry-derived shortcut hints in tooltips", () => {
       render(
         <UndoRedoControls canUndo={true} canRedo={true} {...mockHandlers} />
       );
 
+      const undoHint = getShortcutActionDescription("undo", "Undo");
+      const redoHint = getShortcutActionDescription("redo", "Redo");
+
+      fireEvent.focus(screen.getByLabelText("Undo"));
       expect(
-        screen.getByTitle(/Undo \(Ctrl\+Z \/ Cmd\+Z\)/)
+        screen.getByRole("tooltip", { name: undoHint })
       ).toBeInTheDocument();
+
+      fireEvent.blur(screen.getByLabelText("Undo"));
+      fireEvent.focus(screen.getByLabelText("Redo"));
       expect(
-        screen.getByTitle(/Redo \(Ctrl\+Y \/ Cmd\+Shift\+Z\)/)
+        screen.getByRole("tooltip", { name: redoHint })
       ).toBeInTheDocument();
     });
   });

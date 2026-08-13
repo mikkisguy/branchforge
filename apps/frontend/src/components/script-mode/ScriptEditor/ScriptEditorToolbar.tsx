@@ -81,6 +81,7 @@ export function ScriptEditorToolbar({
               displayMode="compact"
               saveConflict={saveConflict}
               onRetry={onSaveRequest}
+              showSaveShortcutHint
             />
             <span className="w-px h-3 bg-border" aria-hidden="true" />
           </>

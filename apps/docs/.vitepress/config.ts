@@ -40,7 +40,10 @@ export default defineConfig({
         },
         {
           text: "Reference",
-          items: [{ text: "Characters & Stats", link: "/user/characters" }],
+          items: [
+            { text: "Keyboard Shortcuts", link: "/user/keyboard-shortcuts" },
+            { text: "Characters & Stats", link: "/user/characters" },
+          ],
         },
       ],
       "/dev/": [

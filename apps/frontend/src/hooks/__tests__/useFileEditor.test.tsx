@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, fireEvent, renderHook, waitFor } from "@testing-library/react";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
@@ -282,6 +282,69 @@ describe("useFileEditor", () => {
       "This file changed elsewhere. Reload project files before editing again.",
       "Script conflict detected"
     );
+  });
+
+  it("saves on Ctrl+S and Meta+S keyboard shortcuts", async () => {
+    const updateFileContent = vi.fn().mockResolvedValue({
+      success: true,
+      contentHash: "hash-after-ctrl-save",
+      updatedAt: "2024-01-01T00:00:00.000Z",
+    });
+    const showErrorToast = vi.fn();
+
+    const { result } = renderHook(
+      () =>
+        useFileEditor({
+          projectId: "project-1",
+          projectFiles: [FILE_A],
+          updateFileContent,
+          showErrorToast,
+        }),
+      { wrapper }
+    );
+
+    await act(async () => {
+      const switched = await result.current.switchToFile(FILE_A);
+      expect(switched).toBe(true);
+    });
+
+    act(() => {
+      result.current.setEditedFileContent("saved with ctrl+s");
+    });
+
+    act(() => {
+      fireEvent.keyDown(window, { ctrlKey: true, code: "KeyS" });
+    });
+
+    await waitFor(() => {
+      expect(updateFileContent).toHaveBeenCalledWith(
+        "file-1",
+        "saved with ctrl+s",
+        {
+          expectedContentHash: "hash-file-1",
+        }
+      );
+    });
+
+    act(() => {
+      result.current.setEditedFileContent("saved with meta+s");
+    });
+
+    act(() => {
+      fireEvent.keyDown(window, { metaKey: true, code: "KeyS" });
+    });
+
+    await waitFor(() => {
+      expect(updateFileContent).toHaveBeenCalledWith(
+        "file-1",
+        "saved with meta+s",
+        {
+          expectedContentHash: "hash-after-ctrl-save",
+        }
+      );
+    });
+
+    expect(showErrorToast).not.toHaveBeenCalled();
   });
 
   it("blocks switching files when pending save cannot flush", async () => {

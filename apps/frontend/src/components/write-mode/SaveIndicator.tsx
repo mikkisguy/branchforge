@@ -14,6 +14,10 @@
 import { Check, AlertCircle, Loader2 } from "lucide-react";
 import { memo } from "react";
 import type { SaveStatus } from "@/hooks/useAutosave";
+import {
+  formatShortcutAccessible,
+  getKeyboardShortcut,
+} from "@/lib/keyboard-shortcuts";
 
 type SaveIndicatorDisplayMode = "compact" | "verbose";
 
@@ -23,6 +27,8 @@ interface SaveIndicatorProps {
   lastSaved?: Date | null;
   saveConflict?: boolean;
   onRetry?: () => void;
+  /** When true, append the save shortcut to status titles (write-mode discoverability). */
+  showSaveShortcutHint?: boolean;
 }
 
 // Constant lookup maps for O(1) status-based lookups
@@ -43,12 +49,28 @@ const STATUS_TEXT: Record<SaveStatus, { compact: string; verbose: string }> = {
   },
 };
 
+const saveShortcut = getKeyboardShortcut("save");
+const saveShortcutAccessible = saveShortcut
+  ? formatShortcutAccessible(saveShortcut)
+  : null;
+
+function withSaveShortcutHint(
+  statusText: string,
+  showSaveShortcutHint?: boolean
+): string {
+  if (!showSaveShortcutHint || !saveShortcutAccessible) {
+    return statusText;
+  }
+  return `${statusText} (${saveShortcutAccessible})`;
+}
+
 export const SaveIndicator = memo(function SaveIndicator({
   saveStatus,
   displayMode = "compact",
   lastSaved = null,
   saveConflict = false,
   onRetry,
+  showSaveShortcutHint = false,
 }: SaveIndicatorProps) {
   if (saveConflict) {
     return (
@@ -68,6 +90,7 @@ export const SaveIndicator = memo(function SaveIndicator({
   }
 
   const text = STATUS_TEXT[saveStatus][displayMode];
+  const title = withSaveShortcutHint(text, showSaveShortcutHint);
 
   // Compute icon JSX based on status
   const icon = (() => {
@@ -87,7 +110,7 @@ export const SaveIndicator = memo(function SaveIndicator({
       <output
         className="flex items-center justify-center text-xs transition-colors duration-300"
         aria-live="polite"
-        title={text}
+        title={title}
       >
         <span className={STATUS_TEXT_COLORS.saved}>{icon}</span>
       </output>
@@ -114,7 +137,7 @@ export const SaveIndicator = memo(function SaveIndicator({
       }`}
       role={isErrorWithRetry ? "button" : "status"}
       aria-live="polite"
-      title={text}
+      title={title}
       tabIndex={isErrorWithRetry ? 0 : undefined}
       onClick={isErrorWithRetry ? onRetry : undefined}
       onKeyDown={handleKeyDown}

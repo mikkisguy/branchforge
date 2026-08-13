@@ -3,16 +3,15 @@
  *
  * Undo/redo buttons with keyboard shortcuts.
  *
- * Shortcuts:
- * - Undo: Ctrl+Z (Windows/Linux) or Cmd+Z (macOS)
- * - Redo: Ctrl+Y or Ctrl+Shift+Z (Windows/Linux)
- *         Cmd+Y or Cmd+Shift+Z (macOS)
+ * Shortcuts are defined in @/lib/keyboard-shortcuts (undo, redo).
  *
  * Uses local in-memory undo only for instant response.
  */
 
 import { useEffect, useRef } from "react";
 import { Undo2, Redo2 } from "lucide-react";
+import { Tooltip } from "@/components/ui/tooltip";
+import { getShortcutActionDescription } from "@/lib/keyboard-shortcuts";
 
 interface UndoRedoControlsProps {
   canUndo: boolean;
@@ -27,6 +26,9 @@ export function UndoRedoControls({
   onUndo,
   onRedo,
 }: UndoRedoControlsProps) {
+  const undoHint = getShortcutActionDescription("undo", "Undo");
+  const redoHint = getShortcutActionDescription("redo", "Redo");
+
   // Store handlers in refs to avoid re-subscribing to keydown on every render
   const onUndoRef = useRef(onUndo);
   const onRedoRef = useRef(onRedo);
@@ -79,36 +81,38 @@ export function UndoRedoControls({
 
   return (
     <div className="flex items-center gap-1">
-      <button
-        type="button"
-        onClick={onUndo}
-        disabled={!canUndo}
-        aria-disabled={!canUndo}
-        className={`p-1.5 rounded-md transition-all ${
-          canUndo
-            ? "hover:bg-muted text-foreground hover:text-[var(--theme-color)]"
-            : "text-muted-foreground/30 cursor-not-allowed"
-        }`}
-        title="Undo (Ctrl+Z / Cmd+Z)"
-        aria-label="Undo"
-      >
-        <Undo2 className="size-4" />
-      </button>
-      <button
-        type="button"
-        onClick={onRedo}
-        disabled={!canRedo}
-        aria-disabled={!canRedo}
-        className={`p-1.5 rounded-md transition-all ${
-          canRedo
-            ? "hover:bg-muted text-foreground hover:text-[var(--theme-color)]"
-            : "text-muted-foreground/30 cursor-not-allowed"
-        }`}
-        title="Redo (Ctrl+Y / Cmd+Shift+Z)"
-        aria-label="Redo"
-      >
-        <Redo2 className="size-4" />
-      </button>
+      <Tooltip content={undoHint}>
+        <button
+          type="button"
+          onClick={onUndo}
+          disabled={!canUndo}
+          aria-disabled={!canUndo}
+          className={`p-1.5 rounded-md transition-all ${
+            canUndo
+              ? "hover:bg-muted text-foreground hover:text-[var(--theme-color)]"
+              : "text-muted-foreground/30 cursor-not-allowed"
+          }`}
+          aria-label="Undo"
+        >
+          <Undo2 className="size-4" />
+        </button>
+      </Tooltip>
+      <Tooltip content={redoHint}>
+        <button
+          type="button"
+          onClick={onRedo}
+          disabled={!canRedo}
+          aria-disabled={!canRedo}
+          className={`p-1.5 rounded-md transition-all ${
+            canRedo
+              ? "hover:bg-muted text-foreground hover:text-[var(--theme-color)]"
+              : "text-muted-foreground/30 cursor-not-allowed"
+          }`}
+          aria-label="Redo"
+        >
+          <Redo2 className="size-4" />
+        </button>
+      </Tooltip>
     </div>
   );
 }
