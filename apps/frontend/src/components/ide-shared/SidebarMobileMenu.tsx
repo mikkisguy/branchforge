@@ -62,8 +62,19 @@ export function SidebarMobileMenu({
 }: SidebarMobileMenuProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
-  const mobileMenuBtnRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuBtnRef = useRef<HTMLSpanElement>(null);
   const closeMobileMenuEvent = useEffectEvent(() => setMobileMenuOpen(false));
+
+  const openKeyboardShortcutsFromMenu = () => {
+    // Focus the persistent hamburger trigger before the menu item unmounts so
+    // dialog focus trap can restore focus here on close.
+    const menuButton = mobileMenuBtnRef.current?.querySelector("button");
+    if (menuButton instanceof HTMLButtonElement) {
+      menuButton.focus();
+    }
+    onOpenKeyboardShortcuts();
+    setMobileMenuOpen(false);
+  };
 
   // Click-outside dismiss for mobile hamburger menu popover
   useEffect(() => {
@@ -186,10 +197,7 @@ export function SidebarMobileMenu({
             <div className="p-2 rounded-md text-sm font-medium text-muted-foreground border-b border-muted/60 transition-colors">
               <button
                 type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onOpenKeyboardShortcuts();
-                }}
+                onClick={openKeyboardShortcutsFromMenu}
                 className="flex items-center gap-3 p-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
                 title="Keyboard shortcuts"
                 aria-label="Keyboard shortcuts"

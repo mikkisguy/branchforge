@@ -1,5 +1,5 @@
 /**
- * Canonical BranchForge keyboard-shortcut registry.
+ * BranchForge keyboard-shortcut registry.
  *
  * Frontend UI (modal, tooltips, hints) must render from this module.
  * User docs mirror these entries manually — keep IDs/key combos in sync.
@@ -19,6 +19,20 @@ export type ShortcutGroupId = "general" | "write" | "script";
 
 export type ShortcutSource = "branchforge" | "editor";
 
+export type ShortcutId =
+  | "save"
+  | "undo"
+  | "redo"
+  | "focus-mode"
+  | "write-add-line"
+  | "write-delete-empty-line"
+  | "write-move-line-up"
+  | "write-move-line-down"
+  | "script-search"
+  | "script-find-next"
+  | "script-find-previous"
+  | "script-close-search";
+
 /** Semantic key tokens used to derive platform labels and keycaps. */
 export type ShortcutKeyToken =
   | "mod"
@@ -30,7 +44,11 @@ export type ShortcutKeyToken =
   | "arrowup"
   | "arrowdown"
   | "f3"
-  | string;
+  | "s"
+  | "z"
+  | "y"
+  | "f"
+  | "g";
 
 export interface ShortcutChord {
   /** Ordered tokens for one chord, e.g. ["mod", "shift", "f"]. */
@@ -38,7 +56,7 @@ export interface ShortcutChord {
 }
 
 export interface KeyboardShortcut {
-  id: string;
+  id: ShortcutId;
   group: ShortcutGroupId;
   scope: ShortcutScope;
   source: ShortcutSource;
@@ -62,7 +80,17 @@ export interface ShortcutGroup {
   shortcuts: readonly KeyboardShortcut[];
 }
 
-const GENERAL_SHORTCUTS: readonly KeyboardShortcut[] = [
+export interface ShortcutKeyEvent {
+  key: string;
+  code: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+  defaultPrevented?: boolean;
+}
+
+const GENERAL_SHORTCUTS = [
   {
     id: "save",
     group: "general",
@@ -81,7 +109,7 @@ const GENERAL_SHORTCUTS: readonly KeyboardShortcut[] = [
     source: "branchforge",
     label: "Undo",
     description:
-      "Undo the last in-memory editor change. Native undo remains available inside text fields.",
+      "Undo the last in-memory app-shell change when focus is outside native text fields. Native text fields and CodeMirror keep their own undo history.",
     chords: [{ keys: ["mod", "z"] }],
     actionLabel: "Undo",
   },
@@ -92,7 +120,7 @@ const GENERAL_SHORTCUTS: readonly KeyboardShortcut[] = [
     source: "branchforge",
     label: "Redo",
     description:
-      "Redo the last undone in-memory editor change. Native redo remains available inside text fields.",
+      "Redo the last undone in-memory app-shell change when focus is outside native text fields. Native text fields and CodeMirror keep their own redo history.",
     chords: [{ keys: ["mod", "y"] }, { keys: ["mod", "shift", "z"] }],
     actionLabel: "Redo",
   },
@@ -107,9 +135,9 @@ const GENERAL_SHORTCUTS: readonly KeyboardShortcut[] = [
     chords: [{ keys: ["mod", "shift", "f"] }],
     actionLabel: "Toggle focus mode",
   },
-];
+] as const satisfies readonly KeyboardShortcut[];
 
-const WRITE_SHORTCUTS: readonly KeyboardShortcut[] = [
+const WRITE_SHORTCUTS = [
   {
     id: "write-add-line",
     group: "write",
@@ -148,9 +176,9 @@ const WRITE_SHORTCUTS: readonly KeyboardShortcut[] = [
     description: "Move the focused dialogue line down one position.",
     chords: [{ keys: ["mod", "arrowdown"] }],
   },
-];
+] as const satisfies readonly KeyboardShortcut[];
 
-const SCRIPT_SHORTCUTS: readonly KeyboardShortcut[] = [
+const SCRIPT_SHORTCUTS = [
   {
     id: "script-search",
     group: "script",
@@ -188,7 +216,7 @@ const SCRIPT_SHORTCUTS: readonly KeyboardShortcut[] = [
     description: "Close the Script Mode search panel.",
     chords: [{ keys: ["escape"] }],
   },
-];
+] as const satisfies readonly KeyboardShortcut[];
 
 export const KEYBOARD_SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
   {
@@ -214,18 +242,193 @@ export const KEYBOARD_SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
 export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcut[] =
   KEYBOARD_SHORTCUT_GROUPS.flatMap((group) => group.shortcuts);
 
-const SHORTCUT_BY_ID: ReadonlyMap<string, KeyboardShortcut> = new Map(
+const SHORTCUT_BY_ID: ReadonlyMap<ShortcutId, KeyboardShortcut> = new Map(
   KEYBOARD_SHORTCUTS.map((shortcut) => [shortcut.id, shortcut])
 );
 
-export function getKeyboardShortcut(id: string): KeyboardShortcut | undefined {
-  return SHORTCUT_BY_ID.get(id);
+function validateRegistry(groups: readonly ShortcutGroup[]): void {
+  const seenIds = new Set<ShortcutId>();
+
+  for (const group of groups) {
+    for (const shortcut of group.shortcuts) {
+      if (shortcut.group !== group.id) {
+        throw new Error(
+          `Shortcut "${shortcut.id}" group "${shortcut.group}" does not match group "${group.id}"`
+        );
+      }
+
+      if (seenIds.has(shortcut.id)) {
+        throw new Error(`Duplicate shortcut id: ${shortcut.id}`);
+      }
+      seenIds.add(shortcut.id);
+
+      if (shortcut.chords.length === 0) {
+        throw new Error(`Shortcut "${shortcut.id}" has no chords`);
+      }
+
+      for (const chord of shortcut.chords) {
+        if (chord.keys.length === 0) {
+          throw new Error(`Shortcut "${shortcut.id}" has an empty chord`);
+        }
+      }
+    }
+  }
+}
+
+if (import.meta.env.DEV) {
+  validateRegistry(KEYBOARD_SHORTCUT_GROUPS);
+}
+
+function isModifierToken(
+  token: ShortcutKeyToken
+): token is "mod" | "shift" | "alt" {
+  return token === "mod" || token === "shift" || token === "alt";
+}
+
+function keyTokenMatchesEvent(
+  token: ShortcutKeyToken,
+  event: ShortcutKeyEvent
+): boolean {
+  switch (token) {
+    case "mod":
+    case "shift":
+    case "alt":
+      return true;
+    case "enter":
+      return event.key === "Enter";
+    case "backspace":
+      return event.key === "Backspace";
+    case "escape":
+      return event.key === "Escape";
+    case "arrowup":
+      return event.key === "ArrowUp";
+    case "arrowdown":
+      return event.key === "ArrowDown";
+    case "f3":
+      return event.code === "F3" || event.key === "F3";
+    default:
+      return (
+        event.code === `Key${token.toUpperCase()}` ||
+        event.key.toLowerCase() === token
+      );
+  }
 }
 
 export function detectShortcutPlatform(
   userAgent = typeof navigator !== "undefined" ? navigator.userAgent : ""
 ): ShortcutPlatform {
   return /Mac|iPhone|iPad|iPod/i.test(userAgent) ? "mac" : "windows";
+}
+
+/** Overridable platform detector for runtime + tests. */
+export const shortcutPlatformApi = {
+  detect: detectShortcutPlatform,
+};
+
+/**
+ * `mod` means the platform primary modifier only:
+ * - macOS: Meta (⌘), and not Ctrl
+ * - Windows/Linux: Ctrl, and not Meta
+ * Ctrl+Meta together never counts as a valid `mod`.
+ */
+function hasExactPrimaryMod(
+  event: ShortcutKeyEvent,
+  platform: ShortcutPlatform
+): boolean {
+  if (platform === "mac") {
+    return event.metaKey && !event.ctrlKey;
+  }
+  return event.ctrlKey && !event.metaKey;
+}
+
+function hasAnyPrimaryModKey(event: ShortcutKeyEvent): boolean {
+  return event.ctrlKey || event.metaKey;
+}
+
+function chordMatchesEvent(
+  chord: ShortcutChord,
+  event: ShortcutKeyEvent,
+  platform: ShortcutPlatform
+): boolean {
+  let requiresMod = false;
+  let requiresShift = false;
+  let requiresAlt = false;
+  let keyToken: ShortcutKeyToken | null = null;
+
+  for (const token of chord.keys) {
+    if (isModifierToken(token)) {
+      if (token === "mod") requiresMod = true;
+      if (token === "shift") requiresShift = true;
+      if (token === "alt") requiresAlt = true;
+      continue;
+    }
+
+    if (keyToken !== null) {
+      return false;
+    }
+    keyToken = token;
+  }
+
+  if (keyToken === null) {
+    return false;
+  }
+
+  if (requiresMod) {
+    if (!hasExactPrimaryMod(event, platform)) return false;
+  } else if (hasAnyPrimaryModKey(event)) {
+    return false;
+  }
+
+  if (requiresShift !== event.shiftKey) return false;
+  if (requiresAlt !== event.altKey) return false;
+
+  return keyTokenMatchesEvent(keyToken, event);
+}
+
+export function matchesShortcut(
+  event: ShortcutKeyEvent,
+  id: ShortcutId,
+  platform: ShortcutPlatform = shortcutPlatformApi.detect()
+): boolean {
+  const shortcut = SHORTCUT_BY_ID.get(id);
+  if (!shortcut) {
+    return false;
+  }
+
+  return shortcut.chords.some((chord) =>
+    chordMatchesEvent(chord, event, platform)
+  );
+}
+
+export function isNativeEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target.isContentEditable === true
+  );
+}
+
+export function shouldIgnoreAppShortcut(event: ShortcutKeyEvent): boolean {
+  if (event.defaultPrevented) {
+    return true;
+  }
+
+  const target = "target" in event ? event.target : null;
+  if (target instanceof Element && target.closest("dialog[open]")) {
+    return true;
+  }
+
+  return false;
+}
+
+export function getKeyboardShortcut(
+  id: ShortcutId
+): KeyboardShortcut | undefined {
+  return SHORTCUT_BY_ID.get(id);
 }
 
 function tokenAccessibleLabel(
@@ -252,7 +455,7 @@ function tokenAccessibleLabel(
     case "f3":
       return "F3";
     default:
-      return token.length === 1 ? token.toUpperCase() : token;
+      return token.toUpperCase();
   }
 }
 
@@ -280,7 +483,7 @@ function tokenVisualLabel(
     case "f3":
       return "F3";
     default:
-      return token.length === 1 ? token.toUpperCase() : token;
+      return token.toUpperCase();
   }
 }
 
@@ -317,7 +520,7 @@ export function formatShortcutHint(
 }
 
 export function getShortcutActionDescription(
-  shortcutId: string,
+  shortcutId: ShortcutId,
   actionLabel: string,
   platform: ShortcutPlatform = detectShortcutPlatform()
 ): string {

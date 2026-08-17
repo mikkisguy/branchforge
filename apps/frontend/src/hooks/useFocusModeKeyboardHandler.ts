@@ -1,10 +1,17 @@
 import { useEffect } from "react";
+import {
+  matchesShortcut,
+  shouldIgnoreAppShortcut,
+} from "@/lib/keyboard-shortcuts";
 
 export function useFocusModeKeyboardHandler(onToggle: () => void) {
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyF") {
-        e.preventDefault();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (shouldIgnoreAppShortcut(event)) {
+        return;
+      }
+      if (matchesShortcut(event, "focus-mode")) {
+        event.preventDefault();
         onToggle();
       }
     };

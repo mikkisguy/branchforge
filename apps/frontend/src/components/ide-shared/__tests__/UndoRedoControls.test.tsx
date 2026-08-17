@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import * as keyboardShortcuts from "@/lib/keyboard-shortcuts";
 import { getShortcutActionDescription } from "@/lib/keyboard-shortcuts";
 import { UndoRedoControls } from "../UndoRedoControls";
 
@@ -11,6 +12,7 @@ describe("UndoRedoControls", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   describe("button states", () => {
@@ -29,7 +31,8 @@ describe("UndoRedoControls", () => {
       );
 
       const undoButton = screen.getByLabelText("Undo");
-      expect(undoButton).toBeDisabled();
+      expect(undoButton).not.toBeDisabled();
+      expect(undoButton).toHaveAttribute("aria-disabled", "true");
     });
 
     it("should enable redo button when redo is available", () => {
@@ -47,7 +50,8 @@ describe("UndoRedoControls", () => {
       );
 
       const redoButton = screen.getByLabelText("Redo");
-      expect(redoButton).toBeDisabled();
+      expect(redoButton).not.toBeDisabled();
+      expect(redoButton).toHaveAttribute("aria-disabled", "true");
     });
   });
 
@@ -109,6 +113,9 @@ describe("UndoRedoControls", () => {
     });
 
     it("should call onUndo when Cmd+Z is pressed (Mac)", () => {
+      vi.spyOn(keyboardShortcuts.shortcutPlatformApi, "detect").mockReturnValue(
+        "mac"
+      );
       render(
         <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
       );
@@ -154,6 +161,9 @@ describe("UndoRedoControls", () => {
     });
 
     it("should call onRedo when Cmd+Y is pressed (Mac)", () => {
+      vi.spyOn(keyboardShortcuts.shortcutPlatformApi, "detect").mockReturnValue(
+        "mac"
+      );
       render(
         <UndoRedoControls canUndo={false} canRedo={true} {...mockHandlers} />
       );
@@ -227,6 +237,69 @@ describe("UndoRedoControls", () => {
         document.body.removeChild(div);
       }
     });
+    it("should not call onUndo on Ctrl+Shift+Z (redo chord)", () => {
+      render(
+        <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
+      );
+
+      fireEvent.keyDown(document, {
+        key: "z",
+        code: "KeyZ",
+        ctrlKey: true,
+        shiftKey: true,
+      });
+
+      expect(mockHandlers.onUndo).not.toHaveBeenCalled();
+    });
+
+    it("should not call onUndo when Alt is also held", () => {
+      render(
+        <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
+      );
+
+      fireEvent.keyDown(document, {
+        key: "z",
+        code: "KeyZ",
+        ctrlKey: true,
+        altKey: true,
+      });
+
+      expect(mockHandlers.onUndo).not.toHaveBeenCalled();
+    });
+
+    it("should not call onRedo when Alt is also held with Ctrl+Y", () => {
+      render(
+        <UndoRedoControls canUndo={false} canRedo={true} {...mockHandlers} />
+      );
+
+      fireEvent.keyDown(document, {
+        key: "y",
+        code: "KeyY",
+        ctrlKey: true,
+        altKey: true,
+      });
+
+      expect(mockHandlers.onRedo).not.toHaveBeenCalled();
+    });
+
+    it("should not trigger undo when keydown target is inside an open dialog", () => {
+      render(
+        <UndoRedoControls canUndo={true} canRedo={false} {...mockHandlers} />
+      );
+
+      const dialog = document.createElement("dialog");
+      dialog.setAttribute("open", "");
+      const input = document.createElement("input");
+      dialog.appendChild(input);
+      document.body.appendChild(dialog);
+
+      try {
+        fireEvent.keyDown(input, { key: "z", code: "KeyZ", ctrlKey: true });
+        expect(mockHandlers.onUndo).not.toHaveBeenCalled();
+      } finally {
+        document.body.removeChild(dialog);
+      }
+    });
   });
 
   describe("accessibility", () => {
@@ -249,6 +322,26 @@ describe("UndoRedoControls", () => {
 
       const redoButton = screen.getByLabelText("Redo");
       expect(redoButton).toHaveAttribute("aria-disabled", "true");
+    });
+
+    it("keeps disabled undo/redo focusable with shortcut tooltips", () => {
+      render(
+        <UndoRedoControls canUndo={false} canRedo={false} {...mockHandlers} />
+      );
+
+      const undoHint = getShortcutActionDescription("undo", "Undo");
+      const redoHint = getShortcutActionDescription("redo", "Redo");
+
+      fireEvent.focus(screen.getByLabelText("Undo"));
+      expect(
+        screen.getByRole("tooltip", { name: undoHint })
+      ).toBeInTheDocument();
+
+      fireEvent.blur(screen.getByLabelText("Undo"));
+      fireEvent.focus(screen.getByLabelText("Redo"));
+      expect(
+        screen.getByRole("tooltip", { name: redoHint })
+      ).toBeInTheDocument();
     });
 
     it("should show registry-derived shortcut hints in tooltips", () => {

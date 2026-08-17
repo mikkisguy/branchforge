@@ -82,11 +82,14 @@ describe("KeyboardShortcutsDialog", () => {
     expect(dialog?.getAttribute("aria-labelledby")).toBe(
       heading.getAttribute("id")
     );
-    expect(
-      screen.getByText(
-        "Modifier keys follow your platform: Control (Ctrl) on Windows and Linux, Command (⌘) on macOS."
-      )
-    ).toBeInTheDocument();
+
+    const description = screen.getByText(
+      "Modifier keys follow your platform: Control (Ctrl) on Windows and Linux, Command (⌘) on macOS."
+    );
+    expect(description).toBeInTheDocument();
+    expect(dialog?.getAttribute("aria-describedby")).toBe(
+      description.getAttribute("id")
+    );
     expect(
       screen.getByRole("button", {
         name: "Close keyboard shortcuts dialog",

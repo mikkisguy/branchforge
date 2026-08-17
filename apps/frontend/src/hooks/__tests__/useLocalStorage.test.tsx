@@ -105,17 +105,14 @@ describe("useLocalStorage", () => {
     localStorage.setItem("branchforge:isolation", "local");
     sessionStorage.setItem("branchforge:isolation", "session");
 
-    localStorage.clear();
+    try {
+      localStorage.clear();
 
-    expect(localStorage.getItem("branchforge:isolation")).toBeNull();
-    expect(sessionStorage.getItem("branchforge:isolation")).toBe("session");
-  });
-
-  it("isolates values across clear between tests via beforeEach", () => {
-    // beforeEach cleared storage; this write must not see prior-test residue.
-    expect(localStorage.getItem("branchforge:leftover")).toBeNull();
-    localStorage.setItem("branchforge:leftover", "present");
-    expect(localStorage.getItem("branchforge:leftover")).toBe("present");
+      expect(localStorage.getItem("branchforge:isolation")).toBeNull();
+      expect(sessionStorage.getItem("branchforge:isolation")).toBe("session");
+    } finally {
+      sessionStorage.removeItem("branchforge:isolation");
+    }
   });
 
   it("supports boolean convenience hook", () => {

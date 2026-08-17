@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
+import * as keyboardShortcuts from "@/lib/keyboard-shortcuts";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -88,6 +89,10 @@ async function focusDialogueTextarea(container: HTMLElement) {
 }
 
 describe("DialogueLine", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("speaker dropdown options have tabindex=-1 to prevent direct tab navigation", async () => {
     const entry: DialogueEntry = {
       id: "entry-1",
@@ -316,6 +321,9 @@ describe("DialogueLine", () => {
       expect(onMoveUp).toHaveBeenCalledTimes(1);
 
       onMoveUp.mockClear();
+      vi.spyOn(keyboardShortcuts.shortcutPlatformApi, "detect").mockReturnValue(
+        "mac"
+      );
       fireEvent.keyDown(textarea, {
         key: "ArrowUp",
         metaKey: true,
@@ -368,6 +376,9 @@ describe("DialogueLine", () => {
       expect(onMoveDown).toHaveBeenCalledTimes(1);
 
       onMoveDown.mockClear();
+      vi.spyOn(keyboardShortcuts.shortcutPlatformApi, "detect").mockReturnValue(
+        "mac"
+      );
       fireEvent.keyDown(textarea, {
         key: "ArrowDown",
         metaKey: true,
@@ -396,6 +407,74 @@ describe("DialogueLine", () => {
       });
 
       expect(onMoveDown).not.toHaveBeenCalled();
+    });
+    it("Ctrl+Shift+ArrowUp does not move line up", async () => {
+      const onMoveUp = vi.fn();
+      const entry: DialogueEntry = {
+        id: "entry-2",
+        speakerId: null,
+        text: "Second line",
+      };
+
+      const { container } = renderDialogueLine(entry, {
+        onMoveUp,
+        index: 1,
+        totalEntries: 3,
+      });
+      const textarea = await focusDialogueTextarea(container);
+
+      fireEvent.keyDown(textarea, {
+        key: "ArrowUp",
+        ctrlKey: true,
+        shiftKey: true,
+      });
+
+      expect(onMoveUp).not.toHaveBeenCalled();
+    });
+
+    it("Backspace on sole empty non-choice line does not delete", async () => {
+      const onDelete = vi.fn();
+      const entry: DialogueEntry = {
+        id: "entry-1",
+        speakerId: null,
+        text: "",
+      };
+
+      const { container } = renderDialogueLine(entry, {
+        onDelete,
+        totalEntries: 1,
+      });
+      const textarea = await focusDialogueTextarea(container);
+
+      fireEvent.keyDown(textarea, { key: "Backspace" });
+
+      expect(onDelete).not.toHaveBeenCalled();
+    });
+
+    it("Backspace on empty choice line does not delete", async () => {
+      const onDelete = vi.fn();
+      const entry: DialogueEntry = {
+        id: "choice-1",
+        speakerId: null,
+        text: "",
+        contentType: "CHOICE",
+        choiceData: {
+          lineId: "choice-1",
+          optionIndex: 0,
+          targetLabelId: "label-next",
+          targetLabelName: "next_scene",
+        },
+      };
+
+      const { container } = renderDialogueLine(entry, {
+        onDelete,
+        totalEntries: 2,
+      });
+      const textarea = await focusDialogueTextarea(container);
+
+      fireEvent.keyDown(textarea, { key: "Backspace" });
+
+      expect(onDelete).not.toHaveBeenCalled();
     });
   });
 

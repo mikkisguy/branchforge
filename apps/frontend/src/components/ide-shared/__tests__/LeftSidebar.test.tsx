@@ -182,6 +182,31 @@ describe("LeftSidebar accessibility", () => {
     ).toBeInTheDocument();
   });
 
+  it("returns focus to the mobile menu button after closing keyboard shortcuts", async () => {
+    const user = userEvent.setup();
+    render(<LeftSidebar {...defaultProps} />, { wrapper: createWrapper() });
+
+    const menuButton = screen.getByRole("button", { name: "Open menu" });
+    await user.click(menuButton);
+
+    const shortcutsButtons = screen.getAllByRole("button", {
+      name: "Keyboard shortcuts",
+    });
+    const mobileShortcutsButton =
+      shortcutsButtons.find((button) => button.className.includes("gap-3")) ??
+      shortcutsButtons[shortcutsButtons.length - 1]!;
+    await user.click(mobileShortcutsButton);
+
+    expect(
+      screen.getByRole("heading", { name: "Keyboard shortcuts" })
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(menuButton).toHaveFocus();
+  });
+
   it("renders mobile bottom nav hamburger with dynamic aria-label (closed state)", () => {
     render(<LeftSidebar {...defaultProps} />, { wrapper: createWrapper() });
 

@@ -4,7 +4,7 @@ title: Keyboard Shortcuts
 
 # Keyboard Shortcuts
 
-BranchForge supports keyboard shortcuts across Write Mode and Script Mode. This page is the canonical reference for app and editor commands.
+BranchForge supports keyboard shortcuts across Write Mode and Script Mode. This page lists **BranchForge-owned shortcuts** and **selected Script Mode search commands**. CodeMirror provides additional editor bindings in Script Mode that vary by version; those are intentionally not listed exhaustively here.
 
 ## Modifier key notation
 
@@ -23,7 +23,7 @@ You can also open the in-app **Keyboard shortcuts** help from the sidebar or ove
 
 ## General
 
-These shortcuts work in both Write Mode and Script Mode.
+These shortcuts work in both Write Mode and Script Mode when app shortcuts are not suppressed (for example, inside an open dialog).
 
 | Action            | Shortcut                 |
 | ----------------- | ------------------------ |
@@ -34,7 +34,7 @@ These shortcuts work in both Write Mode and Script Mode.
 
 **Save** manually persists the current Script Mode file or Write Mode draft. Write Mode also autosaves in the background.
 
-**Undo** and **Redo** apply to BranchForge's in-memory editor history. Native undo and redo still work inside focused text fields.
+**Undo** and **Redo** apply to BranchForge's in-memory app-shell history when focus is **outside** native text fields (inputs, textareas, and contenteditable regions). When a native text field is focused, use that field's own undo/redo. In Script Mode, CodeMirror also maintains separate edit history inside the script editor.
 
 **Focus mode** hides chrome for a distraction-free editing surface. Use the same shortcut to exit.
 

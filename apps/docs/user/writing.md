@@ -29,7 +29,7 @@ Press Enter after each line to continue.
 
 ## Autosave
 
-Write Mode saves your work automatically every few seconds. You can also save manually, undo and redo changes, and toggle focus mode from the keyboard. See [Keyboard Shortcuts](./keyboard-shortcuts) for the full list.
+Write Mode saves your work automatically every few seconds. You can also save manually, undo and redo changes, and toggle focus mode from the keyboard. See [Keyboard Shortcuts](./keyboard-shortcuts) for BranchForge-owned shortcuts and Script Mode search commands.
 
 ## Technical Badges (Display Only)
 

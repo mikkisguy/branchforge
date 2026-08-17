@@ -1,7 +1,8 @@
 import { act, fireEvent, renderHook, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LabelDetail, PublicLabel } from "@branchforge/shared";
 import { useWriteAutosave, type LabelDialogueDraft } from "../useWriteAutosave";
+import * as keyboardShortcuts from "@/lib/keyboard-shortcuts";
 
 function createLabel(labelId: string, version: number, contentHash: string) {
   const base: PublicLabel = {
@@ -52,6 +53,10 @@ function createLabel(labelId: string, version: number, contentHash: string) {
 }
 
 describe("useWriteAutosave", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("tracks version/hash tokens across successful saves", async () => {
     const onUpdateDialogue = vi
       .fn()
@@ -205,7 +210,8 @@ describe("useWriteAutosave", () => {
       "label-shortcut-1",
       [{ speakerId: null, text: "Saved with Ctrl+S" }],
       expect.objectContaining({
-        expectedVersion: expect.any(Number),
+        expectedVersion: 3,
+        expectedContentHash: "server-hash-3",
       })
     );
 
@@ -218,6 +224,9 @@ describe("useWriteAutosave", () => {
       },
       activeLabel: label,
     });
+    vi.spyOn(keyboardShortcuts.shortcutPlatformApi, "detect").mockReturnValue(
+      "mac"
+    );
 
     act(() => {
       fireEvent.keyDown(window, { metaKey: true, code: "KeyS" });
@@ -230,7 +239,8 @@ describe("useWriteAutosave", () => {
       "label-shortcut-1",
       [{ speakerId: null, text: "Saved with Meta+S" }],
       expect.objectContaining({
-        expectedVersion: expect.any(Number),
+        expectedVersion: 4,
+        expectedContentHash: "server-hash-4",
       })
     );
 
@@ -353,5 +363,84 @@ describe("useWriteAutosave", () => {
     await waitFor(() => {
       expect(result.current.conflictByLabel.get("label-1")).toBeUndefined();
     });
+  });
+
+  it("does not save on Ctrl+Shift+S", async () => {
+    const onUpdateDialogue = vi.fn().mockResolvedValue({
+      success: true,
+      version: 4,
+      contentHash: "server-hash-4",
+      fileContentHash: "file-hash-1",
+      fileUpdatedAt: "2024-01-01T00:00:00.000Z",
+    });
+    const showErrorToast = vi.fn();
+    const label = createLabel("label-shift-block", 3, "server-hash-3");
+
+    renderHook(() =>
+      useWriteAutosave({
+        projectId: "project-1",
+        draft: {
+          labelId: "label-shift-block",
+          entries: [{ id: "line-1", speakerId: null, text: "Edited" }],
+        },
+        labels: [label],
+        activeLabel: label,
+        isUpdatingDialogue: false,
+        onUpdateDialogue,
+        showErrorToast,
+      })
+    );
+
+    act(() => {
+      fireEvent.keyDown(window, {
+        ctrlKey: true,
+        shiftKey: true,
+        code: "KeyS",
+      });
+    });
+
+    expect(onUpdateDialogue).not.toHaveBeenCalled();
+  });
+
+  it("does not save when keydown target is inside an open dialog", async () => {
+    const onUpdateDialogue = vi.fn().mockResolvedValue({
+      success: true,
+      version: 4,
+      contentHash: "server-hash-4",
+      fileContentHash: "file-hash-1",
+      fileUpdatedAt: "2024-01-01T00:00:00.000Z",
+    });
+    const showErrorToast = vi.fn();
+    const label = createLabel("label-dialog-block", 3, "server-hash-3");
+
+    renderHook(() =>
+      useWriteAutosave({
+        projectId: "project-1",
+        draft: {
+          labelId: "label-dialog-block",
+          entries: [{ id: "line-1", speakerId: null, text: "Edited" }],
+        },
+        labels: [label],
+        activeLabel: label,
+        isUpdatingDialogue: false,
+        onUpdateDialogue,
+        showErrorToast,
+      })
+    );
+
+    const dialog = document.createElement("dialog");
+    dialog.setAttribute("open", "");
+    const input = document.createElement("input");
+    dialog.appendChild(input);
+    document.body.appendChild(dialog);
+
+    try {
+      act(() => {
+        fireEvent.keyDown(input, { ctrlKey: true, code: "KeyS" });
+      });
+      expect(onUpdateDialogue).not.toHaveBeenCalled();
+    } finally {
+      document.body.removeChild(dialog);
+    }
   });
 });

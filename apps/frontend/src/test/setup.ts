@@ -51,28 +51,43 @@ function createMemoryLocalStorage(): Storage {
   } as Storage;
 }
 
-function readStorageCandidate(read: () => unknown): unknown {
-  try {
-    return read();
-  } catch {
+function readLocalStorageFromDescriptor(
+  target: typeof globalThis | Window
+): Storage | undefined {
+  const descriptor =
+    Object.getOwnPropertyDescriptor(target, "localStorage") ??
+    ("localStorage" in target
+      ? Object.getOwnPropertyDescriptor(
+          Object.getPrototypeOf(target) as object,
+          "localStorage"
+        )
+      : undefined);
+
+  if (!descriptor) {
     return undefined;
   }
+
+  // Node 26 getter warns when invoked without --localstorage-file; probe only.
+  if (descriptor.get) {
+    return undefined;
+  }
+
+  const value = descriptor.value;
+  return isUsableStorage(value) ? value : undefined;
 }
 
 function ensureLocalStorage(): void {
-  const existing = readStorageCandidate(() => globalThis.localStorage);
-  if (isUsableStorage(existing)) {
+  const existing =
+    readLocalStorageFromDescriptor(globalThis) ??
+    (typeof window !== "undefined"
+      ? readLocalStorageFromDescriptor(window)
+      : undefined);
+
+  if (existing) {
     return;
   }
 
-  // Prefer a usable jsdom window.localStorage if one exists independently.
-  const fromWindow =
-    typeof window !== "undefined"
-      ? readStorageCandidate(() => window.localStorage)
-      : undefined;
-  const storage = isUsableStorage(fromWindow)
-    ? fromWindow
-    : createMemoryLocalStorage();
+  const storage = createMemoryLocalStorage();
 
   Object.defineProperty(globalThis, "localStorage", {
     configurable: true,
@@ -145,4 +160,7 @@ if (typeof document.caretPositionFromPoint === "undefined") {
 
 afterEach(() => {
   cleanup();
+  if (typeof localStorage?.clear === "function") {
+    localStorage.clear();
+  }
 });

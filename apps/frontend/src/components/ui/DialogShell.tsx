@@ -48,6 +48,7 @@ export function DialogShell({
   };
 
   const titleId = useId();
+  const descriptionId = useId();
   const closeLabel = `Close ${title.toLowerCase()} dialog`;
 
   return (
@@ -55,6 +56,7 @@ export function DialogShell({
       open={open}
       onOpenChange={handleOpenChange}
       aria-labelledby={titleId}
+      aria-describedby={description ? descriptionId : undefined}
     >
       <DialogContent
         className={cn(
@@ -69,7 +71,10 @@ export function DialogShell({
               {title}
             </h2>
             {description && (
-              <p className="text-sm text-muted-foreground mt-1">
+              <p
+                id={descriptionId}
+                className="text-sm text-muted-foreground mt-1"
+              >
                 {description}
               </p>
             )}

@@ -11,7 +11,12 @@
 import { useEffect, useRef } from "react";
 import { Undo2, Redo2 } from "lucide-react";
 import { Tooltip } from "@/components/ui/tooltip";
-import { getShortcutActionDescription } from "@/lib/keyboard-shortcuts";
+import {
+  getShortcutActionDescription,
+  isNativeEditableTarget,
+  matchesShortcut,
+  shouldIgnoreAppShortcut,
+} from "@/lib/keyboard-shortcuts";
 
 interface UndoRedoControlsProps {
   canUndo: boolean;
@@ -44,30 +49,24 @@ export function UndoRedoControls({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Preserve native undo/redo in editable elements (inputs, textareas, contenteditable)
-      const target = e.target as HTMLElement;
-      if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target.isContentEditable
-      ) {
+      if (shouldIgnoreAppShortcut(e)) {
         return;
       }
 
-      // Ctrl+Z for undo
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyZ") {
+      // Preserve native undo/redo in editable elements (inputs, textareas, contenteditable)
+      if (isNativeEditableTarget(e.target)) {
+        return;
+      }
+
+      if (matchesShortcut(e, "undo")) {
         e.preventDefault();
         if (canUndoRef.current) {
           onUndoRef.current();
         }
+        return;
       }
 
-      // Ctrl+Y or Ctrl+Shift+Z for redo
-      if (
-        (e.ctrlKey || e.metaKey) &&
-        ((!e.shiftKey && e.code === "KeyY") ||
-          (e.shiftKey && e.code === "KeyZ"))
-      ) {
+      if (matchesShortcut(e, "redo")) {
         e.preventDefault();
         if (canRedoRef.current) {
           onRedoRef.current();
@@ -84,8 +83,9 @@ export function UndoRedoControls({
       <Tooltip content={undoHint}>
         <button
           type="button"
-          onClick={onUndo}
-          disabled={!canUndo}
+          onClick={() => {
+            if (canUndo) onUndo();
+          }}
           aria-disabled={!canUndo}
           className={`p-1.5 rounded-md transition-all ${
             canUndo
@@ -100,8 +100,9 @@ export function UndoRedoControls({
       <Tooltip content={redoHint}>
         <button
           type="button"
-          onClick={onRedo}
-          disabled={!canRedo}
+          onClick={() => {
+            if (canRedo) onRedo();
+          }}
           aria-disabled={!canRedo}
           className={`p-1.5 rounded-md transition-all ${
             canRedo
