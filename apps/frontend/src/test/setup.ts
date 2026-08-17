@@ -2,6 +2,110 @@ import { afterEach } from "vitest";
 import { cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
+/**
+ * Node 26 exposes an experimental `localStorage` getter on the global object
+ * that returns `undefined` unless `--localstorage-file` is passed. Under
+ * vitest + jsdom that getter also shadows `window.localStorage`, while
+ * `window.sessionStorage` remains a usable jsdom Storage.
+ *
+ * Fix narrowly: if `localStorage` is missing/unusable, install a Map-backed
+ * Storage **only** on `globalThis.localStorage` and `window.localStorage`.
+ * Do **not** mutate `Storage.prototype` — that would also rewrite
+ * `sessionStorage` behavior and break per-storage isolation.
+ *
+ * Tests that need to simulate storage failures should spy the instance
+ * (`vi.spyOn(localStorage, "getItem")`), not `Storage.prototype`.
+ */
+function isUsableStorage(value: unknown): value is Storage {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    typeof (value as Storage).getItem === "function" &&
+    typeof (value as Storage).setItem === "function" &&
+    typeof (value as Storage).removeItem === "function" &&
+    typeof (value as Storage).clear === "function"
+  );
+}
+
+function createMemoryLocalStorage(): Storage {
+  const store = new Map<string, string>();
+  return {
+    get length() {
+      return store.size;
+    },
+    clear() {
+      store.clear();
+    },
+    getItem(key: string) {
+      return store.has(String(key)) ? (store.get(String(key)) ?? null) : null;
+    },
+    key(index: number) {
+      return Array.from(store.keys())[index] ?? null;
+    },
+    removeItem(key: string) {
+      store.delete(String(key));
+    },
+    setItem(key: string, value: string) {
+      store.set(String(key), String(value));
+    },
+  } as Storage;
+}
+
+function readLocalStorageFromDescriptor(
+  target: typeof globalThis | Window
+): Storage | undefined {
+  const descriptor =
+    Object.getOwnPropertyDescriptor(target, "localStorage") ??
+    ("localStorage" in target
+      ? Object.getOwnPropertyDescriptor(
+          Object.getPrototypeOf(target) as object,
+          "localStorage"
+        )
+      : undefined);
+
+  if (!descriptor) {
+    return undefined;
+  }
+
+  // Node 26 getter warns when invoked without --localstorage-file; probe only.
+  if (descriptor.get) {
+    return undefined;
+  }
+
+  const value = descriptor.value;
+  return isUsableStorage(value) ? value : undefined;
+}
+
+function ensureLocalStorage(): void {
+  const existing =
+    readLocalStorageFromDescriptor(globalThis) ??
+    (typeof window !== "undefined"
+      ? readLocalStorageFromDescriptor(window)
+      : undefined);
+
+  if (existing) {
+    return;
+  }
+
+  const storage = createMemoryLocalStorage();
+
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    enumerable: true,
+    value: storage,
+  });
+
+  if (typeof window !== "undefined") {
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      enumerable: true,
+      value: storage,
+    });
+  }
+}
+
+ensureLocalStorage();
+
 // Polyfill ResizeObserver for jsdom (used by auto-resize textareas, etc.)
 if (typeof globalThis.ResizeObserver === "undefined") {
   globalThis.ResizeObserver = class ResizeObserver {
@@ -56,4 +160,7 @@ if (typeof document.caretPositionFromPoint === "undefined") {
 
 afterEach(() => {
   cleanup();
+  if (typeof localStorage?.clear === "function") {
+    localStorage.clear();
+  }
 });

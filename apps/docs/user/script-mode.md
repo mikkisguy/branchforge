@@ -27,7 +27,7 @@ When you switch back to Write Mode, BranchForge re-parses the source and the [te
 Script Mode uses CodeMirror 6 with custom Ren'Py syntax highlighting:
 
 - **Syntax highlighting** — keywords, strings, labels, and characters are colorized
-- **Search** — full-text search across the open file (`Ctrl/Cmd + F`)
+- **Search** — full-text search across the open file (see [Keyboard Shortcuts](./keyboard-shortcuts#script-mode) for find, next/previous match, and close)
 - **Font size** — adjust to your preference via the toolbar
 - **Line wrap** — toggle long-line wrapping
 

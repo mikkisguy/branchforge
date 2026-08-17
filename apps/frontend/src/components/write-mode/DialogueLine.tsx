@@ -12,6 +12,7 @@ import { LineTextArea } from "./LineTextArea";
 import { TechnicalBadgeRow } from "./TechnicalBadgeRow";
 import type { DialogueLineProps } from "./DialogueLine.types";
 import { areDialogueLinePropsEqual } from "./DialogueLine.types";
+import { matchesShortcut } from "@/lib/keyboard-shortcuts";
 import { useDialogueLineSpeaker } from "./useDialogueLineSpeaker";
 import { DialogueLineActions } from "./DialogueLineActions";
 
@@ -131,12 +132,12 @@ export const DialogueLine = memo(function DialogueLine({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === "Enter" && !e.shiftKey) {
+      if (matchesShortcut(e, "write-add-line")) {
         e.preventDefault();
         onAddLine?.(index);
       }
       if (
-        e.key === "Backspace" &&
+        matchesShortcut(e, "write-delete-empty-line") &&
         internalTextareaRef.current?.value === "" &&
         totalEntries > 1 &&
         !isChoice
@@ -144,13 +145,12 @@ export const DialogueLine = memo(function DialogueLine({
         e.preventDefault();
         onDelete();
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === "ArrowUp" && index > 0) {
+      if (matchesShortcut(e, "write-move-line-up") && index > 0) {
         e.preventDefault();
         onMoveUp();
       }
       if (
-        (e.ctrlKey || e.metaKey) &&
-        e.key === "ArrowDown" &&
+        matchesShortcut(e, "write-move-line-down") &&
         index < totalEntries - 1
       ) {
         e.preventDefault();

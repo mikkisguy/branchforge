@@ -1,8 +1,9 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, fireEvent, renderHook, waitFor } from "@testing-library/react";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { useFileEditor } from "../useFileEditor";
+import * as keyboardShortcuts from "@/lib/keyboard-shortcuts";
 import { createTestQueryClient } from "@/test/query-client";
 import type { ProjectFileNode } from "../useProjectFiles";
 
@@ -40,6 +41,10 @@ const FILE_B = createProjectFile(
 );
 
 describe("useFileEditor", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   let queryClient: QueryClient;
 
   const wrapper = ({ children }: { children: ReactNode }) => (
@@ -284,6 +289,72 @@ describe("useFileEditor", () => {
     );
   });
 
+  it("saves on Ctrl+S and Meta+S keyboard shortcuts", async () => {
+    const updateFileContent = vi.fn().mockResolvedValue({
+      success: true,
+      contentHash: "hash-after-ctrl-save",
+      updatedAt: "2024-01-01T00:00:00.000Z",
+    });
+    const showErrorToast = vi.fn();
+
+    const { result } = renderHook(
+      () =>
+        useFileEditor({
+          projectId: "project-1",
+          projectFiles: [FILE_A],
+          updateFileContent,
+          showErrorToast,
+        }),
+      { wrapper }
+    );
+
+    await act(async () => {
+      const switched = await result.current.switchToFile(FILE_A);
+      expect(switched).toBe(true);
+    });
+
+    act(() => {
+      result.current.setEditedFileContent("saved with ctrl+s");
+    });
+
+    act(() => {
+      fireEvent.keyDown(window, { ctrlKey: true, code: "KeyS" });
+    });
+
+    await waitFor(() => {
+      expect(updateFileContent).toHaveBeenCalledWith(
+        "file-1",
+        "saved with ctrl+s",
+        {
+          expectedContentHash: "hash-file-1",
+        }
+      );
+    });
+
+    act(() => {
+      result.current.setEditedFileContent("saved with meta+s");
+    });
+    vi.spyOn(keyboardShortcuts.shortcutPlatformApi, "detect").mockReturnValue(
+      "mac"
+    );
+
+    act(() => {
+      fireEvent.keyDown(window, { metaKey: true, code: "KeyS" });
+    });
+
+    await waitFor(() => {
+      expect(updateFileContent).toHaveBeenCalledWith(
+        "file-1",
+        "saved with meta+s",
+        {
+          expectedContentHash: "hash-after-ctrl-save",
+        }
+      );
+    });
+
+    expect(showErrorToast).not.toHaveBeenCalled();
+  });
+
   it("blocks switching files when pending save cannot flush", async () => {
     const updateFileContent = vi.fn().mockResolvedValue({
       success: false,
@@ -332,5 +403,86 @@ describe("useFileEditor", () => {
       "Could not save pending edits. Resolve the save error before switching files.",
       "File switch blocked"
     );
+  });
+
+  it("does not save on Ctrl+Shift+S", async () => {
+    const updateFileContent = vi.fn().mockResolvedValue({
+      success: true,
+      contentHash: "hash-after-save",
+      updatedAt: "2024-01-01T00:00:00.000Z",
+    });
+    const showErrorToast = vi.fn();
+
+    const { result } = renderHook(
+      () =>
+        useFileEditor({
+          projectId: "project-1",
+          projectFiles: [FILE_A],
+          updateFileContent,
+          showErrorToast,
+        }),
+      { wrapper }
+    );
+
+    await act(async () => {
+      await result.current.switchToFile(FILE_A);
+    });
+
+    act(() => {
+      result.current.setEditedFileContent("should not save");
+    });
+
+    act(() => {
+      fireEvent.keyDown(window, {
+        ctrlKey: true,
+        shiftKey: true,
+        code: "KeyS",
+      });
+    });
+
+    expect(updateFileContent).not.toHaveBeenCalled();
+  });
+
+  it("does not save when keydown target is inside an open dialog", async () => {
+    const updateFileContent = vi.fn().mockResolvedValue({
+      success: true,
+      contentHash: "hash-after-save",
+      updatedAt: "2024-01-01T00:00:00.000Z",
+    });
+    const showErrorToast = vi.fn();
+
+    const { result } = renderHook(
+      () =>
+        useFileEditor({
+          projectId: "project-1",
+          projectFiles: [FILE_A],
+          updateFileContent,
+          showErrorToast,
+        }),
+      { wrapper }
+    );
+
+    await act(async () => {
+      await result.current.switchToFile(FILE_A);
+    });
+
+    act(() => {
+      result.current.setEditedFileContent("dialog blocked");
+    });
+
+    const dialog = document.createElement("dialog");
+    dialog.setAttribute("open", "");
+    const input = document.createElement("input");
+    dialog.appendChild(input);
+    document.body.appendChild(dialog);
+
+    try {
+      act(() => {
+        fireEvent.keyDown(input, { ctrlKey: true, code: "KeyS" });
+      });
+      expect(updateFileContent).not.toHaveBeenCalled();
+    } finally {
+      document.body.removeChild(dialog);
+    }
   });
 });

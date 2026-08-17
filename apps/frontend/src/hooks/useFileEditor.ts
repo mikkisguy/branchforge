@@ -4,6 +4,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAutosave, type SaveStatus } from "@/hooks/useAutosave";
 import { labelKeys, projectFilesKeys } from "@/lib/query-keys";
 import { registerModeFlushHandler } from "@/lib/editor-sync-coordinator";
+import {
+  matchesShortcut,
+  shouldIgnoreAppShortcut,
+} from "@/lib/keyboard-shortcuts";
 import { ApiRequestError } from "@/lib/api/client";
 import type { ProjectFileNode, UseProjectFilesReturn } from "./useProjectFiles";
 
@@ -163,7 +167,10 @@ export function useFileEditor({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.code === "KeyS") {
+      if (shouldIgnoreAppShortcut(event)) {
+        return;
+      }
+      if (matchesShortcut(event, "save")) {
         event.preventDefault();
         void triggerFileSave();
       }

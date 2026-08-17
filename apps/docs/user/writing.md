@@ -29,14 +29,7 @@ Press Enter after each line to continue.
 
 ## Autosave
 
-Write Mode saves your work automatically every few seconds. You can also press Ctrl/Cmd + S to save manually.
-
-## Undo and Redo
-
-Use standard keyboard shortcuts to undo and redo:
-
-- Ctrl/Cmd + Z: Undo
-- Ctrl/Cmd + Shift + Z: Redo
+Write Mode saves your work automatically every few seconds. You can also save manually, undo and redo changes, and toggle focus mode from the keyboard. See [Keyboard Shortcuts](./keyboard-shortcuts) for BranchForge-owned shortcuts and Script Mode search commands.
 
 ## Technical Badges (Display Only)
 

@@ -8,6 +8,7 @@ import { ProjectSettingsDialog } from "@/components/ProjectSettingsDialog";
 import { GitLabImportDialog } from "./GitLabImportDialog/GitLabImportDialog.lazy";
 import { ZipImportProjectDialog } from "./ZipImportProjectDialog/ZipImportProjectDialog.lazy";
 import { FlowDialog } from "@/components/flow/FlowDialog";
+import { KeyboardShortcutsDialog } from "@/components/keyboard-shortcuts";
 import { Logo } from "@/components/ui/logo";
 import { ModeSwitcher } from "./ModeSwitcher";
 import { ProjectSelector } from "./ProjectSelector";
@@ -61,7 +62,8 @@ type ModalKey =
   | "projectPopover"
   | "gitLabImport"
   | "zipImport"
-  | "flow";
+  | "flow"
+  | "keyboardShortcuts";
 interface ModalState {
   themeDropdown: boolean;
   settings: boolean;
@@ -70,6 +72,7 @@ interface ModalState {
   gitLabImport: boolean;
   zipImport: boolean;
   flow: boolean;
+  keyboardShortcuts: boolean;
 }
 type ModalAction =
   | { type: "OPEN"; key: ModalKey }
@@ -84,6 +87,7 @@ const initialModalState: ModalState = {
   gitLabImport: false,
   zipImport: false,
   flow: false,
+  keyboardShortcuts: false,
 };
 
 function modalReducer(state: ModalState, action: ModalAction): ModalState {
@@ -236,6 +240,9 @@ export function LeftSidebar(props: LeftSidebarProps) {
           <UserActions
             isCollapsed={isCollapsed}
             showLabel={showLabel}
+            onOpenKeyboardShortcuts={() =>
+              dispatchModal({ type: "OPEN", key: "keyboardShortcuts" })
+            }
             onOpenSettings={() => setSettingsOpen(true)}
             onLogout={onLogout}
           />
@@ -260,6 +267,9 @@ export function LeftSidebar(props: LeftSidebarProps) {
           dispatchModal({ type: "OPEN", key: "projectSettings" })
         }
         onOpenFlow={() => dispatchModal({ type: "OPEN", key: "flow" })}
+        onOpenKeyboardShortcuts={() =>
+          dispatchModal({ type: "OPEN", key: "keyboardShortcuts" })
+        }
         onOpenSettings={() => setSettingsOpen(true)}
         onLogout={onLogout}
         isDarkMode={isDarkMode}
@@ -320,6 +330,15 @@ export function LeftSidebar(props: LeftSidebarProps) {
           projectId={projectId}
         />
       )}
+      <KeyboardShortcutsDialog
+        open={modals.keyboardShortcuts}
+        onOpenChange={(open: boolean) =>
+          dispatchModal({
+            type: open ? "OPEN" : "CLOSE",
+            key: "keyboardShortcuts",
+          })
+        }
+      />
     </>
   );
 }

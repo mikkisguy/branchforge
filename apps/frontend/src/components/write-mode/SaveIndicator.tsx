@@ -14,6 +14,12 @@
 import { Check, AlertCircle, Loader2 } from "lucide-react";
 import { memo } from "react";
 import type { SaveStatus } from "@/hooks/useAutosave";
+import { KeyboardShortcutKeys } from "@/components/keyboard-shortcuts/KeyboardShortcutKeys";
+import {
+  detectShortcutPlatform,
+  formatShortcutAccessible,
+  getKeyboardShortcut,
+} from "@/lib/keyboard-shortcuts";
 
 type SaveIndicatorDisplayMode = "compact" | "verbose";
 
@@ -23,6 +29,8 @@ interface SaveIndicatorProps {
   lastSaved?: Date | null;
   saveConflict?: boolean;
   onRetry?: () => void;
+  /** When true, show a visible save shortcut keycap and accessible label. */
+  showSaveShortcutHint?: boolean;
 }
 
 // Constant lookup maps for O(1) status-based lookups
@@ -43,12 +51,43 @@ const STATUS_TEXT: Record<SaveStatus, { compact: string; verbose: string }> = {
   },
 };
 
+const saveShortcut = getKeyboardShortcut("save");
+const saveShortcutAccessible = saveShortcut
+  ? formatShortcutAccessible(saveShortcut)
+  : null;
+const saveShortcutPlatform = detectShortcutPlatform();
+
+function withSaveShortcutHint(
+  statusText: string,
+  showSaveShortcutHint?: boolean
+): string {
+  if (!showSaveShortcutHint || !saveShortcutAccessible) {
+    return statusText;
+  }
+  return `${statusText} (${saveShortcutAccessible})`;
+}
+
+function SaveShortcutHint({ show }: { show: boolean }) {
+  if (!show || !saveShortcut?.chords[0]) {
+    return null;
+  }
+
+  return (
+    <KeyboardShortcutKeys
+      chord={saveShortcut.chords[0]}
+      platform={saveShortcutPlatform}
+      className="shrink-0"
+    />
+  );
+}
+
 export const SaveIndicator = memo(function SaveIndicator({
   saveStatus,
   displayMode = "compact",
   lastSaved = null,
   saveConflict = false,
   onRetry,
+  showSaveShortcutHint = false,
 }: SaveIndicatorProps) {
   if (saveConflict) {
     return (
@@ -68,6 +107,7 @@ export const SaveIndicator = memo(function SaveIndicator({
   }
 
   const text = STATUS_TEXT[saveStatus][displayMode];
+  const accessibleLabel = withSaveShortcutHint(text, showSaveShortcutHint);
 
   // Compute icon JSX based on status
   const icon = (() => {
@@ -85,11 +125,12 @@ export const SaveIndicator = memo(function SaveIndicator({
   if (displayMode === "compact" && saveStatus === "saved" && !lastSaved) {
     return (
       <output
-        className="flex items-center justify-center text-xs transition-colors duration-300"
+        className="flex items-center gap-1 text-xs transition-colors duration-300"
         aria-live="polite"
-        title={text}
+        aria-label={accessibleLabel}
       >
         <span className={STATUS_TEXT_COLORS.saved}>{icon}</span>
+        <SaveShortcutHint show={showSaveShortcutHint} />
       </output>
     );
   }
@@ -114,7 +155,7 @@ export const SaveIndicator = memo(function SaveIndicator({
       }`}
       role={isErrorWithRetry ? "button" : "status"}
       aria-live="polite"
-      title={text}
+      aria-label={accessibleLabel}
       tabIndex={isErrorWithRetry ? 0 : undefined}
       onClick={isErrorWithRetry ? onRetry : undefined}
       onKeyDown={handleKeyDown}
@@ -136,6 +177,8 @@ export const SaveIndicator = memo(function SaveIndicator({
       {displayMode === "verbose" && (
         <span className={STATUS_TEXT_COLORS[saveStatus]}>{text}</span>
       )}
+
+      <SaveShortcutHint show={showSaveShortcutHint} />
     </div>
   );
 });

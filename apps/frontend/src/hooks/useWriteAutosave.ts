@@ -11,6 +11,10 @@ import {
 } from "@/lib/prose-converter";
 import type { DialogueEntry } from "@/lib/prose-types";
 import type { UpdateDialogueResponse } from "@/lib/api/labels";
+import {
+  matchesShortcut,
+  shouldIgnoreAppShortcut,
+} from "@/lib/keyboard-shortcuts";
 
 export interface LabelDialogueDraft {
   labelId: string | null;
@@ -494,7 +498,10 @@ export function useWriteAutosave({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.code === "KeyS") {
+      if (shouldIgnoreAppShortcut(event)) {
+        return;
+      }
+      if (matchesShortcut(event, "save")) {
         event.preventDefault();
         void triggerSaveRef.current();
       }

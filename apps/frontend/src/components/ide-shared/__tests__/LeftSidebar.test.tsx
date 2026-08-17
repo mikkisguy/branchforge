@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ToastProvider } from "@/contexts/ToastContext";
 import { LeftSidebar } from "../LeftSidebar";
@@ -151,10 +152,59 @@ describe("LeftSidebar accessibility", () => {
   it("renders user action buttons with aria-labels", () => {
     render(<LeftSidebar {...defaultProps} />, { wrapper: createWrapper() });
 
+    const keyboardShortcutsButtons = screen.getAllByRole("button", {
+      name: "Keyboard shortcuts",
+    });
+    expect(keyboardShortcutsButtons.length).toBeGreaterThanOrEqual(1);
+    keyboardShortcutsButtons.forEach((btn) =>
+      expect(btn).toHaveAttribute("aria-label", "Keyboard shortcuts")
+    );
+
     expect(
       screen.getByRole("button", { name: "Settings" })
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Logout" })).toBeInTheDocument();
+  });
+
+  it("opens the keyboard shortcuts dialog from the help trigger", async () => {
+    const user = userEvent.setup();
+    render(<LeftSidebar {...defaultProps} />, { wrapper: createWrapper() });
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    const helpTriggers = screen.getAllByRole("button", {
+      name: "Keyboard shortcuts",
+    });
+    await user.click(helpTriggers[0]!);
+
+    expect(
+      screen.getByRole("heading", { name: "Keyboard shortcuts" })
+    ).toBeInTheDocument();
+  });
+
+  it("returns focus to the mobile menu button after closing keyboard shortcuts", async () => {
+    const user = userEvent.setup();
+    render(<LeftSidebar {...defaultProps} />, { wrapper: createWrapper() });
+
+    const menuButton = screen.getByRole("button", { name: "Open menu" });
+    await user.click(menuButton);
+
+    const shortcutsButtons = screen.getAllByRole("button", {
+      name: "Keyboard shortcuts",
+    });
+    const mobileShortcutsButton =
+      shortcutsButtons.find((button) => button.className.includes("gap-3")) ??
+      shortcutsButtons[shortcutsButtons.length - 1]!;
+    await user.click(mobileShortcutsButton);
+
+    expect(
+      screen.getByRole("heading", { name: "Keyboard shortcuts" })
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(menuButton).toHaveFocus();
   });
 
   it("renders mobile bottom nav hamburger with dynamic aria-label (closed state)", () => {

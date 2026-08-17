@@ -34,6 +34,7 @@ interface DialogProps {
    */
   "aria-label"?: string;
   "aria-labelledby"?: string;
+  "aria-describedby"?: string;
 }
 
 export function Dialog({
@@ -43,6 +44,7 @@ export function Dialog({
   closeOnBackdropClick = true,
   "aria-label": ariaLabel,
   "aria-labelledby": ariaLabelledBy,
+  "aria-describedby": ariaDescribedBy,
 }: DialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   // When the controlled `open` prop becomes false we call dialog.close(),
@@ -117,6 +119,7 @@ export function Dialog({
         ref={dialogRef}
         aria-label={ariaLabel}
         aria-labelledby={ariaLabel ? undefined : titleId}
+        aria-describedby={ariaDescribedBy}
         aria-modal="true"
         className={cn(
           nativeDialogOverlayClassName,

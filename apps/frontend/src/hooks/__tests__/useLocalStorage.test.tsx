@@ -73,7 +73,9 @@ describe("useLocalStorage", () => {
 
   it("warns and falls back when read throws", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+    // Spy the localStorage instance — not Storage.prototype — so sessionStorage
+    // and other Storage consumers stay unaffected.
+    vi.spyOn(localStorage, "getItem").mockImplementation(() => {
       throw new Error("read-failure");
     });
 
@@ -85,7 +87,7 @@ describe("useLocalStorage", () => {
 
   it("warns and keeps state when write throws", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    vi.spyOn(localStorage, "setItem").mockImplementation(() => {
       throw new Error("write-failure");
     });
 
@@ -97,6 +99,20 @@ describe("useLocalStorage", () => {
 
     expect(result.current[0]).toBe(16);
     expect(warnSpy).toHaveBeenCalled();
+  });
+
+  it("clears only localStorage and leaves sessionStorage intact", () => {
+    localStorage.setItem("branchforge:isolation", "local");
+    sessionStorage.setItem("branchforge:isolation", "session");
+
+    try {
+      localStorage.clear();
+
+      expect(localStorage.getItem("branchforge:isolation")).toBeNull();
+      expect(sessionStorage.getItem("branchforge:isolation")).toBe("session");
+    } finally {
+      sessionStorage.removeItem("branchforge:isolation");
+    }
   });
 
   it("supports boolean convenience hook", () => {
