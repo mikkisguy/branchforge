@@ -83,7 +83,6 @@ export function ProseEditorTopBar({
           displayMode="compact"
           lastSaved={lastSaved}
           saveConflict={saveConflict}
-          showSaveShortcutHint
         />
       </div>
     </div>
