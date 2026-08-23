@@ -56,6 +56,15 @@ export function EditorTabBarDesktopTabs({
           return (
             <div
               key={item.id}
+              onMouseDown={(event) => {
+                if (event.button !== 1) {
+                  return;
+                }
+
+                event.preventDefault();
+                event.stopPropagation();
+                onClose(event, item.id);
+              }}
               className={cn(
                 "group relative flex h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-md pl-3 pr-1.5 text-sm transition-all",
                 isActive

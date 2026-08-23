@@ -84,6 +84,15 @@ export function EditorTabBarMobileDropdown({
               return (
                 <div
                   key={item.id}
+                  onMouseDown={(event) => {
+                    if (event.button !== 1) {
+                      return;
+                    }
+
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onClose(event, item.id);
+                  }}
                   className={cn(
                     "flex items-center gap-2 px-3 py-2.5 text-sm",
                     isActive ? "bg-muted/50" : "hover:bg-muted/30"
