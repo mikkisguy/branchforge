@@ -131,8 +131,8 @@ export function SettingsModal({
         if (!isOpen) setExportHistoryProject(null);
       }}
     >
-      <DialogContent className="w-[800px] max-w-[95vw] p-0 gap-0">
-        <DialogHeader className="p-6 pb-4 flex-row items-center justify-between border-b border-border/30">
+      <DialogContent className="flex w-[800px] max-w-[95vw] flex-col gap-0 overflow-hidden p-0 md:h-[min(780px,85vh)] max-md:h-[min(85vh,calc(100%-32px))]">
+        <DialogHeader className="mb-0 shrink-0 flex-row items-center justify-between border-b border-border/30 p-6 pb-4 max-md:px-4 max-md:pt-4 max-md:pb-3">
           <DialogTitle>Settings</DialogTitle>
           <Button
             type="button"
@@ -145,7 +145,7 @@ export function SettingsModal({
           </Button>
         </DialogHeader>
 
-        <div className="flex max-md:flex-col h-[700px] max-h-[calc(95vh-120px)] max-md:h-auto max-md:max-h-none">
+        <div className="flex min-h-0 flex-1 max-md:flex-col">
           <SettingsModalNav
             tabs={visibleTabs}
             activeTab={activeTab}
@@ -153,7 +153,7 @@ export function SettingsModal({
           />
 
           {/* Tab Content */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="min-h-0 flex-1 overflow-y-auto p-6 max-md:px-4">
             {activeTab === "user" && <SettingsModalUserTab user={user} />}
 
             {activeTab === "projects" && (
