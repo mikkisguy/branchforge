@@ -1,5 +1,7 @@
 <div align="center">
 
+<img width="200" height="200" alt="branchforge_logo" src="https://github.com/user-attachments/assets/2ab6fd1f-4110-4568-adc3-dd272fdc34d4" />
+
 # BranchForge
 
 **A creative workspace for Ren'Py visual novel writers**
@@ -11,6 +13,7 @@
 </div>
 
 ---
+
 
 ⚠️ BranchForge is currently in **alpha**. The app may contain bugs, incomplete features, and breaking changes. **Do not use it for production projects.** We welcome feedback, bug reports, and contributions!
 
