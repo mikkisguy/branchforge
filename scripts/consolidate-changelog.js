@@ -142,7 +142,7 @@ function consolidateChangelogs() {
   ];
 
   // Update root changelog
-  const versionRegex = /## v?\[?\d+\.\d+\.\d+\]?/;
+  const versionRegex = /## v?\[?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?\]?/;
   if (versionRegex.test(rootChangelog)) {
     rootChangelog = rootChangelog.replace(
       versionRegex,
@@ -160,7 +160,7 @@ function consolidateChangelogs() {
   if (fs.existsSync(readmePath)) {
     let readme = fs.readFileSync(readmePath, "utf-8");
     readme = readme.replace(
-      /version-\d+\.\d+\.\d+-yellow/,
+      /version-\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?-yellow/,
       `version-${version}-yellow`
     );
     fs.writeFileSync(readmePath, readme);

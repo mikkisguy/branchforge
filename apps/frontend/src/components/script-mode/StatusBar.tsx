@@ -135,15 +135,6 @@ export function StatusBar({
   }, [projectId, isExporting, showErrorToast]);
 
   /**
-   * Handle conflict resolution from ConflictReviewDialog
-   */
-  const handleApplyResolutions = useCallback(() => {
-    // TODO: This would trigger a re-import with the resolved conflicts
-    // For now, just close the conflict dialog
-    dispatchDialog({ type: "closeConflict" });
-  }, []);
-
-  /**
    * Check if GitLab is available for this project
    * GitLab is available if the project type is GITLAB (regardless of linking status)
    */
@@ -282,7 +273,6 @@ export function StatusBar({
             }}
             projectId={projectId}
             branch={gitlabBranch}
-            onApplyResolutions={handleApplyResolutions}
           />
         )}
       {/* Export Confirm Dialog */}

@@ -33,6 +33,25 @@ jobs:
           VERSION=$(grep '"version"' apps/frontend/package.json | head -1 | cut -d'"' -f4)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+      # :latest is only for stable semver (no hyphen). Prereleases such as
+      # 1.0.0-beta.0 get the version tag, the commit SHA, and :beta.
+      - name: Compute image tags
+        id: tags
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          IMAGE="ghcr.io/${{ github.repository_owner }}/branchforge-frontend"
+          {
+            echo "tags<<EOF"
+            echo "${IMAGE}:${VERSION}"
+            echo "${IMAGE}:${{ github.sha }}"
+            if [[ "$VERSION" == *-* ]]; then
+              echo "${IMAGE}:beta"
+            else
+              echo "${IMAGE}:latest"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v7
         with:
@@ -43,10 +62,7 @@ jobs:
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
             VCS_REF=${{ github.sha }}
           push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/branchforge-frontend:${{ steps.version.outputs.version }}
-            ghcr.io/${{ github.repository_owner }}/branchforge-frontend:latest
-            ghcr.io/${{ github.repository_owner }}/branchforge-frontend:${{ github.sha }}
+          tags: ${{ steps.tags.outputs.tags }}
 
   docker-backend:
     name: Docker Backend
@@ -71,6 +87,25 @@ jobs:
           VERSION=$(grep '"version"' apps/backend/package.json | head -1 | cut -d'"' -f4)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+      # :latest is only for stable semver (no hyphen). Prereleases such as
+      # 1.0.0-beta.0 get the version tag, the commit SHA, and :beta.
+      - name: Compute image tags
+        id: tags
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          IMAGE="ghcr.io/${{ github.repository_owner }}/branchforge-backend"
+          {
+            echo "tags<<EOF"
+            echo "${IMAGE}:${VERSION}"
+            echo "${IMAGE}:${{ github.sha }}"
+            if [[ "$VERSION" == *-* ]]; then
+              echo "${IMAGE}:beta"
+            else
+              echo "${IMAGE}:latest"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v7
         with:
@@ -81,7 +116,4 @@ jobs:
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
             VCS_REF=${{ github.sha }}
           push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/branchforge-backend:${{ steps.version.outputs.version }}
-            ghcr.io/${{ github.repository_owner }}/branchforge-backend:latest
-            ghcr.io/${{ github.repository_owner }}/branchforge-backend:${{ github.sha }}
+          tags: ${{ steps.tags.outputs.tags }}

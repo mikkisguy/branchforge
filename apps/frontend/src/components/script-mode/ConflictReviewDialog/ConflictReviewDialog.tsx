@@ -25,20 +25,12 @@ import {
 // Types
 // ============================================================================
 
-interface ConflictResolution {
-  label: string;
-  choice: "local" | "remote" | "skip";
-}
-
 interface ConflictReviewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;
   branch: string;
   userRole?: UserRole;
-  onApplyResolutions?: (
-    resolutions: ConflictResolution[]
-  ) => void | Promise<void>;
 }
 
 // ============================================================================
@@ -51,9 +43,8 @@ export function ConflictReviewDialog({
   projectId,
   branch,
   userRole,
-  onApplyResolutions,
 }: ConflictReviewDialogProps) {
-  const { success, error } = useToast();
+  const { error } = useToast();
 
   // State
   const [state, dispatch] = useReducer(conflictReducer, initialConflictState);
@@ -120,43 +111,6 @@ export function ConflictReviewDialog({
   const goNext = useCallback(() => {
     dispatch({ type: "INCREMENT_INDEX" });
   }, []);
-
-  /**
-   * Apply all resolutions
-   */
-  const handleApply = useCallback(async () => {
-    dispatch({ type: "SET_LOADING", isLoading: true });
-
-    try {
-      // Convert resolutions to array
-      const resolutionArray: ConflictResolution[] = Array.from(
-        state.resolutions.entries()
-      ).map(([label, choice]) => ({
-        label,
-        choice,
-      }));
-
-      // Validate resolution array
-      if (resolutionArray.length === 0) {
-        throw new Error("No resolutions to apply");
-      }
-
-      // Call callback if provided and await the result
-      if (onApplyResolutions) {
-        await onApplyResolutions(resolutionArray);
-      }
-
-      // Only show success and close dialog after successful application
-      success(`Applied ${resolutionArray.length} conflict resolution(s)`);
-      onOpenChange(false);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to apply resolutions";
-      error(message);
-    } finally {
-      dispatch({ type: "SET_LOADING", isLoading: false });
-    }
-  }, [state.resolutions, onApplyResolutions, onOpenChange, success, error]);
 
   /**
    * Load mock conflicts (owner only)
@@ -239,7 +193,8 @@ export function ConflictReviewDialog({
           ) : (
             <div className="text-center py-12">
               <p className="text-sm text-muted-foreground mt-1">
-                You can now apply your resolutions to complete the sync.
+                Conflict choices are not applied in this beta. Resolve in GitLab
+                or locally, then pull again.
               </p>
             </div>
           )}
@@ -250,7 +205,6 @@ export function ConflictReviewDialog({
           isLoading={state.isLoading}
           hasUnresolved={hasUnresolved}
           onCancel={() => onOpenChange(false)}
-          onApply={handleApply}
         />
       </DialogContent>
     </Dialog>

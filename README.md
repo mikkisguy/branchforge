@@ -7,15 +7,16 @@
 **A creative workspace for Ren'Py visual novel writers**
 
 [![Version](https://img.shields.io/badge/version-0.13.0-yellow)](CHANGELOG.md)
-![Alpha](https://img.shields.io/badge/status-alpha-orange)
+![Beta](https://img.shields.io/badge/status-beta-yellow)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 </div>
 
 ---
 
+⚠️ BranchForge is in **beta**. The solo writing loop is usable, but this is **not recommended for production**. Expect bugs, incomplete features, and breaking changes. We welcome feedback, bug reports, and contributions!
 
-⚠️ BranchForge is currently in **alpha**. The app may contain bugs, incomplete features, and breaking changes. **Do not use it for production projects.** We welcome feedback, bug reports, and contributions!
+**Known limitation:** GitLab conflict **review** is read-only. The Apply control does not write resolved files. Resolve conflicts in GitLab or locally, then pull again.
 
 ## ✨ Why BranchForge?
 
@@ -28,7 +29,7 @@ BranchForge gives you a peaceful, focused writing environment that respects your
 - **Variables & stats** - Boolean flags and numeric stat tracking for branching logic
 - **Route configurations** - Define custom story routes per project
 - **World bible & pair groups** - Track locations, items, events, and duo endings
-- **GitLab sync** - Version control with conflict detection
+- **GitLab sync** - Version control with conflict detection (review is read-only in this beta)
 - **Zip import/export** - Bring in existing Ren'Py projects or download your work
 - **Daily writing goals** - Build your writing habit
 
@@ -66,7 +67,7 @@ Track locations, items, concepts, and events per project.
 
 - **Zip Import**: Bring in existing Ren'Py projects (create new or merge into existing)
 - **Zip Export**: Download your full project
-- **GitLab Sync**: Pull RPY files from repos, push back, with conflict detection
+- **GitLab Sync**: Pull RPY files from repos, push back, with conflict detection. Applying in-app resolutions is not available in this beta.
 
 ### Writer-Friendly Extras
 
