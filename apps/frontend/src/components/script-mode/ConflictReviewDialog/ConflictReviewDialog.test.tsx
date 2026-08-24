@@ -4,14 +4,27 @@ import { ConflictReviewDialog } from "./ConflictReviewDialog";
 import { ToastProvider } from "@/contexts/ToastContext";
 import { gitlabApi } from "@/lib/api/gitlab";
 
+const showToast = vi.fn();
+
 vi.mock("@/lib/api/gitlab", () => ({
   gitlabApi: {
     detectConflicts: vi.fn(),
   },
 }));
 
+vi.mock("@/contexts/ToastContext", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/contexts/ToastContext")>();
+  return {
+    ...actual,
+    useToast: () => ({
+      showToast,
+    }),
+  };
+});
+
 describe("ConflictReviewDialog", () => {
   beforeEach(() => {
+    showToast.mockReset();
     vi.mocked(gitlabApi.detectConflicts).mockReset();
     vi.mocked(gitlabApi.detectConflicts).mockResolvedValue({
       hasConflicts: false,
@@ -40,5 +53,30 @@ describe("ConflictReviewDialog", () => {
       "main",
       expect.any(AbortSignal)
     );
+  });
+
+  it("shows a destructive toast with the rejection message for five seconds", async () => {
+    vi.mocked(gitlabApi.detectConflicts).mockRejectedValue(
+      new Error("GitLab unavailable")
+    );
+
+    render(
+      <ToastProvider>
+        <ConflictReviewDialog
+          open
+          onOpenChange={vi.fn()}
+          projectId="project-1"
+          branch="main"
+        />
+      </ToastProvider>
+    );
+
+    await waitFor(() => {
+      expect(showToast).toHaveBeenCalledWith({
+        variant: "destructive",
+        message: "GitLab unavailable",
+        duration: 5000,
+      });
+    });
   });
 });

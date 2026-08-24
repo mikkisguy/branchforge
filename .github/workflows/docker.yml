@@ -33,8 +33,9 @@ jobs:
           VERSION=$(grep '"version"' apps/frontend/package.json | head -1 | cut -d'"' -f4)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      # :latest is only for stable semver (no hyphen). Prereleases such as
-      # 1.0.0-beta.0 get the version tag, the commit SHA, and :beta.
+      # :latest is only for versions with no SemVer prerelease. Build metadata
+      # is stripped (Docker tags cannot contain '+'). 1.0.0-beta.0[+build]
+      # gets the version tag, the commit SHA, and :beta.
       - name: Compute image tags
         id: tags
         env:
@@ -44,12 +45,13 @@ jobs:
             echo "Invalid version: $VERSION"
             exit 1
           fi
+          TAG_VERSION="${VERSION%%+*}"
           IMAGE="ghcr.io/${{ github.repository_owner }}/branchforge-frontend"
           {
             echo "tags<<EOF"
-            echo "${IMAGE}:${VERSION}"
+            echo "${IMAGE}:${TAG_VERSION}"
             echo "${IMAGE}:${{ github.sha }}"
-            if [[ "$VERSION" == *-* ]]; then
+            if [[ "$TAG_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+- ]]; then
               echo "${IMAGE}:beta"
             else
               echo "${IMAGE}:latest"
@@ -92,8 +94,9 @@ jobs:
           VERSION=$(grep '"version"' apps/backend/package.json | head -1 | cut -d'"' -f4)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      # :latest is only for stable semver (no hyphen). Prereleases such as
-      # 1.0.0-beta.0 get the version tag, the commit SHA, and :beta.
+      # :latest is only for versions with no SemVer prerelease. Build metadata
+      # is stripped (Docker tags cannot contain '+'). 1.0.0-beta.0[+build]
+      # gets the version tag, the commit SHA, and :beta.
       - name: Compute image tags
         id: tags
         env:
@@ -103,12 +106,13 @@ jobs:
             echo "Invalid version: $VERSION"
             exit 1
           fi
+          TAG_VERSION="${VERSION%%+*}"
           IMAGE="ghcr.io/${{ github.repository_owner }}/branchforge-backend"
           {
             echo "tags<<EOF"
-            echo "${IMAGE}:${VERSION}"
+            echo "${IMAGE}:${TAG_VERSION}"
             echo "${IMAGE}:${{ github.sha }}"
-            if [[ "$VERSION" == *-* ]]; then
+            if [[ "$TAG_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+- ]]; then
               echo "${IMAGE}:beta"
             else
               echo "${IMAGE}:latest"
