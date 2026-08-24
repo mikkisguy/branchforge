@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { TabScrollArea } from "@/components/ui/tab-scroll-area";
-import { APP_NAME, APP_VERSION } from "@/lib/version";
+import { APP_VERSION } from "@/lib/version";
 import type { Tab } from "../settings-types";
 
 function getTabClassName(isActive: boolean, variant: "desktop" | "mobile") {
