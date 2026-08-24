@@ -65,6 +65,7 @@ export function EditorTabBarDesktopTabs({
         }}
         className="scrollbar-hover flex h-full w-full min-w-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden px-2"
         role="tablist"
+        tabIndex={-1}
       >
         {items.map((item, index) => {
           const isActive = item.id === activeItemId;

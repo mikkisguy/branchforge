@@ -76,6 +76,7 @@ export function EditorTabBarMobileDropdown({
           <div
             ref={dropdownMenuRef}
             role="listbox"
+            tabIndex={-1}
             style={dropdownStyle}
             onMouseDown={(event) => {
               if (event.button !== 1) {
