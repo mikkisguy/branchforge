@@ -164,7 +164,7 @@ function consolidateChangelogs() {
     // displaying as `1.0.0-beta.0`. Match both escaped and raw forms.
     const shieldsVersion = version.replaceAll("-", "--");
     readme = readme.replace(
-      /version-\d+\.\d+\.\d+(?:-{1,2}[0-9A-Za-z.]+)?-yellow/,
+      /version-\d+\.\d+\.\d+(?:-{1,2}[0-9A-Za-z.]+)*-yellow/,
       `version-${shieldsVersion}-yellow`
     );
     fs.writeFileSync(readmePath, readme);

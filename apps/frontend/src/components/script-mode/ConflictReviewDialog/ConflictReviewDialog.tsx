@@ -44,7 +44,7 @@ export function ConflictReviewDialog({
   branch,
   userRole,
 }: ConflictReviewDialogProps) {
-  const { error } = useToast();
+  const { showToast } = useToast();
 
   // State
   const [state, dispatch] = useReducer(conflictReducer, initialConflictState);
@@ -72,13 +72,17 @@ export function ConflictReviewDialog({
         if (signal.aborted) return;
         const message = err.message || "Failed to fetch conflicts";
         dispatch({ type: "FETCH_ERROR", error: message });
-        error(message);
+        showToast({
+          variant: "destructive",
+          message,
+          duration: 5000,
+        });
       });
 
     return () => {
       abortController.abort();
     };
-  }, [open, projectId, branch, error]);
+  }, [open, projectId, branch, showToast]);
 
   const currentConflict = state.conflicts[state.currentIndex];
   const currentResolution = state.resolutions.get(currentConflict?.label || "");

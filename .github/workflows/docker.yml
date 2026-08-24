@@ -37,8 +37,13 @@ jobs:
       # 1.0.0-beta.0 get the version tag, the commit SHA, and :beta.
       - name: Compute image tags
         id: tags
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid version: $VERSION"
+            exit 1
+          fi
           IMAGE="ghcr.io/${{ github.repository_owner }}/branchforge-frontend"
           {
             echo "tags<<EOF"
@@ -91,8 +96,13 @@ jobs:
       # 1.0.0-beta.0 get the version tag, the commit SHA, and :beta.
       - name: Compute image tags
         id: tags
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid version: $VERSION"
+            exit 1
+          fi
           IMAGE="ghcr.io/${{ github.repository_owner }}/branchforge-backend"
           {
             echo "tags<<EOF"
