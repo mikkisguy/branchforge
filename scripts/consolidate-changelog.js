@@ -159,9 +159,13 @@ function consolidateChangelogs() {
   const readmePath = "README.md";
   if (fs.existsSync(readmePath)) {
     let readme = fs.readFileSync(readmePath, "utf-8");
+    // Shields splits badge path fields on `-`. Escape prerelease hyphens
+    // so `1.0.0-beta.0` becomes `1.0.0--beta.0` in the URL while still
+    // displaying as `1.0.0-beta.0`. Match both escaped and raw forms.
+    const shieldsVersion = version.replaceAll("-", "--");
     readme = readme.replace(
-      /version-\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?-yellow/,
-      `version-${version}-yellow`
+      /version-\d+\.\d+\.\d+(?:-{1,2}[0-9A-Za-z.]+)?-yellow/,
+      `version-${shieldsVersion}-yellow`
     );
     fs.writeFileSync(readmePath, readme);
     console.log(`✅ Updated README.md version badge to v${version}`);
