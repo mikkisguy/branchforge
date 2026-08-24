@@ -76,7 +76,24 @@ export function EditorTabBarMobileDropdown({
           <div
             ref={dropdownMenuRef}
             role="listbox"
+            tabIndex={-1}
             style={dropdownStyle}
+            onMouseDown={(event) => {
+              if (event.button !== 1) {
+                return;
+              }
+
+              const tabId = (event.target as HTMLElement)
+                .closest("[data-tab-id]")
+                ?.getAttribute("data-tab-id");
+              if (!tabId) {
+                return;
+              }
+
+              event.preventDefault();
+              event.stopPropagation();
+              onClose(event, tabId);
+            }}
             className="z-[110] rounded-lg border border-border bg-card shadow-xl max-h-48 overflow-y-auto"
           >
             {items.map((item) => {
@@ -84,6 +101,7 @@ export function EditorTabBarMobileDropdown({
               return (
                 <div
                   key={item.id}
+                  data-tab-id={item.id}
                   className={cn(
                     "flex items-center gap-2 px-3 py-2.5 text-sm",
                     isActive ? "bg-muted/50" : "hover:bg-muted/30"

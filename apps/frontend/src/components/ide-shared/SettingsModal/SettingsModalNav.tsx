@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { TabScrollArea } from "@/components/ui/tab-scroll-area";
-import { APP_NAME, APP_VERSION } from "@/lib/version";
+import { APP_VERSION } from "@/lib/version";
 import type { Tab } from "../settings-types";
 
 function getTabClassName(isActive: boolean, variant: "desktop" | "mobile") {
@@ -58,9 +58,9 @@ export function SettingsModalNav({
       </TabScrollArea>
 
       {/* Version — desktop only */}
-      <div className="mt-auto pt-4 px-3 max-md:hidden">
-        <p className="text-xs text-muted-foreground">
-          {APP_NAME} v{APP_VERSION}
+      <div className="mt-auto pt-4 pb-2 px-3 max-md:hidden">
+        <p className="text-xs text-muted-foreground font-mono">
+          v{APP_VERSION}
         </p>
       </div>
     </div>

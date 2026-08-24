@@ -1,5 +1,7 @@
 <div align="center">
 
+<img width="200" height="200" alt="branchforge_logo" src="https://github.com/user-attachments/assets/2ab6fd1f-4110-4568-adc3-dd272fdc34d4" />
+
 # BranchForge
 
 **A creative workspace for Ren'Py visual novel writers**
@@ -12,11 +14,12 @@
 
 ---
 
+
 ⚠️ BranchForge is currently in **alpha**. The app may contain bugs, incomplete features, and breaking changes. **Do not use it for production projects.** We welcome feedback, bug reports, and contributions!
 
 ## ✨ Why BranchForge?
 
-BranchForge gives you a peaceful, focused writing environment that respects your creative flow.
+BranchForge gives you a peaceful, focused writing environment that respects your creative flow. Start from an existing Ren'Py project (zip or GitLab); BranchForge does not create projects from scratch.
 
 - **Distraction-free Write Mode** - Dialogue flows with autosave, undo/redo, and incoming jumps
 - **Script Mode** - Edit RPY files with real Ren'Py syntax highlighting
@@ -24,6 +27,7 @@ BranchForge gives you a peaceful, focused writing environment that respects your
 - **Characters come alive** - Manage characters, avatars, and dialogue linking
 - **Variables & stats** - Boolean flags and numeric stat tracking for branching logic
 - **Route configurations** - Define custom story routes per project
+- **World bible & pair groups** - Track locations, items, events, and duo endings
 - **GitLab sync** - Version control with conflict detection
 - **Zip import/export** - Bring in existing Ren'Py projects or download your work
 - **Daily writing goals** - Build your writing habit
@@ -32,11 +36,11 @@ BranchForge gives you a peaceful, focused writing environment that respects your
 
 ### Write Mode
 
-Enter the flow state. Write dialogue with autosave, unlimited undo/redo, line-level conditions, and metadata badges. Just you and your story.
+Enter the flow state. Write dialogue with autosave, unlimited undo/redo, and metadata badges. Technical badges (conditions, stats, variables, visual statements) are display-only here; author them in Script Mode.
 
 ### Script Mode
 
-When you need to code, we've got your back. CodeMirror 6 with custom Ren'Py syntax highlighting, search, font size, and line wrap toggles.
+When you need to code, we've got your back. CodeMirror 6 with custom Ren'Py syntax highlighting, search, font size, and line wrap toggles. This is where conditions, variables, stats, menus, jumps, and scene/show/hide commands are authored.
 
 ### Flow Graph
 
@@ -47,6 +51,11 @@ Visualize your branching narrative as a directed graph. Switch between FLOW (hie
 - Upload avatars (image processing via Sharp, with size/MIME validation)
 - Auto-detect characters from RPY files
 - Tag dialogue with speakers
+- Pair groups for duo ending tracking
+
+### World Bible
+
+Track locations, items, concepts, and events per project.
 
 ### Variables & Stats
 
@@ -62,24 +71,26 @@ Visualize your branching narrative as a directed graph. Switch between FLOW (hie
 ### Writer-Friendly Extras
 
 - Daily writing goals with progress tracking
+- User settings (avatar, username, theme persistence)
+- Per-project visual system configuration
 - Focus mode toggle
 - Collapsible sidebars
 - Font family switching
+- Mobile-responsive app shell (overflow menu, form and keyboard accessibility improvements)
 
 ### Themes & Appearance
 
 **Theme palettes:** Choose from four color palettes - Forest, Periwinkle, Dark Amethyst, or Graphite
 
-**Appearance modes:** Dark Mode available (Light Mode planned)
+**Appearance modes:** Dark and light mode, with dark as the default
 
 ### Planned features
 
-- **Ren'Py Definitions**: Manage custom code definitions (CHARACTER, TRANSFORM, IMAGE, INIT)
-- **Light Mode toggle**: Explicit light/dark mode switching
-- **World Elements**: Locations, items, and events
-- **Pair Groups**: Track duos and their endings
+- **Ren'Py Definitions**: Import wizard for custom code definitions (CHARACTER, TRANSFORM, IMAGE, INIT)
+- **Ren'Py Snippets**
 - **Beta Reader Management**: Share projects and gather feedback
 - **AI Writing Suggestions**: OpenRouter integration, with opt-in AI assistance for overcoming writer's block
+- Remaining accessibility: tablet layouts, focus indicators, high contrast, reduced motion
 
 ## 🏗️ Tech Stack
 
@@ -104,7 +115,7 @@ Recharts       - Charts and visualizations
 ```text
 Fastify 5      - Fast, low-overhead web framework
 TypeScript     - Full stack type safety
-PostgreSQL 16  - Robust relational database
+PostgreSQL 18  - Robust relational database
 Drizzle ORM    - Type-safe database queries
 Zod            - Runtime validation
 Session Auth   - HTTP-only cookies via @fastify/session
@@ -133,7 +144,7 @@ changesets      - Semantic versioning
 
 - Node.js >= 24.0.0
 - pnpm >= 9.0.0
-- PostgreSQL 14+
+- PostgreSQL 18 (Docker Compose uses `postgres:18-alpine`)
 
 ### Installation
 
@@ -164,10 +175,10 @@ Backend runs at `http://localhost:3000`, frontend at `http://localhost:5173`.
 - [SUPPORT.md](SUPPORT.md) - Get help and FAQ
 - [SECURITY.md](SECURITY.md) - Report vulnerabilities
 - [DEPLOYMENT.md](docs/DEPLOYMENT.md) - Deployment guide
-- [FEATURE_ROADMAP.md](docs/FEATURE_ROADMAP.md) - What's being built
-- [ACCESSIBILITY_ROADMAP.md](docs/ACCESSIBILITY_ROADMAP.md) - Accessibility improvements plan
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System design
 - [DATABASE_SCHEMAS.md](docs/DATABASE_SCHEMAS.md) - Database structure
+- [GitHub Issues](https://github.com/mikkisguy/branchforge/issues) - Remaining work (v1.0 tracker: [#141](https://github.com/mikkisguy/branchforge/issues/141))
+- Docs site: `pnpm docs:dev` (VitePress in `apps/docs`)
 
 ### Project Structure
 
@@ -180,13 +191,14 @@ branchforge/
 │   │   │   ├── services/  # Business logic
 │   │   │   ├── middleware/  # Auth, validation, error handling
 │   │   │   └── db/       # Schema, migrations, connection
-│   └── frontend/         # Creative workspace (React 19)
-│       ├── src/
-│       │   ├── components/  # UI components (write-mode, script-mode, flow, ui)
-│       │   ├── pages/       # Pages (HomePageIDE, auth)
-│       │   ├── hooks/       # Custom React hooks
-│       │   ├── lib/         # API client, query keys, utils
-│       │   └── contexts/    # Theme and Toast contexts
+│   ├── frontend/         # Creative workspace (React 19)
+│   │   ├── src/
+│   │   │   ├── components/  # UI components (write-mode, script-mode, flow, ui)
+│   │   │   ├── pages/       # Pages (HomePageIDE, auth)
+│   │   │   ├── hooks/       # Custom React hooks
+│   │   │   ├── lib/         # API client, query keys, utils
+│   │   │   └── contexts/    # Theme and Toast contexts
+│   └── docs/             # VitePress docs site
 ├── packages/
 │   └── shared/           # Shared Zod schemas & TypeScript types
 ├── docs/                 # Documentation
@@ -213,6 +225,9 @@ pnpm test:integration  # Run integration tests only
 pnpm lint       # Check code quality
 pnpm format     # Format with prettier
 pnpm typecheck  # Type check all packages
+pnpm docs:dev   # VitePress docs site
+pnpm docs:build # Build docs
+pnpm docs:preview  # Preview built docs
 
 # Backend
 pnpm --filter @branchforge/backend dev          # Start backend
@@ -258,42 +273,16 @@ pnpm --filter @branchforge/backend db:restore
 
 The v1.0 roadmap is tracked in [GitHub issue #141](https://github.com/mikkisguy/branchforge/issues/141) — that's the single source of truth for what's done, in progress, and queued. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the system design.
 
-### Completed in v0.10.0
+Shipped through **v0.13.0** includes the core writing workflow, flow graph, zip/GitLab import, world bible, pair groups, visual system config, user settings, dark/light themes, and mobile/accessibility improvements (responsive shell, keyboard nav, screen reader support, form a11y, contrast). Remaining work is in GitHub Issues; highlights:
 
-All 20 Tier 1 (core writing workflow) issues are done: label CRUD in Write Mode, stat management, stat conditions/effects, the unified LabelPropertiesPanel, line-level gating, the meters→stats rename, sidebar restructure, parser improvements, incoming jumps, route visualization / flow graph, persisted node positions, variable condition values, and zip export.
-
-### Tier 2 — Desktop polish (current focus)
-
-- Hover tooltips with label details in the flow graph
-- Performance: optimize flow graph for 100+ labels (virtualization, lazy loading)
-- Text formatting in the Prose Editor (design decision first)
-- Special characters / variable-based display names on import
-- Visual system configuration UI
-- User settings UI (avatars, language, profile, theme persistence)
-- Dark/light mode toggle
+- Flow graph performance and hover tooltips
+- Prose editor text formatting
 - Narrator character marking
-- World elements (locations, items, events)
-- Pair groups (duo ending tracking)
-
-### Tier 3 — Mobile & accessibility
-
-- Mobile responsiveness (tables, forms, dialogs, touch targets)
-- Keyboard navigation overhaul
-- ARIA labels and screen reader support
-- Color contrast audit
-- Form accessibility
-- Tablet responsiveness
-- Focus indicators
-
-### Tier 4 — Advanced / future
-
-- Ren'Py Definitions import wizard
-- Ren'Py Snippets
+- Ren'Py definitions import wizard and snippets
 - Beta reader management
 - AI writing suggestions (OpenRouter)
+- Tablet layouts, focus indicators, high contrast, reduced motion
 - Keyboard shortcuts documentation
-- High contrast mode
-- Reduced motion support
 
 ## 🌍 Deployment
 
@@ -303,7 +292,7 @@ All 20 Tier 1 (core writing workflow) issues are done: label CRUD in Write Mode,
 docker-compose up -d
 ```
 
-Starts PostgreSQL (16), backend, and frontend automatically. Frontend serves on port 80 via Nginx and proxies `/api` requests to the backend on port 3000.
+Starts PostgreSQL (18), backend, and frontend automatically. Frontend serves on port 80 via Nginx and proxies `/api` requests to the backend on port 3000.
 
 To run the frontend locally instead, use `pnpm dev` from `apps/frontend`.
 

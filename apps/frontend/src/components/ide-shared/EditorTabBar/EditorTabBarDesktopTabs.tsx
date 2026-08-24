@@ -47,8 +47,25 @@ export function EditorTabBarDesktopTabs({
         ref={tabsScrollContainerRef}
         onScroll={updateScrollIndicators}
         onWheel={handleWheelScroll}
+        onMouseDown={(event) => {
+          if (event.button !== 1) {
+            return;
+          }
+
+          const tabId = (event.target as HTMLElement)
+            .closest("[data-tab-id]")
+            ?.getAttribute("data-tab-id");
+          if (!tabId) {
+            return;
+          }
+
+          event.preventDefault();
+          event.stopPropagation();
+          onClose(event, tabId);
+        }}
         className="scrollbar-hover flex h-full w-full min-w-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden px-2"
         role="tablist"
+        tabIndex={-1}
       >
         {items.map((item, index) => {
           const isActive = item.id === activeItemId;
@@ -56,6 +73,7 @@ export function EditorTabBarDesktopTabs({
           return (
             <div
               key={item.id}
+              data-tab-id={item.id}
               className={cn(
                 "group relative flex h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-md pl-3 pr-1.5 text-sm transition-all",
                 isActive
