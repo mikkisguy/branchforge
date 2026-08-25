@@ -7,5 +7,15 @@
     "@branchforge/frontend": "0.13.0",
     "@branchforge/shared": "0.13.0"
   },
-  "changesets": []
+  "changesets": [
+    "character-export-name-type",
+    "dirty-form-guards",
+    "first-1-0-beta",
+    "keyboard-shortcuts-docs",
+    "light-carrots-act",
+    "major-cooks-ask",
+    "spotty-books-notice",
+    "tangy-emus-cut",
+    "visual-preview-images"
+  ]
 }
