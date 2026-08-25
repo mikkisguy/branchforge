@@ -4,6 +4,19 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.0-beta.0 - 2026-08-25
+
+- First 1.0 beta: core write and script editing, flow graph, zip import/export, and GitLab sync for solo authors.
+  GitLab conflict review is read-only in this beta. Apply does not write resolved files. Resolve conflicts in GitLab or locally, then pull again.
+- Improved reliability and performance through comprehensive code quality improvements and bug fixes
+- Added visual statement preview images and hover/click previews in Write and Script modes
+- Fixed a bug in Character() export to use Ren'Py name
+- Added warnings for unsaved changes across multiple editing dialogs
+- Documented keyboard shortcuts with an in-app help dialog, contextual hints, and a user guide page
+- Documented keyboard shortcuts with in-app help and docs
+- Updated various places in the UI and added BranchForge logo as favicon
+- Added Script Mode generated-file preview with clearer import handling and fixed label ordering in file tree
+
 ## v0.13.0 - 2026-07-14
 
 - Made the app shell significantly more mobile-responsive
