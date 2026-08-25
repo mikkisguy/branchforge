@@ -90,7 +90,6 @@ Track locations, items, concepts, and events per project.
 - **Ren'Py Definitions**: Import wizard for custom code definitions (CHARACTER, TRANSFORM, IMAGE, INIT)
 - **Ren'Py Snippets**
 - **Beta Reader Management**: Share projects and gather feedback
-- **AI Writing Suggestions**: OpenRouter integration, with opt-in AI assistance for overcoming writer's block
 - Remaining accessibility: tablet layouts, focus indicators, high contrast, reduced motion
 
 ## 🏗️ Tech Stack
@@ -281,7 +280,6 @@ Shipped through **v0.13.0** includes the core writing workflow, flow graph, zip/
 - Narrator character marking
 - Ren'Py definitions import wizard and snippets
 - Beta reader management
-- AI writing suggestions (OpenRouter)
 - Tablet layouts, focus indicators, high contrast, reduced motion
 - Keyboard shortcuts documentation
 

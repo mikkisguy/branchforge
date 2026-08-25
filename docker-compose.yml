@@ -26,8 +26,6 @@ services:
       PORT: 3000
       NODE_ENV: production
       SESSION_SECRET: ${SESSION_SECRET}
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
-      OPENROUTER_API_URL: ${OPENROUTER_API_URL:-https://openrouter.ai/api/v1}
     ports:
       - "3000:3000"
     depends_on:
