@@ -14,7 +14,7 @@
 
 ---
 
-⚠️ BranchForge is in **beta**. The solo writing loop is usable, but this is **not recommended for production**. Expect bugs, incomplete features, and breaking changes. We welcome feedback, bug reports, and contributions!
+⚠️ BranchForge is in **beta**. The solo writing loop is usable. **Use at your own risk.** Expect bugs, incomplete features, and breaking changes. We welcome feedback, bug reports, and contributions!
 
 **Known limitation:** GitLab conflict **review** is read-only. The Apply control does not write resolved files. Resolve conflicts in GitLab or locally, then pull again.
 
@@ -299,76 +299,4 @@ To run the frontend locally instead, use `pnpm dev` from `apps/frontend`.
 
 ### Manual Deployment
 
-```bash
-# Build for production
-pnpm build
-
-# Set environment
-NODE_ENV=production
-# ... configure other env vars (SESSION_SECRET, ENCRYPTION_KEY, DATABASE_URL, ...)
-
-# Start backend
-pnpm start
-
-# Deploy frontend
-# Upload apps/frontend/dist to your web server (Nginx config in apps/frontend/nginx.conf)
-```
-
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the complete guide.
-
-## 🤝 Contributing
-
-Small, focused contributions are welcome! This is a personal project, so we keep it manageable.
-
-[**Read CONTRIBUTING.md →**](CONTRIBUTING.md)
-
-**Quick summary:**
-
-- Open an issue before starting work
-- Small fixes and improvements are most welcome
-- Large features need discussion first
-- Keep PRs focused and well-documented
-
-## 💭 Design Philosophy
-
-BranchForge is built to be **inspiring, gentle, and efficient**.
-
-The interface feels like a quiet, welcoming creative space—not a harsh technical tool. Every interaction is smooth and considered. The polish builds confidence without being flashy.
-
-- **Inspiring**: The UI encourages creativity and flow
-- **Gentle**: Approachable, calm, never overwhelming
-- **Efficient**: Respect the writer's time with thoughtful shortcuts
-- **Polished**: Every detail considered, nothing half-baked
-
-[Read the full design context →](.impeccable.md)
-
-## 📄 License
-
-GPL v3.0 - See [LICENSE](LICENSE) for details.
-
-## 💬 Support
-
-- **Found a bug or have an idea?** [Open an issue!](https://github.com/mikkisguy/branchforge/issues)
-  - Use our [bug report template](https://github.com/mikkisguy/branchforge/issues/new?template=bug_report.md)
-  - Use our [feature request template](https://github.com/mikkisguy/branchforge/issues/new?template=feature_request.md)
-- **Need help?** Check [SUPPORT.md](SUPPORT.md) for FAQ and community resources
-- **Security issue?** See [SECURITY.md](SECURITY.md) for responsible disclosure
-- **Documentation:** Check the [docs/](docs/) folder
-- **Like the project?** Star it on GitHub! ⭐
-
-## 📜 Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for a history of changes.
-
----
-
-<div align="center">
-
-**Made with ❤️ for visual novel writers**
-
-### Check out Ren'Py!
-
-[<img width="130" height="200" alt="image" src="https://github.com/user-attachments/assets/3d9cda19-492f-4486-9e24-264eadd20d1d" />
-](https://www.renpy.org/)
-
-</div>
+[Showing lines 1-300 of 375. Use :301 to continue]
