@@ -124,21 +124,28 @@ describe("flow-graph performance at scale", () => {
         expect(ms).toBeLessThan(20);
       });
 
-      it("computes FLOW (dagre) layout within budget", () => {
-        const { result, ms } = measure(() =>
-          layoutNodes(nodes, edges, routeColorMap, emptyPositions, "FLOW")
-        );
-        expect(result).toHaveLength(nodeCount);
-        // Dagre is a third-party hierarchical layout engine and the most
-        // expensive single operation in the flow graph. It runs once per
-        // data/mode change (memoised), not on every pan/zoom. These
-        // budgets are deliberately generous (≈4× observed dev-machine
-        // times) so CI runners don't flake, while still catching an
-        // accidental O(n²) regression (which would be ~10s at 1000 nodes).
-        const budget =
-          nodeCount <= 100 ? 1500 : nodeCount <= 500 ? 8000 : 30000;
-        expect(ms).toBeLessThan(budget);
-      });
+      // Vitest's default testTimeout is 5s, below the 8s/30s assertion
+      // budgets. Keep the harness timeout above the budget so a slow CI
+      // runner fails the ms assertion rather than timing out.
+      it(
+        "computes FLOW (dagre) layout within budget",
+        () => {
+          const { result, ms } = measure(() =>
+            layoutNodes(nodes, edges, routeColorMap, emptyPositions, "FLOW")
+          );
+          expect(result).toHaveLength(nodeCount);
+          // Dagre is a third-party hierarchical layout engine and the most
+          // expensive single operation in the flow graph. It runs once per
+          // data/mode change (memoised), not on every pan/zoom. These
+          // budgets are deliberately generous (≈4× observed dev-machine
+          // times) so CI runners don't flake, while still catching an
+          // accidental O(n²) regression (which would be ~10s at 1000 nodes).
+          const budget =
+            nodeCount <= 100 ? 1500 : nodeCount <= 500 ? 8000 : 30000;
+          expect(ms).toBeLessThan(budget);
+        },
+        nodeCount <= 100 ? 5000 : nodeCount <= 500 ? 13000 : 35000
+      );
 
       it("computes ROUTE (row) layout within budget", () => {
         const { result, ms } = measure(() =>

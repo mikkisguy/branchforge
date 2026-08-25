@@ -1,0 +1,11 @@
+{
+  "mode": "pre",
+  "tag": "beta",
+  "initialVersions": {
+    "@branchforge/backend": "0.13.0",
+    "@branchforge/docs": "0.12.1",
+    "@branchforge/frontend": "0.13.0",
+    "@branchforge/shared": "0.13.0"
+  },
+  "changesets": []
+}

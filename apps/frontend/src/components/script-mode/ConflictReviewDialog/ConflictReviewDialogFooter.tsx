@@ -2,7 +2,7 @@
  * Conflict Review Dialog — Footer
  *
  * Action buttons at the bottom of the conflict review dialog:
- * cancel, apply resolutions, and unresolved conflict hint.
+ * close, and a disabled apply control (apply does not write files yet).
  */
 
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,6 @@ interface ConflictReviewDialogFooterProps {
   isLoading: boolean;
   hasUnresolved: boolean;
   onCancel: () => void;
-  onApply: () => void;
 }
 
 // ============================================================================
@@ -26,30 +25,33 @@ export function ConflictReviewDialogFooter({
   isLoading,
   hasUnresolved,
   onCancel,
-  onApply,
 }: ConflictReviewDialogFooterProps) {
   return (
-    <div className="p-6 max-sm:p-4 border-t border-border/30 flex justify-between shrink-0">
+    <div className="p-6 max-sm:p-4 border-t border-border/30 flex justify-between items-end gap-4 shrink-0">
       <Button
         type="button"
         variant="outline"
         onClick={onCancel}
         disabled={isLoading}
       >
-        Cancel
+        Close
       </Button>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-col items-end gap-1">
+        <p className="text-sm text-muted-foreground text-right max-w-sm">
+          Review is read-only in this beta. Resolve conflicts in GitLab or
+          locally, then pull again.
+        </p>
         {hasUnresolved && (
           <span className="text-sm text-muted-foreground">
-            Resolve all conflicts first
+            Not all conflicts have a selected side
           </span>
         )}
         <Button
           type="button"
-          onClick={onApply}
-          disabled={isLoading || hasUnresolved}
+          disabled
+          title="Applying resolutions is not implemented yet"
         >
-          {isLoading ? <>Applying…</> : <>Apply Resolutions</>}
+          Apply (not available yet)
         </Button>
       </div>
     </div>
