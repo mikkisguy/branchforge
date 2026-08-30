@@ -17,9 +17,7 @@ services:
       retries: 5
 
   backend:
-    build:
-      context: .
-      dockerfile: apps/backend/Dockerfile
+    image: ghcr.io/mikkisguy/branchforge-backend:${IMAGE_TAG:-beta}
     container_name: branchforge-backend
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-branchforge}:${POSTGRES_PASSWORD:-branchforge}@postgres:5432/${POSTGRES_DB:-branchforge}
@@ -34,9 +32,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    build:
-      context: .
-      dockerfile: apps/frontend/Dockerfile
+    image: ghcr.io/mikkisguy/branchforge-frontend:${IMAGE_TAG:-beta}
     container_name: branchforge-frontend
     ports:
       - "80:80"
