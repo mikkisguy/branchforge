@@ -34,7 +34,7 @@ import { cleanupStaleSyncOperations } from "./services/gitlab/index.js";
 import { globalErrorHandler } from "./middleware/error-handler.middleware.js";
 import { validateCsrfToken } from "./middleware/csrf.middleware.js";
 import { SESSION_COOKIE_NAME } from "./lib/session.js";
-import { getBasePath, getSessionMaxAge } from "./lib/config.js";
+import { getBasePath, getSessionMaxAge, getTrustProxy } from "./lib/config.js";
 import {
   ensureAvatarDir,
   ensureProjectImageDir,
@@ -47,13 +47,12 @@ import {
 const server = Fastify({
   logger: true,
   bodyLimit: 5 * 1024 * 1024, // 5 MB; align with multipart limits
-  // Trust only loopback addresses when reading X-Forwarded-For.
-  // This makes `request.ip` return the real client IP behind a single
-  // reverse proxy on the same host, while preventing clients from
-  // spoofing their IP via headers when no trusted proxy is present.
-  // Operators deploying behind multiple proxy hops should override
-  // this via the TRUST_PROXY environment variable or Fastify config.
-  trustProxy: "loopback",
+  // Trust X-Forwarded-* from addresses in TRUST_PROXY (default
+  // "loopback"). When the reverse proxy is not on loopback — e.g.
+  // nginx in Docker reaching the backend via a bridge gateway — set
+  // TRUST_PROXY to that address or CIDR, otherwise Fastify ignores
+  // X-Forwarded-Proto and secure session cookies are dropped.
+  trustProxy: getTrustProxy(),
 });
 
 // Plugins

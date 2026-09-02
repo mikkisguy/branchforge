@@ -63,3 +63,111 @@ export function getSessionMaxAge(): number {
     Math.max(MIN_SESSION_MAX_AGE_MS, parsed)
   );
 }
+
+/**
+ * Fastify `trustProxy` values that can be expressed via TRUST_PROXY.
+ * Function form is not supported through the environment.
+ */
+export type TrustProxySetting = boolean | string | string[] | number;
+
+const DEFAULT_TRUST_PROXY = "loopback";
+const TRUST_PROXY_KEYWORDS = new Set(["loopback", "linklocal", "uniquelocal"]);
+
+// Loose address/CIDR shapes. Octet ranges are not strictly checked —
+// Fastify/proxy-addr will reject truly unusable values at request time.
+const IPV4_OR_CIDR = /^(?:\d{1,3}\.){3}\d{1,3}(?:\/\d{1,2})?$/;
+const IPV6_OR_CIDR = /^\[?[0-9a-fA-F:.]+\]?(?:\/\d{1,3})?$/;
+
+const PERMISSIVE_TRUST_PROXY_WARNING =
+  "TRUST_PROXY is set to a value that lets clients spoof X-Forwarded-For " +
+  "(true or 0.0.0.0/0). Use a specific proxy IP or CIDR unless you accept " +
+  "that risk.";
+
+function isLooseAddressOrCidr(entry: string): boolean {
+  if (entry === "" || /\s/.test(entry)) {
+    return false;
+  }
+  if (TRUST_PROXY_KEYWORDS.has(entry)) {
+    return true;
+  }
+  if (IPV4_OR_CIDR.test(entry)) {
+    return true;
+  }
+  // Require a colon so bare hex is not treated as IPv6.
+  return entry.includes(":") && IPV6_OR_CIDR.test(entry);
+}
+
+function formatInvalidTrustProxyEntries(entries: string[]): string {
+  return entries.map((entry) => JSON.stringify(entry)).join(", ");
+}
+
+function warnIfPermissiveTrustProxy(value: boolean | string | string[]): void {
+  const permissive =
+    value === true ||
+    value === "0.0.0.0/0" ||
+    (Array.isArray(value) && value.includes("0.0.0.0/0"));
+  if (permissive) {
+    console.warn(PERMISSIVE_TRUST_PROXY_WARNING);
+  }
+}
+
+/**
+ * Get Fastify's `trustProxy` setting from the TRUST_PROXY environment
+ * variable.
+ *
+ * Unset or empty defaults to `"loopback"` (backwards-compatible).
+ * Accepted values:
+ * - `"loopback"`, `"linklocal"`, `"uniquelocal"` — Fastify keywords
+ * - `"true"` / `"false"` — boolean trust-all / trust-none
+ * - a purely numeric string — hop count (Express/Fastify convention)
+ * - a single IP or CIDR, or a comma-separated list of them
+ *
+ * Overly permissive values (`true`, `0.0.0.0/0`) are allowed but log a
+ * startup warning: they let clients spoof `X-Forwarded-For`.
+ *
+ * @throws {Error} If TRUST_PROXY contains empty or unrecognizable entries
+ * @returns A value suitable for Fastify's `trustProxy` option
+ */
+export function getTrustProxy(): TrustProxySetting {
+  const raw = process.env.TRUST_PROXY;
+  if (raw === undefined || raw.trim() === "") {
+    return DEFAULT_TRUST_PROXY;
+  }
+
+  const value = raw.trim();
+
+  if (value === "true") {
+    warnIfPermissiveTrustProxy(true);
+    return true;
+  }
+  if (value === "false") {
+    return false;
+  }
+
+  if (TRUST_PROXY_KEYWORDS.has(value)) {
+    return value;
+  }
+
+  // Pure digits only — do not treat "1.0" or "1e2" as a hop count.
+  if (/^\d+$/.test(value)) {
+    return Number(value);
+  }
+
+  const entries = value.includes(",")
+    ? value.split(",").map((entry) => entry.trim())
+    : [value];
+
+  const invalid = entries.filter((entry) => !isLooseAddressOrCidr(entry));
+  if (invalid.length > 0) {
+    throw new Error(
+      "TRUST_PROXY contains invalid entries: " +
+        `${formatInvalidTrustProxyEntries(invalid)}. ` +
+        "Each entry must be an IP address or CIDR " +
+        "(e.g. 172.31.0.1 or 10.8.0.0/24)."
+    );
+  }
+
+  const parsed: string | string[] = entries.length === 1 ? entries[0] : entries;
+  warnIfPermissiveTrustProxy(parsed);
+  return parsed;
+}
