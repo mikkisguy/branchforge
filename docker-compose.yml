@@ -9,7 +9,8 @@ services:
     ports:
       - "${PGPORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # postgres:18+ image expects the mount at /var/lib/postgresql (data in a versioned subdir)
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-branchforge}"]
       interval: 10s
@@ -17,29 +18,37 @@ services:
       retries: 5
 
   backend:
-    build:
-      context: .
-      dockerfile: apps/backend/Dockerfile
+    image: ghcr.io/mikkisguy/branchforge-backend:${IMAGE_TAG:-beta}
     container_name: branchforge-backend
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-branchforge}:${POSTGRES_PASSWORD:-branchforge}@postgres:5432/${POSTGRES_DB:-branchforge}
       PORT: 3000
       NODE_ENV: production
       SESSION_SECRET: ${SESSION_SECRET}
+      BASE_PATH: ${BASE_PATH:-/api/}
+      CORS_ORIGIN: ${CORS_ORIGIN:?Set CORS_ORIGIN to the frontend origin}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      TRUST_PROXY: ${TRUST_PROXY:-}
+    volumes:
+      # Host path must already exist and be writable by uid 1001.
+      # Compose will not create it: mkdir -p ./uploads && sudo chown 1001:1001 ./uploads
+      - type: bind
+        source: ./uploads
+        target: /app/apps/backend/uploads
+        bind:
+          create_host_path: false
     ports:
-      - "3000:3000"
+      - "${BACKEND_PORT:-3000}:3000"
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
 
   frontend:
-    build:
-      context: .
-      dockerfile: apps/frontend/Dockerfile
+    image: ghcr.io/mikkisguy/branchforge-frontend:${IMAGE_TAG:-beta}
     container_name: branchforge-frontend
     ports:
-      - "80:80"
+      - "${FRONTEND_PORT:-80}:80"
     depends_on:
       - backend
     restart: unless-stopped
