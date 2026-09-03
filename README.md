@@ -6,7 +6,7 @@
 
 **A creative workspace for Ren'Py visual novel writers**
 
-[![Version](https://img.shields.io/badge/version-1.0.0--beta.0-yellowgreen)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.0.0--beta.1-yellowgreen)](CHANGELOG.md)
 ![Beta](https://img.shields.io/badge/status-beta-yellowgreen)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
