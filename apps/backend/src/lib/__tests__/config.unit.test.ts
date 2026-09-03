@@ -136,17 +136,17 @@ describe("getTrustProxy", () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
-  it("parses a purely numeric string as a hop count", () => {
+  it("rejects a purely numeric string (hop count is unsupported)", () => {
     process.env.TRUST_PROXY = "1";
-    expect(getTrustProxy()).toBe(1);
+    expect(() => getTrustProxy()).toThrow(/hop-count/);
 
     process.env.TRUST_PROXY = "2";
-    expect(getTrustProxy()).toBe(2);
+    expect(() => getTrustProxy()).toThrow(/hop-count/);
   });
 
-  it("parses a hop count surrounded by whitespace", () => {
+  it("rejects a hop count surrounded by whitespace", () => {
     process.env.TRUST_PROXY = "  1  ";
-    expect(getTrustProxy()).toBe(1);
+    expect(() => getTrustProxy()).toThrow(/hop-count/);
   });
 
   it("returns a single IP as a string", () => {

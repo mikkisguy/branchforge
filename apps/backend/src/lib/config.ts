@@ -68,7 +68,7 @@ export function getSessionMaxAge(): number {
  * Fastify `trustProxy` values that can be expressed via TRUST_PROXY.
  * Function form is not supported through the environment.
  */
-export type TrustProxySetting = boolean | string | string[] | number;
+export type TrustProxySetting = boolean | string | string[];
 
 const DEFAULT_TRUST_PROXY = "loopback";
 const TRUST_PROXY_KEYWORDS = new Set(["loopback", "linklocal", "uniquelocal"]);
@@ -119,13 +119,16 @@ function warnIfPermissiveTrustProxy(value: boolean | string | string[]): void {
  * Accepted values:
  * - `"loopback"`, `"linklocal"`, `"uniquelocal"` — Fastify keywords
  * - `"true"` / `"false"` — boolean trust-all / trust-none
- * - a purely numeric string — hop count (Express/Fastify convention)
  * - a single IP or CIDR, or a comma-separated list of them
+ *
+ * Numeric hop-count values are rejected. Fastify 5.12.1+ disabled hop-count
+ * trust because it cannot validate the connecting address and lets clients
+ * spoof `X-Forwarded-*` headers.
  *
  * Overly permissive values (`true`, `0.0.0.0/0`) are allowed but log a
  * startup warning: they let clients spoof `X-Forwarded-For`.
  *
- * @throws {Error} If TRUST_PROXY contains empty or unrecognizable entries
+ * @throws {Error} If TRUST_PROXY contains empty, numeric, or unrecognizable entries
  * @returns A value suitable for Fastify's `trustProxy` option
  */
 export function getTrustProxy(): TrustProxySetting {
@@ -148,9 +151,14 @@ export function getTrustProxy(): TrustProxySetting {
     return value;
   }
 
-  // Pure digits only — do not treat "1.0" or "1e2" as a hop count.
+  // Pure digits are the old hop-count form. Fastify 5.12.1+ disabled it
+  // because it cannot validate the connecting address (CVE-2026-16732).
   if (/^\d+$/.test(value)) {
-    return Number(value);
+    throw new Error(
+      "TRUST_PROXY hop-count values are not supported. " +
+        "Set TRUST_PROXY to a proxy IP, CIDR, or a Fastify keyword " +
+        "(loopback, linklocal, uniquelocal)."
+    );
   }
 
   const entries = value.includes(",")

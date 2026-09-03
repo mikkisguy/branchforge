@@ -26,12 +26,17 @@ services:
       NODE_ENV: production
       SESSION_SECRET: ${SESSION_SECRET}
       BASE_PATH: ${BASE_PATH:-/api/}
-      CORS_ORIGIN: ${CORS_ORIGIN}
+      CORS_ORIGIN: ${CORS_ORIGIN:?Set CORS_ORIGIN to the frontend origin}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       TRUST_PROXY: ${TRUST_PROXY:-}
     volumes:
-      # uploads dir must pre-exist and be writable by the container's non-root user (uid 1001)
-      - ./uploads:/app/apps/backend/uploads
+      # Host path must already exist and be writable by uid 1001.
+      # Compose will not create it: mkdir -p ./uploads && sudo chown 1001:1001 ./uploads
+      - type: bind
+        source: ./uploads
+        target: /app/apps/backend/uploads
+        bind:
+          create_host_path: false
     ports:
       - "${BACKEND_PORT:-3000}:3000"
     depends_on:
