@@ -161,6 +161,7 @@ export function ProjectSelector({
     <div className="relative" ref={containerRef}>
       <Select
         value={projectId ?? undefined}
+        aria-label="Select Project"
         onChange={(selectedProjectId) => {
           const project = projects.find((p) => p.id === selectedProjectId);
           if (project) setCurrentProject(project);

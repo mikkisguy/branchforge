@@ -1,5 +1,5 @@
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useProject } from "../useProject.js";
 import { projectsApi, type Project } from "@/lib/api/projects";
@@ -92,6 +92,30 @@ describe("useProject", () => {
 
     expect(result.current.currentProject).toBeNull();
     expect(localStorage.getItem("branchforge:project:current")).toBeNull();
+  });
+
+  it("switches the current project and persists the new id", async () => {
+    const queryClient = createTestQueryClient();
+
+    const { result } = renderHook(() => useProject(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentProject?.id).toBe("project-1");
+    });
+
+    act(() => {
+      result.current.setCurrentProject(result.current.projects[1]!);
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentProject?.id).toBe("project-2");
+    });
+
+    expect(localStorage.getItem("branchforge:project:current")).toBe(
+      "project-2"
+    );
   });
 
   it("surfaces error state when projects query fails", async () => {

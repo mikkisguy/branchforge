@@ -157,7 +157,8 @@ export function useProject(): UseProjectReturn {
   const setCurrentProject = (project: Project | null) => {
     const projectId = project?.id ?? null;
     persistCurrentProjectId(projectId);
-    // Also update query cache for reactive updates
+    // Drop any in-flight current-id read so it cannot overwrite this write.
+    void queryClient.cancelQueries({ queryKey: projectKeys.current() });
     queryClient.setQueryData(projectKeys.current(), projectId);
   };
 

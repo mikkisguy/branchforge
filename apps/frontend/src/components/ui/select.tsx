@@ -65,6 +65,7 @@ export function Select<T extends string = string>({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hasInitializedFocus = useRef(false);
+  const selectLockRef = useRef(false);
   const gap = 4;
 
   // Mirror the trigger node into state (in addition to the ref used by
@@ -86,6 +87,14 @@ export function Select<T extends string = string>({
     setFocusedIndex(-1);
     hasInitializedFocus.current = false;
   }, []);
+
+  // Unlock on false→true only. close() must leave the lock set so a
+  // leftover compatibility click cannot emit a second onChange.
+  useLayoutEffect(() => {
+    if (isOpen) {
+      selectLockRef.current = false;
+    }
+  }, [isOpen]);
 
   const updatePosition = useCallback(() => {
     const trigger = triggerRef.current;
@@ -170,10 +179,28 @@ export function Select<T extends string = string>({
 
   const handleSelect = useCallback(
     (optionValue: T) => {
+      // pointerdown commits immediately so a portaled menu can unmount
+      // before click. Compatibility click (and SR-synthesized click)
+      // may still arrive; only emit onChange once per open.
+      if (selectLockRef.current) {
+        return;
+      }
+      selectLockRef.current = true;
       onChange(optionValue);
       close();
     },
     [onChange, close]
+  );
+
+  const handleOptionPointerDown = useCallback(
+    (optionValue: T) => (event: React.PointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) {
+        return;
+      }
+      event.stopPropagation();
+      handleSelect(optionValue);
+    },
+    [handleSelect]
   );
 
   const handleKeyDown = useCallback(
@@ -218,7 +245,13 @@ export function Select<T extends string = string>({
         type="button"
         role="combobox"
         onClick={() => {
-          if (!disabled) setIsOpen(!isOpen);
+          if (disabled) return;
+          setIsOpen((open) => {
+            if (!open) {
+              selectLockRef.current = false;
+            }
+            return !open;
+          });
         }}
         disabled={disabled}
         aria-expanded={isOpen}
@@ -268,7 +301,7 @@ export function Select<T extends string = string>({
         createPortal(
           <>
             <div
-              className="fixed inset-0 z-40"
+              className="fixed inset-0 z-[100]"
               aria-hidden="true"
               onClick={close}
             />
@@ -283,7 +316,10 @@ export function Select<T extends string = string>({
                 focusedIndex >= 0 ? `select-option-${focusedIndex}` : undefined
               }
               className={cn(
-                "fixed z-50",
+                // LeftSidebar / mobile nav are z-50 with backdrop-blur.
+                // A same-z-index portaled menu loses that compositor fight,
+                // so option clicks hit the sidebar instead of the listbox.
+                "fixed z-[110]",
                 "bg-popover border border-border/70 rounded-lg",
                 "shadow-xl shadow-black/25 ring-1 ring-white/5",
                 "max-h-60 overflow-y-auto",
@@ -291,6 +327,8 @@ export function Select<T extends string = string>({
               )}
               style={menuStyle}
               onKeyDown={handleKeyDown}
+              onPointerDown={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
             >
               {/* eslint-disable jsx-a11y/click-events-have-key-events -- Listbox handles keyboard navigation via aria-activedescendant */}
               {options.map((option, index) => (
@@ -300,6 +338,7 @@ export function Select<T extends string = string>({
                   id={`select-option-${index}`}
                   role="option"
                   aria-selected={option.value === value}
+                  onPointerDown={handleOptionPointerDown(option.value)}
                   onClick={() => handleSelect(option.value)}
                   tabIndex={-1}
                   className={cn(
