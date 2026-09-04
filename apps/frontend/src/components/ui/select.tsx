@@ -246,12 +246,7 @@ export function Select<T extends string = string>({
         role="combobox"
         onClick={() => {
           if (disabled) return;
-          setIsOpen((open) => {
-            if (!open) {
-              selectLockRef.current = false;
-            }
-            return !open;
-          });
+          setIsOpen((open) => !open);
         }}
         disabled={disabled}
         aria-expanded={isOpen}
