@@ -99,6 +99,39 @@ describe("LeftSidebar accessibility", () => {
     );
   });
 
+  it("switches from the visible collapsed project popover", async () => {
+    const user = userEvent.setup();
+    const setCurrentProject = vi.fn();
+    const secondProject: Project = {
+      ...mockProjects[0]!,
+      id: "proj-2",
+      name: "Second Project",
+    };
+
+    render(
+      <LeftSidebar
+        {...defaultProps}
+        projects={[...mockProjects, secondProject]}
+        setCurrentProject={setCurrentProject}
+      />,
+      { wrapper: createWrapper() }
+    );
+
+    const projectTriggers = screen.getAllByRole("button", {
+      name: "Select Project",
+    });
+    await user.click(projectTriggers[0]!);
+
+    const projectOptions = screen.getAllByRole("button", {
+      name: "Second Project",
+    });
+    expect(projectOptions).toHaveLength(1);
+    await user.click(projectOptions[0]!);
+
+    expect(setCurrentProject).toHaveBeenCalledOnce();
+    expect(setCurrentProject).toHaveBeenCalledWith(secondProject);
+  });
+
   it("renders nav buttons with aria-labels", () => {
     render(<LeftSidebar {...defaultProps} />, { wrapper: createWrapper() });
 
