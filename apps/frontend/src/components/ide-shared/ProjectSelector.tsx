@@ -1,6 +1,5 @@
 import { useEffect, useEffectEvent, useRef } from "react";
-import { FolderOpen } from "lucide-react";
-import { Select } from "@/components/ui/select";
+import { ChevronDown, FolderOpen } from "lucide-react";
 import type { Project } from "@/lib/api/projects";
 
 interface ProjectSelectorProps {
@@ -157,26 +156,41 @@ export function ProjectSelector({
     );
   }
 
+  const hasSelectedProject = projects.some(
+    (project) => project.id === projectId
+  );
+  const isSelectDisabled = isLoadingProjects || projects.length === 0;
+  const placeholder = isLoadingProjects
+    ? "Loading…"
+    : projects.length === 0
+      ? "No projects"
+      : "Select project";
+
   return (
     <div className="relative" ref={containerRef}>
-      <Select
-        value={projectId ?? undefined}
-        onChange={(selectedProjectId) => {
+      <select
+        value={hasSelectedProject ? projectId : ""}
+        aria-label="Select Project"
+        onChange={(event) => {
+          const selectedProjectId = event.currentTarget.value;
           const project = projects.find((p) => p.id === selectedProjectId);
           if (project) setCurrentProject(project);
         }}
-        disabled={isLoadingProjects || projects.length === 0}
-        placeholder={
-          isLoadingProjects
-            ? "Loading…"
-            : projects.length === 0
-              ? "No projects"
-              : "Select project"
-        }
-        options={projects.map((p) => ({
-          value: p.id,
-          label: p.name,
-        }))}
+        disabled={isSelectDisabled}
+        className="w-full min-h-11 appearance-none rounded-lg border border-border/70 bg-popover px-3 py-2 pr-9 text-sm text-foreground transition-colors cursor-pointer focus-ring hover:border-[var(--theme-color)]/40 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <option value="" disabled>
+          {placeholder}
+        </option>
+        {projects.map((project) => (
+          <option key={project.id} value={project.id}>
+            {project.name}
+          </option>
+        ))}
+      </select>
+      <ChevronDown
+        className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+        aria-hidden="true"
       />
     </div>
   );

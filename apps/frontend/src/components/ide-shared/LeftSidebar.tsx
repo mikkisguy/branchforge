@@ -60,6 +60,7 @@ type ModalKey =
   | "settings"
   | "projectSettings"
   | "projectPopover"
+  | "mobileProjectPopover"
   | "gitLabImport"
   | "zipImport"
   | "flow"
@@ -69,6 +70,7 @@ interface ModalState {
   settings: boolean;
   projectSettings: boolean;
   projectPopover: boolean;
+  mobileProjectPopover: boolean;
   gitLabImport: boolean;
   zipImport: boolean;
   flow: boolean;
@@ -84,6 +86,7 @@ const initialModalState: ModalState = {
   settings: false,
   projectSettings: false,
   projectPopover: false,
+  mobileProjectPopover: false,
   gitLabImport: false,
   zipImport: false,
   flow: false,
@@ -195,9 +198,10 @@ export function LeftSidebar(props: LeftSidebarProps) {
             setCurrentProject={setCurrentProject}
             isCollapsed={isCollapsed}
             isOpen={modals.projectPopover}
-            onToggle={() =>
-              dispatchModal({ type: "TOGGLE", key: "projectPopover" })
-            }
+            onToggle={() => {
+              dispatchModal({ type: "CLOSE", key: "mobileProjectPopover" });
+              dispatchModal({ type: "TOGGLE", key: "projectPopover" });
+            }}
             onClose={() =>
               dispatchModal({ type: "CLOSE", key: "projectPopover" })
             }
@@ -256,12 +260,13 @@ export function LeftSidebar(props: LeftSidebarProps) {
         projects={projects}
         isLoadingProjects={isLoadingProjects}
         setCurrentProject={setCurrentProject}
-        isProjectPopoverOpen={modals.projectPopover}
-        onToggleProjectPopover={() =>
-          dispatchModal({ type: "TOGGLE", key: "projectPopover" })
-        }
+        isProjectPopoverOpen={modals.mobileProjectPopover}
+        onToggleProjectPopover={() => {
+          dispatchModal({ type: "CLOSE", key: "projectPopover" });
+          dispatchModal({ type: "TOGGLE", key: "mobileProjectPopover" });
+        }}
         onCloseProjectPopover={() =>
-          dispatchModal({ type: "CLOSE", key: "projectPopover" })
+          dispatchModal({ type: "CLOSE", key: "mobileProjectPopover" })
         }
         onOpenProjectSettings={() =>
           dispatchModal({ type: "OPEN", key: "projectSettings" })
