@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useProject } from "../useProject.js";
 import { projectsApi, type Project } from "@/lib/api/projects";
+import { projectKeys } from "@/lib/query-keys";
 import { createTestQueryClient } from "@/test/query-client";
 
 const TEST_PROJECTS: Project[] = [
@@ -116,6 +117,14 @@ describe("useProject", () => {
     expect(localStorage.getItem("branchforge:project:current")).toBe(
       "project-2"
     );
+
+    expect(queryClient.getQueryState(projectKeys.current())?.fetchStatus).toBe(
+      "idle"
+    );
+
+    await queryClient.invalidateQueries({ queryKey: projectKeys.current() });
+
+    expect(result.current.currentProject?.id).toBe("project-2");
   });
 
   it("surfaces error state when projects query fails", async () => {

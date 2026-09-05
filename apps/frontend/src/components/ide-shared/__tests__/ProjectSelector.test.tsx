@@ -8,7 +8,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ProjectSelector } from "../ProjectSelector";
+import { ProjectSelector } from "@/components/ide-shared/ProjectSelector";
 import type { Project } from "@/lib/api/projects";
 
 const projects: Project[] = [
@@ -47,8 +47,9 @@ describe("ProjectSelector", () => {
       />
     );
 
-    await user.click(screen.getByRole("combobox", { name: "Select Project" }));
-    await user.click(screen.getByRole("option", { name: "Beta" }));
+    const select = screen.getByRole("combobox", { name: "Select Project" });
+    expect(select.tagName).toBe("SELECT");
+    await user.selectOptions(select, "proj-2");
 
     expect(setCurrentProject).toHaveBeenCalledTimes(1);
     expect(setCurrentProject).toHaveBeenCalledWith(projects[1]);

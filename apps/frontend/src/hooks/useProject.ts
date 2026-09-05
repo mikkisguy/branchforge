@@ -104,13 +104,19 @@ export function useProject(): UseProjectReturn {
 
   const { data: currentProjectId = null } = useQuery<string | null>({
     queryKey: projectKeys.current(),
-    queryFn: () => {
-      // Return cached value or read from localStorage
-      return (
-        queryClient.getQueryData<string | null>(projectKeys.current()) ??
-        readStoredCurrentProjectId()
+    queryFn: readStoredCurrentProjectId,
+    initialData: () => {
+      const cachedProjectId = queryClient.getQueryData<string | null>(
+        projectKeys.current()
       );
+      return cachedProjectId === undefined
+        ? readStoredCurrentProjectId()
+        : cachedProjectId;
     },
+    // This key is client state, not server state. Keeping the observer disabled
+    // prevents invalidations or remounts from starting a storage read that can
+    // race with setCurrentProject(). setQueryData still updates every observer.
+    enabled: false,
     staleTime: Infinity,
     gcTime: Infinity,
   });
@@ -157,8 +163,6 @@ export function useProject(): UseProjectReturn {
   const setCurrentProject = (project: Project | null) => {
     const projectId = project?.id ?? null;
     persistCurrentProjectId(projectId);
-    // Drop any in-flight current-id read so it cannot overwrite this write.
-    void queryClient.cancelQueries({ queryKey: projectKeys.current() });
     queryClient.setQueryData(projectKeys.current(), projectId);
   };
 
