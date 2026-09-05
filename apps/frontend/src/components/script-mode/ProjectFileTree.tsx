@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, ChevronDown, Folder, FileCode } from "lucide-react";
 import type { ProjectFileNode } from "@/hooks/useProjectFiles";
 import type {
@@ -27,6 +27,7 @@ interface ProjectFileTreeProps {
   onSceneSelect: (sceneId: string) => void;
   initialExpandedFolders?: string[];
   initialExpandedFiles?: string[];
+  foldersToExpand?: string[];
   generatedFiles?: GeneratedFileInfo[];
   activeGeneratedFileId?: string | null;
   onGeneratedFileSelect?: (fileName: string) => void;
@@ -66,6 +67,7 @@ export function ProjectFileTree({
   onSceneSelect,
   initialExpandedFolders,
   initialExpandedFiles,
+  foldersToExpand,
   generatedFiles,
   activeGeneratedFileId,
   onGeneratedFileSelect,
@@ -76,6 +78,20 @@ export function ProjectFileTree({
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(
     () => new Set(initialExpandedFiles ?? [])
   );
+
+  useEffect(() => {
+    if (!foldersToExpand?.length) {
+      return;
+    }
+
+    setExpandedFolders((previous) => {
+      const next = new Set(previous);
+      for (const folder of foldersToExpand) {
+        next.add(folder);
+      }
+      return next;
+    });
+  }, [foldersToExpand]);
 
   const toggleFolder = (folder: string) => {
     setExpandedFolders((prev) => {

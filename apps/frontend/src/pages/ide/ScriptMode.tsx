@@ -3,6 +3,8 @@ import { ScriptModeEmptyState } from "./components/ScriptModeEmptyState";
 import { ScriptModeDialogs } from "./components/ScriptModeDialogs";
 import { useScriptMode } from "./components/useScriptMode";
 import { StatusBar } from "@/components/script-mode";
+import { CreateFileDialog } from "@/components/ide-shared/CreateFileDialog";
+import { useProject } from "@/hooks/useProject";
 
 interface ScriptModeProps {
   projectId?: string;
@@ -15,6 +17,8 @@ export function ScriptMode({
   projectName,
   onOpenSettings,
 }: ScriptModeProps) {
+  const { currentProject } = useProject();
+  const canCreateFile = currentProject?.visibility === "OWNER";
   const {
     isLoadingLabels,
     isLoadingFiles,
@@ -62,7 +66,27 @@ export function ScriptMode({
     onGeneratedFileSelect,
     isGeneratedPreview,
     generatedFileName,
+    showCreateFileDialog,
+    handleOpenCreateFileDialog,
+    handleCreateFileDialogOpenChange,
+    handleCreateFile,
+    isCreatingFile,
+    createFileError,
+    resetCreateFileError,
+    foldersToExpand,
   } = useScriptMode({ projectId });
+
+  const createFileDialog =
+    projectId && canCreateFile ? (
+      <CreateFileDialog
+        open={showCreateFileDialog}
+        onOpenChange={handleCreateFileDialogOpenChange}
+        onCreate={handleCreateFile}
+        isCreating={isCreatingFile}
+        onDismissServerError={resetCreateFileError}
+        serverError={createFileError?.message ?? null}
+      />
+    ) : null;
 
   if (isLoadingLabels || isLoadingFiles) {
     return (
@@ -93,7 +117,9 @@ export function ScriptMode({
           showZipImportDialog={showZipImportDialog}
           onShowZipImportDialogChange={setShowZipImportDialog}
           onOpenSettings={onOpenSettings}
+          onNewFile={canCreateFile ? handleOpenCreateFileDialog : undefined}
         />
+        {createFileDialog}
       </div>
     );
   }
@@ -111,6 +137,7 @@ export function ScriptMode({
         activeFileContent={activeFileContent}
         scrollToLine={scrollToLine}
         initialExpandedFolders={initialExpandedFolders}
+        foldersToExpand={foldersToExpand}
         tabItems={tabItems}
         projectCharacters={projectCharacters}
         isLeftSidebarCollapsed={isLeftSidebarCollapsed}
@@ -127,6 +154,7 @@ export function ScriptMode({
         onCloseTab={handleCloseFileTab}
         onContentChange={handleContentChange}
         onRefreshFiles={refreshFiles}
+        onNewFile={canCreateFile ? handleOpenCreateFileDialog : undefined}
         canUndo={canUndo}
         canRedo={canRedo}
         onUndo={onUndo}
@@ -161,6 +189,7 @@ export function ScriptMode({
         showZipImportDialog={showZipImportDialog}
         onZipImportDialogChange={setShowZipImportDialog}
       />
+      {createFileDialog}
     </div>
   );
 }

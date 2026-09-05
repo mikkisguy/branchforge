@@ -106,29 +106,35 @@ export async function exportToGitlab(
 
     // Export each project file - Script Mode uses stored content directly
     for (const file of files) {
-      if (file.content) {
-        // Defensive strip: remove any `define <tag> = Character(...)` /
-        // `default <key> = ...` lines that might still be present in
-        // the stored `content`. The import path strips them at
-        // ingestion (issue #244), but projects imported before that
-        // fix shipped could still carry those lines. The strip is
-        // idempotent on already-clean content.
-        const baseContent = extractAndStripRpySymbols(
-          file.content
-        ).cleanedContent;
-        let contentToExport = baseContent;
-
-        // Patch content with variables if this file has labels with conditions
-        const fileLabels = labelsByFile.get(file.id);
-        if (fileLabels && fileLabels.length > 0) {
-          contentToExport = patchRPYWithVariables(baseContent, fileLabels);
-        }
-
+      if (file.content.length === 0) {
         filesToExport.push({
           filePath: file.filePath,
-          content: contentToExport,
+          content: "",
         });
+        continue;
       }
+
+      // Defensive strip: remove any `define <tag> = Character(...)` /
+      // `default <key> = ...` lines that might still be present in
+      // the stored `content`. The import path strips them at
+      // ingestion (issue #244), but projects imported before that
+      // fix shipped could still carry those lines. The strip is
+      // idempotent on already-clean content.
+      const baseContent = extractAndStripRpySymbols(
+        file.content
+      ).cleanedContent;
+      let contentToExport = baseContent;
+
+      // Patch content with variables if this file has labels with conditions
+      const fileLabels = labelsByFile.get(file.id);
+      if (fileLabels && fileLabels.length > 0) {
+        contentToExport = patchRPYWithVariables(baseContent, fileLabels);
+      }
+
+      filesToExport.push({
+        filePath: file.filePath,
+        content: contentToExport,
+      });
     }
 
     // Run independent queries concurrently to reduce export latency.

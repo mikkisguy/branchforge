@@ -80,6 +80,7 @@ interface ScriptModeEditorLayoutProps {
   activeFileContent: string;
   scrollToLine: number | null;
   initialExpandedFolders: string[];
+  foldersToExpand?: string[];
   tabItems: EditorTabBarItem[];
   projectCharacters: Character[];
   isLeftSidebarCollapsed: boolean;
@@ -96,7 +97,7 @@ interface ScriptModeEditorLayoutProps {
   onCloseTab: (event: MouseEvent | KeyboardEvent, fileId: string) => void;
   onContentChange: (value: string) => void;
   onRefreshFiles: () => Promise<unknown>;
-  onNewChapter?: () => void;
+  onNewFile?: () => void;
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
@@ -125,6 +126,7 @@ export function ScriptModeEditorLayout({
   activeFileContent,
   scrollToLine,
   initialExpandedFolders,
+  foldersToExpand,
   tabItems,
   projectCharacters,
   isLeftSidebarCollapsed,
@@ -141,7 +143,7 @@ export function ScriptModeEditorLayout({
   onCloseTab,
   onContentChange,
   onRefreshFiles,
-  onNewChapter,
+  onNewFile,
   canUndo,
   canRedo,
   onUndo,
@@ -336,15 +338,15 @@ export function ScriptModeEditorLayout({
             </div>
 
             <div className="p-3 space-y-3">
-              {onNewChapter && (
+              {onNewFile ? (
                 <button
                   type="button"
-                  onClick={onNewChapter}
+                  onClick={onNewFile}
                   className="w-full py-2 px-3 rounded-lg text-sm font-medium transition-colors bg-[var(--theme-color)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  + New Chapter
+                  + New File
                 </button>
-              )}
+              ) : null}
 
               <ProjectFileTree
                 files={projectFiles}
@@ -355,6 +357,7 @@ export function ScriptModeEditorLayout({
                 onFileSelect={onFileSelect}
                 onSceneSelect={onSceneSelect}
                 initialExpandedFolders={initialExpandedFolders}
+                foldersToExpand={foldersToExpand}
                 generatedFiles={generatedFiles}
                 activeGeneratedFileId={activeGeneratedFileId}
                 onGeneratedFileSelect={onGeneratedFileSelect}

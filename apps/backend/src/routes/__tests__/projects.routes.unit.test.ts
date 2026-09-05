@@ -24,6 +24,7 @@ vi.mock("../../services/projects.service.js", () => ({
   updateProject: vi.fn(),
   deleteProject: vi.fn(),
   getProjectFiles: vi.fn(),
+  createProjectFile: vi.fn(),
   updateFileContent: vi.fn(),
 }));
 
@@ -588,6 +589,116 @@ describe("ProjectsRoutes", () => {
       expect(response.statusCode).toBe(400);
       expect(response.json()).toMatchObject({
         message: "Invalid request body",
+      });
+    });
+  });
+
+  describe("POST /projects/:projectId/files", () => {
+    const mockFile = {
+      id: "770e8400-e29b-41d4-a716-446655440000",
+      projectId: PROJECT_ID,
+      filePath: "labels/new_scene.rpy",
+      fileType: "STORY" as const,
+      content: "",
+      source: "ZIP" as const,
+      contentHash:
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      originalContent: null,
+      createdAt: new Date("2024-01-01"),
+      updatedAt: new Date("2024-01-01"),
+      labels: [],
+    };
+
+    it("should create a project file successfully", async () => {
+      vi.mocked(projectsService.createProjectFile).mockResolvedValue(
+        mockFile as never
+      );
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: `/projects/${PROJECT_ID}/files`,
+        payload: { filePath: "labels/new_scene" },
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json().file.filePath).toBe("labels/new_scene.rpy");
+      expect(projectsService.createProjectFile).toHaveBeenCalledWith(
+        PROJECT_ID,
+        "user-123",
+        "labels/new_scene"
+      );
+    });
+
+    it("should return 404 when project not found", async () => {
+      vi.mocked(projectsService.createProjectFile).mockRejectedValue(
+        new NotFoundError("Project")
+      );
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: `/projects/${PROJECT_ID}/files`,
+        payload: { filePath: "labels/act" },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({ error: "Project not found" });
+    });
+
+    it("should return 403 when user is not project owner", async () => {
+      vi.mocked(projectsService.createProjectFile).mockRejectedValue(
+        new ForbiddenError("You do not have access to this project")
+      );
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: `/projects/${PROJECT_ID}/files`,
+        payload: { filePath: "labels/act" },
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({ error: "Forbidden" });
+    });
+
+    it("should return 400 for invalid file paths", async () => {
+      vi.mocked(projectsService.createProjectFile).mockRejectedValue(
+        new ValidationError("This file name is reserved by BranchForge")
+      );
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: `/projects/${PROJECT_ID}/files`,
+        payload: { filePath: "branchforge_variables.rpy" },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({ error: "Invalid request data" });
+    });
+
+    it("should return 409 when file path already exists", async () => {
+      vi.mocked(projectsService.createProjectFile).mockRejectedValue(
+        new ConflictError("A file with this path already exists")
+      );
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: `/projects/${PROJECT_ID}/files`,
+        payload: { filePath: "Story.rpy" },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toEqual({ error: "Resource conflict" });
+    });
+
+    it("should return 400 when filePath is missing", async () => {
+      const response = await fastify.inject({
+        method: "POST",
+        url: `/projects/${PROJECT_ID}/files`,
+        payload: {},
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        message: "Invalid request data",
       });
     });
   });

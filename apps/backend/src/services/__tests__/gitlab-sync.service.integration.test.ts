@@ -756,6 +756,49 @@ describe("GitLabSyncService (Integration)", () => {
       );
     });
 
+    it("should export empty-string files created locally", async () => {
+      const emptyFile = createProjectFileFixture({
+        filePath: "game/new_chapter.rpy",
+        content: "",
+        contentHash: "empty-content-hash",
+      });
+      await db.insert(projectFiles).values(emptyFile);
+
+      vi.spyOn(gitlabFileService, "batchCommitFiles").mockResolvedValue(
+        undefined
+      );
+
+      const result = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "Test export"
+      );
+
+      expect(result).toMatchObject({
+        projectId: testProjectId,
+        operation: "EXPORT",
+        status: "COMPLETED",
+        branch: testBranch,
+        conflictCount: 0,
+      });
+      expect(gitlabFileService.batchCommitFiles).toHaveBeenCalledWith(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "Test export",
+        expect.arrayContaining([
+          {
+            filePath: testGitlabFile.filePath,
+            content: testGitlabFile.content,
+          },
+          { filePath: "game/new_chapter.rpy", content: "" },
+        ])
+      );
+
+      await db.delete(projectFiles).where(eq(projectFiles.id, emptyFile.id));
+    });
+
     it("should handle export when no files exist", async () => {
       // Delete the gitlab file first
       await db

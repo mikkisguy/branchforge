@@ -720,4 +720,171 @@ describe("ProjectsRoutes (Integration)", () => {
       expect(activeHeroLabels).toHaveLength(1);
     });
   });
+  describe("POST /projects/:projectId/files", () => {
+    it("should return 401 when not authenticated", async () => {
+      const response = await fastify.inject({
+        method: "POST",
+        url: `/projects/${ownedProject.id}/files`,
+        payload: { filePath: "labels/new_scene" },
+      });
+
+      expect(response.statusCode).toBe(401);
+    });
+
+    it("should create an empty STORY file with canonicalized path", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: `/projects/${ownedProject.id}/files`,
+        payload: { filePath: " labels/./NewScene " },
+        cookies: {
+          [SESSION_COOKIE_NAME]: auth.sessionId,
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      const json = response.json();
+      expect(json.file).toMatchObject({
+        projectId: ownedProject.id,
+        filePath: "labels/NewScene.rpy",
+        fileType: "STORY",
+        content: "",
+        source: "ZIP",
+        contentHash: calculateContentHash(""),
+        originalContent: null,
+        labels: [],
+      });
+
+      const [storedFile] = await db
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.id, json.file.id))
+        .limit(1);
+
+      expect(storedFile.filePath).toBe("labels/NewScene.rpy");
+    });
+
+    it("should derive source from the project row", async () => {
+      const auth = await createAuthenticatedRequest(otherUserId);
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: `/projects/${sharedProject.id}/files`,
+        payload: { filePath: "labels/gitlab_scene" },
+        cookies: {
+          [SESSION_COOKIE_NAME]: auth.sessionId,
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json().file.source).toBe("GITLAB");
+    });
+
+    it("should return 403 when user is not the project owner", async () => {
+      await db.insert(projectUsers).values({
+        projectId: ownedProject.id!,
+        userId: thirdUserId,
+        role: "READER",
+      });
+
+      const auth = await createAuthenticatedRequest(thirdUserId);
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: `/projects/${ownedProject.id}/files`,
+        payload: { filePath: "labels/forbidden" },
+        cookies: {
+          [SESSION_COOKIE_NAME]: auth.sessionId,
+        },
+      });
+
+      expect(response.statusCode).toBe(403);
+    });
+
+    it("should return 404 when project does not exist", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+      const missingProjectId = testUuid("11999999", 1);
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: `/projects/${missingProjectId}/files`,
+        payload: { filePath: "labels/missing" },
+        cookies: {
+          [SESSION_COOKIE_NAME]: auth.sessionId,
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it("should return 400 for leading control characters before trim", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+
+      for (const filePath of [
+        "\tlabels/act.rpy",
+        "\nlabels/act.rpy",
+        "\u2028labels/act.rpy",
+        "\u2029labels/act.rpy",
+      ]) {
+        const response = await fastify.inject({
+          method: "POST",
+          url: `/projects/${ownedProject.id}/files`,
+          payload: { filePath },
+          cookies: {
+            [SESSION_COOKIE_NAME]: auth.sessionId,
+          },
+        });
+
+        expect(response.statusCode).toBe(400);
+
+        const stored = await db
+          .select({ id: projectFiles.id })
+          .from(projectFiles)
+          .where(eq(projectFiles.projectId, ownedProject.id!));
+        expect(stored).toHaveLength(0);
+      }
+    });
+
+    it("should return 400 for reserved generated file names", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: `/projects/${ownedProject.id}/files`,
+        payload: { filePath: "branchforge_definitions.rpy" },
+        cookies: {
+          [SESSION_COOKIE_NAME]: auth.sessionId,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("should return 409 for case-insensitive duplicate paths", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+
+      await db.insert(projectFiles).values({
+        id: testUuid("13000000", 10),
+        projectId: ownedProject.id!,
+        source: "ZIP",
+        filePath: "labels/story.rpy",
+        fileType: "STORY",
+        content: "",
+        originalContent: null,
+        contentHash: calculateContentHash(""),
+      });
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: `/projects/${ownedProject.id}/files`,
+        payload: { filePath: "labels/Story.rpy" },
+        cookies: {
+          [SESSION_COOKIE_NAME]: auth.sessionId,
+        },
+      });
+
+      expect(response.statusCode).toBe(409);
+    });
+  });
 });

@@ -287,6 +287,62 @@ describe("ExportService", () => {
       expect(result.id).toBe(EXPORT_ID);
     });
 
+    it("should include empty-string project files in the zip payload", async () => {
+      const mockProject = { name: "Empty File Export" };
+      const mockFiles = [
+        {
+          id: "file-1",
+          projectId: PROJECT_ID,
+          filePath: "game/script.rpy",
+          fileType: "STORY",
+          content: "label start:",
+          contentHash: "abc",
+          source: "manual",
+        },
+        {
+          id: "file-2",
+          projectId: PROJECT_ID,
+          filePath: "game/new_chapter.rpy",
+          fileType: "STORY",
+          content: "",
+          contentHash: "def",
+          source: "manual",
+        },
+      ];
+      const mockExportRecord = {
+        id: EXPORT_ID,
+        projectId: PROJECT_ID,
+        format: "RENPY",
+        fileName: "test_export.zip",
+        content: JSON.stringify({
+          "game/script.rpy": "label start:",
+          "game/new_chapter.rpy": "",
+        }),
+        fileSize: 0,
+        createdAt: new Date("2024-01-01T00:00:00Z"),
+      };
+
+      resolveQueue.push(mockFiles);
+      resolveQueue.push([]); // labels
+      resolveQueue.push([]); // variables
+      resolveQueue.push([]); // stats
+      resolveQueue.push([]); // characters
+      resolveQueue.push([]); // cleanup
+
+      mockDb.limit.mockResolvedValueOnce([mockProject]);
+      mockDb.returning.mockResolvedValueOnce([mockExportRecord]);
+
+      await generateExport(PROJECT_ID, USER_ID);
+
+      expect(mockDb.values).toHaveBeenCalledTimes(1);
+      const insertPayload = mockDb.values.mock.calls[0][0] as {
+        content: string;
+      };
+      const savedContent = JSON.parse(insertPayload.content);
+      expect(savedContent["game/new_chapter.rpy"]).toBe("");
+      expect(savedContent["game/script.rpy"]).toBe("label start:");
+    });
+
     it("should generate variables/stats/characters files when they exist", async () => {
       const mockProject = { name: "Full Export" };
       const mockFiles = [

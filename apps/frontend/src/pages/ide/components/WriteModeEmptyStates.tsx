@@ -34,7 +34,33 @@ export function LoadingLabels() {
         </div>
         <div className="absolute inset-0 size-16 rounded-full bg-[var(--theme-color)]/5 animate-ping" />
       </div>
-      <p className="text-muted-foreground mt-4">Loading labels…</p>
+      <p className="text-muted-foreground mt-4">Loading project…</p>
+    </div>
+  );
+}
+
+interface NoStoryFilesProps {
+  onNewFile?: () => void;
+}
+
+// react-doctor-disable-next-line react-doctor/no-multi-comp -- related variants co-located
+export function NoStoryFiles({ onNewFile }: NoStoryFilesProps) {
+  return (
+    <div className="h-full flex flex-col items-center justify-center">
+      <div className="size-20 rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-4">
+        <FileText className="size-10 text-muted-foreground/60" />
+      </div>
+      <p className="text-foreground font-medium">
+        No story files in this project
+      </p>
+      <p className="text-sm text-muted-foreground/70 mt-1 text-center max-w-md px-4">
+        Import content or create a new file to start writing.
+      </p>
+      {onNewFile ? (
+        <Button type="button" className="mt-4" onClick={onNewFile}>
+          + New File
+        </Button>
+      ) : null}
     </div>
   );
 }

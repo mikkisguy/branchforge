@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const showErrorToast = vi.fn();
 const setActiveLabelId = vi.fn();
 const selectFileTab = vi.fn();
+const createFile = vi.fn();
 
 const previewState = vi.hoisted(() => ({
   isError: false,
@@ -23,23 +24,27 @@ const editorState = vi.hoisted(() => ({
   triggerFileSave: vi.fn(async () => true),
 }));
 
+const scriptFilesState = vi.hoisted(() => ({
+  projectFiles: [
+    {
+      id: "file-1",
+      projectId: "project-1",
+      filePath: "game/script.rpy",
+      fileType: "STORY" as const,
+      content: "label start:\n    return",
+      source: "ZIP" as const,
+      contentHash: "hash",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      updatedAt: "2024-01-01T00:00:00.000Z",
+      labels: [] as [],
+    },
+  ],
+}));
+
 vi.mock("../useScriptModeData", () => ({
   useScriptModeData: () => ({
     setActiveLabelId,
-    projectFiles: [
-      {
-        id: "file-1",
-        projectId: "project-1",
-        filePath: "game/script.rpy",
-        fileType: "STORY",
-        content: "label start:\n    return",
-        source: "ZIP",
-        contentHash: "hash",
-        createdAt: "2024-01-01T00:00:00.000Z",
-        updatedAt: "2024-01-01T00:00:00.000Z",
-        labels: [],
-      },
-    ],
+    projectFiles: scriptFilesState.projectFiles,
     skipSaveRef: { current: false },
     labels: [],
     showErrorToast,
@@ -65,6 +70,10 @@ vi.mock("../useScriptModeData", () => ({
     isResettingRef: { current: false },
     isProjectLinked: () => false,
     getLinkedRepository: () => null,
+    createFile,
+    isCreatingFile: false,
+    createFileError: null,
+    resetCreateFileError: vi.fn(),
   }),
 }));
 
@@ -151,6 +160,20 @@ const previewFiles = [
 describe("useScriptMode generated preview lifecycle", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    scriptFilesState.projectFiles = [
+      {
+        id: "file-1",
+        projectId: "project-1",
+        filePath: "game/script.rpy",
+        fileType: "STORY",
+        content: "label start:\n    return",
+        source: "ZIP",
+        contentHash: "hash",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        updatedAt: "2024-01-01T00:00:00.000Z",
+        labels: [],
+      },
+    ];
     previewState.isError = false;
     previewState.data = { files: previewFiles };
     editorState.isFileDirty = false;
@@ -286,6 +309,172 @@ describe("useScriptMode generated preview lifecycle", () => {
         "Failed to load generated preview",
         "Preview Error"
       );
+    });
+  });
+});
+
+describe("useScriptMode create file", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    scriptFilesState.projectFiles = [
+      {
+        id: "file-1",
+        projectId: "project-1",
+        filePath: "game/script.rpy",
+        fileType: "STORY",
+        content: "label start:\n    return",
+        source: "ZIP",
+        contentHash: "hash",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        updatedAt: "2024-01-01T00:00:00.000Z",
+        labels: [],
+      },
+    ];
+    previewState.isError = false;
+    previewState.data = { files: previewFiles };
+    selectFileTab.mockResolvedValue(true);
+    createFile.mockResolvedValue({
+      id: "file-new",
+      projectId: "project-1",
+      filePath: "chapters/new_scene.rpy",
+      fileType: "STORY",
+      content: "",
+      source: "ZIP",
+      contentHash: "empty-hash",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      updatedAt: "2024-01-01T00:00:00.000Z",
+      labels: [],
+    });
+  });
+
+  it("opens the create file dialog from the sidebar entry point", () => {
+    const { result } = renderHook(() =>
+      useScriptMode({ projectId: "project-1" })
+    );
+
+    expect(result.current.showCreateFileDialog).toBe(false);
+
+    act(() => {
+      result.current.handleOpenCreateFileDialog();
+    });
+
+    expect(result.current.showCreateFileDialog).toBe(true);
+  });
+
+  it("exits generated preview when the created file becomes selectable", async () => {
+    const { result, rerender } = renderHook(() =>
+      useScriptMode({ projectId: "project-1" })
+    );
+
+    await act(async () => {
+      await result.current.onGeneratedFileSelect!(
+        "branchforge_definitions.rpy"
+      );
+    });
+    expect(result.current.isGeneratedPreview).toBe(true);
+
+    await act(async () => {
+      await result.current.handleCreateFile("chapters/new_scene.rpy");
+    });
+
+    scriptFilesState.projectFiles = [
+      ...scriptFilesState.projectFiles,
+      {
+        id: "file-new",
+        projectId: "project-1",
+        filePath: "chapters/new_scene.rpy",
+        fileType: "STORY",
+        content: "",
+        source: "ZIP",
+        contentHash: "empty-hash",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        updatedAt: "2024-01-01T00:00:00.000Z",
+        labels: [],
+      },
+    ];
+    rerender();
+
+    await waitFor(() => {
+      expect(result.current.isGeneratedPreview).toBe(false);
+      expect(selectFileTab).toHaveBeenCalledWith("file-new");
+    });
+  });
+
+  it("creates a file, expands its folder, and selects a tab after the file list updates", async () => {
+    const { result, rerender } = renderHook(() =>
+      useScriptMode({ projectId: "project-1" })
+    );
+
+    await act(async () => {
+      await result.current.handleCreateFile("chapters/new_scene.rpy");
+    });
+
+    expect(createFile).toHaveBeenCalledWith("chapters/new_scene.rpy");
+    expect(selectFileTab).not.toHaveBeenCalled();
+    expect(result.current.foldersToExpand).toEqual(["chapters"]);
+
+    const firstFolders = result.current.foldersToExpand;
+    await act(async () => {
+      await result.current.handleCreateFile("chapters/another.rpy");
+    });
+    expect(result.current.foldersToExpand).toEqual(["chapters"]);
+    expect(result.current.foldersToExpand).not.toBe(firstFolders);
+
+    scriptFilesState.projectFiles = [
+      ...scriptFilesState.projectFiles,
+      {
+        id: "file-new",
+        projectId: "project-1",
+        filePath: "chapters/new_scene.rpy",
+        fileType: "STORY",
+        content: "",
+        source: "ZIP",
+        contentHash: "empty-hash",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        updatedAt: "2024-01-01T00:00:00.000Z",
+        labels: [],
+      },
+    ];
+    rerender();
+
+    await waitFor(() => {
+      expect(selectFileTab).toHaveBeenCalledWith("file-new");
+    });
+  });
+
+  it("keeps the active editor unchanged when tab selection is blocked", async () => {
+    selectFileTab.mockResolvedValue(false);
+
+    const { result, rerender } = renderHook(() =>
+      useScriptMode({ projectId: "project-1" })
+    );
+
+    await act(async () => {
+      await result.current.handleCreateFile("chapters/new_scene.rpy");
+    });
+
+    expect(selectFileTab).not.toHaveBeenCalled();
+    expect(result.current.foldersToExpand).toEqual(["chapters"]);
+
+    scriptFilesState.projectFiles = [
+      ...scriptFilesState.projectFiles,
+      {
+        id: "file-new",
+        projectId: "project-1",
+        filePath: "chapters/new_scene.rpy",
+        fileType: "STORY",
+        content: "",
+        source: "ZIP",
+        contentHash: "empty-hash",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        updatedAt: "2024-01-01T00:00:00.000Z",
+        labels: [],
+      },
+    ];
+    rerender();
+
+    await waitFor(() => {
+      expect(selectFileTab).toHaveBeenCalledWith("file-new");
     });
   });
 });
