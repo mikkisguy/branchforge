@@ -43,7 +43,7 @@ Export your project as a Ren'Py-compatible ZIP:
 3. Choose what to include
 4. Download the ZIP file
 
-The ZIP contains RPY files ready to drop into a Ren'Py project.
+The ZIP contains RPY files ready to drop into a Ren'Py project, including any `.rpy` files you created in BranchForge before exporting.
 
 ## GitLab Sync
 

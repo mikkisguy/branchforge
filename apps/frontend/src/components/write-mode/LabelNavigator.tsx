@@ -39,6 +39,10 @@ function compareByUpdatedAt(a: PublicLabel, b: PublicLabel): number {
   if (timeDiff !== 0) return timeDiff;
   return b.labelNumber - a.labelNumber;
 }
+function getFileBasename(filePath: string): string {
+  const parts = filePath.split("/");
+  return parts[parts.length - 1] || filePath;
+}
 
 // ============================================================================
 // Inline Rename Input Component
@@ -409,13 +413,23 @@ function FileGroup({
 // Label Navigator Component
 // ============================================================================
 
+export interface StoryFileRef {
+  id: string;
+  filePath: string;
+}
+
 interface LabelNavigatorProps {
   labels: PublicLabel[];
+  storyFiles: StoryFileRef[];
   activeLabelId: string | null;
   onSelect: (labelId: string) => void;
   projectName?: string;
   projectLabelCount?: number;
   onToggleCollapse?: () => void;
+  revealFileId?: string | null;
+  sortResetToken?: number;
+  onNewFile?: () => void;
+  onFileRevealed?: () => void;
   // Create
   onCreateLabel?: (data: {
     title: string;
@@ -436,11 +450,16 @@ interface LabelNavigatorProps {
 
 export function LabelNavigator({
   labels,
+  storyFiles,
   activeLabelId,
   onSelect,
   projectName,
   projectLabelCount,
   onToggleCollapse,
+  revealFileId,
+  sortResetToken = 0,
+  onNewFile,
+  onFileRevealed,
   onCreateLabel,
   isCreatingLabel,
   onUpdateLabel,
@@ -466,6 +485,33 @@ export function LabelNavigator({
   const [sortMode, setSortMode] = useState<"sequence" | "lastUpdated">(
     "sequence"
   );
+  const fileGroupRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  useEffect(() => {
+    setSortMode("sequence");
+    setSearchQuery("");
+  }, [sortResetToken]);
+
+  useEffect(() => {
+    if (!revealFileId) {
+      return;
+    }
+    const element = fileGroupRefs.current.get(revealFileId);
+    if (!element) {
+      return;
+    }
+    requestAnimationFrame(() => {
+      element.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      onFileRevealed?.();
+    });
+  }, [
+    revealFileId,
+    sortResetToken,
+    storyFiles,
+    sortMode,
+    searchQuery,
+    onFileRevealed,
+  ]);
 
   // Context menu handler
   const handleContextMenu = useCallback(
@@ -528,39 +574,45 @@ export function LabelNavigator({
   }, [labels, searchQuery]);
 
   const groupedLabels = useMemo(() => {
-    // Short-circuit: "lastUpdated" mode only needs the flat list
     if (sortMode === "lastUpdated") {
       const flat = filteredLabels.toSorted(compareByUpdatedAt);
-      return { map: new Map<string, PublicLabel[]>(), flat, mode: sortMode };
+      return { entries: [], flat, mode: sortMode };
     }
 
-    const groups = new Map<string, PublicLabel[]>();
+    const labelsByFileId = new Map<string, PublicLabel[]>();
 
     for (const label of filteredLabels) {
       const key = label.projectFileId;
-      if (!groups.has(key)) {
-        groups.set(key, []);
+      if (!labelsByFileId.has(key)) {
+        labelsByFileId.set(key, []);
       }
-      groups.get(key)!.push(label);
+      labelsByFileId.get(key)!.push(label);
     }
 
-    const groupEntries = Array.from(groups.entries());
-    groupEntries.sort(([, aLabels], [, bLabels]) => {
-      const aName = aLabels[0]?.fileName ?? "";
-      const bName = bLabels[0]?.fileName ?? "";
-      return aName.localeCompare(bName);
+    const hasSearch = searchQuery.trim().length > 0;
+    const filesToShow = hasSearch
+      ? storyFiles.filter(
+          (file) => (labelsByFileId.get(file.id)?.length ?? 0) > 0
+        )
+      : storyFiles;
+
+    const entries = filesToShow.map((file) => {
+      const fileLabels = labelsByFileId.get(file.id) ?? [];
+      const fileName =
+        fileLabels[0]?.fileName ?? getFileBasename(file.filePath);
+      return {
+        projectFileId: file.id,
+        fileName,
+        labels: fileLabels.toSorted(
+          (a, b) => a.sequenceOrder - b.sequenceOrder
+        ),
+      };
     });
 
-    const sorted = new Map<string, PublicLabel[]>();
-    for (const [key, groupLabels] of groupEntries) {
-      sorted.set(
-        key,
-        groupLabels.toSorted((a, b) => a.sequenceOrder - b.sequenceOrder)
-      );
-    }
+    entries.sort((a, b) => a.fileName.localeCompare(b.fileName));
 
-    return { map: sorted, flat: null, mode: sortMode };
-  }, [filteredLabels, sortMode]);
+    return { entries, flat: null, mode: sortMode };
+  }, [filteredLabels, sortMode, storyFiles, searchQuery]);
 
   return (
     <div className="h-full overflow-y-auto">
@@ -642,38 +694,39 @@ export function LabelNavigator({
             </button>
           </Tooltip>
         </div>
+
+        {onNewFile && (
+          <button
+            type="button"
+            onClick={onNewFile}
+            className="mt-2 w-full py-1.5 px-3 rounded-lg text-xs font-medium transition-colors bg-[var(--theme-color)] text-white hover:opacity-90"
+          >
+            + New File
+          </button>
+        )}
       </div>
 
       {/* Label List */}
       <div className="p-3 space-y-2">
-        {groupedLabels.flat && groupedLabels.flat.length > 0 ? (
-          // Flat list for "last updated" sort — no file grouping
-          <div className="space-y-2.5" key={sortMode}>
-            {groupedLabels.flat.map((label) => (
-              <LabelItem
-                key={label.id}
-                label={label}
-                isActive={activeLabelId === label.id}
-                onSelect={() => onSelect(label.id)}
-                onContextMenu={handleContextMenu}
-                onDoubleClick={handleDoubleClick}
-                isRenaming={renamingLabelId === label.id}
-                onRenameSave={(value) => handleRenameSave(label.id, value)}
-                onRenameCancel={handleRenameCancel}
-                isSavingRename={isUpdatingLabel ?? false}
-              />
-            ))}
-          </div>
-        ) : groupedLabels.map.size === 0 ? (
-          labels.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <FolderOpen className="size-10 text-muted-foreground mb-3" />
-              <p className="text-sm text-muted-foreground">No labels found</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Import a .rpy file or create labels to get started.
-              </p>
+        {groupedLabels.flat !== null ? (
+          groupedLabels.flat.length > 0 ? (
+            <div className="space-y-2.5" key={sortMode}>
+              {groupedLabels.flat.map((label) => (
+                <LabelItem
+                  key={label.id}
+                  label={label}
+                  isActive={activeLabelId === label.id}
+                  onSelect={() => onSelect(label.id)}
+                  onContextMenu={handleContextMenu}
+                  onDoubleClick={handleDoubleClick}
+                  isRenaming={renamingLabelId === label.id}
+                  onRenameSave={(value) => handleRenameSave(label.id, value)}
+                  onRenameCancel={handleRenameCancel}
+                  isSavingRename={isUpdatingLabel ?? false}
+                />
+              ))}
             </div>
-          ) : (
+          ) : searchQuery.trim() && labels.length > 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <Search className="size-10 text-muted-foreground mb-3" />
               <p className="text-sm text-muted-foreground">
@@ -687,15 +740,62 @@ export function LabelNavigator({
                 Clear search
               </button>
             </div>
+          ) : storyFiles.length > 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <FolderOpen className="size-10 text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">No labels yet</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Switch to file order to add labels to your story files.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <FolderOpen className="size-10 text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">No labels found</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Import a .rpy file or create labels to get started.
+              </p>
+            </div>
           )
+        ) : groupedLabels.entries.length === 0 ? (
+          searchQuery.trim() && labels.length > 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Search className="size-10 text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">
+                No labels match "{searchQuery}"
+              </p>
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="text-xs text-[var(--theme-color)] hover:underline mt-2"
+              >
+                Clear search
+              </button>
+            </div>
+          ) : storyFiles.length === 0 && labels.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <FolderOpen className="size-10 text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">No labels found</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Import a .rpy file or create labels to get started.
+              </p>
+            </div>
+          ) : null
         ) : (
           <div className="space-y-3" key={sortMode}>
-            {Array.from(groupedLabels.map.entries()).map(
-              ([projectFileId, fileLabels]) => {
-                const fileName = fileLabels[0]?.fileName ?? "unknown";
-                return (
+            {groupedLabels.entries.map(
+              ({ projectFileId, fileName, labels: fileLabels }) => (
+                <div
+                  key={projectFileId}
+                  ref={(element) => {
+                    if (element) {
+                      fileGroupRefs.current.set(projectFileId, element);
+                    } else {
+                      fileGroupRefs.current.delete(projectFileId);
+                    }
+                  }}
+                >
                   <FileGroup
-                    key={projectFileId}
                     fileName={fileName}
                     projectFileId={projectFileId}
                     labels={fileLabels}
@@ -710,8 +810,8 @@ export function LabelNavigator({
                     onRenameCancel={handleRenameCancel}
                     isSavingRename={isUpdatingLabel ?? false}
                   />
-                );
-              }
+                </div>
+              )
             )}
           </div>
         )}

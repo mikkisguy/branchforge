@@ -5,7 +5,7 @@
  * Unified hook for all file sources (GitLab, zip, etc.).
  */
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { projectFilesApi } from "@/lib/api/project-files";
 import type { ProjectFileNode } from "@/lib/api/project-files";
@@ -43,6 +43,10 @@ export interface UseProjectFilesReturn {
       }
   >;
   isUpdatingFile: boolean;
+  createFile: (filePath: string) => Promise<ProjectFileNode>;
+  isCreatingFile: boolean;
+  createFileError: Error | null;
+  resetCreateFileError: () => void;
 }
 
 // ============================================================================
@@ -54,14 +58,17 @@ export function useProjectFiles(
   options?: UseProjectFilesOptions
 ): UseProjectFilesReturn {
   const queryClient = useQueryClient();
+  const sourceFilter = options?.source;
 
-  // Determine the query key based on options
-  const queryKey =
-    projectId && options?.source
-      ? projectFilesKeys.listsWithSource(projectId, options.source)
-      : projectId
-        ? projectFilesKeys.lists(projectId)
-        : ["projectFiles", "__disabled__"];
+  const queryKey = useMemo(() => {
+    if (projectId && sourceFilter) {
+      return projectFilesKeys.listsWithSource(projectId, sourceFilter);
+    }
+    if (projectId) {
+      return projectFilesKeys.lists(projectId);
+    }
+    return ["projectFiles", "__disabled__"] as const;
+  }, [projectId, sourceFilter]);
 
   // Query for project files with stable key
   const {
@@ -106,6 +113,12 @@ export function useProjectFiles(
     },
   });
 
+  const createFileMutation = useMutation({
+    mutationFn: async (filePath: string) => {
+      return await projectFilesApi.createFile(projectId!, filePath);
+    },
+  });
+
   // Update file content method
   const updateFileContent = useCallback<
     UseProjectFilesReturn["updateFileContent"]
@@ -131,6 +144,48 @@ export function useProjectFiles(
     [updateFileMutation]
   );
 
+  const createFile = useCallback<UseProjectFilesReturn["createFile"]>(
+    async (filePath) => {
+      const createdFile = await createFileMutation.mutateAsync(filePath);
+      if (projectId) {
+        const insertCreatedFile = (
+          oldFiles: ProjectFileNode[] | undefined
+        ): ProjectFileNode[] => {
+          if (!oldFiles) {
+            return [createdFile];
+          }
+          if (oldFiles.some((file) => file.id === createdFile.id)) {
+            return oldFiles;
+          }
+          return [...oldFiles, createdFile];
+        };
+
+        await queryClient.cancelQueries({ queryKey });
+        queryClient.setQueryData(
+          projectFilesKeys.lists(projectId),
+          insertCreatedFile
+        );
+        if (sourceFilter && createdFile.source === sourceFilter) {
+          queryClient.setQueryData(
+            projectFilesKeys.listsWithSource(projectId, sourceFilter),
+            insertCreatedFile
+          );
+        }
+
+        void queryClient.invalidateQueries({
+          queryKey: projectFilesKeys.lists(projectId),
+        });
+        if (sourceFilter) {
+          void queryClient.invalidateQueries({
+            queryKey: projectFilesKeys.listsWithSource(projectId, sourceFilter),
+          });
+        }
+      }
+      return createdFile;
+    },
+    [createFileMutation, projectId, queryClient, queryKey, sourceFilter]
+  );
+
   return {
     files,
     isLoadingFiles,
@@ -138,5 +193,9 @@ export function useProjectFiles(
     refreshFiles,
     updateFileContent,
     isUpdatingFile: updateFileMutation.isPending,
+    createFile,
+    isCreatingFile: createFileMutation.isPending,
+    createFileError: createFileMutation.error as Error | null,
+    resetCreateFileError: createFileMutation.reset,
   };
 }

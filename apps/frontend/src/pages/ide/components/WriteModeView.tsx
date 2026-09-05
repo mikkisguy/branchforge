@@ -24,8 +24,14 @@ export function WriteModeView({
   onFocusModeToggle,
   sidebarState,
   isMobile,
+  storyFiles,
+  revealFileId,
+  sortResetToken,
   labels,
   activeLabelId,
+  onNewFile,
+  onFileRevealed,
+
   onLabelSelect,
   onCloseTab,
   tabItems,
@@ -137,11 +143,16 @@ export function WriteModeView({
           <div className="h-full overflow-y-auto relative">
             <LabelNavigator
               labels={labels}
+              storyFiles={storyFiles}
               activeLabelId={activeLabelId}
               onSelect={onLabelSelect}
               projectName={projectName}
               projectLabelCount={projectLabelCount}
               onToggleCollapse={() => setIsLeftSidebarCollapsed(true)}
+              revealFileId={revealFileId}
+              sortResetToken={sortResetToken}
+              onNewFile={onNewFile}
+              onFileRevealed={onFileRevealed}
               onCreateLabel={async (data) => {
                 await onCreateLabel({ projectId, ...data });
               }}

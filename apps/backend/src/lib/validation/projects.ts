@@ -59,6 +59,16 @@ export const projectFilesQuerySchema = z.object({
 });
 
 export type ProjectFilesQuery = z.infer<typeof projectFilesQuerySchema>;
+/**
+ * Create project file request validation
+ */
+export const createProjectFileSchema = z
+  .object({
+    filePath: z.string(),
+  })
+  .strict();
+
+export type CreateProjectFileInput = z.infer<typeof createProjectFileSchema>;
 
 /**
  * Layout mode validation — accepts the values emitted by the frontend

@@ -158,3 +158,75 @@ it("does not wrap empty generated files without emptyReason in a tooltip", async
     screen.getByRole("treeitem", { name: /branchforge_stats\.rpy/i })
   ).toBeInTheDocument();
 });
+
+describe("ProjectFileTree - folder expansion", () => {
+  const nestedFiles = [
+    {
+      id: "file-1",
+      projectId: "project-1",
+      filePath: "game/chapter1.rpy",
+      fileType: "STORY" as const,
+      content: "",
+      source: "ZIP" as const,
+      contentHash: "hash",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      updatedAt: "2024-01-01T00:00:00.000Z",
+      labels: [],
+    },
+  ];
+
+  it("expands folders when foldersToExpand changes", () => {
+    const { rerender } = render(
+      <ProjectFileTree
+        files={nestedFiles}
+        onFileSelect={noopFileSelect}
+        onSceneSelect={noopSceneSelect}
+        initialExpandedFolders={[]}
+      />
+    );
+
+    expect(screen.queryByTitle("game/chapter1.rpy")).not.toBeInTheDocument();
+
+    rerender(
+      <ProjectFileTree
+        files={nestedFiles}
+        onFileSelect={noopFileSelect}
+        onSceneSelect={noopSceneSelect}
+        initialExpandedFolders={[]}
+        foldersToExpand={["game"]}
+      />
+    );
+
+    expect(screen.getByTitle("game/chapter1.rpy")).toBeInTheDocument();
+  });
+
+  it("re-expands a folder when foldersToExpand is sent again", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <ProjectFileTree
+        files={nestedFiles}
+        onFileSelect={noopFileSelect}
+        onSceneSelect={noopSceneSelect}
+        initialExpandedFolders={[]}
+        foldersToExpand={["game"]}
+      />
+    );
+
+    expect(screen.getByTitle("game/chapter1.rpy")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("treeitem", { expanded: true }));
+    expect(screen.queryByTitle("game/chapter1.rpy")).not.toBeInTheDocument();
+
+    rerender(
+      <ProjectFileTree
+        files={nestedFiles}
+        onFileSelect={noopFileSelect}
+        onSceneSelect={noopSceneSelect}
+        initialExpandedFolders={[]}
+        foldersToExpand={["game"]}
+      />
+    );
+
+    expect(screen.getByTitle("game/chapter1.rpy")).toBeInTheDocument();
+  });
+});

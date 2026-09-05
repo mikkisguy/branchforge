@@ -12,22 +12,26 @@ import {
   updateProject,
   deleteProject,
   getProjectFiles,
+  createProjectFile,
   updateFileContent,
 } from "../services/projects.service.js";
 import type { SourceOrigin, PublicProject } from "@branchforge/shared";
 import { authenticate } from "../middleware/auth.middleware.js";
 import {
   validateParams,
+  validateBody,
   validateRequest,
 } from "../middleware/validation.middleware.js";
 import {
   updateProjectSchema,
   projectIdParamsSchema,
   projectFilesQuerySchema,
+  createProjectFileSchema,
   fileIdParamsSchema,
   updateFileContentSchema,
   type UpdateFileContentInput,
   type UpdateProjectInput,
+  type CreateProjectFileInput,
 } from "../lib/validation.js";
 import {
   NotFoundError,
@@ -235,6 +239,54 @@ async function getProjectFilesHandler(
 }
 
 /**
+ * Create a new empty project file
+ *
+ * POST /projects/:projectId/files
+ * Body: { filePath: string }
+ * Requires authentication and project ownership
+ */
+async function createProjectFileHandler(
+  request: FastifyRequest<{
+    Params: { projectId: string };
+    Body: CreateProjectFileInput;
+  }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { projectId } = request.params;
+  const { filePath } = request.body;
+  const user = request.user!;
+
+  try {
+    const file = await createProjectFile(projectId, user.id, filePath);
+    reply.status(201).send({ file });
+  } catch (err) {
+    if (err instanceof NotFoundError) {
+      reply.status(404).send({ error: "Project not found" });
+      return;
+    }
+    if (err instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden" });
+      return;
+    }
+    if (err instanceof ValidationError) {
+      reply.status(400).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    if (err instanceof ConflictError) {
+      reply.status(409).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    request.log.error(
+      { err, projectId },
+      `createProjectFileHandler: Failed to create project file: ${
+        err instanceof Error ? err.message : "Unknown error"
+      }`
+    );
+    reply.status(500).send({ error: "Failed to create project file" });
+  }
+}
+
+/**
  * Update file content
  *
  * PUT /projects/files/:fileId
@@ -349,6 +401,18 @@ export async function projectsRoutes(fastify: FastifyInstance): Promise<void> {
       }),
     },
     getProjectFilesHandler
+  );
+
+  fastify.post<{ Params: { projectId: string }; Body: CreateProjectFileInput }>(
+    "/projects/:projectId/files",
+    {
+      onRequest: authenticate,
+      preValidation: [
+        validateParams(projectIdParamsSchema),
+        validateBody(createProjectFileSchema),
+      ],
+    },
+    createProjectFileHandler
   );
 
   // Update file content (unified endpoint for both script mode and write mode)

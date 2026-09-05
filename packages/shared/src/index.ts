@@ -652,6 +652,42 @@ export interface ProjectFile {
   createdAt: string;
   updatedAt: string;
 }
+/**
+ * Request body for creating a new project file.
+ */
+export interface CreateProjectFileRequest {
+  filePath: string;
+}
+
+/**
+ * Slim label representation attached to project files.
+ */
+export interface ProjectFileLabelSlim {
+  id: string;
+  labelName: string | null;
+  title: string;
+  status: string | null;
+}
+
+/**
+ * Project file with attached labels.
+ */
+export interface ProjectFileWithLabels extends ProjectFile {
+  labels: ProjectFileLabelSlim[];
+}
+
+/**
+ * Response from creating a new project file.
+ */
+export interface CreateProjectFileResponse {
+  file: ProjectFileWithLabels;
+}
+
+export {
+  canonicalizeRpyFilePath,
+  type CanonicalizeRpyFilePathResult,
+  type CanonicalizeRpyFilePathErrorCode,
+} from "./rpy-file-path.js";
 
 /**
  * Legacy: GitLab file information (use ProjectFile instead)
