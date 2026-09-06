@@ -311,7 +311,7 @@ export function Select<T extends string = string>({
                 focusedIndex >= 0 ? `select-option-${focusedIndex}` : undefined
               }
               className={cn(
-                // LeftSidebar / mobile nav are z-50 with backdrop-blur.
+                // Workspace overlays / mobile nav are z-50 with backdrop-blur.
                 // A same-z-index portaled menu loses that compositor fight,
                 // so option clicks hit the sidebar instead of the listbox.
                 "fixed z-[110]",

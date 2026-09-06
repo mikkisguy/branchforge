@@ -31,9 +31,6 @@ export interface PairGroupSummary {
 }
 
 export function useWriteModeView(
-  isMobile: boolean,
-  setIsLeftSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>,
-  setIsRightSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>,
   activeLabel: LabelDetail | undefined,
   onUpdateLabel: (
     labelId: string,
@@ -139,17 +136,6 @@ export function useWriteModeView(
     }
   }, [deleteConfirm.label, onDeleteLabel]);
 
-  // ── Sidebar callbacks ────────────────────────────────────────────────
-  const handleOpenLeftSidebar = useCallback(() => {
-    setIsLeftSidebarCollapsed(false);
-    if (isMobile) setIsRightSidebarCollapsed(true);
-  }, [isMobile, setIsLeftSidebarCollapsed, setIsRightSidebarCollapsed]);
-
-  const handleToggleRightSidebar = useCallback(() => {
-    setIsRightSidebarCollapsed((prev) => !prev);
-    if (isMobile) setIsLeftSidebarCollapsed(true);
-  }, [isMobile, setIsLeftSidebarCollapsed, setIsRightSidebarCollapsed]);
-
   // ── Derived ──────────────────────────────────────────────────────────
   const pairGroupSummaries = useMemo(
     () =>
@@ -182,8 +168,6 @@ export function useWriteModeView(
     handleEditFromPanel,
     handleEditSave,
     handleDeleteConfirmAction,
-    handleOpenLeftSidebar,
-    handleToggleRightSidebar,
     pairGroupSummaries,
     WRITE_FONT_SIZE_OPTIONS,
     FONT_FAMILY_OPTIONS,

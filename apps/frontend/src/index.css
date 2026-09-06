@@ -9,7 +9,13 @@
     --foreground: 0 0% 95%;
     --card: 0 0% 8%;
     --card-foreground: 0 0% 95%;
-    --popover: 0 0% 6%;
+    --canvas: 0 0% 5%;
+    --canvas-foreground: 0 0% 95%;
+    --panel: 0 0% 8%;
+    --panel-foreground: 0 0% 95%;
+    --raised: 0 0% 11%;
+    --raised-foreground: 0 0% 95%;
+    --popover: 0 0% 10%;
     --popover-foreground: 0 0% 95%;
     --primary: 0 0% 98%;
     --primary-foreground: 0 0% 9%;
@@ -30,10 +36,6 @@
     /* Focus ring */
     --focus-ring-width: 3px;
     --focus-ring-color: 108 30% 40%;
-
-    /* Theme accent color (default) */
-    --theme-accent: 108 30% 40%;
-    --theme-accent-hover: 108 30% 45%;
 
     /* Theme UI colors */
     --theme-border: 0 0% 20%;
@@ -75,7 +77,13 @@
     --foreground: 222 47% 11%;
     --card: 220 25% 99%;
     --card-foreground: 222 47% 11%;
-    --popover: 220 25% 99%;
+    --canvas: 220 18% 96%;
+    --canvas-foreground: 222 47% 11%;
+    --panel: 220 25% 99%;
+    --panel-foreground: 222 47% 11%;
+    --raised: 0 0% 100%;
+    --raised-foreground: 222 47% 11%;
+    --popover: 220 30% 100%;
     --popover-foreground: 222 47% 11%;
     --primary: 222 47% 11%;
     --primary-foreground: 210 40% 98%;
@@ -125,22 +133,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-sans tracking-wide;
-    background-image: radial-gradient(
-      circle at 1px 1px,
-      rgba(255, 255, 255, 0.05) 2px,
-      transparent 0
-    );
-    background-size: 24px 24px;
-  }
-
-  /* Light mode uses dark dots so the texture stays visible on white */
-  .light body {
-    background-image: radial-gradient(
-      circle at 1px 1px,
-      rgba(0, 0, 0, 0.04) 2px,
-      transparent 0
-    );
+    @apply bg-background text-foreground font-sans;
   }
 
   /* -----------------------------------------------------------------
@@ -377,6 +370,18 @@
   border-color: var(--theme-color) !important;
 }
 
+.cm-editor .cm-panel.cm-search .cm-button.cm-primary-button {
+  background: var(--theme-color) !important;
+  background-image: none !important;
+  color: var(--theme-foreground) !important;
+  border: none !important;
+}
+
+.cm-editor .cm-panel.cm-search .cm-button.cm-primary-button:hover {
+  background: var(--theme-color-hover) !important;
+  color: var(--theme-foreground-hover) !important;
+}
+
 .cm-editor .cm-panel.cm-search .cm-button:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px hsl(var(--ring) / 0.25);
@@ -507,7 +512,7 @@
    ThemeContext, so these are no-ops there. */
 @layer utilities {
   .bg-panel-tinted {
-    background-color: hsl(var(--card));
+    background-color: hsl(var(--panel));
     background-image: linear-gradient(
       var(--surface-tint, transparent),
       var(--surface-tint, transparent)

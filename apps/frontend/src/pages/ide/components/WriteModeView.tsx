@@ -1,37 +1,37 @@
-import { ChevronRight, ChevronLeft } from "lucide-react";
+import { useState } from "react";
 import {
   ProseEditor,
   LabelNavigator,
   LabelPropertiesPanel,
 } from "@/components/write-mode";
 import type { ProseEditorRef } from "@/components/write-mode";
+import { SaveIndicator } from "@/components/write-mode/SaveIndicator";
 import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
-import { EditorTabBar } from "@/components/ide-shared";
+import { ProseEditorStatusBar } from "@/components/write-mode/ProseEditor/ProseEditorStatusBar";
+import { propsToSaveStatus } from "@/components/write-mode/ProseEditor/utils/proseEditorUtils";
+import { EditorTabBar, UndoRedoControls } from "@/components/ide-shared";
+import { WorkspaceFrameLayout } from "@/components/workspace/WorkspaceFrame";
+import { WorkspaceToolbar } from "@/components/workspace/WorkspaceToolbar";
+import { WorkspaceStatusBar } from "@/components/workspace/WorkspaceStatusBar";
+import { WRITE_LEFT_PANEL, WRITE_RIGHT_PANEL } from "@/lib/workspace-panels";
 import { WriteModeFAB } from "@/pages/ide/components/WriteModeFAB";
 import { WriteModeDialogs } from "@/pages/ide/components/WriteModeDialogs";
 import type { WriteModeViewProps } from "@/pages/ide/components/WriteModeView.types";
 import { useWriteModeView } from "@/pages/ide/components/useWriteModeView";
 import type { RefObject } from "react";
 
-const SIDEBAR_COLLAPSED =
-  "w-0 opacity-0 -translate-x-full pointer-events-none max-md:absolute max-md:z-50 max-md:left-0 max-md:top-0 max-md:h-full max-md:mt-0 max-md:rounded-none";
-const SIDEBAR_EXPANDED =
-  "w-60 opacity-100 translate-x-0 max-md:absolute max-md:z-50 max-md:left-0 max-md:top-0 max-md:h-full max-md:w-72 max-md:shadow-xl max-md:rounded-none max-md:mt-0 max-md:bg-card";
-
 export function WriteModeView({
   isFocusMode,
   focusToggleRef,
   onFocusModeToggle,
-  sidebarState,
-  isMobile,
+  leftPanelRaw,
+  rightPanelRaw,
   labels,
   activeLabelId,
   onLabelSelect,
   onCloseTab,
   tabItems,
-  projectName,
   projectId,
-  projectLabelCount,
   onCreateLabel,
   onUpdateLabel,
   onDeleteLabel,
@@ -50,12 +50,10 @@ export function WriteModeView({
   wordCountState,
   duoEndingEnabled,
 }: WriteModeViewProps) {
-  const {
-    isLeftCollapsed: isLeftSidebarCollapsed,
-    setIsLeftCollapsed: setIsLeftSidebarCollapsed,
-    isRightCollapsed: isRightSidebarCollapsed,
-    setIsRightCollapsed: setIsRightSidebarCollapsed,
-  } = sidebarState;
+  const [editorMetrics, setEditorMetrics] = useState({
+    wordCount: 0,
+    lineCount: 0,
+  });
 
   const {
     writeFontSize,
@@ -77,148 +75,98 @@ export function WriteModeView({
     handleEditFromPanel,
     handleEditSave,
     handleDeleteConfirmAction,
-    handleOpenLeftSidebar,
-    handleToggleRightSidebar,
     pairGroupSummaries,
     WRITE_FONT_SIZE_OPTIONS,
     FONT_FAMILY_OPTIONS,
-  } = useWriteModeView(
-    isMobile,
-    setIsLeftSidebarCollapsed,
-    setIsRightSidebarCollapsed,
-    activeLabel,
-    onUpdateLabel,
-    onDeleteLabel,
-    pairGroups
+  } = useWriteModeView(activeLabel, onUpdateLabel, onDeleteLabel, pairGroups);
+
+  const saveStatus = propsToSaveStatus(
+    editorSaveState.isSaving,
+    editorSaveState.saveError
   );
 
+  const handleUndo = () => {
+    editorRef.current?.undo();
+  };
+
+  const handleRedo = () => {
+    editorRef.current?.redo();
+  };
+
   return (
-    <>
-      {isFocusMode && (
-        <div className="fixed top-2 right-2 z-[100] pointer-events-auto max-md:hidden">
-          <FocusModeToggle
-            ref={focusToggleRef}
-            isFocusMode={isFocusMode}
-            onToggle={onFocusModeToggle}
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <WorkspaceFrameLayout
+        leftConfig={WRITE_LEFT_PANEL}
+        rightConfig={WRITE_RIGHT_PANEL}
+        leftPanelRaw={leftPanelRaw}
+        rightPanelRaw={rightPanelRaw}
+        isFocusMode={isFocusMode}
+        leftPanelId="write-left-panel"
+        rightPanelId="write-right-panel"
+        left={
+          <LabelNavigator
+            labels={labels}
+            activeLabelId={activeLabelId}
+            onSelect={onLabelSelect}
+            onCreateLabel={async (data) => {
+              await onCreateLabel({ projectId, ...data });
+            }}
+            isCreatingLabel={labelMutationState.isCreatingLabel}
+            onUpdateLabel={async (labelId, data) => {
+              return onUpdateLabel(labelId, data);
+            }}
+            isUpdatingLabel={labelMutationState.isUpdatingLabel}
+            onEditLabel={handleEditLabel}
+            onDeleteRequest={handleDeleteRequest}
           />
-        </div>
-      )}
-
-      <div className="flex-1 flex gap-4 px-4 max-md:px-0 pb-0 overflow-hidden min-h-0 min-w-0 relative">
-        {!isFocusMode &&
-          (!isLeftSidebarCollapsed || !isRightSidebarCollapsed) && (
-            <button
-              type="button"
-              className="hidden max-md:block max-md:fixed max-md:inset-0 max-md:bg-black/40 max-md:z-30 border-0 p-0 cursor-pointer"
-              aria-label="Close overlays"
-              onClick={() => {
-                if (!isLeftSidebarCollapsed) setIsLeftSidebarCollapsed(true);
-                if (!isRightSidebarCollapsed) setIsRightSidebarCollapsed(true);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  if (!isLeftSidebarCollapsed) setIsLeftSidebarCollapsed(true);
-                  if (!isRightSidebarCollapsed)
-                    setIsRightSidebarCollapsed(true);
-                }
-              }}
-            />
-          )}
-
-        <div
-          aria-hidden={isFocusMode}
-          className={`min-h-0 shrink-0 rounded-lg border border-border bg-card/50 overflow-hidden mt-3 transition-all duration-300 ease-out ${
-            isFocusMode || isLeftSidebarCollapsed
-              ? SIDEBAR_COLLAPSED
-              : SIDEBAR_EXPANDED
-          }`}
-        >
-          <div className="h-full overflow-y-auto relative">
-            <LabelNavigator
-              labels={labels}
-              activeLabelId={activeLabelId}
-              onSelect={onLabelSelect}
-              projectName={projectName}
-              projectLabelCount={projectLabelCount}
-              onToggleCollapse={() => setIsLeftSidebarCollapsed(true)}
-              onCreateLabel={async (data) => {
-                await onCreateLabel({ projectId, ...data });
-              }}
-              isCreatingLabel={labelMutationState.isCreatingLabel}
-              onUpdateLabel={async (labelId, data) => {
-                return onUpdateLabel(labelId, data);
-              }}
-              isUpdatingLabel={labelMutationState.isUpdatingLabel}
-              onEditLabel={handleEditLabel}
-              onDeleteRequest={handleDeleteRequest}
-            />
-          </div>
-        </div>
-
-        {isLeftSidebarCollapsed && !isFocusMode && (
-          <div className="min-h-0 shrink-0 mt-3 flex items-start -ml-4 max-md:hidden">
-            <button
-              type="button"
-              onClick={handleOpenLeftSidebar}
-              className="size-12 rounded-lg border border-border bg-card/50 hover:bg-muted/80 transition-colors flex items-center justify-center"
-              aria-label="Expand label navigator sidebar"
-              title="Expand label navigator sidebar"
-            >
-              <ChevronRight className="size-4 text-muted-foreground" />
-            </button>
-          </div>
-        )}
-
-        <div className="flex-1 flex flex-col min-h-0 min-w-0 mt-3">
-          {!isFocusMode && (
-            <div className="mb-2 flex gap-2 items-center">
-              {isLeftSidebarCollapsed && (
-                <button
-                  type="button"
-                  onClick={handleOpenLeftSidebar}
-                  className="md:hidden h-12 w-9 shrink-0 rounded-lg border border-border/80 bg-card/55 backdrop-blur-sm flex items-center justify-center"
-                  aria-label="Expand label navigator sidebar"
-                  title="Expand label navigator sidebar"
-                >
-                  <ChevronRight className="size-4 text-muted-foreground" />
-                </button>
-              )}
-              <div className="flex-1 min-w-0 h-12 overflow-hidden">
-                <EditorTabBar
-                  items={tabItems}
-                  activeItemId={activeLabelId}
-                  onSelect={onLabelSelect}
-                  onClose={onCloseTab}
-                  idPrefix="tab-"
-                  titleMaxWidthClassName="max-w-[180px]"
-                />
-              </div>
-              <div className="h-12 overflow-hidden rounded-lg border border-border/80 bg-card/55 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] max-md:hidden">
-                <div className="h-full flex items-center justify-end px-3">
-                  <FocusModeToggle
-                    ref={focusToggleRef}
-                    isFocusMode={isFocusMode}
-                    onToggle={onFocusModeToggle}
-                  />
-                </div>
-              </div>
-              {isRightSidebarCollapsed && (
-                <button
-                  type="button"
-                  onClick={handleToggleRightSidebar}
-                  className="md:hidden h-12 w-9 shrink-0 rounded-lg border border-border/80 bg-card/55 backdrop-blur-sm flex items-center justify-center"
-                  aria-label="Expand properties sidebar"
-                  title="Expand properties sidebar"
-                >
-                  <ChevronLeft className="size-4 text-muted-foreground" />
-                </button>
-              )}
+        }
+        right={
+          <LabelPropertiesPanel
+            activeLabel={activeLabel}
+            characters={characters}
+            stats={stats}
+            routeConfigs={routeConfigs}
+            pairGroups={pairGroupSummaries}
+            onEdit={handleEditFromPanel}
+            onCharacterEdit={setEditingCharacterId}
+          />
+        }
+        toolbar={
+          <WorkspaceToolbar showPanelToggles>
+            <div className="flex min-h-0 min-w-0 flex-1 items-center">
+              <EditorTabBar
+                items={tabItems}
+                activeItemId={activeLabelId}
+                onSelect={onLabelSelect}
+                onClose={onCloseTab}
+                idPrefix="tab-"
+                titleMaxWidthClassName="max-w-[180px]"
+              />
             </div>
-          )}
-
-          <div className="flex-1 flex justify-center min-h-0 min-w-0">
-            <div className="w-full max-w-3xl min-h-0">
+            <div className="max-md:hidden">
+              <UndoRedoControls
+                canUndo={proseUndoState.canUndo}
+                canRedo={proseUndoState.canRedo}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+              />
+            </div>
+            <SaveIndicator
+              saveStatus={saveStatus}
+              displayMode="compact"
+              lastSaved={editorSaveState.lastSaved}
+              saveConflict={editorSaveState.saveConflict}
+            />
+            <FocusModeToggle
+              ref={focusToggleRef}
+              isFocusMode={isFocusMode}
+              onToggle={onFocusModeToggle}
+            />
+          </WorkspaceToolbar>
+        }
+        editor={
+          <div className="flex h-full min-h-0 w-full justify-center">
+            <div className="h-full min-h-0 w-full max-w-3xl">
               <ProseEditor
                 key={activeLabel?.id ?? "__no_label__"}
                 ref={editorRef}
@@ -226,12 +174,14 @@ export function WriteModeView({
                 characters={characters}
                 onChange={onChange}
                 isFocusMode={isFocusMode}
+                hideChrome
                 isSaving={editorSaveState.isSaving}
                 lastSaved={editorSaveState.lastSaved}
                 saveError={editorSaveState.saveError}
                 saveConflict={editorSaveState.saveConflict}
                 onUndoStateChange={onUndoStateChange}
                 onWordCountChange={onWordCountChange}
+                onEditorMetricsChange={setEditorMetrics}
                 showBadges={showBadges}
                 onShowBadgesChange={setShowBadges}
                 layoutMode={writeLineLayout as "inline" | "stacked"}
@@ -243,55 +193,80 @@ export function WriteModeView({
               />
             </div>
           </div>
-        </div>
+        }
+        statusBar={
+          <WorkspaceStatusBar className="max-md:hidden">
+            <div className="flex min-h-0 min-w-0 flex-1 [&>div]:rounded-none [&>div]:border-0 [&>div]:bg-transparent [&>div]:px-0 [&>div]:py-0">
+              <ProseEditorStatusBar
+                layoutMode={writeLineLayout as "inline" | "stacked"}
+                onLayoutModeChange={setWriteLineLayout}
+                showBadges={showBadges}
+                onShowBadgesToggle={() => setShowBadges(!showBadges)}
+                wordCount={editorMetrics.wordCount}
+                lineCount={editorMetrics.lineCount}
+                fontSizeValue={writeFontSize}
+                onFontSizeChange={setWriteFontSize}
+                fontFamilyValue={writeFontFamily}
+                onFontFamilyChange={setWriteFontFamily}
+                isFocusMode={false}
+                isBottomBarHovered
+                onBottomBarHoverStart={() => undefined}
+                onBottomBarHoverEnd={() => undefined}
+              />
+            </div>
+          </WorkspaceStatusBar>
+        }
+        focusChrome={
+          <div className="pointer-events-auto fixed top-2 right-2 z-[100] flex items-center gap-2">
+            <SaveIndicator
+              saveStatus={saveStatus}
+              displayMode="compact"
+              lastSaved={editorSaveState.lastSaved}
+              saveConflict={editorSaveState.saveConflict}
+            />
+            <FocusModeToggle
+              ref={focusToggleRef}
+              isFocusMode={isFocusMode}
+              onToggle={onFocusModeToggle}
+            />
+          </div>
+        }
+      />
 
-        <LabelPropertiesPanel
-          activeLabel={activeLabel}
-          characters={characters}
-          stats={stats}
-          routeConfigs={routeConfigs}
-          pairGroups={pairGroupSummaries}
-          isCollapsed={isRightSidebarCollapsed || isFocusMode}
-          onCollapseToggle={!isFocusMode ? handleToggleRightSidebar : undefined}
-          onEdit={handleEditFromPanel}
-          onCharacterEdit={setEditingCharacterId}
-        />
+      <WriteModeFAB
+        fontSizeValue={writeFontSize}
+        onFontSizeChange={setWriteFontSize}
+        fontSizeOptions={WRITE_FONT_SIZE_OPTIONS}
+        fontFamilyValue={writeFontFamily}
+        onFontFamilyChange={setWriteFontFamily}
+        fontFamilyOptions={FONT_FAMILY_OPTIONS}
+        layoutMode={writeLineLayout as "inline" | "stacked"}
+        onLayoutModeChange={setWriteLineLayout}
+        showBadges={showBadges}
+        onShowBadgesChange={setShowBadges}
+        proseUndoState={proseUndoState}
+        wordCountState={wordCountState}
+        isFocusMode={isFocusMode}
+        onFocusModeToggle={onFocusModeToggle}
+        editorRef={editorRef as RefObject<ProseEditorRef | null>}
+      />
 
-        <WriteModeFAB
-          fontSizeValue={writeFontSize}
-          onFontSizeChange={setWriteFontSize}
-          fontSizeOptions={WRITE_FONT_SIZE_OPTIONS}
-          fontFamilyValue={writeFontFamily}
-          onFontFamilyChange={setWriteFontFamily}
-          fontFamilyOptions={FONT_FAMILY_OPTIONS}
-          layoutMode={writeLineLayout as "inline" | "stacked"}
-          onLayoutModeChange={setWriteLineLayout}
-          showBadges={showBadges}
-          onShowBadgesChange={setShowBadges}
-          proseUndoState={proseUndoState}
-          wordCountState={wordCountState}
-          isFocusMode={isFocusMode}
-          onFocusModeToggle={onFocusModeToggle}
-          editorRef={editorRef as RefObject<ProseEditorRef | null>}
-        />
-
-        <WriteModeDialogs
-          editDialog={editDialog}
-          onEditDialogChange={setEditDialog}
-          deleteConfirm={deleteConfirm}
-          onDeleteConfirmChange={setDeleteConfirm}
-          editingCharacterId={editingCharacterId}
-          onEditingCharacterIdChange={setEditingCharacterId}
-          routeConfigs={routeConfigs}
-          pairGroupSummaries={pairGroupSummaries}
-          duoEndingEnabled={duoEndingEnabled}
-          projectId={projectId}
-          onEditSave={handleEditSave}
-          onDeleteConfirmAction={handleDeleteConfirmAction}
-          isUpdatingLabel={labelMutationState.isUpdatingLabel}
-          isDeletingLabel={labelMutationState.isDeletingLabel}
-        />
-      </div>
-    </>
+      <WriteModeDialogs
+        editDialog={editDialog}
+        onEditDialogChange={setEditDialog}
+        deleteConfirm={deleteConfirm}
+        onDeleteConfirmChange={setDeleteConfirm}
+        editingCharacterId={editingCharacterId}
+        onEditingCharacterIdChange={setEditingCharacterId}
+        routeConfigs={routeConfigs}
+        pairGroupSummaries={pairGroupSummaries}
+        duoEndingEnabled={duoEndingEnabled}
+        projectId={projectId}
+        onEditSave={handleEditSave}
+        onDeleteConfirmAction={handleDeleteConfirmAction}
+        isUpdatingLabel={labelMutationState.isUpdatingLabel}
+        isDeletingLabel={labelMutationState.isDeletingLabel}
+      />
+    </div>
   );
 }

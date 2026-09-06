@@ -173,7 +173,7 @@ export function SettingsModalUserTab({ user }: SettingsModalUserTabProps) {
           )}
 
           {/* Username */}
-          <div className="space-y-2 border-t border-border/30 pt-5">
+          <div className="space-y-2 border-t border-border pt-5">
             <Label htmlFor="username-input">Username</Label>
             <Input
               id="username-input"
@@ -190,7 +190,7 @@ export function SettingsModalUserTab({ user }: SettingsModalUserTabProps) {
           </div>
         </div>
 
-        <div className="mt-5 flex items-center gap-3 border-t border-border/30 pt-4">
+        <div className="mt-5 flex items-center gap-3 border-t border-border pt-4">
           <Button
             type="button"
             onClick={() => void handleSaveUserProfile()}

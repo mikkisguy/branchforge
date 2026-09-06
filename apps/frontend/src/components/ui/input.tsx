@@ -9,8 +9,9 @@ const inputVariants = cva(
   {
     variants: {
       size: {
-        default: "h-9 px-3 py-1 text-base md:text-sm shadow-sm",
-        sm: "h-7 px-2 py-0.5 text-xs",
+        default:
+          "h-10 px-3 py-1 text-base md:text-sm shadow-sm max-md:min-h-11",
+        sm: "h-8 px-2 py-0.5 text-xs max-md:min-h-11",
       },
     },
     defaultVariants: {
@@ -28,10 +29,7 @@ function Input({ className, type, size, ref, ...props }: InputProps) {
   return (
     <input
       type={type}
-      className={cn(
-        inputVariants({ size, className }),
-        type !== "file" && size !== "sm" && "min-h-11"
-      )}
+      className={cn(inputVariants({ size, className }))}
       ref={ref}
       {...props}
     />

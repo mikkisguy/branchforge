@@ -18,6 +18,8 @@ import {
   Announcement,
   type AnnouncementHandle,
 } from "@/components/ui/announcement";
+import { AmbientBackdrop } from "@/components/ui/AmbientBackdrop";
+import { LoadingState } from "@/components/ui/loading-state";
 import { BASE_URL } from "@/lib/constants";
 import { APP_NAME } from "../../../lib/version";
 
@@ -83,20 +85,19 @@ export function RegisterPage() {
       <main
         id="main-content"
         tabIndex={-1}
-        className="flex min-h-screen items-center justify-center p-4"
+        className="relative flex min-h-screen items-center justify-center overflow-hidden bg-canvas p-4"
       >
-        <div className="w-full max-w-md space-y-8">
+        <AmbientBackdrop />
+        <div className="relative z-10 w-full max-w-md space-y-8">
           <div className="text-center">
             <Logo className="text-4xl" />
           </div>
-          <Card>
+          <Card className="border-border bg-raised">
             <CardHeader>
-              <h2 className="font-semibold leading-none tracking-tight">
-                Create Account
-              </h2>
+              <h2 className="font-semibold leading-none">Create Account</h2>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">Loading…</p>
+              <LoadingState />
             </CardContent>
           </Card>
         </div>
@@ -110,15 +111,16 @@ export function RegisterPage() {
       <main
         id="main-content"
         tabIndex={-1}
-        className="flex min-h-screen items-center justify-center p-4"
+        className="relative flex min-h-screen items-center justify-center overflow-hidden bg-canvas p-4"
       >
-        <div className="w-full max-w-md space-y-8">
+        <AmbientBackdrop />
+        <div className="relative z-10 w-full max-w-md space-y-8">
           <div className="text-center">
             <Logo className="text-4xl" />
           </div>
-          <Card>
+          <Card className="border-border bg-raised">
             <CardHeader>
-              <h2 className="font-semibold leading-none tracking-tight">
+              <h2 className="font-semibold leading-none">
                 Registration Closed
               </h2>
               <CardDescription>
@@ -179,17 +181,16 @@ export function RegisterPage() {
     <main
       id="main-content"
       tabIndex={-1}
-      className="flex min-h-screen items-center justify-center p-4"
+      className="relative flex min-h-screen items-center justify-center overflow-hidden bg-canvas p-4"
     >
-      <div className="w-full max-w-md space-y-8">
+      <AmbientBackdrop />
+      <div className="relative z-10 w-full max-w-md space-y-8">
         <div className="text-center">
           <Logo className="text-4xl" />
         </div>
-        <Card>
+        <Card className="border-border bg-raised">
           <CardHeader>
-            <h2 className="font-semibold leading-none tracking-tight">
-              Create Account
-            </h2>
+            <h2 className="font-semibold leading-none">Create Account</h2>
             <CardDescription>
               Register for {APP_NAME} to start creating visual novels
             </CardDescription>
@@ -264,6 +265,7 @@ export function RegisterPage() {
                 type="submit"
                 className="w-full"
                 disabled={state.isLoading}
+                aria-busy={state.isLoading}
               >
                 {state.isLoading ? "Creating account…" : "Create Account"}
               </Button>

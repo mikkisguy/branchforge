@@ -11,7 +11,6 @@ import { useCharacters } from "@/hooks/useCharacters";
 import { useRouteConfigs } from "@/hooks/useRouteConfigs";
 import { useProject } from "@/hooks/useProject";
 import { useToast } from "@/contexts/ToastContext";
-import { useResponsiveSidebarState } from "@/hooks/useResponsiveSidebarState";
 import { useStats } from "@/hooks/useStats";
 import { usePairGroups } from "@/hooks/usePairGroups";
 import {
@@ -22,6 +21,8 @@ import {
 import { useWriteTabs } from "@/hooks/useWriteTabs";
 import { useLabelSwitcher } from "@/hooks/useLabelSwitcher";
 import { useWriteFocusMode } from "@/hooks/useWriteFocusMode";
+import { useWorkspacePanel } from "@/hooks/useWorkspacePanel";
+import { WRITE_LEFT_PANEL, WRITE_RIGHT_PANEL } from "@/lib/workspace-panels";
 import { WriteModeView } from "@/pages/ide/components/WriteModeView";
 import {
   NoProjectSelected,
@@ -34,9 +35,13 @@ import type { DialogueEntry } from "@/lib/prose-types";
 interface WriteModeProps {
   projectName?: string;
   onOpenSettings?: () => void;
+  onFocusModeChange?: (focused: boolean) => void;
 }
 
-export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
+export function WriteMode({
+  onOpenSettings,
+  onFocusModeChange,
+}: WriteModeProps) {
   const { currentProject } = useProject();
   const { error: showErrorToast } = useToast();
   const {
@@ -62,10 +67,8 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
     enabled: !!currentProject?.id,
   });
 
-  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed, isMobile] =
-    useResponsiveSidebarState("write:left-sidebar-collapsed");
-  const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] =
-    useResponsiveSidebarState("write:right-sidebar-collapsed");
+  const leftPanelRaw = useWorkspacePanel(WRITE_LEFT_PANEL);
+  const rightPanelRaw = useWorkspacePanel(WRITE_RIGHT_PANEL);
 
   const editorRef = useRef<ProseEditorRef | null>(null);
 
@@ -81,12 +84,20 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
 
   const { isFocusMode, focusToggleRef, handleFocusModeToggle } =
     useWriteFocusMode({
-      isLeftSidebarCollapsed,
-      setIsLeftSidebarCollapsed,
-      isRightSidebarCollapsed,
-      setIsRightSidebarCollapsed,
+      isLeftSidebarCollapsed: leftPanelRaw.collapsed,
+      setIsLeftSidebarCollapsed: leftPanelRaw.setCollapsed,
+      isRightSidebarCollapsed: rightPanelRaw.collapsed,
+      setIsRightSidebarCollapsed: rightPanelRaw.setCollapsed,
       editorRef,
     });
+
+  const isEditorMounted =
+    !!currentProject && !isLoadingLabels && labels.length > 0;
+
+  useEffect(() => {
+    onFocusModeChange?.(isEditorMounted && isFocusMode);
+    return () => onFocusModeChange?.(false);
+  }, [isEditorMounted, isFocusMode, onFocusModeChange]);
 
   const [currentDraft, setCurrentDraft] = useState<LabelDialogueDraft>(() => ({
     labelId: activeLabel?.id ?? activeLabelId,
@@ -200,26 +211,19 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden max-md:px-2">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <WriteModeView
         isFocusMode={isFocusMode}
         focusToggleRef={focusToggleRef}
         onFocusModeToggle={handleFocusModeToggle}
-        sidebarState={{
-          isLeftCollapsed: isLeftSidebarCollapsed,
-          setIsLeftCollapsed: setIsLeftSidebarCollapsed,
-          isRightCollapsed: isRightSidebarCollapsed,
-          setIsRightCollapsed: setIsRightSidebarCollapsed,
-        }}
-        isMobile={isMobile}
+        leftPanelRaw={leftPanelRaw}
+        rightPanelRaw={rightPanelRaw}
         labels={labels}
         activeLabelId={activeLabelId}
         onLabelSelect={handleLabelSelect}
         onCloseTab={handleCloseTab}
         tabItems={tabItems}
-        projectName={projectName || currentProject?.name}
         projectId={currentProject.id}
-        projectLabelCount={labels.length}
         onCreateLabel={createLabel}
         onUpdateLabel={updateLabel}
         onDeleteLabel={deleteLabel}

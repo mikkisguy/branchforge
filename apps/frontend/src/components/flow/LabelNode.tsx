@@ -73,7 +73,7 @@ function LabelNodeImpl({ data }: NodeProps<LabelNodeType>) {
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         className={cn(
-          "bg-slate-800 border border-slate-600 rounded-lg shadow-lg min-w-[180px] max-w-[240px] transition-opacity duration-150",
+          "bg-raised border border-border rounded-lg shadow-lg min-w-[180px] max-w-[240px] transition-opacity duration-150",
           data.dimmed && "opacity-25",
           data.highlighted && "ring-2 ring-[var(--theme-color)]/70"
         )}
@@ -81,13 +81,13 @@ function LabelNodeImpl({ data }: NodeProps<LabelNodeType>) {
         <Handle
           type="target"
           position={Position.Left}
-          className="!bg-slate-400 !w-2 !h-2"
+          className="!bg-muted-foreground !w-2 !h-2"
         />
         <NodeBody data={data} />
         <Handle
           type="source"
           position={Position.Right}
-          className="!bg-slate-400 !w-2 !h-2"
+          className="!bg-muted-foreground !w-2 !h-2"
         />
       </div>
       {isHovered && <LabelNodeTooltipPortal data={data} nodeRef={nodeRef} />}

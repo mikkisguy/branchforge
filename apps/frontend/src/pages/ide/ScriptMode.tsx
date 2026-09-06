@@ -1,19 +1,21 @@
+import { useEffect } from "react";
 import { ScriptModeEditorLayout } from "./components/ScriptModeEditorLayout";
 import { ScriptModeEmptyState } from "./components/ScriptModeEmptyState";
 import { ScriptModeDialogs } from "./components/ScriptModeDialogs";
 import { useScriptMode } from "./components/useScriptMode";
-import { StatusBar } from "@/components/script-mode";
 
 interface ScriptModeProps {
   projectId?: string;
   projectName?: string;
   onOpenSettings?: () => void;
+  onFocusModeChange?: (focused: boolean) => void;
 }
 
 export function ScriptMode({
   projectId,
   projectName,
   onOpenSettings,
+  onFocusModeChange,
 }: ScriptModeProps) {
   const {
     isLoadingLabels,
@@ -25,11 +27,6 @@ export function ScriptMode({
     setShowSyncDialog,
     showZipImportDialog,
     setShowZipImportDialog,
-    isLeftSidebarCollapsed,
-    setIsLeftSidebarCollapsed,
-    isRightSidebarCollapsed,
-    setIsRightSidebarCollapsed,
-    isMobile,
     focusModeState,
     handleFocusModeToggle,
     editorRef,
@@ -64,11 +61,23 @@ export function ScriptMode({
     generatedFileName,
   } = useScriptMode({ projectId });
 
+  const isEditorMounted =
+    !isLoadingLabels &&
+    !isLoadingFiles &&
+    (projectFiles.length > 0 ||
+      isGeneratedPreview ||
+      generatedFiles.some((file) => !file.isEmpty));
+
+  useEffect(() => {
+    onFocusModeChange?.(isEditorMounted && focusModeState.isFocusMode);
+    return () => onFocusModeChange?.(false);
+  }, [isEditorMounted, focusModeState.isFocusMode, onFocusModeChange]);
+
   if (isLoadingLabels || isLoadingFiles) {
     return (
-      <div className="h-full flex flex-col overflow-hidden">
-        <div className="flex-1 flex flex-col pt-16">
-          <div className="flex-1 flex items-center justify-center">
+      <div className="flex h-full flex-col overflow-hidden">
+        <div className="flex flex-1 flex-col pt-16">
+          <div className="flex flex-1 items-center justify-center">
             <p className="text-muted-foreground">Loading project…</p>
           </div>
         </div>
@@ -79,10 +88,10 @@ export function ScriptMode({
   if (
     !projectFiles.length &&
     !isGeneratedPreview &&
-    !generatedFiles.some((f) => !f.isEmpty)
+    !generatedFiles.some((file) => !file.isEmpty)
   ) {
     return (
-      <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex h-full flex-col overflow-hidden">
         <ScriptModeEmptyState
           projectId={projectId}
           projectName={projectName}
@@ -99,57 +108,48 @@ export function ScriptMode({
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <ScriptModeEditorLayout
-        projectName={projectName}
-        projectId={projectId}
-        projectFiles={projectFiles}
-        activeFileId={activeFileId}
-        activeLabelId={activeLabelId}
-        activeLabel={activeLabel}
-        activeProjectFile={activeProjectFile}
-        activeFileContent={activeFileContent}
-        scrollToLine={scrollToLine}
-        initialExpandedFolders={initialExpandedFolders}
-        tabItems={tabItems}
-        projectCharacters={projectCharacters}
-        isLeftSidebarCollapsed={isLeftSidebarCollapsed}
-        setIsLeftSidebarCollapsed={setIsLeftSidebarCollapsed}
-        isRightSidebarCollapsed={isRightSidebarCollapsed}
-        setIsRightSidebarCollapsed={setIsRightSidebarCollapsed}
-        isMobile={isMobile}
-        focusModeState={focusModeState}
-        editorRef={editorRef}
-        onFocusModeToggle={handleFocusModeToggle}
-        onFileSelect={handleGitLabFileSelect}
-        onSceneSelect={handleGitLabSceneSelect}
-        onSelectTab={handleSelectFileTab}
-        onCloseTab={handleCloseFileTab}
-        onContentChange={handleContentChange}
-        onRefreshFiles={refreshFiles}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        onUndo={onUndo}
-        onRedo={onRedo}
-        saveStatus={activeProjectFile ? fileSaveStatus : undefined}
-        saveConflict={saveConflict}
-        onSaveRequest={onSaveRequest}
-        labelTitles={labelTitles}
-        generatedFiles={generatedFiles}
-        activeGeneratedFileId={activeGeneratedFileId}
-        onGeneratedFileSelect={onGeneratedFileSelect}
-        isGeneratedPreview={isGeneratedPreview}
-        generatedFileName={generatedFileName}
-      />
-
-      <StatusBar
-        projectId={projectId}
-        projectName={projectName}
-        gitlabBranch={linkedRepo?.defaultBranch}
-        fileSourceType={primaryFileSourceType}
-        isFocusMode={focusModeState.isFocusMode}
-        onOpenZipImportDialog={() => setShowZipImportDialog(true)}
-      />
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="min-h-0 flex-1">
+        <ScriptModeEditorLayout
+          projectName={projectName}
+          projectId={projectId}
+          projectFiles={projectFiles}
+          activeFileId={activeFileId}
+          activeLabelId={activeLabelId}
+          activeLabel={activeLabel}
+          activeProjectFile={activeProjectFile}
+          activeFileContent={activeFileContent}
+          scrollToLine={scrollToLine}
+          initialExpandedFolders={initialExpandedFolders}
+          tabItems={tabItems}
+          projectCharacters={projectCharacters}
+          focusModeState={focusModeState}
+          editorRef={editorRef}
+          onFocusModeToggle={handleFocusModeToggle}
+          onFileSelect={handleGitLabFileSelect}
+          onSceneSelect={handleGitLabSceneSelect}
+          onSelectTab={handleSelectFileTab}
+          onCloseTab={handleCloseFileTab}
+          onContentChange={handleContentChange}
+          onRefreshFiles={refreshFiles}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onUndo={onUndo}
+          onRedo={onRedo}
+          saveStatus={activeProjectFile ? fileSaveStatus : undefined}
+          saveConflict={saveConflict}
+          onSaveRequest={onSaveRequest}
+          labelTitles={labelTitles}
+          gitlabBranch={linkedRepo?.defaultBranch}
+          fileSourceType={primaryFileSourceType}
+          onOpenZipImportDialog={() => setShowZipImportDialog(true)}
+          generatedFiles={generatedFiles}
+          activeGeneratedFileId={activeGeneratedFileId}
+          onGeneratedFileSelect={onGeneratedFileSelect}
+          isGeneratedPreview={isGeneratedPreview}
+          generatedFileName={generatedFileName}
+        />
+      </div>
 
       <ScriptModeDialogs
         projectId={projectId}

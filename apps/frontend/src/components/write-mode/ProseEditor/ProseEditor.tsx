@@ -5,7 +5,7 @@
  * Matches app design system with theme colors and simple styling.
  */
 
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import type React from "react";
 import { ProseEditorEmpty } from "./ProseEditorEmpty";
 import { ProseEditorTopBar } from "./ProseEditorTopBar";
@@ -54,6 +54,13 @@ interface ProseEditorProps {
   /** Controlled font family. When provided, FontFamilySwitcher uses this value instead of internal localStorage. */
   fontFamilyValue?: string;
   onFontFamilyChange?: (value: string) => void;
+  /** Hide internal top/status chrome when lifted to WorkspaceFrame. */
+  hideChrome?: boolean;
+  /** Report live word/line counts for external status bars. */
+  onEditorMetricsChange?: (metrics: {
+    wordCount: number;
+    lineCount: number;
+  }) => void;
 }
 
 export interface ProseEditorRef {
@@ -91,6 +98,8 @@ export const ProseEditor = function ProseEditor({
   onFontSizeChange,
   fontFamilyValue,
   onFontFamilyChange,
+  hideChrome = false,
+  onEditorMetricsChange,
   ref,
 }: ProseEditorProps & { ref?: React.Ref<ProseEditorRef> }) {
   const state = useProseEditorState({
@@ -106,6 +115,13 @@ export const ProseEditor = function ProseEditor({
     ref,
   });
 
+  useEffect(() => {
+    onEditorMetricsChange?.({
+      wordCount: state.wordCount,
+      lineCount: state.lineCount,
+    });
+  }, [onEditorMetricsChange, state.lineCount, state.wordCount]);
+
   // Empty state: no active label or label with no entries
   if (!state.activeLabel || state.entries.length === 0) {
     return (
@@ -118,9 +134,8 @@ export const ProseEditor = function ProseEditor({
   }
 
   return (
-    <div className="flex flex-col h-full tracking-normal pb-3">
-      {/* Top Bar */}
-      {!isFocusMode && (
+    <div className="flex h-full flex-col tracking-normal">
+      {!hideChrome && !isFocusMode ? (
         <ProseEditorTopBar
           activeLabel={state.activeLabel}
           canUndo={state.canUndo}
@@ -132,9 +147,8 @@ export const ProseEditor = function ProseEditor({
           lastSaved={lastSaved}
           saveConflict={saveConflict}
         />
-      )}
+      ) : null}
 
-      {/* Editor Lines */}
       <ProseEditorLines
         entries={state.entries}
         characters={state.characters}
@@ -150,7 +164,6 @@ export const ProseEditor = function ProseEditor({
         onAddLine={state.handleAddLine}
       />
 
-      {/* Goal Pill */}
       {state.writingGoalSettings?.dailyWritingGoal != null && (
         <ProseEditorGoalPill
           todayWordCount={state.todayWordCount}
@@ -163,25 +176,25 @@ export const ProseEditor = function ProseEditor({
         />
       )}
 
-      {/* Status Bar */}
-      <ProseEditorStatusBar
-        layoutMode={state.layoutMode}
-        onLayoutModeChange={state.setLayoutMode}
-        showBadges={state.showBadges}
-        onShowBadgesToggle={() => state.setShowBadges(!state.showBadges)}
-        wordCount={state.wordCount}
-        lineCount={state.lineCount}
-        fontSizeValue={fontSizeValue}
-        onFontSizeChange={onFontSizeChange}
-        fontFamilyValue={fontFamilyValue}
-        onFontFamilyChange={onFontFamilyChange}
-        isFocusMode={isFocusMode}
-        isBottomBarHovered={state.isBottomBarHovered}
-        onBottomBarHoverStart={() => state.setIsBottomBarHovered(true)}
-        onBottomBarHoverEnd={() => state.setIsBottomBarHovered(false)}
-      />
+      {!hideChrome ? (
+        <ProseEditorStatusBar
+          layoutMode={state.layoutMode}
+          onLayoutModeChange={state.setLayoutMode}
+          showBadges={state.showBadges}
+          onShowBadgesToggle={() => state.setShowBadges(!state.showBadges)}
+          wordCount={state.wordCount}
+          lineCount={state.lineCount}
+          fontSizeValue={fontSizeValue}
+          onFontSizeChange={onFontSizeChange}
+          fontFamilyValue={fontFamilyValue}
+          onFontFamilyChange={onFontFamilyChange}
+          isFocusMode={isFocusMode}
+          isBottomBarHovered={state.isBottomBarHovered}
+          onBottomBarHoverStart={() => state.setIsBottomBarHovered(true)}
+          onBottomBarHoverEnd={() => state.setIsBottomBarHovered(false)}
+        />
+      ) : null}
 
-      {/* Writing Stats Dialog */}
       <Suspense fallback={null}>
         <WritingStatsDialog
           open={state.statsDialogOpen}

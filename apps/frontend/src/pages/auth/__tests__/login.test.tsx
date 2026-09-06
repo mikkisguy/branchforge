@@ -55,6 +55,12 @@ describe("LoginPage", () => {
       ).toBeInTheDocument();
     });
 
+    it("should render a decorative ambient backdrop", () => {
+      const { container } = render(<LoginPage />, { wrapper });
+      const backdrop = container.querySelector("[aria-hidden='true']");
+      expect(backdrop).toBeInTheDocument();
+    });
+
     it("should show email placeholder", () => {
       render(<LoginPage />, { wrapper });
 

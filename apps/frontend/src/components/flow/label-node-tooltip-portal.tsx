@@ -100,7 +100,7 @@ export function LabelNodeTooltipPortal({
         left: position.left,
         width: TOOLTIP_ESTIMATED_WIDTH,
       }}
-      className="z-[100] rounded-lg border border-slate-600 bg-slate-900/95 backdrop-blur-sm px-3 py-2.5 text-xs text-slate-200 shadow-xl shadow-black/40 ring-1 ring-white/5 pointer-events-none"
+      className="z-[100] rounded-lg border border-border bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-xl pointer-events-none"
     >
       <LabelTooltipContent data={data} />
     </div>,

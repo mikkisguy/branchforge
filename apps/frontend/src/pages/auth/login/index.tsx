@@ -17,6 +17,7 @@ import {
   Announcement,
   type AnnouncementHandle,
 } from "@/components/ui/announcement";
+import { AmbientBackdrop } from "@/components/ui/AmbientBackdrop";
 import { BASE_URL } from "@/lib/constants";
 import { APP_NAME } from "../../../lib/version";
 
@@ -49,17 +50,16 @@ export function LoginPage() {
     <main
       id="main-content"
       tabIndex={-1}
-      className="flex min-h-screen items-center justify-center p-4"
+      className="relative flex min-h-screen items-center justify-center overflow-hidden bg-canvas p-4"
     >
-      <div className="w-full max-w-md space-y-8">
+      <AmbientBackdrop />
+      <div className="relative z-10 w-full max-w-md space-y-8">
         <div className="text-center">
           <Logo className="text-4xl" />
         </div>
-        <Card>
+        <Card className="border-border bg-raised">
           <CardHeader>
-            <h2 className="font-semibold leading-none tracking-tight">
-              Sign In
-            </h2>
+            <h2 className="font-semibold leading-none">Sign In</h2>
             <CardDescription>
               Enter your credentials to access {APP_NAME}
             </CardDescription>
@@ -101,7 +101,12 @@ export function LoginPage() {
               </div>
             </CardContent>
             <CardFooter className="flex flex-col gap-2">
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isLoading}
+                aria-busy={isLoading}
+              >
                 {isLoading ? "Signing in..." : "Sign In"}
               </Button>
               <p className="text-sm text-muted-foreground">

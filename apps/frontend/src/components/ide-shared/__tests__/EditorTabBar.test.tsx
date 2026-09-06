@@ -24,9 +24,9 @@ describe("EditorTabBar", () => {
   it("closes a tab on middle click via the tablist delegate", () => {
     const onClose = renderTabBar();
 
-    const title = screen.getByRole("tab", { name: "Ending" }).querySelector(
-      "span"
-    );
+    const title = screen
+      .getByRole("tab", { name: "Ending" })
+      .querySelector("span");
     expect(title).not.toBeNull();
     fireEvent.mouseDown(title as HTMLElement, { button: 1 });
 

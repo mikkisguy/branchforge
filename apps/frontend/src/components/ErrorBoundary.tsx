@@ -115,7 +115,7 @@ export class ErrorBoundary extends Component<
               <button
                 type="button"
                 onClick={() => window.location.reload()}
-                className="px-4 py-2 bg-theme-primary text-white rounded hover:opacity-90 transition-opacity"
+                className="px-4 py-2 bg-theme text-white rounded hover:opacity-90 transition-opacity"
               >
                 Reload Page
               </button>

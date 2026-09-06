@@ -52,8 +52,6 @@ vi.mock("@/hooks/useStats", () => ({
 describe("ScriptReferencePanel - Characters Section", () => {
   let queryClient: QueryClient;
   const mockProjectId = "test-project";
-  const mockOnCollapseToggle = vi.fn();
-
   const mockCharacters: Character[] = [
     {
       id: "char-1",
@@ -119,11 +117,7 @@ describe("ScriptReferencePanel - Characters Section", () => {
 
   it("renders empty state when no characters exist", () => {
     render(
-      <ScriptReferencePanel
-        projectId={mockProjectId}
-        projectCharacters={[]}
-        onCollapseToggle={mockOnCollapseToggle}
-      />,
+      <ScriptReferencePanel projectId={mockProjectId} projectCharacters={[]} />,
       { wrapper }
     );
 
@@ -139,7 +133,6 @@ describe("ScriptReferencePanel - Characters Section", () => {
           mockCharacters[0], // Emily
           mockCharacters[2], // Sayori
         ]}
-        onCollapseToggle={mockOnCollapseToggle}
       />,
       { wrapper }
     );
@@ -157,7 +150,6 @@ describe("ScriptReferencePanel - Characters Section", () => {
       <ScriptReferencePanel
         projectId={mockProjectId}
         projectCharacters={[mockCharacters[1]]} // Natsuki with avatarUrl
-        onCollapseToggle={mockOnCollapseToggle}
       />,
       { wrapper }
     );
@@ -172,7 +164,6 @@ describe("ScriptReferencePanel - Characters Section", () => {
       <ScriptReferencePanel
         projectId={mockProjectId}
         projectCharacters={[mockCharacters[0]]} // Emily without avatarUrl
-        onCollapseToggle={mockOnCollapseToggle}
       />,
       { wrapper }
     );
@@ -193,7 +184,6 @@ describe("ScriptReferencePanel - Characters Section", () => {
       <ScriptReferencePanel
         projectId={mockProjectId}
         projectCharacters={mockCharacters}
-        onCollapseToggle={mockOnCollapseToggle}
       />,
       { wrapper }
     );
@@ -209,7 +199,6 @@ describe("ScriptReferencePanel - Characters Section", () => {
       <ScriptReferencePanel
         projectId={mockProjectId}
         projectCharacters={mockCharacters}
-        onCollapseToggle={mockOnCollapseToggle}
       />,
       { wrapper }
     );
