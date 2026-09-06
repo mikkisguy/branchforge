@@ -19,7 +19,7 @@ import {
   type AnnouncementHandle,
 } from "@/components/ui/announcement";
 import { AmbientBackdrop } from "@/components/ui/AmbientBackdrop";
-import { LoadingState } from "@/components/ui/loading-state";
+import { LoadingState } from "@/components/ui/LoadingState";
 import { BASE_URL } from "@/lib/constants";
 import { APP_NAME } from "../../../lib/version";
 

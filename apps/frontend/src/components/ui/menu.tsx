@@ -8,9 +8,8 @@ import {
   useMemo,
   useRef,
   useState,
-  type ButtonHTMLAttributes,
-  type ReactNode,
 } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import type { VariantProps } from "class-variance-authority";

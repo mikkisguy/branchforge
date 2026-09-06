@@ -156,6 +156,7 @@ describe("LoginPage", () => {
       await waitFor(() => {
         expect(submitButton).toHaveTextContent("Signing in...");
         expect(submitButton).toBeDisabled();
+        expect(submitButton).toHaveAttribute("aria-busy", "true");
         expect(emailInput).toBeDisabled();
         expect(passwordInput).toBeDisabled();
       });

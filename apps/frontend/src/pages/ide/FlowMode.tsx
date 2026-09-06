@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { LoadingState } from "@/components/ui/loading-state";
+import { LoadingState } from "@/components/ui/LoadingState";
 import { useFlowGraphEntryRefetch } from "@/components/flow/useFlowGraphEntryRefetch";
 
 const LazyFlowGraph = lazy(() =>

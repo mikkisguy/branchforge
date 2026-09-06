@@ -4,6 +4,10 @@ import type { ReactNode } from "react";
 import { ScriptModeEditorLayout } from "../ScriptModeEditorLayout";
 import type { FocusModeState } from "@/hooks/useFocusModeState";
 
+const { panelBreakpoint } = vi.hoisted(() => ({
+  panelBreakpoint: { current: "wide" as "wide" | "mobile" },
+}));
+
 vi.mock("@/hooks/useWorkspacePanel", () => ({
   useWorkspacePanel: (config: { collapseKey: string }) => ({
     width: 248,
@@ -11,7 +15,9 @@ vi.mock("@/hooks/useWorkspacePanel", () => ({
       config.collapseKey === "script:left-sidebar-collapsed" ? true : false,
     setCollapsed: vi.fn(),
     canResize: true,
-    breakpoint: "wide",
+    get breakpoint() {
+      return panelBreakpoint.current;
+    },
     isOverlay: false,
     onPointerResize: {
       onPointerDown: vi.fn(),
@@ -27,7 +33,11 @@ vi.mock("@/hooks/useWorkspacePanel", () => ({
 vi.mock("@/components/script-mode", () => ({
   ScriptEditor: () => <div>Script editor</div>,
   ScriptReferencePanel: () => <div>Reference panel</div>,
-  StatusBar: () => <div>Import export actions</div>,
+  StatusBar: ({ className }: { className?: string }) => (
+    <div data-testid={className ? "mobile-status-bar" : "desktop-status-bar"}>
+      Import export actions
+    </div>
+  ),
 }));
 
 vi.mock("@/components/script-mode/ProjectFileTree", () => ({
@@ -97,6 +107,7 @@ function renderLayout(isFocusMode: boolean) {
 describe("ScriptModeEditorLayout chrome", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    panelBreakpoint.current = "wide";
   });
 
   afterEach(() => {
@@ -118,5 +129,20 @@ describe("ScriptModeEditorLayout chrome", () => {
     expect(
       screen.queryByRole("button", { name: "Expand navigator" })
     ).not.toBeInTheDocument();
+  });
+
+  it("mounts only the desktop StatusBar when not mobile", () => {
+    renderLayout(false);
+
+    expect(screen.getByTestId("desktop-status-bar")).toBeInTheDocument();
+    expect(screen.queryByTestId("mobile-status-bar")).not.toBeInTheDocument();
+  });
+
+  it("mounts only the mobile StatusBar when mobile", () => {
+    panelBreakpoint.current = "mobile";
+    renderLayout(false);
+
+    expect(screen.getByTestId("mobile-status-bar")).toBeInTheDocument();
+    expect(screen.queryByTestId("desktop-status-bar")).not.toBeInTheDocument();
   });
 });

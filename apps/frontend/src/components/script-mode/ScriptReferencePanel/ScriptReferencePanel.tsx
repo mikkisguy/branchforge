@@ -42,7 +42,8 @@ export function ScriptReferencePanel({
   const groupedVariables = useMemo(() => {
     const groups: Record<string, typeof variables> = {};
     for (const variable of variables) {
-      const category = variable.category || "Uncategorized";
+      const trimmedCategory = variable.category?.trim() ?? "";
+      const category = trimmedCategory || "Uncategorized";
       if (!groups[category]) {
         groups[category] = [];
       }

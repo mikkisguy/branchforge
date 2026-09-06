@@ -429,13 +429,15 @@ export function ScriptModeEditorLayout({
             }
             statusBar={
               <WorkspaceStatusBar className="max-md:hidden min-w-0 justify-between gap-2 overflow-x-auto">
-                <StatusBar
-                  projectId={projectId}
-                  projectName={projectName}
-                  gitlabBranch={gitlabBranch}
-                  fileSourceType={fileSourceType}
-                  onOpenZipImportDialog={onOpenZipImportDialog}
-                />
+                {!isMobile ? (
+                  <StatusBar
+                    projectId={projectId}
+                    projectName={projectName}
+                    gitlabBranch={gitlabBranch}
+                    fileSourceType={fileSourceType}
+                    onOpenZipImportDialog={onOpenZipImportDialog}
+                  />
+                ) : null}
                 <ScriptEditorFormattingControls
                   className="shrink-0 max-md:hidden"
                   lineWrap={lineWrap}
@@ -531,16 +533,18 @@ export function ScriptModeEditorLayout({
           onClick={() => setShowOverlays((value) => !value)}
         />
         <div className="my-1 h-px bg-border/30" />
-        <div className="px-1 py-1">
-          <StatusBar
-            projectId={projectId}
-            projectName={projectName}
-            gitlabBranch={gitlabBranch}
-            fileSourceType={fileSourceType}
-            onOpenZipImportDialog={onOpenZipImportDialog}
-            className="flex-col items-stretch"
-          />
-        </div>
+        {isMobile ? (
+          <div className="px-1 py-1">
+            <StatusBar
+              projectId={projectId}
+              projectName={projectName}
+              gitlabBranch={gitlabBranch}
+              fileSourceType={fileSourceType}
+              onOpenZipImportDialog={onOpenZipImportDialog}
+              className="flex-col items-stretch"
+            />
+          </div>
+        ) : null}
         <div className="my-1 h-px bg-border/30" />
         <FABFocusButton
           isFocusMode={isFocusMode}

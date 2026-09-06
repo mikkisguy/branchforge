@@ -30,7 +30,7 @@ interface WorkspaceChromePropsBase {
     body: UpdateProjectBody
   ) => Promise<Project>;
   deleteProject?: (projectId: string) => Promise<void>;
-  refetchProjects?: () => Promise<void>;
+  refetchProjects?: () => Promise<Project[]>;
   hidden?: boolean;
   onOpenSettingsTab?: (tab: Tab) => void;
 }
@@ -129,20 +129,17 @@ export function WorkspaceChrome(props: WorkspaceChromeProps) {
   const handleImportSuccess = useCallback(
     async (importedProject?: { id: string }) => {
       try {
-        await refetchProjects?.();
-        if (importedProject?.id) {
-          const latestProjects = projectsRef.current;
-          if (latestProjects) {
-            const fullProject = latestProjects.find(
-              (p) => p.id === importedProject.id
-            );
-            if (fullProject) setCurrentProject(fullProject);
-            else
-              console.warn(
-                "Imported project not found in list, will retry on next render"
-              );
-          }
-        }
+        const refreshedProjects = await refetchProjects?.();
+        if (!importedProject?.id) return;
+        const latestProjects = refreshedProjects ?? projectsRef.current;
+        const fullProject = latestProjects.find(
+          (p) => p.id === importedProject.id
+        );
+        if (fullProject) setCurrentProject(fullProject);
+        else
+          console.warn(
+            "Imported project not found in list, will retry on next render"
+          );
       } catch {
         console.warn("Failed to refresh projects after import");
       }

@@ -1,9 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { ScriptReferencePanel } from "../ScriptReferencePanel";
-import type { Character } from "@branchforge/shared";
+import type { Character, Variable } from "@branchforge/shared";
 import { createTestQueryClient } from "@/test/query-client";
+
+const { mockVariables } = vi.hoisted(() => ({
+  mockVariables: [] as Variable[],
+}));
 
 // Mock toast context
 vi.mock("@/contexts/ToastContext", () => ({
@@ -16,7 +21,7 @@ vi.mock("@/contexts/ToastContext", () => ({
 // Mock useVariables hook
 vi.mock("@/hooks/useVariables", () => ({
   useVariables: () => ({
-    variables: [],
+    variables: mockVariables,
     isLoadingVariables: false,
     variablesError: null,
     isCreatingVariable: false,
@@ -112,6 +117,7 @@ describe("ScriptReferencePanel - Characters Section", () => {
 
   beforeEach(() => {
     queryClient = createTestQueryClient();
+    mockVariables.length = 0;
     vi.clearAllMocks();
   });
 
@@ -205,5 +211,63 @@ describe("ScriptReferencePanel - Characters Section", () => {
 
     const hearts = container.querySelectorAll(".text-pink-400");
     expect(hearts).toHaveLength(2); // Emily and Sayori are love interests
+  });
+
+  it("trims variable categories and falls back to Uncategorized", async () => {
+    const user = userEvent.setup();
+    mockVariables.push(
+      {
+        id: "var-1",
+        projectId: mockProjectId,
+        key: "blank_category",
+        description: null,
+        category: "   ",
+        createdAt: "2024-01-01T00:00:00.000Z",
+      },
+      {
+        id: "var-2",
+        projectId: mockProjectId,
+        key: "null_category",
+        description: null,
+        category: null,
+        createdAt: "2024-01-01T00:00:00.000Z",
+      },
+      {
+        id: "var-3",
+        projectId: mockProjectId,
+        key: "story_flag",
+        description: null,
+        category: "  Story  ",
+        createdAt: "2024-01-01T00:00:00.000Z",
+      }
+    );
+
+    render(
+      <ScriptReferencePanel projectId={mockProjectId} projectCharacters={[]} />,
+      { wrapper }
+    );
+
+    await user.click(screen.getByRole("button", { name: "Variables" }));
+
+    const variablesSection = screen
+      .getByRole("button", { name: "Variables" })
+      .closest("div.border-b") as HTMLElement;
+
+    expect(
+      within(variablesSection).getByRole("heading", { name: "Uncategorized" })
+    ).toBeInTheDocument();
+    expect(
+      within(variablesSection).getByRole("heading", { name: "Story" })
+    ).toBeInTheDocument();
+    expect(
+      within(variablesSection).queryByRole("heading", { name: "  Story  " })
+    ).not.toBeInTheDocument();
+    expect(
+      within(variablesSection).getByText("blank_category")
+    ).toBeInTheDocument();
+    expect(
+      within(variablesSection).getByText("null_category")
+    ).toBeInTheDocument();
+    expect(within(variablesSection).getByText("story_flag")).toBeInTheDocument();
   });
 });

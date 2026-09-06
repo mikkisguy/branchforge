@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { LoadingState } from "@/components/ui/loading-state";
+import { LoadingState } from "@/components/ui/LoadingState";
 
 describe("LoadingState", () => {
   it("exposes role status and renders the label", () => {

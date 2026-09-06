@@ -35,6 +35,7 @@ import { FlowGraphStatus } from "./FlowGraphStatus";
 import { FlowGraphEmpty } from "./FlowGraphEmpty";
 import { FlowGraphCanvas } from "./FlowGraphCanvas";
 import { FLOW_SEARCH_DEBOUNCE_MS } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 
 interface FlowGraphProps {
   projectId: string;
@@ -239,15 +240,17 @@ export function FlowGraph({
     handleLayoutDragStop(nodePositions);
   }, [handleLayoutDragStop]);
 
+  const rootClassName = cn("h-full w-full min-h-0", className);
+
   if (isLoading)
     return (
-      <div className={className}>
+      <div className={rootClassName}>
         <FlowGraphStatus loading>Loading flow graph...</FlowGraphStatus>
       </div>
     );
   if (error)
     return (
-      <div className={className}>
+      <div className={rootClassName}>
         <FlowGraphStatus tone="error">
           Failed to load flow graph: {error.message}
         </FlowGraphStatus>
@@ -255,13 +258,13 @@ export function FlowGraph({
     );
   if (flowNodes.length === 0)
     return (
-      <div className={className}>
+      <div className={rootClassName}>
         <FlowGraphEmpty />
       </div>
     );
   if (layoutComputing)
     return (
-      <div className={className}>
+      <div className={rootClassName}>
         <FlowGraphStatus
           loading
           subtitle="This one-time layout is cached — reopening will be instant."
@@ -272,7 +275,7 @@ export function FlowGraph({
     );
 
   return (
-    <div className={className}>
+    <div className={rootClassName}>
       <FlowGraphCanvas
         nodes={nodes}
         edges={edges}

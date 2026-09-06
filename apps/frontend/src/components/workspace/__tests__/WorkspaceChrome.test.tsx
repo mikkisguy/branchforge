@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ToastProvider } from "@/contexts/ToastContext";
@@ -11,6 +11,21 @@ import { WorkspaceChrome } from "../WorkspaceChrome";
 import type { Project } from "@/lib/api/projects";
 import type { ThemePalette } from "@branchforge/shared";
 import type { ReactNode } from "react";
+
+vi.mock(
+  "@/components/ide-shared/GitLabImportDialog/GitLabImportDialog.lazy",
+  () => ({
+    GitLabImportDialog: ({
+      onSuccess,
+    }: {
+      onSuccess?: (importedProject?: { id: string }) => void;
+    }) => (
+      <button type="button" onClick={() => onSuccess?.({ id: "imported-1" })}>
+        Complete GitLab import
+      </button>
+    ),
+  })
+);
 
 const mockProjects: Project[] = [
   {
@@ -229,6 +244,40 @@ describe("WorkspaceChrome", () => {
     await user.click(screen.getByRole("menuitem", { name: "Settings" }));
 
     expect(onSettingsOpenChangeExternally).toHaveBeenCalledWith(true);
+  });
+
+  it("selects the imported project from refreshed data before projects prop commits", async () => {
+    const user = userEvent.setup();
+    const importedProject: Project = {
+      ...mockProjects[0]!,
+      id: "imported-1",
+      name: "Imported Project",
+    };
+    const setCurrentProject = vi.fn();
+    const refetchProjects = vi
+      .fn()
+      .mockResolvedValue([...mockProjects, importedProject]);
+
+    render(
+      <WorkspaceChrome
+        {...defaultProps}
+        projects={mockProjects}
+        setCurrentProject={setCurrentProject}
+        refetchProjects={refetchProjects}
+      />,
+      { wrapper: createWrapper() }
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Complete GitLab import" })
+    );
+
+    await waitFor(() => {
+      expect(refetchProjects).toHaveBeenCalledOnce();
+    });
+    expect(setCurrentProject).toHaveBeenCalledOnce();
+    expect(setCurrentProject).toHaveBeenCalledWith(importedProject);
+    expect(setCurrentProject).not.toHaveBeenCalledWith(mockProjects[0]);
   });
 
   it("hidden does not render the top bar nav", () => {

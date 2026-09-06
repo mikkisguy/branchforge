@@ -122,6 +122,12 @@ export const ProseEditor = function ProseEditor({
     });
   }, [onEditorMetricsChange, state.lineCount, state.wordCount]);
 
+  useEffect(() => {
+    return () => {
+      onEditorMetricsChange?.({ wordCount: 0, lineCount: 0 });
+    };
+  }, [onEditorMetricsChange]);
+
   // Empty state: no active label or label with no entries
   if (!state.activeLabel || state.entries.length === 0) {
     return (
