@@ -115,7 +115,11 @@ export function FlowGraphCanvas({
   onResetLayout,
 }: FlowGraphCanvasProps) {
   const { isDarkMode } = useTheme();
-  const borderColor = useHslCssVar("--border", "hsl(0 0% 20%)");
+  const gridColor = useHslCssVarAlpha(
+    "--border",
+    isDarkMode ? 0.35 : 0.55,
+    "hsl(0 0% 20% / 0.35)"
+  );
   const canvasMaskColor = useHslCssVarAlpha(
     "--canvas",
     0.7,
@@ -168,7 +172,7 @@ export function FlowGraphCanvas({
             variant={BackgroundVariant.Lines}
             gap={24}
             size={1}
-            color={borderColor}
+            color={gridColor}
           />
           <Controls className="!bg-raised !border-border !rounded-lg" />
           {flowNodesLength <= FLOW_MINIMAP_HIDE_THRESHOLD && (
