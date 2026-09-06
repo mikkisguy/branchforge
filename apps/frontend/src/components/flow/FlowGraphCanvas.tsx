@@ -2,6 +2,7 @@
  * FlowGraphCanvas - Graph canvas rendering (ReactFlow, background, controls, minimap, overlays)
  */
 
+import { useEffect, useState } from "react";
 import {
   ReactFlow,
   Background,
@@ -17,6 +18,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { FlowCharacterProvider } from "./flow-character-provider";
 import { FlowGraphFiltersPanel } from "@/components/flow/FlowGraphFiltersPanel";
+import { FlowFiltersDock } from "@/components/flow/FlowFiltersDock";
 import { FlowGraphToolbar } from "./FlowGraphToolbar";
 import { LabelNodeMemo } from "./LabelNode";
 import {
@@ -25,10 +27,48 @@ import {
 } from "@/lib/constants";
 import type { FlowLayoutMode, Character } from "@branchforge/shared";
 import type { FlowGraphFilters } from "@/components/flow/flow-filters";
+import { useTheme } from "@/contexts/useTheme";
+import { cn } from "@/lib/utils";
 
 const nodeTypes = {
   label: LabelNodeMemo,
 };
+
+function useHslCssVar(name: string, fallback: string): string {
+  const { isDarkMode, theme } = useTheme();
+  const [color, setColor] = useState(fallback);
+
+  useEffect(() => {
+    const raw = getComputedStyle(document.documentElement)
+      .getPropertyValue(name)
+      .trim();
+    if (raw) {
+      setColor(`hsl(${raw})`);
+    }
+  }, [name, isDarkMode, theme]);
+
+  return color;
+}
+
+function useHslCssVarAlpha(
+  name: string,
+  alpha: number,
+  fallback: string
+): string {
+  const { isDarkMode, theme } = useTheme();
+  const [color, setColor] = useState(fallback);
+
+  useEffect(() => {
+    const raw = getComputedStyle(document.documentElement)
+      .getPropertyValue(name)
+      .trim();
+    if (raw) {
+      setColor(`hsl(${raw} / ${alpha})`);
+    }
+  }, [alpha, name, isDarkMode, theme]);
+
+  return color;
+}
 
 interface FlowGraphCanvasProps {
   // ReactFlow state
@@ -74,11 +114,32 @@ export function FlowGraphCanvas({
   onLayoutModeChange,
   onResetLayout,
 }: FlowGraphCanvasProps) {
+  const { isDarkMode } = useTheme();
+  const borderColor = useHslCssVar("--border", "hsl(0 0% 20%)");
+  const canvasMaskColor = useHslCssVarAlpha(
+    "--canvas",
+    0.7,
+    "hsl(0 0% 5% / 0.7)"
+  );
+  const mutedNodeColor = useHslCssVar("--muted-foreground", "hsl(0 0% 55%)");
+
   return (
-    <div className="h-full w-full absolute inset-0">
+    <FlowFiltersDock
+      filters={({ onCollapse }) => (
+        <FlowGraphFiltersPanel
+          filters={validFilters}
+          onChange={onFiltersChange}
+          routes={routeOptions}
+          routeColors={routeColorMap}
+          characters={characters}
+          onCollapse={onCollapse}
+          className="h-full min-h-0"
+        />
+      )}
+    >
       <FlowCharacterProvider characters={characters}>
         <ReactFlow
-          colorMode="dark"
+          colorMode={isDarkMode ? "dark" : "light"}
           nodes={nodes}
           edges={edges}
           onNodesChange={onNodesChange}
@@ -101,34 +162,31 @@ export function FlowGraphCanvas({
           onlyRenderVisibleElements={
             flowNodesLength > FLOW_VIRTUALIZATION_THRESHOLD
           }
+          className="bg-canvas"
         >
           <Background
-            variant={BackgroundVariant.Dots}
-            gap={20}
+            variant={BackgroundVariant.Lines}
+            gap={24}
             size={1}
-            color="#334155"
+            color={borderColor}
           />
-          <Controls className="!bg-slate-800 !border-slate-600 !rounded-lg" />
+          <Controls className="!bg-raised !border-border !rounded-lg" />
           {flowNodesLength <= FLOW_MINIMAP_HIDE_THRESHOLD && (
             <MiniMap
-              className="!bg-slate-800 !border-slate-600 !rounded-lg"
-              maskColor="rgba(15, 23, 42, 0.7)"
+              className="!bg-raised !border-border !rounded-lg"
+              maskColor={canvasMaskColor}
               nodeColor={(node) => {
                 const data = node.data as { routeColor?: string };
-                return data.routeColor ?? "#64748b";
+                return data.routeColor ?? mutedNodeColor;
               }}
             />
           )}
-          <div className="absolute top-4 left-4 z-10">
-            <FlowGraphFiltersPanel
-              filters={validFilters}
-              onChange={onFiltersChange}
-              routes={routeOptions}
-              routeColors={routeColorMap}
-              characters={characters}
-            />
-          </div>
-          <div className="absolute top-4 right-4 z-10 flex items-center gap-2 flex-wrap max-sm:flex-col max-sm:items-end">
+          <div
+            className={cn(
+              "absolute top-3 right-3 z-10 flex items-center gap-2",
+              "flex-wrap max-sm:flex-col max-sm:items-end"
+            )}
+          >
             <FlowGraphToolbar
               layoutMode={layoutMode}
               isBusy={isBusy}
@@ -138,6 +196,6 @@ export function FlowGraphCanvas({
           </div>
         </ReactFlow>
       </FlowCharacterProvider>
-    </div>
+    </FlowFiltersDock>
   );
 }

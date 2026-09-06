@@ -185,7 +185,7 @@ describe("LabelNavigator", () => {
       );
 
       expect(screen.getByText("story.rpy")).toBeInTheDocument();
-      expect(screen.getAllByText("2 labels").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText("2")).toBeInTheDocument();
     });
   });
 

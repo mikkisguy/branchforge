@@ -16,13 +16,7 @@ import type {
   SetStateAction,
 } from "react";
 import type { CreateLabelInput, UpdateLabelInput } from "@/lib/api/labels";
-
-export interface SidebarState {
-  isLeftCollapsed: boolean;
-  setIsLeftCollapsed: Dispatch<SetStateAction<boolean>>;
-  isRightCollapsed: boolean;
-  setIsRightCollapsed: Dispatch<SetStateAction<boolean>>;
-}
+import type { WorkspacePanelState } from "@/hooks/useWorkspacePanel";
 
 export interface LabelMutationState {
   isCreatingLabel: boolean;
@@ -43,9 +37,9 @@ export interface WriteModeViewProps {
   focusToggleRef: RefObject<HTMLButtonElement | null>;
   onFocusModeToggle: () => void;
 
-  // Sidebar state (grouped to satisfy react-doctor no-many-boolean-props)
-  sidebarState: SidebarState;
-  isMobile: boolean;
+  // Workspace panels
+  leftPanelRaw: WorkspacePanelState;
+  rightPanelRaw: WorkspacePanelState;
 
   // Labels
   labels: PublicLabel[];
@@ -56,9 +50,7 @@ export interface WriteModeViewProps {
     labelId: string
   ) => void;
   tabItems: EditorTabBarItem[];
-  projectName?: string;
   projectId: string;
-  projectLabelCount: number;
   onCreateLabel: (data: CreateLabelInput) => Promise<unknown>;
   onUpdateLabel: (
     labelId: string,

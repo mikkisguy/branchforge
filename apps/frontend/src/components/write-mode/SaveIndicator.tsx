@@ -114,9 +114,7 @@ export const SaveIndicator = memo(function SaveIndicator({
       }`}
       role={isErrorWithRetry ? "button" : "status"}
       aria-live="polite"
-      aria-label={
-        isErrorWithRetry ? "Save failed. Activate to retry" : text
-      }
+      aria-label={isErrorWithRetry ? "Save failed. Activate to retry" : text}
       tabIndex={isErrorWithRetry ? 0 : undefined}
       onClick={isErrorWithRetry ? onRetry : undefined}
       onKeyDown={handleKeyDown}

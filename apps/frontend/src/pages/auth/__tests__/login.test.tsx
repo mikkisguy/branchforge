@@ -55,6 +55,12 @@ describe("LoginPage", () => {
       ).toBeInTheDocument();
     });
 
+    it("should render a decorative ambient backdrop", () => {
+      const { container } = render(<LoginPage />, { wrapper });
+      const backdrop = container.querySelector("[aria-hidden='true']");
+      expect(backdrop).toBeInTheDocument();
+    });
+
     it("should show email placeholder", () => {
       render(<LoginPage />, { wrapper });
 
@@ -150,6 +156,7 @@ describe("LoginPage", () => {
       await waitFor(() => {
         expect(submitButton).toHaveTextContent("Signing in...");
         expect(submitButton).toBeDisabled();
+        expect(submitButton).toHaveAttribute("aria-busy", "true");
         expect(emailInput).toBeDisabled();
         expect(passwordInput).toBeDisabled();
       });

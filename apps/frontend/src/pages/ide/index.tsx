@@ -5,48 +5,52 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProject } from "@/hooks/useProject";
 import { useLabels } from "@/hooks/useLabels";
 import { themePalettes, BASE_URL } from "@/lib/constants";
-import { FloatingParticles, LeftSidebar } from "@/components/ide-shared";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { WriteMode } from "./WriteMode";
+import { FlowMode } from "./FlowMode";
 import { flushModeBeforeTransition } from "@/lib/editor-sync-coordinator";
 import { useToast } from "@/contexts/ToastContext";
-import {
-  useLocalStorage,
-  useLocalStorageBoolean,
-} from "@/hooks/useLocalStorage";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type { Tab } from "@/components/ide-shared/settings-types";
 import { SETTINGS_TABS } from "@/components/ide-shared/settings-types";
+import { WorkspaceChrome } from "@/components/workspace/WorkspaceChrome";
+import { EmptyState } from "@/components/ui/empty-state";
+import {
+  WORKSPACE_VIEW_STORAGE_KEY,
+  isWorkspaceView,
+  type WorkspaceView,
+} from "@/lib/workspace-view";
 
 const ScriptMode = lazy(() =>
   import("./ScriptMode").then((m) => ({ default: m.ScriptMode }))
 );
 
+function isEditorView(view: WorkspaceView): view is "write" | "script" {
+  return view === "write" || view === "script";
+}
+
 export function HomePageIDE() {
   const { theme, setTheme, isDarkMode, toggleDarkMode } = useTheme();
   const { logout } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useLocalStorage<"write" | "script">(
-    "ide:mode",
+  const [view, setView] = useLocalStorage<WorkspaceView>(
+    WORKSPACE_VIEW_STORAGE_KEY,
     "write",
     {
       serializer: (value) => value,
-      deserializer: (value) => value as "write" | "script",
-      validate: (value) => value === "write" || value === "script",
+      deserializer: (value) => value as WorkspaceView,
+      validate: isWorkspaceView,
     }
-  );
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useLocalStorageBoolean(
-    "ide:sidebar-collapsed",
-    false
   );
   const [scriptModeKey, setScriptModeKey] = useState(0);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [initialSettingsTab, setInitialSettingsTab] = useState<Tab | undefined>(
     undefined
   );
+  const [isFocusMode, setIsFocusMode] = useState(false);
   const isFlushing = useRef(false);
   const previousProjectIdRef = useRef<string | undefined>(undefined);
 
-  // Project context
   const {
     currentProject,
     projects,
@@ -57,11 +61,9 @@ export function HomePageIDE() {
     refreshProjects,
   } = useProject();
 
-  // Labels context - clear active label when project changes
   const { setActiveLabelId } = useLabels();
   const { error: showErrorToast } = useToast();
 
-  // Clear active label when project changes
   useEffect(() => {
     const previousProjectId = previousProjectIdRef.current;
     const nextProjectId = currentProject?.id;
@@ -74,7 +76,6 @@ export function HomePageIDE() {
     previousProjectIdRef.current = nextProjectId;
   }, [currentProject?.id, setActiveLabelId]);
 
-  // Wrapped setter that resets tab state when closing
   const handleSetIsSettingsOpen = (open: boolean) => {
     setIsSettingsOpen(open);
     if (!open) {
@@ -82,14 +83,19 @@ export function HomePageIDE() {
     }
   };
 
+  const handleOpenSettingsTab = (tab: Tab) => {
+    setInitialSettingsTab(tab);
+    handleSetIsSettingsOpen(true);
+  };
+
   const handleLogout = async () => {
     await logout();
     navigate(`${BASE_URL}login`);
   };
 
-  const handleSetMode = (newMode: "write" | "script") => {
+  const handleSetView = (nextView: WorkspaceView) => {
     void (async () => {
-      if (newMode === mode) {
+      if (nextView === view) {
         return;
       }
 
@@ -97,28 +103,32 @@ export function HomePageIDE() {
         return;
       }
 
-      isFlushing.current = true;
+      if (isEditorView(view)) {
+        isFlushing.current = true;
 
-      try {
-        const flushed = await flushModeBeforeTransition(mode);
-        if (!flushed) {
+        try {
+          const flushed = await flushModeBeforeTransition(view);
+          if (!flushed) {
+            showErrorToast(
+              "Could not save pending edits. Resolve the save error before switching modes.",
+              "Mode switch blocked"
+            );
+            return;
+          }
+        } catch (error) {
           showErrorToast(
-            "Could not save pending edits. Resolve the save error before switching modes.",
-            "Mode switch blocked"
+            "An error occurred while switching modes. Please try again.",
+            "Mode switch failed"
           );
+          console.error("Error in handleSetView:", error);
           return;
+        } finally {
+          isFlushing.current = false;
         }
-
-        setMode(newMode);
-      } catch (error) {
-        showErrorToast(
-          "An error occurred while switching modes. Please try again.",
-          "Mode switch failed"
-        );
-        console.error("Error in handleSetMode:", error);
-      } finally {
-        isFlushing.current = false;
       }
+
+      setIsFocusMode(false);
+      setView(nextView);
     })();
   };
 
@@ -132,51 +142,49 @@ export function HomePageIDE() {
         return;
       }
 
-      isFlushing.current = true;
+      if (isEditorView(view)) {
+        isFlushing.current = true;
 
-      try {
-        const flushed = await flushModeBeforeTransition(mode);
-        if (!flushed) {
+        try {
+          const flushed = await flushModeBeforeTransition(view);
+          if (!flushed) {
+            showErrorToast(
+              "Could not save pending edits. Resolve the save error before switching projects.",
+              "Project switch blocked"
+            );
+            return;
+          }
+        } catch (error) {
           showErrorToast(
-            "Could not save pending edits. Resolve the save error before switching projects.",
-            "Project switch blocked"
+            "An error occurred while switching projects. Please try again.",
+            "Project switch failed"
           );
+          console.error("Error in handleSetProject:", error);
           return;
+        } finally {
+          isFlushing.current = false;
         }
-
-        setCurrentProject(project);
-      } catch (error) {
-        showErrorToast(
-          "An error occurred while switching projects. Please try again.",
-          "Project switch failed"
-        );
-        console.error("Error in handleSetProject:", error);
-      } finally {
-        isFlushing.current = false;
       }
+
+      setCurrentProject(project);
     })();
   };
 
-  // Retry handler for ScriptMode - forces re-mount by incrementing key
   const handleScriptModeRetry = () => {
     setScriptModeKey((prev) => prev + 1);
   };
 
   const handleOpenSettings = () => handleSetIsSettingsOpen(true);
 
-  // Listen for custom event to open Settings with specific tab
   useEffect(() => {
     const handleOpenSettingsEvent = (event: CustomEvent) => {
-      // Validate event.detail exists
       if (!event.detail) return;
 
       const tab = event.detail.tab;
 
-      // Only set tab if it's one of the allowed values
       if (tab && SETTINGS_TABS.includes(tab)) {
         setInitialSettingsTab(tab);
       } else if (tab != null) {
-        // Invalid tab value provided - ignore the event entirely
         return;
       }
 
@@ -196,13 +204,10 @@ export function HomePageIDE() {
   }, []);
 
   return (
-    <div className="h-screen h-[100dvh] relative overflow-hidden">
-      <FloatingParticles />
-
-      {/* Left Sidebar */}
-      <LeftSidebar
-        mode={mode}
-        setMode={handleSetMode}
+    <div className="relative h-dvh overflow-hidden bg-canvas">
+      <WorkspaceChrome
+        view={view}
+        setView={handleSetView}
         theme={theme}
         setTheme={setTheme}
         themePalettes={themePalettes}
@@ -213,34 +218,35 @@ export function HomePageIDE() {
         projects={projects}
         setCurrentProject={handleSetProject}
         isLoadingProjects={isLoadingProjects}
-        isCollapsed={isSidebarCollapsed}
-        onCollapsedChange={setIsSidebarCollapsed}
         updateProject={updateProject}
         deleteProject={deleteProject}
         refetchProjects={refreshProjects}
         isSettingsOpenExternally={isSettingsOpen}
         onSettingsOpenChangeExternally={handleSetIsSettingsOpen}
         initialSettingsTab={initialSettingsTab}
+        onOpenSettingsTab={handleOpenSettingsTab}
+        hidden={isFocusMode}
       />
 
-      {/* Main content area */}
       <main
         id="main-content"
         tabIndex={-1}
-        className={`h-full overflow-hidden transition-all duration-300 max-md:ml-0 max-md:w-full max-md:pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] ${
-          isSidebarCollapsed
-            ? "md:ml-14 md:w-[calc(100%-3.5rem)]"
-            : "md:ml-56 md:w-[calc(100%-14rem)]"
-        }`}
+        className={
+          isFocusMode
+            ? "h-full overflow-hidden pt-0 pb-0"
+            : "h-full overflow-hidden pt-14 max-md:pt-12 max-md:pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))]"
+        }
       >
-        {mode === "write" ? (
+        {view === "write" ? (
           <WriteMode
             projectName={currentProject?.name}
             onOpenSettings={handleOpenSettings}
+            onFocusModeChange={setIsFocusMode}
           />
-        ) : (
+        ) : view === "script" ? (
           <ErrorBoundary
             key={scriptModeKey}
+            onError={() => setIsFocusMode(false)}
             fallback={
               <div
                 className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground"
@@ -255,7 +261,7 @@ export function HomePageIDE() {
                 <button
                   type="button"
                   onClick={handleScriptModeRetry}
-                  className="px-4 py-2 mt-2 text-sm text-white bg-theme-primary rounded hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-theme-primary"
+                  className="px-4 py-2 mt-2 text-sm text-white bg-theme rounded hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-theme"
                 >
                   Retry
                 </button>
@@ -273,9 +279,16 @@ export function HomePageIDE() {
                 projectId={currentProject?.id}
                 projectName={currentProject?.name}
                 onOpenSettings={handleOpenSettings}
+                onFocusModeChange={setIsFocusMode}
               />
             </Suspense>
           </ErrorBoundary>
+        ) : currentProject?.id ? (
+          <FlowMode projectId={currentProject.id} />
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <EmptyState title="Select a project to view Flow" />
+          </div>
         )}
       </main>
     </div>

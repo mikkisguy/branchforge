@@ -74,7 +74,7 @@ export function LayoutModeSelector({
       role="radiogroup"
       aria-label="Layout mode"
       className={cn(
-        "inline-flex items-center gap-0.5 p-0.5 rounded-lg border border-slate-600 bg-slate-800",
+        "inline-flex items-center gap-0.5 p-0.5 rounded-lg border border-border bg-raised",
         disabled && "opacity-50",
         className
       )}
@@ -96,8 +96,8 @@ export function LayoutModeSelector({
             className={cn(
               "flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md transition-colors",
               isActive
-                ? "bg-slate-600 text-white shadow-sm"
-                : "text-slate-300 hover:text-white hover:bg-slate-700/60"
+                ? "bg-accent text-accent-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
             )}
           >
             <Icon className="w-3.5 h-3.5" aria-hidden="true" />

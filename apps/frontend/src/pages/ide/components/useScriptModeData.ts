@@ -1,19 +1,11 @@
-import {
-  useCallback,
-  useRef,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from "react";
+import { useCallback, useRef, useState } from "react";
 import { useLabels } from "@/hooks/useLabels";
-import { useFocusModeKeyboardHandler } from "@/hooks/useFocusModeKeyboardHandler";
 import { useFocusModeState } from "@/hooks/useFocusModeState";
 import { useGitLab, type UseGitLabReturn } from "@/hooks/useGitLab";
 import { useCharacters } from "@/hooks/useCharacters";
 import { useProjectFiles } from "@/hooks/useProjectFiles";
 import { useToast } from "@/contexts/ToastContext";
 import type { ScriptEditorRef } from "@/components/script-mode/ScriptEditor";
-import { useResponsiveSidebarState } from "@/hooks/useResponsiveSidebarState";
 import type { FocusModeState } from "@/hooks/useFocusModeState";
 import type {
   UseProjectFilesReturn,
@@ -41,11 +33,6 @@ export interface UseScriptModeDataReturn {
   setShowSyncDialog: (open: boolean) => void;
   showZipImportDialog: boolean;
   setShowZipImportDialog: (open: boolean) => void;
-  isLeftSidebarCollapsed: boolean;
-  setIsLeftSidebarCollapsed: Dispatch<SetStateAction<boolean>>;
-  isRightSidebarCollapsed: boolean;
-  setIsRightSidebarCollapsed: Dispatch<SetStateAction<boolean>>;
-  isMobile: boolean;
   focusModeState: FocusModeState;
   handleFocusModeToggle: () => void;
   editorRef: React.RefObject<ScriptEditorRef | null>;
@@ -77,20 +64,9 @@ export function useScriptModeData({
   const [showSyncDialog, setShowSyncDialog] = useState(false);
   const [showZipImportDialog, setShowZipImportDialog] = useState(false);
 
-  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed, isMobile] =
-    useResponsiveSidebarState("script:left-sidebar-collapsed");
-  const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] =
-    useResponsiveSidebarState("script:right-sidebar-collapsed");
-
   const focusModeState = useFocusModeState("script:focus-mode");
-  const {
-    isFocusMode,
-    setIsFocusMode,
-    preFocusSidebarStates,
-    setPreFocusSidebarStates,
-    preFocusElementRef,
-    focusToggleRef,
-  } = focusModeState;
+  const { isFocusMode, setIsFocusMode, preFocusElementRef, focusToggleRef } =
+    focusModeState;
 
   const editorRef = useRef<ScriptEditorRef | null>(null);
   const isResettingRef = useRef(false);
@@ -102,39 +78,18 @@ export function useScriptModeData({
         document.activeElement instanceof HTMLElement
           ? document.activeElement
           : null;
-      setPreFocusSidebarStates({
-        leftCollapsed: isLeftSidebarCollapsed,
-        rightCollapsed: isRightSidebarCollapsed,
-      });
       setIsFocusMode(true);
       editorRef.current?.focus();
       return;
     }
 
     setIsFocusMode(false);
-    if (preFocusSidebarStates) {
-      setIsLeftSidebarCollapsed(preFocusSidebarStates.leftCollapsed);
-      setIsRightSidebarCollapsed(preFocusSidebarStates.rightCollapsed);
-    }
     if (preFocusElementRef.current) {
       preFocusElementRef.current.focus();
     } else {
       focusToggleRef.current?.focus();
     }
-  }, [
-    focusToggleRef,
-    isFocusMode,
-    isLeftSidebarCollapsed,
-    isRightSidebarCollapsed,
-    preFocusElementRef,
-    preFocusSidebarStates,
-    setIsFocusMode,
-    setIsLeftSidebarCollapsed,
-    setIsRightSidebarCollapsed,
-    setPreFocusSidebarStates,
-  ]);
-
-  useFocusModeKeyboardHandler(handleFocusModeToggle);
+  }, [focusToggleRef, isFocusMode, preFocusElementRef, setIsFocusMode]);
 
   const { characters: projectCharacters } = useCharacters(projectId ?? "");
 
@@ -155,11 +110,6 @@ export function useScriptModeData({
     setShowSyncDialog,
     showZipImportDialog,
     setShowZipImportDialog,
-    isLeftSidebarCollapsed,
-    setIsLeftSidebarCollapsed,
-    isRightSidebarCollapsed,
-    setIsRightSidebarCollapsed,
-    isMobile,
     focusModeState,
     handleFocusModeToggle,
     editorRef,

@@ -24,9 +24,10 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["Kanit", "sans-serif"],
+        sans: ["DM Sans", "sans-serif"],
         display: ["Sirin Stencil", "cursive"],
         code: ["Fira Code", "monospace"],
+        serif: ["Noto Serif", "serif"],
       },
       letterSpacing: {
         tighter: "-0.05em",
@@ -41,16 +42,17 @@ export default {
         },
       },
       colors: {
-        border: "var(--theme-border)",
+        border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         theme: {
-          DEFAULT: "var(--theme-primary)",
-          hover: "var(--theme-primary-hover)",
-          accent: "var(--theme-accent)",
-          "accent-hover": "var(--theme-accent-hover)",
+          DEFAULT: "var(--theme-color)",
+          hover: "var(--theme-color-hover)",
+          accent: "var(--theme-color)",
+          "accent-hover": "var(--theme-color-hover)",
+          border: "var(--theme-border)",
         },
         primary: {
           DEFAULT: "hsl(var(--primary))",
@@ -80,6 +82,19 @@ export default {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
+        },
+
+        canvas: {
+          DEFAULT: "hsl(var(--canvas))",
+          foreground: "hsl(var(--canvas-foreground))",
+        },
+        panel: {
+          DEFAULT: "hsl(var(--panel))",
+          foreground: "hsl(var(--panel-foreground))",
+        },
+        raised: {
+          DEFAULT: "hsl(var(--raised))",
+          foreground: "hsl(var(--raised-foreground))",
         },
         // BranchForge custom palettes
         forest: {

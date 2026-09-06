@@ -17,16 +17,13 @@ import { cn } from "@/lib/utils";
 import { projectFilesApi } from "@/lib/api/project-files";
 import type { SourceOrigin } from "@branchforge/shared";
 
-// Status bar styled like a storybook footer
 interface StatusBarProps {
   projectId?: string;
   projectName?: string;
   gitlabBranch?: string;
-  // File source type - determines which import/export controls to show
   fileSourceType?: SourceOrigin;
-  // Focus mode
-  isFocusMode?: boolean;
   onOpenZipImportDialog?: () => void;
+  className?: string;
 }
 
 // Dialog state lives in a single reducer so opening / closing / switching
@@ -74,14 +71,13 @@ export function StatusBar({
   projectName,
   gitlabBranch,
   fileSourceType,
-  isFocusMode = false,
   onOpenZipImportDialog,
+  className,
 }: StatusBarProps) {
   const [dialogState, dispatchDialog] = useReducer(
     dialogReducer,
     initialDialogState
   );
-  const [isHovered, setIsHovered] = useState(false);
 
   /**
    * Handle export click
@@ -149,15 +145,10 @@ export function StatusBar({
   return (
     <>
       <div
-        className="flex items-center justify-between max-md:justify-start max-md:pr-16 px-3 max-sm:px-2 py-2 text-xs bg-card/50 border-t border-dashed transition-opacity duration-300 ease-out gap-2 max-sm:gap-1"
-        style={{
-          borderColor: "var(--theme-border-subtle)",
-          opacity: isFocusMode ? (isHovered ? 1 : 0.6) : 1,
-        }}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        onFocusCapture={() => setIsHovered(true)}
-        onBlurCapture={() => setIsHovered(false)}
+        className={cn(
+          "flex min-w-0 flex-1 items-center justify-between gap-2",
+          className
+        )}
       >
         <div className="flex items-center gap-3 max-sm:gap-2">
           {isGitLabAvailable && (
@@ -180,9 +171,10 @@ export function StatusBar({
                     "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
                   )}
                   title="Import from GitLab"
+                  aria-label="Import from GitLab"
                 >
                   <Download className="size-3.5" />
-                  <span className="max-sm:hidden">Import from GitLab</span>
+                  <span className="sr-only">Import from GitLab</span>
                 </button>
               </div>
               <div className="border-l border-border/30 pl-4 max-sm:pl-2">
@@ -194,9 +186,10 @@ export function StatusBar({
                     "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
                   )}
                   title="Sync to GitLab"
+                  aria-label="Sync to GitLab"
                 >
                   <Upload className="size-3.5" />
-                  <span className="max-sm:hidden">Sync to GitLab</span>
+                  <span className="sr-only">Sync to GitLab</span>
                 </button>
               </div>
             </>
@@ -213,9 +206,10 @@ export function StatusBar({
                   "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
                 )}
                 title="Import from Zip"
+                aria-label="Import from Zip"
               >
                 <Download className="size-3.5" />
-                <span className="max-sm:hidden">Import from Zip</span>
+                <span className="sr-only">Import from Zip</span>
               </button>
             </div>
           )}
@@ -233,13 +227,14 @@ export function StatusBar({
                   isExporting && "opacity-60 cursor-not-allowed"
                 )}
                 title="Export as Zip"
+                aria-label="Export as Zip"
               >
                 {isExporting ? (
                   <Loader2 className="size-3.5 animate-spin" />
                 ) : (
                   <FolderArchive className="size-3.5" />
                 )}
-                <span className="max-sm:hidden">
+                <span className="sr-only">
                   {isExporting ? "Exporting..." : "Export Zip"}
                 </span>
               </button>

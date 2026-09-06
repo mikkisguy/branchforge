@@ -12,18 +12,18 @@ export function NodeBody({ data }: { data: LabelNodeData }) {
             }`}
           />
         )}
-        <span className="text-sm font-medium text-slate-100 truncate">
+        <span className="text-sm font-medium text-foreground truncate">
           {data.title}
         </span>
       </div>
       {data.labelName && (
-        <div className="text-xs text-slate-400 truncate font-mono">
+        <div className="text-xs text-muted-foreground truncate font-mono">
           {data.labelName}
         </div>
       )}
       <div className="flex items-center gap-2 mt-1">
         {data.routeKey && (
-          <span className="text-xs px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">
+          <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
             {data.routeKey}
           </span>
         )}
@@ -37,7 +37,7 @@ export function NodeBody({ data }: { data: LabelNodeData }) {
           </span>
         )}
       </div>
-      <div className="text-xs text-slate-500 mt-1 truncate">
+      <div className="text-xs text-muted-foreground mt-1 truncate">
         {data.fileName}
       </div>
     </div>

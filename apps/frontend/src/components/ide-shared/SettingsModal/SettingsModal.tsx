@@ -131,13 +131,14 @@ export function SettingsModal({
         if (!isOpen) setExportHistoryProject(null);
       }}
     >
-      <DialogContent className="flex w-[800px] max-w-[95vw] flex-col gap-0 overflow-hidden p-0 max-sm:p-0 md:h-[min(780px,85vh)] max-md:h-[min(85vh,calc(100%-32px))]">
-        <DialogHeader className="mb-0 shrink-0 flex-row items-center justify-between space-y-0 border-b border-border/30 p-6 pb-4 max-md:px-4 max-md:pt-4 max-md:pb-3">
+      <DialogContent className="flex w-[800px] max-w-[95vw] flex-col gap-0 overflow-hidden border-border bg-raised p-0 max-sm:p-0 md:h-[min(780px,85vh)] max-md:h-[min(85vh,calc(100%-32px))]">
+        <DialogHeader className="mb-0 shrink-0 flex-row items-center justify-between space-y-0 border-b border-border p-6 pb-4 max-md:px-4 max-md:pt-4 max-md:pb-3">
           <DialogTitle>Settings</DialogTitle>
           <Button
             type="button"
             variant="ghost"
             size="icon"
+            className="size-10 max-md:size-11"
             onClick={() => onOpenChange(false)}
             aria-label="Close settings"
           >
