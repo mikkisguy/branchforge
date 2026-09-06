@@ -49,7 +49,7 @@ export function WorkspaceBar({
   onLogout,
 }: WorkspaceBarProps) {
   return (
-    <header className="max-md:hidden fixed top-0 inset-x-0 z-50 h-14 bg-raised border-b border-border flex items-center px-2 gap-2">
+    <header className="max-md:hidden fixed top-0 inset-x-0 z-50 h-14 bg-raised border-b border-border flex items-center pl-4 pr-2 gap-2">
       <div className="flex items-center gap-2 min-w-0">
         <Logo compact size="sm" />
         <ProjectMenu

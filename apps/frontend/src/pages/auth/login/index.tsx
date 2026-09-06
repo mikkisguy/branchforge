@@ -55,7 +55,7 @@ export function LoginPage() {
       <AmbientBackdrop />
       <div className="relative z-10 w-full max-w-md space-y-8">
         <div className="text-center">
-          <Logo className="text-4xl" />
+          <Logo />
         </div>
         <Card className="border-border bg-raised">
           <CardHeader>

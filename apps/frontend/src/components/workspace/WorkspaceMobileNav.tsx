@@ -62,7 +62,7 @@ export function WorkspaceMobileNav({
 }: WorkspaceMobileNavProps) {
   return (
     <>
-      <header className="md:hidden fixed top-0 inset-x-0 z-50 h-12 bg-raised border-b border-border flex items-center px-2 gap-2">
+      <header className="md:hidden fixed top-0 inset-x-0 z-50 h-12 bg-raised border-b border-border flex items-center pl-4 pr-2 gap-2">
         <Logo compact size="sm" />
         <ProjectMenu
           projectId={projectId}

@@ -25,7 +25,6 @@ export default {
     extend: {
       fontFamily: {
         sans: ["DM Sans", "sans-serif"],
-        display: ["Sirin Stencil", "cursive"],
         code: ["Fira Code", "monospace"],
         serif: ["Noto Serif", "serif"],
       },
