@@ -1,11 +1,4 @@
-import {
-  createContext,
-  use,
-  useCallback,
-  useEffect,
-  useMemo,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useMemo, type ReactNode } from "react";
 import type { WorkspacePanelConfig } from "@/lib/workspace-panels";
 import {
   useWorkspacePanel,
@@ -13,28 +6,10 @@ import {
 } from "@/hooks/useWorkspacePanel";
 import type { WorkspaceBreakpoint } from "@/hooks/useWorkspaceBreakpoint";
 import { WorkspacePanelView } from "./WorkspacePanel";
-
-export interface WorkspaceFrameContextValue {
-  leftPanel: WorkspacePanelState;
-  rightPanel: WorkspacePanelState;
-  toggleLeft: () => void;
-  toggleRight: () => void;
-  breakpoint: WorkspaceBreakpoint;
-  leftPanelId: string;
-  rightPanelId: string;
-}
-
-const WorkspaceFrameContext = createContext<WorkspaceFrameContextValue | null>(
-  null
-);
-
-export function useWorkspaceFrame(): WorkspaceFrameContextValue {
-  const context = use(WorkspaceFrameContext);
-  if (!context) {
-    throw new Error("useWorkspaceFrame must be used within a WorkspaceFrame");
-  }
-  return context;
-}
+import {
+  WorkspaceFrameContext,
+  type WorkspaceFrameContextValue,
+} from "./useWorkspaceFrame";
 
 function shouldMutuallyExcludePanels(breakpoint: WorkspaceBreakpoint): boolean {
   return breakpoint === "narrow" || breakpoint === "mobile";
@@ -103,33 +78,34 @@ export function WorkspaceFrameLayout({
 }: WorkspaceFrameLayoutProps) {
   const breakpoint = leftPanelRaw.breakpoint;
   const mutuallyExclusive = shouldMutuallyExcludePanels(breakpoint);
+  const leftCollapsed = leftPanelRaw.collapsed;
+  const rightCollapsed = rightPanelRaw.collapsed;
+  const leftSetCollapsedRaw = leftPanelRaw.setCollapsed;
+  const rightSetCollapsedRaw = rightPanelRaw.setCollapsed;
+  const leftIsOverlay = leftPanelRaw.isOverlay;
+  const rightIsOverlay = rightPanelRaw.isOverlay;
 
   useEffect(() => {
     if (!mutuallyExclusive) {
       return;
     }
-    if (!leftPanelRaw.collapsed && !rightPanelRaw.collapsed) {
-      rightPanelRaw.setCollapsed(true);
+    if (!leftCollapsed && !rightCollapsed) {
+      rightSetCollapsedRaw(true);
     }
-  }, [
-    mutuallyExclusive,
-    leftPanelRaw.collapsed,
-    rightPanelRaw.collapsed,
-    rightPanelRaw.setCollapsed,
-  ]);
+  }, [mutuallyExclusive, leftCollapsed, rightCollapsed, rightSetCollapsedRaw]);
 
   const leftSetCollapsed = useMemo(
     () =>
       wrapSetCollapsed(
-        leftPanelRaw.collapsed,
-        leftPanelRaw.setCollapsed,
-        rightPanelRaw.setCollapsed,
+        leftCollapsed,
+        leftSetCollapsedRaw,
+        rightSetCollapsedRaw,
         mutuallyExclusive
       ),
     [
-      leftPanelRaw.collapsed,
-      leftPanelRaw.setCollapsed,
-      rightPanelRaw.setCollapsed,
+      leftCollapsed,
+      leftSetCollapsedRaw,
+      rightSetCollapsedRaw,
       mutuallyExclusive,
     ]
   );
@@ -137,15 +113,15 @@ export function WorkspaceFrameLayout({
   const rightSetCollapsed = useMemo(
     () =>
       wrapSetCollapsed(
-        rightPanelRaw.collapsed,
-        rightPanelRaw.setCollapsed,
-        leftPanelRaw.setCollapsed,
+        rightCollapsed,
+        rightSetCollapsedRaw,
+        leftSetCollapsedRaw,
         mutuallyExclusive
       ),
     [
-      rightPanelRaw.collapsed,
-      rightPanelRaw.setCollapsed,
-      leftPanelRaw.setCollapsed,
+      rightCollapsed,
+      rightSetCollapsedRaw,
+      leftSetCollapsedRaw,
       mutuallyExclusive,
     ]
   );
@@ -161,43 +137,43 @@ export function WorkspaceFrameLayout({
   );
 
   const toggleLeft = useCallback(() => {
-    const willExpand = leftPanel.collapsed;
+    const willExpand = leftCollapsed;
     if (willExpand && mutuallyExclusive) {
-      rightPanelRaw.setCollapsed(true);
+      rightSetCollapsedRaw(true);
     }
-    leftPanelRaw.setCollapsed(!leftPanel.collapsed);
+    leftSetCollapsedRaw(!leftCollapsed);
   }, [
-    leftPanel.collapsed,
-    leftPanelRaw,
+    leftCollapsed,
+    leftSetCollapsedRaw,
     mutuallyExclusive,
-    rightPanelRaw.setCollapsed,
+    rightSetCollapsedRaw,
   ]);
 
   const toggleRight = useCallback(() => {
-    const willExpand = rightPanel.collapsed;
+    const willExpand = rightCollapsed;
     if (willExpand && mutuallyExclusive) {
-      leftPanelRaw.setCollapsed(true);
+      leftSetCollapsedRaw(true);
     }
-    rightPanelRaw.setCollapsed(!rightPanel.collapsed);
+    rightSetCollapsedRaw(!rightCollapsed);
   }, [
-    leftPanelRaw.setCollapsed,
-    rightPanel.collapsed,
-    rightPanelRaw,
+    leftSetCollapsedRaw,
+    rightCollapsed,
+    rightSetCollapsedRaw,
     mutuallyExclusive,
   ]);
 
   const closeOverlays = useCallback(() => {
-    if (leftPanelRaw.isOverlay) {
-      leftPanelRaw.setCollapsed(true);
+    if (leftIsOverlay) {
+      leftSetCollapsedRaw(true);
     }
-    if (rightPanelRaw.isOverlay) {
-      rightPanelRaw.setCollapsed(true);
+    if (rightIsOverlay) {
+      rightSetCollapsedRaw(true);
     }
   }, [
-    leftPanelRaw.isOverlay,
-    leftPanelRaw.setCollapsed,
-    rightPanelRaw.isOverlay,
-    rightPanelRaw.setCollapsed,
+    leftIsOverlay,
+    leftSetCollapsedRaw,
+    rightIsOverlay,
+    rightSetCollapsedRaw,
   ]);
 
   const showScrim =
@@ -205,7 +181,7 @@ export function WorkspaceFrameLayout({
     (!rightPanel.collapsed && rightPanel.isOverlay);
 
   const contextValue = useMemo(
-    () => ({
+    (): WorkspaceFrameContextValue => ({
       leftPanel,
       rightPanel,
       toggleLeft,
@@ -307,7 +283,6 @@ export function WorkspaceFrame({
     <WorkspaceFrameLayout
       leftConfig={leftConfig}
       rightConfig={rightConfig}
-
       leftPanelRaw={leftPanelRaw}
       rightPanelRaw={rightPanelRaw}
       {...layoutProps}

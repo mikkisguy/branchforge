@@ -3,6 +3,7 @@ import type { Project } from "@/lib/api/projects";
 import {
   Menu,
   MenuContent,
+  MenuGroup,
   MenuItem,
   MenuSeparator,
   MenuTrigger,
@@ -49,22 +50,24 @@ export function ProjectMenu({
         <ChevronDown className="size-4 flex-shrink-0" aria-hidden="true" />
       </MenuTrigger>
       <MenuContent align="start" className="min-w-[220px]">
-        {projects.map((project) => {
-          const isCurrent = project.id === projectId;
-          return (
-            <MenuItem
-              key={project.id}
-              aria-checked={isCurrent}
-              onSelect={() => setCurrentProject(project)}
-              className="justify-between gap-2"
-            >
-              <span className="truncate">{project.name}</span>
-              {isCurrent ? (
-                <Check className="size-4 flex-shrink-0" aria-hidden="true" />
-              ) : null}
-            </MenuItem>
-          );
-        })}
+        <MenuGroup label="Project">
+          {projects.map((project) => {
+            const isCurrent = project.id === projectId;
+            return (
+              <MenuItem
+                key={project.id}
+                aria-checked={isCurrent}
+                onSelect={() => setCurrentProject(project)}
+                className="justify-between gap-2"
+              >
+                <span className="truncate">{project.name}</span>
+                {isCurrent ? (
+                  <Check className="size-4 flex-shrink-0" aria-hidden="true" />
+                ) : null}
+              </MenuItem>
+            );
+          })}
+        </MenuGroup>
         <MenuSeparator />
         <MenuItem disabled={!projectId} onSelect={onOpenProjectSettings}>
           Project settings

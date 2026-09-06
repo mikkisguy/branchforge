@@ -61,41 +61,31 @@ export function ScriptReferencePanel({
 
   return (
     <>
-      <div className="h-full min-h-0 overflow-hidden bg-panel">
-        <div className="h-full overflow-y-auto">
-          <div className="sticky top-0 z-20 border-b border-border bg-panel px-4 py-3">
-            <h2 className="text-sm font-semibold tracking-wide">Reference</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Project definitions
-            </p>
-          </div>
-          <div>
-            <ScriptReferenceCharactersSection
-              characters={sortedCharacters}
-              failedAvatars={failedAvatars}
-              onAvatarError={(id) => {
-                setFailedAvatars((prev) => ({ ...prev, [id]: true }));
-              }}
-              canEdit={!!onCharacterEdit}
-              onEdit={onCharacterEdit}
-            />
-            <ScriptReferenceVariablesSection
-              isLoading={isLoadingVariables}
-              groupedVariables={groupedVariables}
-              onManage={() => setVariablesDialogOpen(true)}
-            />
-            <ScriptReferenceStatsSection
-              isLoading={isLoadingStats}
-              stats={stats}
-              onManage={() => setStatsDialogOpen(true)}
-            />
-            <ScriptReferenceWorldElementsSection
-              isLoading={isLoadingElements}
-              elements={elements}
-              onManage={() => setWorldElementsDialogOpen(true)}
-            />
-          </div>
-        </div>
+      <div className="h-full min-h-0 overflow-y-auto">
+        <ScriptReferenceCharactersSection
+          characters={sortedCharacters}
+          failedAvatars={failedAvatars}
+          onAvatarError={(id) => {
+            setFailedAvatars((prev) => ({ ...prev, [id]: true }));
+          }}
+          canEdit={!!onCharacterEdit}
+          onEdit={onCharacterEdit}
+        />
+        <ScriptReferenceVariablesSection
+          isLoading={isLoadingVariables}
+          groupedVariables={groupedVariables}
+          onManage={() => setVariablesDialogOpen(true)}
+        />
+        <ScriptReferenceStatsSection
+          isLoading={isLoadingStats}
+          stats={stats}
+          onManage={() => setStatsDialogOpen(true)}
+        />
+        <ScriptReferenceWorldElementsSection
+          isLoading={isLoadingElements}
+          elements={elements}
+          onManage={() => setWorldElementsDialogOpen(true)}
+        />
       </div>
 
       <VariablesDialog

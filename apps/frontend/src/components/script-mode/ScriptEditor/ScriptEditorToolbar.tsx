@@ -1,4 +1,4 @@
-import { createContext, use } from "react";
+import { use } from "react";
 import { PaletteSwitcher } from "../PaletteSwitcher";
 import { FontSizeSwitcher } from "../../FontSizeSwitcher";
 import { LineWrapSwitcher } from "../LineWrapSwitcher";
@@ -6,10 +6,7 @@ import { SaveIndicator } from "../../write-mode/SaveIndicator";
 import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SaveStatus } from "@/hooks/useAutosave";
-
-export const ScriptEditorToolbarPlacementContext = createContext<
-  "editor" | "workspace"
->("editor");
+import { ScriptEditorToolbarPlacementContext } from "./script-editor-toolbar-context";
 
 interface ScriptEditorFormattingControlsProps {
   lineWrap: boolean;

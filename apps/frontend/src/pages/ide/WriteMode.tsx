@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { WorkspaceFocusReporter } from "@/components/workspace/WorkspaceFocusReporter";
 import { useLabels } from "@/hooks/useLabels";
 import { useCharacters } from "@/hooks/useCharacters";
 import { useRouteConfigs } from "@/hooks/useRouteConfigs";
@@ -90,14 +91,6 @@ export function WriteMode({
       setIsRightSidebarCollapsed: rightPanelRaw.setCollapsed,
       editorRef,
     });
-
-  const isEditorMounted =
-    !!currentProject && !isLoadingLabels && labels.length > 0;
-
-  useEffect(() => {
-    onFocusModeChange?.(isEditorMounted && isFocusMode);
-    return () => onFocusModeChange?.(false);
-  }, [isEditorMounted, isFocusMode, onFocusModeChange]);
 
   const [currentDraft, setCurrentDraft] = useState<LabelDialogueDraft>(() => ({
     labelId: activeLabel?.id ?? activeLabelId,
@@ -212,6 +205,10 @@ export function WriteMode({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <WorkspaceFocusReporter
+        active={isFocusMode}
+        onFocusModeChange={onFocusModeChange}
+      />
       <WriteModeView
         isFocusMode={isFocusMode}
         focusToggleRef={focusToggleRef}

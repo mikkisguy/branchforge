@@ -5,6 +5,7 @@ import {
   useEffect,
   useId,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ButtonHTMLAttributes,
@@ -107,22 +108,35 @@ export function Menu({ children, className }: MenuProps) {
     }
   }, [open]);
 
-  const contextValue: MenuContextValue = {
-    open,
-    setOpen,
-    triggerRef,
-    triggerNode,
-    setTriggerNode: setTriggerRef,
-    containerRef,
-    menuId,
-    close,
-    focusedId,
-    setFocusedId,
-    registerItem,
-    unregisterItem,
-    items,
-    selectLockRef,
-  };
+  const contextValue = useMemo<MenuContextValue>(
+    () => ({
+      open,
+      setOpen,
+      triggerRef,
+      triggerNode,
+      setTriggerNode: setTriggerRef,
+      containerRef,
+      menuId,
+      close,
+      focusedId,
+      setFocusedId,
+      registerItem,
+      unregisterItem,
+      items,
+      selectLockRef,
+    }),
+    [
+      open,
+      triggerNode,
+      setTriggerRef,
+      menuId,
+      close,
+      focusedId,
+      registerItem,
+      unregisterItem,
+      items,
+    ]
+  );
 
   return (
     <MenuContext.Provider value={contextValue}>
@@ -480,5 +494,19 @@ export function MenuSeparator({ className }: MenuSeparatorProps) {
       className={cn("my-1 h-px bg-border", className)}
       aria-orientation="horizontal"
     />
+  );
+}
+
+export interface MenuGroupProps {
+  children: ReactNode;
+  label: string;
+  className?: string;
+}
+
+export function MenuGroup({ children, label, className }: MenuGroupProps) {
+  return (
+    <div role="group" aria-label={label} className={className}>
+      {children}
+    </div>
   );
 }

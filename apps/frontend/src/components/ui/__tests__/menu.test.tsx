@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import {
   Menu,
   MenuContent,
+  MenuGroup,
   MenuItem,
   MenuSeparator,
   MenuTrigger,
@@ -108,8 +109,10 @@ describe("Menu", () => {
       <Menu>
         <MenuTrigger aria-label="Theme">Open</MenuTrigger>
         <MenuContent>
-          <MenuItem aria-checked={true}>Forest</MenuItem>
-          <MenuItem aria-checked={false}>Graphite</MenuItem>
+          <MenuGroup label="Theme">
+            <MenuItem aria-checked={true}>Forest</MenuItem>
+            <MenuItem aria-checked={false}>Graphite</MenuItem>
+          </MenuGroup>
         </MenuContent>
       </Menu>
     );
@@ -121,6 +124,7 @@ describe("Menu", () => {
     expect(
       screen.getByRole("menuitemradio", { name: "Graphite" })
     ).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByRole("group", { name: "Theme" })).toBeInTheDocument();
   });
 
   it("stacks the menu above sidebar chrome", async () => {

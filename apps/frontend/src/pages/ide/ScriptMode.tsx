@@ -1,5 +1,5 @@
-import { useEffect } from "react";
 import { ScriptModeEditorLayout } from "./components/ScriptModeEditorLayout";
+import { WorkspaceFocusReporter } from "@/components/workspace/WorkspaceFocusReporter";
 import { ScriptModeEmptyState } from "./components/ScriptModeEmptyState";
 import { ScriptModeDialogs } from "./components/ScriptModeDialogs";
 import { useScriptMode } from "./components/useScriptMode";
@@ -61,18 +61,6 @@ export function ScriptMode({
     generatedFileName,
   } = useScriptMode({ projectId });
 
-  const isEditorMounted =
-    !isLoadingLabels &&
-    !isLoadingFiles &&
-    (projectFiles.length > 0 ||
-      isGeneratedPreview ||
-      generatedFiles.some((file) => !file.isEmpty));
-
-  useEffect(() => {
-    onFocusModeChange?.(isEditorMounted && focusModeState.isFocusMode);
-    return () => onFocusModeChange?.(false);
-  }, [isEditorMounted, focusModeState.isFocusMode, onFocusModeChange]);
-
   if (isLoadingLabels || isLoadingFiles) {
     return (
       <div className="flex h-full flex-col overflow-hidden">
@@ -109,6 +97,10 @@ export function ScriptMode({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <WorkspaceFocusReporter
+        active={focusModeState.isFocusMode}
+        onFocusModeChange={onFocusModeChange}
+      />
       <div className="min-h-0 flex-1">
         <ScriptModeEditorLayout
           projectName={projectName}

@@ -118,6 +118,7 @@ describe("WorkspaceChrome", () => {
     });
     await user.click(projectMenus[0]!);
 
+    expect(screen.getByRole("group", { name: "Project" })).toBeInTheDocument();
     const secondProjectItem = screen.getByRole("menuitemradio", {
       name: /Second Project/,
     });
@@ -162,6 +163,9 @@ describe("WorkspaceChrome", () => {
     await user.click(accountMenus[0]!);
 
     const menu = screen.getByRole("menu");
+    expect(
+      within(menu).getByRole("group", { name: "Theme" })
+    ).toBeInTheDocument();
     expect(
       within(menu).getByRole("menuitem", { name: "Appearance: Dark" })
     ).toBeInTheDocument();

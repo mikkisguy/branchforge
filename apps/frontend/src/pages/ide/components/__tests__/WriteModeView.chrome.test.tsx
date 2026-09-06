@@ -67,6 +67,9 @@ vi.mock("@/components/workspace/WorkspaceFrame", () => ({
       {focusChrome}
     </div>
   ),
+}));
+
+vi.mock("@/components/workspace/useWorkspaceFrame", () => ({
   useWorkspaceFrame: () => ({
     leftPanel: { collapsed: true },
     rightPanel: { collapsed: true },

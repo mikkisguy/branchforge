@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { PanelLeft, PanelRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useWorkspaceFrame } from "./WorkspaceFrame";
+import { useWorkspaceFrame } from "./useWorkspaceFrame";
 
 export interface WorkspaceToolbarProps {
   children?: ReactNode;

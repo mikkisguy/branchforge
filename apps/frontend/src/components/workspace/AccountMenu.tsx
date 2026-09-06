@@ -5,6 +5,7 @@ import type { ThemePaletteOption } from "@/components/ide-shared/ThemeSwitcher";
 import {
   Menu,
   MenuContent,
+  MenuGroup,
   MenuItem,
   MenuSeparator,
   MenuTrigger,
@@ -55,22 +56,24 @@ export function AccountMenu({
       >
         <MenuItem onSelect={onToggleDarkMode}>{appearanceLabel}</MenuItem>
         <MenuSeparator />
-        {themePalettes.map((palette) => {
-          const isCurrent = theme === palette.key;
-          return (
-            <MenuItem
-              key={palette.key}
-              aria-checked={isCurrent}
-              onSelect={() => setTheme(palette.key)}
-              className="justify-between gap-2"
-            >
-              <span>{palette.name}</span>
-              {isCurrent ? (
-                <Check className="size-4 flex-shrink-0" aria-hidden="true" />
-              ) : null}
-            </MenuItem>
-          );
-        })}
+        <MenuGroup label="Theme">
+          {themePalettes.map((palette) => {
+            const isCurrent = theme === palette.key;
+            return (
+              <MenuItem
+                key={palette.key}
+                aria-checked={isCurrent}
+                onSelect={() => setTheme(palette.key)}
+                className="justify-between gap-2"
+              >
+                <span>{palette.name}</span>
+                {isCurrent ? (
+                  <Check className="size-4 flex-shrink-0" aria-hidden="true" />
+                ) : null}
+              </MenuItem>
+            );
+          })}
+        </MenuGroup>
         <MenuSeparator />
         <MenuItem onSelect={onOpenKeyboardShortcuts}>
           Keyboard shortcuts

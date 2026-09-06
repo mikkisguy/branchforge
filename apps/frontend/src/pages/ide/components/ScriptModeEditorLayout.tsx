@@ -36,10 +36,8 @@ import { CharacterEditDialog } from "@/components/CharacterEditDialog/CharacterE
 import { WorkspaceFrameLayout } from "@/components/workspace/WorkspaceFrame";
 import { WorkspaceToolbar } from "@/components/workspace/WorkspaceToolbar";
 import { WorkspaceStatusBar } from "@/components/workspace/WorkspaceStatusBar";
-import {
-  ScriptEditorFormattingControls,
-  ScriptEditorToolbarPlacementContext,
-} from "@/components/script-mode/ScriptEditor/ScriptEditorToolbar";
+import { ScriptEditorFormattingControls } from "@/components/script-mode/ScriptEditor/ScriptEditorToolbar";
+import { ScriptEditorToolbarPlacementContext } from "@/components/script-mode/ScriptEditor/script-editor-toolbar-context";
 import { useWorkspacePanel } from "@/hooks/useWorkspacePanel";
 import { useFocusModeKeyboardHandler } from "@/hooks/useFocusModeKeyboardHandler";
 import { SCRIPT_LEFT_PANEL, SCRIPT_RIGHT_PANEL } from "@/lib/workspace-panels";

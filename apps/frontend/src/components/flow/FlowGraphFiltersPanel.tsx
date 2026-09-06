@@ -8,9 +8,9 @@
  * - Character multi-select
  * - "Clear all" + active-filter count badge
  *
- * Renders inside a docked {@link WorkspacePanel} in FlowGraphCanvas. Collapse
- * is handled by the workspace panel chrome — this component only renders the
- * expanded panel body.
+ * Renders inside the docked filters panel owned by {@link FlowFiltersDock}.
+ * Collapse is handled by that dock — this component only renders the expanded
+ * panel body.
  *
  * State is fully controlled by the parent so it can be serialised /
  * persisted by the surrounding FlowGraph if needed.

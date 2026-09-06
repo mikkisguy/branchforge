@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import {
   clampPanelWidth,
@@ -65,14 +65,14 @@ export function useWorkspacePanel(
   const [overlayCollapsed, setOverlayCollapsed] = useState(true);
 
   const isOverlay = isPanelOverlay(config.side, breakpoint);
-  const prevIsOverlayRef = useRef(isOverlay);
+  const [prevIsOverlay, setPrevIsOverlay] = useState(isOverlay);
 
-  useEffect(() => {
-    if (isOverlay && !prevIsOverlayRef.current) {
+  if (isOverlay !== prevIsOverlay) {
+    setPrevIsOverlay(isOverlay);
+    if (isOverlay) {
       setOverlayCollapsed(true);
     }
-    prevIsOverlayRef.current = isOverlay;
-  }, [isOverlay]);
+  }
 
   const collapsed = isOverlay ? overlayCollapsed : storedCollapsed;
 

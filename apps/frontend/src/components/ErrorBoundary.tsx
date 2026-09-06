@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Component } from "react";
+import { Button } from "@/components/ui/button";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -84,41 +85,37 @@ export class ErrorBoundary extends Component<
         this.props.fallback ?? (
           <div
             role="alert"
-            className="flex flex-col items-center justify-center h-screen gap-4 px-4 text-center"
+            className="flex h-screen flex-col items-center justify-center gap-4 px-4 text-center"
           >
-            <div className="text-6xl text-slate-600">⚠️</div>
-            <h2 className="text-xl font-semibold text-slate-300">
+            <div className="text-6xl text-muted-foreground">⚠️</div>
+            <h2 className="text-xl font-semibold text-foreground">
               Something went wrong
             </h2>
-            <p className="text-sm text-slate-500 max-w-md">
+            <p className="max-w-md text-sm text-muted-foreground">
               The application encountered an unexpected error. Please try
               refreshing the page.
             </p>
             {this.state.error && import.meta.env.DEV && (
-              <details className="mt-4 text-xs text-slate-600 text-left max-w-lg">
-                <summary className="cursor-pointer hover:text-slate-500">
+              <details className="mt-4 max-w-lg text-left text-xs text-muted-foreground">
+                <summary className="cursor-pointer hover:text-foreground">
                   Error details
                 </summary>
-                <pre className="mt-2 p-3 bg-slate-900 rounded overflow-auto max-h-48">
+                <pre className="mt-2 max-h-48 overflow-auto rounded bg-panel p-3">
                   {this.state.error.stack ?? this.state.error.toString()}
                 </pre>
               </details>
             )}
-            <div className="flex gap-3 mt-4">
-              <button
+            <div className="mt-4 flex gap-3">
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => this.resetErrorBoundary()}
-                className="px-4 py-2 text-slate-300 border border-slate-600 rounded hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-slate-500"
               >
                 Try Again
-              </button>
-              <button
-                type="button"
-                onClick={() => window.location.reload()}
-                className="px-4 py-2 bg-theme text-white rounded hover:opacity-90 transition-opacity"
-              >
+              </Button>
+              <Button type="button" onClick={() => window.location.reload()}>
                 Reload Page
-              </button>
+              </Button>
             </div>
           </div>
         )
