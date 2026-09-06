@@ -65,4 +65,41 @@ describe("EditorTabBar", () => {
 
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  it("sits flush in the toolbar without nested card chrome", () => {
+    const { container } = render(
+      <EditorTabBar
+        items={items}
+        activeItemId="scene-1"
+        onSelect={vi.fn()}
+        onClose={vi.fn()}
+        idPrefix="write-tab-"
+      />
+    );
+
+    const root = container.firstElementChild;
+    expect(root).toHaveClass("h-full", "min-w-0", "flex-1");
+    expect(root?.className).not.toMatch(/mb-2|rounded-lg|border-border/);
+  });
+
+  it("keeps title, meta, and close on one aligned row", () => {
+    render(
+      <EditorTabBar
+        items={[{ id: "scene-1", title: "Opening", meta: "act_i" }]}
+        activeItemId="scene-1"
+        onSelect={vi.fn()}
+        onClose={vi.fn()}
+        idPrefix="write-tab-"
+      />
+    );
+
+    const tab = screen.getByRole("tab", { name: /Opening/ });
+    const row = tab.parentElement;
+    expect(row).toHaveClass("h-8", "items-center", "gap-1.5", "rounded-md");
+    expect(tab).toHaveClass("items-center", "gap-1.5");
+    expect(tab).toHaveTextContent("act_i");
+    expect(
+      screen.getByRole("button", { name: "Close Opening" })
+    ).toBeInTheDocument();
+  });
 });

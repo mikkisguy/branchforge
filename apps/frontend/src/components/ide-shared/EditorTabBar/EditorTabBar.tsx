@@ -56,10 +56,10 @@ export function EditorTabBar({
   return (
     <div
       className={cn(
-        "transition-all duration-300 ease-out",
+        "min-w-0 flex-1 transition-[height,opacity] duration-300 ease-out",
         hidden
-          ? "h-0 opacity-0 overflow-hidden"
-          : "mb-2 h-12 overflow-hidden rounded-lg border border-border/80 bg-card/55 opacity-100 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+          ? "h-0 overflow-hidden opacity-0"
+          : "h-full overflow-hidden opacity-100"
       )}
       aria-hidden={hidden}
       inert={hidden || undefined}
