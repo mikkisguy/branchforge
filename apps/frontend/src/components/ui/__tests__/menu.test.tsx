@@ -127,6 +127,26 @@ describe("Menu", () => {
     expect(screen.getByRole("group", { name: "Theme" })).toBeInTheDocument();
   });
 
+  it("can show a visible group label", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Menu>
+        <MenuTrigger aria-label="Project">Open</MenuTrigger>
+        <MenuContent>
+          <MenuGroup label="Projects" showLabel>
+            <MenuItem>Alpha</MenuItem>
+          </MenuGroup>
+        </MenuContent>
+      </Menu>
+    );
+
+    await user.click(screen.getByRole("button", { name: "Project" }));
+
+    expect(screen.getByRole("group", { name: "Projects" })).toBeInTheDocument();
+    expect(screen.getByText("Projects")).toBeInTheDocument();
+  });
+
   it("stacks the menu above sidebar chrome", async () => {
     const user = userEvent.setup();
     renderMenu();
@@ -134,6 +154,17 @@ describe("Menu", () => {
     await user.click(screen.getByRole("button", { name: "Account" }));
 
     expect(screen.getByRole("menu").className).toContain("z-[110]");
+  });
+
+  it("destructive items use the readable muted token", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+
+    await user.click(screen.getByRole("button", { name: "Account" }));
+
+    expect(
+      screen.getByRole("menuitem", { name: "Logout" }).className
+    ).toContain("text-destructive-muted");
   });
 
   it("does not select on right-click pointerdown", async () => {

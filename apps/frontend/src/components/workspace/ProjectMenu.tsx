@@ -10,6 +10,11 @@ import {
 } from "@/components/ui/menu";
 import { cn } from "@/lib/utils";
 
+function projectInitial(name: string): string {
+  const trimmed = name.trim();
+  return trimmed ? trimmed[0]!.toUpperCase() : "?";
+}
+
 interface ProjectMenuProps {
   projectId?: string;
   projects: Project[];
@@ -50,31 +55,48 @@ export function ProjectMenu({
         <ChevronDown className="size-4 flex-shrink-0" aria-hidden="true" />
       </MenuTrigger>
       <MenuContent align="start" className="min-w-[220px]">
-        <MenuGroup label="Project">
-          {projects.map((project) => {
-            const isCurrent = project.id === projectId;
-            return (
-              <MenuItem
-                key={project.id}
-                aria-checked={isCurrent}
-                onSelect={() => setCurrentProject(project)}
-                className="justify-between gap-2"
-              >
-                <span className="truncate">{project.name}</span>
-                {isCurrent ? (
-                  <Check className="size-4 flex-shrink-0" aria-hidden="true" />
-                ) : null}
-              </MenuItem>
-            );
-          })}
-        </MenuGroup>
-        <MenuSeparator />
-        <MenuItem disabled={!projectId} onSelect={onOpenProjectSettings}>
-          Project settings
-        </MenuItem>
-        <MenuItem onSelect={onImportGitLab}>Import from GitLab</MenuItem>
-        <MenuItem onSelect={onImportZip}>Import ZIP</MenuItem>
-        <MenuItem onSelect={onManageProjects}>Manage projects</MenuItem>
+        {projects.length > 0 ? (
+          <>
+            <MenuGroup label="Projects" showLabel>
+              {projects.map((project) => {
+                const isCurrent = project.id === projectId;
+                return (
+                  <MenuItem
+                    key={project.id}
+                    aria-checked={isCurrent}
+                    onSelect={() => setCurrentProject(project)}
+                    className="justify-between gap-2"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span
+                        className="flex size-4 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium leading-none text-muted-foreground"
+                        aria-hidden="true"
+                      >
+                        {projectInitial(project.name)}
+                      </span>
+                      <span className="truncate">{project.name}</span>
+                    </span>
+                    {isCurrent ? (
+                      <Check
+                        className="size-4 flex-shrink-0"
+                        aria-hidden="true"
+                      />
+                    ) : null}
+                  </MenuItem>
+                );
+              })}
+            </MenuGroup>
+            <MenuSeparator />
+          </>
+        ) : null}
+        <div className="text-muted-foreground">
+          <MenuItem disabled={!projectId} onSelect={onOpenProjectSettings}>
+            Project settings
+          </MenuItem>
+          <MenuItem onSelect={onImportGitLab}>Import from GitLab</MenuItem>
+          <MenuItem onSelect={onImportZip}>Import ZIP</MenuItem>
+          <MenuItem onSelect={onManageProjects}>Manage projects</MenuItem>
+        </div>
       </MenuContent>
     </Menu>
   );

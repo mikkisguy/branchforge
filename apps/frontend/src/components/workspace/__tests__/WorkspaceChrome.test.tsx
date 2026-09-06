@@ -133,10 +133,17 @@ describe("WorkspaceChrome", () => {
     });
     await user.click(projectMenus[0]!);
 
-    expect(screen.getByRole("group", { name: "Project" })).toBeInTheDocument();
-    const secondProjectItem = screen.getByRole("menuitemradio", {
+    const menu = screen.getByRole("menu");
+    expect(
+      within(menu).getByRole("group", { name: "Projects" })
+    ).toBeInTheDocument();
+    expect(within(menu).getByText("Projects")).toBeInTheDocument();
+    const secondProjectItem = within(menu).getByRole("menuitemradio", {
       name: /Second Project/,
     });
+    expect(
+      secondProjectItem.querySelector("[aria-hidden='true']")
+    ).toHaveTextContent("S");
     await user.click(secondProjectItem);
 
     expect(setCurrentProject).toHaveBeenCalledOnce();
@@ -205,6 +212,36 @@ describe("WorkspaceChrome", () => {
     expect(
       within(menu).getByRole("menuitem", { name: "Logout" })
     ).toBeInTheDocument();
+
+    for (const palette of themePalettes) {
+      const item = within(menu).getByRole("menuitemradio", {
+        name: palette.name,
+      });
+      const swatch = item.querySelector("[aria-hidden='true']");
+      expect(swatch).toHaveStyle({ background: palette.color });
+      expect(swatch).toHaveClass("rounded-full", "size-2");
+    }
+
+    expect(
+      within(menu)
+        .getByRole("menuitem", { name: "Appearance: Dark" })
+        .querySelector("svg")
+    ).toBeInTheDocument();
+    expect(
+      within(menu)
+        .getByRole("menuitem", { name: "Keyboard shortcuts" })
+        .querySelector("svg")
+    ).not.toBeInTheDocument();
+    expect(
+      within(menu)
+        .getByRole("menuitem", { name: "Settings" })
+        .querySelector("svg")
+    ).not.toBeInTheDocument();
+    expect(
+      within(menu)
+        .getByRole("menuitem", { name: "Logout" })
+        .querySelector("svg")
+    ).not.toBeInTheDocument();
   });
 
   it("logout item calls onLogout", async () => {

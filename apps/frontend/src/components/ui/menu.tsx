@@ -460,8 +460,11 @@ export function MenuItem({
       className={cn(
         "relative flex w-full cursor-default select-none items-center rounded-sm border-0 bg-transparent px-2 py-1.5 text-left text-sm font-inherit outline-none transition-colors",
         "h-10 max-md:min-h-11",
-        variant === "destructive" && "text-destructive",
-        isFocused && "bg-accent text-accent-foreground",
+        variant === "destructive" && "text-destructive-muted",
+        isFocused &&
+          (variant === "destructive"
+            ? "bg-destructive/10 text-destructive-muted"
+            : "bg-accent text-accent-foreground"),
         disabled && "pointer-events-none opacity-50",
         className
       )}
@@ -500,11 +503,32 @@ export interface MenuGroupProps {
   children: ReactNode;
   label: string;
   className?: string;
+  showLabel?: boolean;
 }
 
-export function MenuGroup({ children, label, className }: MenuGroupProps) {
+export function MenuGroup({
+  children,
+  label,
+  className,
+  showLabel = false,
+}: MenuGroupProps) {
+  const headingId = useId();
+
   return (
-    <div role="group" aria-label={label} className={className}>
+    <div
+      role="group"
+      aria-label={showLabel ? undefined : label}
+      aria-labelledby={showLabel ? headingId : undefined}
+      className={className}
+    >
+      {showLabel ? (
+        <div
+          id={headingId}
+          className="px-2 pb-1 pt-1.5 text-xs font-medium text-muted-foreground"
+        >
+          {label}
+        </div>
+      ) : null}
       {children}
     </div>
   );

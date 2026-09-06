@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Check, CircleUser } from "lucide-react";
+import { Check, CircleUser, Moon, Sun } from "lucide-react";
 import type { ThemePalette } from "@/contexts/ThemeContext";
 import type { ThemePaletteOption } from "@/components/ide-shared/ThemeSwitcher";
 import {
@@ -54,7 +54,14 @@ export function AccountMenu({
         align={align}
         className={cn("min-w-[220px]", contentClassName)}
       >
-        <MenuItem onSelect={onToggleDarkMode}>{appearanceLabel}</MenuItem>
+        <MenuItem className="gap-2" onSelect={onToggleDarkMode}>
+          {isDarkMode ? (
+            <Moon className="size-4 flex-shrink-0" aria-hidden="true" />
+          ) : (
+            <Sun className="size-4 flex-shrink-0" aria-hidden="true" />
+          )}
+          {appearanceLabel}
+        </MenuItem>
         <MenuSeparator />
         <MenuGroup label="Theme">
           {themePalettes.map((palette) => {
@@ -66,7 +73,14 @@ export function AccountMenu({
                 onSelect={() => setTheme(palette.key)}
                 className="justify-between gap-2"
               >
-                <span>{palette.name}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  <span
+                    className="size-2 flex-shrink-0 rounded-full"
+                    style={{ background: palette.color }}
+                    aria-hidden="true"
+                  />
+                  <span>{palette.name}</span>
+                </span>
                 {isCurrent ? (
                   <Check className="size-4 flex-shrink-0" aria-hidden="true" />
                 ) : null}
