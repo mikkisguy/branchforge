@@ -34,6 +34,7 @@ export function FlowFiltersDock({ filters, children }: FlowFiltersDockProps) {
             aria-label="Open filters"
             aria-expanded={!filtersPanel.collapsed}
             title="Open filters"
+            tabIndex={filtersPanel.collapsed ? undefined : -1}
             className="inline-flex items-center gap-1.5 rounded-md border border-border bg-raised px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <Filter className="h-3.5 w-3.5" aria-hidden="true" />
@@ -51,6 +52,7 @@ export function FlowFiltersDock({ filters, children }: FlowFiltersDockProps) {
             <button
               type="button"
               aria-label="Close overlays"
+              tabIndex={-1}
               className="absolute inset-0 z-40 bg-black/40"
               onClick={() => filtersPanel.setCollapsed(true)}
             />

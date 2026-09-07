@@ -1,5 +1,6 @@
-import { APP_NAME } from "@/lib/version";
+import { BASE_URL } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { APP_NAME } from "@/lib/version";
 
 interface LogoProps {
   className?: string;
@@ -25,7 +26,7 @@ export function Logo({
       title={compact ? APP_NAME : undefined}
     >
       <img
-        src="/favicon.png"
+        src={`${BASE_URL}favicon.png`}
         alt={APP_NAME}
         className={cn(
           compact ? sizeClasses[size].compact : sizeClasses[size].full,

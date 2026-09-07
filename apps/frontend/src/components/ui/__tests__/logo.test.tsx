@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { Logo } from "@/components/ui/logo";
+import { BASE_URL } from "@/lib/constants";
 import { APP_NAME } from "@/lib/version";
 
 describe("Logo", () => {
@@ -8,7 +9,7 @@ describe("Logo", () => {
     render(<Logo />);
 
     const image = screen.getByRole("img", { name: APP_NAME });
-    expect(image).toHaveAttribute("src", "/favicon.png");
+    expect(image).toHaveAttribute("src", `${BASE_URL}favicon.png`);
   });
 
   it("exposes the full app name as a tooltip when compact", () => {

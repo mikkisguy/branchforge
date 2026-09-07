@@ -127,6 +127,41 @@ describe("useProject", () => {
     expect(result.current.currentProject?.id).toBe("project-2");
   });
 
+  it("refreshProjects returns the refreshed project list after invalidation", async () => {
+    const queryClient = createTestQueryClient();
+
+    const { result } = renderHook(() => useProject(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(result.current.projects).toEqual(TEST_PROJECTS);
+    });
+
+    const refreshedProjects: Project[] = [
+      {
+        id: "project-3",
+        name: "Project Three",
+        source: "ZIP",
+        duoEndingEnabled: false,
+        createdAt: "2026-03-09T00:00:00.000Z",
+        updatedAt: "2026-03-09T00:00:00.000Z",
+      },
+    ];
+    vi.mocked(projectsApi.listProjects).mockResolvedValue(refreshedProjects);
+
+    let returnedProjects: Project[] = [];
+    await act(async () => {
+      returnedProjects = await result.current.refreshProjects();
+    });
+
+    expect(returnedProjects).toEqual(refreshedProjects);
+
+    await waitFor(() => {
+      expect(result.current.projects).toEqual(refreshedProjects);
+    });
+  });
+
   it("surfaces error state when projects query fails", async () => {
     vi.spyOn(projectsApi, "listProjects").mockRejectedValue(
       new Error("Network error")
