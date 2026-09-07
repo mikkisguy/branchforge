@@ -1,7 +1,7 @@
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useProject } from "../useProject.js";
+import { useProject } from "../useProject";
 import { projectsApi, type Project } from "@/lib/api/projects";
 import { projectKeys } from "@/lib/query-keys";
 import { createTestQueryClient } from "@/test/query-client";

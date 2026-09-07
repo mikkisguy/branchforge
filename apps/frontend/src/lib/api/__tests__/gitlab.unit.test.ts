@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { gitlabApi } from "../gitlab.js";
+import { gitlabApi } from "../gitlab";
 
 // Mock fetch
 const mockFetch = vi.fn();

@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PublicLabel } from "@branchforge/shared";
-import { LabelNavigator } from "@/components/write-mode/LabelNavigator.js";
+import { LabelNavigator } from "@/components/write-mode/LabelNavigator";
 
 function makeLabel(overrides: Partial<PublicLabel> = {}): PublicLabel {
   return {
