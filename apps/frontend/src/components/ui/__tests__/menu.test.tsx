@@ -179,4 +179,119 @@ describe("Menu", () => {
     expect(onAppearance).not.toHaveBeenCalled();
     expect(screen.getByRole("menu")).toBeInTheDocument();
   });
+
+  function mockTriggerRect(
+    trigger: HTMLElement,
+    rect: Pick<
+      DOMRect,
+      "top" | "left" | "bottom" | "right" | "width" | "height"
+    >
+  ) {
+    vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({
+      x: rect.left,
+      y: rect.top,
+      toJSON: () => ({}),
+      ...rect,
+    });
+  }
+
+  it("positions under the trigger on the first open", async () => {
+    const user = userEvent.setup();
+    const innerWidthSpy = vi
+      .spyOn(window, "innerWidth", "get")
+      .mockReturnValue(1280);
+
+    try {
+      renderMenu();
+
+      const trigger = screen.getByRole("button", { name: "Account" });
+      mockTriggerRect(trigger, {
+        top: 8,
+        left: 400,
+        bottom: 40,
+        right: 480,
+        width: 80,
+        height: 32,
+      });
+
+      await user.click(trigger);
+
+      const menu = screen.getByRole("menu");
+      expect(menu).toHaveClass("fixed");
+      expect(menu.style.position).toBe("fixed");
+      expect(menu.style.visibility).not.toBe("hidden");
+      expect(menu.style.top).toBe("44px");
+      expect(menu.style.width).toBe("max-content");
+      expect(menu.style.left).toBe("auto");
+      expect(menu.style.right).toBe("800px");
+    } finally {
+      innerWidthSpy.mockRestore();
+    }
+  });
+
+  it("aligns start menus to the trigger left on the first open", async () => {
+    const user = userEvent.setup();
+    render(
+      <Menu>
+        <MenuTrigger aria-label="Project">Open</MenuTrigger>
+        <MenuContent align="start">
+          <MenuItem>Settings</MenuItem>
+        </MenuContent>
+      </Menu>
+    );
+
+    const trigger = screen.getByRole("button", { name: "Project" });
+    mockTriggerRect(trigger, {
+      top: 8,
+      left: 24,
+      bottom: 40,
+      right: 160,
+      width: 136,
+      height: 32,
+    });
+
+    await user.click(trigger);
+
+    const menu = screen.getByRole("menu");
+    expect(menu.style.position).toBe("fixed");
+    expect(menu.style.top).toBe("44px");
+    expect(menu.style.left).toBe("24px");
+    expect(menu.style.width).toBe("max-content");
+    expect(menu.style.right).toBe("auto");
+  });
+
+  it("aligns end menus to the trigger right edge on the first open", async () => {
+    const user = userEvent.setup();
+    const innerWidthSpy = vi
+      .spyOn(window, "innerWidth", "get")
+      .mockReturnValue(1280);
+
+    try {
+      renderMenu();
+
+      const trigger = screen.getByRole("button", { name: "Account" });
+      mockTriggerRect(trigger, {
+        top: 8,
+        left: 880,
+        bottom: 40,
+        right: 960,
+        width: 80,
+        height: 32,
+      });
+
+      await user.click(trigger);
+
+      const menu = screen.getByRole("menu");
+      expect(menu.style.position).toBe("fixed");
+      expect(menu.style.visibility).not.toBe("hidden");
+      expect(menu.style.top).toBe("44px");
+      expect(menu.style.width).toBe("max-content");
+      expect(menu.style.left).toBe("auto");
+      // 1280 (viewport) - 960 (trigger right); does not use trigger width.
+      expect(menu.style.right).toBe("320px");
+      expect(Number.parseFloat(menu.style.maxWidth)).toBeGreaterThan(200);
+    } finally {
+      innerWidthSpy.mockRestore();
+    }
+  });
 });

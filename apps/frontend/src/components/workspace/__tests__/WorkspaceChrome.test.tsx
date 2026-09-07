@@ -244,6 +244,51 @@ describe("WorkspaceChrome", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("account menu keeps min-w-[220px] so Appearance stays one line", async () => {
+    const user = userEvent.setup();
+    const innerWidthSpy = vi
+      .spyOn(window, "innerWidth", "get")
+      .mockReturnValue(1280);
+
+    try {
+      render(<WorkspaceChrome {...defaultProps} />, {
+        wrapper: createWrapper(),
+      });
+
+      const trigger = screen.getAllByRole("button", {
+        name: "Account menu",
+      })[0]!;
+      vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({
+        x: 1216,
+        y: 8,
+        top: 8,
+        left: 1216,
+        bottom: 48,
+        right: 1256,
+        width: 40,
+        height: 40,
+        toJSON: () => ({}),
+      });
+
+      await user.click(trigger);
+
+      const menu = screen.getByRole("menu");
+      expect(menu).toHaveClass("min-w-[220px]");
+      expect(menu.style.width).toBe("max-content");
+      expect(Number.parseFloat(menu.style.maxWidth)).toBeGreaterThanOrEqual(
+        220
+      );
+
+      const appearance = within(menu).getByRole("menuitem", {
+        name: "Appearance: Dark",
+      });
+      expect(appearance).toHaveClass("whitespace-nowrap");
+      expect(appearance).toHaveClass("h-10");
+    } finally {
+      innerWidthSpy.mockRestore();
+    }
+  });
+
   it("logout item calls onLogout", async () => {
     const user = userEvent.setup();
     const onLogout = vi.fn();

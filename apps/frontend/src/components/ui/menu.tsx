@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import type { VariantProps } from "class-variance-authority";
@@ -53,6 +53,83 @@ function getDefaultPortalContainer(from: Element | null): HTMLElement {
   const dialog = from?.closest("dialog[open]");
   if (dialog instanceof HTMLElement) return dialog;
   return document.body;
+}
+
+const MENU_GAP = 4;
+const MENU_VIEWPORT_PADDING = 8;
+
+const UNPOSITIONED_MENU_STYLE: CSSProperties = {
+  position: "fixed",
+  visibility: "hidden",
+};
+
+function computeMenuPosition(
+  trigger: HTMLElement,
+  menu: HTMLElement | null,
+  align: "start" | "center" | "end"
+): CSSProperties {
+  const rect = trigger.getBoundingClientRect();
+  const menuWidth = menu?.offsetWidth ?? 0;
+  const menuHeight = menu?.offsetHeight ?? 0;
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+
+  const spaceBelow =
+    viewportHeight - rect.bottom - MENU_GAP - MENU_VIEWPORT_PADDING;
+  const spaceAbove = rect.top - MENU_GAP - MENU_VIEWPORT_PADDING;
+  let top = rect.bottom + MENU_GAP;
+  let maxHeight = spaceBelow;
+
+  if (menuHeight > spaceBelow && spaceAbove > spaceBelow) {
+    top = rect.top - MENU_GAP - menuHeight;
+    maxHeight = spaceAbove;
+  } else if (
+    menuHeight > 0 &&
+    top + menuHeight > viewportHeight - MENU_VIEWPORT_PADDING
+  ) {
+    top = Math.max(
+      MENU_VIEWPORT_PADDING,
+      viewportHeight - menuHeight - MENU_VIEWPORT_PADDING
+    );
+    maxHeight = viewportHeight - top - MENU_VIEWPORT_PADDING;
+  }
+
+  // Pin start/end to the trigger edge instead of guessing width from the
+  // trigger. A guessed `left` near the viewport edge shrinks the menu and
+  // wraps labels like "Appearance: Dark".
+  const style: CSSProperties = {
+    position: "fixed",
+    top,
+    width: "max-content",
+    maxHeight: Math.max(0, maxHeight),
+    overflowY: "auto",
+  };
+
+  if (align === "end") {
+    const right = Math.max(MENU_VIEWPORT_PADDING, viewportWidth - rect.right);
+    style.right = right;
+    style.left = "auto";
+    style.maxWidth = Math.max(0, viewportWidth - right - MENU_VIEWPORT_PADDING);
+  } else if (align === "center") {
+    if (menuWidth > 0) {
+      let left = rect.left + (rect.width - menuWidth) / 2;
+      const maxLeft = viewportWidth - menuWidth - MENU_VIEWPORT_PADDING;
+      left = Math.max(MENU_VIEWPORT_PADDING, Math.min(left, maxLeft));
+      style.left = left;
+      style.transform = "none";
+    } else {
+      style.left = rect.left + rect.width / 2;
+      style.transform = "translateX(-50%)";
+    }
+    style.maxWidth = Math.max(0, viewportWidth - 2 * MENU_VIEWPORT_PADDING);
+  } else {
+    const left = Math.max(MENU_VIEWPORT_PADDING, rect.left);
+    style.left = left;
+    style.right = "auto";
+    style.maxWidth = Math.max(0, viewportWidth - left - MENU_VIEWPORT_PADDING);
+  }
+
+  return style;
 }
 
 export interface MenuProps {
@@ -204,64 +281,27 @@ export function MenuContent({
     close,
     containerRef,
     menuId,
+    triggerRef,
     triggerNode,
     focusedId,
     setFocusedId,
     items,
     selectLockRef,
   } = useMenuContext();
-  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+  const [menuStyle, setMenuStyle] = useState<CSSProperties>(
+    UNPOSITIONED_MENU_STYLE
+  );
   const menuRef = useRef<HTMLDivElement | null>(null);
   const hasInitializedFocus = useRef(false);
-  const gap = 4;
 
   const enabledItems = items.filter((item) => !item.disabled);
 
   const updatePosition = useCallback(() => {
-    const trigger = triggerNode;
-    const menu = menuRef.current;
+    const trigger = triggerRef.current ?? triggerNode;
     if (!trigger) return;
 
-    const rect = trigger.getBoundingClientRect();
-    const menuWidth = menu?.offsetWidth ?? rect.width;
-    const menuHeight = menu?.offsetHeight ?? 0;
-    const viewportPadding = 8;
-    let left = rect.left;
-
-    if (align === "end") {
-      left = rect.right - menuWidth;
-    } else if (align === "center") {
-      left = rect.left + (rect.width - menuWidth) / 2;
-    }
-
-    const maxLeft = window.innerWidth - menuWidth - viewportPadding;
-    left = Math.max(viewportPadding, Math.min(left, maxLeft));
-
-    const spaceBelow = window.innerHeight - rect.bottom - gap - viewportPadding;
-    const spaceAbove = rect.top - gap - viewportPadding;
-    let top = rect.bottom + gap;
-    let maxHeight = spaceBelow;
-
-    if (menuHeight > spaceBelow && spaceAbove > spaceBelow) {
-      top = rect.top - gap - menuHeight;
-      maxHeight = spaceAbove;
-    } else if (top + menuHeight > window.innerHeight - viewportPadding) {
-      top = Math.max(
-        viewportPadding,
-        window.innerHeight - menuHeight - viewportPadding
-      );
-      maxHeight = window.innerHeight - top - viewportPadding;
-    }
-
-    setMenuStyle({
-      position: "fixed",
-      top,
-      left,
-      minWidth: rect.width,
-      maxHeight: Math.max(0, maxHeight),
-      overflowY: "auto",
-    });
-  }, [align, triggerNode]);
+    setMenuStyle(computeMenuPosition(trigger, menuRef.current, align));
+  }, [align, triggerNode, triggerRef]);
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -277,6 +317,7 @@ export function MenuContent({
   useLayoutEffect(() => {
     if (!open) {
       hasInitializedFocus.current = false;
+      setMenuStyle(UNPOSITIONED_MENU_STYLE);
       return;
     }
     updatePosition();
@@ -384,6 +425,11 @@ export function MenuContent({
   const portalTarget =
     portalContainer ?? getDefaultPortalContainer(triggerNode);
 
+  const resolvedStyle: CSSProperties =
+    menuStyle.visibility === "hidden" && triggerNode
+      ? computeMenuPosition(triggerNode, null, align)
+      : menuStyle;
+
   return createPortal(
     <div
       ref={menuRef}
@@ -392,10 +438,10 @@ export function MenuContent({
       tabIndex={-1}
       aria-activedescendant={focusedId ?? undefined}
       className={cn(
-        "z-[110] rounded-md border border-border bg-popover p-1 shadow-md outline-none",
+        "fixed z-[110] rounded-md border border-border bg-popover p-1 shadow-md outline-none",
         className
       )}
-      style={menuStyle}
+      style={resolvedStyle}
       onKeyDown={handleKeyDown}
     >
       {children}
@@ -458,7 +504,7 @@ export function MenuItem({
       aria-disabled={disabled || undefined}
       tabIndex={-1}
       className={cn(
-        "relative flex w-full cursor-default select-none items-center rounded-sm border-0 bg-transparent px-2 py-1.5 text-left text-sm font-inherit outline-none transition-colors",
+        "relative flex w-full cursor-default select-none items-center whitespace-nowrap rounded-sm border-0 bg-transparent px-2 py-1.5 text-left text-sm font-inherit outline-none transition-colors",
         "h-10 max-md:min-h-11",
         variant === "destructive" && "text-destructive-muted",
         isFocused &&
