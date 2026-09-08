@@ -1,6 +1,7 @@
-import { ChevronsLeft, ChevronsRight, X } from "lucide-react";
+import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { EditorTabBarItem } from "./EditorTabBar";
+import { EDITOR_TAB_META_BADGE_CLASS } from "./editor-tab-bar-styles";
 import type {
   KeyboardEvent,
   MouseEvent,
@@ -42,7 +43,7 @@ export function EditorTabBarDesktopTabs({
   handleSelectItem,
 }: EditorTabBarDesktopTabsProps) {
   return (
-    <div className="hidden md:block relative h-full w-full min-w-0 overflow-hidden rounded-[inherit]">
+    <div className="relative hidden h-full w-full min-w-0 overflow-hidden md:block">
       <div
         ref={tabsScrollContainerRef}
         onScroll={updateScrollIndicators}
@@ -63,7 +64,7 @@ export function EditorTabBarDesktopTabs({
           event.stopPropagation();
           onClose(event, tabId);
         }}
-        className="scrollbar-hover flex h-full w-full min-w-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden px-2"
+        className="scrollbar-hover flex h-full w-full min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden py-1"
         role="tablist"
         tabIndex={-1}
       >
@@ -75,10 +76,10 @@ export function EditorTabBarDesktopTabs({
               key={item.id}
               data-tab-id={item.id}
               className={cn(
-                "group relative flex h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-md pl-3 pr-1.5 text-sm transition-all",
+                "group relative flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md pl-2.5 pr-1 text-sm transition-colors",
                 isActive
-                  ? "border border-border/90 bg-background/85 text-foreground font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
-                  : "border border-transparent text-muted-foreground hover:border-border/70 hover:bg-muted/40 hover:text-foreground"
+                  ? "bg-background font-medium text-foreground shadow-sm after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-[var(--theme-color)]"
+                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
               )}
             >
               <div
@@ -89,19 +90,24 @@ export function EditorTabBarDesktopTabs({
                 onMouseDown={handleTabMouseDown}
                 onClick={() => handleSelectItem(item.id)}
                 onKeyDown={(event) => handleTabKeyDown(event, index)}
-                className="flex min-w-0 cursor-pointer items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="flex min-w-0 cursor-pointer items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
-                <span className={cn("truncate", titleMaxWidthClassName)}>
+                <span
+                  className={cn(
+                    "truncate leading-none",
+                    titleMaxWidthClassName
+                  )}
+                >
                   {item.title}
                 </span>
 
                 {item.meta ? (
                   <span
                     className={cn(
-                      "rounded px-1.5 py-0.5 text-[11px] font-semibold tracking-wide",
+                      EDITOR_TAB_META_BADGE_CLASS,
                       isActive
-                        ? "bg-muted/70 text-foreground/90"
-                        : "bg-muted/55 text-muted-foreground/80"
+                        ? "bg-muted text-foreground/80"
+                        : "bg-muted/70 text-muted-foreground"
                     )}
                   >
                     {item.meta}
@@ -123,10 +129,10 @@ export function EditorTabBarDesktopTabs({
                   }
                 }}
                 className={cn(
-                  "rounded p-0.5 opacity-25 transition group-hover:opacity-100 focus:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                  "inline-flex size-5 shrink-0 items-center justify-center rounded-sm opacity-40 transition group-hover:opacity-100 focus:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
                   isActive
-                    ? "text-foreground/65 hover:bg-muted/70 hover:text-foreground"
-                    : "text-muted-foreground/45 hover:bg-muted/60 hover:text-muted-foreground"
+                    ? "text-foreground/70 hover:bg-muted hover:text-foreground"
+                    : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
                 )}
                 aria-label={item.closeLabel ?? `Close ${item.title}`}
                 title="Close tab"
@@ -141,26 +147,16 @@ export function EditorTabBarDesktopTabs({
 
       {showLeftScrollIndicator ? (
         <div
-          className="pointer-events-none absolute inset-y-0 left-0 z-20 flex w-20 items-center justify-start bg-gradient-to-r from-background via-background/90 to-transparent pl-2"
+          className="pointer-events-none absolute inset-y-0 left-0 z-20 w-8 bg-gradient-to-r from-raised via-raised/80 to-transparent"
           aria-hidden="true"
-        >
-          <div className="flex items-center gap-1 rounded-full border border-border/80 bg-background/92 px-1.5 py-1 shadow-[0_2px_10px_rgba(0,0,0,0.35)]">
-            <ChevronsLeft className="size-4 text-foreground/80" />
-            <div className="h-4 w-px rounded-full bg-border/85" />
-          </div>
-        </div>
+        />
       ) : null}
 
       {showRightScrollIndicator ? (
         <div
-          className="pointer-events-none absolute inset-y-0 right-0 z-20 flex w-20 items-center justify-end bg-gradient-to-l from-background via-background/90 to-transparent pr-2"
+          className="pointer-events-none absolute inset-y-0 right-0 z-20 w-8 bg-gradient-to-l from-raised via-raised/80 to-transparent"
           aria-hidden="true"
-        >
-          <div className="flex items-center gap-1 rounded-full border border-border/80 bg-background/92 px-1.5 py-1 shadow-[0_2px_10px_rgba(0,0,0,0.35)]">
-            <div className="h-4 w-px rounded-full bg-border/85" />
-            <ChevronsRight className="size-4 text-foreground/80" />
-          </div>
-        </div>
+        />
       ) : null}
     </div>
   );

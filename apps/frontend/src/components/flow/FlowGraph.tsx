@@ -35,13 +35,19 @@ import { FlowGraphStatus } from "./FlowGraphStatus";
 import { FlowGraphEmpty } from "./FlowGraphEmpty";
 import { FlowGraphCanvas } from "./FlowGraphCanvas";
 import { FLOW_SEARCH_DEBOUNCE_MS } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 
 interface FlowGraphProps {
   projectId: string;
   onNodeClick?: (labelId: string) => void;
+  className?: string;
 }
 
-export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
+export function FlowGraph({
+  projectId,
+  onNodeClick,
+  className,
+}: FlowGraphProps) {
   const {
     nodes: flowNodes,
     edges: flowEdges,
@@ -234,44 +240,60 @@ export function FlowGraph({ projectId, onNodeClick }: FlowGraphProps) {
     handleLayoutDragStop(nodePositions);
   }, [handleLayoutDragStop]);
 
-  // Guard: loading / error / empty / computing
+  const rootClassName = cn("h-full w-full min-h-0", className);
+
   if (isLoading)
-    return <FlowGraphStatus loading>Loading flow graph...</FlowGraphStatus>;
+    return (
+      <div className={rootClassName}>
+        <FlowGraphStatus loading>Loading flow graph...</FlowGraphStatus>
+      </div>
+    );
   if (error)
     return (
-      <FlowGraphStatus tone="error">
-        Failed to load flow graph: {error.message}
-      </FlowGraphStatus>
+      <div className={rootClassName}>
+        <FlowGraphStatus tone="error">
+          Failed to load flow graph: {error.message}
+        </FlowGraphStatus>
+      </div>
     );
-  if (flowNodes.length === 0) return <FlowGraphEmpty />;
+  if (flowNodes.length === 0)
+    return (
+      <div className={rootClassName}>
+        <FlowGraphEmpty />
+      </div>
+    );
   if (layoutComputing)
     return (
-      <FlowGraphStatus
-        loading
-        subtitle="This one-time layout is cached — reopening will be instant."
-      >
-        Arranging {flowNodes.length} nodes...
-      </FlowGraphStatus>
+      <div className={rootClassName}>
+        <FlowGraphStatus
+          loading
+          subtitle="This one-time layout is cached — reopening will be instant."
+        >
+          Arranging {flowNodes.length} nodes...
+        </FlowGraphStatus>
+      </div>
     );
 
   return (
-    <FlowGraphCanvas
-      nodes={nodes}
-      edges={edges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      onNodeClick={handleNodeClick as NodeMouseHandler}
-      onNodeDragStop={onNodeDragStop}
-      flowNodesLength={flowNodes.length}
-      characters={characters}
-      validFilters={validFilters}
-      onFiltersChange={setFilters}
-      routeOptions={routeOptions}
-      routeColorMap={routeColorMap}
-      layoutMode={layoutMode}
-      isBusy={isSaving || isResetting}
-      onLayoutModeChange={setLayoutMode}
-      onResetLayout={handleResetLayout}
-    />
+    <div className={rootClassName}>
+      <FlowGraphCanvas
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeClick={handleNodeClick as NodeMouseHandler}
+        onNodeDragStop={onNodeDragStop}
+        flowNodesLength={flowNodes.length}
+        characters={characters}
+        validFilters={validFilters}
+        onFiltersChange={setFilters}
+        routeOptions={routeOptions}
+        routeColorMap={routeColorMap}
+        layoutMode={layoutMode}
+        isBusy={isSaving || isResetting}
+        onLayoutModeChange={setLayoutMode}
+        onResetLayout={handleResetLayout}
+      />
+    </div>
   );
 }

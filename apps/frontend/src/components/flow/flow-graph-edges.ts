@@ -5,6 +5,8 @@
 import { MarkerType, type Edge } from "@xyflow/react";
 import type { FlowEdge } from "@branchforge/shared";
 
+const MUTED_EDGE_COLOR = "hsl(var(--muted-foreground))";
+
 export function getEdgeColor(type: string): string {
   switch (type) {
     case "JUMP":
@@ -14,9 +16,9 @@ export function getEdgeColor(type: string): string {
       // graph's main interaction color matches the rest of the app.
       return "var(--theme-color)";
     case "NATURAL":
-      return "#475569"; // slate-600
+      return MUTED_EDGE_COLOR;
     default:
-      return "#64748b";
+      return MUTED_EDGE_COLOR;
   }
 }
 
@@ -48,7 +50,7 @@ export function buildEdges(flowEdges: FlowEdge[]): Edge[] {
         stroke: getEdgeColor(edge.type),
         strokeWidth: getEdgeWidth(edge.type),
       },
-      labelStyle: { fill: "#94a3b8", fontSize: 11 },
+      labelStyle: { fill: "hsl(var(--muted-foreground))", fontSize: 11 },
       animated: false,
     };
     return edgeStyle;

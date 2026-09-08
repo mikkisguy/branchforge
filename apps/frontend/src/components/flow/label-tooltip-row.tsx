@@ -9,7 +9,7 @@ export function TooltipRow({
 }) {
   return (
     <div className="flex items-baseline gap-2 py-0.5">
-      <span className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase w-20 shrink-0">
+      <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase w-20 shrink-0">
         {label}
       </span>
       <span className="flex-1 min-w-0">{children}</span>

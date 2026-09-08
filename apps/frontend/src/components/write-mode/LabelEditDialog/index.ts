@@ -1,2 +1,2 @@
-export { LabelEditDialog } from "./LabelEditDialog.js";
+export { LabelEditDialog } from "./LabelEditDialog";
 export type { LabelEditDialogProps } from "./LabelEditDialog";

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Type } from "lucide-react";
 import { useLocalStorageNumber } from "@/hooks/useLocalStorage";
+import { STATUS_BAR_CONTROL_CLASSNAME } from "@/components/workspace/status-bar-control";
 
 export const EDITOR_FONT_SIZE_CHANGED = "editor-font-size-changed";
 
@@ -35,8 +36,7 @@ const MODE_CONFIGS = {
       { label: "Huge", value: 20 },
     ] as const,
     className: "font-code",
-    buttonClassName:
-      "px-3 py-1.5 bg-muted/50 hover:bg-muted border border-border",
+    buttonClassName: STATUS_BAR_CONTROL_CLASSNAME,
   },
   write: {
     storageKey: "write:font-size",
@@ -50,8 +50,7 @@ const MODE_CONFIGS = {
       { label: "Huge", value: 22 },
     ] as const,
     className: "",
-    buttonClassName:
-      "px-2 py-1 border border-[hsl(var(--border)/0.6)] hover:bg-[hsl(var(--muted)/0.4)]",
+    buttonClassName: STATUS_BAR_CONTROL_CLASSNAME,
   },
 } as const;
 
@@ -254,7 +253,7 @@ export function FontSizeSwitcher({
         aria-expanded={isOpen}
         aria-haspopup="listbox"
         aria-labelledby="font-size-label"
-        className={`${buttonClassName} text-xs ${baseClassName} text-muted-foreground hover:text-foreground rounded flex items-center gap-2 transition-colors`}
+        className={`${buttonClassName} ${baseClassName}`}
         title="Change font size"
       >
         <Type className="size-3" aria-hidden="true" />

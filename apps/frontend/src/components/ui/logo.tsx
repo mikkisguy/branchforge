@@ -1,4 +1,6 @@
-import { APP_NAME, APP_NAME_ABBREVIATED } from "../../lib/version";
+import { BASE_URL } from "@/lib/constants";
+import { cn } from "@/lib/utils";
+import { APP_NAME } from "@/lib/version";
 
 interface LogoProps {
   className?: string;
@@ -6,31 +8,31 @@ interface LogoProps {
   size?: "xs" | "sm" | "md" | "lg";
 }
 
+const sizeClasses = {
+  xs: { compact: "size-5", full: "size-6" },
+  sm: { compact: "size-7", full: "size-8" },
+  md: { compact: "size-9", full: "size-12" },
+  lg: { compact: "size-14", full: "size-24" },
+} as const;
+
 export function Logo({
   className = "",
   compact = false,
   size = "lg",
 }: LogoProps) {
-  const sizeClasses = {
-    xs: compact ? "text-lg" : "text-xl",
-    sm: compact ? "text-xl" : "text-2xl",
-    md: compact ? "text-2xl" : "text-3xl",
-    lg: compact ? "text-4xl" : "text-6xl",
-  };
-
   return (
     <h1
-      className={`font-display tracking-wide leading-tight pb-2 ${className} ${sizeClasses[size]}`}
-      style={{
-        background:
-          "linear-gradient(135deg, var(--theme-color) 0%, var(--logo-gradient-mid) 50%, var(--theme-color) 100%)",
-        WebkitBackgroundClip: "text",
-        WebkitTextFillColor: "transparent",
-        backgroundClip: "text",
-      }}
-      title={compact ? APP_NAME : ""}
+      className={cn("inline-flex items-center justify-center", className)}
+      title={compact ? APP_NAME : undefined}
     >
-      {compact ? APP_NAME_ABBREVIATED : APP_NAME}
+      <img
+        src={`${BASE_URL}favicon.png`}
+        alt={APP_NAME}
+        className={cn(
+          compact ? sizeClasses[size].compact : sizeClasses[size].full,
+          "rounded-md object-contain"
+        )}
+      />
     </h1>
   );
 }

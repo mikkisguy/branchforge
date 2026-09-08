@@ -4,7 +4,8 @@
  * Unified modal that hosts the project's configuration tabs:
  *   - Characters (1:N CRUD — list + add/edit/delete)
  *   - Routes (1:N CRUD — list + add/edit/delete)
- *   - Visual System (1:1 config — single form with live preview)
+ *   - Visual System (1:1 config — single form with live preview).
+ *     Shown only in development until generation/export consumes it.
  *
  * Each tab is a self-contained piece of state and persistence.
  * The outer dialog is just a navigation shell: no global save,
@@ -79,13 +80,20 @@ const TAB_ICONS: Record<
   visual: Wand2,
 };
 
+/** Visual System is stored but unused by authoring/export; hide it in production. */
+const SHOW_VISUAL_SYSTEM_TAB = import.meta.env.DEV;
+
 const TAB_ORDER: SettingsTab[] = [
   "characters",
   "routes",
   "world",
   "images",
-  "visual",
+  ...(SHOW_VISUAL_SYSTEM_TAB ? (["visual"] as const) : []),
 ];
+
+const SETTINGS_DESCRIPTION = SHOW_VISUAL_SYSTEM_TAB
+  ? "Configure characters, routes, preview images, visual system, and world bible elements."
+  : "Configure characters, routes, preview images, and world bible elements.";
 
 // ============================================================================
 // Component
@@ -97,6 +105,11 @@ export function ProjectSettingsDialog({
   projectId,
   defaultTab = "characters",
 }: ProjectSettingsDialogProps) {
+  const resolvedDefaultTab =
+    defaultTab === "visual" && !SHOW_VISUAL_SYSTEM_TAB
+      ? "characters"
+      : defaultTab;
+
   // Reset to the default tab each time the modal opens. This way a
   // user who closes the dialog while on "Visual" comes back to
   // "Characters" (the most-edited tab) rather than landing on a
@@ -108,18 +121,18 @@ export function ProjectSettingsDialog({
   // `useRef` because the `react-hooks/refs` rule forbids reading
   // and writing refs during render. The extra render that the
   // tracker produces is the cost of this pattern.)
-  const [activeTab, setActiveTab] = useState<SettingsTab>(defaultTab);
+  const [activeTab, setActiveTab] = useState<SettingsTab>(resolvedDefaultTab);
   const [visualSystemDirty, setVisualSystemDirty] = useState(false);
   const [visualFormSession, setVisualFormSession] = useState(0);
   // react-doctor-disable-next-line react-doctor/no-derived-useState, react-doctor/rerender-state-only-in-handlers
   const [prevOpen, setPrevOpen] = useState(open);
   // react-doctor-disable-next-line react-doctor/no-derived-useState, react-doctor/rerender-state-only-in-handlers
-  const [prevDefaultTab, setPrevDefaultTab] = useState(defaultTab);
-  if (open !== prevOpen || defaultTab !== prevDefaultTab) {
+  const [prevDefaultTab, setPrevDefaultTab] = useState(resolvedDefaultTab);
+  if (open !== prevOpen || resolvedDefaultTab !== prevDefaultTab) {
     setPrevOpen(open);
-    setPrevDefaultTab(defaultTab);
+    setPrevDefaultTab(resolvedDefaultTab);
     if (open) {
-      setActiveTab(defaultTab);
+      setActiveTab(resolvedDefaultTab);
       setVisualFormSession((s) => s + 1);
     }
   }
@@ -151,8 +164,7 @@ export function ProjectSettingsDialog({
             <div>
               <h2 className="text-lg font-medium">Project Settings</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Configure characters, routes, preview images, visual system, and
-                world bible elements.
+                {SETTINGS_DESCRIPTION}
               </p>
             </div>
             <button
@@ -202,13 +214,15 @@ export function ProjectSettingsDialog({
               <TabsPanel value="images" className="space-y-4">
                 <ProjectImagesSettingsContent projectId={projectId} />
               </TabsPanel>
-              <TabsPanel value="visual" className="space-y-4">
-                <VisualSystemTabContent
-                  key={visualFormSession}
-                  projectId={projectId}
-                  onDirtyChange={setVisualSystemDirty}
-                />
-              </TabsPanel>
+              {SHOW_VISUAL_SYSTEM_TAB ? (
+                <TabsPanel value="visual" className="space-y-4">
+                  <VisualSystemTabContent
+                    key={visualFormSession}
+                    projectId={projectId}
+                    onDirtyChange={setVisualSystemDirty}
+                  />
+                </TabsPanel>
+              ) : null}
             </div>
           </Tabs>
 

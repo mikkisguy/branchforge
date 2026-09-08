@@ -29,6 +29,18 @@ describe("PaletteSwitcher", () => {
     }
   });
 
+  it("positions an upward dropdown above its trigger", async () => {
+    render(<PaletteSwitcher direction="up" />);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /syntax palette/i })
+    );
+
+    expect(
+      screen.getByRole("listbox", { name: /syntax palette options/i })
+    ).toHaveClass("bottom-full");
+  });
+
   it("opens dropdown on ArrowDown key press", async () => {
     render(<PaletteSwitcher />);
 

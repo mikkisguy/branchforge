@@ -22,7 +22,7 @@ export function FlowGraphStatus({
         <div
           className={cn(
             "flex items-center gap-2.5",
-            tone === "error" ? "text-red-400" : "text-slate-400"
+            tone === "error" ? "text-destructive" : "text-muted-foreground"
           )}
         >
           {loading && (
@@ -32,7 +32,9 @@ export function FlowGraphStatus({
             {children}
           </span>
         </div>
-        {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
+        {subtitle && (
+          <p className="text-xs text-muted-foreground">{subtitle}</p>
+        )}
       </div>
     </div>
   );

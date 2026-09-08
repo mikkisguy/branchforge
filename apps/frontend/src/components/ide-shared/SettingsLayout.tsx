@@ -13,8 +13,13 @@ export function SettingsSection({
   className,
 }: SettingsSectionProps) {
   return (
-    <section className={cn("bg-card/40 overflow-hidden", className)}>
-      <div className="border-b border-border/30 px-4 py-3">
+    <section
+      className={cn(
+        "overflow-hidden rounded-lg border border-border bg-raised",
+        className
+      )}
+    >
+      <div className="border-b border-border px-4 py-3">
         <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {title}
         </h4>

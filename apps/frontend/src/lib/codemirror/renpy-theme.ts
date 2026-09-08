@@ -162,11 +162,12 @@ export const renPyBaseTheme = EditorView.theme({
     },
     // Primary action button style (for "replace all" etc.)
     "&.cm-primary-button": {
-      backgroundColor: "hsl(var(--theme-accent))",
-      color: "hsl(var(--background))",
+      backgroundColor: "var(--theme-color)",
+      color: "var(--theme-foreground)",
       border: "none",
       "&:hover": {
-        backgroundColor: "hsl(var(--theme-accent-hover))",
+        backgroundColor: "var(--theme-color-hover)",
+        color: "var(--theme-foreground-hover)",
       },
     },
   },

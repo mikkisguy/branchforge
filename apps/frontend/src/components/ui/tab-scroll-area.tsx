@@ -4,8 +4,8 @@
  *
  * When content overflows the available width, gradient fades
  * appear on the left/right edges to signal "more to scroll."
- * The indicators match the visual language of EditorTabBar but
- * are lighter — just the gradient fade, no chevron badge.
+ * The indicators match EditorTabBar: a short gradient fade on
+ * the overflowing edge.
  *
  * Children should be single-row elements (buttons, triggers)
  * that are flex-nowrap-safe.

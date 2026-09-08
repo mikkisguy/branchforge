@@ -15,9 +15,9 @@ import {
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useDirtyForm } from "@/hooks/useDirtyForm";
 import { useDirtyDialogWarning } from "@/hooks/useDirtyDialogWarning";
-import { INITIAL_FORM_STATE, formReducer } from "./LabelEditDialogReducer.js";
-import { LabelEditDialogFields } from "./LabelEditDialogFields.js";
-import { LabelEditDialogFooter } from "./LabelEditDialogFooter.js";
+import { INITIAL_FORM_STATE, formReducer } from "./LabelEditDialogReducer";
+import { LabelEditDialogFields } from "./LabelEditDialogFields";
+import { LabelEditDialogFooter } from "./LabelEditDialogFooter";
 
 export interface LabelEditDialogProps {
   /** Whether the dialog is open */

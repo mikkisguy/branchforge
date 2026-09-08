@@ -13,7 +13,8 @@ vi.mock("@/lib/api/gitlab", () => ({
 }));
 
 vi.mock("@/contexts/ToastContext", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/contexts/ToastContext")>();
+  const actual =
+    await importOriginal<typeof import("@/contexts/ToastContext")>();
   return {
     ...actual,
     useToast: () => ({

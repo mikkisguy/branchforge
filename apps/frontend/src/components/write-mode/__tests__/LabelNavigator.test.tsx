@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PublicLabel } from "@branchforge/shared";
-import { LabelNavigator } from "@/components/write-mode/LabelNavigator.js";
+import { LabelNavigator } from "@/components/write-mode/LabelNavigator";
 
 function makeLabel(overrides: Partial<PublicLabel> = {}): PublicLabel {
   return {
@@ -166,6 +166,11 @@ describe("LabelNavigator", () => {
 
       const activeButton = screen.getByText("Label B").closest("button")!;
       expect(activeButton).toHaveAttribute("aria-pressed", "true");
+      expect(activeButton).toHaveClass(
+        "bg-[rgba(var(--theme-color-rgb),0.06)]",
+        "border-transparent",
+      );
+      expect(activeButton).toHaveClass("gap-2.5", "px-2.5", "py-2");
     });
   });
 
@@ -185,7 +190,7 @@ describe("LabelNavigator", () => {
       );
 
       expect(screen.getByText("story.rpy")).toBeInTheDocument();
-      expect(screen.getAllByText("2 labels").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText("2")).toBeInTheDocument();
     });
   });
 

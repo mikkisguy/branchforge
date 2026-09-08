@@ -21,7 +21,7 @@ export function LabelTooltipContent({ data }: { data: LabelNodeData }) {
             }`}
           />
         )}
-        <span className="text-sm font-semibold text-slate-100 truncate flex-1">
+        <span className="text-sm font-semibold text-popover-foreground truncate flex-1">
           {data.title}
         </span>
         {data.status && (
@@ -42,7 +42,7 @@ export function LabelTooltipContent({ data }: { data: LabelNodeData }) {
             {characters.map((c) => (
               <span
                 key={c.id}
-                className="inline-flex items-center gap-1.5 text-slate-300"
+                className="inline-flex items-center gap-1.5 text-popover-foreground"
               >
                 {c.avatarUrl ? (
                   <img
@@ -61,25 +61,27 @@ export function LabelTooltipContent({ data }: { data: LabelNodeData }) {
             ))}
           </div>
         ) : (
-          <span className="text-slate-500 italic">None</span>
+          <span className="text-muted-foreground italic">None</span>
         )}
       </TooltipRow>
 
       {/* Word count */}
       <TooltipRow label="Words">
-        <span className="text-slate-300 tabular-nums">
+        <span className="text-popover-foreground tabular-nums">
           {wordCount.toLocaleString()}
         </span>
       </TooltipRow>
 
       {/* Route affiliation */}
       <TooltipRow label="Route">
-        <span className="text-slate-300">{data.routeKey ?? "Unassigned"}</span>
+        <span className="text-popover-foreground">
+          {data.routeKey ?? "Unassigned"}
+        </span>
       </TooltipRow>
 
       {/* File name */}
       <TooltipRow label="File">
-        <span className="text-slate-400 font-mono text-[11px]">
+        <span className="text-muted-foreground font-mono text-[11px]">
           {data.fileName}
         </span>
       </TooltipRow>

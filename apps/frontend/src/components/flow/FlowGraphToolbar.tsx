@@ -27,7 +27,7 @@ export function FlowGraphToolbar({
         type="button"
         onClick={onResetLayout}
         disabled={isBusy}
-        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 border border-slate-600 rounded-lg hover:bg-slate-700 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground bg-raised border border-border rounded-lg hover:bg-accent hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         title={`Reset ${FLOW_LAYOUT_MODE_LABELS[layoutMode].toLowerCase()} positions to auto-arrange`}
         aria-label="Reset label positions to auto-arrange"
       >

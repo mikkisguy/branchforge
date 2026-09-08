@@ -6,8 +6,8 @@ import type { Tab } from "../settings-types";
 function getTabClassName(isActive: boolean, variant: "desktop" | "mobile") {
   const base =
     variant === "desktop"
-      ? "w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors"
-      : "shrink-0 whitespace-nowrap px-3 py-2 my-1.5 rounded-md text-sm font-medium transition-colors";
+      ? "flex h-10 max-md:min-h-11 w-full items-center rounded-md px-3 text-left text-sm font-medium transition-colors"
+      : "flex h-10 max-md:min-h-11 shrink-0 items-center whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors";
   return cn(
     base,
     isActive
@@ -28,7 +28,7 @@ export function SettingsModalNav({
   onTabChange,
 }: SettingsModalNavProps) {
   return (
-    <div className="w-48 border-r border-border/30 flex flex-col max-md:w-full max-md:border-r-0 max-md:border-b max-md:sticky max-md:top-0 max-md:bg-card max-md:z-10">
+    <div className="flex w-48 flex-col border-r border-border max-md:sticky max-md:top-0 max-md:z-10 max-md:w-full max-md:border-r-0 max-md:border-b max-md:bg-raised">
       {/* Desktop: vertical sidebar */}
       <div className="p-2 space-y-1 max-md:hidden">
         {tabs.map((tab) => (
