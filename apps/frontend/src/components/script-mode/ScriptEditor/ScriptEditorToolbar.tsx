@@ -3,9 +3,10 @@ import { PaletteSwitcher } from "../PaletteSwitcher";
 import { FontSizeSwitcher } from "../../FontSizeSwitcher";
 import { LineWrapSwitcher } from "../LineWrapSwitcher";
 import { SaveIndicator } from "../../write-mode/SaveIndicator";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, GitBranch } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SaveStatus } from "@/hooks/useAutosave";
+import { STATUS_BAR_CONTROL_CLASSNAME } from "@/components/workspace/status-bar-control";
 import { ScriptEditorToolbarPlacementContext } from "./script-editor-toolbar-context";
 
 interface ScriptEditorFormattingControlsProps {
@@ -27,14 +28,14 @@ export function ScriptEditorFormattingControls({
     <div className={cn("flex items-center gap-2", className)}>
       <FontSizeSwitcher mode="script" direction="up" />
       <LineWrapSwitcher lineWrap={lineWrap} onToggle={toggleLineWrap} />
-      <PaletteSwitcher />
+      <PaletteSwitcher direction="up" />
       <button
         type="button"
         onClick={() => setShowOverlays(!showOverlays)}
         aria-pressed={showOverlays}
         className={cn(
-          "flex items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors",
-          "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+          STATUS_BAR_CONTROL_CLASSNAME,
+          "font-code",
           showOverlays && "bg-muted/40 text-foreground"
         )}
         title={
@@ -56,19 +57,33 @@ export function ScriptEditorFormattingControls({
   );
 }
 
-interface ScriptEditorStatusMetaProps {
+export interface ScriptEditorStatus {
   cursorPosition: { line: number; col: number };
   selectionInfo: string | null;
   totalLines: number;
+}
+
+interface ScriptEditorStatusMetaProps extends ScriptEditorStatus {
+  gitlabBranch?: string;
 }
 
 export function ScriptEditorStatusMeta({
   cursorPosition,
   selectionInfo,
   totalLines,
+  gitlabBranch,
 }: ScriptEditorStatusMetaProps) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex shrink-0 items-center gap-3 whitespace-nowrap">
+      {gitlabBranch ? (
+        <>
+          <span className="flex items-center gap-1.5 text-foreground">
+            <GitBranch className="size-3" aria-hidden="true" />
+            <span>{gitlabBranch}</span>
+          </span>
+          <span className="h-3 w-px bg-border" aria-hidden="true" />
+        </>
+      ) : null}
       <span>Ren&apos;Py</span>
       <span className="h-3 w-px bg-border" aria-hidden="true" />
       <span>UTF-8</span>
@@ -121,18 +136,7 @@ export function ScriptEditorToolbar({
   const placement = use(ScriptEditorToolbarPlacementContext);
 
   if (placement === "workspace") {
-    return (
-      <div
-        className="flex items-center justify-end px-3 font-code text-xs text-muted-foreground max-md:hidden"
-        data-script-editor-meta
-      >
-        <ScriptEditorStatusMeta
-          cursorPosition={cursorPosition}
-          selectionInfo={selectionInfo}
-          totalLines={totalLines}
-        />
-      </div>
-    );
+    return null;
   }
 
   return (

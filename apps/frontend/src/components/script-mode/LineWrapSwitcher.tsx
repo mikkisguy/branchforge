@@ -1,4 +1,5 @@
 import { AlignJustify, WrapText } from "lucide-react";
+import { STATUS_BAR_CONTROL_CLASSNAME } from "@/components/workspace/status-bar-control";
 
 /**
  * Line wrap toggle for the code editor.
@@ -19,11 +20,8 @@ export function LineWrapSwitcher({
     <button
       type="button"
       onClick={onToggle}
-      className={`px-3 py-1.5 text-xs font-code border rounded flex items-center gap-2 transition-colors ${
-        lineWrap
-          ? "bg-accent/50 hover:bg-accent border-border"
-          : "bg-muted/50 hover:bg-muted border-border"
-      }`}
+      aria-pressed={lineWrap}
+      className={`${STATUS_BAR_CONTROL_CLASSNAME} font-code`}
       title={lineWrap ? "Disable line wrapping" : "Enable line wrapping"}
     >
       {lineWrap ? (

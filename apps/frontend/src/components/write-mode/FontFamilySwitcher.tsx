@@ -9,6 +9,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { cva } from "class-variance-authority";
 import { Pilcrow } from "lucide-react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { STATUS_BAR_CONTROL_CLASSNAME } from "@/components/workspace/status-bar-control";
 
 type FontFamilyOption = {
   label: string;
@@ -209,7 +210,7 @@ export function FontFamilySwitcher({
         aria-expanded={dropdownState.isOpen}
         aria-haspopup="listbox"
         aria-labelledby="font-family-label"
-        className="px-2 py-1 border border-[hsl(var(--border)/0.6)] hover:bg-[hsl(var(--muted)/0.4)] text-xs text-muted-foreground hover:text-foreground rounded flex items-center gap-2 transition-colors"
+        className={STATUS_BAR_CONTROL_CLASSNAME}
         title="Change font family"
       >
         <Pilcrow className="size-3.5" aria-hidden="true" />

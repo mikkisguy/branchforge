@@ -36,7 +36,11 @@ import { CharacterEditDialog } from "@/components/CharacterEditDialog/CharacterE
 import { WorkspaceFrameLayout } from "@/components/workspace/WorkspaceFrame";
 import { WorkspaceToolbar } from "@/components/workspace/WorkspaceToolbar";
 import { WorkspaceStatusBar } from "@/components/workspace/WorkspaceStatusBar";
-import { ScriptEditorFormattingControls } from "@/components/script-mode/ScriptEditor/ScriptEditorToolbar";
+import {
+  ScriptEditorFormattingControls,
+  ScriptEditorStatusMeta,
+  type ScriptEditorStatus,
+} from "@/components/script-mode/ScriptEditor/ScriptEditorToolbar";
 import { ScriptEditorToolbarPlacementContext } from "@/components/script-mode/ScriptEditor/script-editor-toolbar-context";
 import { useWorkspacePanel } from "@/hooks/useWorkspacePanel";
 import { useFocusModeKeyboardHandler } from "@/hooks/useFocusModeKeyboardHandler";
@@ -256,6 +260,16 @@ export function ScriptModeEditorLayout({
     "script:show-label-titles",
     true
   );
+  const [scriptEditorStatus, setScriptEditorStatus] =
+    useState<ScriptEditorStatus>({
+      cursorPosition: { line: 1, col: 1 },
+      selectionInfo: null,
+      totalLines: activeFileContent.split("\n").length,
+    });
+
+  const hasActiveEditor = Boolean(
+    (isGeneratedPreview && generatedFileName) || activeProjectFile
+  );
 
   const editorContent =
     isGeneratedPreview && generatedFileName ? (
@@ -277,6 +291,7 @@ export function ScriptModeEditorLayout({
             showOverlays={showOverlays}
             onShowOverlaysChange={setShowOverlays}
             projectId={projectId}
+            onStatusChange={setScriptEditorStatus}
           />
         </div>
       </>
@@ -296,6 +311,7 @@ export function ScriptModeEditorLayout({
         showOverlays={showOverlays}
         onShowOverlaysChange={setShowOverlays}
         projectId={projectId}
+        onStatusChange={setScriptEditorStatus}
       />
     ) : activeLabel ? (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
@@ -428,23 +444,39 @@ export function ScriptModeEditorLayout({
               </div>
             }
             statusBar={
-              <WorkspaceStatusBar className="max-md:hidden min-w-0 justify-between gap-2 overflow-x-auto">
-                {!isMobile ? (
-                  <StatusBar
-                    projectId={projectId}
-                    projectName={projectName}
-                    gitlabBranch={gitlabBranch}
-                    fileSourceType={fileSourceType}
-                    onOpenZipImportDialog={onOpenZipImportDialog}
+              <WorkspaceStatusBar className="max-md:hidden min-w-0 justify-between gap-3 overflow-visible">
+                <div className="flex shrink-0 items-center gap-2">
+                  <ScriptEditorFormattingControls
+                    lineWrap={lineWrap}
+                    toggleLineWrap={handleLineWrapToggle}
+                    showOverlays={showOverlays}
+                    setShowOverlays={setShowOverlays}
+                  />
+                  <span
+                    className="mx-1 h-4 w-px bg-border"
+                    aria-hidden="true"
+                  />
+                  {!isMobile ? (
+                    <StatusBar
+                      projectId={projectId}
+                      projectName={projectName}
+                      gitlabBranch={gitlabBranch}
+                      fileSourceType={fileSourceType}
+                      onOpenZipImportDialog={onOpenZipImportDialog}
+                      showBranch={false}
+                    />
+                  ) : null}
+                </div>
+                {hasActiveEditor ? (
+                  <ScriptEditorStatusMeta
+                    {...scriptEditorStatus}
+                    gitlabBranch={
+                      fileSourceType === "GITLAB"
+                        ? (gitlabBranch ?? "Unknown")
+                        : undefined
+                    }
                   />
                 ) : null}
-                <ScriptEditorFormattingControls
-                  className="shrink-0 max-md:hidden"
-                  lineWrap={lineWrap}
-                  toggleLineWrap={handleLineWrapToggle}
-                  showOverlays={showOverlays}
-                  setShowOverlays={setShowOverlays}
-                />
               </WorkspaceStatusBar>
             }
             focusChrome={

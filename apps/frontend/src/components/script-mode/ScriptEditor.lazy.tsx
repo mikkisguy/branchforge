@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import type React from "react";
 import type { ScriptEditorRef } from "./ScriptEditor";
+import type { ScriptEditorStatus } from "./ScriptEditor/ScriptEditorToolbar";
 import type { LabelTitleMap } from "@/lib/codemirror/label-title-decoration";
 
 /**
@@ -39,6 +40,8 @@ interface ScriptEditorProps {
   onShowOverlaysChange?: (show: boolean) => void;
   /** Project ID for visual statement preview images */
   projectId?: string | null;
+  /** Report cursor and document metadata to a workspace-level status bar. */
+  onStatusChange?: (status: ScriptEditorStatus) => void;
   ref?: React.Ref<ScriptEditorRef>;
 }
 

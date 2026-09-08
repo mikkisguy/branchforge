@@ -132,10 +132,14 @@ describe("ScriptModeEditorLayout chrome", () => {
   });
 
   it("mounts only the desktop StatusBar when not mobile", () => {
-    renderLayout(false);
+    const { container } = renderLayout(false);
 
     expect(screen.getByTestId("desktop-status-bar")).toBeInTheDocument();
     expect(screen.queryByTestId("mobile-status-bar")).not.toBeInTheDocument();
+    expect(container.querySelector("footer")).toHaveClass("overflow-visible");
+    expect(container.querySelector("footer")).not.toHaveClass(
+      "overflow-x-auto"
+    );
   });
 
   it("mounts only the mobile StatusBar when mobile", () => {

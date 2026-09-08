@@ -27,4 +27,14 @@ describe("FontSizeSwitcher", () => {
       expect(option).toHaveAttribute("tabindex", "-1");
     }
   });
+
+  it("positions an upward dropdown above its trigger", async () => {
+    render(<FontSizeSwitcher mode="script" direction="up" />);
+
+    await userEvent.click(screen.getByRole("button", { name: /font size/i }));
+
+    expect(
+      screen.getByRole("listbox", { name: /font size options/i })
+    ).toHaveClass("bottom-full");
+  });
 });
