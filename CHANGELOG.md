@@ -4,6 +4,11 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.0-beta.3 - 2026-09-08
+
+- Overhauled the UI and introduced a unified workspace
+- Replaced the global sidebar with a laptop-first workspace: a 56px top bar, Write/Script/Flow as equal views, resizable authoring panels, and theme-aware Flow chrome.
+
 ## v1.0.0-beta.2 - 2026-09-05
 
 - Fixed broken project switcher
