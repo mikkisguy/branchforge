@@ -96,6 +96,7 @@ describe("EditorTabBar", () => {
     const tab = screen.getByRole("tab", { name: /Opening/ });
     const row = tab.parentElement;
     expect(row).toHaveClass("h-8", "items-center", "gap-1.5", "rounded-md");
+    expect(row).toHaveClass("after:bg-[var(--theme-color)]");
     expect(tab).toHaveClass("items-center", "gap-1.5");
     expect(tab).toHaveTextContent("act_i");
     expect(

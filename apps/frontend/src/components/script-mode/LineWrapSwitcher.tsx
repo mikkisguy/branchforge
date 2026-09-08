@@ -1,5 +1,8 @@
 import { AlignJustify, WrapText } from "lucide-react";
-import { STATUS_BAR_CONTROL_CLASSNAME } from "@/components/workspace/status-bar-control";
+import {
+  STATUS_BAR_ACTIVE_CONTROL_CLASSNAME,
+  STATUS_BAR_CONTROL_CLASSNAME,
+} from "@/components/workspace/status-bar-control";
 import { cn } from "@/lib/utils";
 
 /**
@@ -25,7 +28,7 @@ export function LineWrapSwitcher({
       className={cn(
         STATUS_BAR_CONTROL_CLASSNAME,
         "font-code",
-        lineWrap && "bg-muted/40 text-foreground"
+        lineWrap && STATUS_BAR_ACTIVE_CONTROL_CLASSNAME
       )}
       title={lineWrap ? "Disable line wrapping" : "Enable line wrapping"}
     >

@@ -8,7 +8,10 @@
 import { PanelTop, Eye, EyeOff } from "lucide-react";
 import { FontSizeSwitcher } from "../../FontSizeSwitcher";
 import { FontFamilySwitcher } from "../FontFamilySwitcher";
-import { STATUS_BAR_CONTROL_CLASSNAME } from "@/components/workspace/status-bar-control";
+import {
+  STATUS_BAR_ACTIVE_CONTROL_CLASSNAME,
+  STATUS_BAR_CONTROL_CLASSNAME,
+} from "@/components/workspace/status-bar-control";
 import type { LineLayoutMode } from "./ProseEditor";
 import { cn } from "@/lib/utils";
 
@@ -95,7 +98,7 @@ export function ProseEditorStatusBar({
             onClick={onShowBadgesToggle}
             className={cn(
               STATUS_BAR_CONTROL_CLASSNAME,
-              showBadges && "bg-muted/40 text-foreground"
+              showBadges && STATUS_BAR_ACTIVE_CONTROL_CLASSNAME
             )}
             title="Toggle technical badges (jumps, menus, etc.)"
             aria-pressed={showBadges}

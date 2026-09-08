@@ -264,5 +264,13 @@ describe("flow chrome semantic tokens", () => {
     const { container } = render(<LayoutModeSelector />);
 
     expectNoSlateClasses(container);
+    const activeMode = screen.getByRole("radio", { name: "Flow view" });
+    expect(activeMode).toHaveClass(
+      "bg-[rgba(var(--theme-color-rgb),0.1)]",
+      "ring-[rgba(var(--theme-color-rgb),0.25)]"
+    );
+    expect(activeMode.querySelector("svg")).toHaveClass(
+      "text-[var(--theme-color)]"
+    );
   });
 });

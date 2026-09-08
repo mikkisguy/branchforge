@@ -17,9 +17,15 @@ describe("ScriptEditorFormattingControls", () => {
     const overlays = screen.getByRole("button", { name: /overlays: off/i });
 
     for (const control of [wrap, overlays]) {
-      expect(control).toHaveClass("h-6", "border", "border-border/60");
+      expect(control).toHaveClass("h-6", "border");
     }
+    expect(overlays).toHaveClass("border-border/60");
     expect(wrap).toHaveAttribute("aria-pressed", "true");
-    expect(wrap).toHaveClass("bg-muted/40", "text-foreground");
+    expect(wrap).toHaveClass(
+      "bg-[rgba(var(--theme-color-rgb),0.1)]",
+      "border-[rgba(var(--theme-color-rgb),0.3)]",
+      "text-foreground"
+    );
+    expect(overlays).not.toHaveClass("bg-[rgba(var(--theme-color-rgb),0.1)]");
   });
 });

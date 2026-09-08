@@ -6,7 +6,10 @@ import { SaveIndicator } from "../../write-mode/SaveIndicator";
 import { Eye, EyeOff, GitBranch } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SaveStatus } from "@/hooks/useAutosave";
-import { STATUS_BAR_CONTROL_CLASSNAME } from "@/components/workspace/status-bar-control";
+import {
+  STATUS_BAR_ACTIVE_CONTROL_CLASSNAME,
+  STATUS_BAR_CONTROL_CLASSNAME,
+} from "@/components/workspace/status-bar-control";
 import { ScriptEditorToolbarPlacementContext } from "./script-editor-toolbar-context";
 
 interface ScriptEditorFormattingControlsProps {
@@ -36,7 +39,7 @@ export function ScriptEditorFormattingControls({
         className={cn(
           STATUS_BAR_CONTROL_CLASSNAME,
           "font-code",
-          showOverlays && "bg-muted/40 text-foreground"
+          showOverlays && STATUS_BAR_ACTIVE_CONTROL_CLASSNAME
         )}
         title={
           showOverlays

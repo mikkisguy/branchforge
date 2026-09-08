@@ -233,12 +233,9 @@ export function StatusBar({
         ) : (
           <Menu>
             <MenuTrigger
-              variant="secondary"
+              variant="ghost"
               size="sm"
-              className={cn(
-                STATUS_BAR_CONTROL_CLASSNAME,
-                "border-[var(--theme-color)]/30 text-[var(--theme-color)] shadow-none hover:border-[var(--theme-color)]/50 hover:bg-[var(--theme-color)]/10 hover:text-[var(--theme-color)]"
-              )}
+              className={cn(STATUS_BAR_CONTROL_CLASSNAME, "shadow-none")}
             >
               {isExporting ? (
                 <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />

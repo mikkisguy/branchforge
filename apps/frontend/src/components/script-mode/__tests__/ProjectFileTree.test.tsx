@@ -132,9 +132,11 @@ describe("ProjectFileTree - Generated section", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /^Generated$/i }));
 
-    expect(
-      screen.getByRole("treeitem", { name: /outline\.md/i })
-    ).toHaveAttribute("aria-selected", "true");
+    const activeItem = screen.getByRole("treeitem", { name: /outline\.md/i });
+    expect(activeItem).toHaveAttribute("aria-selected", "true");
+    expect(activeItem).toHaveClass(
+      "bg-[rgba(var(--theme-color-rgb),0.06)]",
+    );
     expect(
       screen.getByRole("treeitem", { name: /summary\.md/i })
     ).toHaveAttribute("aria-selected", "false");
@@ -157,4 +159,95 @@ it("does not wrap empty generated files without emptyReason in a tooltip", async
   expect(
     screen.getByRole("treeitem", { name: /branchforge_stats\.rpy/i })
   ).toBeInTheDocument();
+});
+
+it("keeps script labels as navigation targets without an active state", async () => {
+  const onSceneSelect = vi.fn();
+
+  render(
+    <ProjectFileTree
+      files={[
+        {
+          id: "story-file",
+          projectId: "project-1",
+          filePath: "labels/act_i.rpy",
+          fileType: "STORY",
+          content: "label start:",
+          source: "GITLAB",
+          contentHash: "hash",
+          createdAt: "2024-01-01T00:00:00.000Z",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+          labels: [
+            {
+              id: "label-1",
+              labelName: "start",
+              title: "Start",
+              status: "DRAFT",
+            },
+          ],
+        },
+      ]}
+      activeSceneId="label-1"
+      onFileSelect={noopFileSelect}
+      onSceneSelect={onSceneSelect}
+      initialExpandedFolders={["labels"]}
+      initialExpandedFiles={["story-file"]}
+    />
+  );
+
+  const label = screen.getByRole("treeitem", { name: "start" });
+  expect(label).not.toHaveAttribute("aria-selected");
+  expect(label).not.toHaveClass(
+    "bg-[rgba(var(--theme-color-rgb),0.06)]",
+    "ring-1",
+    "ring-inset"
+  );
+
+  await userEvent.click(label);
+  expect(onSceneSelect).toHaveBeenCalledWith("label-1");
+});
+
+it("opens a story file from its filename and toggles labels from the chevron", async () => {
+  const onFileSelect = vi.fn();
+
+  render(
+    <ProjectFileTree
+      files={[
+        {
+          id: "story-file",
+          projectId: "project-1",
+          filePath: "labels/act_i.rpy",
+          fileType: "STORY",
+          content: "label start:",
+          source: "GITLAB",
+          contentHash: "hash",
+          createdAt: "2024-01-01T00:00:00.000Z",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+          labels: [
+            {
+              id: "label-1",
+              labelName: "start",
+              title: "Start",
+              status: "DRAFT",
+            },
+          ],
+        },
+      ]}
+      onFileSelect={onFileSelect}
+      onSceneSelect={noopSceneSelect}
+      initialExpandedFolders={["labels"]}
+    />
+  );
+
+  expect(
+    screen.queryByRole("treeitem", { name: "start" })
+  ).not.toBeInTheDocument();
+
+  await userEvent.click(
+    screen.getByRole("button", { name: "Expand labels for act_i.rpy" })
+  );
+  expect(screen.getByRole("treeitem", { name: "start" })).toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole("treeitem", { name: /^act_i\.rpy/ }));
+  expect(onFileSelect).toHaveBeenCalledWith("story-file");
 });

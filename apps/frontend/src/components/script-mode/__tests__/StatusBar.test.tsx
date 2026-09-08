@@ -38,11 +38,16 @@ describe("StatusBar", () => {
     );
 
     expect(screen.getByText("main")).toBeInTheDocument();
-    await user.click(
-      screen.getByRole("button", {
-        name: "Import / Export",
-      })
+    const transferButton = screen.getByRole("button", {
+      name: "Import / Export",
+    });
+    expect(transferButton).toHaveClass(
+      "border-border/60",
+      "bg-transparent",
+      "text-muted-foreground"
     );
+    expect(transferButton).not.toHaveClass("text-[var(--theme-color)]");
+    await user.click(transferButton);
 
     expect(
       screen.getByRole("menuitem", { name: /pull from gitlab/i })

@@ -96,11 +96,17 @@ export function LayoutModeSelector({
             className={cn(
               "flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md transition-colors",
               isActive
-                ? "bg-accent text-accent-foreground shadow-sm"
+                ? "bg-[rgba(var(--theme-color-rgb),0.1)] text-foreground shadow-sm ring-1 ring-inset ring-[rgba(var(--theme-color-rgb),0.25)]"
                 : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
             )}
           >
-            <Icon className="w-3.5 h-3.5" aria-hidden="true" />
+            <Icon
+              className={cn(
+                "w-3.5 h-3.5",
+                isActive && "text-[var(--theme-color)]"
+              )}
+              aria-hidden="true"
+            />
             <span>{label}</span>
           </button>
         );

@@ -166,6 +166,11 @@ describe("LabelNavigator", () => {
 
       const activeButton = screen.getByText("Label B").closest("button")!;
       expect(activeButton).toHaveAttribute("aria-pressed", "true");
+      expect(activeButton).toHaveClass(
+        "bg-[rgba(var(--theme-color-rgb),0.06)]",
+        "border-transparent",
+      );
+      expect(activeButton).toHaveClass("gap-2.5", "px-2.5", "py-2");
     });
   });
 

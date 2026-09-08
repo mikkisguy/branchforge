@@ -78,7 +78,7 @@ export function EditorTabBarDesktopTabs({
               className={cn(
                 "group relative flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md pl-2.5 pr-1 text-sm transition-colors",
                 isActive
-                  ? "bg-background font-medium text-foreground shadow-sm"
+                  ? "bg-background font-medium text-foreground shadow-sm after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-[var(--theme-color)]"
                   : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
               )}
             >
