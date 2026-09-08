@@ -10,6 +10,7 @@
   "changesets": [
     "character-export-name-type",
     "dirty-form-guards",
+    "fifty-walls-ring",
     "first-1-0-beta",
     "keyboard-shortcuts-docs",
     "light-carrots-act",
