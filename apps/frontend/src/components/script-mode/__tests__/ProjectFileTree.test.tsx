@@ -248,6 +248,12 @@ it("opens a story file from its filename and toggles labels from the chevron", a
   );
   expect(screen.getByRole("treeitem", { name: "start" })).toBeInTheDocument();
 
-  await userEvent.click(screen.getByRole("treeitem", { name: /^act_i\.rpy/ }));
+  const filenameButton = screen.getByRole("treeitem", {
+    name: /^act_i\.rpy/,
+  });
+  expect(filenameButton).not.toHaveAttribute("aria-expanded");
+  expect(filenameButton).not.toHaveAttribute("aria-owns");
+
+  await userEvent.click(filenameButton);
   expect(onFileSelect).toHaveBeenCalledWith("story-file");
 });

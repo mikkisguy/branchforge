@@ -214,19 +214,7 @@ export function ProjectFileTree({
                       onClick={() => onFileSelect(file.id)}
                       role="treeitem"
                       aria-selected={activeFileId === file.id}
-                      aria-expanded={
-                        file.fileType === "STORY" && file.labels.length > 0
-                          ? expandedFiles.has(file.id)
-                          : undefined
-                      }
                       aria-level={folder ? 2 : 1}
-                      aria-owns={
-                        file.fileType === "STORY" &&
-                        file.labels.length > 0 &&
-                        expandedFiles.has(file.id)
-                          ? `label-group-${file.id}`
-                          : undefined
-                      }
                       className={`flex-1 flex items-center gap-2 py-1.5 px-2 rounded-md text-sm text-left transition-colors ${
                         activeFileId === file.id
                           ? ACTIVE_NAVIGATOR_ITEM_CLASSNAME
