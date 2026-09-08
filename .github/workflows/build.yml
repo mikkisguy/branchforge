@@ -18,7 +18,7 @@ jobs:
         run: apk add --no-cache git
 
       - name: Install pnpm
-        run: npm install -g pnpm@9
+        run: corepack enable pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

@@ -38,7 +38,7 @@ jobs:
           git pull --ff-only origin main
 
       - name: Install pnpm
-        run: npm install -g pnpm@9
+        run: corepack enable pnpm
 
       - name: Install project dependencies
         run: pnpm install --frozen-lockfile
