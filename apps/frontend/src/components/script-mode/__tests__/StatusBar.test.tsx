@@ -94,4 +94,28 @@ describe("StatusBar", () => {
 
     expect(onOpenZipImportDialog).toHaveBeenCalledOnce();
   });
+
+  it("uses an expandable mobile row instead of the desktop dropdown", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <StatusBar
+        projectId="project-1"
+        gitlabBranch="main"
+        fileSourceType="GITLAB"
+        mobile
+      />
+    );
+
+    const trigger = screen.getByRole("button", {
+      name: /import \/ export/i,
+    });
+    expect(screen.getByText("main").parentElement).toHaveClass("gap-3", "px-3");
+    expect(trigger).not.toHaveClass("border");
+
+    await user.click(trigger);
+    await user.click(screen.getByRole("button", { name: /pull from gitlab/i }));
+
+    expect(screen.getByRole("dialog")).toHaveTextContent("import GitLab");
+  });
 });

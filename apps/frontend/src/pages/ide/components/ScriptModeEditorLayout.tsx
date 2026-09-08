@@ -573,6 +573,7 @@ export function ScriptModeEditorLayout({
               gitlabBranch={gitlabBranch}
               fileSourceType={fileSourceType}
               onOpenZipImportDialog={onOpenZipImportDialog}
+              mobile
               className="flex-col items-stretch"
             />
           </div>
