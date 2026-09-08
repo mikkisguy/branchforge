@@ -221,6 +221,9 @@ describe("FlowGraphCanvas", () => {
     const { container } = render(<FlowGraphCanvas {...baseCanvasProps} />);
 
     expect(screen.getByTestId("workspace-panel")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Collapse filters" })
+    ).toHaveAttribute("aria-controls", "flow-filters-panel");
     expectNoSlateClasses(container);
   });
 });

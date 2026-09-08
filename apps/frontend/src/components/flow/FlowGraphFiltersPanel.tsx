@@ -19,6 +19,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Search, X, Filter, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { WorkspacePanelToggle } from "@/components/workspace/WorkspacePanelToggle";
 import { cn } from "@/lib/utils";
 import type { Character } from "@branchforge/shared";
 import type { LabelStatus } from "@branchforge/shared";
@@ -126,14 +127,7 @@ export function FlowGraphFiltersPanel({
       aria-label="Flow graph filters"
     >
       <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
-        <button
-          type="button"
-          onClick={onCollapse}
-          aria-label="Collapse filters"
-          aria-expanded={true}
-          title="Collapse filters"
-          className="flex items-center gap-1.5 text-foreground font-medium hover:text-foreground/80 transition-colors"
-        >
+        <div className="flex items-center gap-1.5 font-medium text-foreground">
           <Filter
             className="w-3.5 h-3.5 text-muted-foreground"
             aria-hidden="true"
@@ -147,19 +141,26 @@ export function FlowGraphFiltersPanel({
               {activeCount}
             </span>
           )}
-          <ChevronDown
-            className="w-4 h-4 text-muted-foreground transition-transform duration-200"
-            aria-hidden="true"
-          />
-        </button>
-        <button
-          type="button"
-          onClick={clearAll}
-          disabled={activeCount === 0}
-          className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-muted-foreground transition-colors px-1"
-        >
-          Clear
-        </button>
+        </div>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={clearAll}
+            disabled={activeCount === 0}
+            className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-muted-foreground transition-colors px-1"
+          >
+            Clear
+          </button>
+          {onCollapse ? (
+            <WorkspacePanelToggle
+              side="left"
+              collapsed={false}
+              panelId="flow-filters-panel"
+              label="filters"
+              onToggle={onCollapse}
+            />
+          ) : null}
+        </div>
       </div>
 
       <div className="p-3 space-y-4 overflow-y-auto flex-1 min-h-0">

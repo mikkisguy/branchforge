@@ -1,6 +1,6 @@
 import { useCallback, type ReactNode } from "react";
-import { ChevronRight, Filter } from "lucide-react";
 import { WorkspacePanelView } from "@/components/workspace/WorkspacePanel";
+import { WorkspacePanelToggle } from "@/components/workspace/WorkspacePanelToggle";
 import { FLOW_FILTERS_PANEL } from "@/lib/workspace-panels";
 import { useWorkspacePanel } from "@/hooks/useWorkspacePanel";
 
@@ -20,30 +20,16 @@ export function FlowFiltersDock({ filters, children }: FlowFiltersDockProps) {
 
   return (
     <div className="relative flex h-full w-full min-h-0">
-      {(filtersPanel.collapsed || filtersPanel.isOverlay) && (
-        <div
-          className={
-            filtersPanel.collapsed
-              ? "shrink-0 border-r border-border bg-panel px-2 py-3"
-              : "sr-only"
-          }
-        >
-          <button
-            type="button"
-            onClick={() => filtersPanel.setCollapsed(false)}
-            aria-label="Open filters"
-            aria-expanded={!filtersPanel.collapsed}
-            title="Open filters"
-            tabIndex={filtersPanel.collapsed ? undefined : -1}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-raised px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <Filter className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>Filters</span>
-            <ChevronRight
-              className="h-4 w-4 text-muted-foreground"
-              aria-hidden="true"
-            />
-          </button>
+      {filtersPanel.collapsed && (
+        <div className="absolute left-3 top-3 z-10">
+          <WorkspacePanelToggle
+            side="left"
+            collapsed
+            panelId="flow-filters-panel"
+            label="filters"
+            onToggle={() => filtersPanel.setCollapsed(false)}
+            className="border border-border bg-raised shadow-sm"
+          />
         </div>
       )}
       {!filtersPanel.collapsed && (

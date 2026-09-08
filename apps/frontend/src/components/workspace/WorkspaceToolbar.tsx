@@ -1,8 +1,7 @@
 import type { ReactNode } from "react";
-import { PanelLeft, PanelRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useWorkspaceFrame } from "./useWorkspaceFrame";
+import { WorkspacePanelToggle } from "./WorkspacePanelToggle";
 
 export interface WorkspaceToolbarProps {
   children?: ReactNode;
@@ -34,36 +33,20 @@ export function WorkspaceToolbar({
       {showPanelToggles ? (
         <>
           <div className="flex shrink-0 items-center gap-0.5">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0"
-              aria-pressed={!leftPanel.collapsed}
-              aria-controls={leftPanelId}
-              aria-expanded={!leftPanel.collapsed}
-              aria-label={
-                leftPanel.collapsed ? "Expand navigator" : "Collapse navigator"
-              }
-              onClick={toggleLeft}
-            >
-              <PanelLeft />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0"
-              aria-pressed={!rightPanel.collapsed}
-              aria-controls={rightPanelId}
-              aria-expanded={!rightPanel.collapsed}
-              aria-label={
-                rightPanel.collapsed ? "Expand inspector" : "Collapse inspector"
-              }
-              onClick={toggleRight}
-            >
-              <PanelRight />
-            </Button>
+            <WorkspacePanelToggle
+              side="left"
+              collapsed={leftPanel.collapsed}
+              panelId={leftPanelId}
+              label="navigator"
+              onToggle={toggleLeft}
+            />
+            <WorkspacePanelToggle
+              side="right"
+              collapsed={rightPanel.collapsed}
+              panelId={rightPanelId}
+              label="inspector"
+              onToggle={toggleRight}
+            />
           </div>
           <span className="h-4 w-px shrink-0 bg-border" aria-hidden="true" />
         </>
