@@ -19,6 +19,7 @@ describe("ScriptEditorFormattingControls", () => {
     for (const control of [wrap, overlays]) {
       expect(control).toHaveClass("h-6", "border", "border-border/60");
     }
-    expect(wrap).not.toHaveClass("bg-muted/40");
+    expect(wrap).toHaveAttribute("aria-pressed", "true");
+    expect(wrap).toHaveClass("bg-muted/40", "text-foreground");
   });
 });

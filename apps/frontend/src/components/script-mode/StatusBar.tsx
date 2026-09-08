@@ -173,7 +173,6 @@ export function StatusBar({
               STATUS_BAR_CONTROL_CLASSNAME,
               "border-[var(--theme-color)]/30 text-[var(--theme-color)] shadow-none hover:border-[var(--theme-color)]/50 hover:bg-[var(--theme-color)]/10 hover:text-[var(--theme-color)]"
             )}
-            aria-label="Import and export project files"
           >
             {isExporting ? (
               <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />

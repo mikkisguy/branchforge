@@ -40,7 +40,7 @@ describe("StatusBar", () => {
     expect(screen.getByText("main")).toBeInTheDocument();
     await user.click(
       screen.getByRole("button", {
-        name: "Import and export project files",
+        name: "Import / Export",
       })
     );
 
@@ -68,7 +68,7 @@ describe("StatusBar", () => {
     expect(screen.queryByText("main")).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", {
-        name: "Import and export project files",
+        name: "Import / Export",
       })
     ).toBeInTheDocument();
   });
@@ -87,7 +87,7 @@ describe("StatusBar", () => {
 
     await user.click(
       screen.getByRole("button", {
-        name: "Import and export project files",
+        name: "Import / Export",
       })
     );
     await user.click(screen.getByRole("menuitem", { name: /import zip/i }));
