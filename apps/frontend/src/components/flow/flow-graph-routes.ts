@@ -41,13 +41,15 @@ export function buildRouteOptions(
   return options;
 }
 
+export const UNASSIGNED_ROUTE_COLOR = "hsl(var(--muted-foreground))";
+
 export function getRouteColor(
   routeKey: string | null,
   routeColorMap: Map<string, string>
 ): string {
-  if (!routeKey) return "#64748b"; // slate-500 for unassigned
+  if (!routeKey) return UNASSIGNED_ROUTE_COLOR;
   const color = routeColorMap.get(routeKey);
-  return color ?? "#64748b";
+  return color ?? UNASSIGNED_ROUTE_COLOR;
 }
 
 /**

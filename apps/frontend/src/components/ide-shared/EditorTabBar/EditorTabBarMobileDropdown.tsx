@@ -2,10 +2,13 @@ import { createPortal } from "react-dom";
 import { ChevronDown, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { EditorTabBarItem } from "./EditorTabBar";
+import { EDITOR_TAB_META_BADGE_CLASS } from "./editor-tab-bar-styles";
 import type { KeyboardEvent, MouseEvent } from "react";
 
-const META_BADGE_CLASSES =
-  "rounded px-1.5 py-0.5 text-[11px] font-semibold tracking-wide bg-muted/55 text-muted-foreground/80 shrink-0";
+const META_BADGE_CLASSES = cn(
+  EDITOR_TAB_META_BADGE_CLASS,
+  "bg-muted/70 text-muted-foreground"
+);
 
 interface EditorTabBarMobileDropdownProps {
   items: EditorTabBarItem[];
@@ -53,7 +56,7 @@ export function EditorTabBarMobileDropdown({
         }}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="h-full w-full flex items-center gap-2 px-3 text-sm"
+        className="flex h-full w-full items-center gap-1.5 px-2.5 text-sm"
       >
         <Menu className="size-4 text-muted-foreground shrink-0" />
         <span className="truncate font-medium">
@@ -103,7 +106,7 @@ export function EditorTabBarMobileDropdown({
                   key={item.id}
                   data-tab-id={item.id}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-2.5 text-sm",
+                    "flex items-center gap-1.5 px-3 py-2.5 text-sm",
                     isActive ? "bg-muted/50" : "hover:bg-muted/30"
                   )}
                 >

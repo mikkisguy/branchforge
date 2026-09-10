@@ -38,6 +38,7 @@ import type { SaveStatus } from "@/hooks/useAutosave";
 import { createHighlightExtension } from "./ScriptEditorHighlight";
 import { useScriptEditorController } from "./useScriptEditorController";
 import { ScriptEditorToolbar } from "./ScriptEditorToolbar";
+import type { ScriptEditorStatus } from "./ScriptEditorToolbar";
 
 export interface ScriptEditorRef {
   focus: () => void;
@@ -61,6 +62,8 @@ interface ScriptEditorProps {
   onShowOverlaysChange?: (show: boolean) => void;
   /** Project ID for visual statement preview images */
   projectId?: string | null;
+  /** Report cursor and document metadata to a workspace-level status bar. */
+  onStatusChange?: (status: ScriptEditorStatus) => void;
 }
 
 export const ScriptEditor = function ScriptEditor({
@@ -78,6 +81,7 @@ export const ScriptEditor = function ScriptEditor({
   showOverlays: propsShowOverlays,
   onShowOverlaysChange,
   projectId,
+  onStatusChange,
   ref,
 }: ScriptEditorProps & { ref?: React.Ref<ScriptEditorRef> }) {
   const [internalLineWrap, setInternalLineWrap] = useLocalStorageBoolean(
@@ -190,6 +194,10 @@ export const ScriptEditor = function ScriptEditor({
 
   const { cursorPosition, selectionInfo, totalLines, updateListener } =
     useEditorCursor({ initialContent: cleanContent });
+
+  useEffect(() => {
+    onStatusChange?.({ cursorPosition, selectionInfo, totalLines });
+  }, [cursorPosition, onStatusChange, selectionInfo, totalLines]);
 
   const extensions = useMemo(
     () =>

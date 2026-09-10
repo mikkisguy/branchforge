@@ -8,7 +8,12 @@
 import { PanelTop, Eye, EyeOff } from "lucide-react";
 import { FontSizeSwitcher } from "../../FontSizeSwitcher";
 import { FontFamilySwitcher } from "../FontFamilySwitcher";
+import {
+  STATUS_BAR_ACTIVE_CONTROL_CLASSNAME,
+  STATUS_BAR_CONTROL_CLASSNAME,
+} from "@/components/workspace/status-bar-control";
 import type { LineLayoutMode } from "./ProseEditor";
+import { cn } from "@/lib/utils";
 
 interface ProseEditorStatusBarProps {
   /** Current line layout mode */
@@ -66,7 +71,7 @@ export function ProseEditorStatusBar({
 }: ProseEditorStatusBarProps) {
   return (
     <div
-      className="px-4 py-2 border-t border-border bg-card rounded-b-lg transition-opacity duration-300 ease-out max-md:hidden"
+      className="w-full px-4 py-2 border-t border-border bg-card rounded-b-lg transition-opacity duration-300 ease-out max-md:hidden"
       style={{
         opacity: isFocusMode ? (isBottomBarHovered ? 1 : 0.4) : 1,
       }}
@@ -76,13 +81,13 @@ export function ProseEditorStatusBar({
       onBlurCapture={onBottomBarHoverEnd}
     >
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() =>
               onLayoutModeChange(layoutMode === "inline" ? "stacked" : "inline")
             }
-            className="px-2 py-1 rounded border border-[hsl(var(--border)/0.6)] hover:bg-[hsl(var(--muted)/0.4)] text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
+            className={STATUS_BAR_CONTROL_CLASSNAME}
             title="Toggle line layout"
           >
             <PanelTop className="size-3" aria-hidden="true" />
@@ -91,7 +96,10 @@ export function ProseEditorStatusBar({
           <button
             type="button"
             onClick={onShowBadgesToggle}
-            className="px-2 py-1 rounded border border-[hsl(var(--border)/0.6)] hover:bg-[hsl(var(--muted)/0.4)] text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
+            className={cn(
+              STATUS_BAR_CONTROL_CLASSNAME,
+              showBadges && STATUS_BAR_ACTIVE_CONTROL_CLASSNAME
+            )}
             title="Toggle technical badges (jumps, menus, etc.)"
             aria-pressed={showBadges}
           >

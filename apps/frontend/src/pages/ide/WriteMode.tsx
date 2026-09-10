@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { WorkspaceFocusReporter } from "@/components/workspace/WorkspaceFocusReporter";
 import { useLabels } from "@/hooks/useLabels";
 import { useProjectFiles } from "@/hooks/useProjectFiles";
 import { useCharacters } from "@/hooks/useCharacters";
@@ -13,7 +14,6 @@ import { useRouteConfigs } from "@/hooks/useRouteConfigs";
 import { useProject } from "@/hooks/useProject";
 import { useToast } from "@/contexts/ToastContext";
 import { CreateFileDialog } from "@/components/ide-shared/CreateFileDialog";
-import { useResponsiveSidebarState } from "@/hooks/useResponsiveSidebarState";
 import { useStats } from "@/hooks/useStats";
 import { usePairGroups } from "@/hooks/usePairGroups";
 import {
@@ -24,6 +24,8 @@ import {
 import { useWriteTabs } from "@/hooks/useWriteTabs";
 import { useLabelSwitcher } from "@/hooks/useLabelSwitcher";
 import { useWriteFocusMode } from "@/hooks/useWriteFocusMode";
+import { useWorkspacePanel } from "@/hooks/useWorkspacePanel";
+import { WRITE_LEFT_PANEL, WRITE_RIGHT_PANEL } from "@/lib/workspace-panels";
 import { WriteModeView } from "@/pages/ide/components/WriteModeView";
 import {
   NoProjectSelected,
@@ -36,9 +38,13 @@ import type { DialogueEntry } from "@/lib/prose-types";
 interface WriteModeProps {
   projectName?: string;
   onOpenSettings?: () => void;
+  onFocusModeChange?: (focused: boolean) => void;
 }
 
-export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
+export function WriteMode({
+  onOpenSettings,
+  onFocusModeChange,
+}: WriteModeProps) {
   const { currentProject } = useProject();
   const { error: showErrorToast } = useToast();
   const [createFileDialogOpen, setCreateFileDialogOpen] = useState(false);
@@ -113,10 +119,8 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
     enabled: !!currentProject?.id,
   });
 
-  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed, isMobile] =
-    useResponsiveSidebarState("write:left-sidebar-collapsed");
-  const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] =
-    useResponsiveSidebarState("write:right-sidebar-collapsed");
+  const leftPanelRaw = useWorkspacePanel(WRITE_LEFT_PANEL);
+  const rightPanelRaw = useWorkspacePanel(WRITE_RIGHT_PANEL);
 
   const editorRef = useRef<ProseEditorRef | null>(null);
 
@@ -132,10 +136,10 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
 
   const { isFocusMode, focusToggleRef, handleFocusModeToggle } =
     useWriteFocusMode({
-      isLeftSidebarCollapsed,
-      setIsLeftSidebarCollapsed,
-      isRightSidebarCollapsed,
-      setIsRightSidebarCollapsed,
+      isLeftSidebarCollapsed: leftPanelRaw.collapsed,
+      setIsLeftSidebarCollapsed: leftPanelRaw.setCollapsed,
+      isRightSidebarCollapsed: rightPanelRaw.collapsed,
+      setIsRightSidebarCollapsed: rightPanelRaw.setCollapsed,
       editorRef,
     });
 
@@ -270,18 +274,17 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
 
   return (
     <>
-      <div className="h-full flex flex-col overflow-hidden max-md:px-2">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <WorkspaceFocusReporter
+          active={isFocusMode}
+          onFocusModeChange={onFocusModeChange}
+        />
         <WriteModeView
           isFocusMode={isFocusMode}
           focusToggleRef={focusToggleRef}
           onFocusModeToggle={handleFocusModeToggle}
-          sidebarState={{
-            isLeftCollapsed: isLeftSidebarCollapsed,
-            setIsLeftCollapsed: setIsLeftSidebarCollapsed,
-            isRightCollapsed: isRightSidebarCollapsed,
-            setIsRightCollapsed: setIsRightSidebarCollapsed,
-          }}
-          isMobile={isMobile}
+          leftPanelRaw={leftPanelRaw}
+          rightPanelRaw={rightPanelRaw}
           storyFiles={storyFiles}
           revealFileId={revealFileId}
           sortResetToken={sortResetToken}
@@ -292,9 +295,7 @@ export function WriteMode({ projectName, onOpenSettings }: WriteModeProps) {
           onLabelSelect={handleLabelSelect}
           onCloseTab={handleCloseTab}
           tabItems={tabItems}
-          projectName={projectName || currentProject?.name}
           projectId={currentProject.id}
-          projectLabelCount={storyLabels.length}
           onCreateLabel={createLabel}
           onUpdateLabel={updateLabel}
           onDeleteLabel={deleteLabel}

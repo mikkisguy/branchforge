@@ -12,8 +12,6 @@ import type { PublicLabel, LabelStatus } from "@branchforge/shared";
 import {
   ArrowUpDown,
   Clock,
-  Sparkles,
-  ChevronLeft,
   File,
   FolderOpen,
   Plus,
@@ -23,7 +21,9 @@ import {
 } from "lucide-react";
 import { LabelContextMenu } from "@/components/write-mode/LabelContextMenu";
 import { Tooltip } from "@/components/ui/tooltip";
+import { ACTIVE_NAVIGATOR_ITEM_CLASSNAME } from "@/components/workspace/navigator-item";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { FormErrorMessage } from "@/components/ui/form-error-message";
 import type { UpdateLabelInput } from "@/lib/api/labels";
 
@@ -39,6 +39,7 @@ function compareByUpdatedAt(a: PublicLabel, b: PublicLabel): number {
   if (timeDiff !== 0) return timeDiff;
   return b.labelNumber - a.labelNumber;
 }
+
 function getFileBasename(filePath: string): string {
   const parts = filePath.split("/");
   return parts[parts.length - 1] || filePath;
@@ -152,7 +153,7 @@ function LabelItem({
           w-full rounded-md border transition-all
           ${
             isActive
-              ? "bg-[var(--theme-color)]/10 border-[var(--theme-color)] shadow-sm"
+              ? `${ACTIVE_NAVIGATOR_ITEM_CLASSNAME} border-transparent`
               : "bg-card/50 border-border"
           }
         `}
@@ -181,17 +182,17 @@ function LabelItem({
         onDoubleClick={() => onDoubleClick(label)}
         aria-pressed={isActive}
         className={`
-        relative w-full flex items-center gap-3 px-3 py-2.5 rounded-md border transition-all
+        relative w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md border transition-all
         ${
           isActive
-            ? "bg-[var(--theme-color)]/10 border-[var(--theme-color)] shadow-sm"
+            ? `${ACTIVE_NAVIGATOR_ITEM_CLASSNAME} border-transparent`
             : "bg-card/80 border-transparent hover:border-border hover:bg-accent/50"
         }
       `}
       >
         {/* Status dot on the left */}
         <div
-          className="size-2 rounded-full flex-shrink-0 ring-2 ring-background"
+          className="size-1.5 rounded-full flex-shrink-0 ring-[1.5px] ring-background"
           style={{
             backgroundColor: statusColor,
           }}
@@ -370,7 +371,7 @@ function FileGroup({
       </div>
 
       {/* Label list */}
-      <div className="space-y-2.5">
+      <div className="space-y-1">
         {labels.map((label) => (
           <LabelItem
             key={label.id}
@@ -423,9 +424,6 @@ interface LabelNavigatorProps {
   storyFiles: StoryFileRef[];
   activeLabelId: string | null;
   onSelect: (labelId: string) => void;
-  projectName?: string;
-  projectLabelCount?: number;
-  onToggleCollapse?: () => void;
   revealFileId?: string | null;
   sortResetToken?: number;
   onNewFile?: () => void;
@@ -453,9 +451,6 @@ export function LabelNavigator({
   storyFiles,
   activeLabelId,
   onSelect,
-  projectName,
-  projectLabelCount,
-  onToggleCollapse,
   revealFileId,
   sortResetToken = 0,
   onNewFile,
@@ -615,41 +610,11 @@ export function LabelNavigator({
   }, [filteredLabels, sortMode, storyFiles, searchQuery]);
 
   return (
-    <div className="h-full overflow-y-auto">
-      {/* Project Info Header */}
-      <div
-        className={`sticky top-0 z-20 bg-card border-b border-border pr-4 py-3 ${onToggleCollapse ? "pl-10" : "px-4"}`}
-      >
-        {onToggleCollapse && (
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            className="absolute top-2 left-2 z-30 p-1 rounded-md hover:bg-muted/80 transition-colors"
-            aria-label="Collapse label navigator sidebar"
-            title="Collapse label navigator sidebar"
-          >
-            <ChevronLeft className="size-4 text-muted-foreground" />
-          </button>
-        )}
-        <div className="flex items-center gap-3">
-          <div className="size-7 rounded bg-[var(--theme-color)] flex items-center justify-center shadow-sm shrink-0">
-            <Sparkles className="size-4 text-white" />
-          </div>
-          <div className="min-w-0">
-            <span className="text-sm font-medium block truncate">
-              {projectName || "Write Mode"}
-            </span>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {projectLabelCount ?? labels.length} label
-              {(projectLabelCount ?? labels.length) !== 1 ? "s" : ""}
-            </p>
-          </div>
-        </div>
-
-        {/* Search input + sort toggle */}
-        <div className="mt-2.5 flex items-center gap-1">
-          <div className="flex-1 relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+    <div className="h-full overflow-y-auto bg-transparent">
+      <div className="sticky top-0 z-20 border-b border-border bg-panel px-4 py-3">
+        <div className="flex items-center gap-1">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="text"
               value={searchQuery}
@@ -658,16 +623,16 @@ export function LabelNavigator({
               className="pl-7 pr-7"
               aria-label="Filter labels"
             />
-            {searchQuery && (
+            {searchQuery ? (
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-muted/80 transition-colors"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 transition-colors hover:bg-muted/80"
                 aria-label="Clear search"
               >
                 <X className="size-3 text-muted-foreground" />
               </button>
-            )}
+            ) : null}
           </div>
           <Tooltip
             content={
@@ -683,7 +648,7 @@ export function LabelNavigator({
                   prev === "lastUpdated" ? "sequence" : "lastUpdated"
                 )
               }
-              className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+              className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
               aria-label={`Sort mode: ${sortMode === "lastUpdated" ? "last updated" : "sequence order"}. Click to toggle.`}
             >
               {sortMode === "lastUpdated" ? (
@@ -694,23 +659,23 @@ export function LabelNavigator({
             </button>
           </Tooltip>
         </div>
-
-        {onNewFile && (
-          <button
+        {onNewFile ? (
+          <Button
             type="button"
+            size="sm"
             onClick={onNewFile}
-            className="mt-2 w-full py-1.5 px-3 rounded-lg text-xs font-medium transition-colors bg-[var(--theme-color)] text-white hover:opacity-90"
+            className="mt-2 w-full"
           >
             + New File
-          </button>
-        )}
+          </Button>
+        ) : null}
       </div>
 
       {/* Label List */}
       <div className="p-3 space-y-2">
         {groupedLabels.flat !== null ? (
           groupedLabels.flat.length > 0 ? (
-            <div className="space-y-2.5" key={sortMode}>
+            <div className="space-y-1" key={sortMode}>
               {groupedLabels.flat.map((label) => (
                 <LabelItem
                   key={label.id}

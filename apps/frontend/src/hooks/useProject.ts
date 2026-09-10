@@ -73,7 +73,7 @@ export interface UseProjectReturn {
   projectsError: Error | null;
 
   // Methods
-  refreshProjects: () => Promise<void>;
+  refreshProjects: () => Promise<Project[]>;
   setCurrentProject: (project: Project | null) => void;
   updateProject: (
     projectId: string,
@@ -155,8 +155,9 @@ export function useProject(): UseProjectReturn {
   ]);
 
   // Refresh projects method
-  const refreshProjects = async () => {
+  const refreshProjects = async (): Promise<Project[]> => {
     await queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+    return queryClient.getQueryData<Project[]>(projectKeys.lists()) ?? [];
   };
 
   // Set current project method - persists to both localStorage and query cache

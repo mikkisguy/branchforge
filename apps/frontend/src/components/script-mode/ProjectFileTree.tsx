@@ -7,6 +7,7 @@ import type {
 } from "@branchforge/shared";
 import { CollapsibleSection } from "@/components/ide-shared/CollapsibleSection";
 import { Tooltip } from "@/components/ui/tooltip";
+import { ACTIVE_NAVIGATOR_ITEM_CLASSNAME } from "@/components/workspace/navigator-item";
 
 const STATUS_COLORS: Record<LabelStatus, string> = {
   FINAL: "var(--theme-final-color)",
@@ -62,7 +63,6 @@ function getFileName(filePath: string): string {
 export function ProjectFileTree({
   files,
   activeFileId,
-  activeSceneId,
   onFileSelect,
   onSceneSelect,
   initialExpandedFolders,
@@ -140,7 +140,7 @@ export function ProjectFileTree({
                   }}
                   className={`w-full flex items-center gap-2 py-1.5 px-2 rounded-md text-sm text-left transition-colors italic opacity-70 ${
                     isSelected
-                      ? "bg-[var(--theme-color)]/10 text-foreground font-medium"
+                      ? ACTIVE_NAVIGATOR_ITEM_CLASSNAME
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
                   } ${file.isEmpty ? "cursor-not-allowed opacity-50" : ""}`}
                 >
@@ -208,49 +208,32 @@ export function ProjectFileTree({
                 <div key={file.id}>
                   <div className="flex items-center gap-0.5">
                     {file.fileType === "STORY" && file.labels.length > 0 ? (
-                      <span
-                        aria-hidden="true"
-                        className="flex items-center justify-center size-5"
+                      <button
+                        type="button"
+                        aria-label={`${expandedFiles.has(file.id) ? "Collapse" : "Expand"} labels for ${getFileName(file.filePath)}`}
+                        aria-expanded={expandedFiles.has(file.id)}
+                        aria-controls={`label-group-${file.id}`}
+                        onClick={() => toggleFile(file.id)}
+                        className="flex items-center justify-center size-5 rounded text-muted-foreground transition-colors hover:bg-muted/20 hover:text-foreground"
                       >
                         {expandedFiles.has(file.id) ? (
                           <ChevronDown className="size-3 text-muted-foreground" />
                         ) : (
                           <ChevronRight className="size-3 text-muted-foreground" />
                         )}
-                      </span>
+                      </button>
                     ) : (
                       <span className="w-5" />
                     )}
                     <button
                       type="button"
-                      onClick={() => {
-                        if (
-                          file.fileType === "STORY" &&
-                          file.labels.length > 0
-                        ) {
-                          toggleFile(file.id);
-                        } else {
-                          onFileSelect(file.id);
-                        }
-                      }}
+                      onClick={() => onFileSelect(file.id)}
                       role="treeitem"
                       aria-selected={activeFileId === file.id}
-                      aria-expanded={
-                        file.fileType === "STORY" && file.labels.length > 0
-                          ? expandedFiles.has(file.id)
-                          : undefined
-                      }
                       aria-level={folder ? 2 : 1}
-                      aria-owns={
-                        file.fileType === "STORY" &&
-                        file.labels.length > 0 &&
-                        expandedFiles.has(file.id)
-                          ? `label-group-${file.id}`
-                          : undefined
-                      }
                       className={`flex-1 flex items-center gap-2 py-1.5 px-2 rounded-md text-sm text-left transition-colors ${
                         activeFileId === file.id
-                          ? "bg-[var(--theme-color)]/10 text-foreground font-medium"
+                          ? ACTIVE_NAVIGATOR_ITEM_CLASSNAME
                           : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
                       }`}
                     >
@@ -288,14 +271,10 @@ export function ProjectFileTree({
                               type="button"
                               key={label.id}
                               onClick={() => onSceneSelect(label.id)}
+                              // eslint-disable-next-line jsx-a11y/role-has-required-aria-props -- labels navigate to a scene but do not represent selection state
                               role="treeitem"
-                              aria-selected={activeSceneId === label.id}
                               aria-level={folder ? 3 : 2}
-                              className={`w-full flex items-center gap-2 py-1 px-2 rounded-md text-xs transition-colors ${
-                                activeSceneId === label.id
-                                  ? "bg-[var(--theme-color)]/8 text-foreground"
-                                  : "text-muted-foreground hover:text-foreground"
-                              }`}
+                              className="w-full flex items-center gap-2 py-1 px-2 rounded-md text-xs text-muted-foreground transition-colors hover:text-foreground"
                             >
                               <span
                                 className="size-1.5 rounded-full shrink-0 ring-[1.5px] ring-background"

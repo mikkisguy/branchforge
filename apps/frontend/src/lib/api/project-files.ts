@@ -5,7 +5,7 @@
  * Handles file listing, content retrieval, updates, and zip import.
  */
 
-import { API_BASE, request, getApiErrorMessage } from "./client.js";
+import { API_BASE, request, getApiErrorMessage } from "./client";
 import type {
   ProjectFile,
   ImportZipResponse,

@@ -4,6 +4,14 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.0-beta.3 - 2026-09-08
+
+- Overhauled the UI and introduced a unified workspace
+
+## v1.0.0-beta.2 - 2026-09-05
+
+- Fixed broken project switcher
+
 ## v1.0.0-beta.1 - 2026-09-03
 
 - Made deployment more configurable and added reverse-proxy support

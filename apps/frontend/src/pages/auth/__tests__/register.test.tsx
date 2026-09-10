@@ -254,6 +254,7 @@ describe("RegisterPage", () => {
 
       // Button and inputs should be disabled
       expect(submitButton).toBeDisabled();
+      expect(submitButton).toHaveAttribute("aria-busy", "true");
       expect(emailInput).toBeDisabled();
       expect(passwordInput).toBeDisabled();
       expect(confirmPasswordInput).toBeDisabled();

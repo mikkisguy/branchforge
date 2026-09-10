@@ -152,7 +152,7 @@ describe("buildEdges", () => {
       expect.objectContaining({ type: MarkerType.ArrowClosed })
     );
     expect(edge).toHaveProperty("labelStyle", {
-      fill: "#94a3b8",
+      fill: "hsl(var(--muted-foreground))",
       fontSize: 11,
     });
   });
@@ -185,16 +185,18 @@ describe("buildEdges", () => {
     expect(choiceEdge.animated).toBe(false);
   });
 
-  it("NATURAL edges get slate color, width 1, and are not animated", () => {
+  it("NATURAL edges get muted token color, width 1, and are not animated", () => {
     const edges = buildEdges(mockFlowEdges);
     const naturalEdge = edges[2];
     expect(naturalEdge.style).toEqual(
       expect.objectContaining({
-        stroke: "#475569",
+        stroke: "hsl(var(--muted-foreground))",
         strokeWidth: 1,
       })
     );
-    expect((naturalEdge.markerEnd as { color: string }).color).toBe("#475569");
+    expect((naturalEdge.markerEnd as { color: string }).color).toBe(
+      "hsl(var(--muted-foreground))"
+    );
     expect(naturalEdge.animated).toBe(false);
   });
 
@@ -223,13 +225,13 @@ describe("getEdgeColor", () => {
     expect(getEdgeColor("CHOICE")).toBe("var(--theme-color)");
   });
 
-  it('NATURAL returns "#475569"', () => {
-    expect(getEdgeColor("NATURAL")).toBe("#475569");
+  it("NATURAL returns muted foreground token", () => {
+    expect(getEdgeColor("NATURAL")).toBe("hsl(var(--muted-foreground))");
   });
 
-  it('unknown type returns "#64748b"', () => {
-    expect(getEdgeColor("UNKNOWN")).toBe("#64748b");
-    expect(getEdgeColor("")).toBe("#64748b");
+  it("unknown type returns muted foreground token", () => {
+    expect(getEdgeColor("UNKNOWN")).toBe("hsl(var(--muted-foreground))");
+    expect(getEdgeColor("")).toBe("hsl(var(--muted-foreground))");
   });
 });
 
@@ -263,12 +265,16 @@ describe("getRouteColor", () => {
     expect(getRouteColor("heroine_a", routeColorMap)).toBe("#ef4444");
   });
 
-  it('returns "#64748b" for null routeKey', () => {
-    expect(getRouteColor(null, routeColorMap)).toBe("#64748b");
+  it("returns muted foreground token for null routeKey", () => {
+    expect(getRouteColor(null, routeColorMap)).toBe(
+      "hsl(var(--muted-foreground))"
+    );
   });
 
-  it('returns "#64748b" for unknown routeKey', () => {
-    expect(getRouteColor("nonexistent", routeColorMap)).toBe("#64748b");
+  it("returns muted foreground token for unknown routeKey", () => {
+    expect(getRouteColor("nonexistent", routeColorMap)).toBe(
+      "hsl(var(--muted-foreground))"
+    );
   });
 });
 

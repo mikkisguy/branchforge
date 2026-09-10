@@ -13,6 +13,7 @@ import {
   type PaletteGroup,
 } from "@/lib/codemirror/palettes";
 import { useLocalStorageNumber } from "@/hooks/useLocalStorage";
+import { STATUS_BAR_CONTROL_CLASSNAME } from "@/components/workspace/status-bar-control";
 
 interface PaletteSwitcherProps {
   direction?: "up" | "down";
@@ -204,7 +205,7 @@ export function PaletteSwitcher({
         aria-expanded={isOpen}
         aria-haspopup="listbox"
         aria-labelledby={labelId}
-        className="px-3 py-1.5 text-xs font-code bg-muted/50 hover:bg-muted border border-border rounded flex items-center gap-2 transition-colors"
+        className={`${STATUS_BAR_CONTROL_CLASSNAME} font-code`}
         title="Change syntax colors"
       >
         <Palette className="size-3.5" aria-hidden="true" />

@@ -5,3 +5,14 @@ reviews:
   tools:
     eslint:
       enabled: false
+  path_instructions:
+    - path: "apps/frontend/**"
+      instructions: >
+        Do not suggest adding .js to extensionless frontend imports,
+        especially @/ aliases (for example import { thing } from "@/lib/thing").
+    - path: "apps/backend/**"
+      instructions: >
+        Backend local imports must keep .js extensions (ES modules), for
+        example import { thing } from "../service.js" and
+        import type { Thing } from "./file.js". Do not suggest removing those
+        .js extensions.

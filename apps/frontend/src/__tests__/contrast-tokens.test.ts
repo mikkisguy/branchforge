@@ -116,6 +116,12 @@ describe("Dark mode token contrast (WCAG AA)", () => {
     assertContrast("card-foreground", "card", t, 4.5, m));
   it("popover-foreground on popover >= 4.5:1", () =>
     assertContrast("popover-foreground", "popover", t, 4.5, m));
+  it("canvas-foreground on canvas >= 4.5:1", () =>
+    assertContrast("canvas-foreground", "canvas", t, 4.5, m));
+  it("panel-foreground on panel >= 4.5:1", () =>
+    assertContrast("panel-foreground", "panel", t, 4.5, m));
+  it("raised-foreground on raised >= 4.5:1", () =>
+    assertContrast("raised-foreground", "raised", t, 4.5, m));
   it("primary-foreground on primary >= 4.5:1", () =>
     assertContrast("primary-foreground", "primary", t, 4.5, m));
   it("secondary-foreground on secondary >= 4.5:1", () =>
@@ -130,6 +136,9 @@ describe("Dark mode token contrast (WCAG AA)", () => {
     assertContrast("accent-foreground", "accent", t, 4.5, m));
   it("destructive-foreground on destructive >= 4.5:1", () =>
     assertContrast("destructive-foreground", "destructive", t, 4.5, m));
+
+  // FlowGraphStatus error tone uses text-destructive; paired with
+  // destructive-foreground on destructive for AA body text.
 });
 
 // ---------------------------------------------------------------------------
@@ -146,6 +155,12 @@ describe("Light mode token contrast (WCAG AA)", () => {
     assertContrast("card-foreground", "card", t, 4.5, m));
   it("popover-foreground on popover >= 4.5:1", () =>
     assertContrast("popover-foreground", "popover", t, 4.5, m));
+  it("canvas-foreground on canvas >= 4.5:1", () =>
+    assertContrast("canvas-foreground", "canvas", t, 4.5, m));
+  it("panel-foreground on panel >= 4.5:1", () =>
+    assertContrast("panel-foreground", "panel", t, 4.5, m));
+  it("raised-foreground on raised >= 4.5:1", () =>
+    assertContrast("raised-foreground", "raised", t, 4.5, m));
   it("primary-foreground on primary >= 4.5:1", () =>
     assertContrast("primary-foreground", "primary", t, 4.5, m));
   it("secondary-foreground on secondary >= 4.5:1", () =>
@@ -211,6 +226,88 @@ describe("Theme color contrast (all palettes, both modes)", () => {
       if (ratio < 3.0) {
         throw new Error(
           `${name} ${primary} on light bg: ${ratio.toFixed(2)}:1 < 3:1`
+        );
+      }
+    });
+  }
+});
+
+describe("CodeMirror primary button contrast", () => {
+  for (const [name, { primary, foreground }] of Object.entries(THEME_COLORS)) {
+    it(`${name}: theme foreground on primary >= 4.5:1`, () => {
+      const ratio = contrastRatioRgb(hexToRgb(foreground), hexToRgb(primary));
+      if (ratio < 4.5) {
+        throw new Error(
+          `${name} theme foreground ${foreground} on ${primary}: ${ratio.toFixed(2)}:1 < 4.5:1`
+        );
+      }
+    });
+  }
+});
+
+describe("Label status chip contrast", () => {
+  const reviewBg = hexToRgb("#f59e0b");
+  const reviewFg = hexToRgb("#451a03");
+  const finalBg = hexToRgb("#047857");
+  const finalFg = hexToRgb("#ffffff");
+
+  it("REVIEW chip: amber-950 on amber-500 >= 4.5:1", () => {
+    const ratio = contrastRatioRgb(reviewFg, reviewBg);
+    if (ratio < 4.5) {
+      throw new Error(`REVIEW chip contrast ${ratio.toFixed(2)}:1 < 4.5:1`);
+    }
+  });
+
+  it("REVIEW chip: black on amber-500 >= 4.5:1", () => {
+    const ratio = contrastRatioRgb(hexToRgb("#000000"), reviewBg);
+    if (ratio < 4.5) {
+      throw new Error(
+        `REVIEW chip black contrast ${ratio.toFixed(2)}:1 < 4.5:1`
+      );
+    }
+  });
+
+  it("FINAL chip: white on emerald-700 >= 4.5:1", () => {
+    const ratio = contrastRatioRgb(finalFg, finalBg);
+    if (ratio < 4.5) {
+      throw new Error(`FINAL chip contrast ${ratio.toFixed(2)}:1 < 4.5:1`);
+    }
+  });
+});
+
+describe("Flow graph chrome contrast", () => {
+  it("muted-foreground on canvas >= 4.5:1 in dark mode", () =>
+    assertContrast("muted-foreground", "canvas", DARK_TOKENS, 4.5, "dark"));
+
+  it("muted-foreground on canvas >= 4.5:1 in light mode", () =>
+    assertContrast("muted-foreground", "canvas", LIGHT_TOKENS, 4.5, "light"));
+
+  it("foreground on raised >= 4.5:1 in dark mode", () =>
+    assertContrast("foreground", "raised", DARK_TOKENS, 4.5, "dark"));
+
+  it("foreground on raised >= 4.5:1 in light mode", () =>
+    assertContrast("foreground", "raised", LIGHT_TOKENS, 4.5, "light"));
+
+  const darkCanvas = rgbFor(DARK_TOKENS, "canvas");
+  const lightCanvas = rgbFor(LIGHT_TOKENS, "canvas");
+
+  for (const [name, { primary }] of Object.entries(THEME_COLORS)) {
+    const theme = hexToRgb(primary);
+
+    it(`${name}: primary on canvas >= 3:1 in dark mode`, () => {
+      const ratio = contrastRatioRgb(theme, darkCanvas);
+      if (ratio < 3.0) {
+        throw new Error(
+          `${name} ${primary} on dark canvas: ${ratio.toFixed(2)}:1 < 3:1`
+        );
+      }
+    });
+
+    it(`${name}: primary on canvas >= 3:1 in light mode`, () => {
+      const ratio = contrastRatioRgb(theme, lightCanvas);
+      if (ratio < 3.0) {
+        throw new Error(
+          `${name} ${primary} on light canvas: ${ratio.toFixed(2)}:1 < 3:1`
         );
       }
     });
