@@ -76,13 +76,15 @@ export function WriteMode({
   } = useProjectFiles(currentProject?.id);
   const canCreateFile = currentProject?.visibility === "OWNER";
 
-  const storyFiles = useMemo(
-    () =>
-      files
-        .filter((file) => file.fileType === "STORY")
-        .map((file) => ({ id: file.id, filePath: file.filePath })),
-    [files]
-  );
+  const storyFiles = useMemo(() => {
+    const nextStoryFiles: Array<{ id: string; filePath: string }> = [];
+    for (const file of files) {
+      if (file.fileType === "STORY") {
+        nextStoryFiles.push({ id: file.id, filePath: file.filePath });
+      }
+    }
+    return nextStoryFiles;
+  }, [files]);
 
   const storyFileIds = useMemo(
     () => new Set(storyFiles.map((file) => file.id)),
@@ -95,8 +97,9 @@ export function WriteMode({
   );
 
   const openCreateFileDialog = useCallback(() => {
+    resetCreateFileError();
     setCreateFileDialogOpen(true);
-  }, []);
+  }, [resetCreateFileError]);
 
   const handleCreateFile = useCallback(
     async (filePath: string) => {

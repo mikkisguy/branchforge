@@ -114,8 +114,63 @@ export function useProjectFiles(
   });
 
   const createFileMutation = useMutation({
-    mutationFn: async (filePath: string) => {
-      return await projectFilesApi.createFile(projectId!, filePath);
+    mutationFn: async ({
+      operationProjectId,
+      filePath,
+    }: {
+      operationProjectId: string;
+      operationSourceFilter?: SourceOrigin;
+      filePath: string;
+    }) => {
+      return await projectFilesApi.createFile(operationProjectId, filePath);
+    },
+    onSuccess: async (
+      createdFile,
+      { operationProjectId, operationSourceFilter }
+    ) => {
+      const insertCreatedFile = (
+        oldFiles: ProjectFileNode[] | undefined
+      ): ProjectFileNode[] => {
+        if (!oldFiles) {
+          return [createdFile];
+        }
+        if (oldFiles.some((file) => file.id === createdFile.id)) {
+          return oldFiles;
+        }
+        return [...oldFiles, createdFile];
+      };
+
+      await queryClient.cancelQueries({
+        queryKey: projectFilesKeys.lists(operationProjectId),
+      });
+      queryClient.setQueryData(
+        projectFilesKeys.lists(operationProjectId),
+        insertCreatedFile
+      );
+      if (
+        operationSourceFilter &&
+        createdFile.source === operationSourceFilter
+      ) {
+        queryClient.setQueryData(
+          projectFilesKeys.listsWithSource(
+            operationProjectId,
+            operationSourceFilter
+          ),
+          insertCreatedFile
+        );
+      }
+
+      void queryClient.invalidateQueries({
+        queryKey: projectFilesKeys.lists(operationProjectId),
+      });
+      if (operationSourceFilter) {
+        void queryClient.invalidateQueries({
+          queryKey: projectFilesKeys.listsWithSource(
+            operationProjectId,
+            operationSourceFilter
+          ),
+        });
+      }
     },
   });
 
@@ -146,46 +201,16 @@ export function useProjectFiles(
 
   const createFile = useCallback<UseProjectFilesReturn["createFile"]>(
     async (filePath) => {
-      const createdFile = await createFileMutation.mutateAsync(filePath);
-      if (projectId) {
-        const insertCreatedFile = (
-          oldFiles: ProjectFileNode[] | undefined
-        ): ProjectFileNode[] => {
-          if (!oldFiles) {
-            return [createdFile];
-          }
-          if (oldFiles.some((file) => file.id === createdFile.id)) {
-            return oldFiles;
-          }
-          return [...oldFiles, createdFile];
-        };
-
-        await queryClient.cancelQueries({
-          queryKey: projectFilesKeys.lists(projectId),
-        });
-        queryClient.setQueryData(
-          projectFilesKeys.lists(projectId),
-          insertCreatedFile
-        );
-        if (sourceFilter && createdFile.source === sourceFilter) {
-          queryClient.setQueryData(
-            projectFilesKeys.listsWithSource(projectId, sourceFilter),
-            insertCreatedFile
-          );
-        }
-
-        void queryClient.invalidateQueries({
-          queryKey: projectFilesKeys.lists(projectId),
-        });
-        if (sourceFilter) {
-          void queryClient.invalidateQueries({
-            queryKey: projectFilesKeys.listsWithSource(projectId, sourceFilter),
-          });
-        }
+      if (!projectId) {
+        throw new Error("Cannot create a file without a project");
       }
-      return createdFile;
+      return await createFileMutation.mutateAsync({
+        operationProjectId: projectId,
+        operationSourceFilter: sourceFilter,
+        filePath,
+      });
     },
-    [createFileMutation, projectId, queryClient, sourceFilter]
+    [createFileMutation, projectId, sourceFilter]
   );
 
   return {

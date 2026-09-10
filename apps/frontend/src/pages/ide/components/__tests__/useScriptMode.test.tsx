@@ -5,6 +5,7 @@ const showErrorToast = vi.fn();
 const setActiveLabelId = vi.fn();
 const selectFileTab = vi.fn();
 const createFile = vi.fn();
+const resetCreateFileError = vi.fn();
 
 const previewState = vi.hoisted(() => ({
   isError: false,
@@ -73,7 +74,7 @@ vi.mock("../useScriptModeData", () => ({
     createFile,
     isCreatingFile: false,
     createFileError: null,
-    resetCreateFileError: vi.fn(),
+    resetCreateFileError,
   }),
 }));
 
@@ -359,6 +360,7 @@ describe("useScriptMode create file", () => {
     });
 
     expect(result.current.showCreateFileDialog).toBe(true);
+    expect(resetCreateFileError).toHaveBeenCalledOnce();
   });
 
   it("exits generated preview when the created file becomes selectable", async () => {

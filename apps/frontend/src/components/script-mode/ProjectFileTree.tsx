@@ -84,6 +84,7 @@ export function ProjectFileTree({
       return;
     }
 
+    // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change -- command prop merges newly created file folders into user-controlled expansion state
     setExpandedFolders((previous) => {
       const next = new Set(previous);
       for (const folder of foldersToExpand) {

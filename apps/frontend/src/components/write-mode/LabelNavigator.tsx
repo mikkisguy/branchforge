@@ -7,7 +7,14 @@
  * metadata editing, and soft delete.
  */
 
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import {
+  useState,
+  useMemo,
+  useRef,
+  useEffect,
+  useEffectEvent,
+  useCallback,
+} from "react";
 import type { PublicLabel, LabelStatus } from "@branchforge/shared";
 import {
   ArrowUpDown,
@@ -446,6 +453,7 @@ interface LabelNavigatorProps {
   onDeleteRequest?: (label: PublicLabel) => void;
 }
 
+// react-doctor-disable-next-line react-doctor/no-high-complexity-react-function, react-doctor/no-giant-component -- cohesive navigator state spans filtering, sorting, renaming, and context-menu interactions while row/group rendering is already extracted
 export function LabelNavigator({
   labels,
   storyFiles,
@@ -483,9 +491,15 @@ export function LabelNavigator({
   const fileGroupRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change -- command token intentionally restores sequence order so a newly created empty file remains visible
     setSortMode("sequence");
+    // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change -- the same create-file command clears filtering that could hide the new file
     setSearchQuery("");
   }, [sortResetToken]);
+
+  const notifyFileRevealed = useEffectEvent(() => {
+    onFileRevealed?.();
+  });
 
   useEffect(() => {
     if (!revealFileId) {
@@ -497,16 +511,9 @@ export function LabelNavigator({
     }
     requestAnimationFrame(() => {
       element.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      onFileRevealed?.();
+      notifyFileRevealed();
     });
-  }, [
-    revealFileId,
-    sortResetToken,
-    storyFiles,
-    sortMode,
-    searchQuery,
-    onFileRevealed,
-  ]);
+  }, [revealFileId, sortResetToken, storyFiles, sortMode, searchQuery]);
 
   // Context menu handler
   const handleContextMenu = useCallback(

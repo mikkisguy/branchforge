@@ -107,6 +107,33 @@ describe("CreateFileDialog", () => {
     expect(screen.getByLabelText(/file path/i)).toHaveValue("");
   });
 
+  it("starts with fresh form state when reopened", async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderDialog();
+
+    await user.type(
+      screen.getByLabelText(/file path/i),
+      "/invalid-before-close.rpy"
+    );
+    expect(screen.getByText("File path must be relative")).toBeInTheDocument();
+
+    rerender(
+      <CreateFileDialog
+        open={false}
+        onOpenChange={onOpenChange}
+        onCreate={onCreate}
+      />
+    );
+    rerender(
+      <CreateFileDialog open onOpenChange={onOpenChange} onCreate={onCreate} />
+    );
+
+    expect(screen.getByLabelText(/file path/i)).toHaveValue("");
+    expect(
+      screen.queryByText("File path must be relative")
+    ).not.toBeInTheDocument();
+  });
+
   it("stays open on a rejected submit and clears the stale server error on edit", async () => {
     const user = userEvent.setup();
     onCreate.mockRejectedValueOnce(new Error("Resource conflict"));

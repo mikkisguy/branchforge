@@ -179,6 +179,79 @@ describe("useProjectFiles", () => {
     ).toEqual([]);
   });
 
+  it("updates the originating project cache when the project changes mid-creation", async () => {
+    const projectTwoFiles: ProjectFileNode[] = [
+      {
+        ...mockFiles[0],
+        id: "file-project-2",
+        projectId: "project-2",
+        filePath: "game/project_2.rpy",
+        source: "GITLAB",
+      },
+    ];
+    let resolveCreate: ((value: ProjectFileNode) => void) | undefined;
+    vi.mocked(projectFilesApi.createFile).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveCreate = resolve;
+        })
+    );
+    vi.mocked(projectFilesApi.listFiles).mockImplementation(
+      async (projectId) =>
+        projectId === "project-1" ? mockFiles : projectTwoFiles
+    );
+    queryClient.setQueryData(projectFilesKeys.lists("project-1"), mockFiles);
+    queryClient.setQueryData(
+      projectFilesKeys.lists("project-2"),
+      projectTwoFiles
+    );
+
+    const { result, rerender } = renderHook(
+      ({
+        projectId,
+        source,
+      }: {
+        projectId: string;
+        source: "ZIP" | "GITLAB";
+      }) => useProjectFiles(projectId, { source }),
+      {
+        wrapper,
+        initialProps: { projectId: "project-1", source: "ZIP" },
+      }
+    );
+
+    await waitFor(() => {
+      expect(result.current.files).toEqual(mockFiles);
+    });
+
+    let createPromise: Promise<ProjectFileNode> | undefined;
+    act(() => {
+      createPromise = result.current.createFile("labels/chapter_01");
+    });
+
+    rerender({ projectId: "project-2", source: "GITLAB" });
+    await waitFor(() => {
+      expect(result.current.files).toEqual(projectTwoFiles);
+    });
+
+    await act(async () => {
+      resolveCreate?.(createdFile);
+      await createPromise;
+    });
+
+    expect(
+      queryClient.getQueryData(projectFilesKeys.lists("project-1"))
+    ).toEqual([...mockFiles, createdFile]);
+    expect(
+      queryClient.getQueryData(projectFilesKeys.lists("project-2"))
+    ).toEqual(projectTwoFiles);
+    expect(
+      queryClient.getQueryData(
+        projectFilesKeys.listsWithSource("project-2", "GITLAB")
+      )
+    ).toEqual(projectTwoFiles);
+  });
+
   it("tracks pending and error state for createFile", async () => {
     let resolveCreate: ((value: ProjectFileNode) => void) | undefined;
     vi.mocked(projectFilesApi.createFile).mockImplementation(

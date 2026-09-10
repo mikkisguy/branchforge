@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { Loader2, X } from "lucide-react";
 import { canonicalizeRpyFilePath } from "@branchforge/shared";
 import {
@@ -36,18 +36,32 @@ export function CreateFileDialog({
   serverError = null,
   onDismissServerError,
 }: CreateFileDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {open ? (
+        <CreateFileDialogContent
+          onOpenChange={onOpenChange}
+          onCreate={onCreate}
+          isCreating={isCreating}
+          serverError={serverError}
+          onDismissServerError={onDismissServerError}
+        />
+      ) : null}
+    </Dialog>
+  );
+}
+
+type CreateFileDialogContentProps = Omit<CreateFileDialogProps, "open">;
+
+function CreateFileDialogContent({
+  onOpenChange,
+  onCreate,
+  isCreating = false,
+  serverError = null,
+  onDismissServerError,
+}: CreateFileDialogContentProps) {
   const [filePath, setFilePath] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
-  const previousOpenRef = useRef(false);
-
-  useEffect(() => {
-    if (open && !previousOpenRef.current) {
-      setFilePath("");
-      setValidationError(null);
-      onDismissServerError?.();
-    }
-    previousOpenRef.current = open;
-  }, [open, onDismissServerError]);
 
   const handleFilePathChange = (value: string) => {
     setFilePath(value);
@@ -83,66 +97,64 @@ export function CreateFileDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[500px] max-w-[95vw]">
-        <DialogHeader className="flex flex-row items-center justify-between gap-y-0 pb-4">
-          <DialogTitle>New File</DialogTitle>
+    <DialogContent className="w-[500px] max-w-[95vw]">
+      <DialogHeader className="flex flex-row items-center justify-between gap-y-0 pb-4">
+        <DialogTitle>New File</DialogTitle>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => onOpenChange(false)}
+          aria-label="Close"
+          disabled={isCreating}
+        >
+          <X className="size-5" />
+        </Button>
+      </DialogHeader>
+
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <p className="text-sm text-muted-foreground">
+          The file is created in BranchForge and included in the next ZIP or
+          GitLab export.
+        </p>
+
+        <div className="space-y-2">
+          <Label htmlFor="create-file-path">File path *</Label>
+          <Input
+            id="create-file-path"
+            value={filePath}
+            onChange={(event) => handleFilePathChange(event.target.value)}
+            placeholder="labels/chapter_01.rpy"
+            disabled={isCreating}
+            aria-required="true"
+            aria-invalid={displayedError ? true : undefined}
+            aria-describedby={displayedError ? FILE_PATH_ERROR_ID : undefined}
+          />
+        </div>
+
+        <FormErrorMessage id={FILE_PATH_ERROR_ID} message={displayedError} />
+
+        <div className="flex justify-end gap-2 pt-2">
           <Button
             type="button"
-            variant="ghost"
-            size="icon"
+            variant="outline"
             onClick={() => onOpenChange(false)}
-            aria-label="Close"
             disabled={isCreating}
           >
-            <X className="size-5" />
+            Cancel
           </Button>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-          <p className="text-sm text-muted-foreground">
-            The file is created in BranchForge and included in the next ZIP or
-            GitLab export.
-          </p>
-
-          <div className="space-y-2">
-            <Label htmlFor="create-file-path">File path *</Label>
-            <Input
-              id="create-file-path"
-              value={filePath}
-              onChange={(event) => handleFilePathChange(event.target.value)}
-              placeholder="labels/chapter_01.rpy"
-              disabled={isCreating}
-              aria-required="true"
-              aria-invalid={displayedError ? true : undefined}
-              aria-describedby={displayedError ? FILE_PATH_ERROR_ID : undefined}
-            />
-          </div>
-
-          <FormErrorMessage id={FILE_PATH_ERROR_ID} message={displayedError} />
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isCreating}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitDisabled}>
-              {isCreating ? (
-                <>
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                  Creating…
-                </>
-              ) : (
-                "Create File"
-              )}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+          <Button type="submit" disabled={isSubmitDisabled}>
+            {isCreating ? (
+              <>
+                <Loader2 className="mr-2 size-4 animate-spin" />
+                Creating…
+              </>
+            ) : (
+              "Create File"
+            )}
+          </Button>
+        </div>
+      </form>
+    </DialogContent>
   );
 }

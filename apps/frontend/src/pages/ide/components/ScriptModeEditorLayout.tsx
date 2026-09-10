@@ -100,7 +100,7 @@ interface ScriptModeEditorLayoutProps {
   generatedFileName?: string;
 }
 
-// react-doctor-disable-next-line react-doctor/no-many-boolean-props, react-doctor/no-giant-component
+// react-doctor-disable-next-line react-doctor/no-many-boolean-props, react-doctor/no-giant-component, react-doctor/no-high-complexity-react-function -- workspace shell coordinates shared panels, editor state, and commands while delegating their rendering and behavior
 export function ScriptModeEditorLayout({
   projectName,
   projectId,
