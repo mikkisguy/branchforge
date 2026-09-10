@@ -64,18 +64,3 @@ export function NoStoryFiles({ onNewFile }: NoStoryFilesProps) {
     </div>
   );
 }
-
-// react-doctor-disable-next-line react-doctor/no-multi-comp -- related variants co-located
-export function NoLabels() {
-  return (
-    <div className="h-full flex flex-col items-center justify-center">
-      <div className="size-20 rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-4">
-        <FileText className="size-10 text-muted-foreground/60" />
-      </div>
-      <p className="text-foreground font-medium">No labels in this project</p>
-      <p className="text-sm text-muted-foreground/70 mt-1 text-center max-w-md px-4">
-        Import content or create labels to start writing.
-      </p>
-    </div>
-  );
-}

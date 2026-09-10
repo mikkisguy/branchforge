@@ -160,7 +160,9 @@ export function useProjectFiles(
           return [...oldFiles, createdFile];
         };
 
-        await queryClient.cancelQueries({ queryKey });
+        await queryClient.cancelQueries({
+          queryKey: projectFilesKeys.lists(projectId),
+        });
         queryClient.setQueryData(
           projectFilesKeys.lists(projectId),
           insertCreatedFile
@@ -183,7 +185,7 @@ export function useProjectFiles(
       }
       return createdFile;
     },
-    [createFileMutation, projectId, queryClient, queryKey, sourceFilter]
+    [createFileMutation, projectId, queryClient, sourceFilter]
   );
 
   return {

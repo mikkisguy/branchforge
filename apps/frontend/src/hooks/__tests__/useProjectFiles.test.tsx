@@ -147,6 +147,38 @@ describe("useProjectFiles", () => {
     });
   });
 
+  it("does not seed a filtered cache when the created file source does not match", async () => {
+    vi.mocked(projectFilesApi.listFiles).mockResolvedValue([]);
+    vi.mocked(projectFilesApi.createFile).mockResolvedValue(createdFile);
+    queryClient.setQueryData(projectFilesKeys.lists("project-1"), mockFiles);
+    const cancelSpy = vi.spyOn(queryClient, "cancelQueries");
+
+    const { result } = renderHook(
+      () => useProjectFiles("project-1", { source: "GITLAB" }),
+      { wrapper }
+    );
+
+    await waitFor(() => {
+      expect(result.current.files).toEqual([]);
+    });
+
+    await act(async () => {
+      await result.current.createFile("labels/chapter_01");
+    });
+
+    expect(cancelSpy).toHaveBeenCalledWith({
+      queryKey: projectFilesKeys.lists("project-1"),
+    });
+    expect(
+      queryClient.getQueryData(projectFilesKeys.lists("project-1"))
+    ).toEqual([...mockFiles, createdFile]);
+    expect(
+      queryClient.getQueryData(
+        projectFilesKeys.listsWithSource("project-1", "GITLAB")
+      )
+    ).toEqual([]);
+  });
+
   it("tracks pending and error state for createFile", async () => {
     let resolveCreate: ((value: ProjectFileNode) => void) | undefined;
     vi.mocked(projectFilesApi.createFile).mockImplementation(
