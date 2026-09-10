@@ -165,9 +165,12 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     const fileId = pendingSelectFileId;
     // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change -- consume the pending selection only after its cache-backed file becomes available
     setPendingSelectFileId(null);
-    // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change -- selecting the newly created source file must leave generated-preview mode
-    setGeneratedPreview(null);
-    void selectFileTab(fileId);
+    void (async () => {
+      const selected = await selectFileTab(fileId);
+      if (selected) {
+        setGeneratedPreview(null);
+      }
+    })();
   }, [pendingSelectFileId, projectFiles, selectFileTab]);
 
   const { resetRefreshState } = useScriptModeRefresh({
@@ -184,6 +187,7 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     setGeneratedPreview(null);
     setFoldersToExpand([]);
     setPendingSelectFileId(null);
+    setShowCreateFileDialog(false);
   }, [clearEditorState, clearTabsState, resetRefreshState]);
 
   const setSkipSave = useCallback(

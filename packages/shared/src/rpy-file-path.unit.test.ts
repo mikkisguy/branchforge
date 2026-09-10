@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { canonicalizeRpyFilePath } from "./rpy-file-path.js";
 
 describe("canonicalizeRpyFilePath", () => {
-  it("trims surrounding whitespace", () => {
-    expect(canonicalizeRpyFilePath("  labels/act  ")).toEqual({
+  it("trims leading whitespace", () => {
+    expect(canonicalizeRpyFilePath("  labels/act")).toEqual({
       ok: true,
       filePath: "labels/act.rpy",
     });
@@ -80,6 +80,52 @@ describe("canonicalizeRpyFilePath", () => {
     });
   });
 
+  it("rejects Windows-unsafe characters in every segment", () => {
+    for (const filePath of [
+      "labels/act?.rpy",
+      "labels<draft>/act.rpy",
+      'labels/act"one.rpy',
+      "labels/act|one.rpy",
+      "labels/act*one.rpy",
+      "labels/act:one.rpy",
+    ]) {
+      expect(canonicalizeRpyFilePath(filePath)).toMatchObject({
+        ok: false,
+        code: "INVALID_SEGMENT",
+      });
+    }
+  });
+
+  it("rejects trailing dots and spaces in every segment", () => {
+    for (const filePath of [
+      "labels./act.rpy",
+      "labels /act.rpy",
+      "labels/act.rpy.",
+      "labels/act.rpy ",
+    ]) {
+      expect(canonicalizeRpyFilePath(filePath)).toMatchObject({
+        ok: false,
+        code: "INVALID_SEGMENT",
+      });
+    }
+  });
+
+  it("rejects Windows device basenames regardless of case or extension", () => {
+    for (const filePath of [
+      "CON.rpy",
+      "labels/prn.RPY",
+      "AUX.txt",
+      "game/nul/act.rpy",
+      "chapters/Com1.scene.rpy",
+      "LPT9.rpy",
+    ]) {
+      expect(canonicalizeRpyFilePath(filePath)).toMatchObject({
+        ok: false,
+        code: "INVALID_SEGMENT",
+      });
+    }
+  });
+
   it("rejects C0, C1, Unicode line separators, and bidi controls before trim", () => {
     expect(canonicalizeRpyFilePath("labels/act\u001f.rpy")).toMatchObject({
       ok: false,
@@ -145,5 +191,16 @@ describe("canonicalizeRpyFilePath", () => {
         code: "RESERVED",
       });
     }
+  });
+
+  it("can allow BranchForge-generated basenames for export assembly", () => {
+    expect(
+      canonicalizeRpyFilePath("game/branchforge_stats.rpy", {
+        allowBranchForgeReserved: true,
+      })
+    ).toEqual({
+      ok: true,
+      filePath: "game/branchforge_stats.rpy",
+    });
   });
 });

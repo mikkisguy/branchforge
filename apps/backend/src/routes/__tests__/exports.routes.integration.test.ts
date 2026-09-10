@@ -27,6 +27,7 @@ import Fastify, {
 } from "fastify";
 import cookie from "@fastify/cookie";
 import session from "@fastify/session";
+import JSZip from "jszip";
 import type { PublicUser } from "@branchforge/shared";
 import { exportsRoutes } from "../exports.routes.js";
 import * as exportService from "../../services/export.service.js";
@@ -280,6 +281,27 @@ describe("Export Routes (Integration)", () => {
         testProjectId,
         testUserId
       );
+    });
+
+    it("omits unsafe paths from stored export content", async () => {
+      vi.spyOn(exportService, "getExportForDownload").mockResolvedValue({
+        fileName: mockExportResult.fileName,
+        content: JSON.stringify({
+          "game/script.rpy": "label start:",
+          "game/CON.rpy": "label reserved:",
+          "game/branchforge_stats.rpy": "default score = 0",
+        }),
+      });
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: `/projects/${testProjectId}/exports/${testExportId}/download`,
+      });
+
+      const zip = await JSZip.loadAsync(response.rawPayload);
+      expect(Object.keys(zip.files)).toContain("game/script.rpy");
+      expect(Object.keys(zip.files)).toContain("game/branchforge_stats.rpy");
+      expect(Object.keys(zip.files)).not.toContain("game/CON.rpy");
     });
 
     it("should return 404 when export not found", async () => {

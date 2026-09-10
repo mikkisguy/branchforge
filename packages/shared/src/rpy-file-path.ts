@@ -1,5 +1,9 @@
 const MAX_STORED_PATH_LENGTH = 500;
 
+const WINDOWS_UNSAFE_CHARACTERS = /[<>:"|?*]/;
+const WINDOWS_RESERVED_DEVICE_BASENAME =
+  /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
+
 function hasDisallowedPathChars(value: string): boolean {
   for (const char of value) {
     const code = char.charCodeAt(0);
@@ -22,6 +26,21 @@ function hasDisallowedPathChars(value: string): boolean {
   return false;
 }
 
+function hasWindowsUnsafeSegment(segments: string[]): boolean {
+  return segments.some((segment) => {
+    if (segment === "" || segment === "." || segment === "..") {
+      return false;
+    }
+
+    return (
+      WINDOWS_UNSAFE_CHARACTERS.test(segment) ||
+      segment.endsWith(".") ||
+      segment.endsWith(" ") ||
+      WINDOWS_RESERVED_DEVICE_BASENAME.test(segment)
+    );
+  });
+}
+
 const RESERVED_BASENAMES = new Set([
   "branchforge_variables.rpy",
   "branchforge_stats.rpy",
@@ -33,6 +52,7 @@ export type CanonicalizeRpyFilePathErrorCode =
   | "ABSOLUTE"
   | "TRAVERSAL"
   | "CONTROL"
+  | "INVALID_SEGMENT"
   | "TOO_LONG"
   | "EXTENSION"
   | "RESERVED";
@@ -44,6 +64,10 @@ export type CanonicalizeRpyFilePathResult =
       code: CanonicalizeRpyFilePathErrorCode;
       message: string;
     };
+
+export interface CanonicalizeRpyFilePathOptions {
+  allowBranchForgeReserved?: boolean;
+}
 
 function isAbsolutePath(path: string): boolean {
   return (
@@ -83,7 +107,8 @@ function normalizeExtension(path: string): string | { code: "EXTENSION" } {
  * Canonicalize a user-provided Ren'Py file path for storage.
  */
 export function canonicalizeRpyFilePath(
-  input: string
+  input: string,
+  options: CanonicalizeRpyFilePathOptions = {}
 ): CanonicalizeRpyFilePathResult {
   if (hasDisallowedPathChars(input)) {
     return {
@@ -99,6 +124,14 @@ export function canonicalizeRpyFilePath(
       ok: false,
       code: "EMPTY",
       message: "File path cannot be empty",
+    };
+  }
+
+  if (input.endsWith(" ")) {
+    return {
+      ok: false,
+      code: "INVALID_SEGMENT",
+      message: "File path contains a Windows-unsafe path segment",
     };
   }
 
@@ -118,6 +151,14 @@ export function canonicalizeRpyFilePath(
       ok: false,
       code: "TRAVERSAL",
       message: "File path cannot contain parent directory segments",
+    };
+  }
+
+  if (hasWindowsUnsafeSegment(segments)) {
+    return {
+      ok: false,
+      code: "INVALID_SEGMENT",
+      message: "File path contains a Windows-unsafe path segment",
     };
   }
 
@@ -152,7 +193,10 @@ export function canonicalizeRpyFilePath(
       ? withExtension.slice(withExtension.lastIndexOf("/") + 1)
       : withExtension;
 
-  if (RESERVED_BASENAMES.has(basename.toLowerCase())) {
+  if (
+    !options.allowBranchForgeReserved &&
+    RESERVED_BASENAMES.has(basename.toLowerCase())
+  ) {
     return {
       ok: false,
       code: "RESERVED",

@@ -30,6 +30,7 @@ import { WriteModeView } from "@/pages/ide/components/WriteModeView";
 import {
   NoProjectSelected,
   LoadingLabels,
+  ProjectFilesError,
   NoStoryFiles,
 } from "@/pages/ide/components/WriteModeEmptyStates";
 import type { ProseEditorRef } from "@/components/write-mode";
@@ -69,12 +70,26 @@ export function WriteMode({
   const {
     files,
     isLoadingFiles,
+    filesError,
+    refreshFiles,
     createFile,
     isCreatingFile,
     createFileError,
     resetCreateFileError,
   } = useProjectFiles(currentProject?.id);
   const canCreateFile = currentProject?.visibility === "OWNER";
+  const previousProjectIdRef = useRef(currentProject?.id);
+
+  useEffect(() => {
+    if (previousProjectIdRef.current === currentProject?.id) {
+      return;
+    }
+
+    previousProjectIdRef.current = currentProject?.id;
+    setCreateFileDialogOpen(false);
+    setRevealFileId(null);
+    resetCreateFileError();
+  }, [currentProject?.id, resetCreateFileError]);
 
   const storyFiles = useMemo(() => {
     const nextStoryFiles: Array<{ id: string; filePath: string }> = [];
@@ -92,8 +107,11 @@ export function WriteMode({
   );
 
   const storyLabels = useMemo(
-    () => labels.filter((label) => storyFileIds.has(label.projectFileId)),
-    [labels, storyFileIds]
+    () =>
+      filesError
+        ? []
+        : labels.filter((label) => storyFileIds.has(label.projectFileId)),
+    [filesError, labels, storyFileIds]
   );
 
   const openCreateFileDialog = useCallback(() => {
@@ -262,6 +280,10 @@ export function WriteMode({
 
   if (isLoadingLabels || isLoadingFiles) {
     return <LoadingLabels />;
+  }
+
+  if (filesError) {
+    return <ProjectFilesError onRetry={() => void refreshFiles()} />;
   }
 
   if (!storyFiles.length) {

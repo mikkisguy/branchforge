@@ -737,7 +737,7 @@ describe("ProjectsRoutes (Integration)", () => {
       const response = await fastify.inject({
         method: "POST",
         url: `/projects/${ownedProject.id}/files`,
-        payload: { filePath: " labels/./NewScene " },
+        payload: { filePath: " labels/./NewScene" },
         cookies: {
           [SESSION_COOKIE_NAME]: auth.sessionId,
         },

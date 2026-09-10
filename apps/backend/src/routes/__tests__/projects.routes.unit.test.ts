@@ -621,7 +621,14 @@ describe("ProjectsRoutes", () => {
       });
 
       expect(response.statusCode).toBe(201);
-      expect(response.json().file.filePath).toBe("labels/new_scene.rpy");
+      expect(response.json().file).toMatchObject({
+        filePath: "labels/new_scene.rpy",
+        originalContent: null,
+        lastSyncedAt: null,
+        createdAt: "2024-01-01T00:00:00.000Z",
+        updatedAt: "2024-01-01T00:00:00.000Z",
+        labels: [],
+      });
       expect(projectsService.createProjectFile).toHaveBeenCalledWith(
         PROJECT_ID,
         "user-123",

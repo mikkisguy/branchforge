@@ -99,6 +99,19 @@ describe("createProjectFile", () => {
     expect(mockTransaction).not.toHaveBeenCalled();
   });
 
+  it("throws ValidationError for Windows-unsafe file paths", async () => {
+    for (const filePath of [
+      "labels/scene?.rpy",
+      "CON.rpy",
+      "labels./act.rpy",
+    ]) {
+      await expect(
+        createProjectFile(projectId, userId, filePath)
+      ).rejects.toThrow(ValidationError);
+    }
+    expect(mockTransaction).not.toHaveBeenCalled();
+  });
+
   it("throws ConflictError for case-insensitive duplicate paths", async () => {
     mockTransaction.mockImplementation(async (callback) =>
       callback({

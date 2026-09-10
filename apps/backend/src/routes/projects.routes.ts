@@ -15,7 +15,11 @@ import {
   createProjectFile,
   updateFileContent,
 } from "../services/projects.service.js";
-import type { SourceOrigin, PublicProject } from "@branchforge/shared";
+import type {
+  CreateProjectFileResponse,
+  PublicProject,
+  SourceOrigin,
+} from "@branchforge/shared";
 import { authenticate } from "../middleware/auth.middleware.js";
 import {
   validateParams,
@@ -258,7 +262,15 @@ async function createProjectFileHandler(
 
   try {
     const file = await createProjectFile(projectId, user.id, filePath);
-    reply.status(201).send({ file });
+    const response: CreateProjectFileResponse = {
+      file: {
+        ...file,
+        lastSyncedAt: file.lastSyncedAt?.toISOString() ?? null,
+        createdAt: file.createdAt.toISOString(),
+        updatedAt: file.updatedAt.toISOString(),
+      },
+    };
+    reply.status(201).send(response);
   } catch (err) {
     if (err instanceof NotFoundError) {
       reply.status(404).send({ error: "Project not found" });

@@ -8,6 +8,7 @@
 import type { FastifyInstance } from "fastify";
 import type { FastifyRequest, FastifyReply } from "fastify";
 import JSZip from "jszip";
+import { canonicalizeRpyFilePath } from "@branchforge/shared";
 import {
   generateExport,
   listExports,
@@ -205,7 +206,12 @@ async function downloadExportHandler(
     const zip = new JSZip();
 
     for (const [filePath, fileContent] of Object.entries(files)) {
-      zip.file(filePath, fileContent);
+      const canonical = canonicalizeRpyFilePath(filePath, {
+        allowBranchForgeReserved: true,
+      });
+      if (canonical.ok) {
+        zip.file(canonical.filePath, fileContent);
+      }
     }
 
     const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });

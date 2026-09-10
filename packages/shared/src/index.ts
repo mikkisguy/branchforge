@@ -685,6 +685,7 @@ export interface CreateProjectFileResponse {
 
 export {
   canonicalizeRpyFilePath,
+  type CanonicalizeRpyFilePathOptions,
   type CanonicalizeRpyFilePathResult,
   type CanonicalizeRpyFilePathErrorCode,
 } from "./rpy-file-path.js";

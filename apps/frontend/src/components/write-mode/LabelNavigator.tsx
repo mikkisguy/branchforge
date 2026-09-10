@@ -601,7 +601,9 @@ export function LabelNavigator({
     const entries = filesToShow.map((file) => {
       const fileLabels = labelsByFileId.get(file.id) ?? [];
       const fileName =
-        fileLabels[0]?.fileName ?? getFileBasename(file.filePath);
+        file.filePath ||
+        fileLabels[0]?.fileName ||
+        getFileBasename(file.filePath);
       return {
         projectFileId: file.id,
         fileName,

@@ -110,8 +110,31 @@ describe("LabelNavigator", () => {
         />
       );
 
-      expect(screen.getByText("empty.rpy")).toBeInTheDocument();
+      expect(screen.getByText("chapters/empty.rpy")).toBeInTheDocument();
       expect(screen.getAllByText("Add label")).toHaveLength(3);
+    });
+
+    it("shows full paths for files with identical basenames", () => {
+      render(
+        <LabelNavigator
+          labels={[
+            makeLabel({
+              id: "nested-label",
+              projectFileId: "file-a",
+              fileName: "scene.rpy",
+            }),
+          ]}
+          storyFiles={[
+            { id: "file-a", filePath: "chapters/one/scene.rpy" },
+            { id: "file-b", filePath: "chapters/two/scene.rpy" },
+          ]}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText("chapters/one/scene.rpy")).toBeInTheDocument();
+      expect(screen.getByText("chapters/two/scene.rpy")).toBeInTheDocument();
     });
 
     it("builds groups from story files even when a file has no labels", () => {

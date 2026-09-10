@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { useEffect, useRef } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const showErrorToast = vi.fn();
@@ -112,7 +113,21 @@ vi.mock("@/hooks/useLabelFileSync", () => ({
 }));
 
 vi.mock("@/hooks/useProjectReset", () => ({
-  useProjectReset: () => {},
+  useProjectReset: ({
+    projectId,
+    onReset,
+  }: {
+    projectId?: string;
+    onReset: () => void;
+  }) => {
+    const previousProjectIdRef = useRef(projectId);
+    useEffect(() => {
+      if (previousProjectIdRef.current !== projectId) {
+        previousProjectIdRef.current = projectId;
+        onReset();
+      }
+    }, [onReset, projectId]);
+  },
 }));
 
 vi.mock("@/hooks/useScriptModeRefresh", () => ({
@@ -363,6 +378,24 @@ describe("useScriptMode create file", () => {
     expect(resetCreateFileError).toHaveBeenCalledOnce();
   });
 
+  it("closes the create file dialog when the project changes", async () => {
+    const { result, rerender } = renderHook(
+      ({ projectId }) => useScriptMode({ projectId }),
+      { initialProps: { projectId: "project-1" } }
+    );
+
+    act(() => {
+      result.current.handleOpenCreateFileDialog();
+    });
+    expect(result.current.showCreateFileDialog).toBe(true);
+
+    rerender({ projectId: "project-2" });
+
+    await waitFor(() => {
+      expect(result.current.showCreateFileDialog).toBe(false);
+    });
+  });
+
   it("exits generated preview when the created file becomes selectable", async () => {
     const { result, rerender } = renderHook(() =>
       useScriptMode({ projectId: "project-1" })
@@ -452,6 +485,13 @@ describe("useScriptMode create file", () => {
     );
 
     await act(async () => {
+      await result.current.onGeneratedFileSelect!(
+        "branchforge_definitions.rpy"
+      );
+    });
+    expect(result.current.isGeneratedPreview).toBe(true);
+
+    await act(async () => {
       await result.current.handleCreateFile("chapters/new_scene.rpy");
     });
 
@@ -478,5 +518,9 @@ describe("useScriptMode create file", () => {
     await waitFor(() => {
       expect(selectFileTab).toHaveBeenCalledWith("file-new");
     });
+    expect(result.current.isGeneratedPreview).toBe(true);
+    expect(result.current.generatedFileName).toBe(
+      "branchforge_definitions.rpy"
+    );
   });
 });

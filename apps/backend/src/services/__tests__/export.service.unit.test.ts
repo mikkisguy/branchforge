@@ -248,6 +248,15 @@ describe("ExportService", () => {
           contentHash: "def",
           source: "manual",
         },
+        {
+          id: "file-3",
+          projectId: PROJECT_ID,
+          filePath: "game/CON.rpy",
+          fileType: "STORY",
+          content: "label reserved:",
+          contentHash: "ghi",
+          source: "manual",
+        },
       ];
       const mockExportRecord = {
         id: EXPORT_ID,
@@ -675,6 +684,7 @@ describe("ExportService", () => {
       expect(savedContent).not.toHaveProperty("branchforge_variables.rpy");
       // The unsafe path itself is not in the archive.
       expect(savedContent).not.toHaveProperty("evil/../escape.rpy");
+      expect(savedContent).not.toHaveProperty("game/CON.rpy");
     });
 
     it("should fall back to no prefix when project files have mixed top-level directories", async () => {

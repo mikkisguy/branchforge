@@ -1,6 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { NoStoryFiles } from "@/pages/ide/components/WriteModeEmptyStates";
+import {
+  NoStoryFiles,
+  ProjectFilesError,
+} from "@/pages/ide/components/WriteModeEmptyStates";
 
 describe("WriteModeEmptyStates", () => {
   it("shows + New File in the no story files state", () => {
@@ -17,5 +20,13 @@ describe("WriteModeEmptyStates", () => {
     expect(
       screen.queryByRole("button", { name: "+ New File" })
     ).not.toBeInTheDocument();
+  });
+
+  it("retries loading project files from the error state", () => {
+    const onRetry = vi.fn();
+    render(<ProjectFilesError onRetry={onRetry} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(onRetry).toHaveBeenCalledOnce();
   });
 });
