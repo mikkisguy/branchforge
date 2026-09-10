@@ -114,8 +114,8 @@ function CreateFileDialogContent({
 
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         <p className="text-sm text-muted-foreground">
-          The file is created in BranchForge and included in the next ZIP or
-          GitLab export.
+          Enter a filename or path. The file stays in BranchForge until the next
+          ZIP or GitLab export.
         </p>
 
         <div className="space-y-2">
@@ -124,7 +124,7 @@ function CreateFileDialogContent({
             id="create-file-path"
             value={filePath}
             onChange={(event) => handleFilePathChange(event.target.value)}
-            placeholder="labels/chapter_01.rpy"
+            placeholder="script.rpy"
             disabled={isCreating}
             aria-required="true"
             aria-invalid={displayedError ? true : undefined}
