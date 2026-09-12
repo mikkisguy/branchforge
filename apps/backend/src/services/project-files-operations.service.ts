@@ -34,7 +34,10 @@ import {
 import { requireProjectOwnership } from "./authz.service.js";
 import { canonicalizeRpyFilePath } from "@branchforge/shared";
 import { calculateContentHash } from "../lib/hash.js";
-import { computeCommonDirectoryPrefix } from "./rpy-statements.service.js";
+import {
+  computeCommonDirectoryPrefix,
+  extractAndStripRpySymbols,
+} from "./rpy-statements.service.js";
 import { parseRPYFileWithLabels } from "./rpy-parser.service.js";
 import { logWarn } from "../lib/logger.js";
 import type {
@@ -996,7 +999,7 @@ export async function getPendingStructuralSummary(
         filePath: projectFiles.filePath,
         contentHash: projectFiles.contentHash,
         lastPushedContentHash: projectFiles.lastPushedContentHash,
-        remoteContent: projectFiles.remoteContent,
+        originalContent: projectFiles.originalContent,
       })
       .from(projectFiles)
       .where(
@@ -1015,13 +1018,18 @@ export async function getPendingStructuralSummary(
 
   // Content-modified: local contentHash differs from the last-pushed LOCAL
   // baseline; excludes new files (pending CREATE) and tombstones. For
-  // legacy rows without a local baseline, fall back to the imported remote
-  // content snapshot.
+  // legacy rows without a local baseline, fall back to the imported original
+  // content. This deliberately matches the export planner's fallback, so
+  // pre-migration GitLab projects expose the same edits that will be pushed.
   const contentChanges = activeFiles.filter((f) => {
     if (createPendingFileIds.has(f.id)) return false;
     const baseline =
       f.lastPushedContentHash ??
-      (f.remoteContent != null ? calculateContentHash(f.remoteContent) : null);
+      (f.originalContent != null
+        ? calculateContentHash(
+            extractAndStripRpySymbols(f.originalContent).cleanedContent
+          )
+        : null);
     if (baseline === null) return false;
     return f.contentHash !== baseline;
   });

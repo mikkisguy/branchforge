@@ -1165,6 +1165,21 @@ describe("ProjectFileOperationsRoutes (Integration)", () => {
         .set({ contentHash: "different-hash" })
         .where(eq(projectFiles.id, modified.id));
 
+      // Legacy GitLab imports predate the durable local baseline columns.
+      // Their original imported content remains the safe comparison point.
+      const legacy = await createTestFile(gitProjectId, "game/legacy.rpy", {
+        content: 'label legacy:\n    "Before"',
+      });
+      await db
+        .update(projectFiles)
+        .set({
+          content: 'label legacy:\n    "After"',
+          contentHash: calculateContentHash('label legacy:\n    "After"'),
+          lastPushedContentHash: null,
+          remoteContent: null,
+        })
+        .where(eq(projectFiles.id, legacy.id));
+
       // Renamed existing file whose content also changed: counts in BOTH
       const renamed = await createTestFile(
         gitProjectId,
@@ -1201,10 +1216,11 @@ describe("ProjectFileOperationsRoutes (Integration)", () => {
       expect(
         body.operations.map((o: { operation: string }) => o.operation).sort()
       ).toEqual(["CREATE", "RENAME"]);
-      expect(body.contentModifiedCount).toBe(2); // modified + renamed (both changed content)
+      expect(body.contentModifiedCount).toBe(3);
       expect(body.contentChanges).toEqual(
         expect.arrayContaining([
           { fileId: modified.id, filePath: "game/modified.rpy" },
+          { fileId: legacy.id, filePath: "game/legacy.rpy" },
           { fileId: renamed.id, filePath: "game/renamed_dst.rpy" },
         ])
       );
