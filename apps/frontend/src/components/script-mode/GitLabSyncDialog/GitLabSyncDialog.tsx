@@ -7,8 +7,9 @@
 
 import { useReducer, useCallback, useRef, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Download, Upload } from "lucide-react";
+import { Download, FilePenLine, Upload } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { useGitLabSync } from "@/hooks/useGitLabSync";
 import { useToast } from "@/contexts/ToastContext";
 import { useLabels } from "@/hooks/useLabels";
@@ -413,50 +414,77 @@ function PendingFileChangesSection({
           </Button>
         )}
       </div>
-      <ul className="space-y-2 text-sm">
-        {changes.map((change) => {
-          const actionLabel =
-            change.kind === "CREATED"
-              ? "Cancel creation"
-              : change.kind === "RENAMED"
-                ? "Undo rename"
-                : "Restore file";
-          const description =
-            change.kind === "CREATED"
-              ? `Created: ${change.filePath}`
-              : change.kind === "RENAMED"
-                ? `${change.previousFilePath} → ${change.filePath}`
-                : `Deleted: ${change.filePath}`;
-          return (
-            <li
-              key={change.fileId}
-              className="flex items-start justify-between gap-3"
-            >
-              <span className="min-w-0 flex-1 break-all">{description}</span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={isReversing}
-                onClick={() => onReverse(change)}
-              >
-                {actionLabel}
-              </Button>
-            </li>
-          );
-        })}
-      </ul>
-      {contentChangedCount > 0 && (
-        <div className="space-y-1 text-xs text-muted-foreground">
-          <p>
-            {contentChangedCount}{" "}
-            {contentChangedCount === 1 ? "file contains" : "files contain"}{" "}
-            content changes
+      {changes.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-muted-foreground">
+            File structure
           </p>
-          <ul className="space-y-1" aria-label="Files with content changes">
+          <ul className="space-y-1.5 text-sm">
+            {changes.map((change) => {
+              const actionLabel =
+                change.kind === "CREATED"
+                  ? "Cancel creation"
+                  : change.kind === "RENAMED"
+                    ? "Undo rename"
+                    : "Restore file";
+              const description =
+                change.kind === "CREATED"
+                  ? `Created: ${change.filePath}`
+                  : change.kind === "RENAMED"
+                    ? `${change.previousFilePath} → ${change.filePath}`
+                    : `Deleted: ${change.filePath}`;
+              return (
+                <li
+                  key={change.fileId}
+                  className="flex items-start justify-between gap-3 rounded-md bg-muted/40 px-2.5 py-2"
+                >
+                  <span className="min-w-0 flex-1 break-all leading-5">
+                    {description}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isReversing}
+                    onClick={() => onReverse(change)}
+                  >
+                    {actionLabel}
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+      {contentChangedCount > 0 && (
+        <div
+          className={
+            changes.length > 0
+              ? "space-y-1.5 border-t border-border/60 pt-2.5"
+              : "space-y-1.5"
+          }
+        >
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-medium text-muted-foreground">
+              Content updates
+            </p>
+            <Badge variant="secondary" className="shrink-0 text-[11px]">
+              {contentChangedCount}
+            </Badge>
+          </div>
+          <ul
+            className="space-y-1.5 text-sm"
+            aria-label="Files with content changes"
+          >
             {contentChanges.map((change) => (
-              <li key={change.fileId} className="break-all">
-                Edited: {change.filePath}
+              <li
+                key={change.fileId}
+                className="flex items-center gap-2 rounded-md bg-muted/40 px-2.5 py-2 text-muted-foreground"
+              >
+                <FilePenLine className="size-3.5 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 break-all leading-5">
+                  {change.filePath}
+                </span>
               </li>
             ))}
           </ul>
