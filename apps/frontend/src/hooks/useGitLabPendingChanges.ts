@@ -20,6 +20,7 @@ export interface UseGitLabPendingChangesOptions {
 
 export interface UseGitLabPendingChangesReturn {
   changes: PendingFileChange[];
+  contentChanges: Array<{ fileId: string; filePath: string }>;
   isLoading: boolean;
   error: Error | null;
   refetch: () => Promise<unknown>;
@@ -143,6 +144,7 @@ export function useGitLabPendingChanges(
 
   return {
     changes,
+    contentChanges: query.data?.contentChanges ?? [],
     isLoading: query.isLoading,
     error: (query.error as Error | null) ?? null,
     refetch: query.refetch,

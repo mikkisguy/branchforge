@@ -1153,7 +1153,7 @@ describe("ProjectFileOperationsRoutes (Integration)", () => {
   // ==========================================================================
 
   describe("GET /projects/:projectId/files/pending-structural", () => {
-    it("returns structural entries only, with contentModifiedCount semantics", async () => {
+    it("returns structural entries and every content-modified file", async () => {
       buildApp();
       await fastify.ready();
       const cookie = await sessionFor(testUserId);
@@ -1202,6 +1202,12 @@ describe("ProjectFileOperationsRoutes (Integration)", () => {
         body.operations.map((o: { operation: string }) => o.operation).sort()
       ).toEqual(["CREATE", "RENAME"]);
       expect(body.contentModifiedCount).toBe(2); // modified + renamed (both changed content)
+      expect(body.contentChanges).toEqual(
+        expect.arrayContaining([
+          { fileId: modified.id, filePath: "game/modified.rpy" },
+          { fileId: renamed.id, filePath: "game/renamed_dst.rpy" },
+        ])
+      );
     });
   });
 

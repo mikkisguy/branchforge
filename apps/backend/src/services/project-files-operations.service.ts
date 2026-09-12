@@ -993,6 +993,7 @@ export async function getPendingStructuralSummary(
     db
       .select({
         id: projectFiles.id,
+        filePath: projectFiles.filePath,
         contentHash: projectFiles.contentHash,
         lastPushedContentHash: projectFiles.lastPushedContentHash,
         remoteContent: projectFiles.remoteContent,
@@ -1016,18 +1017,22 @@ export async function getPendingStructuralSummary(
   // baseline; excludes new files (pending CREATE) and tombstones. For
   // legacy rows without a local baseline, fall back to the imported remote
   // content snapshot.
-  const contentModifiedCount = activeFiles.filter((f) => {
+  const contentChanges = activeFiles.filter((f) => {
     if (createPendingFileIds.has(f.id)) return false;
     const baseline =
       f.lastPushedContentHash ??
       (f.remoteContent != null ? calculateContentHash(f.remoteContent) : null);
     if (baseline === null) return false;
     return f.contentHash !== baseline;
-  }).length;
+  });
 
   return {
     operations: pendingOps.map(mapOperation),
-    contentModifiedCount,
+    contentChanges: contentChanges.map((file) => ({
+      fileId: file.id,
+      filePath: file.filePath,
+    })),
+    contentModifiedCount: contentChanges.length,
   };
 }
 

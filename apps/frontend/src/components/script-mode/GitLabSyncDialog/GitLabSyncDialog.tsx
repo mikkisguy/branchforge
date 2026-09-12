@@ -251,6 +251,7 @@ export function GitLabSyncDialog({
               {operationType === "export" && (
                 <PendingFileChangesSection
                   changes={pendingChanges.changes}
+                  contentChanges={pendingChanges.contentChanges}
                   contentChangedCount={pendingChanges.contentChangedCount}
                   isLoading={pendingChanges.isLoading}
                   error={pendingChanges.error}
@@ -358,6 +359,7 @@ export function GitLabSyncDialog({
 
 function PendingFileChangesSection({
   changes,
+  contentChanges,
   contentChangedCount,
   isLoading,
   error,
@@ -367,6 +369,7 @@ function PendingFileChangesSection({
   onDiscardAll,
 }: {
   changes: import("@/lib/api/gitlab").PendingFileChange[];
+  contentChanges: Array<{ fileId: string; filePath: string }>;
   contentChangedCount: number;
   isLoading: boolean;
   error: Error | null;
@@ -390,7 +393,7 @@ function PendingFileChangesSection({
         </Button>
       </div>
     );
-  if (changes.length === 0 && contentChangedCount === 0) return null;
+  if (changes.length === 0 && contentChanges.length === 0) return null;
 
   return (
     <section
@@ -427,9 +430,9 @@ function PendingFileChangesSection({
           return (
             <li
               key={change.fileId}
-              className="flex items-center justify-between gap-3"
+              className="flex items-start justify-between gap-3"
             >
-              <span className="min-w-0 break-all">{description}</span>
+              <span className="min-w-0 flex-1 break-all">{description}</span>
               <Button
                 type="button"
                 variant="outline"
@@ -444,11 +447,20 @@ function PendingFileChangesSection({
         })}
       </ul>
       {contentChangedCount > 0 && (
-        <p className="text-xs text-muted-foreground">
-          {contentChangedCount}{" "}
-          {contentChangedCount === 1 ? "file contains" : "files contain"}{" "}
-          content changes
-        </p>
+        <div className="space-y-1 text-xs text-muted-foreground">
+          <p>
+            {contentChangedCount}{" "}
+            {contentChangedCount === 1 ? "file contains" : "files contain"}{" "}
+            content changes
+          </p>
+          <ul className="space-y-1" aria-label="Files with content changes">
+            {contentChanges.map((change) => (
+              <li key={change.fileId} className="break-all">
+                Edited: {change.filePath}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </section>
   );

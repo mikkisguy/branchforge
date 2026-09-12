@@ -139,6 +139,7 @@ export interface PendingFileChange {
 
 export interface PendingFileChangesResponse {
   changes: PendingFileChange[];
+  contentChanges: Array<{ fileId: string; filePath: string }>;
   contentChangedCount: number;
 }
 
@@ -618,6 +619,7 @@ export const gitlabApi = {
     );
     return {
       changes: summary.operations.map(toPendingFileChange),
+      contentChanges: summary.contentChanges,
       contentChangedCount: summary.contentModifiedCount,
     };
   },

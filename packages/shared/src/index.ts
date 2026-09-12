@@ -778,13 +778,19 @@ export interface ProjectFileDeleteImpactResponse {
 /**
  * Pending structural summary for a project:
  * - operations: structural entries only, from the collapsed one-row table
- * - contentModifiedCount: active files whose local contentHash differs
+ * - contentChanges: active files whose local contentHash differs
  *   from the last-pushed local baseline; excludes new files (pending
  *   CREATE) and tombstoned files. A renamed existing file whose content
- *   changed counts in BOTH categories.
+ *   changed appears in BOTH categories.
  */
+export interface ProjectFileContentChange {
+  fileId: string;
+  filePath: string;
+}
+
 export interface ProjectFilePendingStructuralSummary {
   operations: ProjectFileOperation[];
+  contentChanges: ProjectFileContentChange[];
   contentModifiedCount: number;
 }
 
