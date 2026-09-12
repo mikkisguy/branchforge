@@ -15,7 +15,13 @@ import { useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { projectFilesApi } from "@/lib/api/project-files";
 import type { ProjectFileNode } from "@/lib/api/project-files";
-import { flowKeys, labelKeys, projectFilesKeys } from "@/lib/query-keys";
+import {
+  exportKeys,
+  flowKeys,
+  gitlabKeys,
+  labelKeys,
+  projectFilesKeys,
+} from "@/lib/query-keys";
 
 type FileListUpdater = (
   files: ProjectFileNode[] | undefined
@@ -85,6 +91,12 @@ export function useProjectFileMutations(
       void queryClient.invalidateQueries({
         queryKey: flowKeys.graph(operationProjectId),
       });
+      void queryClient.invalidateQueries({
+        queryKey: exportKeys.preview(operationProjectId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: gitlabKeys.pendingChanges(operationProjectId),
+      });
     },
   });
 
@@ -124,6 +136,12 @@ export function useProjectFileMutations(
       });
       void queryClient.invalidateQueries({
         queryKey: flowKeys.graph(operationProjectId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: exportKeys.preview(operationProjectId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: gitlabKeys.pendingChanges(operationProjectId),
       });
     },
   });
