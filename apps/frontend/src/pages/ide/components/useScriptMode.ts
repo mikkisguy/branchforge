@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFileEditor } from "@/hooks/useFileEditor";
 import { useFileTabs } from "@/hooks/useFileTabs";
 import { useLabelFileSync } from "@/hooks/useLabelFileSync";
+import { useProjectFileActions } from "@/hooks/useProjectFileActions";
+import { useProject } from "@/hooks/useProject";
 import { useProjectReset } from "@/hooks/useProjectReset";
 import { useScriptModeRefresh } from "@/hooks/useScriptModeRefresh";
 import { useTextUndo } from "@/hooks/useTextUndo";
@@ -9,6 +11,7 @@ import type { LabelTitleMap } from "@/lib/codemirror/label-title-decoration";
 import type { SourceOrigin } from "@branchforge/shared";
 import { useScriptModeData } from "./useScriptModeData";
 import { useExportPreview } from "@/hooks/useExportPreview";
+import type { ProjectFileNode } from "@/hooks/useProjectFiles";
 
 function getContainingFolder(filePath: string): string | null {
   const parts = filePath.split("/");
@@ -17,6 +20,8 @@ function getContainingFolder(filePath: string): string | null {
 
 export function useScriptMode({ projectId }: { projectId?: string }) {
   const data = useScriptModeData({ projectId });
+  const { currentProject } = useProject();
+  const canModifyFiles = currentProject?.visibility === "OWNER";
   const {
     setActiveLabelId,
     projectFiles,
@@ -114,6 +119,7 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
   }, [setActiveLabelId]);
 
   const {
+    openTabs,
     activeFileId,
     tabItems,
     selectFileTab,
@@ -266,6 +272,68 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
       : activeProjectFile?.content || "";
 
   const isGeneratedPreview = !!generatedPreview;
+
+  // --- Structural file actions (rename/move, delete) -----------------------
+  // Owner-only; flushes the pending autosave before opening a dialog and
+  // blocks the operation when the flush fails (rename) or enables the
+  // force-delete pathway (delete).
+  const flushAutosaveForFileAction = useCallback(
+    async (fileId: string) => {
+      if (fileId !== currentEditFileId) return true;
+      if (!hasPendingSave) return true;
+      return await triggerFileSave();
+    },
+    [currentEditFileId, hasPendingSave, triggerFileSave]
+  );
+
+  const handleFileDeleted = useCallback(
+    (deletedFile: ProjectFileNode) => {
+      // Repair tabs/selection: fall back to the previous tab, then the
+      // next; with no tabs left, clear into the empty state.
+      if (activeFileId !== deletedFile.id) return;
+      const index = openTabs.indexOf(deletedFile.id);
+      const remaining = openTabs.filter((id) => id !== deletedFile.id);
+      if (remaining.length === 0) {
+        handleNoTabsRemaining();
+        return;
+      }
+      const fallbackFileId = openTabs[index - 1] ?? remaining[0];
+      void selectFileTab(fallbackFileId);
+    },
+    [activeFileId, handleNoTabsRemaining, openTabs, selectFileTab]
+  );
+
+  const handleFileRenamed = useCallback((renamedFile: ProjectFileNode) => {
+    const folder = getContainingFolder(renamedFile.filePath);
+    if (folder) {
+      setFoldersToExpand([folder]);
+    }
+  }, []);
+
+  const fileActions = useProjectFileActions({
+    projectId,
+    canModify: canModifyFiles,
+    flushAutosave: flushAutosaveForFileAction,
+    getActiveFile: () => (generatedPreview ? null : activeProjectFile),
+    onFileDeleted: handleFileDeleted,
+    onFileRenamed: handleFileRenamed,
+    showErrorToast,
+  });
+
+  const fileRowActions = useMemo(
+    () =>
+      canModifyFiles
+        ? {
+            onRenameRequest: (file: ProjectFileNode) => {
+              void fileActions.requestRename(file);
+            },
+            onDeleteRequest: (file: ProjectFileNode) => {
+              void fileActions.requestDelete(file);
+            },
+          }
+        : undefined,
+    [canModifyFiles, fileActions]
+  );
 
   const activeFileContent = generatedPreview
     ? generatedPreview.content
@@ -481,5 +549,8 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     createFileError: data.createFileError,
     resetCreateFileError: data.resetCreateFileError,
     foldersToExpand,
+    canModifyFiles,
+    fileActions,
+    fileRowActions,
   };
 }

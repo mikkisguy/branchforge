@@ -8,6 +8,10 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 import { getCsrfHeader } from "./csrf";
+import type {
+  ProjectFilePendingStructuralSummary,
+  ProjectFileOperation,
+} from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -105,6 +109,55 @@ import type { PublicProject } from "@branchforge/shared";
 export interface ImportProjectResponse {
   project: PublicProject;
   operation: SyncOperation;
+}
+
+// ============================================================================
+// Pending file changes (structural changes not yet pushed to GitLab)
+// ============================================================================
+
+/**
+ * Kind of a pending structural file change.
+ * Frontend-local contract until promoted to @branchforge/shared.
+ */
+export type PendingFileChangeKind =
+  "CREATED" | "RENAMED" | "DELETED" | "MODIFIED";
+
+/**
+ * A project file whose structure differs from the last GitLab sync point.
+ * Frontend-local contract until promoted to @branchforge/shared.
+ */
+export interface PendingFileChange {
+  fileId: string;
+  /** Current full relative path of the file. */
+  filePath: string;
+  /** Path before the rename, when kind is RENAMED. */
+  previousFilePath: string | null;
+  kind: PendingFileChangeKind;
+  /** Whether the file content also changed since the last sync point. */
+  contentChanged: boolean;
+}
+
+export interface PendingFileChangesResponse {
+  changes: PendingFileChange[];
+  contentChangedCount: number;
+}
+
+function toPendingFileChange(
+  operation: ProjectFileOperation
+): PendingFileChange {
+  return {
+    fileId: operation.projectFileId,
+    filePath: operation.localPath,
+    previousFilePath:
+      operation.operation === "RENAME" ? operation.remoteBasePath : null,
+    kind:
+      operation.operation === "CREATE"
+        ? "CREATED"
+        : operation.operation === "RENAME"
+          ? "RENAMED"
+          : "DELETED",
+    contentChanged: false,
+  };
 }
 
 class ApiError extends Error {
@@ -547,6 +600,76 @@ export const gitlabApi = {
       method: "POST",
       signal,
       body: JSON.stringify(body),
+    });
+  },
+
+  /**
+   * List pending structural file changes that have not been pushed to GitLab.
+   */
+  async getPendingChanges(
+    projectId: string,
+    signal?: AbortSignal
+  ): Promise<PendingFileChangesResponse> {
+    validateRequired(projectId, "Project ID");
+
+    const summary = await request<ProjectFilePendingStructuralSummary>(
+      `/projects/${projectId}/files/pending-structural`,
+      { signal }
+    );
+    return {
+      changes: summary.operations.map(toPendingFileChange),
+      contentChangedCount: summary.contentModifiedCount,
+    };
+  },
+
+  /**
+   * Cancel a pending file creation. The file was created in BranchForge but
+   * never pushed, so cancelling removes it entirely.
+   */
+  async cancelPendingCreation(
+    projectId: string,
+    fileId: string
+  ): Promise<void> {
+    validateRequired(projectId, "Project ID");
+    validateRequired(fileId, "File ID");
+
+    await request(`/projects/files/${fileId}/reverse`, { method: "POST" });
+  },
+
+  /**
+   * Undo a pending rename, restoring the file's previous path.
+   */
+  async undoPendingRename(
+    projectId: string,
+    fileId: string
+  ): Promise<PendingFileChangesResponse> {
+    validateRequired(projectId, "Project ID");
+    validateRequired(fileId, "File ID");
+
+    return request(`/projects/files/${fileId}/reverse`, { method: "POST" });
+  },
+
+  /**
+   * Restore a file with a pending deletion.
+   */
+  async restorePendingDeletedFile(
+    projectId: string,
+    fileId: string
+  ): Promise<PendingFileChangesResponse> {
+    validateRequired(projectId, "Project ID");
+    validateRequired(fileId, "File ID");
+
+    return request(`/projects/files/${fileId}/reverse`, { method: "POST" });
+  },
+
+  /**
+   * Discard every pending change in a single backend transaction.
+   */
+  async discardAllPendingChanges(projectId: string): Promise<void> {
+    validateRequired(projectId, "Project ID");
+
+    return requestNoContent(`/projects/${projectId}/files/discard-all`, {
+      method: "POST",
     });
   },
 

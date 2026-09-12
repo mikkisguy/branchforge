@@ -29,6 +29,7 @@ export function WriteModeView({
   storyFiles,
   revealFileId,
   sortResetToken,
+  fileActions,
   labels,
   activeLabelId,
   onNewFile,
@@ -118,6 +119,7 @@ export function WriteModeView({
             sortResetToken={sortResetToken}
             onNewFile={onNewFile}
             onFileRevealed={onFileRevealed}
+            fileActions={fileActions}
             onCreateLabel={async (data) => {
               await onCreateLabel({ projectId, ...data });
             }}

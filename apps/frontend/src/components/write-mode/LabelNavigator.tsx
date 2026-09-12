@@ -15,6 +15,7 @@ import {
   useEffectEvent,
   useCallback,
 } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import type { PublicLabel, LabelStatus } from "@branchforge/shared";
 import {
   ArrowUpDown,
@@ -27,6 +28,12 @@ import {
   X,
 } from "lucide-react";
 import { LabelContextMenu } from "@/components/write-mode/LabelContextMenu";
+import {
+  buildFileMenuItems,
+  FileContextMenu,
+  FileRowMenu,
+} from "@/components/ide-shared/FileRowMenu";
+import { isGeneratedPreviewFilePath } from "@/lib/generated-preview-files";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ACTIVE_NAVIGATOR_ITEM_CLASSNAME } from "@/components/workspace/navigator-item";
 import { Input } from "@/components/ui/input";
@@ -323,6 +330,7 @@ function InlineCreateInput({
 interface FileGroupProps {
   fileName: string;
   projectFileId: string;
+  filePath: string;
   labels: PublicLabel[];
   activeLabelId: string | null;
   onLabelSelect: (labelId: string) => void;
@@ -337,11 +345,14 @@ interface FileGroupProps {
   onRenameSave: (labelId: string, value: string) => Promise<void>;
   onRenameCancel: () => void;
   isSavingRename: boolean;
+  onFileContextMenu?: (e: ReactMouseEvent, file: StoryFileRef) => void;
+  fileActions?: LabelNavigatorFileActions;
 }
 
 function FileGroup({
   fileName,
   projectFileId: fileGroupId,
+  filePath,
   labels,
   activeLabelId,
   onLabelSelect,
@@ -353,6 +364,8 @@ function FileGroup({
   onRenameSave,
   onRenameCancel,
   isSavingRename,
+  onFileContextMenu,
+  fileActions,
 }: FileGroupProps) {
   const [showInput, setShowInput] = useState(false);
 
@@ -364,17 +377,39 @@ function FileGroup({
     setShowInput(false);
   };
 
+  const fileRef = useMemo<StoryFileRef>(
+    () => ({ id: fileGroupId, filePath }),
+    [fileGroupId, filePath]
+  );
+  const showFileMenu = !!fileActions && !isGeneratedPreviewFilePath(filePath);
+
   return (
     <div className="mb-4">
       {/* File Header */}
-      <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-muted/20 border border-border/40">
+      <div
+        className="group/row flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-muted/20 border border-border/40"
+        onContextMenu={
+          onFileContextMenu
+            ? (event) => onFileContextMenu(event, fileRef)
+            : undefined
+        }
+      >
         <File className="size-3.5 text-muted-foreground shrink-0" />
         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
           {fileName}
         </span>
-        <span className="text-[10px] text-muted-foreground ml-auto shrink-0">
-          {labels.length}
-        </span>
+        {showFileMenu && fileActions ? (
+          <FileRowMenu
+            fileName={fileName}
+            items={buildFileMenuItems({
+              onRename: () => void fileActions.onRenameRequest(fileRef),
+              onDelete: () => void fileActions.onDeleteRequest(fileRef),
+              renameDisabled: fileActions.disabled,
+              deleteDisabled: fileActions.disabled,
+            })}
+            disabled={fileActions.disabled}
+          />
+        ) : null}
       </div>
 
       {/* Label list */}
@@ -426,6 +461,17 @@ export interface StoryFileRef {
   filePath: string;
 }
 
+/**
+ * Owner-only structural file actions rendered on Write Mode file group
+ * headers. Omitted entirely for non-owners so no affordance appears.
+ */
+export interface LabelNavigatorFileActions {
+  onRenameRequest: (file: StoryFileRef) => void | Promise<void>;
+  onDeleteRequest: (file: StoryFileRef) => void | Promise<void>;
+  /** Disables both actions while a file operation is in flight. */
+  disabled?: boolean;
+}
+
 interface LabelNavigatorProps {
   labels: PublicLabel[];
   storyFiles: StoryFileRef[];
@@ -451,6 +497,8 @@ interface LabelNavigatorProps {
   onEditLabel?: (label: PublicLabel) => void;
   /** Called when user wants to delete a label (replaces internal confirm dialog) */
   onDeleteRequest?: (label: PublicLabel) => void;
+  /** Owner-only structural file actions for file group headers */
+  fileActions?: LabelNavigatorFileActions;
 }
 
 // react-doctor-disable-next-line react-doctor/no-high-complexity-react-function, react-doctor/no-giant-component -- cohesive navigator state spans filtering, sorting, renaming, and context-menu interactions while row/group rendering is already extracted
@@ -469,6 +517,7 @@ export function LabelNavigator({
   isUpdatingLabel,
   onEditLabel,
   onDeleteRequest,
+  fileActions,
 }: LabelNavigatorProps) {
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -477,6 +526,14 @@ export function LabelNavigator({
     y: number;
     label: PublicLabel | null;
   }>({ open: false, x: 0, y: 0, label: null });
+
+  // File context menu state (right-click on file group headers)
+  const [fileContextMenu, setFileContextMenu] = useState<{
+    open: boolean;
+    x: number;
+    y: number;
+    file: StoryFileRef | null;
+  }>({ open: false, x: 0, y: 0, file: null });
 
   // Inline rename state
   const [renamingLabelId, setRenamingLabelId] = useState<string | null>(null);
@@ -565,6 +622,38 @@ export function LabelNavigator({
     }
   }, [contextMenu.label, onDeleteRequest]);
 
+  // File context menu handlers (right-click on file group headers)
+  const handleFileContextMenu = useCallback(
+    (event: ReactMouseEvent, file: StoryFileRef) => {
+      if (!fileActions) return;
+      if (isGeneratedPreviewFilePath(file.filePath)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setFileContextMenu({
+        open: true,
+        x: event.clientX,
+        y: event.clientY,
+        file,
+      });
+    },
+    [fileActions]
+  );
+
+  const closeFileContextMenu = useCallback(() => {
+    setFileContextMenu((prev) => ({ ...prev, open: false, file: null }));
+  }, []);
+
+  const fileContextMenuItems = useMemo(() => {
+    if (!fileActions || !fileContextMenu.file) return [];
+    const file = fileContextMenu.file;
+    return buildFileMenuItems({
+      onRename: () => void fileActions.onRenameRequest(file),
+      onDelete: () => void fileActions.onDeleteRequest(file),
+      renameDisabled: fileActions.disabled,
+      deleteDisabled: fileActions.disabled,
+    });
+  }, [fileActions, fileContextMenu.file]);
+
   const filteredLabels = useMemo(() => {
     if (!searchQuery.trim()) return labels;
     const query = searchQuery.toLowerCase().trim();
@@ -607,6 +696,7 @@ export function LabelNavigator({
       return {
         projectFileId: file.id,
         fileName,
+        filePath: file.filePath,
         labels: fileLabels.toSorted(
           (a, b) => a.sequenceOrder - b.sequenceOrder
         ),
@@ -759,7 +849,7 @@ export function LabelNavigator({
         ) : (
           <div className="space-y-3" key={sortMode}>
             {groupedLabels.entries.map(
-              ({ projectFileId, fileName, labels: fileLabels }) => (
+              ({ projectFileId, fileName, filePath, labels: fileLabels }) => (
                 <div
                   key={projectFileId}
                   ref={(element) => {
@@ -773,6 +863,7 @@ export function LabelNavigator({
                   <FileGroup
                     fileName={fileName}
                     projectFileId={projectFileId}
+                    filePath={filePath}
                     labels={fileLabels}
                     activeLabelId={activeLabelId}
                     onLabelSelect={onSelect}
@@ -784,6 +875,10 @@ export function LabelNavigator({
                     onRenameSave={handleRenameSave}
                     onRenameCancel={handleRenameCancel}
                     isSavingRename={isUpdatingLabel ?? false}
+                    onFileContextMenu={
+                      fileActions ? handleFileContextMenu : undefined
+                    }
+                    fileActions={fileActions}
                   />
                 </div>
               )
@@ -802,6 +897,17 @@ export function LabelNavigator({
         onEditDetails={handleContextEditDetails}
         onDelete={handleContextDelete}
       />
+
+      {/* File context menu (right-click on file group headers) */}
+      {fileActions ? (
+        <FileContextMenu
+          open={fileContextMenu.open && fileContextMenu.file !== null}
+          onClose={closeFileContextMenu}
+          x={fileContextMenu.x}
+          y={fileContextMenu.y}
+          items={fileContextMenuItems}
+        />
+      ) : null}
     </div>
   );
 }

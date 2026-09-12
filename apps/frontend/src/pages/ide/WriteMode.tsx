@@ -23,10 +23,13 @@ import {
 } from "@/hooks/useWriteAutosave";
 import { useWriteTabs } from "@/hooks/useWriteTabs";
 import { useLabelSwitcher } from "@/hooks/useLabelSwitcher";
+import { useProjectFileActions } from "@/hooks/useProjectFileActions";
 import { useWriteFocusMode } from "@/hooks/useWriteFocusMode";
 import { useWorkspacePanel } from "@/hooks/useWorkspacePanel";
 import { WRITE_LEFT_PANEL, WRITE_RIGHT_PANEL } from "@/lib/workspace-panels";
 import { WriteModeView } from "@/pages/ide/components/WriteModeView";
+import { RenameFileDialog } from "@/components/ide-shared/RenameFileDialog";
+import { DeleteFileDialog } from "@/components/ide-shared/DeleteFileDialog";
 import {
   NoProjectSelected,
   LoadingLabels,
@@ -191,7 +194,7 @@ export function WriteMode({
     showErrorToast,
   });
 
-  const { tabItems, selectLabelTab, handleCloseTab } = useWriteTabs({
+  const { tabItems, openTabs, selectLabelTab, handleCloseTab } = useWriteTabs({
     projectId: currentProject?.id,
     labels,
     activeLabelId,
@@ -250,6 +253,86 @@ export function WriteMode({
     [handleSelectLabel]
   );
 
+  // --- Structural file actions (rename/move, delete) -----------------------
+  const canModifyFiles = currentProject?.visibility === "OWNER";
+
+  const flushAutosaveForFileAction = useCallback(
+    async (fileId: string) => {
+      if (activeLabel?.projectFileId !== fileId) return true;
+      if (!isDirty && saveStatus !== "error") return true;
+      return await triggerSave();
+    },
+    [activeLabel?.projectFileId, isDirty, saveStatus, triggerSave]
+  );
+
+  const handleFileDeleted = useCallback(
+    (deletedFile: { id: string }) => {
+      // Repair the active label when it lived in the deleted file: fall
+      // back to the previous tab, then the next; with none left, end in
+      // the empty state. Cancel stale autosave state while switching.
+      const affectedLabelIds = new Set(
+        labels
+          .filter((label) => label.projectFileId === deletedFile.id)
+          .map((label) => label.id)
+      );
+      if (!activeLabelId || !affectedLabelIds.has(activeLabelId)) {
+        return;
+      }
+
+      const index = openTabs.indexOf(activeLabelId);
+      const remainingTabs = openTabs.filter(
+        (tabId) => !affectedLabelIds.has(tabId)
+      );
+      const fallbackLabelId = openTabs[index - 1] ?? remainingTabs[0] ?? null;
+
+      isSwitchingLabelsRef.current = true;
+      if (fallbackLabelId) {
+        setActiveLabelId(fallbackLabelId);
+        return;
+      }
+
+      setActiveLabelId(null);
+      prevDraftLabelIdRef.current = null;
+      const emptyDraft: LabelDialogueDraft = { labelId: null, entries: [] };
+      setCurrentDraft(emptyDraft);
+      pendingResetHashRef.current = emptyDraft;
+    },
+    [activeLabelId, labels, openTabs, setActiveLabelId]
+  );
+
+  const fileActions = useProjectFileActions({
+    projectId: currentProject?.id,
+    canModify: canModifyFiles ?? false,
+    flushAutosave: flushAutosaveForFileAction,
+    getActiveFile: () => {
+      if (!activeLabel) return null;
+      return (
+        files.find((file) => file.id === activeLabel.projectFileId) ?? null
+      );
+    },
+    onFileDeleted: handleFileDeleted,
+    showErrorToast,
+  });
+
+  const fileRowActions = useMemo(
+    () =>
+      canModifyFiles
+        ? {
+            onRenameRequest: (file: { id: string; filePath: string }) => {
+              const projectFile = files.find((f) => f.id === file.id);
+              if (!projectFile) return;
+              void fileActions.requestRename(projectFile);
+            },
+            onDeleteRequest: (file: { id: string; filePath: string }) => {
+              const projectFile = files.find((f) => f.id === file.id);
+              if (!projectFile) return;
+              void fileActions.requestDelete(projectFile);
+            },
+          }
+        : undefined,
+    [canModifyFiles, fileActions, files]
+  );
+
   // react-doctor-disable-next-line react-doctor/no-usememo-simple-expression -- referential stability for editorSaveState passed to WriteModeView
   const editorSaveState = useMemo(
     () => ({
@@ -274,6 +357,36 @@ export function WriteMode({
     />
   );
 
+  const pendingFileAction = fileActions.pendingAction;
+  const fileActionDialogs =
+    currentProject && pendingFileAction ? (
+      pendingFileAction.kind === "rename" ? (
+        <RenameFileDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) fileActions.closeDialog();
+          }}
+          currentFilePath={pendingFileAction.file.filePath}
+          onRename={fileActions.confirmRename}
+          isRenaming={fileActions.isRenaming}
+          serverError={fileActions.renameError?.message ?? null}
+        />
+      ) : (
+        <DeleteFileDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) fileActions.closeDialog();
+          }}
+          projectId={currentProject.id}
+          file={pendingFileAction.file}
+          canForce={pendingFileAction.forceAllowed}
+          onDelete={fileActions.confirmDelete}
+          isDeleting={fileActions.isDeleting}
+          serverError={fileActions.deleteError?.message ?? null}
+        />
+      )
+    ) : null;
+
   if (!currentProject) {
     return <NoProjectSelected onOpenSettings={onOpenSettings} />;
   }
@@ -293,6 +406,7 @@ export function WriteMode({
           onNewFile={canCreateFile ? openCreateFileDialog : undefined}
         />
         {createFileDialog}
+        {fileActionDialogs}
       </>
     );
   }
@@ -315,6 +429,7 @@ export function WriteMode({
           sortResetToken={sortResetToken}
           onNewFile={canCreateFile ? openCreateFileDialog : undefined}
           onFileRevealed={handleFileRevealed}
+          fileActions={fileRowActions}
           labels={storyLabels}
           activeLabelId={activeLabelId}
           onLabelSelect={handleLabelSelect}
@@ -345,6 +460,7 @@ export function WriteMode({
         />
       </div>
       {createFileDialog}
+      {fileActionDialogs}
     </>
   );
 }

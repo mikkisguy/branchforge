@@ -80,7 +80,7 @@ describe("LabelNavigator", () => {
       expect(screen.getByText("act_ii.rpy")).toBeInTheDocument();
     });
 
-    it("shows correct label counts per file", () => {
+    it("does not show label counts in file headers", () => {
       render(
         <LabelNavigator
           labels={labelsFromMultipleFiles}
@@ -92,8 +92,8 @@ describe("LabelNavigator", () => {
 
       const actIHeader = screen.getByText("act_i.rpy").parentElement!;
       const actIiHeader = screen.getByText("act_ii.rpy").parentElement!;
-      expect(within(actIHeader).getByText("2")).toBeInTheDocument();
-      expect(within(actIiHeader).getByText("1")).toBeInTheDocument();
+      expect(within(actIHeader).queryByText("2")).not.toBeInTheDocument();
+      expect(within(actIiHeader).queryByText("1")).not.toBeInTheDocument();
     });
 
     it("renders empty story file groups from storyFiles with Add label", () => {
@@ -431,7 +431,9 @@ describe("LabelNavigator", () => {
       );
 
       expect(screen.getByText("story.rpy")).toBeInTheDocument();
-      expect(screen.getByText("2")).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: "Add label" })).toHaveLength(
+        1
+      );
     });
   });
 

@@ -9,6 +9,7 @@ import type {
 } from "@branchforge/shared";
 import type { Character } from "@branchforge/shared";
 import type { StoryFileRef } from "@/components/write-mode/LabelNavigator";
+import type { LabelNavigatorFileActions } from "@/components/write-mode/LabelNavigator";
 
 import type {
   Dispatch,
@@ -49,6 +50,8 @@ export interface WriteModeViewProps {
   sortResetToken?: number;
   onNewFile?: () => void;
   onFileRevealed?: () => void;
+  /** Owner-only structural file actions for file group headers. */
+  fileActions?: LabelNavigatorFileActions;
 
   // Labels
 

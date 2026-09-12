@@ -16,6 +16,7 @@ import {
 import {
   ProjectFileTree,
   type GeneratedFileInfo,
+  type ProjectFileTreeFileActions,
 } from "@/components/script-mode/ProjectFileTree";
 import { FocusModeToggle } from "@/components/write-mode/FocusModeToggle";
 import { SaveIndicator } from "@/components/write-mode/SaveIndicator";
@@ -98,6 +99,8 @@ interface ScriptModeEditorLayoutProps {
   onGeneratedFileSelect?: (fileName: string) => void;
   isGeneratedPreview?: boolean;
   generatedFileName?: string;
+  /** Owner-only rename/delete actions for file rows (undefined hides them). */
+  fileActions?: ProjectFileTreeFileActions;
 }
 
 // react-doctor-disable-next-line react-doctor/no-many-boolean-props, react-doctor/no-giant-component, react-doctor/no-high-complexity-react-function -- workspace shell coordinates shared panels, editor state, and commands while delegating their rendering and behavior
@@ -141,6 +144,7 @@ export function ScriptModeEditorLayout({
   onGeneratedFileSelect,
   isGeneratedPreview = false,
   generatedFileName,
+  fileActions,
 }: ScriptModeEditorLayoutProps) {
   const leftPanelRaw = useWorkspacePanel(SCRIPT_LEFT_PANEL);
   const rightPanelRaw = useWorkspacePanel(SCRIPT_RIGHT_PANEL);
@@ -392,6 +396,7 @@ export function ScriptModeEditorLayout({
                     generatedFiles={generatedFiles}
                     activeGeneratedFileId={activeGeneratedFileId}
                     onGeneratedFileSelect={onGeneratedFileSelect}
+                    fileActions={fileActions}
                   />
                 </div>
               </div>

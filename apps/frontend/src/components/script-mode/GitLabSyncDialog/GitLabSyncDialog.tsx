@@ -5,16 +5,19 @@
  * Shows progress and allows configuration of branch and commit message.
  */
 
-import { useReducer, useCallback, useRef, useEffect } from "react";
+import { useReducer, useCallback, useRef, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Download, Upload } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useGitLabSync } from "@/hooks/useGitLabSync";
 import { useToast } from "@/contexts/ToastContext";
 import { useLabels } from "@/hooks/useLabels";
+import { useGitLabPendingChanges } from "@/hooks/useGitLabPendingChanges";
 import { characterKeys, projectFilesKeys } from "@/lib/query-keys";
 import { CharacterImportWizard } from "@/components/CharacterImportWizard/CharacterImportWizard.lazy";
 import { charactersApi } from "@/lib/api/characters";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { GitLabSyncDialogProgress } from "./GitLabSyncDialogProgress";
 import { GitLabSyncSyncForm } from "./GitLabSyncSyncForm";
 import { GitLabSyncDialogHeader } from "./GitLabSyncDialogHeader";
@@ -52,6 +55,10 @@ export function GitLabSyncDialog({
   const { state, exportToGitlab, importFromGitlab, reset } = useGitLabSync();
   const { success, error } = useToast();
   const { invalidateLabels, labels, isLoadingLabels } = useLabels();
+  const pendingChanges = useGitLabPendingChanges(projectId, {
+    enabled: open && operationType === "export",
+  });
+  const [discardConfirmationOpen, setDiscardConfirmationOpen] = useState(false);
 
   // Check if this is a first sync (no local labels)
   const isFirstSync = !isLoadingLabels && labels.length === 0;
@@ -116,6 +123,7 @@ export function GitLabSyncDialog({
       );
 
       await invalidateLabels();
+      pendingChanges.refetch();
 
       // For import operations, also refresh project files list
       // to ensure Script Mode shows imported files immediately
@@ -173,6 +181,7 @@ export function GitLabSyncDialog({
     isFirstSync,
     queryClient,
     clearAutoCloseTimeout,
+    pendingChanges,
   ]);
 
   /**
@@ -238,25 +247,53 @@ export function GitLabSyncDialog({
               operationType={operationType}
             />
           ) : (
-            <GitLabSyncSyncForm
-              branch={branch}
-              commitMessage={formState.commitMessage}
-              conflictResolution={formState.conflictResolution}
-              operationType={operationType}
-              isFirstSync={isFirstSync}
-              isProcessing={state.isProcessing}
-              error={state.error}
-              onBranchChange={(value) =>
-                dispatch({ type: "SET_USER_BRANCH", value })
-              }
-              onCommitMessageChange={(value) =>
-                dispatch({ type: "SET_COMMIT_MESSAGE", value })
-              }
-              onConflictResolutionChange={(value) =>
-                dispatch({ type: "SET_CONFLICT_RESOLUTION", value })
-              }
-              defaultBranch={defaultBranch}
-            />
+            <>
+              {operationType === "export" && (
+                <PendingFileChangesSection
+                  changes={pendingChanges.changes}
+                  contentChangedCount={pendingChanges.contentChangedCount}
+                  isLoading={pendingChanges.isLoading}
+                  error={pendingChanges.error}
+                  isReversing={pendingChanges.isReversing}
+                  onRetry={() => void pendingChanges.refetch()}
+                  onReverse={(change) => {
+                    const action =
+                      change.kind === "CREATED"
+                        ? pendingChanges.cancelCreation
+                        : change.kind === "RENAMED"
+                          ? pendingChanges.undoRename
+                          : pendingChanges.restoreFile;
+                    void action(change.fileId).catch((reason: unknown) => {
+                      error(
+                        reason instanceof Error
+                          ? reason.message
+                          : "Could not reverse the file change"
+                      );
+                    });
+                  }}
+                  onDiscardAll={() => setDiscardConfirmationOpen(true)}
+                />
+              )}
+              <GitLabSyncSyncForm
+                branch={branch}
+                commitMessage={formState.commitMessage}
+                conflictResolution={formState.conflictResolution}
+                operationType={operationType}
+                isFirstSync={isFirstSync}
+                isProcessing={state.isProcessing}
+                error={state.error}
+                onBranchChange={(value) =>
+                  dispatch({ type: "SET_USER_BRANCH", value })
+                }
+                onCommitMessageChange={(value) =>
+                  dispatch({ type: "SET_COMMIT_MESSAGE", value })
+                }
+                onConflictResolutionChange={(value) =>
+                  dispatch({ type: "SET_CONFLICT_RESOLUTION", value })
+                }
+                defaultBranch={defaultBranch}
+              />
+            </>
           )}
         </div>
 
@@ -270,6 +307,26 @@ export function GitLabSyncDialog({
           onClose={handleClose}
         />
       </DialogContent>
+
+      <ConfirmDialog
+        open={discardConfirmationOpen}
+        onOpenChange={setDiscardConfirmationOpen}
+        title="Discard pending file changes?"
+        description="This restores the project file structure to the last GitLab sync point."
+        confirmLabel="Discard all"
+        isLoading={pendingChanges.isDiscarding}
+        onConfirm={async () => {
+          await pendingChanges.discardAll();
+          setDiscardConfirmationOpen(false);
+        }}
+        onError={(reason) =>
+          error(
+            reason instanceof Error
+              ? reason.message
+              : "Could not discard changes"
+          )
+        }
+      />
 
       {/* Character Import Wizard */}
       {formState.detectedCharacters && (
@@ -296,5 +353,103 @@ export function GitLabSyncDialog({
         />
       )}
     </Dialog>
+  );
+}
+
+function PendingFileChangesSection({
+  changes,
+  contentChangedCount,
+  isLoading,
+  error,
+  isReversing,
+  onRetry,
+  onReverse,
+  onDiscardAll,
+}: {
+  changes: import("@/lib/api/gitlab").PendingFileChange[];
+  contentChangedCount: number;
+  isLoading: boolean;
+  error: Error | null;
+  isReversing: boolean;
+  onRetry: () => void;
+  onReverse: (change: import("@/lib/api/gitlab").PendingFileChange) => void;
+  onDiscardAll: () => void;
+}) {
+  if (isLoading)
+    return (
+      <p className="text-sm text-muted-foreground">
+        Loading pending file changes…
+      </p>
+    );
+  if (error)
+    return (
+      <div className="rounded-md border border-destructive/40 p-3 text-sm text-destructive">
+        Could not load pending file changes.{" "}
+        <Button variant="link" className="h-auto p-0" onClick={onRetry}>
+          Retry
+        </Button>
+      </div>
+    );
+  if (changes.length === 0 && contentChangedCount === 0) return null;
+
+  return (
+    <section
+      className="space-y-2 rounded-md border border-border/60 p-3"
+      aria-label="Pending file changes"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-medium">Pending file changes</h3>
+        {changes.length > 0 && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onDiscardAll}
+          >
+            Discard all
+          </Button>
+        )}
+      </div>
+      <ul className="space-y-2 text-sm">
+        {changes.map((change) => {
+          const actionLabel =
+            change.kind === "CREATED"
+              ? "Cancel creation"
+              : change.kind === "RENAMED"
+                ? "Undo rename"
+                : "Restore file";
+          const description =
+            change.kind === "CREATED"
+              ? `Created: ${change.filePath}`
+              : change.kind === "RENAMED"
+                ? `${change.previousFilePath} → ${change.filePath}`
+                : `Deleted: ${change.filePath}`;
+          return (
+            <li
+              key={change.fileId}
+              className="flex items-center justify-between gap-3"
+            >
+              <span className="min-w-0 break-all">{description}</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isReversing}
+                onClick={() => onReverse(change)}
+              >
+                {actionLabel}
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
+      {contentChangedCount > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {contentChangedCount}{" "}
+          {contentChangedCount === 1 ? "file contains" : "files contain"}{" "}
+          content changes
+        </p>
+      )}
+    </section>
   );
 }

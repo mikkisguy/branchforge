@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { ChevronRight, ChevronDown, Folder, FileCode } from "lucide-react";
 import type { ProjectFileNode } from "@/hooks/useProjectFiles";
 import type {
@@ -6,6 +7,12 @@ import type {
   LabelStatus,
 } from "@branchforge/shared";
 import { CollapsibleSection } from "@/components/ide-shared/CollapsibleSection";
+import {
+  buildFileMenuItems,
+  FileContextMenu,
+  FileRowMenu,
+} from "@/components/ide-shared/FileRowMenu";
+import { isGeneratedPreviewFilePath } from "@/lib/generated-preview-files";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ACTIVE_NAVIGATOR_ITEM_CLASSNAME } from "@/components/workspace/navigator-item";
 
@@ -20,6 +27,17 @@ export type GeneratedFileInfo = Pick<
   "fileName" | "isEmpty" | "emptyReason"
 >;
 
+/**
+ * Owner-only structural file actions rendered on each file row.
+ * Omitted entirely for non-owners so no action affordance appears.
+ */
+export interface ProjectFileTreeFileActions {
+  onRenameRequest: (file: ProjectFileNode) => void | Promise<void>;
+  onDeleteRequest: (file: ProjectFileNode) => void | Promise<void>;
+  /** Disables both actions while a file operation is in flight. */
+  disabled?: boolean;
+}
+
 interface ProjectFileTreeProps {
   files: ProjectFileNode[];
   activeFileId?: string;
@@ -32,6 +50,7 @@ interface ProjectFileTreeProps {
   generatedFiles?: GeneratedFileInfo[];
   activeGeneratedFileId?: string | null;
   onGeneratedFileSelect?: (fileName: string) => void;
+  fileActions?: ProjectFileTreeFileActions;
 }
 
 /**
@@ -71,6 +90,7 @@ export function ProjectFileTree({
   generatedFiles,
   activeGeneratedFileId,
   onGeneratedFileSelect,
+  fileActions,
 }: ProjectFileTreeProps) {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
     () => new Set(initialExpandedFolders ?? [])
@@ -78,6 +98,12 @@ export function ProjectFileTree({
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(
     () => new Set(initialExpandedFiles ?? [])
   );
+  const [contextMenuFile, setContextMenuFile] =
+    useState<ProjectFileNode | null>(null);
+  const [contextMenuPosition, setContextMenuPosition] = useState({
+    x: 0,
+    y: 0,
+  });
 
   useEffect(() => {
     if (!foldersToExpand?.length) {
@@ -119,6 +145,32 @@ export function ProjectFileTree({
   };
 
   const groupedFiles = useMemo(() => groupFilesByFolder(files), [files]);
+
+  const handleRowContextMenu = useCallback(
+    (event: ReactMouseEvent, file: ProjectFileNode) => {
+      if (!fileActions) return;
+      if (isGeneratedPreviewFilePath(file.filePath)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setContextMenuPosition({ x: event.clientX, y: event.clientY });
+      setContextMenuFile(file);
+    },
+    [fileActions]
+  );
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenuFile(null);
+  }, []);
+
+  const contextMenuItems = useMemo(() => {
+    if (!fileActions || !contextMenuFile) return [];
+    return buildFileMenuItems({
+      onRename: () => void fileActions.onRenameRequest(contextMenuFile),
+      onDelete: () => void fileActions.onDeleteRequest(contextMenuFile),
+      renameDisabled: fileActions.disabled,
+      deleteDisabled: fileActions.disabled,
+    });
+  }, [fileActions, contextMenuFile]);
 
   return (
     <div className="space-y-2" role="tree">
@@ -205,95 +257,117 @@ export function ProjectFileTree({
                   : undefined
               }
             >
-              {folderFiles.map((file) => (
-                <div key={file.id}>
-                  <div className="flex items-center gap-0.5">
-                    {file.fileType === "STORY" && file.labels.length > 0 ? (
+              {folderFiles.map((file) => {
+                const isProtected = isGeneratedPreviewFilePath(file.filePath);
+                return (
+                  <div key={file.id}>
+                    <div
+                      className="group/row flex items-center gap-0.5"
+                      onContextMenu={(event) =>
+                        handleRowContextMenu(event, file)
+                      }
+                    >
+                      {file.fileType === "STORY" && file.labels.length > 0 ? (
+                        <button
+                          type="button"
+                          aria-label={`${expandedFiles.has(file.id) ? "Collapse" : "Expand"} labels for ${getFileName(file.filePath)}`}
+                          aria-expanded={expandedFiles.has(file.id)}
+                          aria-controls={`label-group-${file.id}`}
+                          onClick={() => toggleFile(file.id)}
+                          className="flex items-center justify-center size-5 rounded text-muted-foreground transition-colors hover:bg-muted/20 hover:text-foreground"
+                        >
+                          {expandedFiles.has(file.id) ? (
+                            <ChevronDown className="size-3 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="size-3 text-muted-foreground" />
+                          )}
+                        </button>
+                      ) : (
+                        <span className="w-5" />
+                      )}
                       <button
                         type="button"
-                        aria-label={`${expandedFiles.has(file.id) ? "Collapse" : "Expand"} labels for ${getFileName(file.filePath)}`}
-                        aria-expanded={expandedFiles.has(file.id)}
-                        aria-controls={`label-group-${file.id}`}
-                        onClick={() => toggleFile(file.id)}
-                        className="flex items-center justify-center size-5 rounded text-muted-foreground transition-colors hover:bg-muted/20 hover:text-foreground"
+                        onClick={() => onFileSelect(file.id)}
+                        role="treeitem"
+                        aria-selected={activeFileId === file.id}
+                        aria-level={folder ? 2 : 1}
+                        className={`flex-1 flex items-center gap-2 py-1.5 px-2 rounded-md text-sm text-left transition-colors ${
+                          activeFileId === file.id
+                            ? ACTIVE_NAVIGATOR_ITEM_CLASSNAME
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
+                        }`}
                       >
-                        {expandedFiles.has(file.id) ? (
-                          <ChevronDown className="size-3 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="size-3 text-muted-foreground" />
+                        <span className="truncate" title={file.filePath}>
+                          {getFileName(file.filePath)}
+                        </span>
+                        {file.fileType === "SETTINGS" && (
+                          <span className="text-[10px] text-muted-foreground/80 ml-auto shrink-0">
+                            Settings
+                          </span>
                         )}
                       </button>
-                    ) : (
-                      <span className="w-5" />
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => onFileSelect(file.id)}
-                      role="treeitem"
-                      aria-selected={activeFileId === file.id}
-                      aria-level={folder ? 2 : 1}
-                      className={`flex-1 flex items-center gap-2 py-1.5 px-2 rounded-md text-sm text-left transition-colors ${
-                        activeFileId === file.id
-                          ? ACTIVE_NAVIGATOR_ITEM_CLASSNAME
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
-                      }`}
-                    >
-                      <span className="truncate" title={file.filePath}>
-                        {getFileName(file.filePath)}
-                      </span>
-                      {file.fileType === "SETTINGS" && (
-                        <span className="text-[10px] text-muted-foreground/80 ml-auto shrink-0">
-                          Settings
-                        </span>
+                      {fileActions && !isProtected ? (
+                        <FileRowMenu
+                          fileName={getFileName(file.filePath)}
+                          items={buildFileMenuItems({
+                            onRename: () =>
+                              void fileActions.onRenameRequest(file),
+                            onDelete: () =>
+                              void fileActions.onDeleteRequest(file),
+                            renameDisabled: fileActions.disabled,
+                            deleteDisabled: fileActions.disabled,
+                          })}
+                          disabled={fileActions.disabled}
+                        />
+                      ) : null}
+                    </div>
+
+                    {/* Show labels for STORY files */}
+                    {file.fileType === "STORY" &&
+                      expandedFiles.has(file.id) &&
+                      file.labels.length > 0 && (
+                        // react-doctor-disable-next-line react-doctor/prefer-tag-over-role
+                        <div
+                          className="pl-7 space-y-0.5"
+                          role="group"
+                          id={`label-group-${file.id}`}
+                        >
+                          {file.labels.map((label) => {
+                            const safeStatus =
+                              typeof label.status === "string" &&
+                              label.status in STATUS_COLORS
+                                ? (label.status as LabelStatus)
+                                : "DRAFT";
+                            const statusColor = STATUS_COLORS[safeStatus];
+
+                            return (
+                              <button
+                                type="button"
+                                key={label.id}
+                                onClick={() => onSceneSelect(label.id)}
+                                // eslint-disable-next-line jsx-a11y/role-has-required-aria-props -- labels navigate to a scene but do not represent selection state
+                                role="treeitem"
+                                aria-level={folder ? 3 : 2}
+                                className="w-full flex items-center gap-2 py-1 px-2 rounded-md text-xs text-muted-foreground transition-colors hover:text-foreground"
+                              >
+                                <span
+                                  className="size-1.5 rounded-full shrink-0 ring-[1.5px] ring-background"
+                                  style={{
+                                    backgroundColor: statusColor,
+                                  }}
+                                  title={`Status: ${safeStatus}`}
+                                />
+                                <span className="truncate">
+                                  {label.labelName || label.title}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
                       )}
-                    </button>
                   </div>
-
-                  {/* Show labels for STORY files */}
-                  {file.fileType === "STORY" &&
-                    expandedFiles.has(file.id) &&
-                    file.labels.length > 0 && (
-                      // react-doctor-disable-next-line react-doctor/prefer-tag-over-role
-                      <div
-                        className="pl-7 space-y-0.5"
-                        role="group"
-                        id={`label-group-${file.id}`}
-                      >
-                        {file.labels.map((label) => {
-                          const safeStatus =
-                            typeof label.status === "string" &&
-                            label.status in STATUS_COLORS
-                              ? (label.status as LabelStatus)
-                              : "DRAFT";
-                          const statusColor = STATUS_COLORS[safeStatus];
-
-                          return (
-                            <button
-                              type="button"
-                              key={label.id}
-                              onClick={() => onSceneSelect(label.id)}
-                              // eslint-disable-next-line jsx-a11y/role-has-required-aria-props -- labels navigate to a scene but do not represent selection state
-                              role="treeitem"
-                              aria-level={folder ? 3 : 2}
-                              className="w-full flex items-center gap-2 py-1 px-2 rounded-md text-xs text-muted-foreground transition-colors hover:text-foreground"
-                            >
-                              <span
-                                className="size-1.5 rounded-full shrink-0 ring-[1.5px] ring-background"
-                                style={{
-                                  backgroundColor: statusColor,
-                                }}
-                                title={`Status: ${safeStatus}`}
-                              />
-                              <span className="truncate">
-                                {label.labelName || label.title}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -304,6 +378,16 @@ export function ProjectFileTree({
           No files imported yet
         </div>
       )}
+
+      {fileActions ? (
+        <FileContextMenu
+          open={contextMenuFile !== null}
+          onClose={closeContextMenu}
+          x={contextMenuPosition.x}
+          y={contextMenuPosition.y}
+          items={contextMenuItems}
+        />
+      ) : null}
     </div>
   );
 }
