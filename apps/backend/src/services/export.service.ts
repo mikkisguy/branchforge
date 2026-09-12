@@ -7,7 +7,6 @@
  */
 
 import JSZip from "jszip";
-import path from "node:path";
 import { getDb } from "../db/index.js";
 import {
   exportsTable,
@@ -39,6 +38,7 @@ import {
 import { checkRateLimit } from "./rate-limiter.service.js";
 import { logInfo, logError, logWarn, LogEventType } from "../lib/logger.js";
 import {
+  canonicalizeRpyFilePath,
   type ExportPreviewResponse,
   type GeneratedExportPreviewFile,
 } from "@branchforge/shared";
@@ -77,17 +77,8 @@ export interface GenerateExportResult {
  * @returns The sanitized relative path, or null if the path is unsafe.
  */
 function sanitizeZipEntryPath(filePath: string): string | null {
-  const normalized = path.posix.normalize(filePath);
-  if (
-    normalized.length === 0 ||
-    normalized === "." ||
-    normalized === ".." ||
-    normalized.startsWith("/") ||
-    normalized.includes("../")
-  ) {
-    return null;
-  }
-  return normalized;
+  const canonical = canonicalizeRpyFilePath(filePath);
+  return canonical.ok ? canonical.filePath : null;
 }
 
 /**

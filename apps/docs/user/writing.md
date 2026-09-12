@@ -12,6 +12,16 @@ Write Mode provides a distraction-free environment for writing dialogue and narr
 
 Open your project and click "Write" to enter Write Mode. The editor loads your script and autosaves your changes.
 
+## Creating Story Files
+
+Click **New File** from the label navigator, or when your project has no story files yet. Enter a relative path such as `labels/chapter_01` or `labels/chapter_01.rpy`. BranchForge adds `.rpy` if you omit the extension.
+
+Empty files show up as groups in the label navigator with **Add label**, so you can start writing dialogue without importing a project first.
+
+New files are saved in BranchForge immediately. They are not pushed to GitLab until you [export or push](./import-export) — ZIP export includes them too.
+
+You cannot use the reserved names `branchforge_variables.rpy`, `branchforge_stats.rpy`, or `branchforge_definitions.rpy`.
+
 ## Writing Dialogue
 
 [screenshot of dialogue writing]

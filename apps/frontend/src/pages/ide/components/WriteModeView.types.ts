@@ -8,6 +8,8 @@ import type {
   RouteConfig,
 } from "@branchforge/shared";
 import type { Character } from "@branchforge/shared";
+import type { StoryFileRef } from "@/components/write-mode/LabelNavigator";
+
 import type {
   Dispatch,
   KeyboardEvent,
@@ -41,7 +43,15 @@ export interface WriteModeViewProps {
   leftPanelRaw: WorkspacePanelState;
   rightPanelRaw: WorkspacePanelState;
 
+  // Story files
+  storyFiles: StoryFileRef[];
+  revealFileId?: string | null;
+  sortResetToken?: number;
+  onNewFile?: () => void;
+  onFileRevealed?: () => void;
+
   // Labels
+
   labels: PublicLabel[];
   activeLabelId: string | null;
   onLabelSelect: (labelId: string) => void;

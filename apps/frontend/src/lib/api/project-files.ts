@@ -10,8 +10,11 @@ import type {
   ProjectFile,
   ImportZipResponse,
   ExportPreviewResponse,
+  CreateProjectFileRequest,
+  CreateProjectFileResponse,
+  ProjectFileWithLabels,
+  SourceOrigin,
 } from "@branchforge/shared";
-import type { SourceOrigin } from "@branchforge/shared";
 import { isValidSourceOrigin } from "@branchforge/shared";
 
 // ============================================================================
@@ -164,6 +167,32 @@ export const projectFilesApi = {
       },
       true // allow 409 Conflict responses (STALE_CONTENT_HASH) to be returned instead of thrown
     );
+  },
+
+  /**
+   * Create a new empty Ren'Py story file in the project
+   */
+  async createFile(
+    projectId: string,
+    filePath: string
+  ): Promise<ProjectFileNode> {
+    validateRequired(projectId, "Project ID");
+    validateRequired(filePath, "File path");
+
+    const body: CreateProjectFileRequest = { filePath };
+    const response = await request<CreateProjectFileResponse>(
+      `/projects/${projectId}/files`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      }
+    );
+
+    const file: ProjectFileWithLabels = response.file;
+    return {
+      ...file,
+      labels: file.labels ?? [],
+    };
   },
 
   /**

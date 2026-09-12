@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, ChevronDown, Folder, FileCode } from "lucide-react";
 import type { ProjectFileNode } from "@/hooks/useProjectFiles";
 import type {
@@ -28,6 +28,7 @@ interface ProjectFileTreeProps {
   onSceneSelect: (sceneId: string) => void;
   initialExpandedFolders?: string[];
   initialExpandedFiles?: string[];
+  foldersToExpand?: string[];
   generatedFiles?: GeneratedFileInfo[];
   activeGeneratedFileId?: string | null;
   onGeneratedFileSelect?: (fileName: string) => void;
@@ -66,6 +67,7 @@ export function ProjectFileTree({
   onSceneSelect,
   initialExpandedFolders,
   initialExpandedFiles,
+  foldersToExpand,
   generatedFiles,
   activeGeneratedFileId,
   onGeneratedFileSelect,
@@ -76,6 +78,21 @@ export function ProjectFileTree({
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(
     () => new Set(initialExpandedFiles ?? [])
   );
+
+  useEffect(() => {
+    if (!foldersToExpand?.length) {
+      return;
+    }
+
+    // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change -- command prop merges newly created file folders into user-controlled expansion state
+    setExpandedFolders((previous) => {
+      const next = new Set(previous);
+      for (const folder of foldersToExpand) {
+        next.add(folder);
+      }
+      return next;
+    });
+  }, [foldersToExpand]);
 
   const toggleFolder = (folder: string) => {
     setExpandedFolders((prev) => {
@@ -255,6 +272,7 @@ export function ProjectFileTree({
                               type="button"
                               key={label.id}
                               onClick={() => onSceneSelect(label.id)}
+                              // eslint-disable-next-line jsx-a11y/role-has-required-aria-props -- labels navigate to a scene but do not represent selection state
                               role="treeitem"
                               aria-level={folder ? 3 : 2}
                               className="w-full flex items-center gap-2 py-1 px-2 rounded-md text-xs text-muted-foreground transition-colors hover:text-foreground"

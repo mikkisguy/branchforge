@@ -28,7 +28,10 @@ import {
 } from "../middleware/error-handler.middleware.js";
 import { z } from "zod";
 import { createProjectSchema } from "../lib/validation.js";
-import { isValidSourceOrigin } from "@branchforge/shared";
+import {
+  isValidSourceOrigin,
+  canonicalizeRpyFilePath,
+} from "@branchforge/shared";
 import {
   requireProjectAccess,
   requireProjectOwnership,
@@ -36,6 +39,7 @@ import {
 import { syncLabelsFromFile } from "./labels.service.js";
 import type { SyncLabelsResult } from "./labels.service.js";
 import { calculateContentHash } from "../lib/hash.js";
+import { isUniqueConstraintViolation } from "../lib/db.js";
 import { parseRPYFileWithLabels } from "./rpy-parser.service.js";
 
 /**
@@ -476,6 +480,103 @@ export async function getProjectFiles(
   }));
 
   return { files: filesWithLabels };
+}
+
+/**
+ * Create a new empty STORY file in a project.
+ *
+ * Case-insensitive uniqueness is enforced here across every source for this
+ * project. Concurrent creates are serialized with FOR UPDATE on the project
+ * row. The database unique index remains `(project_id, source, file_path)`
+ * because ZIP leftover rows and later GitLab imports can legally share a
+ * path under different sources; import writers are unchanged.
+ */
+export async function createProjectFile(
+  projectId: string,
+  userId: string,
+  filePath: string
+): Promise<FileWithLabels> {
+  await requireProjectOwnership(projectId, userId);
+
+  const canonical = canonicalizeRpyFilePath(filePath);
+  if (!canonical.ok) {
+    throw new ValidationError(canonical.message);
+  }
+
+  const canonicalPath = canonical.filePath;
+  const content = "";
+  const contentHash = calculateContentHash(content);
+  const db = getDb();
+
+  try {
+    return await db.transaction(async (tx) => {
+      const [project] = await tx
+        .select({ source: projects.source })
+        .from(projects)
+        .where(eq(projects.id, projectId))
+        .for("update")
+        .limit(1);
+
+      if (!project) {
+        throw new NotFoundError("Project");
+      }
+
+      await requireProjectOwnership(projectId, userId, tx);
+
+      const existingFiles = await tx
+        .select({ filePath: projectFiles.filePath })
+        .from(projectFiles)
+        .where(eq(projectFiles.projectId, projectId));
+
+      const normalizedNewPath = canonicalPath.toLowerCase();
+      const hasDuplicate = existingFiles.some(
+        (existing) => existing.filePath.toLowerCase() === normalizedNewPath
+      );
+
+      if (hasDuplicate) {
+        throw new ConflictError("A file with this path already exists");
+      }
+
+      const [createdFile] = await tx
+        .insert(projectFiles)
+        .values({
+          projectId,
+          source: project.source,
+          filePath: canonicalPath,
+          fileType: "STORY",
+          content,
+          originalContent: null,
+          contentHash,
+        })
+        .returning();
+
+      if (!createdFile) {
+        throw new Error(
+          "Failed to create project file: database insert returned no rows"
+        );
+      }
+
+      return {
+        ...createdFile,
+        labels: [],
+      };
+    });
+  } catch (error) {
+    if (
+      error instanceof NotFoundError ||
+      error instanceof ForbiddenError ||
+      error instanceof ValidationError ||
+      error instanceof ConflictError
+    ) {
+      throw error;
+    }
+
+    if (isUniqueConstraintViolation(error)) {
+      throw new ConflictError("A file with this path already exists");
+    }
+
+    throw error;
+  }
 }
 
 /**

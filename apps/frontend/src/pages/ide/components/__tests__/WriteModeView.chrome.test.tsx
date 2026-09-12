@@ -106,6 +106,7 @@ function createProps(
     onFocusModeToggle: vi.fn(),
     leftPanelRaw: createPanelState(),
     rightPanelRaw: createPanelState(),
+    storyFiles: [],
     labels: [],
     activeLabelId: "label-1",
     onLabelSelect: vi.fn(),

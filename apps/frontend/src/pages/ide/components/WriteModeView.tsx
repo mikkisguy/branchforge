@@ -26,8 +26,13 @@ export function WriteModeView({
   onFocusModeToggle,
   leftPanelRaw,
   rightPanelRaw,
+  storyFiles,
+  revealFileId,
+  sortResetToken,
   labels,
   activeLabelId,
+  onNewFile,
+  onFileRevealed,
   onLabelSelect,
   onCloseTab,
   tabItems,
@@ -106,8 +111,13 @@ export function WriteModeView({
         left={
           <LabelNavigator
             labels={labels}
+            storyFiles={storyFiles}
             activeLabelId={activeLabelId}
             onSelect={onLabelSelect}
+            revealFileId={revealFileId}
+            sortResetToken={sortResetToken}
+            onNewFile={onNewFile}
+            onFileRevealed={onFileRevealed}
             onCreateLabel={async (data) => {
               await onCreateLabel({ projectId, ...data });
             }}

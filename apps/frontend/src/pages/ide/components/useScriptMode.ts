@@ -10,6 +10,11 @@ import type { SourceOrigin } from "@branchforge/shared";
 import { useScriptModeData } from "./useScriptModeData";
 import { useExportPreview } from "@/hooks/useExportPreview";
 
+function getContainingFolder(filePath: string): string | null {
+  const parts = filePath.split("/");
+  return parts.length > 1 ? parts[0] : null;
+}
+
 export function useScriptMode({ projectId }: { projectId?: string }) {
   const data = useScriptModeData({ projectId });
   const {
@@ -21,6 +26,11 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
   } = data;
   const previousEditFileIdRef = useRef<string | null>(null);
   const [scrollToLine, setScrollToLine] = useState<number | null>(null);
+  const [showCreateFileDialog, setShowCreateFileDialog] = useState(false);
+  const [foldersToExpand, setFoldersToExpand] = useState<string[]>([]);
+  const [pendingSelectFileId, setPendingSelectFileId] = useState<string | null>(
+    null
+  );
 
   const [generatedPreview, setGeneratedPreview] = useState<{
     fileName: string;
@@ -119,6 +129,50 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     onNoTabsRemaining: handleNoTabsRemaining,
   });
 
+  const resetCreateFileError = data.resetCreateFileError;
+  const handleOpenCreateFileDialog = useCallback(() => {
+    resetCreateFileError();
+    setShowCreateFileDialog(true);
+  }, [resetCreateFileError]);
+
+  const handleCreateFileDialogOpenChange = useCallback((open: boolean) => {
+    setShowCreateFileDialog(open);
+  }, []);
+
+  const createFile = data.createFile;
+  const handleCreateFile = useCallback(
+    async (filePath: string) => {
+      const newFile = await createFile(filePath);
+
+      const folder = getContainingFolder(newFile.filePath);
+      if (folder) {
+        setFoldersToExpand([folder]);
+      }
+
+      setPendingSelectFileId(newFile.id);
+    },
+    [createFile]
+  );
+
+  useEffect(() => {
+    if (!pendingSelectFileId) {
+      return;
+    }
+    if (!projectFiles.some((file) => file.id === pendingSelectFileId)) {
+      return;
+    }
+
+    const fileId = pendingSelectFileId;
+    // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change -- consume the pending selection only after its cache-backed file becomes available
+    setPendingSelectFileId(null);
+    void (async () => {
+      const selected = await selectFileTab(fileId);
+      if (selected) {
+        setGeneratedPreview(null);
+      }
+    })();
+  }, [pendingSelectFileId, projectFiles, selectFileTab]);
+
   const { resetRefreshState } = useScriptModeRefresh({
     projectId,
     isLoadingFiles: data.isLoadingFiles,
@@ -131,6 +185,9 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     void clearEditorState();
     setScrollToLine(null);
     setGeneratedPreview(null);
+    setFoldersToExpand([]);
+    setPendingSelectFileId(null);
+    setShowCreateFileDialog(false);
   }, [clearEditorState, clearTabsState, resetRefreshState]);
 
   const setSkipSave = useCallback(
@@ -416,5 +473,13 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     onGeneratedFileSelect: handleGeneratedFileSelect,
     isGeneratedPreview,
     generatedFileName,
+    showCreateFileDialog,
+    handleOpenCreateFileDialog,
+    handleCreateFileDialogOpenChange,
+    handleCreateFile,
+    isCreatingFile: data.isCreatingFile,
+    createFileError: data.createFileError,
+    resetCreateFileError: data.resetCreateFileError,
+    foldersToExpand,
   };
 }

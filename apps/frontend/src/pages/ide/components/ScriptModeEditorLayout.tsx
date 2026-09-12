@@ -69,6 +69,7 @@ interface ScriptModeEditorLayoutProps {
   activeFileContent: string;
   scrollToLine: number | null;
   initialExpandedFolders: string[];
+  foldersToExpand?: string[];
   tabItems: EditorTabBarItem[];
   projectCharacters: Character[];
   focusModeState: FocusModeState;
@@ -80,7 +81,7 @@ interface ScriptModeEditorLayoutProps {
   onCloseTab: (event: MouseEvent | KeyboardEvent, fileId: string) => void;
   onContentChange: (value: string) => void;
   onRefreshFiles: () => Promise<unknown>;
-  onNewChapter?: () => void;
+  onNewFile?: () => void;
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
@@ -99,7 +100,7 @@ interface ScriptModeEditorLayoutProps {
   generatedFileName?: string;
 }
 
-// react-doctor-disable-next-line react-doctor/no-many-boolean-props, react-doctor/no-giant-component
+// react-doctor-disable-next-line react-doctor/no-many-boolean-props, react-doctor/no-giant-component, react-doctor/no-high-complexity-react-function -- workspace shell coordinates shared panels, editor state, and commands while delegating their rendering and behavior
 export function ScriptModeEditorLayout({
   projectName,
   projectId,
@@ -111,6 +112,7 @@ export function ScriptModeEditorLayout({
   activeFileContent,
   scrollToLine,
   initialExpandedFolders,
+  foldersToExpand,
   tabItems,
   projectCharacters,
   focusModeState,
@@ -122,7 +124,7 @@ export function ScriptModeEditorLayout({
   onCloseTab,
   onContentChange,
   onRefreshFiles,
-  onNewChapter,
+  onNewFile,
   canUndo,
   canRedo,
   onUndo,
@@ -364,15 +366,16 @@ export function ScriptModeEditorLayout({
                   </p>
                 </div>
                 <div className="min-h-0 flex-1 overflow-auto p-2">
-                  {onNewChapter ? (
-                    <button
+                  {onNewFile ? (
+                    <Button
                       type="button"
-                      onClick={onNewChapter}
-                      className="mb-3 w-full rounded px-3 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                      style={{ backgroundColor: "var(--theme-color)" }}
+                      variant="secondary"
+                      size="sm"
+                      onClick={onNewFile}
+                      className="mb-3 w-full"
                     >
-                      + New Chapter
-                    </button>
+                      + New File
+                    </Button>
                   ) : null}
                   <ProjectFileTree
                     files={projectFiles}
@@ -385,6 +388,7 @@ export function ScriptModeEditorLayout({
                     onFileSelect={onFileSelect}
                     onSceneSelect={onSceneSelect}
                     initialExpandedFolders={initialExpandedFolders}
+                    foldersToExpand={foldersToExpand}
                     generatedFiles={generatedFiles}
                     activeGeneratedFileId={activeGeneratedFileId}
                     onGeneratedFileSelect={onGeneratedFileSelect}
