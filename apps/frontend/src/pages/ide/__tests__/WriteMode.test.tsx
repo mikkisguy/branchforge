@@ -99,6 +99,21 @@ vi.mock("@/hooks/useWriteFocusMode", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useProjectFileActions", () => ({
+  useProjectFileActions: () => ({
+    pendingAction: null,
+    requestRename: vi.fn(),
+    requestDelete: vi.fn(),
+    confirmRename: vi.fn(),
+    confirmDelete: vi.fn(),
+    closeDialog: vi.fn(),
+    renameError: null,
+    deleteError: null,
+    isRenaming: false,
+    isDeleting: false,
+  }),
+}));
+
 vi.mock("@/hooks/useWorkspacePanel", () => ({
   useWorkspacePanel: () => ({
     collapsed: false,
