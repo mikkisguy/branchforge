@@ -4,7 +4,7 @@
  * Accessible per-file actions used by both Script Mode (ProjectFileTree) and
  * Write Mode (LabelNavigator) file rows:
  *
- * - `FileRowMenu` — an always-visible three-dot trigger button backed by the
+ * - `FileRowMenu` — an always-visible trailing action button backed by the
  *   shared Menu primitives.
  * - `FileContextMenu` — the same actions on right-click, rendered in a
  *   portal at the pointer position with keyboard navigation.
@@ -67,7 +67,7 @@ export function buildFileMenuItems({
 }
 
 // ============================================================================
-// Three-dot menu (hover / focus reveal)
+// Three-dot menu
 // ============================================================================
 
 export interface FileRowMenuProps {
@@ -83,7 +83,7 @@ export function FileRowMenu({ fileName, items, disabled }: FileRowMenuProps) {
       <MenuTrigger
         variant="ghost"
         size="icon"
-        className="size-6 shrink-0"
+        className="size-6 shrink-0 rounded-md text-muted-foreground/70 hover:bg-muted hover:text-foreground focus-visible:bg-muted [&[aria-expanded=true]]:bg-muted [&[aria-expanded=true]]:text-foreground"
         aria-label={`File actions for ${fileName}`}
         disabled={disabled}
         onClick={(event) => event.stopPropagation()}

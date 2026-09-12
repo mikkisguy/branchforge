@@ -262,7 +262,11 @@ export function ProjectFileTree({
                 return (
                   <div key={file.id}>
                     <div
-                      className="group/row flex items-center gap-0.5"
+                      className={`group/row flex items-center gap-0.5 rounded-md pr-1 transition-colors ${
+                        activeFileId === file.id
+                          ? ACTIVE_NAVIGATOR_ITEM_CLASSNAME
+                          : "hover:bg-muted/20"
+                      }`}
                       onContextMenu={(event) =>
                         handleRowContextMenu(event, file)
                       }
@@ -274,7 +278,7 @@ export function ProjectFileTree({
                           aria-expanded={expandedFiles.has(file.id)}
                           aria-controls={`label-group-${file.id}`}
                           onClick={() => toggleFile(file.id)}
-                          className="flex items-center justify-center size-5 rounded text-muted-foreground transition-colors hover:bg-muted/20 hover:text-foreground"
+                          className="flex items-center justify-center size-5 rounded text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
                         >
                           {expandedFiles.has(file.id) ? (
                             <ChevronDown className="size-3 text-muted-foreground" />
@@ -291,10 +295,10 @@ export function ProjectFileTree({
                         role="treeitem"
                         aria-selected={activeFileId === file.id}
                         aria-level={folder ? 2 : 1}
-                        className={`flex-1 flex items-center gap-2 py-1.5 px-2 rounded-md text-sm text-left transition-colors ${
+                        className={`min-w-0 flex-1 flex items-center gap-2 py-1.5 px-2 rounded-md text-sm text-left transition-colors ${
                           activeFileId === file.id
-                            ? ACTIVE_NAVIGATOR_ITEM_CLASSNAME
-                            : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
+                            ? "text-foreground"
+                            : "text-muted-foreground hover:text-foreground"
                         }`}
                       >
                         <span className="truncate" title={file.filePath}>

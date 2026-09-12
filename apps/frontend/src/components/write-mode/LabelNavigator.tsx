@@ -395,7 +395,7 @@ function FileGroup({
         }
       >
         <File className="size-3.5 text-muted-foreground shrink-0" />
-        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
+        <span className="min-w-0 flex-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
           {fileName}
         </span>
         {showFileMenu && fileActions ? (
