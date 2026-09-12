@@ -1038,6 +1038,27 @@ describe("LabelsService Sync (Integration)", () => {
         expect(result.success).toBe(false);
         expect(result.errors.length).toBeGreaterThanOrEqual(1);
       });
+
+      it("does not sync or revive labels for a tombstoned file", async () => {
+        await db
+          .update(projectFiles)
+          .set({ deletedAt: new Date() })
+          .where(eq(projectFiles.id, testFileId));
+
+        const result = await syncLabelsFromFile(
+          testProjectId,
+          { filePath: testFile.filePath, fileType: "STORY" },
+          'label start:\n    "Content"\n    return',
+          testFileId
+        );
+
+        expect(result.success).toBe(false);
+        const syncedLabels = await db
+          .select({ id: labelsTable.id })
+          .from(labelsTable)
+          .where(eq(labelsTable.projectFileId, testFileId));
+        expect(syncedLabels).toEqual([]);
+      });
     });
   });
 });

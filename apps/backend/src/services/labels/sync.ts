@@ -1024,6 +1024,24 @@ export async function syncLabelsFromFile(
   };
 
   try {
+    // Never reconstruct or revive labels for a tombstoned file. Autosaves
+    // normally reach this function under the project/file lock, but this
+    // guard also protects direct callers such as import/sync workflows.
+    const [activeFile] = await dbOrTx
+      .select({ id: projectFiles.id })
+      .from(projectFiles)
+      .where(
+        and(
+          eq(projectFiles.id, sourceId),
+          eq(projectFiles.projectId, projectId),
+          isNull(projectFiles.deletedAt)
+        )
+      )
+      .limit(1);
+    if (!activeFile) {
+      throw new NotFoundError("ProjectFile");
+    }
+
     // Step 1: Parse RPY content with filename for better file type detection
     const parsed = parseRPYFileWithLabels(rpyContent, fileData.filePath);
 
@@ -1130,7 +1148,9 @@ export async function syncLabelsFromGitLabFile(
         filePath: projectFiles.filePath,
       })
       .from(projectFiles)
-      .where(eq(projectFiles.id, projectFileId))
+      .where(
+        and(eq(projectFiles.id, projectFileId), isNull(projectFiles.deletedAt))
+      )
       .limit(1);
 
     if (!file) {
