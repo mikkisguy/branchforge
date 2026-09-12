@@ -1,8 +1,10 @@
 const MAX_STORED_PATH_LENGTH = 500;
 
 const WINDOWS_UNSAFE_CHARACTERS = /[<>:"|?*]/;
+// Windows recognizes superscript digits ¹ (U+00B9), ² (U+00B2), and ³
+// (U+00B3) as COM/LPT device suffixes, so reject them alongside 1-9.
 const WINDOWS_RESERVED_DEVICE_BASENAME =
-  /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
+  /^(?:con|prn|aux|nul|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3])(?:\.|$)/i;
 
 function hasDisallowedPathChars(value: string): boolean {
   for (const char of value) {

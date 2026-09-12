@@ -283,12 +283,11 @@ describe("Export Routes (Integration)", () => {
       );
     });
 
-    it("omits unsafe paths from stored export content", async () => {
+    it("includes BranchForge-reserved basenames in the zip on success", async () => {
       vi.spyOn(exportService, "getExportForDownload").mockResolvedValue({
         fileName: mockExportResult.fileName,
         content: JSON.stringify({
           "game/script.rpy": "label start:",
-          "game/CON.rpy": "label reserved:",
           "game/branchforge_stats.rpy": "default score = 0",
         }),
       });
@@ -298,10 +297,50 @@ describe("Export Routes (Integration)", () => {
         url: `/projects/${testProjectId}/exports/${testExportId}/download`,
       });
 
+      expect(response.statusCode).toBe(200);
       const zip = await JSZip.loadAsync(response.rawPayload);
       expect(Object.keys(zip.files)).toContain("game/script.rpy");
       expect(Object.keys(zip.files)).toContain("game/branchforge_stats.rpy");
-      expect(Object.keys(zip.files)).not.toContain("game/CON.rpy");
+    });
+
+    it("should return 500 when stored export content contains an invalid path", async () => {
+      vi.spyOn(exportService, "getExportForDownload").mockResolvedValue({
+        fileName: mockExportResult.fileName,
+        content: JSON.stringify({
+          "game/script.rpy": "label start:",
+          "game/CON.rpy": "label reserved:",
+        }),
+      });
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: `/projects/${testProjectId}/exports/${testExportId}/download`,
+      });
+
+      expect(response.statusCode).toBe(500);
+      expect(response.json()).toEqual({
+        error: "Internal server error",
+      });
+    });
+
+    it("should return 500 when stored export content contains a COM/LPT device path with superscript suffix", async () => {
+      vi.spyOn(exportService, "getExportForDownload").mockResolvedValue({
+        fileName: mockExportResult.fileName,
+        content: JSON.stringify({
+          "game/script.rpy": "label start:",
+          "game/com\u00b9.rpy": "label device:",
+        }),
+      });
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: `/projects/${testProjectId}/exports/${testExportId}/download`,
+      });
+
+      expect(response.statusCode).toBe(500);
+      expect(response.json()).toEqual({
+        error: "Internal server error",
+      });
     });
 
     it("should return 404 when export not found", async () => {

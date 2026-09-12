@@ -209,9 +209,15 @@ async function downloadExportHandler(
       const canonical = canonicalizeRpyFilePath(filePath, {
         allowBranchForgeReserved: true,
       });
-      if (canonical.ok) {
-        zip.file(canonical.filePath, fileContent);
+      if (!canonical.ok) {
+        // Stored export content should always contain canonicalized paths.
+        // A rejection means the stored data is invalid or corrupted, so fail
+        // the download instead of silently omitting the entry from the ZIP.
+        throw new Error(
+          `Stored export contains an invalid file path (${canonical.code})`
+        );
       }
+      zip.file(canonical.filePath, fileContent);
     }
 
     const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });

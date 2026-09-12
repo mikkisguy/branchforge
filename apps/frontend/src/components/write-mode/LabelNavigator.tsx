@@ -671,6 +671,7 @@ export function LabelNavigator({
         {onNewFile ? (
           <Button
             type="button"
+            variant="secondary"
             size="sm"
             onClick={onNewFile}
             className="mt-2 w-full"

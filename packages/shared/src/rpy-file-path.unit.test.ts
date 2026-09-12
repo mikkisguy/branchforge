@@ -126,6 +126,34 @@ describe("canonicalizeRpyFilePath", () => {
     }
   });
 
+  it("rejects COM/LPT device basenames with superscript digit suffixes", () => {
+    for (const filePath of [
+      "com\u00b9.rpy",
+      "COM\u00b2.rpy",
+      "LPT\u00b3.rpy",
+      "labels/lpt\u00b9.rpy",
+      "game/com\u00b2.scene.rpy",
+      "chapters/Lpt\u00b3",
+    ]) {
+      expect(canonicalizeRpyFilePath(filePath)).toMatchObject({
+        ok: false,
+        code: "INVALID_SEGMENT",
+      });
+    }
+  });
+
+  it("allows superscript digits outside COM/LPT device basenames", () => {
+    for (const filePath of [
+      "act\u00b9.rpy",
+      "labels/scene\u00b2.rpy",
+      "comet\u00b3.rpy",
+    ]) {
+      expect(canonicalizeRpyFilePath(filePath)).toMatchObject({
+        ok: true,
+      });
+    }
+  });
+
   it("rejects C0, C1, Unicode line separators, and bidi controls before trim", () => {
     expect(canonicalizeRpyFilePath("labels/act\u001f.rpy")).toMatchObject({
       ok: false,

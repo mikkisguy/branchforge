@@ -367,14 +367,15 @@ export function ScriptModeEditorLayout({
                 </div>
                 <div className="min-h-0 flex-1 overflow-auto p-2">
                   {onNewFile ? (
-                    <button
+                    <Button
                       type="button"
+                      variant="secondary"
+                      size="sm"
                       onClick={onNewFile}
-                      className="mb-3 w-full rounded px-3 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                      style={{ backgroundColor: "var(--theme-color)" }}
+                      className="mb-3 w-full"
                     >
                       + New File
-                    </button>
+                    </Button>
                   ) : null}
                   <ProjectFileTree
                     files={projectFiles}
