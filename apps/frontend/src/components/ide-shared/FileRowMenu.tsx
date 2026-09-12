@@ -83,7 +83,7 @@ export function FileRowMenu({ fileName, items, disabled }: FileRowMenuProps) {
       <MenuTrigger
         variant="ghost"
         size="icon"
-        className="size-6 shrink-0 rounded-md text-muted-foreground/70 opacity-0 transition-[opacity,color,background-color] hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:opacity-100 group-hover/row:opacity-100 group-focus-within/row:opacity-100 [&[aria-expanded=true]]:bg-muted [&[aria-expanded=true]]:text-foreground [&[aria-expanded=true]]:opacity-100"
+        className="size-6 shrink-0 rounded-md text-muted-foreground/70 opacity-0 transition-[opacity,color,background-color] hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:opacity-100 group-hover/row:opacity-100 [&[aria-expanded=true]]:bg-muted [&[aria-expanded=true]]:text-foreground [&[aria-expanded=true]]:opacity-100"
         aria-label={`File actions for ${fileName}`}
         disabled={disabled}
         onClick={(event) => event.stopPropagation()}
