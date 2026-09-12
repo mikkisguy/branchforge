@@ -144,7 +144,13 @@ export async function createLabel(
         content: projectFiles.content,
       })
       .from(projectFiles)
-      .where(eq(projectFiles.id, validProjectFileId))
+      .where(
+        and(
+          eq(projectFiles.id, validProjectFileId),
+          // Tombstoned files cannot be mutated through label endpoints.
+          isNull(projectFiles.deletedAt)
+        )
+      )
       .for("update")
       .limit(1);
 
@@ -367,7 +373,14 @@ export async function updateLabel(
       .from(labels)
       .innerJoin(projects, eq(labels.projectId, projects.id))
       .innerJoin(projectFiles, eq(labels.projectFileId, projectFiles.id))
-      .where(and(eq(labels.id, labelId), isNull(labels.deletedAt)))
+      .where(
+        and(
+          eq(labels.id, labelId),
+          isNull(labels.deletedAt),
+          // Tombstoned files cannot be mutated through label endpoints.
+          isNull(projectFiles.deletedAt)
+        )
+      )
       .limit(1);
 
     if (!labelWithProject) {

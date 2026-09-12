@@ -9,6 +9,7 @@ import {
   projects,
   projectUsers,
   projectFiles,
+  projectFilePendingOperations,
   labels,
   labelLines,
 } from "../db/schema/index.js";
@@ -430,13 +431,18 @@ export async function getProjectFiles(
 
   const db = getDb();
 
-  // Build where conditions
+  // Build where conditions. Tombstoned (deleted) files are excluded from
+  // normal listings.
   const whereConditions = source
     ? and(
         eq(projectFiles.projectId, projectId),
-        eq(projectFiles.source, source)
+        eq(projectFiles.source, source),
+        isNull(projectFiles.deletedAt)
       )
-    : eq(projectFiles.projectId, projectId);
+    : and(
+        eq(projectFiles.projectId, projectId),
+        isNull(projectFiles.deletedAt)
+      );
 
   // Get all project files
   const files = await db.select().from(projectFiles).where(whereConditions);
@@ -485,11 +491,15 @@ export async function getProjectFiles(
 /**
  * Create a new empty STORY file in a project.
  *
- * Case-insensitive uniqueness is enforced here across every source for this
- * project. Concurrent creates are serialized with FOR UPDATE on the project
- * row. The database unique index remains `(project_id, source, file_path)`
- * because ZIP leftover rows and later GitLab imports can legally share a
- * path under different sources; import writers are unchanged.
+ * Case-insensitive uniqueness is enforced here ACROSS every source for this
+ * project, over ACTIVE (non-tombstoned) files only. Concurrent creates are
+ * serialized with FOR UPDATE on the project row. The database keeps the
+ * legacy exact `(project_id, source, file_path)` unique for import upserts,
+ * plus a partial `(project_id, lower(file_path))` unique over active rows.
+ *
+ * For GitLab projects, the create is recorded as a pending CREATE
+ * structural operation in the same transaction (ZIP remains ordinary
+ * hard-local state with no structural rows).
  */
 export async function createProjectFile(
   projectId: string,
@@ -511,7 +521,7 @@ export async function createProjectFile(
   try {
     return await db.transaction(async (tx) => {
       const [project] = await tx
-        .select({ source: projects.source })
+        .select({ id: projects.id, source: projects.source })
         .from(projects)
         .where(eq(projects.id, projectId))
         .for("update")
@@ -526,7 +536,12 @@ export async function createProjectFile(
       const existingFiles = await tx
         .select({ filePath: projectFiles.filePath })
         .from(projectFiles)
-        .where(eq(projectFiles.projectId, projectId));
+        .where(
+          and(
+            eq(projectFiles.projectId, projectId),
+            isNull(projectFiles.deletedAt)
+          )
+        );
 
       const normalizedNewPath = canonicalPath.toLowerCase();
       const hasDuplicate = existingFiles.some(
@@ -554,6 +569,18 @@ export async function createProjectFile(
         throw new Error(
           "Failed to create project file: database insert returned no rows"
         );
+      }
+
+      // GitLab create records CREATE in the same transaction; the remote
+      // will receive an explicit create action on the next push.
+      if (project.source === "GITLAB") {
+        await tx.insert(projectFilePendingOperations).values({
+          projectId,
+          projectFileId: createdFile.id,
+          operation: "CREATE",
+          remoteBasePath: canonicalPath,
+          localPath: canonicalPath,
+        });
       }
 
       return {
@@ -596,7 +623,14 @@ async function validateFileAccess(
     })
     .from(projectFiles)
     .innerJoin(projects, eq(projectFiles.projectId, projects.id))
-    .where(eq(projectFiles.id, fileId))
+    .where(
+      and(
+        eq(projectFiles.id, fileId),
+        // Stale/in-flight updates must never mutate a deleted (tombstoned)
+        // file.
+        isNull(projectFiles.deletedAt)
+      )
+    )
     .limit(1);
 
   if (!fileWithProject) {
@@ -631,7 +665,19 @@ async function applyFileUpdate(
   const newContentHash = calculateContentHash(content);
 
   const result = await db.transaction(async (tx) => {
-    // Defensive ownership verification at write time (TOCTOU safety net)
+    // Structural operations and autosaves share one lock order. Locking the
+    // project first serializes path/lifecycle changes before this autosave
+    // acquires its file and label locks.
+    await tx
+      .select({ id: projects.id })
+      .from(projects)
+      .where(and(eq(projects.id, file.projectId), eq(projects.userId, userId)))
+      .for("update")
+      .limit(1);
+
+    // Defensive ownership verification at write time (TOCTOU safety net).
+    // deletedAt IS NULL filter so a stale/in-flight autosave cannot
+    // revive or update a deleted file.
     const [lockedFile] = await tx
       .select({
         contentHash: projectFiles.contentHash,
@@ -639,13 +685,28 @@ async function applyFileUpdate(
       })
       .from(projectFiles)
       .innerJoin(projects, eq(projectFiles.projectId, projects.id))
-      .where(and(eq(projectFiles.id, fileId), eq(projects.userId, userId)))
+      .where(
+        and(
+          eq(projectFiles.id, fileId),
+          eq(projects.userId, userId),
+          isNull(projectFiles.deletedAt)
+        )
+      )
       .for("update")
       .limit(1);
 
     if (!lockedFile) {
       throw new NotFoundError("File");
     }
+
+    // Acquire existing labels after the file lock, in stable ID order. The
+    // label synchronizer runs in this transaction and may update/delete them.
+    await tx
+      .select({ id: labels.id })
+      .from(labels)
+      .where(eq(labels.projectFileId, fileId))
+      .orderBy(asc(labels.id))
+      .for("update");
 
     if (
       expectedContentHash !== undefined &&

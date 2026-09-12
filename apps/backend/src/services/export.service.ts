@@ -196,11 +196,13 @@ export async function generateExport(
     throw new NotFoundError("Project");
   }
 
-  // Fetch all project files
+  // Fetch all project files (excluding tombstones)
   const files = await db
     .select()
     .from(projectFiles)
-    .where(eq(projectFiles.projectId, projectId));
+    .where(
+      and(eq(projectFiles.projectId, projectId), isNull(projectFiles.deletedAt))
+    );
 
   if (files.length === 0) {
     throw new NotFoundError("Project files");

@@ -122,14 +122,15 @@ export async function detectConflicts(
       }
     }
 
-    // Get all project_files for this project (GitLab source only)
+    // Get all project_files for this project (GitLab source only, excluding tombstones)
     const files = await db
       .select()
       .from(projectFiles)
       .where(
         and(
           eq(projectFiles.projectId, projectId),
-          eq(projectFiles.source, "GITLAB")
+          eq(projectFiles.source, "GITLAB"),
+          isNull(projectFiles.deletedAt)
         )
       );
 

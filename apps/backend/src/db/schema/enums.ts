@@ -99,6 +99,17 @@ export const projectFileTypeEnum = pgEnum("project_file_type", [
   "SETTINGS",
 ]);
 
+// Project file structural operation types.
+// A pending row is a collapsed structural delta against the remote:
+// - CREATE: file does not exist on the remote yet
+// - RENAME: file exists on the remote at remoteBasePath, local path changed
+// - DELETE: file exists on the remote at remoteBasePath, deleted locally
+// MOVE is represented as RENAME (paths, not a distinct type).
+export const projectFileOperationTypeEnum = pgEnum(
+  "project_file_operation_type",
+  ["CREATE", "RENAME", "DELETE"]
+);
+
 // Source types (unified for projects and files)
 // Represents where data comes from: GITLAB or ZIP
 // Note: Using ENUM for consistency with other enums in this schema. Values are stable and

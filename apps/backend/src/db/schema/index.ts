@@ -31,6 +31,7 @@ export * from "./tables/project-images.js";
 
 // Project Files (unified for all sources)
 export * from "./tables/project-files.js";
+export * from "./tables/project-file-operations.js";
 
 // Visual system tables
 export * from "./tables/visual-systems.js";

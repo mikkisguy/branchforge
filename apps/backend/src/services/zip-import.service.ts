@@ -475,7 +475,8 @@ async function processFileInTransaction(
         and(
           eq(projectFiles.projectId, projectId),
           eq(projectFiles.source, "ZIP"),
-          eq(projectFiles.filePath, entry.filePath)
+          eq(projectFiles.filePath, entry.filePath),
+          isNull(projectFiles.deletedAt)
         )
       )
       .limit(1);

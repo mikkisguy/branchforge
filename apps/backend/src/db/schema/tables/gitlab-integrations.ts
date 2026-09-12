@@ -118,6 +118,8 @@ export const gitlabSyncOperations = pgTable(
     status: syncOperationStatusEnum("status").notNull(),
     branch: text("branch"),
     conflictCount: integer("conflict_count").default(0),
+    // Actual GitLab commit id of the created commit (for exports)
+    commitId: text("commit_id"),
     errorMessage: text("error_message"),
     startedAt: timestamp("started_at").defaultNow().notNull(),
     completedAt: timestamp("completed_at"),

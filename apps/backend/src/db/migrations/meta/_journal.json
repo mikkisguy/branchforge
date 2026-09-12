@@ -407,6 +407,13 @@
       "when": 1785092076173,
       "tag": "0057_slim_vector",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1789238582290,
+      "tag": "0058_legal_loa",
+      "breakpoints": true
     }
   ]
 }

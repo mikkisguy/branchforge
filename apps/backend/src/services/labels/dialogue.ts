@@ -115,7 +115,13 @@ export async function updateLabelDialogue(params: {
     const [lockedProjectFile] = await tx
       .select()
       .from(projectFiles)
-      .where(eq(projectFiles.id, label.projectFileId))
+      .where(
+        and(
+          eq(projectFiles.id, label.projectFileId),
+          // Tombstoned files cannot be mutated through label endpoints.
+          isNull(projectFiles.deletedAt)
+        )
+      )
       .limit(1);
 
     if (!lockedProjectFile) {

@@ -526,3 +526,78 @@ export async function getFileContent(
   // GitLab returns base64-encoded content
   return Buffer.from(fileData.content, "base64").toString("utf-8");
 }
+
+export interface GitlabFileContentWithMetadata {
+  content: string | null;
+  /** GitLab last_commit_id for the file at this ref (per-file revision). */
+  lastCommitId: string | null;
+  /** GitLab content_sha256 (base64-encoded SHA-256 of the raw content). */
+  contentSha256: string | null;
+  /** GitLab blob id. */
+  blobId: string | null;
+}
+
+/**
+ * Get file content from a GitLab repository together with its true
+ * per-file metadata (content plus last_commit_id / content_sha256 /
+ * blob_id). NEVER use the branch head SHA as a per-file revision.
+ *
+ * @returns null if the file does not exist on the ref
+ */
+export async function getFileContentWithMetadata(
+  projectId: string,
+  userId: string,
+  filePath: string,
+  branch: string,
+  gitlabUrl?: string
+): Promise<GitlabFileContentWithMetadata> {
+  await requireProjectOwnership(projectId, userId);
+
+  const repoLink = await getRepositoryLink(projectId);
+  if (!repoLink) {
+    throw new RepositoryNotLinkedError();
+  }
+
+  const token = await getDecryptedToken(userId);
+  const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
+
+  const apiUrl = new URL(
+    `/api/v4/projects/${
+      repoLink.gitlabProjectId
+    }/repository/files/${encodeURIComponent(filePath)}`,
+    url
+  );
+  apiUrl.searchParams.set("ref", branch);
+
+  const response = await fetchWithTimeout(apiUrl.toString(), {
+    headers: {
+      "PRIVATE-TOKEN": token,
+    },
+  });
+
+  if (response.status === 404) {
+    return {
+      content: null,
+      lastCommitId: null,
+      contentSha256: null,
+      blobId: null,
+    };
+  }
+
+  if (!response.ok) {
+    throw new Error(`GitLab API error: ${response.status}`);
+  }
+
+  const fileData = (await response.json()) as GitlabFile & {
+    last_commit_id?: string;
+    content_sha256?: string;
+    blob_id?: string;
+  };
+
+  return {
+    content: Buffer.from(fileData.content, "base64").toString("utf-8"),
+    lastCommitId: fileData.last_commit_id ?? null,
+    contentSha256: fileData.content_sha256 ?? null,
+    blobId: fileData.blob_id ?? null,
+  };
+}

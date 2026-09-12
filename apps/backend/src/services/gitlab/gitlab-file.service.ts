@@ -7,7 +7,7 @@
 
 import { getDb } from "../../db/index.js";
 import { projectFiles, labels } from "../../db/schema/index.js";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, isNull } from "drizzle-orm";
 import { validateGitLabUrl } from "../encryption.service.js";
 import {
   NotFoundError,
@@ -155,20 +155,54 @@ export async function createOrUpdateFile(
 }
 
 /**
- * Create a single batch commit with multiple file changes in a GitLab repo.
+ * Structured action for an atomic batch commit. The commit is created in
+ * ONE GitLab commit; actions are applied in order, so a delete of a path
+ * can be followed by a create of the same path (and casing-only moves use
+ * a deterministic temporary two-step move).
+ */
+export interface BatchCommitAction {
+  action: "create" | "update" | "move" | "delete";
+  /** Destination path (final path for move, path to remove for delete). */
+  filePath: string;
+  /** Source path for move actions. */
+  previousPath?: string;
+  content?: string;
+}
+
+function toGitlabCommitAction(
+  action: BatchCommitAction
+): Record<string, unknown> {
+  if (action.action === "move") {
+    return {
+      action: "move",
+      previous_path: action.previousPath ?? action.filePath,
+      new_path: action.filePath,
+      content: action.content ?? "",
+    };
+  }
+  if (action.action === "delete") {
+    return { action: "delete", file_path: action.filePath };
+  }
+  return {
+    action: action.action,
+    file_path: action.filePath,
+    content: action.content ?? "",
+  };
+}
+
+/**
+ * Create a single atomic batch commit with multiple file actions in a
+ * GitLab repo.
  *
  * Uses the GitLab Commits API to create ONE commit for all file operations,
  * instead of one commit per file (as createOrUpdateFile does).
  *
- * Supports both existing branches (create/update actions) and new branches
- * (all creates, using the repo's defaultBranch as start_branch).
+ * Supports explicit create/update/move/delete actions, existing branches,
+ * and new (non-default) branches (using the repo's defaultBranch as
+ * start_branch).
  *
- * @param projectId - The BranchForge project ID
- * @param userId - The user ID making the request (for authorization/token lookup)
- * @param branch - The branch to commit to
- * @param commitMessage - The commit message
- * @param files - Array of file operations { filePath, content }
- * @param gitlabUrl - Optional GitLab URL override
+ * @returns The actual GitLab commit id of the created commit, or null when
+ *          the response did not include one.
  * @throws RepositoryNotLinkedError if no GitLab link exists
  */
 export async function batchCommitFiles(
@@ -176,9 +210,9 @@ export async function batchCommitFiles(
   userId: string,
   branch: string,
   commitMessage: string,
-  files: Array<{ filePath: string; content: string }>,
+  actions: ReadonlyArray<BatchCommitAction>,
   gitlabUrl?: string
-): Promise<void> {
+): Promise<string | null> {
   await requireProjectOwnership(projectId, userId);
 
   const repoLink = await getRepositoryLink(projectId);
@@ -194,8 +228,7 @@ export async function batchCommitFiles(
     url
   );
 
-  // Determine which files exist on the branch (create vs update actions)
-  let existingFilePaths: Set<string>;
+  // Determine whether the branch exists yet (new branches need start_branch)
   let branchExists = false;
 
   try {
@@ -203,38 +236,17 @@ export async function batchCommitFiles(
     branchExists = true;
   } catch (err) {
     if (err instanceof NotFoundError) {
-      // Branch doesn't exist yet — all files will be "create" actions
+      // Branch doesn't exist yet — will be created from start_branch
     } else {
       throw err;
     }
   }
 
-  if (branchExists) {
-    const existingFiles = await _listFilesWithAuth(
-      token,
-      url,
-      String(repoLink.gitlabProjectId),
-      branch,
-      (_item: { name: string; path: string }) => true
-    );
-    existingFilePaths = new Set(existingFiles.map((f) => f.path));
-  } else {
-    existingFilePaths = new Set();
-  }
-
-  // Build actions array
-  const actions = files.map((file) => ({
-    action: (existingFilePaths.has(file.filePath) ? "update" : "create") as
-      "create" | "update",
-    file_path: file.filePath,
-    content: file.content,
-  }));
-
   // Build the request body
   const body: Record<string, unknown> = {
     branch,
     commit_message: commitMessage,
-    actions,
+    actions: actions.map(toGitlabCommitAction),
   };
 
   // For new branches, provide start_branch (default branch of the repo)
@@ -254,6 +266,14 @@ export async function batchCommitFiles(
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`GitLab API error: ${response.status} - ${errorText}`);
+  }
+
+  // GitLab returns the created commit object; store/return the actual id.
+  try {
+    const commit = (await response.json()) as { id?: string };
+    return commit.id ?? null;
+  } catch {
+    return null;
   }
 }
 
@@ -302,7 +322,8 @@ export async function getGitLabFilesWithScenes(
     .where(
       and(
         eq(projectFiles.projectId, projectId),
-        eq(projectFiles.source, "GITLAB")
+        eq(projectFiles.source, "GITLAB"),
+        isNull(projectFiles.deletedAt)
       )
     );
 
@@ -378,11 +399,11 @@ export async function updateGitLabFileContent(
 }> {
   const db = getDb();
 
-  // Get file to check project access
+  // Get file to check project access (tombstoned files are not mutable)
   const [file] = await db
     .select()
     .from(projectFiles)
-    .where(eq(projectFiles.id, fileId))
+    .where(and(eq(projectFiles.id, fileId), isNull(projectFiles.deletedAt)))
     .limit(1);
 
   if (!file) {

@@ -13,7 +13,7 @@ import {
   labels,
   projectFiles,
 } from "../db/schema/index.js";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import {
   NotFoundError,
   ConflictError,
@@ -292,7 +292,12 @@ export class CharactersService {
       db
         .select()
         .from(projectFiles)
-        .where(eq(projectFiles.projectId, projectId)),
+        .where(
+          and(
+            eq(projectFiles.projectId, projectId),
+            isNull(projectFiles.deletedAt)
+          )
+        ),
     ]);
 
     const allDetected: DetectedCharacter[] = [];

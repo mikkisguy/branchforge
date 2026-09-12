@@ -72,7 +72,13 @@ export async function getFlowGraph(
     })
     .from(labels)
     .innerJoin(projectFiles, eq(labels.projectFileId, projectFiles.id))
-    .where(and(eq(labels.projectId, projectId), isNull(labels.deletedAt)))
+    .where(
+      and(
+        eq(labels.projectId, projectId),
+        isNull(labels.deletedAt),
+        isNull(projectFiles.deletedAt)
+      )
+    )
     .orderBy(asc(labels.sequenceOrder), asc(labels.labelNumber));
 
   if (labelRows.length === 0) {

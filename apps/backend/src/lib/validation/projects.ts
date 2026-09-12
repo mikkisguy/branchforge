@@ -143,3 +143,16 @@ export const updateFileContentSchema = z
   .strict();
 
 export type UpdateFileContentInput = z.infer<typeof updateFileContentSchema>;
+
+/**
+ * Rename/move project file request validation (PATCH /projects/files/:fileId)
+ * Body: { filePath, expectedContentHash? }
+ */
+export const renameProjectFileSchema = z
+  .object({
+    filePath: z.string().min(1).max(500),
+    expectedContentHash: expectedContentHashSchema,
+  })
+  .strict();
+
+export type RenameProjectFileInput = z.infer<typeof renameProjectFileSchema>;

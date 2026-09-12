@@ -683,6 +683,127 @@ export interface CreateProjectFileResponse {
   file: ProjectFileWithLabels;
 }
 
+/**
+ * Structural operation types for project files.
+ *
+ * A pending row is a collapsed structural delta against the remote.
+ * MOVE is represented by RENAME (paths), never a distinct type.
+ */
+export type ProjectFileOperationType = "CREATE" | "RENAME" | "DELETE";
+
+/**
+ * One durable collapsed pending structural operation on a project file.
+ * Exactly one row exists per file while a structural delta is pending.
+ */
+export interface ProjectFileOperation {
+  id: string;
+  projectId: string;
+  projectFileId: string;
+  operation: ProjectFileOperationType;
+  /**
+   * The remote path this operation targets:
+   * - CREATE: the final (local) path to create on the remote
+   * - RENAME: the original remote path to move away from
+   * - DELETE: the original remote path to delete
+   */
+  remoteBasePath: string;
+  /**
+   * The current local path (for DELETE, the path at deletion time so a
+   * restore can restore the actual local state, including a rename).
+   */
+  localPath: string;
+  /** Exact IDs of labels soft-deleted together with this deletion (empty for CREATE/RENAME). */
+  deletedLabelIds: string[];
+  /** Exact IDs of label lines active at deletion time (empty for CREATE/RENAME). */
+  deletedLineIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Reference type of an incoming occurrence counted for delete impact.
+ * Occurrences (not unique source labels) are authoritative.
+ */
+export type ProjectFileDeleteImpactReferenceType =
+  "JUMP" | "CALL" | "MENU_CHOICE";
+
+/** An active label defined by the file about to be deleted. */
+export interface ProjectFileDeleteImpactLabel {
+  id: string;
+  title: string;
+  labelName: string | null;
+}
+
+/**
+ * A single incoming reference occurrence to a label in a file about to be
+ * deleted: one direct jump, call, or menu-choice target.
+ */
+export interface ProjectFileDeleteImpactOccurrence {
+  referenceType: ProjectFileDeleteImpactReferenceType;
+  targetLabelId: string;
+  targetLabelName: string;
+  sourceFileId: string;
+  sourceFilePath: string;
+  sourceLabelId: string;
+  sourceLabelName: string | null;
+  sourceLabelTitle: string;
+  /** Source line number in the RPY file when available. */
+  sourceLineNumber: number | null;
+  /** Raw line content for the occurrence when available. */
+  lineContent: string | null;
+}
+
+/**
+ * Impact from deleting a project file: authoritative active-label count
+ * plus EVERY incoming direct jump/call/menu-choice occurrence, matched
+ * case-insensitively against target label names, excluding sources that
+ * live in the target file itself.
+ */
+export interface ProjectFileDeleteImpact {
+  fileId: string;
+  filePath: string;
+  labelCount: number;
+  labels: ProjectFileDeleteImpactLabel[];
+  occurrenceCount: number;
+  occurrences: ProjectFileDeleteImpactOccurrence[];
+}
+
+/**
+ * Response from the delete-impact endpoint.
+ */
+export interface ProjectFileDeleteImpactResponse {
+  impact: ProjectFileDeleteImpact;
+}
+
+/**
+ * Pending structural summary for a project:
+ * - operations: structural entries only, from the collapsed one-row table
+ * - contentModifiedCount: active files whose local contentHash differs
+ *   from the last-pushed local baseline; excludes new files (pending
+ *   CREATE) and tombstoned files. A renamed existing file whose content
+ *   changed counts in BOTH categories.
+ */
+export interface ProjectFilePendingStructuralSummary {
+  operations: ProjectFileOperation[];
+  contentModifiedCount: number;
+}
+
+/**
+ * Request body for PATCHing (renaming/moving) a project file.
+ */
+export interface PatchProjectFileRequest {
+  filePath: string;
+  expectedContentHash?: string;
+}
+
+/**
+ * Response from a file mutation (PATCH rename / DELETE).
+ */
+export interface ProjectFileMutationResponse {
+  file: ProjectFile;
+  operation: ProjectFileOperation | null;
+}
+
 export {
   canonicalizeRpyFilePath,
   type CanonicalizeRpyFilePathOptions,
