@@ -157,7 +157,7 @@ export function useProjectFileMutations(
         filePath,
       });
     },
-    [projectId, queryClient, renameMutation]
+    [projectId, renameMutation]
   );
 
   const deleteFile = useCallback(
@@ -174,7 +174,7 @@ export function useProjectFileMutations(
         force: options?.force ?? false,
       });
     },
-    [projectId, queryClient, deleteMutation]
+    [projectId, deleteMutation]
   );
 
   return {

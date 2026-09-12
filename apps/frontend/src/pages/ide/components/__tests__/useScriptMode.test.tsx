@@ -498,6 +498,66 @@ describe("useScriptMode create file", () => {
     });
   });
 
+  it("does not clear the preview when a pending selection resolves after unmount", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    let resolveSelection!: (value: boolean) => void;
+    selectFileTab.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveSelection = resolve;
+        })
+    );
+
+    const { result, rerender, unmount } = renderHook(() =>
+      useScriptMode({ projectId: "project-1" })
+    );
+
+    await act(async () => {
+      await result.current.onGeneratedFileSelect!(
+        "branchforge_definitions.rpy"
+      );
+    });
+    expect(result.current.isGeneratedPreview).toBe(true);
+
+    await act(async () => {
+      await result.current.handleCreateFile("chapters/new_scene.rpy");
+    });
+
+    scriptFilesState.projectFiles = [
+      ...scriptFilesState.projectFiles,
+      {
+        id: "file-new",
+        projectId: "project-1",
+        filePath: "chapters/new_scene.rpy",
+        fileType: "STORY",
+        content: "",
+        source: "ZIP",
+        contentHash: "empty-hash",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        updatedAt: "2024-01-01T00:00:00.000Z",
+        labels: [],
+      },
+    ];
+    rerender();
+
+    await waitFor(() => {
+      expect(selectFileTab).toHaveBeenCalledWith("file-new");
+    });
+
+    // Unmount while the selection is still in flight; when it resolves
+    // the stale effect instance must not update any state.
+    unmount();
+
+    await act(async () => {
+      resolveSelection(true);
+    });
+
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
   it("keeps the active editor unchanged when tab selection is blocked", async () => {
     selectFileTab.mockResolvedValue(false);
 

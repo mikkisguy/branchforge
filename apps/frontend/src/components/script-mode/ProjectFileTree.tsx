@@ -7,8 +7,8 @@ import type {
   LabelStatus,
 } from "@branchforge/shared";
 import { CollapsibleSection } from "@/components/ide-shared/CollapsibleSection";
+import { buildFileMenuItems } from "@/components/ide-shared/file-menu-items";
 import {
-  buildFileMenuItems,
   FileContextMenu,
   FileRowMenu,
 } from "@/components/ide-shared/FileRowMenu";

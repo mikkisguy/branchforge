@@ -36,6 +36,17 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
   const [pendingSelectFileId, setPendingSelectFileId] = useState<string | null>(
     null
   );
+  // Tracks the most recently launched pending file selection so a stale
+  // effect instance's late resolution can never update state.
+  const pendingSelectionIdRef = useRef<string | null>(null);
+  // StrictMode-safe unmount guard: reset on (re)mount, set on unmount.
+  const isUnmountedRef = useRef(false);
+  useEffect(() => {
+    isUnmountedRef.current = false;
+    return () => {
+      isUnmountedRef.current = true;
+    };
+  }, []);
 
   const [generatedPreview, setGeneratedPreview] = useState<{
     fileName: string;
@@ -169,13 +180,22 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     }
 
     const fileId = pendingSelectFileId;
+    pendingSelectionIdRef.current = fileId;
     // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change -- consume the pending selection only after its cache-backed file becomes available
     setPendingSelectFileId(null);
     void (async () => {
       const selected = await selectFileTab(fileId);
-      if (selected) {
-        setGeneratedPreview(null);
+      // Ignore stale resolutions: only the most recent pending selection
+      // may clear the generated preview, and never after unmount.
+      if (
+        !selected ||
+        isUnmountedRef.current ||
+        pendingSelectionIdRef.current !== fileId
+      ) {
+        return;
       }
+      pendingSelectionIdRef.current = null;
+      setGeneratedPreview(null);
     })();
   }, [pendingSelectFileId, projectFiles, selectFileTab]);
 

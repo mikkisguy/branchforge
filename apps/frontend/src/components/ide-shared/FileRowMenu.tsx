@@ -9,62 +9,24 @@
  * - `FileContextMenu` — the same actions on right-click, rendered in a
  *   portal at the pointer position with keyboard navigation.
  *
- * Both render from a shared item list so behavior stays identical.
+ * Both render from the shared item list built by
+ * `buildFileMenuItems` (see `./file-menu-items`) so behavior stays
+ * identical.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/components/ui/menu";
+import type { FileMenuItem } from "./file-menu-items";
 
-// ============================================================================
-// Shared item model
-// ============================================================================
-
-export interface FileMenuItem {
-  key: "rename" | "delete";
-  label: string;
-  icon: ReactNode;
-  destructive: boolean;
-  disabled: boolean;
-  onSelect: () => void;
-}
-
-export interface BuildFileMenuItemsOptions {
-  onRename: () => void;
-  onDelete: () => void;
-  /** Disables rename (e.g. another file operation is in flight). */
-  renameDisabled?: boolean;
-  /** Disables delete (e.g. another file operation is in flight). */
-  deleteDisabled?: boolean;
-}
-
-export function buildFileMenuItems({
-  onRename,
-  onDelete,
-  renameDisabled = false,
-  deleteDisabled = false,
-}: BuildFileMenuItemsOptions): FileMenuItem[] {
-  return [
-    {
-      key: "rename",
-      label: "Rename / Move",
-      icon: <Pencil className="size-3.5" />,
-      destructive: false,
-      disabled: renameDisabled,
-      onSelect: onRename,
-    },
-    {
-      key: "delete",
-      label: "Delete file…",
-      icon: <Trash2 className="size-3.5" />,
-      destructive: true,
-      disabled: deleteDisabled,
-      onSelect: onDelete,
-    },
-  ];
-}
+// Re-exported as types only; the item-building helper lives in
+// `./file-menu-items` (a non-component module) so this file stays a
+// pure-component module.
+export type {
+  BuildFileMenuItemsOptions,
+  FileMenuItem,
+} from "./file-menu-items";
 
 // ============================================================================
 // Three-dot menu (hover / keyboard-focus reveal)
@@ -136,13 +98,16 @@ export function FileContextMenu({
   const [focusedIndex, setFocusedIndex] = useState(0);
   const onCloseRef = useRef(onClose);
 
-  const enabledIndexes = useMemo(
-    () =>
-      items
-        .map((item, index) => (item.disabled ? -1 : index))
-        .filter((index) => index >= 0),
-    [items]
-  );
+  // Single pass: collect indexes of enabled items, preserving order.
+  const enabledIndexes = useMemo(() => {
+    const indexes: number[] = [];
+    for (let index = 0; index < items.length; index += 1) {
+      if (!items[index].disabled) {
+        indexes.push(index);
+      }
+    }
+    return indexes;
+  }, [items]);
 
   useEffect(() => {
     if (!open) return;

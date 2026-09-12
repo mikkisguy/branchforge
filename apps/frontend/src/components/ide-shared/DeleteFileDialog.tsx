@@ -11,7 +11,7 @@
  * offers the force-delete pathway which discards unsaved changes.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Loader2, Trash2, X } from "lucide-react";
 import {
@@ -61,25 +61,51 @@ function getFileBasename(filePath: string): string {
   return filePath.split("/").pop() ?? filePath;
 }
 
+/**
+ * Builds unique, stable React keys for the occurrence entries of one
+ * list. `getKey` derives a stable identity string per entry; exact
+ * duplicate identities (possible for identical reference descriptors)
+ * are disambiguated by occurrence count, deterministically and in a
+ * single pass, so keys stay stable across rerenders.
+ */
+function buildStableEntryKeys(
+  entries: Array<DeleteFileImpactLabel | DeleteFileImpactReference>,
+  getKey: (entry: DeleteFileImpactLabel | DeleteFileImpactReference) => string
+): string[] {
+  const seen = new Map<string, number>();
+  const keys: string[] = [];
+  for (const entry of entries) {
+    const identity = getKey(entry);
+    const occurrence = seen.get(identity) ?? 0;
+    seen.set(identity, occurrence + 1);
+    keys.push(occurrence === 0 ? identity : `${identity}#${occurrence}`);
+  }
+  return keys;
+}
+
 function OccurrenceList({
   heading,
   entries,
+  getKey,
   renderEntry,
 }: {
   heading: string;
   entries: Array<DeleteFileImpactLabel | DeleteFileImpactReference>;
+  getKey: (entry: DeleteFileImpactLabel | DeleteFileImpactReference) => string;
   renderEntry: (
     entry: DeleteFileImpactLabel | DeleteFileImpactReference
   ) => string;
 }) {
   if (entries.length === 0) return null;
 
+  const entryKeys = buildStableEntryKeys(entries, getKey);
+
   return (
     <div className="space-y-1">
       <p className="text-xs font-medium text-muted-foreground">{heading}</p>
       <ul className="space-y-0.5 text-xs text-muted-foreground">
         {entries.map((entry, index) => (
-          <li key={`${heading}-${index}`} className="break-words">
+          <li key={entryKeys[index]} className="break-words">
             {renderEntry(entry)}
           </li>
         ))}
@@ -102,7 +128,11 @@ export function DeleteFileDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {open ? (
+        // Keyed remount boundary: mounting the content for a different
+        // file.id starts from fresh typed-confirmation and force-choice
+        // state, while ordinary rerenders for the same file keep it.
         <DeleteFileDialogContent
+          key={file.id}
           onOpenChange={onOpenChange}
           projectId={projectId}
           file={file}
@@ -144,13 +174,6 @@ function DeleteFileDialogContent({
     enabled: !!projectId,
     staleTime: 0,
   });
-
-  // Reset typed confirmation and force choice whenever the dialog opens
-  // for a different file.
-  useEffect(() => {
-    setTypedBasename("");
-    setForceChecked(false);
-  }, [file.id]);
 
   const basename = getFileBasename(file.filePath);
   const requiresTypedConfirmation =
@@ -260,6 +283,7 @@ function DeleteFileDialogContent({
             <OccurrenceList
               heading="Labels in this file"
               entries={impact.labels}
+              getKey={(entry) => (entry as DeleteFileImpactLabel).id}
               renderEntry={(entry) =>
                 `${(entry as DeleteFileImpactLabel).title}${
                   (entry as DeleteFileImpactLabel).labelName
@@ -272,6 +296,18 @@ function DeleteFileDialogContent({
             <OccurrenceList
               heading="Referenced from"
               entries={impact.references}
+              getKey={(entry) => {
+                const reference = entry as DeleteFileImpactReference;
+                return [
+                  reference.referenceType,
+                  reference.targetLabelId,
+                  reference.sourceLabelId,
+                  reference.sourceFileId,
+                  reference.lineNumber === null
+                    ? "unknown"
+                    : reference.lineNumber,
+                ].join("-");
+              }}
               renderEntry={(entry) => {
                 const reference = entry as DeleteFileImpactReference;
                 const line =

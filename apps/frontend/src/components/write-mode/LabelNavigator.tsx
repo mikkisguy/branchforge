@@ -28,8 +28,8 @@ import {
   X,
 } from "lucide-react";
 import { LabelContextMenu } from "@/components/write-mode/LabelContextMenu";
+import { buildFileMenuItems } from "@/components/ide-shared/file-menu-items";
 import {
-  buildFileMenuItems,
   FileContextMenu,
   FileRowMenu,
 } from "@/components/ide-shared/FileRowMenu";
