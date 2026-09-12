@@ -22,6 +22,11 @@ New files are saved in BranchForge immediately. They are not pushed to GitLab un
 
 You cannot use the reserved names `branchforge_variables.rpy`, `branchforge_stats.rpy`, or `branchforge_definitions.rpy`.
 
+File rename and delete actions are available from the file menu. Write Mode
+waits for the affected file's autosave before either action; resolve a save
+error before renaming. Deleting another file never discards an unrelated
+draft.
+
 ## Writing Dialogue
 
 [screenshot of dialogue writing]

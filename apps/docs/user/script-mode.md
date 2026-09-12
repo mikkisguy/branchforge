@@ -45,6 +45,17 @@ The file is created in your project right away and opens in a new tab. It stays 
 
 You cannot create files with these reserved names: `branchforge_variables.rpy`, `branchforge_stats.rpy`, and `branchforge_definitions.rpy` (BranchForge generates these).
 
+### Renaming, moving, and deleting files
+
+Use a file row's **…** menu (or right-click it) to rename, move, or delete a
+file. Renaming accepts a full relative path and adds `.rpy` when needed. Press
+`F2` to rename the active file when focus is not in an editor or dialog.
+
+Before deletion, BranchForge shows labels in the file and every incoming jump,
+call, and menu choice. Larger impacts require typing the file's exact basename.
+GitLab files can be restored before the next push; ZIP files are removed from
+the local project immediately.
+
 ## Editing Conditions and Technical Details
 
 Because conditions are part of the Ren'Py source, you author them directly in Script Mode. For example:

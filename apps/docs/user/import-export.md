@@ -67,6 +67,13 @@ Push your changes back to GitLab:
 2. Click "Push to GitLab"
 3. Review the changes and confirm
 
+The sync dialog lists pending file creations, moves, and deletions separately
+from ordinary content changes. You can cancel a creation, undo a rename, or
+restore a deleted GitLab file before pushing. **Discard all** restores the
+remote file structure in one operation. Pulling is paused only while one of
+these structural changes is pending; ordinary autosaved edits do not block a
+pull.
+
 ### Conflict Detection
 
 If GitLab has changes that conflict with your local work, BranchForge will detect this and show you the conflicts. You can:
