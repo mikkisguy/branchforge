@@ -26,9 +26,7 @@ vi.mock("@/components/ui/confirm-dialog", () => ({
 }));
 
 describe("StatusBar", () => {
-  it("groups GitLab and ZIP transfer actions in a labeled menu", async () => {
-    const user = userEvent.setup();
-
+  it("leaves GitLab transfer actions out of the desktop status bar", () => {
     render(
       <StatusBar
         projectId="project-1"
@@ -38,26 +36,9 @@ describe("StatusBar", () => {
     );
 
     expect(screen.getByText("main")).toBeInTheDocument();
-    const transferButton = screen.getByRole("button", {
-      name: "Import / Export",
-    });
-    expect(transferButton).toHaveClass(
-      "border-border/60",
-      "bg-transparent",
-      "text-muted-foreground"
-    );
-    expect(transferButton).not.toHaveClass("text-[var(--theme-color)]");
-    await user.click(transferButton);
-
     expect(
-      screen.getByRole("menuitem", { name: /pull from gitlab/i })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("menuitem", { name: /push to gitlab/i })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("menuitem", { name: /export zip/i })
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: "Import / Export" })
+    ).not.toBeInTheDocument();
   });
 
   it("can leave branch rendering to the shared editor metadata", () => {
@@ -72,32 +53,8 @@ describe("StatusBar", () => {
 
     expect(screen.queryByText("main")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", {
-        name: "Import / Export",
-      })
-    ).toBeInTheDocument();
-  });
-
-  it("keeps ZIP import available from the same menu", async () => {
-    const user = userEvent.setup();
-    const onOpenZipImportDialog = vi.fn();
-
-    render(
-      <StatusBar
-        projectId="project-1"
-        fileSourceType="ZIP"
-        onOpenZipImportDialog={onOpenZipImportDialog}
-      />
-    );
-
-    await user.click(
-      screen.getByRole("button", {
-        name: "Import / Export",
-      })
-    );
-    await user.click(screen.getByRole("menuitem", { name: /import zip/i }));
-
-    expect(onOpenZipImportDialog).toHaveBeenCalledOnce();
+      screen.queryByRole("button", { name: "Import / Export" })
+    ).not.toBeInTheDocument();
   });
 
   it("uses an expandable mobile row instead of the desktop dropdown", async () => {

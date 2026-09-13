@@ -8,6 +8,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ToastProvider } from "@/contexts/ToastContext";
 import { WorkspaceChrome } from "../WorkspaceChrome";
+import { ProjectFileTransferProvider } from "../ProjectFileTransferContext";
 import type { Project } from "@/lib/api/projects";
 import type { ThemePalette } from "@branchforge/shared";
 import type { ReactNode } from "react";
@@ -161,6 +162,21 @@ describe("WorkspaceChrome", () => {
     await user.click(projectMenus[0]!);
 
     expect(
+      within(screen.getByRole("menu")).getByRole("group", {
+        name: "Project settings",
+      })
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("menu")).getByRole("group", {
+        name: "Import projects",
+      })
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("menu")).getByRole("group", {
+        name: "Manage projects",
+      })
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole("menuitem", { name: "Project settings" })
     ).toBeInTheDocument();
     expect(
@@ -171,6 +187,35 @@ describe("WorkspaceChrome", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("menuitem", { name: "Manage projects" })
+    ).toBeInTheDocument();
+  });
+
+  it("groups registered project file transfers under project files", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ProjectFileTransferProvider projectId="proj-1" fileSourceType="GITLAB">
+        <WorkspaceChrome {...defaultProps} />
+      </ProjectFileTransferProvider>,
+      { wrapper: createWrapper() }
+    );
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Project menu" })[0]!
+    );
+
+    const menu = screen.getByRole("menu");
+    expect(
+      within(menu).getByRole("group", { name: "Project files" })
+    ).toBeInTheDocument();
+    expect(
+      within(menu).getByRole("menuitem", { name: "Pull from GitLab" })
+    ).toBeInTheDocument();
+    expect(
+      within(menu).getByRole("menuitem", { name: "Push to GitLab" })
+    ).toBeInTheDocument();
+    expect(
+      within(menu).getByRole("menuitem", { name: "Export ZIP" })
     ).toBeInTheDocument();
   });
 

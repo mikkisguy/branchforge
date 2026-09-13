@@ -574,20 +574,6 @@ export function ScriptModeEditorLayout({
           onClick={() => setShowOverlays((value) => !value)}
         />
         <div className="my-1 h-px bg-border/30" />
-        {isMobile ? (
-          <div className="px-1 py-1">
-            <StatusBar
-              projectId={projectId}
-              projectName={projectName}
-              gitlabBranch={gitlabBranch}
-              fileSourceType={fileSourceType}
-              onOpenZipImportDialog={onOpenZipImportDialog}
-              mobile
-              className="flex-col items-stretch"
-            />
-          </div>
-        ) : null}
-        <div className="my-1 h-px bg-border/30" />
         <FABFocusButton
           isFocusMode={isFocusMode}
           onToggle={handleFocusModeToggle}

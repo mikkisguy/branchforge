@@ -1,13 +1,5 @@
-import { useState, useCallback, useReducer, useRef } from "react";
-import {
-  ArrowUpDown,
-  ChevronUp,
-  Download,
-  Upload,
-  GitBranch,
-  Loader2,
-  FolderArchive,
-} from "lucide-react";
+import { useState, useCallback, useEffect, useReducer, useRef } from "react";
+import { ArrowUpDown, GitBranch, Loader2 } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
 import {
   GitLabSyncDialog,
@@ -15,19 +7,11 @@ import {
 } from "@/components/script-mode/GitLabSyncDialog";
 import { ConflictReviewDialog } from "@/components/script-mode/ConflictReviewDialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { STATUS_BAR_CONTROL_CLASSNAME } from "@/components/workspace/status-bar-control";
 import { FABExpandableChoice } from "@/components/ide-shared/MobileOverflowFAB";
-import {
-  Menu,
-  MenuContent,
-  MenuGroup,
-  MenuItem,
-  MenuSeparator,
-  MenuTrigger,
-} from "@/components/ui/menu";
 import { cn } from "@/lib/utils";
 import { projectFilesApi } from "@/lib/api/project-files";
 import type { SourceOrigin } from "@branchforge/shared";
+import { useProjectFileTransferActions } from "@/components/workspace/ProjectFileTransferContext";
 
 interface StatusBarProps {
   projectId?: string;
@@ -90,6 +74,8 @@ export function StatusBar({
   mobile = false,
   className,
 }: StatusBarProps) {
+  const { setActions: setProjectFileTransferActions } =
+    useProjectFileTransferActions();
   const [dialogState, dispatchDialog] = useReducer(
     dialogReducer,
     initialDialogState
@@ -198,6 +184,32 @@ export function StatusBar({
       : []),
   ];
 
+  useEffect(() => {
+    setProjectFileTransferActions({
+      onPullGitLab: isGitLabAvailable ? handleImportClick : undefined,
+      onPushGitLab: isGitLabAvailable ? handleExportClick : undefined,
+      onImportZip:
+        isZipAvailable && onOpenZipImportDialog
+          ? handleZipImportClick
+          : undefined,
+      onExportZip: projectId ? handleZipExportClick : undefined,
+      isExporting,
+    });
+
+    return () => setProjectFileTransferActions(null);
+  }, [
+    handleExportClick,
+    handleImportClick,
+    handleZipExportClick,
+    handleZipImportClick,
+    isExporting,
+    isGitLabAvailable,
+    isZipAvailable,
+    onOpenZipImportDialog,
+    projectId,
+    setProjectFileTransferActions,
+  ]);
+
   return (
     <>
       <div className={cn("flex min-w-0 items-center gap-3", className)}>
@@ -230,60 +242,7 @@ export function StatusBar({
             options={mobileTransferOptions}
             onSelect={handleMobileTransferSelect}
           />
-        ) : (
-          <Menu>
-            <MenuTrigger
-              variant="ghost"
-              size="sm"
-              className={cn(STATUS_BAR_CONTROL_CLASSNAME, "shadow-none")}
-            >
-              {isExporting ? (
-                <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-              ) : (
-                <ArrowUpDown className="size-3.5" aria-hidden="true" />
-              )}
-              <span>{isExporting ? "Exporting…" : "Import / Export"}</span>
-              <ChevronUp className="size-3" aria-hidden="true" />
-            </MenuTrigger>
-            <MenuContent align="start" className="min-w-[210px]">
-              <MenuGroup label="Project files" showLabel>
-                {isGitLabAvailable ? (
-                  <>
-                    <MenuItem className="gap-2" onSelect={handleImportClick}>
-                      <Download className="size-4" aria-hidden="true" />
-                      Pull from GitLab
-                    </MenuItem>
-                    <MenuItem className="gap-2" onSelect={handleExportClick}>
-                      <Upload className="size-4" aria-hidden="true" />
-                      Push to GitLab
-                    </MenuItem>
-                  </>
-                ) : null}
-                {isZipAvailable && onOpenZipImportDialog ? (
-                  <MenuItem className="gap-2" onSelect={handleZipImportClick}>
-                    <Download className="size-4" aria-hidden="true" />
-                    Import ZIP
-                  </MenuItem>
-                ) : null}
-                {(isGitLabAvailable ||
-                  (isZipAvailable && onOpenZipImportDialog)) &&
-                projectId ? (
-                  <MenuSeparator />
-                ) : null}
-                {projectId ? (
-                  <MenuItem
-                    className="gap-2"
-                    onSelect={handleZipExportClick}
-                    disabled={isExporting}
-                  >
-                    <FolderArchive className="size-4" aria-hidden="true" />
-                    Export ZIP
-                  </MenuItem>
-                ) : null}
-              </MenuGroup>
-            </MenuContent>
-          </Menu>
-        )}
+        ) : null}
       </div>
 
       {/* Sync Dialog */}
