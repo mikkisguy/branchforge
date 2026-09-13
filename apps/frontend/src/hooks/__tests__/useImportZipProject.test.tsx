@@ -77,6 +77,7 @@ describe("useImportZipProject", () => {
         queryKey: labelKeys.scoped("proj-new"),
       });
     });
+    expect(invalidateSpy).toHaveBeenCalledTimes(2);
   });
 
   it("does not invalidate label caches when import response has no project id", async () => {
@@ -104,5 +105,7 @@ describe("useImportZipProject", () => {
     expect(invalidateSpy).not.toHaveBeenCalledWith({
       queryKey: labelKeys.scoped("proj-new"),
     });
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
   });
+
 });

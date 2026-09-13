@@ -88,4 +88,53 @@ describe("useZipImportProjectDialog", () => {
     expect(result.current.state.importState.status).not.toBe("success");
     expect(successToast).not.toHaveBeenCalled();
   });
+
+  it("ignores a stale import failure after the dialog closes", async () => {
+    let rejectImport: ((reason: Error) => void) | undefined;
+    mutateAsync.mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          rejectImport = reject;
+        })
+    );
+
+    const onOpenChange = vi.fn();
+    const zipFile = new File(["zip"], "project.zip", {
+      type: "application/zip",
+    });
+
+    const { result, rerender } = renderHook(
+      ({ open }) => useZipImportProjectDialog(open, onOpenChange),
+      { initialProps: { open: true } }
+    );
+
+    act(() => {
+      result.current.dispatch({ type: "SET_SELECTED_FILE", file: zipFile });
+      result.current.dispatch({
+        type: "SET_PROJECT_NAME",
+        value: "Imported Project",
+      });
+    });
+
+    await act(async () => {
+      void result.current.handleImport();
+    });
+
+    expect(result.current.state.importState.status).toBe("uploading");
+
+    rerender({ open: false });
+    onOpenChange.mockClear();
+    rerender({ open: true });
+
+    await act(async () => {
+      rejectImport?.(new Error("Network error"));
+    });
+
+    await waitFor(() => {
+      expect(mutateAsync).toHaveBeenCalledTimes(1);
+    });
+
+    expect(result.current.state.importState.status).not.toBe("error");
+    expect(errorToast).not.toHaveBeenCalled();
+  });
 });

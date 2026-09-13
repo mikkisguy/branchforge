@@ -28,13 +28,15 @@ export function buildLoginPath(): string {
   return new URL("login", new URL(BASE_URL, window.location.origin)).pathname;
 }
 
+export function buildRegisterPath(): string {
+  return new URL("register", new URL(BASE_URL, window.location.origin))
+    .pathname;
+}
+
 export function isAuthRoute(pathname = window.location.pathname): boolean {
-  const loginPath = buildLoginPath();
-  const registerPath = new URL(
-    "register",
-    new URL(BASE_URL, window.location.origin)
-  ).pathname;
-  return pathname === loginPath || pathname === registerPath;
+  return (
+    pathname === buildLoginPath() || pathname === buildRegisterPath()
+  );
 }
 
 export function handleSessionExpired(queryClient: QueryClient): void {
@@ -42,13 +44,15 @@ export function handleSessionExpired(queryClient: QueryClient): void {
     return;
   }
 
+  if (isAuthRoute()) {
+    clearCsrfToken();
+    queryClient.clear();
+    return;
+  }
+
   handlingSessionExpiry = true;
   clearCsrfToken();
   queryClient.clear();
-
-  if (isAuthRoute()) {
-    return;
-  }
 
   const loginPath = buildLoginPath();
   if (window.location.pathname !== loginPath) {

@@ -535,8 +535,12 @@ describe("useWriteAutosave", () => {
       reloaded = await result.current.reloadScene("label-1");
     });
 
-    expect(reloaded).toBeDefined();
+    expect(reloaded).toBe(refreshedLabel);
     expect(onRefetchLabel).toHaveBeenCalledWith("label-1");
+
+    if (!reloaded) {
+      return;
+    }
 
     await waitFor(() => {
       expect(result.current.conflictByLabel.get("label-1")).toBeUndefined();
@@ -551,7 +555,7 @@ describe("useWriteAutosave", () => {
 
     rerender({
       draft: serverDraft,
-      activeLabel: refreshedLabel,
+      activeLabel: reloaded,
     });
 
     await waitFor(() => {

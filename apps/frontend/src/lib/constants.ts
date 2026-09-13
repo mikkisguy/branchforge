@@ -1,6 +1,19 @@
 import type { ThemePalette } from "@/contexts/ThemeContext";
 
-export const BASE_URL = import.meta.env.VITE_FRONTEND_BASE_URL ?? "/";
+/** Normalize configured base URL for consistent route concatenation. */
+export function normalizeBaseUrl(url: string): string {
+  if (!url || url === "/") {
+    return "/";
+  }
+  const withLeadingSlash = url.startsWith("/") ? url : `/${url}`;
+  return withLeadingSlash.endsWith("/")
+    ? withLeadingSlash
+    : `${withLeadingSlash}/`;
+}
+
+export const BASE_URL = normalizeBaseUrl(
+  import.meta.env.VITE_FRONTEND_BASE_URL ?? "/"
+);
 
 // ─── Flow graph performance tuning ──────────────────────────────────────────
 //

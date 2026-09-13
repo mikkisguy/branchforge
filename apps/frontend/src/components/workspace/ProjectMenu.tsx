@@ -1,6 +1,5 @@
 import { Check, ChevronDown } from "lucide-react";
 import type { Project } from "@/lib/api/projects";
-import { Button } from "@/components/ui/button";
 import {
   Menu,
   MenuContent,
@@ -83,18 +82,10 @@ export function ProjectMenu({
               <p className="text-xs text-muted-foreground mt-1">
                 Check your connection and try again.
               </p>
-              {onRetryProjects ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                  onClick={onRetryProjects}
-                >
-                  Retry
-                </Button>
-              ) : null}
             </div>
+            {onRetryProjects ? (
+              <MenuItem onSelect={onRetryProjects}>Retry</MenuItem>
+            ) : null}
             <MenuSeparator />
           </>
         ) : null}

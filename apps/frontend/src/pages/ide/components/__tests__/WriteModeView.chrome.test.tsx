@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { WriteModeView } from "../WriteModeView";
@@ -63,8 +63,11 @@ vi.mock("@/components/workspace/WorkspaceFrame", () => ({
     isFocusMode: boolean;
   }) => (
     <div data-testid="workspace-frame" data-focus-mode={String(isFocusMode)}>
-      {!isFocusMode ? toolbar : null}
-      {focusChrome}
+      {isFocusMode ? (
+        focusChrome
+      ) : (
+        <div data-testid="workspace-toolbar">{toolbar}</div>
+      )}
     </div>
   ),
 }));
@@ -178,8 +181,13 @@ describe("WriteModeView chrome", () => {
       />
     );
 
-    expect(screen.getAllByText("Reload scene")).toHaveLength(2);
-    expect(screen.getAllByText("Discard draft")).toHaveLength(2);
+    const toolbar = screen.getByTestId("workspace-toolbar");
+    expect(
+      within(toolbar).getByRole("button", { name: "Reload scene" })
+    ).toBeInTheDocument();
+    expect(
+      within(toolbar).getByRole("button", { name: "Discard draft" })
+    ).toBeInTheDocument();
   });
 
   it("calls the correct handlers from toolbar conflict controls", () => {
@@ -201,10 +209,16 @@ describe("WriteModeView chrome", () => {
       />
     );
 
-    fireEvent.click(screen.getAllByText("Reload scene")[0]!);
+    const toolbar = screen.getByTestId("workspace-toolbar");
+
+    fireEvent.click(
+      within(toolbar).getByRole("button", { name: "Reload scene" })
+    );
     expect(onReloadScene).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getAllByText("Discard draft")[0]!);
+    fireEvent.click(
+      within(toolbar).getByRole("button", { name: "Discard draft" })
+    );
     expect(onDiscardDraft).toHaveBeenCalledTimes(1);
   });
 

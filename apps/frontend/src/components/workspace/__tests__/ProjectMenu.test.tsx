@@ -86,6 +86,34 @@ describe("ProjectMenu", () => {
     expect(within(menu).getAllByRole("separator")).toHaveLength(4);
   });
 
+  it("invokes onRetryProjects from a menu item when project loading fails", async () => {
+    const user = userEvent.setup();
+    const onRetryProjects = vi.fn();
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <ProjectMenu
+            projects={[]}
+            projectsError={new Error("Network error")}
+            onRetryProjects={onRetryProjects}
+            setCurrentProject={vi.fn()}
+            onOpenProjectSettings={vi.fn()}
+            onImportGitLab={vi.fn()}
+            onImportZip={vi.fn()}
+            onManageProjects={vi.fn()}
+          />
+        </ToastProvider>
+      </QueryClientProvider>
+    );
+
+    await user.click(screen.getByRole("button", { name: "Project menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "Retry" }));
+
+    expect(onRetryProjects).toHaveBeenCalledTimes(1);
+  });
+
   it("does not render a second separator when no project file actions exist", async () => {
     const user = userEvent.setup();
     renderProjectMenu(false);
