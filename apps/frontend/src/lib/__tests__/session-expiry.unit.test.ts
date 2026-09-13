@@ -8,10 +8,10 @@ import {
   resetNavigateToLoginForTests,
   resetSessionExpiryHandling,
   setNavigateToLoginForTests,
-} from "../session-expiry";
-import { clearCsrfToken, setCsrfToken } from "../api/csrf";
+} from "@/lib/session-expiry";
+import { clearCsrfToken, setCsrfToken } from "@/lib/api/csrf";
 
-vi.mock("../constants", () => ({
+vi.mock("@/lib/constants", () => ({
   BASE_URL: "/branchforge/",
 }));
 
@@ -29,24 +29,11 @@ describe("session-expiry", () => {
     setNavigateToLoginForTests(navigateSpy);
 
     originalPathname = window.location.pathname;
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      value: {
-        ...window.location,
-        pathname: "/branchforge/projects",
-        assign: vi.fn(),
-      },
-    });
+    window.history.replaceState({}, "", "/branchforge/projects");
   });
 
   afterEach(() => {
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      value: {
-        ...window.location,
-        pathname: originalPathname,
-      },
-    });
+    window.history.replaceState({}, "", originalPathname);
     resetSessionExpiryHandling();
     resetNavigateToLoginForTests();
     clearCsrfToken();
@@ -61,14 +48,7 @@ describe("session-expiry", () => {
   });
 
   it("does not clear observed queries or set the expiry guard on an auth route", () => {
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      value: {
-        ...window.location,
-        pathname: "/branchforge/login",
-        assign: vi.fn(),
-      },
-    });
+    window.history.replaceState({}, "", "/branchforge/login");
 
     const queryClient = new QueryClient();
     queryClient.setQueryData(["cached"], { value: 1 });
