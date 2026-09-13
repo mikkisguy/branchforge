@@ -13,7 +13,15 @@
  * - Test database must exist and have proper schema
  */
 
-import { describe, it, expect, beforeEach, afterEach, beforeAll } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  beforeAll,
+  vi,
+} from "vitest";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import cookie from "@fastify/cookie";
 import session from "@fastify/session";
@@ -35,6 +43,7 @@ import {
 } from "../../db/schema/index.js";
 import { eq, inArray, and, asc } from "drizzle-orm";
 import { calculateContentHash } from "../../lib/hash.js";
+import * as labelsService from "../../services/labels.service.js";
 
 describe("ProjectsRoutes (Integration)", () => {
   let db: ReturnType<typeof getDb>;
@@ -180,6 +189,7 @@ describe("ProjectsRoutes (Integration)", () => {
   });
 
   beforeEach(async () => {
+    vi.restoreAllMocks();
     await cleanupTestData();
     await setupTestData();
 
@@ -474,6 +484,79 @@ describe("ProjectsRoutes (Integration)", () => {
         speakerId: characterId,
         content: "Hello there",
       });
+    });
+
+    it("rolls back file content when label sync reports errors (H3)", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+      const fileId = testUuid("13000000", 9);
+      const initialContent = ["label intro:", '    "Hello"'].join("\n");
+      const initialHash = calculateContentHash(initialContent);
+
+      await db.insert(projectFiles).values({
+        id: fileId,
+        projectId: ownedProject.id!,
+        source: "ZIP",
+        filePath: "story/partial_sync.rpy",
+        fileType: "STORY",
+        content: initialContent,
+        originalContent: initialContent,
+        contentHash: initialHash,
+      });
+
+      await db.insert(labels).values({
+        id: testUuid("15000000", 9),
+        projectId: ownedProject.id!,
+        title: "intro",
+        projectFileId: fileId,
+        labelName: "intro",
+        labelPosition: 0,
+        sequenceOrder: 0,
+        labelNumber: 1,
+        status: "DRAFT",
+        conditions: {},
+        effects: {},
+      });
+
+      vi.spyOn(labelsService, "syncLabelsFromFile").mockResolvedValue({
+        success: true,
+        labelsCreated: 0,
+        labelsUpdated: 0,
+        labelsDeleted: 0,
+        linesProcessed: 0,
+        errors: [{ label: "intro", error: "forced label sync failure" }],
+        skipped: false,
+        affectedLabelIds: [],
+        dbLabelCount: 1,
+      });
+
+      const updatedContent = ["label intro:", '    "Should not persist"'].join(
+        "\n"
+      );
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/projects/files/${fileId}`,
+        payload: { content: updatedContent },
+        cookies: {
+          [SESSION_COOKIE_NAME]: auth.sessionId,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+
+      const [file] = await db
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.id, fileId));
+      expect(file?.content).toBe(initialContent);
+      expect(file?.contentHash).toBe(initialHash);
+
+      const remainingLabels = await db
+        .select()
+        .from(labels)
+        .where(eq(labels.projectFileId, fileId));
+      expect(remainingLabels).toHaveLength(1);
+      expect(remainingLabels[0]?.labelName).toBe("intro");
     });
 
     it("returns 409 when expected content hash is stale", async () => {

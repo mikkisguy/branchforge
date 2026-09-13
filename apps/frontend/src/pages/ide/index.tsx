@@ -14,6 +14,7 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type { Tab } from "@/components/ide-shared/settings-types";
 import { SETTINGS_TABS } from "@/components/ide-shared/settings-types";
 import { WorkspaceChrome } from "@/components/workspace/WorkspaceChrome";
+import { ProjectFileTransferProvider } from "@/components/workspace/ProjectFileTransferContext";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   WORKSPACE_VIEW_STORAGE_KEY,
@@ -204,93 +205,100 @@ export function HomePageIDE() {
   }, []);
 
   return (
-    <div className="relative h-dvh overflow-hidden bg-canvas">
-      <WorkspaceChrome
-        view={view}
-        setView={handleSetView}
-        theme={theme}
-        setTheme={setTheme}
-        themePalettes={themePalettes}
-        isDarkMode={isDarkMode}
-        onToggleDarkMode={toggleDarkMode}
-        onLogout={handleLogout}
-        projectId={currentProject?.id}
-        projects={projects}
-        setCurrentProject={handleSetProject}
-        isLoadingProjects={isLoadingProjects}
-        updateProject={updateProject}
-        deleteProject={deleteProject}
-        refetchProjects={refreshProjects}
-        isSettingsOpenExternally={isSettingsOpen}
-        onSettingsOpenChangeExternally={handleSetIsSettingsOpen}
-        initialSettingsTab={initialSettingsTab}
-        onOpenSettingsTab={handleOpenSettingsTab}
-        hidden={isFocusMode}
-      />
+    <ProjectFileTransferProvider
+      projectId={currentProject?.id}
+      projectName={currentProject?.name}
+      fileSourceType={currentProject?.source}
+      projectVisibility={currentProject?.visibility}
+    >
+      <div className="relative h-dvh overflow-hidden bg-canvas">
+        <WorkspaceChrome
+          view={view}
+          setView={handleSetView}
+          theme={theme}
+          setTheme={setTheme}
+          themePalettes={themePalettes}
+          isDarkMode={isDarkMode}
+          onToggleDarkMode={toggleDarkMode}
+          onLogout={handleLogout}
+          projectId={currentProject?.id}
+          projects={projects}
+          setCurrentProject={handleSetProject}
+          isLoadingProjects={isLoadingProjects}
+          updateProject={updateProject}
+          deleteProject={deleteProject}
+          refetchProjects={refreshProjects}
+          isSettingsOpenExternally={isSettingsOpen}
+          onSettingsOpenChangeExternally={handleSetIsSettingsOpen}
+          initialSettingsTab={initialSettingsTab}
+          onOpenSettingsTab={handleOpenSettingsTab}
+          hidden={isFocusMode}
+        />
 
-      <main
-        id="main-content"
-        tabIndex={-1}
-        className={
-          isFocusMode
-            ? "h-full overflow-hidden pt-0 pb-0"
-            : "h-full overflow-hidden pt-14 max-md:pt-12 max-md:pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))]"
-        }
-      >
-        {view === "write" ? (
-          <WriteMode
-            projectName={currentProject?.name}
-            onOpenSettings={handleOpenSettings}
-            onFocusModeChange={setIsFocusMode}
-          />
-        ) : view === "script" ? (
-          <ErrorBoundary
-            key={scriptModeKey}
-            onError={() => setIsFocusMode(false)}
-            fallback={
-              <div
-                className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground"
-                role="alert"
-                aria-live="assertive"
-                aria-label="Editor failed to load"
-              >
-                <span aria-hidden="true" className="text-4xl">
-                  ⚠️
-                </span>
-                <p>Failed to load editor. Please refresh or retry.</p>
-                <button
-                  type="button"
-                  onClick={handleScriptModeRetry}
-                  className="px-4 py-2 mt-2 text-sm text-white bg-theme rounded hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-theme"
-                >
-                  Retry
-                </button>
-              </div>
-            }
-          >
-            <Suspense
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className={
+            isFocusMode
+              ? "h-full overflow-hidden pt-0 pb-0"
+              : "h-full overflow-hidden pt-14 max-md:pt-12 max-md:pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))]"
+          }
+        >
+          {view === "write" ? (
+            <WriteMode
+              projectName={currentProject?.name}
+              onOpenSettings={handleOpenSettings}
+              onFocusModeChange={setIsFocusMode}
+            />
+          ) : view === "script" ? (
+            <ErrorBoundary
+              key={scriptModeKey}
+              onError={() => setIsFocusMode(false)}
               fallback={
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  Loading editor…
+                <div
+                  className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground"
+                  role="alert"
+                  aria-live="assertive"
+                  aria-label="Editor failed to load"
+                >
+                  <span aria-hidden="true" className="text-4xl">
+                    ⚠️
+                  </span>
+                  <p>Failed to load editor. Please refresh or retry.</p>
+                  <button
+                    type="button"
+                    onClick={handleScriptModeRetry}
+                    className="px-4 py-2 mt-2 text-sm text-white bg-theme rounded hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-theme"
+                  >
+                    Retry
+                  </button>
                 </div>
               }
             >
-              <ScriptMode
-                projectId={currentProject?.id}
-                projectName={currentProject?.name}
-                onOpenSettings={handleOpenSettings}
-                onFocusModeChange={setIsFocusMode}
-              />
-            </Suspense>
-          </ErrorBoundary>
-        ) : currentProject?.id ? (
-          <FlowMode projectId={currentProject.id} />
-        ) : (
-          <div className="flex h-full items-center justify-center">
-            <EmptyState title="Select a project to view Flow" />
-          </div>
-        )}
-      </main>
-    </div>
+              <Suspense
+                fallback={
+                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                    Loading editor…
+                  </div>
+                }
+              >
+                <ScriptMode
+                  projectId={currentProject?.id}
+                  projectName={currentProject?.name}
+                  onOpenSettings={handleOpenSettings}
+                  onFocusModeChange={setIsFocusMode}
+                />
+              </Suspense>
+            </ErrorBoundary>
+          ) : currentProject?.id ? (
+            <FlowMode projectId={currentProject.id} />
+          ) : (
+            <div className="flex h-full items-center justify-center">
+              <EmptyState title="Select a project to view Flow" />
+            </div>
+          )}
+        </main>
+      </div>
+    </ProjectFileTransferProvider>
   );
 }

@@ -43,6 +43,8 @@ import {
 } from "../gitlab-sync.service.js";
 import type { ConflictResolution } from "../gitlab.types.js";
 import { testEmail, testUuid } from "../../utils/test-ids.js";
+import { calculateContentHash } from "../../lib/hash.js";
+import * as labelsService from "../labels.service.js";
 
 describe("GitLabSyncService (Integration)", () => {
   let db: ReturnType<typeof getDb>;
@@ -931,7 +933,7 @@ describe("GitLabSyncService (Integration)", () => {
       await db.insert(projectFiles).values(testGitlabFile2);
 
       const batchCommitFilesSpy = vi
-        .spyOn(gitlabService, "batchCommitFiles")
+        .spyOn(gitlabFileService, "batchCommitFiles")
         .mockResolvedValue("commit126");
       await makeFileContentModified(testGitlabFileId);
       await makeFileContentModified(testGitlabFile2.id);
@@ -1498,6 +1500,155 @@ describe("GitLabSyncService (Integration)", () => {
       expect(fileRow?.lastPushedContentHash).toBe("hash-reconciled");
       expect(fileRow?.remoteFilePath).toBe("game/reconciled_dst.rpy");
     });
+
+    it("deletes only planned pending ops and preserves concurrent ops (H2)", async () => {
+      const createdFile = createProjectFileFixture({
+        id: testUuid("56000000", 96),
+        filePath: "game/planned_create.rpy",
+        content: 'label planned:\n    "New"\n    return',
+        contentHash: "hash-planned",
+      });
+      await db.insert(projectFiles).values(createdFile);
+
+      const concurrentFile = createProjectFileFixture({
+        id: testUuid("56000000", 97),
+        filePath: "game/concurrent_create.rpy",
+        content: 'label concurrent:\n    "Later"\n    return',
+        contentHash: "hash-concurrent",
+      });
+      await db.insert(projectFiles).values(concurrentFile);
+
+      const plannedOp = await insertPendingOp({
+        projectId: testProjectId,
+        projectFileId: createdFile.id,
+        operation: "CREATE",
+        remoteBasePath: "game/planned_create.rpy",
+        localPath: "game/planned_create.rpy",
+      });
+
+      let concurrentOpId: string | null = null;
+      vi.spyOn(gitlabFileService, "batchCommitFiles").mockImplementation(
+        async () => {
+          const concurrentOp = await insertPendingOp({
+            projectId: testProjectId,
+            projectFileId: concurrentFile.id,
+            operation: "CREATE",
+            remoteBasePath: "game/concurrent_create.rpy",
+            localPath: "game/concurrent_create.rpy",
+          });
+          concurrentOpId = concurrentOp.id;
+          return "commit-h2-scoped";
+        }
+      );
+
+      vi.spyOn(
+        gitlabRepoService,
+        "getFileContentWithMetadata"
+      ).mockResolvedValue({
+        content: null,
+        lastCommitId: null,
+        contentSha256: null,
+        blobId: null,
+      });
+
+      const result = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "Scoped finalize"
+      );
+
+      expect(result.status).toBe("COMPLETED");
+      expect(concurrentOpId).not.toBeNull();
+
+      const pendingRows = await db
+        .select()
+        .from(projectFilePendingOperations)
+        .where(eq(projectFilePendingOperations.projectId, testProjectId));
+      expect(pendingRows).toHaveLength(1);
+      expect(pendingRows[0]?.id).toBe(concurrentOpId);
+      expect(pendingRows[0]?.id).not.toBe(plannedOp.id);
+      expect(pendingRows[0]?.attemptStartedAt).toBeNull();
+    });
+
+    it("marks attempt metadata only on planned pending ops (H2)", async () => {
+      const plannedFile = createProjectFileFixture({
+        id: testUuid("56000000", 98),
+        filePath: "game/mark_planned.rpy",
+        content: "label planned:\n    return",
+        contentHash: "hash-mark-planned",
+      });
+      await db.insert(projectFiles).values(plannedFile);
+
+      const skippedFile = {
+        ...createProjectFileFixture({
+          id: testUuid("56000000", 99),
+          filePath: "game/mark_skipped.rpy",
+          content: "label skipped:\n    return",
+          contentHash: "hash-mark-skipped",
+        }),
+        // Not tombstoned: DELETE op is skipped by the planner.
+        deletedAt: null,
+      };
+      await db.insert(projectFiles).values(skippedFile);
+
+      const plannedOp = await insertPendingOp({
+        projectId: testProjectId,
+        projectFileId: plannedFile.id,
+        operation: "CREATE",
+        remoteBasePath: "game/mark_planned.rpy",
+        localPath: "game/mark_planned.rpy",
+      });
+      const skippedOp = await insertPendingOp({
+        projectId: testProjectId,
+        projectFileId: skippedFile.id,
+        operation: "DELETE",
+        remoteBasePath: "game/mark_skipped.rpy",
+        localPath: "game/mark_skipped.rpy",
+      });
+
+      vi.spyOn(gitlabFileService, "batchCommitFiles").mockImplementation(
+        async () => {
+          const [plannedRow] = await db
+            .select()
+            .from(projectFilePendingOperations)
+            .where(eq(projectFilePendingOperations.id, plannedOp.id));
+          const [skippedRow] = await db
+            .select()
+            .from(projectFilePendingOperations)
+            .where(eq(projectFilePendingOperations.id, skippedOp.id));
+          expect(plannedRow?.attemptStartedAt).not.toBeNull();
+          expect(plannedRow?.attemptBranch).toBe(testBranch);
+          expect(skippedRow?.attemptStartedAt).toBeNull();
+          return "commit-h2-mark";
+        }
+      );
+      vi.spyOn(
+        gitlabRepoService,
+        "getFileContentWithMetadata"
+      ).mockResolvedValue({
+        content: null,
+        lastCommitId: null,
+        contentSha256: null,
+        blobId: null,
+      });
+
+      const result = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "Mark planned only"
+      );
+
+      expect(result.status).toBe("COMPLETED");
+
+      const pendingRows = await db
+        .select()
+        .from(projectFilePendingOperations)
+        .where(eq(projectFilePendingOperations.projectId, testProjectId));
+      expect(pendingRows).toHaveLength(1);
+      expect(pendingRows[0]?.id).toBe(skippedOp.id);
+    });
   });
 
   describe("importFromGitlab", () => {
@@ -1600,7 +1751,21 @@ describe("GitLabSyncService (Integration)", () => {
     });
 
     it("should handle gitlab_wins conflict resolution", async () => {
-      // Create an existing scene
+      const localContent = 'label start:\n    "Local unpushed"\n    return';
+      const remoteContent =
+        'label start:\n    "Updated from GitLab"\n    return';
+      await db
+        .update(projectFiles)
+        .set({
+          content: localContent,
+          contentHash: calculateContentHash(localContent),
+          lastPushedContentHash: "stale-pushed-baseline",
+          remoteContentHash: calculateContentHash(
+            'label start:\n    "Previous remote"\n    return'
+          ),
+          originalContent: 'label start:\n    "Previous remote"\n    return',
+        })
+        .where(eq(projectFiles.id, testGitlabFileId));
       await db.insert(labelsTable).values(testScene);
 
       vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockResolvedValue(
@@ -1614,7 +1779,7 @@ describe("GitLabSyncService (Integration)", () => {
         gitlabRepoService,
         "getFileContentWithMetadata"
       ).mockResolvedValue({
-        content: 'label start:\n    "Updated from GitLab"\n    return',
+        content: remoteContent,
         lastCommitId: "remote-rev-import-2",
         contentSha256: null,
         blobId: null,
@@ -1645,10 +1810,31 @@ describe("GitLabSyncService (Integration)", () => {
 
       expect(result.status).toBe("COMPLETED");
       expect(result.conflictCount).toBe(0);
+
+      const [file] = await db
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.id, testGitlabFileId));
+      expect(file?.content).toBe(remoteContent);
+      expect(file?.hasRemoteConflict).toBe(false);
     });
 
     it("should handle manual_review conflict resolution", async () => {
-      // Create an existing scene
+      const localContent = 'label start:\n    "Local unpushed"\n    return';
+      const remoteContent =
+        'label start:\n    "Conflicting content"\n    return';
+      await db
+        .update(projectFiles)
+        .set({
+          content: localContent,
+          contentHash: calculateContentHash(localContent),
+          lastPushedContentHash: "stale-pushed-baseline",
+          remoteContentHash: calculateContentHash(
+            'label start:\n    "Previous remote"\n    return'
+          ),
+          originalContent: 'label start:\n    "Previous remote"\n    return',
+        })
+        .where(eq(projectFiles.id, testGitlabFileId));
       await db.insert(labelsTable).values(testScene);
 
       vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockResolvedValue(
@@ -1662,7 +1848,7 @@ describe("GitLabSyncService (Integration)", () => {
         gitlabRepoService,
         "getFileContentWithMetadata"
       ).mockResolvedValue({
-        content: 'label start:\n    "Conflicting content"\n    return',
+        content: remoteContent,
         lastCommitId: "remote-rev-import-3",
         contentSha256: null,
         blobId: null,
@@ -1693,6 +1879,316 @@ describe("GitLabSyncService (Integration)", () => {
 
       expect(result.status).toBe("COMPLETED");
       expect(result.conflictCount).toBeGreaterThanOrEqual(1);
+
+      const [file] = await db
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.id, testGitlabFileId));
+      expect(file?.content).toBe(localContent);
+      expect(file?.hasRemoteConflict).toBe(true);
+      expect(file?.remoteContentHash).toBe(calculateContentHash(remoteContent));
+    });
+
+    it("preserves dirty local content under branchforge_wins (H1)", async () => {
+      const localContent = 'label start:\n    "Local unpushed"\n    return';
+      const remoteContent = 'label start:\n    "Remote wins text"\n    return';
+      await db
+        .update(projectFiles)
+        .set({
+          content: localContent,
+          contentHash: calculateContentHash(localContent),
+          lastPushedContentHash: "stale-pushed-baseline",
+          remoteContentHash: calculateContentHash(
+            'label start:\n    "Previous remote"\n    return'
+          ),
+          originalContent: 'label start:\n    "Previous remote"\n    return',
+        })
+        .where(eq(projectFiles.id, testGitlabFileId));
+      await db.insert(labelsTable).values(testScene);
+
+      vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockResolvedValue(
+        "abc123def456"
+      );
+      vi.spyOn(gitlabRepoService, "listRpyFiles").mockResolvedValue([
+        { name: "script.rpy", path: "game/script.rpy" } as any,
+      ]);
+      vi.spyOn(
+        gitlabRepoService,
+        "getFileContentWithMetadata"
+      ).mockResolvedValue({
+        content: remoteContent,
+        lastCommitId: "remote-rev-h1",
+        contentSha256: null,
+        blobId: null,
+      });
+      vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockReturnValue({
+        labels: [
+          {
+            label: "start",
+            lineNumber: 1,
+            dialogue: [
+              { speaker: null, text: "Remote wins text", lineNumber: 2 },
+            ],
+            choices: [],
+            jumps: [],
+          },
+        ],
+        characters: [],
+        fileType: "STORY",
+      });
+
+      const result = await importFromGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "branchforge_wins" as ConflictResolution
+      );
+
+      expect(result.status).toBe("COMPLETED");
+
+      const [file] = await db
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.id, testGitlabFileId));
+      expect(file?.content).toBe(localContent);
+      expect(file?.contentHash).toBe(calculateContentHash(localContent));
+      expect(file?.lastPushedContentHash).toBe("stale-pushed-baseline");
+      expect(file?.hasRemoteConflict).toBe(true);
+      expect(file?.remoteContentHash).toBe(calculateContentHash(remoteContent));
+    });
+
+    it("preserves dirty SETTINGS file content under branchforge_wins (H1)", async () => {
+      const localContent = 'define config.name = _("Local Game")\n';
+      const remoteContent = 'define config.name = _("Remote Game")\n';
+      await db
+        .update(projectFiles)
+        .set({
+          fileType: "SETTINGS",
+          content: localContent,
+          contentHash: calculateContentHash(localContent),
+          lastPushedContentHash: "stale-settings-baseline",
+          remoteContentHash: calculateContentHash(
+            'define config.name = _("Old Game")\n'
+          ),
+          originalContent: 'define config.name = _("Old Game")\n',
+        })
+        .where(eq(projectFiles.id, testGitlabFileId));
+
+      vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockResolvedValue(
+        "abc123def456"
+      );
+      vi.spyOn(gitlabRepoService, "listRpyFiles").mockResolvedValue([
+        { name: "script.rpy", path: "game/script.rpy" } as any,
+      ]);
+      vi.spyOn(
+        gitlabRepoService,
+        "getFileContentWithMetadata"
+      ).mockResolvedValue({
+        content: remoteContent,
+        lastCommitId: "remote-rev-settings",
+        contentSha256: null,
+        blobId: null,
+      });
+      vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockReturnValue({
+        labels: [],
+        characters: [],
+        fileType: "SETTINGS",
+      });
+
+      const result = await importFromGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "branchforge_wins" as ConflictResolution
+      );
+
+      expect(result.status).toBe("COMPLETED");
+      const [file] = await db
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.id, testGitlabFileId));
+      expect(file?.content).toBe(localContent);
+      expect(file?.lastPushedContentHash).toBe("stale-settings-baseline");
+      expect(file?.hasRemoteConflict).toBe(true);
+    });
+
+    it("imports remote-only changes under branchforge_wins when local is clean", async () => {
+      const localContent = 'label start:\n    "Synced"\n    return';
+      const remoteContent =
+        'label start:\n    "Remote only change"\n    return';
+      const localHash = calculateContentHash(localContent);
+      await db
+        .update(projectFiles)
+        .set({
+          content: localContent,
+          contentHash: localHash,
+          lastPushedContentHash: localHash,
+          remoteContentHash: calculateContentHash(localContent),
+          originalContent: localContent,
+          hasRemoteConflict: false,
+        })
+        .where(eq(projectFiles.id, testGitlabFileId));
+
+      vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockResolvedValue(
+        "abc123def456"
+      );
+      vi.spyOn(gitlabRepoService, "listRpyFiles").mockResolvedValue([
+        { name: "script.rpy", path: "game/script.rpy" } as any,
+      ]);
+      vi.spyOn(
+        gitlabRepoService,
+        "getFileContentWithMetadata"
+      ).mockResolvedValue({
+        content: remoteContent,
+        lastCommitId: "remote-rev-clean",
+        contentSha256: null,
+        blobId: null,
+      });
+      vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockReturnValue({
+        labels: [
+          {
+            label: "start",
+            lineNumber: 1,
+            dialogue: [
+              { speaker: null, text: "Remote only change", lineNumber: 2 },
+            ],
+            choices: [],
+            jumps: [],
+          },
+        ],
+        characters: [],
+        fileType: "STORY",
+      });
+
+      const result = await importFromGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "branchforge_wins" as ConflictResolution
+      );
+
+      expect(result.status).toBe("COMPLETED");
+      const [file] = await db
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.id, testGitlabFileId));
+      expect(file?.content).toBe(remoteContent);
+      expect(file?.hasRemoteConflict).toBe(false);
+    });
+
+    it("fails the whole pull when any file fetch fails (M1)", async () => {
+      const localContent = 'label start:\n    "Keep me"\n    return';
+      await db
+        .update(projectFiles)
+        .set({
+          content: localContent,
+          contentHash: calculateContentHash(localContent),
+          lastPushedContentHash: calculateContentHash(localContent),
+        })
+        .where(eq(projectFiles.id, testGitlabFileId));
+
+      vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockResolvedValue(
+        "abc123def456"
+      );
+      vi.spyOn(gitlabRepoService, "listRpyFiles").mockResolvedValue([
+        { name: "script.rpy", path: "game/script.rpy" } as any,
+        { name: "other.rpy", path: "game/other.rpy" } as any,
+      ]);
+      vi.spyOn(
+        gitlabRepoService,
+        "getFileContentWithMetadata"
+      ).mockImplementation(async (_projectId, _userId, path) => {
+        if (path === "game/other.rpy") {
+          throw new Error("fetch failed for other.rpy");
+        }
+        return {
+          content: 'label start:\n    "Remote"\n    return',
+          lastCommitId: "remote-rev-partial-fetch",
+          contentSha256: null,
+          blobId: null,
+        };
+      });
+
+      const result = await importFromGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "gitlab_wins" as ConflictResolution
+      );
+
+      expect(result.status).toBe("FAILED");
+      expect(result.errorMessage).toContain("fetch failed");
+
+      const [file] = await db
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.id, testGitlabFileId));
+      expect(file?.content).toBe(localContent);
+    });
+
+    it("rolls back file upserts when incoming-jump recompute fails (M1)", async () => {
+      const localContent = 'label start:\n    "Before import"\n    return';
+      const remoteContent = 'label start:\n    "After import"\n    return';
+      await db
+        .update(projectFiles)
+        .set({
+          content: localContent,
+          contentHash: calculateContentHash(localContent),
+          lastPushedContentHash: calculateContentHash(localContent),
+          remoteContentHash: calculateContentHash(localContent),
+          originalContent: localContent,
+        })
+        .where(eq(projectFiles.id, testGitlabFileId));
+
+      vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockResolvedValue(
+        "abc123def456"
+      );
+      vi.spyOn(gitlabRepoService, "listRpyFiles").mockResolvedValue([
+        { name: "script.rpy", path: "game/script.rpy" } as any,
+      ]);
+      vi.spyOn(
+        gitlabRepoService,
+        "getFileContentWithMetadata"
+      ).mockResolvedValue({
+        content: remoteContent,
+        lastCommitId: "remote-rev-rollback",
+        contentSha256: null,
+        blobId: null,
+      });
+      vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockReturnValue({
+        labels: [
+          {
+            label: "start",
+            lineNumber: 1,
+            dialogue: [{ speaker: null, text: "After import", lineNumber: 2 }],
+            choices: [],
+            jumps: [],
+          },
+        ],
+        characters: [],
+        fileType: "STORY",
+      });
+      vi.spyOn(
+        labelsService,
+        "updateIncomingJumpsForLabels"
+      ).mockRejectedValueOnce(new Error("incoming jumps failed"));
+
+      const result = await importFromGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "gitlab_wins" as ConflictResolution
+      );
+
+      expect(result.status).toBe("FAILED");
+      expect(result.errorMessage).toContain("incoming jumps failed");
+
+      const [file] = await db
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.id, testGitlabFileId));
+      expect(file?.content).toBe(localContent);
+      expect(file?.contentHash).toBe(calculateContentHash(localContent));
     });
 
     it("should handle API errors", async () => {

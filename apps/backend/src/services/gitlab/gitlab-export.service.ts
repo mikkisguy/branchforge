@@ -66,6 +66,7 @@ import { validateGitLabUrl } from "../encryption.service.js";
 import { getDecryptedToken } from "./gitlab-integration.service.js";
 import { requireProjectOwnership } from "../authz.service.js";
 import { lockProject } from "../project-files-operations.service.js";
+import { localContentBaselineHash } from "../project-file-baseline.js";
 import { logWarn } from "../../lib/logger.js";
 import { NotFoundError } from "../../middleware/error-handler.middleware.js";
 import type { Transaction } from "../../db/types.js";
@@ -97,19 +98,6 @@ interface ExportPlan {
   operations: PlannedOperation[];
   /** Active files whose content was pushed as a plain update (no pending op). */
   contentUpdatedFiles: Array<{ file: ProjectFileRow; content: string }>;
-}
-
-/** Last-pushed LOCAL baseline for a file, falling back to import-time content. */
-function localBaselineHash(file: {
-  lastPushedContentHash: string | null;
-  originalContent: string | null;
-}): string | null {
-  if (file.lastPushedContentHash) return file.lastPushedContentHash;
-  if (!file.originalContent) return null;
-  const cleaned = extractAndStripRpySymbols(
-    file.originalContent
-  ).cleanedContent;
-  return calculateContentHash(cleaned);
 }
 
 function buildPlannedActions(
@@ -174,7 +162,7 @@ function buildPlannedActions(
   for (const file of files) {
     if (file.deletedAt) continue;
     if (opsByFileId.has(file.id)) continue;
-    const baseline = localBaselineHash(file);
+    const baseline = localContentBaselineHash(file);
     if (baseline === null || baseline === file.contentHash) continue;
     actions.push({
       action: "update",
@@ -413,10 +401,14 @@ async function finalizeSuccessfulPush(
       .where(eq(projectFiles.id, file.id));
   }
 
-  // All pending structural rows for this project are consumed.
-  await tx
-    .delete(projectFilePendingOperations)
-    .where(eq(projectFilePendingOperations.projectId, projectId));
+  // Consume only the pending rows that were included in this push plan.
+  // Concurrent structural ops created during the remote call must survive.
+  const plannedIds = plan.operations.map((item) => item.op.id);
+  if (plannedIds.length > 0) {
+    await tx
+      .delete(projectFilePendingOperations)
+      .where(inArray(projectFilePendingOperations.id, plannedIds));
+  }
 }
 
 /**
@@ -528,10 +520,11 @@ export async function exportToGitlab(
     // Reconciliation: a previously marked attempt without confirmed success
     // must be reconciled before a fresh push. The previous attempt is only
     // treated as success if the ENTIRE atomic action set is observed on the
-    // remote.
+    // remote. Only rows carrying the attempt marker are part of that attempt.
     const unresolved = ops.filter((op) => op.attemptStartedAt !== null);
     if (unresolved.length > 0) {
-      const plan = buildPlannedActions(files, ops);
+      const unresolvedIds = unresolved.map((op) => op.id);
+      const plan = buildPlannedActions(files, unresolved);
       const observed = await verifyActionSetObserved(
         projectId,
         userId,
@@ -563,7 +556,7 @@ export async function exportToGitlab(
         };
       }
       // Not observed: the previous attempt did not fully apply. Clear the
-      // attempt markers and proceed with a fresh push.
+      // attempt markers on the marked rows only and proceed with a fresh push.
       await db
         .update(projectFilePendingOperations)
         .set({
@@ -571,7 +564,7 @@ export async function exportToGitlab(
           attemptBranch: null,
           updatedAt: new Date(),
         })
-        .where(eq(projectFilePendingOperations.projectId, projectId));
+        .where(inArray(projectFilePendingOperations.id, unresolvedIds));
     }
 
     // Active (non-tombstoned) files for label patching and generated files.
@@ -697,18 +690,21 @@ export async function exportToGitlab(
       // content baseline.
       await preflightConflicts(projectId, userId, targetBranch, files, plan);
 
-      // Durably mark the exact attempt BEFORE the remote call.
-      await db.transaction(async (tx) => {
-        await lockProject(tx, projectId);
-        await tx
-          .update(projectFilePendingOperations)
-          .set({
-            attemptBranch: targetBranch,
-            attemptStartedAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(eq(projectFilePendingOperations.projectId, projectId));
-      });
+      // Durably mark the exact planned attempt BEFORE the remote call.
+      const plannedIds = plan.operations.map((item) => item.op.id);
+      if (plannedIds.length > 0) {
+        await db.transaction(async (tx) => {
+          await lockProject(tx, projectId);
+          await tx
+            .update(projectFilePendingOperations)
+            .set({
+              attemptBranch: targetBranch,
+              attemptStartedAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(inArray(projectFilePendingOperations.id, plannedIds));
+        });
+      }
 
       // ONE GitLab commit containing all required explicit actions.
       const commitId = await batchCommitFiles(

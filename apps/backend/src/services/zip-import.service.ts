@@ -88,7 +88,7 @@ interface PreProcessedFile {
   contentHash: string;
 }
 
-type ProcessFileAction = "imported" | "updated" | "skipped" | "failed";
+type ProcessFileAction = "imported" | "updated" | "skipped";
 
 interface ProcessFileInTxResult {
   action: ProcessFileAction;
@@ -283,11 +283,12 @@ function preProcessFiles(extractedFiles: ExtractedFile[]): PreProcessedFile[] {
  * 1. Load and parse the zip file
  * 2. Extract all .rpy files
  * 3. Pre-process all files (parse RPY, strip symbols, calculate hashes) - outside transaction
- * 4. In a single transaction, process each file with savepoints for error isolation
+ * 4. In a single transaction, process each file
  *    - Check if already exists (by project + source + path)
  *    - If exists with same hash: skip (no-op for idempotency)
  *    - If exists with different hash: update file content and sync labels
  *    - If not exists: insert new file and sync labels
+ *    - Any file failure aborts and rolls back the entire import
  * 5. Promote extracted symbols (characters, variables, stats) into the database
  * 6. Compute incomingJumps for all project labels (atomic with step 4 + 5)
  *
@@ -336,16 +337,15 @@ export async function importZipFile(
     let filesImported = 0;
     let filesUpdated = 0;
     let filesSkipped = 0;
-    let filesFailed = 0;
     let labelsCreated = 0;
 
     const charactersByTag = new Map<string, DetectedCharacterStatement>();
     const variablesByKey = new Map<string, DetectedDefaultStatement>();
     const statsByKey = new Map<string, DetectedDefaultStatement>();
 
-    // Step 4: Process all files in a single transaction with savepoints.
-    // Symbol promotion and incomingJumps computation are also inside
-    // this transaction for atomicity.
+    // Step 4: Process all files in a single transaction.
+    // Any per-file failure aborts the whole import so callers never see a
+    // partial success with some ZIP files committed and others missing.
     await db.transaction(async (tx) => {
       let fileIndex = 0;
       for (const entry of preProcessedFiles) {
@@ -366,15 +366,9 @@ export async function importZipFile(
           case "skipped":
             filesSkipped++;
             break;
-          case "failed":
-            filesFailed++;
-            break;
         }
 
-        // Only accumulate symbols after the per-file savepoint has
-        // succeeded (imported or updated). If the savepoint rolled
-        // back (failed) or the file was skipped, we must not promote
-        // its symbols.
+        // Accumulate symbols only after a successful per-file write.
         if (result.action === "imported" || result.action === "updated") {
           accumulateSymbols(entry, charactersByTag, variablesByKey, statsByKey);
         }
@@ -414,7 +408,7 @@ export async function importZipFile(
       filesImported,
       filesUpdated,
       filesSkipped,
-      filesFailed,
+      filesFailed: 0,
       labelsCreated,
     };
   } catch (error) {
@@ -445,11 +439,11 @@ export async function importZipFile(
 
 /**
  * Process a single pre-processed RPY file inside the import transaction.
- * Uses savepoints to isolate per-file failures so one bad file does not
- * abort the entire import.
+ * Uses a savepoint so a failure can roll back that file's writes before the
+ * error is rethrown to abort the entire import.
  *
  * NOTE: Symbol accumulation is done by the caller (importZipFile) after
- * the savepoint succeeds, so that rolled-back files never leak symbols.
+ * the file succeeds, so that rolled-back files never leak symbols.
  */
 async function processFileInTransaction(
   tx: Transaction,
@@ -548,7 +542,7 @@ async function processFileInTransaction(
       return { action: "imported", labelsCreated };
     }
   } catch (error) {
-    // Rollback to savepoint on error, continue with next file
+    // Roll back this file's writes, then abort the entire import.
     try {
       await tx.execute(sql.raw(`ROLLBACK TO SAVEPOINT ${savepointName}`));
     } catch {
@@ -568,7 +562,9 @@ async function processFileInTransaction(
       error: error instanceof Error ? error.message : "Unknown error",
     });
 
-    return { action: "failed", labelsCreated: 0 };
+    throw error instanceof Error
+      ? error
+      : new Error(`Failed to import file: ${entry.filePath}`);
   }
 }
 

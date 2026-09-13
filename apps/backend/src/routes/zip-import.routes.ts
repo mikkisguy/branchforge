@@ -19,7 +19,7 @@ import {
   type ImportZipResult,
   importProjectFromZip,
 } from "../services/zip-import.service.js";
-import { requireProjectAccess } from "../services/authz.service.js";
+import { requireProjectOwnership } from "../services/authz.service.js";
 import type { MultipartFile } from "@fastify/multipart";
 import {
   HttpError,
@@ -105,8 +105,8 @@ async function importZipHandler(
   const user = request.user!;
 
   try {
-    // Verify project access
-    await requireProjectAccess(projectId, user.id);
+    // Verify project ownership (mutating import is owner-only)
+    await requireProjectOwnership(projectId, user.id);
 
     // Parse multipart form data with fileSize limit enforced at stream creation
     let data;

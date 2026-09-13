@@ -33,11 +33,8 @@ import {
 } from "../middleware/error-handler.middleware.js";
 import { requireProjectOwnership } from "./authz.service.js";
 import { canonicalizeRpyFilePath } from "@branchforge/shared";
-import { calculateContentHash } from "../lib/hash.js";
-import {
-  computeCommonDirectoryPrefix,
-  extractAndStripRpySymbols,
-} from "./rpy-statements.service.js";
+import { computeCommonDirectoryPrefix } from "./rpy-statements.service.js";
+import { hasUnpushedLocalContent } from "./project-file-baseline.js";
 import { parseRPYFileWithLabels } from "./rpy-parser.service.js";
 import { logWarn } from "../lib/logger.js";
 import type {
@@ -1045,15 +1042,7 @@ export async function getPendingStructuralSummary(
   // pre-migration GitLab projects expose the same edits that will be pushed.
   const contentChanges = activeFiles.filter((f) => {
     if (createPendingFileIds.has(f.id)) return false;
-    const baseline =
-      f.lastPushedContentHash ??
-      (f.originalContent != null
-        ? calculateContentHash(
-            extractAndStripRpySymbols(f.originalContent).cleanedContent
-          )
-        : null);
-    if (baseline === null) return false;
-    return f.contentHash !== baseline;
+    return hasUnpushedLocalContent(f);
   });
 
   return {

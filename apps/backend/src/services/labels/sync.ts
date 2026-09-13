@@ -1051,27 +1051,38 @@ export async function syncLabelsFromFile(
     // Step 3: Validate RPY content
     validateRPYContent(rpyContent, parsed);
 
-    // Step 4: Execute sync in atomic transaction
-    // If an external transaction is provided, use it directly; otherwise create a new one
-    const syncResult = await (externalTx
-      ? syncLabelsInTransaction(
-          dbOrTx as Transaction,
+    // Step 4: Execute sync in atomic transaction.
+    // Partial per-label failures must roll back — throw inside the transaction
+    // (standalone or external) so successful sibling labels cannot commit alone.
+    const runSync = async (tx: Transaction) => {
+      const syncResult = await syncLabelsInTransaction(
+        tx,
+        projectId,
+        parsed,
+        rpyContent,
+        sourceId,
+        skipCleanup
+      );
+
+      if (syncResult.errors.length > 0) {
+        logError(LogEventType.SERVICE_ERROR, {
+          event: "labels.sync_partial_failure",
           projectId,
-          parsed,
-          rpyContent,
           sourceId,
-          skipCleanup
-        )
-      : dbOrTx.transaction((tx: Transaction) =>
-          syncLabelsInTransaction(
-            tx,
-            projectId,
-            parsed,
-            rpyContent,
-            sourceId,
-            skipCleanup
-          )
-        ));
+          errorCount: syncResult.errors.length,
+          errors: syncResult.errors,
+        });
+        throw new ValidationError(
+          `Label sync failed with ${syncResult.errors.length} error(s)`
+        );
+      }
+
+      return syncResult;
+    };
+
+    const syncResult = await (externalTx
+      ? runSync(dbOrTx as Transaction)
+      : dbOrTx.transaction((tx: Transaction) => runSync(tx)));
 
     // Return success
     return {

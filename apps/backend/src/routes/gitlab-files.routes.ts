@@ -1,26 +1,14 @@
 /**
  * GitLab Files Routes
  *
- * Sub-plugin for GitLab file operations: get stored files and update file content.
+ * Sub-plugin for reading stored GitLab files.
  */
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { authenticate } from "../middleware/auth.middleware.js";
-import {
-  validateBody,
-  validateParams,
-} from "../middleware/validation.middleware.js";
-import { ConflictError } from "../middleware/error-handler.middleware.js";
-import {
-  getGitLabFilesWithScenes,
-  updateGitLabFileContent,
-} from "../services/gitlab.service.js";
-import {
-  projectIdParamsSchema,
-  fileIdParamsSchema,
-  updateGitLabFileContentSchema,
-  type UpdateGitLabFileContentInput,
-} from "../lib/validation.js";
+import { validateParams } from "../middleware/validation.middleware.js";
+import { getGitLabFilesWithScenes } from "../services/gitlab.service.js";
+import { projectIdParamsSchema } from "../lib/validation.js";
 import {
   getAuthenticatedUserId,
   handleKnownRouteErrors,
@@ -57,49 +45,6 @@ async function getGitLabFilesHandler(
   }
 }
 
-/**
- * Update GitLab file content
- *
- * PUT /api/gitlab/files/:fileId
- * Body: { content: string }
- *
- * Updates file content (Script Mode editing)
- * Also re-parses the content to update associated scenes
- */
-async function updateGitLabFileHandler(
-  request: FastifyRequest<{
-    Params: { fileId: string };
-    Body: UpdateGitLabFileContentInput;
-  }>,
-  reply: FastifyReply
-): Promise<void> {
-  const userId = getAuthenticatedUserId(request);
-  const { fileId } = request.params;
-  const { content } = request.body;
-
-  try {
-    const result = await updateGitLabFileContent(fileId, content, userId);
-    reply.send(result);
-  } catch (err) {
-    if (err instanceof ConflictError) {
-      reply.status(409).send({
-        error: "Sync already in progress",
-        message: err.message,
-      });
-      return;
-    }
-    if (handleKnownRouteErrors(err, reply)) return;
-    request.log.error(
-      { err, fileId },
-      "updateGitLabFileHandler: Failed to update GitLab file"
-    );
-    reply.status(500).send({
-      error: "Failed to update GitLab file",
-      message: "An internal error occurred",
-    });
-  }
-}
-
 export async function gitlabFilesRoutes(
   fastify: FastifyInstance
 ): Promise<void> {
@@ -112,20 +57,5 @@ export async function gitlabFilesRoutes(
       preValidation: validateParams(projectIdParamsSchema),
     },
     getGitLabFilesHandler
-  );
-
-  fastify.put<{
-    Params: { fileId: string };
-    Body: UpdateGitLabFileContentInput;
-  }>(
-    "/gitlab/files/:fileId",
-    {
-      onRequest: [authenticate],
-      preValidation: [
-        validateParams(fileIdParamsSchema),
-        validateBody(updateGitLabFileContentSchema),
-      ],
-    },
-    updateGitLabFileHandler
   );
 }

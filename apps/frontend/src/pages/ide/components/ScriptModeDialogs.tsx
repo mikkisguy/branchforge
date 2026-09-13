@@ -1,5 +1,6 @@
 import { GitLabSyncDialog } from "@/components/script-mode/GitLabSyncDialog";
 import { ZipImportFilesDialog } from "@/components/ide-shared/ZipImportFilesDialog";
+import type { UserRole } from "@branchforge/shared";
 
 interface ScriptModeDialogsProps {
   projectId?: string;
@@ -10,6 +11,7 @@ interface ScriptModeDialogsProps {
   onSyncDialogChange: (open: boolean) => void;
   showZipImportDialog: boolean;
   onZipImportDialogChange: (open: boolean) => void;
+  projectVisibility?: UserRole;
 }
 
 export function ScriptModeDialogs({
@@ -21,6 +23,7 @@ export function ScriptModeDialogs({
   onSyncDialogChange,
   showZipImportDialog,
   onZipImportDialogChange,
+  projectVisibility,
 }: ScriptModeDialogsProps) {
   return (
     <>
@@ -35,7 +38,7 @@ export function ScriptModeDialogs({
         />
       )}
 
-      {projectId && (
+      {projectId && projectVisibility === "OWNER" && (
         <ZipImportFilesDialog
           open={showZipImportDialog}
           onOpenChange={onZipImportDialogChange}

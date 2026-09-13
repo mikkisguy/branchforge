@@ -18,14 +18,11 @@ describe("AmbientBackdrop", () => {
 
   it("renders a static ambient glow", () => {
     const { container } = render(<AmbientBackdrop />);
-    const glow = container.querySelector<HTMLElement>(
-      ".ambient-backdrop-glow"
-    );
+    const glow = container.querySelector<HTMLElement>(".ambient-backdrop-glow");
 
     expect(glow).toBeInTheDocument();
     expect(glow?.style.animation).toBe("");
     expect(glow?.style.willChange).toBe("");
     expect(container.querySelector("style")).toBeNull();
   });
-
 });

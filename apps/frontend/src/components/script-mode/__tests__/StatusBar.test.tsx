@@ -1,10 +1,17 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { StatusBar } from "../StatusBar";
+import { ToastProvider } from "@/contexts/ToastContext";
+import {
+  ProjectFileTransferProvider,
+  useProjectFileTransferActions,
+} from "@/components/workspace/ProjectFileTransferContext";
 
 vi.mock("@/contexts/ToastContext", () => ({
   useToast: () => ({ error: vi.fn() }),
+  ToastProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
 vi.mock("@/components/script-mode/GitLabSyncDialog", () => ({
@@ -25,10 +32,26 @@ vi.mock("@/components/ui/confirm-dialog", () => ({
   ConfirmDialog: () => null,
 }));
 
-describe("StatusBar", () => {
-  it("groups GitLab and ZIP transfer actions in a labeled menu", async () => {
-    const user = userEvent.setup();
+vi.mock("@/components/ide-shared/ZipImportFilesDialog", () => ({
+  ZipImportFilesDialog: () => null,
+}));
 
+function TransferActionsProbe() {
+  const { actions } = useProjectFileTransferActions();
+  return (
+    <div>
+      <span data-testid="zip-import-action">
+        {actions?.onImportZip ? "available" : "hidden"}
+      </span>
+      <span data-testid="zip-export-action">
+        {actions?.onExportZip ? "available" : "hidden"}
+      </span>
+    </div>
+  );
+}
+
+describe("StatusBar", () => {
+  it("leaves GitLab transfer actions out of the desktop status bar", () => {
     render(
       <StatusBar
         projectId="project-1"
@@ -38,26 +61,9 @@ describe("StatusBar", () => {
     );
 
     expect(screen.getByText("main")).toBeInTheDocument();
-    const transferButton = screen.getByRole("button", {
-      name: "Import / Export",
-    });
-    expect(transferButton).toHaveClass(
-      "border-border/60",
-      "bg-transparent",
-      "text-muted-foreground"
-    );
-    expect(transferButton).not.toHaveClass("text-[var(--theme-color)]");
-    await user.click(transferButton);
-
     expect(
-      screen.getByRole("menuitem", { name: /pull from gitlab/i })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("menuitem", { name: /push to gitlab/i })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("menuitem", { name: /export zip/i })
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: "Import / Export" })
+    ).not.toBeInTheDocument();
   });
 
   it("can leave branch rendering to the shared editor metadata", () => {
@@ -72,32 +78,8 @@ describe("StatusBar", () => {
 
     expect(screen.queryByText("main")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", {
-        name: "Import / Export",
-      })
-    ).toBeInTheDocument();
-  });
-
-  it("keeps ZIP import available from the same menu", async () => {
-    const user = userEvent.setup();
-    const onOpenZipImportDialog = vi.fn();
-
-    render(
-      <StatusBar
-        projectId="project-1"
-        fileSourceType="ZIP"
-        onOpenZipImportDialog={onOpenZipImportDialog}
-      />
-    );
-
-    await user.click(
-      screen.getByRole("button", {
-        name: "Import / Export",
-      })
-    );
-    await user.click(screen.getByRole("menuitem", { name: /import zip/i }));
-
-    expect(onOpenZipImportDialog).toHaveBeenCalledOnce();
+      screen.queryByRole("button", { name: "Import / Export" })
+    ).not.toBeInTheDocument();
   });
 
   it("uses an expandable mobile row instead of the desktop dropdown", async () => {
@@ -122,5 +104,108 @@ describe("StatusBar", () => {
     await user.click(screen.getByRole("button", { name: /pull from gitlab/i }));
 
     expect(screen.getByRole("dialog")).toHaveTextContent("import GitLab");
+  });
+
+  it("omits the reader's Import ZIP option from the mobile transfer menu", async () => {
+    const user = userEvent.setup();
+    const onOpenZipImportDialog = vi.fn();
+
+    render(
+      <StatusBar
+        projectId="project-1"
+        fileSourceType="ZIP"
+        projectVisibility="READER"
+        onOpenZipImportDialog={onOpenZipImportDialog}
+        mobile
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /import \/ export/i }));
+
+    expect(
+      screen.queryByRole("button", { name: "Import ZIP" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Export ZIP" })
+    ).toBeInTheDocument();
+    expect(onOpenZipImportDialog).not.toHaveBeenCalled();
+  });
+
+  it("offers the owner's Import ZIP option in the mobile transfer menu", async () => {
+    const user = userEvent.setup();
+    const onOpenZipImportDialog = vi.fn();
+
+    render(
+      <StatusBar
+        projectId="project-1"
+        fileSourceType="ZIP"
+        projectVisibility="OWNER"
+        onOpenZipImportDialog={onOpenZipImportDialog}
+        mobile
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /import \/ export/i }));
+    await user.click(screen.getByRole("button", { name: "Import ZIP" }));
+
+    expect(onOpenZipImportDialog).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not publish the ZIP import override for readers", async () => {
+    render(
+      <ToastProvider>
+        <ProjectFileTransferProvider
+          projectId="project-1"
+          fileSourceType="ZIP"
+          projectVisibility="READER"
+        >
+          <TransferActionsProbe />
+          <StatusBar
+            projectId="project-1"
+            fileSourceType="ZIP"
+            projectVisibility="READER"
+            onOpenZipImportDialog={vi.fn()}
+          />
+        </ProjectFileTransferProvider>
+      </ToastProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("zip-import-action")).toHaveTextContent(
+        "hidden"
+      );
+    });
+    expect(screen.getByTestId("zip-export-action")).toHaveTextContent(
+      "available"
+    );
+  });
+
+  it("publishes the ZIP import override for owners", async () => {
+    render(
+      <ToastProvider>
+        <ProjectFileTransferProvider
+          projectId="project-1"
+          fileSourceType="ZIP"
+          projectVisibility="OWNER"
+        >
+          <TransferActionsProbe />
+          <StatusBar
+            projectId="project-1"
+            fileSourceType="ZIP"
+            projectVisibility="OWNER"
+            onOpenZipImportDialog={vi.fn()}
+          />
+        </ProjectFileTransferProvider>
+      </ToastProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("zip-import-action")).toHaveTextContent(
+        "available"
+      );
+    });
+    expect(screen.getByTestId("zip-export-action")).toHaveTextContent(
+      "available"
+    );
   });
 });

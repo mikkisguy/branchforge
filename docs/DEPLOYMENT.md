@@ -23,13 +23,21 @@ This guide covers deploying BranchForge to production.
    ```bash
    cp .env.example .env
    # Edit .env with your production values
+   mkdir -p uploads
+   sudo chown 1001:1001 uploads
    ```
 
 3. **Start services:**
 
    ```bash
+   docker compose pull
    docker compose up -d
    ```
+
+   Compose first runs the one-shot `migrate` service. On a fresh deployment,
+   the backend starts only after all pending migrations succeed. During an
+   upgrade, an existing backend can remain available, but Compose will not
+   replace it with the new image unless the migration succeeds.
 
 4. **Access your application:**
    - Frontend: http://localhost
@@ -42,9 +50,19 @@ This guide covers deploying BranchForge to production.
 Update `.env` for production:
 
 ```bash
-# Database
-DATABASE_URL=postgresql://user:password@postgres:5432/branchforge
-DATABASE_URL_TEST=postgresql://user:password@postgres:5432/branchforge_test
+# Docker Compose database
+# POSTGRES_USER and POSTGRES_PASSWORD need URL-encoded variants for
+# DATABASE_URL when they contain characters outside letters, digits, - _ . ~.
+# See "Database URI credential encoding" below.
+POSTGRES_USER=branchforge
+POSTGRES_USER_URL_ENCODED=branchforge
+POSTGRES_PASSWORD=generate-strong-password
+POSTGRES_PASSWORD_URL_ENCODED=generate-strong-password
+POSTGRES_DB=branchforge
+PGPORT=5432
+
+# Optional: how long a deploy waits for another migration job (default: 60000)
+DB_MIGRATION_LOCK_TIMEOUT_MS=60000
 
 # Server
 PORT=3000
@@ -58,12 +76,6 @@ SESSION_SECRET=generate-a-long-random-string-at-least-32-chars
 # clamped to 3600000–2592000000 = 1h–30d). With sliding expiry enabled,
 # this is the inactivity timeout, not a fixed-from-login cap.
 # SESSION_MAX_AGE=86400000
-
-# Docker (prod)
-POSTGRES_USER=branchforge
-POSTGRES_PASSWORD=generate-strong-password
-POSTGRES_DB=branchforge
-PGPORT=5432
 
 # Encryption key for GitLab PAT (CRITICAL: Generate with Node.js)
 ENCRYPTION_KEY=generate-with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -93,40 +105,175 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ## Docker Compose Configuration
 
-The default `docker-compose.yml` includes:
+The default `docker-compose.yml` uses the published backend image for both the
+one-shot migration job and the application. Its relevant dependency chain is:
 
 ```yaml
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
-      POSTGRES_USER: branchforge
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: branchforge
+      # The postgres container receives the RAW password. Never pre-encode it
+      # here — the server needs the literal characters to authenticate.
+      POSTGRES_USER: ${POSTGRES_USER:-branchforge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-branchforge}
+      POSTGRES_DB: ${POSTGRES_DB:-branchforge}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # postgres:18 changed the data directory layout: PGDATA now lives in a
+      # versioned subdirectory (e.g. /var/lib/postgresql/18/docker) instead of
+      # /var/lib/postgresql/data, so the named volume mounts at the parent.
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-branchforge} -d ${POSTGRES_DB:-branchforge}",
+        ]
+
+  migrate:
+    image: ghcr.io/mikkisguy/branchforge-backend:${IMAGE_TAG:-beta}
+    command: ["node", "apps/backend/dist/db/migrate.js"]
+    environment:
+      # URI-composed credentials must be percent-encoded — see
+      # "Database URI password encoding" below.
+      DATABASE_URL: postgresql://${POSTGRES_USER_URL_ENCODED:-branchforge}:${POSTGRES_PASSWORD_URL_ENCODED:-branchforge}@postgres:5432/${POSTGRES_DB:-branchforge}
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   backend:
-    build: ./apps/backend
-    depends_on:
-      - postgres
+    image: ghcr.io/mikkisguy/branchforge-backend:${IMAGE_TAG:-beta}
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      PORT: 3000
-    volumes:
-      - backend_uploads:/app/uploads
-
-  frontend:
-    build: ./apps/frontend
-    ports:
-      - "80:80"
+      DATABASE_URL: postgresql://${POSTGRES_USER_URL_ENCODED:-branchforge}:${POSTGRES_PASSWORD_URL_ENCODED:-branchforge}@postgres:5432/${POSTGRES_DB:-branchforge}
     depends_on:
-      - backend
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - ./uploads:/app/apps/backend/uploads
 
 volumes:
   postgres_data:
-  backend_uploads:
 ```
+
+Compose constructs the containers' `DATABASE_URL` from the **URL-encoded**
+username and password plus `POSTGRES_DB`. The raw username and password are
+still passed to the `postgres` container itself. A standalone `DATABASE_URL`
+is only used by the manual/non-Compose command below.
+
+### Database URI credential encoding
+
+The PostgreSQL connection URI embeds its username and password directly, so
+characters that are syntactically meaningful in a URI must be percent-encoded
+(RFC 3986). The `postgres` container keeps receiving the **raw** values via
+`POSTGRES_USER` and `POSTGRES_PASSWORD`; only the composed `DATABASE_URL`
+uses the encoded forms.
+
+Docker Compose interpolation is plain `${VAR}` substitution — it cannot encode
+for you — so keep encoded variants in `.env` and reference them in the URI:
+
+```bash
+# .env
+POSTGRES_USER=branch@forge                   # raw — used by the postgres container
+POSTGRES_USER_URL_ENCODED=branch%40forge     # encoded — used in DATABASE_URL
+POSTGRES_PASSWORD=p@ss:word/2026              # raw — used by the postgres container
+POSTGRES_PASSWORD_URL_ENCODED=p%40ss%3Aword%2F2026  # encoded — used in DATABASE_URL
+```
+
+Common characters and their encodings: `@` → `%40`, `:` → `%3A`, `/` → `%2F`,
+`?` → `%3F`, `#` → `%23`, `%` → `%25`, space → `%20`.
+
+Generate the encoded values from the raw ones instead of hand-editing:
+
+```bash
+# Node.js
+node -e "console.log(encodeURIComponent(process.env.POSTGRES_USER)); console.log(encodeURIComponent(process.env.POSTGRES_PASSWORD))"
+
+# Python
+python3 -c "import os, urllib.parse; print(urllib.parse.quote(os.environ['POSTGRES_USER'], safe='')); print(urllib.parse.quote(os.environ['POSTGRES_PASSWORD'], safe=''))"
+```
+
+Usernames and passwords made only of letters, digits, `-`, `_`, `.`, and `~`
+need no encoding and may reuse their raw values directly.
+
+### Upgrading PostgreSQL 16 to 18
+
+The shipped image moved from PostgreSQL 16 to `postgres:18-alpine`. **The 18
+image cannot read 16 data files.** PostgreSQL 18 also changed its data
+directory layout inside the image: PGDATA moved from `/var/lib/postgresql/data`
+(16) into a versioned subdirectory such as `/var/lib/postgresql/18/docker`.
+The existing named volume `postgres_data` therefore mounts at
+`/var/lib/postgresql` and is not portable across the major upgrade — a
+dump-and-restore is required **before** pulling the new image:
+
+1. **Stop the writers:**
+
+   ```bash
+   docker compose stop backend migrate frontend
+   ```
+
+2. **Dump the data with the old (16) container still running:**
+
+   ```bash
+   docker compose exec postgres pg_dump -U branchforge -Fc branchforge \
+     > branchforge_pg16.dump
+   ```
+
+   If you created additional roles or global objects, also save the globals
+   dump to a file:
+
+   ```bash
+   docker compose exec -T postgres pg_dumpall -U branchforge --globals-only \
+     > branchforge_pg16_globals.sql
+   ```
+
+3. **Tear down the old database and its volume.** Verify the dump is non-empty
+   and keep a copy off-host before deleting anything:
+
+   ```bash
+   docker compose down
+   docker volume rm branchforge_postgres_data   # adjust to your volume name
+   ```
+
+   Keep the removed data recoverable (e.g. `docker volume create` + copy) or
+   delay removal until the restore is verified if you need a rollback path.
+
+4. **Pull the new image and start PostgreSQL 18:**
+
+   ```bash
+   docker compose pull postgres
+   docker compose up -d postgres
+   docker compose ps postgres   # wait for "healthy"
+   ```
+
+5. **Restore globals, then the database dump into 18:**
+
+   The new container normally bootstraps the raw `POSTGRES_USER` role. If that
+   role is also in `branchforge_pg16_globals.sql`, its `CREATE ROLE` statement
+   collides. Prefer temporarily bootstrapping PostgreSQL 18 with a distinct
+   superuser (for example, `POSTGRES_USER=postgres`) while restoring; restore
+   with that superuser and then return the Compose setting to `branchforge`.
+   Alternatively, remove the duplicate bootstrap-role statements from the
+   globals file before restoring it.
+
+   ```bash
+   docker compose exec -T postgres psql -U postgres -d postgres \
+     -v ON_ERROR_STOP=1 < branchforge_pg16_globals.sql
+   docker compose exec -T postgres pg_restore -U branchforge -d branchforge \
+     --clean --if-exists < branchforge_pg16.dump
+   ```
+
+6. **Bring the stack back up** — Compose runs the one-shot `migrate` service
+   against the restored data before starting the backend:
+
+   ```bash
+   docker compose up -d
+   ```
+
+   Check `docker compose logs migrate` to confirm migrations completed.
 
 ### Custom Docker Compose
 
@@ -177,11 +324,14 @@ volumes:
    # ... other env vars
    ```
 
-3. **Run migrations:**
+3. **Run the compiled production migration command:**
 
    ```bash
-   pnpm db:migrate
+   pnpm db:migrate:prod
    ```
+
+   Run this as a one-shot release job before starting or replacing application
+   instances. Concurrent jobs are serialized with a PostgreSQL advisory lock.
 
 4. **Start:**
    ```bash
@@ -226,6 +376,42 @@ volumes:
    ```
 
 ## Database Management
+
+### Production migrations
+
+The backend image contains both the compiled migration runner and the exact SQL
+journal for that image version. On initial deployment and upgrades, use:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+The `migrate` container exits after applying pending migrations. Drizzle tracks
+completed migrations, so rerunning it is safe. To rerun it manually or inspect
+its output:
+
+```bash
+docker compose run --rm migrate
+docker compose logs migrate
+```
+
+If it fails, do not bypass the dependency or start the backend manually. Check
+the migration logs and database connectivity, correct the cause, then rerun the
+one-shot service. Existing backends can keep serving during an upgrade, so
+migrations must remain backward-compatible with the previous application
+version; stop the backend first for blocking or destructive DDL. For a
+non-Compose platform, run this release command from the backend image before
+rolling out application instances:
+
+```bash
+pnpm --filter @branchforge/backend db:migrate:prod
+```
+
+`DB_MIGRATION_LOCK_TIMEOUT_MS` controls how long the job waits for another
+migration job and defaults to 60 seconds. Schema migrations are generated and
+committed during development; never write or modify production migration files
+on the server.
 
 ### Backups
 
@@ -315,10 +501,20 @@ Check if services are running:
 docker compose ps
 ```
 
-Check backend health:
+BranchForge exposes two backend probes:
+
+- `GET /api/health` — **liveness**. Confirms the Node process is up. It does
+  not check Postgres.
+- `GET /api/health/ready` — **readiness**. Confirms Postgres answers
+  `SELECT 1`. Compose and the backend image healthchecks use this endpoint
+  so the frontend only starts once the API can serve database-backed traffic.
 
 ```bash
+# Liveness
 curl http://localhost:3000/api/health
+
+# Readiness (used by Docker healthchecks)
+curl http://localhost:3000/api/health/ready
 ```
 
 ## Performance Optimization

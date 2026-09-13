@@ -1,13 +1,5 @@
-import { useState, useCallback, useReducer, useRef } from "react";
-import {
-  ArrowUpDown,
-  ChevronUp,
-  Download,
-  Upload,
-  GitBranch,
-  Loader2,
-  FolderArchive,
-} from "lucide-react";
+import { useState, useCallback, useEffect, useReducer, useRef } from "react";
+import { ArrowUpDown, GitBranch, Loader2 } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
 import {
   GitLabSyncDialog,
@@ -15,25 +7,18 @@ import {
 } from "@/components/script-mode/GitLabSyncDialog";
 import { ConflictReviewDialog } from "@/components/script-mode/ConflictReviewDialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { STATUS_BAR_CONTROL_CLASSNAME } from "@/components/workspace/status-bar-control";
 import { FABExpandableChoice } from "@/components/ide-shared/MobileOverflowFAB";
-import {
-  Menu,
-  MenuContent,
-  MenuGroup,
-  MenuItem,
-  MenuSeparator,
-  MenuTrigger,
-} from "@/components/ui/menu";
 import { cn } from "@/lib/utils";
 import { projectFilesApi } from "@/lib/api/project-files";
-import type { SourceOrigin } from "@branchforge/shared";
+import type { SourceOrigin, UserRole } from "@branchforge/shared";
+import { useProjectFileTransferActions } from "@/components/workspace/ProjectFileTransferContext";
 
 interface StatusBarProps {
   projectId?: string;
   projectName?: string;
   gitlabBranch?: string;
   fileSourceType?: SourceOrigin;
+  projectVisibility?: UserRole;
   onOpenZipImportDialog?: () => void;
   showBranch?: boolean;
   mobile?: boolean;
@@ -85,11 +70,14 @@ export function StatusBar({
   projectName,
   gitlabBranch,
   fileSourceType,
+  projectVisibility,
   onOpenZipImportDialog,
   showBranch = true,
   mobile = false,
   className,
 }: StatusBarProps) {
+  const { setActions: setProjectFileTransferActions } =
+    useProjectFileTransferActions();
   const [dialogState, dispatchDialog] = useReducer(
     dialogReducer,
     initialDialogState
@@ -154,9 +142,14 @@ export function StatusBar({
 
   /**
    * Check if ZIP import is available for this project
-   * ZIP is available if the project type is ZIP
+   * ZIP is available if the project type is ZIP and the current user owns
+   * the project — readers never get the current-project ZIP import control.
    */
-  const isZipAvailable = fileSourceType === "ZIP";
+  const isProjectOwner = projectVisibility === "OWNER";
+  const canImportZip =
+    fileSourceType === "ZIP" &&
+    isProjectOwner &&
+    Boolean(onOpenZipImportDialog);
 
   const handleMobileTransferSelect = useCallback(
     (value: string | number) => {
@@ -190,13 +183,36 @@ export function StatusBar({
           { label: "Push to GitLab", value: "push-gitlab", active: false },
         ]
       : []),
-    ...(isZipAvailable && onOpenZipImportDialog
+    ...(canImportZip
       ? [{ label: "Import ZIP", value: "import-zip", active: false }]
       : []),
     ...(projectId
       ? [{ label: "Export ZIP", value: "export-zip", active: false }]
       : []),
   ];
+
+  useEffect(() => {
+    setProjectFileTransferActions({
+      onPullGitLab: isGitLabAvailable ? handleImportClick : undefined,
+      onPushGitLab: isGitLabAvailable ? handleExportClick : undefined,
+      onImportZip: canImportZip ? handleZipImportClick : undefined,
+      onExportZip: projectId ? handleZipExportClick : undefined,
+      isExporting,
+    });
+
+    return () => setProjectFileTransferActions(null);
+  }, [
+    canImportZip,
+    handleExportClick,
+    handleImportClick,
+    handleZipExportClick,
+    handleZipImportClick,
+    isExporting,
+    isGitLabAvailable,
+    onOpenZipImportDialog,
+    projectId,
+    setProjectFileTransferActions,
+  ]);
 
   return (
     <>
@@ -230,60 +246,7 @@ export function StatusBar({
             options={mobileTransferOptions}
             onSelect={handleMobileTransferSelect}
           />
-        ) : (
-          <Menu>
-            <MenuTrigger
-              variant="ghost"
-              size="sm"
-              className={cn(STATUS_BAR_CONTROL_CLASSNAME, "shadow-none")}
-            >
-              {isExporting ? (
-                <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-              ) : (
-                <ArrowUpDown className="size-3.5" aria-hidden="true" />
-              )}
-              <span>{isExporting ? "Exporting…" : "Import / Export"}</span>
-              <ChevronUp className="size-3" aria-hidden="true" />
-            </MenuTrigger>
-            <MenuContent align="start" className="min-w-[210px]">
-              <MenuGroup label="Project files" showLabel>
-                {isGitLabAvailable ? (
-                  <>
-                    <MenuItem className="gap-2" onSelect={handleImportClick}>
-                      <Download className="size-4" aria-hidden="true" />
-                      Pull from GitLab
-                    </MenuItem>
-                    <MenuItem className="gap-2" onSelect={handleExportClick}>
-                      <Upload className="size-4" aria-hidden="true" />
-                      Push to GitLab
-                    </MenuItem>
-                  </>
-                ) : null}
-                {isZipAvailable && onOpenZipImportDialog ? (
-                  <MenuItem className="gap-2" onSelect={handleZipImportClick}>
-                    <Download className="size-4" aria-hidden="true" />
-                    Import ZIP
-                  </MenuItem>
-                ) : null}
-                {(isGitLabAvailable ||
-                  (isZipAvailable && onOpenZipImportDialog)) &&
-                projectId ? (
-                  <MenuSeparator />
-                ) : null}
-                {projectId ? (
-                  <MenuItem
-                    className="gap-2"
-                    onSelect={handleZipExportClick}
-                    disabled={isExporting}
-                  >
-                    <FolderArchive className="size-4" aria-hidden="true" />
-                    Export ZIP
-                  </MenuItem>
-                ) : null}
-              </MenuGroup>
-            </MenuContent>
-          </Menu>
-        )}
+        ) : null}
       </div>
 
       {/* Sync Dialog */}

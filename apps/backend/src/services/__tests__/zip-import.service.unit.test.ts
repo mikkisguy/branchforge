@@ -693,10 +693,9 @@ describe("ZipImportService", () => {
       expect(result).toHaveProperty("filesUpdated");
     });
 
-    it("does NOT promote symbols when the per-file savepoint rolls back", async () => {
-      // Two files: the first will fail label sync (triggering a
-      // savepoint rollback), the second will succeed. Symbols from
-      // the failed file must not appear in the promoteSymbols calls.
+    it("aborts the entire import when any file fails (M2)", async () => {
+      // Two files: the first fails label sync. The whole import must fail
+      // and no symbols from either file should be promoted.
       const file1Content = [
         'define e = Character("Eileen", color="#c8ffc8")',
         "",
@@ -740,33 +739,17 @@ describe("ZipImportService", () => {
       const result = await importZipFile(mockProjectId, mockBuffer);
 
       expect(result).toMatchObject({
-        success: true,
-        filesFailed: 1,
-        filesImported: 1,
+        success: false,
+        error: "Failed to import zip file",
       });
 
-      // Collect all rows passed to tx.values() — these include both
-      // the project_file inserts and the symbol-promotion inserts.
-      // Batch inserts pass arrays to values(); flatten to inspect rows.
+      // Transaction aborted before symbol promotion — no character rows.
       const allRows = mockTx.values.mock.calls.flatMap(
         (c) =>
           (Array.isArray(c[0]) ? c[0] : [c[0]]) as Record<string, unknown>[]
       );
       const characterRows = allRows.filter((r) => "renpyTag" in r);
-
-      // Eileen's character (from the failed file) must NOT be promoted.
-      const eileenRow = characterRows.find((r) => r.renpyTag === "e");
-      expect(eileenRow).toBeUndefined();
-
-      // Sylvie's character (from the succeeding file) MUST be promoted.
-      const sylvieRow = characterRows.find((r) => r.renpyTag === "s");
-      expect(sylvieRow).toMatchObject({
-        projectId: mockProjectId,
-        renpyTag: "s",
-        name: "Sylvie",
-        displayName: "Sylvie",
-        color: "#ff0000",
-      });
+      expect(characterRows).toHaveLength(0);
     });
 
     it("calls updateIncomingJumpsForLabels with the transaction object", async () => {

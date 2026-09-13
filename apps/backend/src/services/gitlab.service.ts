@@ -19,5 +19,4 @@ export {
   batchCommitFiles,
   importProjectFromGitLab,
   getGitLabFilesWithScenes,
-  updateGitLabFileContent,
 } from "./gitlab/index.js";

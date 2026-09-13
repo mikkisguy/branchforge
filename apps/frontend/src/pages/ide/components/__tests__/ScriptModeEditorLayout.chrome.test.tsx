@@ -142,11 +142,11 @@ describe("ScriptModeEditorLayout chrome", () => {
     );
   });
 
-  it("mounts only the mobile StatusBar when mobile", () => {
+  it("does not mount the StatusBar in the mobile overflow menu", () => {
     panelBreakpoint.current = "mobile";
     renderLayout(false);
 
-    expect(screen.getByTestId("mobile-status-bar")).toBeInTheDocument();
+    expect(screen.queryByTestId("mobile-status-bar")).not.toBeInTheDocument();
     expect(screen.queryByTestId("desktop-status-bar")).not.toBeInTheDocument();
   });
 });

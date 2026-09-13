@@ -11,7 +11,6 @@ import {
   nonEmptyStringSchema,
   requiredString,
   optionalString,
-  FILE_CONTENT_MAX_SIZE,
 } from "./common.js";
 import { conflictResolutionSchema } from "./enums.js";
 import {
@@ -117,25 +116,6 @@ export const importProjectSchema = z
   .strict();
 
 export type ImportProjectInput = z.infer<typeof importProjectSchema>;
-
-/**
- * GitLab file content update request validation (Script Mode editing)
- * Mirrors updateFileContentSchema but without expectedContentHash, because
- * the GitLab sync path tracks conflicts via a separate in-flight mechanism
- * (see updateGitLabFileContent service).
- */
-export const updateGitLabFileContentSchema = z
-  .object({
-    content: z
-      .string()
-      .min(1, "File content is required")
-      .max(FILE_CONTENT_MAX_SIZE, "File content too large (max 10MB)"),
-  })
-  .strict();
-
-export type UpdateGitLabFileContentInput = z.infer<
-  typeof updateGitLabFileContentSchema
->;
 
 /**
  * GitLab export request validation
