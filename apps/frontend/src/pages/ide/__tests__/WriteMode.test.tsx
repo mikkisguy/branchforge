@@ -80,6 +80,8 @@ vi.mock("@/hooks/useWriteAutosave", () => ({
     resetSavedHash: vi.fn(),
     lastSaved: null,
     conflictByLabel: new Map(),
+    reloadScene: vi.fn(),
+    discardDraft: vi.fn(),
   }),
 }));
 

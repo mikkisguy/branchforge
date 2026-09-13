@@ -29,6 +29,10 @@ interface ProseEditorTopBarProps {
   lastSaved: Date | null;
   /** Whether there is a save conflict */
   saveConflict: boolean;
+  /** Callback to reload the scene from the server */
+  onReloadScene?: () => void;
+  /** Callback to discard local draft changes */
+  onDiscardDraft?: () => void;
 }
 
 /**
@@ -48,6 +52,8 @@ export function ProseEditorTopBar({
   saveError,
   lastSaved,
   saveConflict,
+  onReloadScene,
+  onDiscardDraft,
 }: ProseEditorTopBarProps) {
   return (
     <div className="flex items-center justify-between border-b border-border bg-raised px-4 py-2">
@@ -83,6 +89,8 @@ export function ProseEditorTopBar({
           displayMode="compact"
           lastSaved={lastSaved}
           saveConflict={saveConflict}
+          onReload={onReloadScene}
+          onDiscard={onDiscardDraft}
         />
       </div>
     </div>

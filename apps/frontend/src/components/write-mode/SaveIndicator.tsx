@@ -23,6 +23,8 @@ interface SaveIndicatorProps {
   lastSaved?: Date | null;
   saveConflict?: boolean;
   onRetry?: () => void;
+  onReload?: () => void;
+  onDiscard?: () => void;
 }
 
 // Constant lookup maps for O(1) status-based lookups
@@ -49,6 +51,8 @@ export const SaveIndicator = memo(function SaveIndicator({
   lastSaved = null,
   saveConflict = false,
   onRetry,
+  onReload,
+  onDiscard,
 }: SaveIndicatorProps) {
   if (saveConflict) {
     return (
@@ -63,6 +67,24 @@ export const SaveIndicator = memo(function SaveIndicator({
           <AlertCircle className="size-3" />
         </span>
         {displayMode === "verbose" && <span>Conflict detected</span>}
+        {onReload && (
+          <button
+            type="button"
+            onClick={onReload}
+            className="underline underline-offset-2 hover:opacity-80"
+          >
+            Reload scene
+          </button>
+        )}
+        {onDiscard && (
+          <button
+            type="button"
+            onClick={onDiscard}
+            className="underline underline-offset-2 hover:opacity-80"
+          >
+            Discard draft
+          </button>
+        )}
       </output>
     );
   }

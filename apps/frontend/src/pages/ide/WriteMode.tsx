@@ -21,6 +21,7 @@ import {
   getPersistedDialogueFromLabel,
   type LabelDialogueDraft,
 } from "@/hooks/useWriteAutosave";
+import { labelsApi } from "@/lib/api/labels";
 import { useWriteTabs } from "@/hooks/useWriteTabs";
 import { useLabelSwitcher } from "@/hooks/useLabelSwitcher";
 import { useProjectFileActions } from "@/hooks/useProjectFileActions";
@@ -179,6 +180,13 @@ export function WriteMode({
   const isSwitchingLabelsRef = useRef(false);
   const pendingResetHashRef = useRef<LabelDialogueDraft | null>(null);
 
+  const handleRefetchLabel = useCallback(
+    async (labelId: string) => {
+      return await labelsApi.getLabel(labelId);
+    },
+    []
+  );
+
   const {
     saveStatus,
     isDirty,
@@ -186,6 +194,8 @@ export function WriteMode({
     resetSavedHash,
     lastSaved,
     conflictByLabel,
+    reloadScene,
+    discardDraft,
   } = useWriteAutosave({
     projectId: currentProject?.id,
     draft: currentDraft,
@@ -194,6 +204,7 @@ export function WriteMode({
     isUpdatingDialogue,
     skipSaveRef: isSwitchingLabelsRef,
     onUpdateDialogue: updateDialogue,
+    onRefetchLabel: handleRefetchLabel,
     showErrorToast,
   });
 
@@ -248,6 +259,34 @@ export function WriteMode({
   const handleContentChange = useCallback((entries: DialogueEntry[]) => {
     setCurrentDraft((prev) => ({ ...prev, entries }));
   }, []);
+
+  const handleReloadScene = useCallback(async () => {
+    if (!activeLabel) {
+      return;
+    }
+
+    const label = await reloadScene(activeLabel.id);
+    if (!label) {
+      return;
+    }
+
+    setCurrentDraft({
+      labelId: label.id,
+      entries: getPersistedDialogueFromLabel(label),
+    });
+  }, [activeLabel, reloadScene]);
+
+  const handleDiscardDraft = useCallback(() => {
+    if (!activeLabel) {
+      return;
+    }
+
+    const serverEntries = discardDraft(activeLabel);
+    setCurrentDraft({
+      labelId: activeLabel.id,
+      entries: serverEntries,
+    });
+  }, [activeLabel, discardDraft]);
 
   const handleLabelSelect = useCallback(
     (labelId: string) => {
@@ -462,6 +501,8 @@ export function WriteMode({
           characters={characters}
           onChange={handleContentChange}
           editorSaveState={editorSaveState}
+          onReloadScene={handleReloadScene}
+          onDiscardDraft={handleDiscardDraft}
           onUndoStateChange={setProseUndoState}
           onWordCountChange={setWordCountState}
           stats={stats}
