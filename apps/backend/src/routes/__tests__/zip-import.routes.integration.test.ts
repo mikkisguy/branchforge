@@ -13,7 +13,7 @@
  * - Uses real Fastify request/response lifecycle (inject() method)
  *
  * What is mocked:
- * - Authorization service (requireProjectAccess)
+ * - Authorization service (requireProjectOwnership)
  * - ZIP import service operations (file parsing, label creation)
  * - Project service operations (create, delete)
  *
@@ -46,7 +46,7 @@ vi.mock("../../services/projects.service.js", () => ({
 }));
 
 vi.mock("../../services/authz.service.js", () => ({
-  requireProjectAccess: vi.fn(async () => {}),
+  requireProjectOwnership: vi.fn(async () => {}),
 }));
 
 // Mock the authenticate middleware
@@ -287,8 +287,8 @@ describe("ZIP Import Routes (Integration)", () => {
     });
 
     it("should verify user owns project", async () => {
-      vi.spyOn(authzService, "requireProjectAccess").mockRejectedValue(
-        new ForbiddenError("You do not have access to this project")
+      vi.spyOn(authzService, "requireProjectOwnership").mockRejectedValue(
+        new ForbiddenError("You do not own this project")
       );
 
       // Create a mock ZIP file buffer
@@ -320,7 +320,7 @@ describe("ZIP Import Routes (Integration)", () => {
     });
 
     it("should return 404 when project not found", async () => {
-      vi.spyOn(authzService, "requireProjectAccess").mockRejectedValue(
+      vi.spyOn(authzService, "requireProjectOwnership").mockRejectedValue(
         new NotFoundError("Project")
       );
 
@@ -353,8 +353,8 @@ describe("ZIP Import Routes (Integration)", () => {
     });
 
     it("should return 500 when service throws a non-HttpError", async () => {
-      // Ensure requireProjectAccess resolves (previous tests may have left it rejecting)
-      vi.spyOn(authzService, "requireProjectAccess").mockResolvedValue(
+      // Ensure requireProjectOwnership resolves (previous tests may have left it rejecting)
+      vi.spyOn(authzService, "requireProjectOwnership").mockResolvedValue(
         undefined
       );
 
