@@ -180,12 +180,9 @@ export function WriteMode({
   const isSwitchingLabelsRef = useRef(false);
   const pendingResetHashRef = useRef<LabelDialogueDraft | null>(null);
 
-  const handleRefetchLabel = useCallback(
-    async (labelId: string) => {
-      return await labelsApi.getLabel(labelId);
-    },
-    []
-  );
+  const handleRefetchLabel = useCallback(async (labelId: string) => {
+    return await labelsApi.getLabel(labelId);
+  }, []);
 
   const {
     saveStatus,
