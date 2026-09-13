@@ -25,12 +25,15 @@ export function isUnauthorizedError(error: unknown): boolean {
 }
 
 export function buildLoginPath(): string {
-  return `${BASE_URL}login`.replace(/\/+/g, "/");
+  return new URL("login", new URL(BASE_URL, window.location.origin)).pathname;
 }
 
 export function isAuthRoute(pathname = window.location.pathname): boolean {
   const loginPath = buildLoginPath();
-  const registerPath = `${BASE_URL}register`.replace(/\/+/g, "/");
+  const registerPath = new URL(
+    "register",
+    new URL(BASE_URL, window.location.origin)
+  ).pathname;
   return pathname === loginPath || pathname === registerPath;
 }
 
