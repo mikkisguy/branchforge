@@ -187,10 +187,12 @@ const installAnchor = withBase(
       </div>
       <div class="bf-release-copy">
         <p class="bf-kicker">What's new</p>
-        <h2 id="release-title">A unified workspace in v1.0.0-beta.3</h2>
+        <h2 id="release-title">
+          File management in Write and Script in v1.0.0-beta.4
+        </h2>
         <p>
-          Write, Script, and Flow now live together in a calmer, more consistent
-          interface.
+          Create, rename, move, and delete Ren'Py files in the workspace, with
+          import and export now in the project menu.
         </p>
       </div>
       <a class="bf-text-link" :href="changelog">
