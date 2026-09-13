@@ -588,6 +588,32 @@ describe("useGitLabSync", () => {
   });
 
   describe("Cache Invalidation", () => {
+    it("should not invalidate project caches when polling starts", async () => {
+      const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+      vi.mocked(gitlabApi.exportToGitlab).mockResolvedValue(
+        mockPendingOperation
+      );
+      vi.mocked(gitlabApi.getOperationStatus).mockResolvedValue(
+        mockPendingOperation
+      );
+
+      const { result } = renderHook(() => useGitLabSync(), { wrapper });
+
+      void result.current.exportToGitlab("project-1");
+
+      await waitFor(() => {
+        expect(result.current.state.isProcessing).toBe(true);
+      });
+
+      expect(invalidateQueriesSpy).not.toHaveBeenCalledWith({
+        queryKey: labelKeys.scoped("project-1"),
+      });
+      expect(invalidateQueriesSpy).not.toHaveBeenCalledWith({
+        queryKey: characterKeys.lists("project-1"),
+      });
+    });
+
     it("should invalidate and refetch relevant queries on successful export", async () => {
       const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries");
       const refetchQueriesSpy = vi.spyOn(queryClient, "refetchQueries");
@@ -634,6 +660,39 @@ describe("useGitLabSync", () => {
         },
         {}
       );
+    });
+
+    it("should not invalidate project caches when export fails", async () => {
+      const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+      vi.mocked(gitlabApi.exportToGitlab).mockResolvedValue(
+        mockPendingOperation
+      );
+
+      let callCount = 0;
+      vi.mocked(gitlabApi.getOperationStatus).mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) return mockPendingOperation;
+        return mockFailedOperation;
+      });
+
+      const { result } = renderHook(() => useGitLabSync(), { wrapper });
+
+      await result.current.exportToGitlab("project-1");
+
+      await waitFor(
+        () => {
+          expect(result.current.state.isProcessing).toBe(false);
+        },
+        { timeout: 5000 }
+      );
+
+      expect(invalidateQueriesSpy).not.toHaveBeenCalledWith({
+        queryKey: labelKeys.scoped("project-1"),
+      });
+      expect(invalidateQueriesSpy).not.toHaveBeenCalledWith({
+        queryKey: characterKeys.lists("project-1"),
+      });
     });
   });
 });

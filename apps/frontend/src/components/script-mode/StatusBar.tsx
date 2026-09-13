@@ -9,9 +9,13 @@ import { ConflictReviewDialog } from "@/components/script-mode/ConflictReviewDia
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FABExpandableChoice } from "@/components/ide-shared/MobileOverflowFAB";
 import { cn } from "@/lib/utils";
-import { projectFilesApi } from "@/lib/api/project-files";
 import type { SourceOrigin, UserRole } from "@branchforge/shared";
 import { useProjectFileTransferActions } from "@/components/workspace/ProjectFileTransferContext";
+import { useExports } from "@/hooks/useExports";
+import {
+  EXPORT_ERROR_TITLE,
+  getExportErrorMessage,
+} from "@/lib/export-project";
 
 interface StatusBarProps {
   projectId?: string;
@@ -107,10 +111,11 @@ export function StatusBar({
   /**
    * Handle ZIP export click - shows confirm dialog before exporting
    */
-  const [isExporting, setIsExporting] = useState(false);
   const isExportingRef = useRef(false);
   const [showExportConfirm, setShowExportConfirm] = useState(false);
   const { error: showErrorToast } = useToast();
+  const { generateAndDownload, isGeneratingAndDownloading } =
+    useExports(projectId);
 
   const handleZipExportClick = useCallback(() => {
     if (!projectId) return;
@@ -118,21 +123,25 @@ export function StatusBar({
   }, [projectId]);
 
   const handleConfirmExport = useCallback(async () => {
-    if (!projectId || isExporting || isExportingRef.current) return;
+    if (!projectId || isGeneratingAndDownloading || isExportingRef.current) {
+      return;
+    }
     isExportingRef.current = true;
-    setIsExporting(true);
     try {
-      const result = await projectFilesApi.generateExport(projectId);
-      await projectFilesApi.downloadExport(projectId, result.id);
+      await generateAndDownload();
       setShowExportConfirm(false);
     } catch (err) {
       console.error("Export failed:", err);
-      showErrorToast("Export failed. Please try again.", "Export Error");
+      showErrorToast(getExportErrorMessage(err), EXPORT_ERROR_TITLE);
     } finally {
       isExportingRef.current = false;
-      setIsExporting(false);
     }
-  }, [projectId, isExporting, showErrorToast]);
+  }, [
+    generateAndDownload,
+    isGeneratingAndDownloading,
+    projectId,
+    showErrorToast,
+  ]);
 
   /**
    * Check if GitLab is available for this project
@@ -197,7 +206,7 @@ export function StatusBar({
       onPushGitLab: isGitLabAvailable ? handleExportClick : undefined,
       onImportZip: canImportZip ? handleZipImportClick : undefined,
       onExportZip: projectId ? handleZipExportClick : undefined,
-      isExporting,
+      isExporting: isGeneratingAndDownloading,
     });
 
     return () => setProjectFileTransferActions(null);
@@ -207,7 +216,7 @@ export function StatusBar({
     handleImportClick,
     handleZipExportClick,
     handleZipImportClick,
-    isExporting,
+    isGeneratingAndDownloading,
     isGitLabAvailable,
     onOpenZipImportDialog,
     projectId,
@@ -235,13 +244,15 @@ export function StatusBar({
         {mobile ? (
           <FABExpandableChoice
             icon={
-              isExporting ? (
+              isGeneratingAndDownloading ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
                 <ArrowUpDown className="size-4" />
               )
             }
-            label={isExporting ? "Exporting…" : "Import / Export"}
+            label={
+              isGeneratingAndDownloading ? "Exporting…" : "Import / Export"
+            }
             currentLabel={isGitLabAvailable ? "GitLab and ZIP" : "ZIP"}
             options={mobileTransferOptions}
             onSelect={handleMobileTransferSelect}
@@ -284,7 +295,7 @@ export function StatusBar({
         title="Export Project Files"
         description="Download all project files as a ZIP archive?"
         confirmLabel="Export"
-        isLoading={isExporting}
+        isLoading={isGeneratingAndDownloading}
         loadingLabel="Exporting..."
         isNonDestructive
       />

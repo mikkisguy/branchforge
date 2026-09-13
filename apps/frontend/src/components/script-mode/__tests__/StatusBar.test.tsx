@@ -36,6 +36,13 @@ vi.mock("@/components/ide-shared/ZipImportFilesDialog", () => ({
   ZipImportFilesDialog: () => null,
 }));
 
+vi.mock("@/hooks/useExports", () => ({
+  useExports: () => ({
+    generateAndDownload: vi.fn(),
+    isGeneratingAndDownloading: false,
+  }),
+}));
+
 function TransferActionsProbe() {
   const { actions } = useProjectFileTransferActions();
   return (

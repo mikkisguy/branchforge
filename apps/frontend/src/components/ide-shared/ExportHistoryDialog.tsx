@@ -16,6 +16,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { useExports } from "@/hooks/useExports";
 import { useToast } from "@/contexts/ToastContext";
+import {
+  EXPORT_ERROR_TITLE,
+  getExportErrorMessage,
+} from "@/lib/export-project";
 import { formatDate, formatFileSize } from "@/lib/utils";
 
 interface ExportHistoryDialogProps {
@@ -42,10 +46,7 @@ export function ExportHistoryDialog({
       await downloadExport(exportId);
       toastSuccess("Download started");
     } catch (err) {
-      toastError(
-        err instanceof Error ? err.message : "Download failed",
-        "Export Error"
-      );
+      toastError(getExportErrorMessage(err), EXPORT_ERROR_TITLE);
     } finally {
       setDownloadingId(null);
     }

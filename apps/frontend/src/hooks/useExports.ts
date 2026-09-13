@@ -7,6 +7,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { projectFilesApi } from "@/lib/api/project-files";
+import { exportAndDownloadProject } from "@/lib/export-project";
 import { exportKeys } from "@/lib/query-keys";
 import type {
   ExportSummary,
@@ -26,10 +27,12 @@ export interface UseExportsReturn {
   // Mutation states
   isGenerating: boolean;
   isDownloading: boolean;
+  isGeneratingAndDownloading: boolean;
 
   // Methods
   refreshExports: () => void;
   generateExport: () => Promise<GenerateExportResponse>;
+  generateAndDownload: () => Promise<GenerateExportResponse>;
   downloadExport: (exportId: string) => Promise<void>;
 }
 
@@ -78,8 +81,24 @@ export function useExports(projectId: string | undefined): UseExportsReturn {
     },
   });
 
+  const generateAndDownloadMutation = useMutation({
+    mutationFn: async () => {
+      if (!projectId) throw new Error("Project ID is required");
+      return exportAndDownloadProject(projectId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: exportKeys.lists(projectId ?? ""),
+      });
+    },
+  });
+
   const generateExport = async (): Promise<GenerateExportResponse> => {
     return generateExportMutation.mutateAsync();
+  };
+
+  const generateAndDownload = async (): Promise<GenerateExportResponse> => {
+    return generateAndDownloadMutation.mutateAsync();
   };
 
   const downloadExport = async (exportId: string): Promise<void> => {
@@ -92,8 +111,10 @@ export function useExports(projectId: string | undefined): UseExportsReturn {
     exportsError: exportsError as Error | null,
     isGenerating: generateExportMutation.isPending,
     isDownloading: downloadExportMutation.isPending,
+    isGeneratingAndDownloading: generateAndDownloadMutation.isPending,
     refreshExports,
     generateExport,
+    generateAndDownload,
     downloadExport,
   };
 }

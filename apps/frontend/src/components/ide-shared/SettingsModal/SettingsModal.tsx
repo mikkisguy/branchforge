@@ -13,7 +13,7 @@ import { useSettings } from "@/hooks/useSettings";
 import { ProjectsSettingsContent } from "@/components/ide-shared/ProjectsSettingsContent";
 import { IntegrationsSettingsContent } from "@/components/ide-shared/IntegrationsSettingsContent";
 import { ExportHistoryDialog } from "@/components/ide-shared/ExportHistoryDialog";
-import { projectFilesApi } from "@/lib/api/project-files";
+import { exportAndDownloadProject } from "@/lib/export-project";
 import { exportKeys } from "@/lib/query-keys";
 import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 import type { Tab } from "../settings-types";
@@ -65,8 +65,7 @@ export function SettingsModal({
   // Handle export: generate + download
   const handleExportProject = useCallback(
     async (projectId: string) => {
-      const result = await projectFilesApi.generateExport(projectId);
-      await projectFilesApi.downloadExport(projectId, result.id);
+      await exportAndDownloadProject(projectId);
       queryClient.invalidateQueries({
         queryKey: exportKeys.lists(projectId),
       });
