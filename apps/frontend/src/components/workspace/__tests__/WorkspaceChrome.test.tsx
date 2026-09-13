@@ -168,7 +168,7 @@ describe("WorkspaceChrome", () => {
     ).toBeInTheDocument();
     expect(
       within(screen.getByRole("menu")).getByRole("group", {
-        name: "Import projects",
+        name: "New project",
       })
     ).toBeInTheDocument();
     expect(
@@ -190,7 +190,7 @@ describe("WorkspaceChrome", () => {
     ).toBeInTheDocument();
   });
 
-  it("groups registered project file transfers under project files", async () => {
+  it("groups registered project file transfers under project controls", async () => {
     const user = userEvent.setup();
 
     render(
@@ -206,7 +206,7 @@ describe("WorkspaceChrome", () => {
 
     const menu = screen.getByRole("menu");
     expect(
-      within(menu).getByRole("group", { name: "Project files" })
+      within(menu).getByRole("group", { name: "Project controls" })
     ).toBeInTheDocument();
     expect(
       within(menu).getByRole("menuitem", { name: "Pull from GitLab" })

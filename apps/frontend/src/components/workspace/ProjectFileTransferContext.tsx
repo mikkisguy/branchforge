@@ -102,13 +102,16 @@ export function ProjectFileTransferProvider({
     []
   );
 
+  const contextValue = useMemo<ProjectFileTransferContextValue>(
+    () => ({
+      actions: overrides ?? defaultActions,
+      setActions: setActionsValue,
+    }),
+    [defaultActions, overrides, setActionsValue]
+  );
+
   return (
-    <ProjectFileTransferContext.Provider
-      value={{
-        actions: overrides ?? defaultActions,
-        setActions: setActionsValue,
-      }}
-    >
+    <ProjectFileTransferContext.Provider value={contextValue}>
       {children}
       {projectId && fileSourceType === "GITLAB" ? (
         <GitLabSyncDialog
