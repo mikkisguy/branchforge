@@ -66,7 +66,9 @@ describe("createProjectFile", () => {
           })
           .mockReturnValueOnce({
             from: vi.fn().mockReturnValue({
-              where: vi.fn().mockResolvedValue([]),
+              where: vi.fn().mockReturnValue({
+                limit: vi.fn().mockResolvedValue([]),
+              }),
             }),
           }),
         insert: vi.fn().mockReturnValue({
@@ -128,9 +130,11 @@ describe("createProjectFile", () => {
           })
           .mockReturnValueOnce({
             from: vi.fn().mockReturnValue({
-              where: vi
-                .fn()
-                .mockResolvedValue([{ filePath: "labels/story.rpy" }]),
+              where: vi.fn().mockReturnValue({
+                limit: vi
+                  .fn()
+                  .mockResolvedValue([{ filePath: "labels/story.rpy" }]),
+              }),
             }),
           }),
       })

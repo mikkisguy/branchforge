@@ -22,6 +22,7 @@ import nock from "nock";
 import * as gitlabService from "../gitlab.service.js";
 import * as gitlabRepoService from "../gitlab/gitlab-repository.service.js";
 import * as gitlabFileService from "../gitlab/gitlab-file.service.js";
+import * as gitlabIntegrationService from "../gitlab/gitlab-integration.service.js";
 import * as rpyParserService from "../rpy-parser.service.js";
 import { getDb } from "../../db/index.js";
 import {
@@ -1220,9 +1221,21 @@ describe("GitLabSyncService (Integration)", () => {
             blobId: null,
           };
         }
+        if (
+          filePath === "game/renamed_src.rpy" ||
+          filePath === "game/cased.rpy" ||
+          filePath === "game/old.rpy"
+        ) {
+          return {
+            content: "remote-content",
+            lastCommitId: "remote-rev",
+            contentSha256: null,
+            blobId: null,
+          };
+        }
         return {
-          content: "remote-content",
-          lastCommitId: "remote-rev",
+          content: null,
+          lastCommitId: null,
           contentSha256: null,
           blobId: null,
         };
@@ -1450,6 +1463,9 @@ describe("GitLabSyncService (Integration)", () => {
       vi.spyOn(gitlabRepoService, "_listFilesWithAuth").mockResolvedValue([
         { name: "reconciled_dst.rpy", path: "game/reconciled_dst.rpy" },
       ]);
+      vi.spyOn(gitlabIntegrationService, "getDecryptedToken").mockResolvedValue(
+        "test-token"
+      );
       vi.spyOn(
         gitlabRepoService,
         "getFileContentWithMetadata"
