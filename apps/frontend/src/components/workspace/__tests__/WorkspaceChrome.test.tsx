@@ -402,7 +402,7 @@ describe("WorkspaceChrome", () => {
       within(menu).queryByRole("group", { name: "Projects" })
     ).not.toBeInTheDocument();
 
-    await user.click(within(menu).getByRole("button", { name: "Retry" }));
+    await user.click(within(menu).getByRole("menuitem", { name: "Retry" }));
     expect(refetchProjects).toHaveBeenCalledOnce();
   });
 
