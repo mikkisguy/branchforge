@@ -23,13 +23,21 @@ This guide covers deploying BranchForge to production.
    ```bash
    cp .env.example .env
    # Edit .env with your production values
+   mkdir -p uploads
+   sudo chown 1001:1001 uploads
    ```
 
 3. **Start services:**
 
    ```bash
+   docker compose pull
    docker compose up -d
    ```
+
+   Compose first runs the one-shot `migrate` service. On a fresh deployment,
+   the backend starts only after all pending migrations succeed. During an
+   upgrade, an existing backend can remain available, but Compose will not
+   replace it with the new image unless the migration succeeds.
 
 4. **Access your application:**
    - Frontend: http://localhost
@@ -42,9 +50,14 @@ This guide covers deploying BranchForge to production.
 Update `.env` for production:
 
 ```bash
-# Database
-DATABASE_URL=postgresql://user:password@postgres:5432/branchforge
-DATABASE_URL_TEST=postgresql://user:password@postgres:5432/branchforge_test
+# Docker Compose database
+POSTGRES_USER=branchforge
+POSTGRES_PASSWORD=generate-strong-password
+POSTGRES_DB=branchforge
+PGPORT=5432
+
+# Optional: how long a deploy waits for another migration job (default: 60000)
+DB_MIGRATION_LOCK_TIMEOUT_MS=60000
 
 # Server
 PORT=3000
@@ -58,12 +71,6 @@ SESSION_SECRET=generate-a-long-random-string-at-least-32-chars
 # clamped to 3600000–2592000000 = 1h–30d). With sliding expiry enabled,
 # this is the inactivity timeout, not a fixed-from-login cap.
 # SESSION_MAX_AGE=86400000
-
-# Docker (prod)
-POSTGRES_USER=branchforge
-POSTGRES_PASSWORD=generate-strong-password
-POSTGRES_DB=branchforge
-PGPORT=5432
 
 # Encryption key for GitLab PAT (CRITICAL: Generate with Node.js)
 ENCRYPTION_KEY=generate-with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -93,40 +100,54 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ## Docker Compose Configuration
 
-The default `docker-compose.yml` includes:
+The default `docker-compose.yml` uses the published backend image for both the
+one-shot migration job and the application. Its relevant dependency chain is:
 
 ```yaml
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
-      POSTGRES_USER: branchforge
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: branchforge
+      POSTGRES_USER: ${POSTGRES_USER:-branchforge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-branchforge}
+      POSTGRES_DB: ${POSTGRES_DB:-branchforge}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-branchforge} -d ${POSTGRES_DB:-branchforge}",
+        ]
+
+  migrate:
+    image: ghcr.io/mikkisguy/branchforge-backend:${IMAGE_TAG:-beta}
+    command: ["node", "apps/backend/dist/db/migrate.js"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-branchforge}:${POSTGRES_PASSWORD:-branchforge}@postgres:5432/${POSTGRES_DB:-branchforge}
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   backend:
-    build: ./apps/backend
+    image: ghcr.io/mikkisguy/branchforge-backend:${IMAGE_TAG:-beta}
     depends_on:
-      - postgres
-    environment:
-      DATABASE_URL: ${DATABASE_URL}
-      PORT: 3000
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     volumes:
-      - backend_uploads:/app/uploads
-
-  frontend:
-    build: ./apps/frontend
-    ports:
-      - "80:80"
-    depends_on:
-      - backend
+      - ./uploads:/app/apps/backend/uploads
 
 volumes:
   postgres_data:
-  backend_uploads:
 ```
+
+Compose constructs the containers' `DATABASE_URL` from `POSTGRES_USER`,
+`POSTGRES_PASSWORD`, and `POSTGRES_DB`. A standalone `DATABASE_URL` is only used
+by the manual/non-Compose command below.
 
 ### Custom Docker Compose
 
@@ -177,11 +198,14 @@ volumes:
    # ... other env vars
    ```
 
-3. **Run migrations:**
+3. **Run the compiled production migration command:**
 
    ```bash
-   pnpm db:migrate
+   pnpm db:migrate:prod
    ```
+
+   Run this as a one-shot release job before starting or replacing application
+   instances. Concurrent jobs are serialized with a PostgreSQL advisory lock.
 
 4. **Start:**
    ```bash
@@ -226,6 +250,42 @@ volumes:
    ```
 
 ## Database Management
+
+### Production migrations
+
+The backend image contains both the compiled migration runner and the exact SQL
+journal for that image version. On initial deployment and upgrades, use:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+The `migrate` container exits after applying pending migrations. Drizzle tracks
+completed migrations, so rerunning it is safe. To rerun it manually or inspect
+its output:
+
+```bash
+docker compose run --rm migrate
+docker compose logs migrate
+```
+
+If it fails, do not bypass the dependency or start the backend manually. Check
+the migration logs and database connectivity, correct the cause, then rerun the
+one-shot service. Existing backends can keep serving during an upgrade, so
+migrations must remain backward-compatible with the previous application
+version; stop the backend first for blocking or destructive DDL. For a
+non-Compose platform, run this release command from the backend image before
+rolling out application instances:
+
+```bash
+pnpm --filter @branchforge/backend db:migrate:prod
+```
+
+`DB_MIGRATION_LOCK_TIMEOUT_MS` controls how long the job waits for another
+migration job and defaults to 60 seconds. Schema migrations are generated and
+committed during development; never write or modify production migration files
+on the server.
 
 ### Backups
 

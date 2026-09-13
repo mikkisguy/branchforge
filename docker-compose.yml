@@ -12,10 +12,27 @@ services:
       # postgres:18+ image expects the mount at /var/lib/postgresql (data in a versioned subdir)
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-branchforge}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-branchforge} -d ${POSTGRES_DB:-branchforge}",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  migrate:
+    image: ghcr.io/mikkisguy/branchforge-backend:${IMAGE_TAG:-beta}
+    container_name: branchforge-migrate
+    command: ["node", "apps/backend/dist/db/migrate.js"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-branchforge}:${POSTGRES_PASSWORD:-branchforge}@postgres:5432/${POSTGRES_DB:-branchforge}
+      NODE_ENV: production
+      DB_MIGRATION_LOCK_TIMEOUT_MS: ${DB_MIGRATION_LOCK_TIMEOUT_MS:-60000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   backend:
     image: ghcr.io/mikkisguy/branchforge-backend:${IMAGE_TAG:-beta}
@@ -42,6 +59,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   frontend:
