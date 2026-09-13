@@ -34,6 +34,7 @@ import {
   NoProjectSelected,
   LoadingLabels,
   ProjectFilesError,
+  LabelsError,
   NoStoryFiles,
 } from "@/pages/ide/components/WriteModeEmptyStates";
 import type { ProseEditorRef } from "@/components/write-mode";
@@ -60,6 +61,8 @@ export function WriteMode({
     activeLabelId,
     setActiveLabelId,
     isLoadingLabels,
+    labelsError,
+    refetchLabels,
     updateDialogue,
     isUpdatingDialogue,
     createLabel,
@@ -111,10 +114,10 @@ export function WriteMode({
 
   const storyLabels = useMemo(
     () =>
-      filesError
+      filesError || labelsError
         ? []
         : labels.filter((label) => storyFileIds.has(label.projectFileId)),
-    [filesError, labels, storyFileIds]
+    [filesError, labelsError, labels, storyFileIds]
   );
 
   const openCreateFileDialog = useCallback(() => {
@@ -403,6 +406,10 @@ export function WriteMode({
 
   if (filesError) {
     return <ProjectFilesError onRetry={() => void refreshFiles()} />;
+  }
+
+  if (labelsError) {
+    return <LabelsError onRetry={() => void refetchLabels()} />;
   }
 
   if (!storyFiles.length) {

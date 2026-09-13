@@ -1,6 +1,7 @@
 import { ScriptModeEditorLayout } from "./components/ScriptModeEditorLayout";
 import { WorkspaceFocusReporter } from "@/components/workspace/WorkspaceFocusReporter";
 import { ScriptModeEmptyState } from "./components/ScriptModeEmptyState";
+import { ProjectFilesError } from "./components/WriteModeEmptyStates";
 import { ScriptModeDialogs } from "./components/ScriptModeDialogs";
 import { useScriptMode } from "./components/useScriptMode";
 import { CreateFileDialog } from "@/components/ide-shared/CreateFileDialog";
@@ -26,6 +27,7 @@ export function ScriptMode({
   const {
     isLoadingLabels,
     isLoadingFiles,
+    filesError,
     projectFiles,
     activeLabel,
     activeLabelId,
@@ -128,6 +130,16 @@ export function ScriptMode({
           <div className="flex flex-1 items-center justify-center">
             <p className="text-muted-foreground">Loading project…</p>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (filesError) {
+    return (
+      <div className="flex h-full flex-col overflow-hidden">
+        <div className="flex flex-1 flex-col pt-16">
+          <ProjectFilesError onRetry={() => void refreshFiles()} />
         </div>
       </div>
     );

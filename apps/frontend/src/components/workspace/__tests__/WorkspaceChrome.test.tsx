@@ -373,6 +373,39 @@ describe("WorkspaceChrome", () => {
     expect(onSettingsOpenChangeExternally).toHaveBeenCalledWith(true);
   });
 
+  it("shows the projects error state and retries without showing an empty project list", async () => {
+    const user = userEvent.setup();
+    const refetchProjects = vi.fn().mockResolvedValue([]);
+
+    render(
+      <WorkspaceChrome
+        {...defaultProps}
+        projects={[]}
+        projectsError={new Error("load failed")}
+        refetchProjects={refetchProjects}
+      />,
+      { wrapper: createWrapper() }
+    );
+
+    expect(screen.getAllByText("Failed to load projects")).toHaveLength(2);
+    expect(screen.queryByText("Select project")).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Project menu" })[0]!
+    );
+
+    const menu = screen.getByRole("menu");
+    expect(within(menu).getByRole("alert")).toHaveTextContent(
+      "Failed to load projects"
+    );
+    expect(
+      within(menu).queryByRole("group", { name: "Projects" })
+    ).not.toBeInTheDocument();
+
+    await user.click(within(menu).getByRole("button", { name: "Retry" }));
+    expect(refetchProjects).toHaveBeenCalledOnce();
+  });
+
   it("selects the imported project from refreshed data before projects prop commits", async () => {
     const user = userEvent.setup();
     const importedProject: Project = {

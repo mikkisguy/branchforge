@@ -57,6 +57,7 @@ export function HomePageIDE() {
     projects,
     setCurrentProject,
     isLoadingProjects,
+    projectsError,
     updateProject,
     deleteProject,
     refreshProjects,
@@ -225,6 +226,7 @@ export function HomePageIDE() {
           projects={projects}
           setCurrentProject={handleSetProject}
           isLoadingProjects={isLoadingProjects}
+          projectsError={projectsError}
           updateProject={updateProject}
           deleteProject={deleteProject}
           refetchProjects={refreshProjects}

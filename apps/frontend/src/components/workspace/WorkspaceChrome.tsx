@@ -25,6 +25,7 @@ interface WorkspaceChromePropsBase {
   projects: Project[];
   setCurrentProject: (project: Project | null) => void;
   isLoadingProjects?: boolean;
+  projectsError?: Error | null;
   updateProject?: (
     projectId: string,
     body: UpdateProjectBody
@@ -101,6 +102,7 @@ export function WorkspaceChrome(props: WorkspaceChromeProps) {
     projects,
     setCurrentProject,
     isLoadingProjects,
+    projectsError,
     updateProject,
     deleteProject,
     refetchProjects,
@@ -153,6 +155,7 @@ export function WorkspaceChrome(props: WorkspaceChromeProps) {
     projectId,
     projects,
     isLoadingProjects,
+    projectsError,
     setCurrentProject,
     onOpenProjectSettings: () =>
       dispatchModal({ type: "OPEN", key: "projectSettings" }),
@@ -171,6 +174,11 @@ export function WorkspaceChrome(props: WorkspaceChromeProps) {
       dispatchModal({ type: "OPEN", key: "keyboardShortcuts" }),
     onOpenSettings: () => setSettingsOpen(true),
     onLogout,
+    onRetryProjects: refetchProjects
+      ? () => {
+          void refetchProjects();
+        }
+      : undefined,
   };
 
   return (

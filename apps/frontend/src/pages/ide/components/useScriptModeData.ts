@@ -20,6 +20,7 @@ export interface UseScriptModeDataReturn {
   showErrorToast: (message: string, title: string) => void;
   isLoadingLabels: boolean;
   isLoadingFiles: boolean;
+  filesError: Error | null;
   labels: PublicLabel[];
   activeLabel: LabelDetail | undefined;
   activeLabelId: string | null;
@@ -61,6 +62,7 @@ export function useScriptModeData({
   const {
     files: projectFiles,
     isLoadingFiles,
+    filesError,
     updateFileContent,
     refreshFiles,
     createFile,
@@ -105,6 +107,7 @@ export function useScriptModeData({
     showErrorToast,
     isLoadingLabels,
     isLoadingFiles,
+    filesError,
     labels,
     activeLabel,
     activeLabelId,

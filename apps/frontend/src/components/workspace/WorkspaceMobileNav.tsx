@@ -15,6 +15,7 @@ interface WorkspaceMobileNavProps {
   projectId?: string;
   projects: Project[];
   isLoadingProjects?: boolean;
+  projectsError?: Error | null;
   setCurrentProject: (project: Project | null) => void;
   onOpenProjectSettings: () => void;
   onImportGitLab: () => void;
@@ -28,6 +29,7 @@ interface WorkspaceMobileNavProps {
   onOpenKeyboardShortcuts: () => void;
   onOpenSettings: () => void;
   onLogout: () => void;
+  onRetryProjects?: () => void;
 }
 
 const mobileViews: {
@@ -46,6 +48,7 @@ export function WorkspaceMobileNav({
   projectId,
   projects,
   isLoadingProjects,
+  projectsError,
   setCurrentProject,
   onOpenProjectSettings,
   onImportGitLab,
@@ -59,6 +62,7 @@ export function WorkspaceMobileNav({
   onOpenKeyboardShortcuts,
   onOpenSettings,
   onLogout,
+  onRetryProjects,
 }: WorkspaceMobileNavProps) {
   return (
     <>
@@ -68,6 +72,8 @@ export function WorkspaceMobileNav({
           projectId={projectId}
           projects={projects}
           isLoadingProjects={isLoadingProjects}
+          projectsError={projectsError}
+          onRetryProjects={onRetryProjects}
           setCurrentProject={setCurrentProject}
           onOpenProjectSettings={onOpenProjectSettings}
           onImportGitLab={onImportGitLab}

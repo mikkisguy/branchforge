@@ -524,6 +524,7 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
   return {
     isLoadingLabels: data.isLoadingLabels,
     isLoadingFiles: data.isLoadingFiles,
+    filesError: data.filesError,
     labels: data.labels,
     activeLabel: data.activeLabel,
     activeLabelId: data.activeLabelId,

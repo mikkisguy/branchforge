@@ -8,7 +8,9 @@ const testState = vi.hoisted(() => ({
     visibility: "OWNER",
   } as { id: string; visibility: "OWNER" | "READER" } | null,
   filesError: null as Error | null,
+  labelsError: null as Error | null,
   refreshFiles: vi.fn(async () => undefined),
+  refetchLabels: vi.fn(async () => undefined),
   resetCreateFileError: vi.fn(),
 }));
 
@@ -36,6 +38,8 @@ vi.mock("@/hooks/useLabels", () => ({
     activeLabelId: null,
     setActiveLabelId: vi.fn(),
     isLoadingLabels: false,
+    labelsError: testState.labelsError,
+    refetchLabels: testState.refetchLabels,
     updateDialogue: vi.fn(),
     isUpdatingDialogue: false,
     createLabel: vi.fn(),
@@ -140,6 +144,20 @@ describe("WriteMode", () => {
       visibility: "OWNER",
     };
     testState.filesError = null;
+    testState.labelsError = null;
+  });
+
+  it("shows the labels error state and retries without rendering the empty state", () => {
+    testState.labelsError = new Error("load failed");
+    render(<WriteMode />);
+
+    expect(screen.getByText("Failed to load labels")).toBeInTheDocument();
+    expect(
+      screen.queryByText("No story files in this project")
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(testState.refetchLabels).toHaveBeenCalledOnce();
   });
 
   it("shows the files error state and retries without rendering the empty state", () => {
