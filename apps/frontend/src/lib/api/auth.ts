@@ -2,6 +2,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 import type { PublicUser } from "@branchforge/shared";
 import { getCsrfHeader } from "./csrf";
+import { ApiRequestError } from "./client";
 
 export interface AuthResponse {
   user: PublicUser | null;
@@ -151,8 +152,10 @@ async function request<T>(
     const error: ApiError = await response
       .json()
       .catch(() => ({ error: "Unknown error" }));
-    throw new Error(
-      error.error || `Request failed with status ${response.status}`
+    throw new ApiRequestError(
+      error.error || `Request failed with status ${response.status}`,
+      response.status,
+      error
     );
   }
 
@@ -185,7 +188,7 @@ export const authApi = {
     });
   },
 
-  async register(credentials: RegisterCredentials): Promise<AuthResponse> {
+  async register(credentials: RegisterCredentials): Promise<PublicUser> {
     // Validate input before sending to backend
     validateRegisterCredentials(credentials);
 
@@ -195,7 +198,7 @@ export const authApi = {
       password: sanitizePassword(credentials.password),
     };
 
-    return request<AuthResponse>("/register", {
+    return request<PublicUser>("/register", {
       method: "POST",
       body: JSON.stringify(sanitized),
     });

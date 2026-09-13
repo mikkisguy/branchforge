@@ -10,6 +10,7 @@ import type { ReactNode } from "react";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { useAuth } from "../useAuth";
 import { authApi, type PublicUser } from "@/lib/api/auth";
+import { clearCsrfToken } from "@/lib/api/csrf";
 import { authKeys } from "@/lib/query-keys";
 import { createTestQueryClient } from "@/test/query-client";
 
@@ -42,6 +43,7 @@ describe("useAuth", () => {
 
   beforeEach(() => {
     queryClient = createTestQueryClient();
+    clearCsrfToken();
     vi.clearAllMocks();
   });
 
@@ -249,11 +251,28 @@ describe("useAuth", () => {
   });
 
   describe("Register Mutation", () => {
+    it("registers the raw user response without creating a session token", async () => {
+      vi.mocked(authApi.getMe).mockResolvedValue({
+        user: null,
+      });
+      vi.mocked(authApi.register).mockResolvedValue(mockUser);
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.user).toBeNull();
+      });
+
+      await result.current.register("new@example.com", "password123");
+
+      expect(queryClient.getQueryData(authKeys.user())).toEqual(mockUser);
+    });
+
     it("should register successfully and set cache", async () => {
       vi.mocked(authApi.getMe).mockResolvedValue({
         user: null,
       });
-      vi.mocked(authApi.register).mockResolvedValue({ user: mockUser });
+      vi.mocked(authApi.register).mockResolvedValue(mockUser);
 
       const { result } = renderHook(() => useAuth(), { wrapper });
 
@@ -283,10 +302,7 @@ describe("useAuth", () => {
         user: null,
       });
       vi.mocked(authApi.register).mockImplementation(
-        () =>
-          new Promise((resolve) =>
-            setTimeout(() => resolve({ user: mockUser }), 100)
-          )
+        () => new Promise((resolve) => setTimeout(() => resolve(mockUser), 100))
       );
 
       const { result } = renderHook(() => useAuth(), { wrapper });

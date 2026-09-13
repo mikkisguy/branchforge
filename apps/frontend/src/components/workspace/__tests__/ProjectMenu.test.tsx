@@ -10,9 +10,11 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "@/contexts/ToastContext";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { ProjectMenu } from "../ProjectMenu";
 import { ProjectFileTransferProvider } from "../ProjectFileTransferContext";
 import type { Project } from "@/lib/api/projects";
+import { createTestQueryClient } from "@/test/query-client";
 
 vi.mock("@/components/ide-shared/ZipImportFilesDialog", () => ({
   ZipImportFilesDialog: () => null,
@@ -32,6 +34,7 @@ const project: Project = {
 };
 
 function renderProjectMenu(withTransferActions: boolean) {
+  const queryClient = createTestQueryClient();
   const props = {
     projectId: "proj-1",
     projects: [project],
@@ -45,19 +48,21 @@ function renderProjectMenu(withTransferActions: boolean) {
   const menu = <ProjectMenu {...props} />;
 
   render(
-    <ToastProvider>
-      {withTransferActions ? (
-        <ProjectFileTransferProvider
-          projectId="proj-1"
-          fileSourceType="GITLAB"
-          projectVisibility="OWNER"
-        >
-          {menu}
-        </ProjectFileTransferProvider>
-      ) : (
-        menu
-      )}
-    </ToastProvider>
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        {withTransferActions ? (
+          <ProjectFileTransferProvider
+            projectId="proj-1"
+            fileSourceType="GITLAB"
+            projectVisibility="OWNER"
+          >
+            {menu}
+          </ProjectFileTransferProvider>
+        ) : (
+          menu
+        )}
+      </ToastProvider>
+    </QueryClientProvider>
   );
 }
 
@@ -79,6 +84,34 @@ describe("ProjectMenu", () => {
       "separator"
     );
     expect(within(menu).getAllByRole("separator")).toHaveLength(4);
+  });
+
+  it("invokes onRetryProjects from a menu item when project loading fails", async () => {
+    const user = userEvent.setup();
+    const onRetryProjects = vi.fn();
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <ProjectMenu
+            projects={[]}
+            projectsError={new Error("Network error")}
+            onRetryProjects={onRetryProjects}
+            setCurrentProject={vi.fn()}
+            onOpenProjectSettings={vi.fn()}
+            onImportGitLab={vi.fn()}
+            onImportZip={vi.fn()}
+            onManageProjects={vi.fn()}
+          />
+        </ToastProvider>
+      </QueryClientProvider>
+    );
+
+    await user.click(screen.getByRole("button", { name: "Project menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "Retry" }));
+
+    expect(onRetryProjects).toHaveBeenCalledTimes(1);
   });
 
   it("does not render a second separator when no project file actions exist", async () => {

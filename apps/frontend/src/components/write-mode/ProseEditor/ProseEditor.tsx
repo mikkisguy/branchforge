@@ -35,6 +35,8 @@ interface ProseEditorProps {
   lastSaved?: Date | null;
   saveError?: boolean;
   saveConflict?: boolean;
+  onReloadScene?: () => void;
+  onDiscardDraft?: () => void;
   /** Callback when undo/redo availability changes. Used by mobile FAB. */
   onUndoStateChange?: (state: { canUndo: boolean; canRedo: boolean }) => void;
   /** Callback when today's word count or daily goal changes. Used by mobile FAB. */
@@ -88,6 +90,8 @@ export const ProseEditor = function ProseEditor({
   lastSaved = null,
   saveError = false,
   saveConflict = false,
+  onReloadScene,
+  onDiscardDraft,
   onUndoStateChange,
   onWordCountChange,
   showBadges: propsShowBadges,
@@ -152,6 +156,8 @@ export const ProseEditor = function ProseEditor({
           saveError={saveError}
           lastSaved={lastSaved}
           saveConflict={saveConflict}
+          onReloadScene={onReloadScene}
+          onDiscardDraft={onDiscardDraft}
         />
       ) : null}
 

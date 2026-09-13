@@ -20,6 +20,8 @@ interface ProjectMenuProps {
   projectId?: string;
   projects: Project[];
   isLoadingProjects?: boolean;
+  projectsError?: Error | null;
+  onRetryProjects?: () => void;
   setCurrentProject: (project: Project | null) => void;
   onOpenProjectSettings: () => void;
   onImportGitLab: () => void;
@@ -32,6 +34,8 @@ export function ProjectMenu({
   projectId,
   projects,
   isLoadingProjects,
+  projectsError,
+  onRetryProjects,
   setCurrentProject,
   onOpenProjectSettings,
   onImportGitLab,
@@ -41,7 +45,9 @@ export function ProjectMenu({
 }: ProjectMenuProps) {
   const { actions: transferActions } = useProjectFileTransferActions();
   const currentProject = projects.find((project) => project.id === projectId);
-  const label = currentProject?.name ?? "Select project";
+  const label = projectsError
+    ? "Failed to load projects"
+    : (currentProject?.name ?? "Select project");
   const hasProjectFileActions = Boolean(
     transferActions?.onPullGitLab ||
     transferActions?.onPushGitLab ||
@@ -63,7 +69,27 @@ export function ProjectMenu({
         <ChevronDown className="size-4 flex-shrink-0" aria-hidden="true" />
       </MenuTrigger>
       <MenuContent align="start" className="min-w-[220px]">
-        {projects.length > 0 ? (
+        {projectsError ? (
+          <>
+            <div
+              className="px-2 py-3 text-center"
+              role="alert"
+              aria-live="assertive"
+            >
+              <p className="text-sm font-medium text-foreground">
+                Failed to load projects
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Check your connection and try again.
+              </p>
+            </div>
+            {onRetryProjects ? (
+              <MenuItem onSelect={onRetryProjects}>Retry</MenuItem>
+            ) : null}
+            <MenuSeparator />
+          </>
+        ) : null}
+        {!projectsError && projects.length > 0 ? (
           <>
             <MenuGroup label="Projects" showLabel>
               {projects.map((project) => {

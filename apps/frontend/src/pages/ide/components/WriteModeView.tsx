@@ -47,6 +47,8 @@ export function WriteModeView({
   characters,
   onChange,
   editorSaveState,
+  onReloadScene,
+  onDiscardDraft,
   onUndoStateChange,
   onWordCountChange,
   stats,
@@ -168,6 +170,8 @@ export function WriteModeView({
               displayMode="compact"
               lastSaved={editorSaveState.lastSaved}
               saveConflict={editorSaveState.saveConflict}
+              onReload={onReloadScene}
+              onDiscard={onDiscardDraft}
             />
             <FocusModeToggle
               ref={focusToggleRef}
@@ -191,6 +195,8 @@ export function WriteModeView({
                 lastSaved={editorSaveState.lastSaved}
                 saveError={editorSaveState.saveError}
                 saveConflict={editorSaveState.saveConflict}
+                onReloadScene={onReloadScene}
+                onDiscardDraft={onDiscardDraft}
                 onUndoStateChange={onUndoStateChange}
                 onWordCountChange={onWordCountChange}
                 onEditorMetricsChange={setEditorMetrics}
@@ -235,6 +241,8 @@ export function WriteModeView({
               displayMode="compact"
               lastSaved={editorSaveState.lastSaved}
               saveConflict={editorSaveState.saveConflict}
+              onReload={onReloadScene}
+              onDiscard={onDiscardDraft}
             />
             <FocusModeToggle
               ref={focusToggleRef}

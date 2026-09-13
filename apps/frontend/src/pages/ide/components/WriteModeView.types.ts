@@ -78,6 +78,8 @@ export interface WriteModeViewProps {
   characters: Character[];
   onChange: (entries: DialogueEntry[]) => void;
   editorSaveState: EditorSaveState;
+  onReloadScene: () => void;
+  onDiscardDraft: () => void;
   onUndoStateChange: Dispatch<
     SetStateAction<{ canUndo: boolean; canRedo: boolean }>
   >;

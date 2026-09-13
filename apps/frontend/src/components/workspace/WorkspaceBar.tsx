@@ -13,6 +13,7 @@ interface WorkspaceBarProps {
   projectId?: string;
   projects: Project[];
   isLoadingProjects?: boolean;
+  projectsError?: Error | null;
   setCurrentProject: (project: Project | null) => void;
   onOpenProjectSettings: () => void;
   onImportGitLab: () => void;
@@ -26,6 +27,7 @@ interface WorkspaceBarProps {
   onOpenKeyboardShortcuts: () => void;
   onOpenSettings: () => void;
   onLogout: () => void;
+  onRetryProjects?: () => void;
 }
 
 export function WorkspaceBar({
@@ -34,6 +36,7 @@ export function WorkspaceBar({
   projectId,
   projects,
   isLoadingProjects,
+  projectsError,
   setCurrentProject,
   onOpenProjectSettings,
   onImportGitLab,
@@ -47,6 +50,7 @@ export function WorkspaceBar({
   onOpenKeyboardShortcuts,
   onOpenSettings,
   onLogout,
+  onRetryProjects,
 }: WorkspaceBarProps) {
   return (
     <header className="max-md:hidden fixed top-0 inset-x-0 z-50 h-14 bg-raised border-b border-border flex items-center pl-4 pr-2 gap-2">
@@ -56,6 +60,8 @@ export function WorkspaceBar({
           projectId={projectId}
           projects={projects}
           isLoadingProjects={isLoadingProjects}
+          projectsError={projectsError}
+          onRetryProjects={onRetryProjects}
           setCurrentProject={setCurrentProject}
           onOpenProjectSettings={onOpenProjectSettings}
           onImportGitLab={onImportGitLab}

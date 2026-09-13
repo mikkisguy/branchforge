@@ -160,6 +160,8 @@ export function useZipImportProjectDialog(
 
       success("Project imported successfully");
     } catch (err) {
+      if (currentImportId !== importIdRef.current) return;
+
       const message =
         err instanceof Error ? err.message : "Failed to import project";
       dispatch({

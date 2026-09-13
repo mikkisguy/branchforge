@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { WriteModeView } from "../WriteModeView";
@@ -63,8 +63,11 @@ vi.mock("@/components/workspace/WorkspaceFrame", () => ({
     isFocusMode: boolean;
   }) => (
     <div data-testid="workspace-frame" data-focus-mode={String(isFocusMode)}>
-      {!isFocusMode ? toolbar : null}
-      {focusChrome}
+      {isFocusMode ? (
+        focusChrome
+      ) : (
+        <div data-testid="workspace-toolbar">{toolbar}</div>
+      )}
     </div>
   ),
 }));
@@ -131,6 +134,8 @@ function createProps(
       saveError: false,
       saveConflict: false,
     },
+    onReloadScene: vi.fn(),
+    onDiscardDraft: vi.fn(),
     onUndoStateChange: vi.fn(),
     onWordCountChange: vi.fn(),
     stats: [],
@@ -160,5 +165,79 @@ describe("WriteModeView chrome", () => {
       "data-focus-mode",
       "true"
     );
+  });
+
+  it("renders conflict controls in the toolbar when saveConflict is true", () => {
+    render(
+      <WriteModeView
+        {...createProps({
+          editorSaveState: {
+            isSaving: false,
+            lastSaved: null,
+            saveError: false,
+            saveConflict: true,
+          },
+        })}
+      />
+    );
+
+    const toolbar = screen.getByTestId("workspace-toolbar");
+    expect(
+      within(toolbar).getByRole("button", { name: "Reload scene" })
+    ).toBeInTheDocument();
+    expect(
+      within(toolbar).getByRole("button", { name: "Discard draft" })
+    ).toBeInTheDocument();
+  });
+
+  it("calls the correct handlers from toolbar conflict controls", () => {
+    const onReloadScene = vi.fn();
+    const onDiscardDraft = vi.fn();
+
+    render(
+      <WriteModeView
+        {...createProps({
+          onReloadScene,
+          onDiscardDraft,
+          editorSaveState: {
+            isSaving: false,
+            lastSaved: null,
+            saveError: false,
+            saveConflict: true,
+          },
+        })}
+      />
+    );
+
+    const toolbar = screen.getByTestId("workspace-toolbar");
+
+    fireEvent.click(
+      within(toolbar).getByRole("button", { name: "Reload scene" })
+    );
+    expect(onReloadScene).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(
+      within(toolbar).getByRole("button", { name: "Discard draft" })
+    );
+    expect(onDiscardDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders conflict controls in the focus chrome when saveConflict is true", () => {
+    render(
+      <WriteModeView
+        {...createProps({
+          isFocusMode: true,
+          editorSaveState: {
+            isSaving: false,
+            lastSaved: null,
+            saveError: false,
+            saveConflict: true,
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByText("Reload scene")).toBeInTheDocument();
+    expect(screen.getByText("Discard draft")).toBeInTheDocument();
   });
 });

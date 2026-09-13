@@ -56,9 +56,11 @@ export interface UseLabelsReturn {
   activeLabelId: string | null;
   isLoadingLabels: boolean;
   isLoadingLabel: boolean;
+  labelsError: Error | null;
 
   // Methods
   setActiveLabelId: (labelId: string | null) => void;
+  refetchLabels: () => Promise<unknown>;
   invalidateLabels: () => Promise<void>;
   updateDialogue: (
     labelId: string,
@@ -108,7 +110,12 @@ export function useLabels(): UseLabelsReturn {
 
   // Query for all labels in the current project
   // Refetch on mount to ensure fresh data when entering Write Mode
-  const { data: labels = [], isLoading: isLoadingLabels } = useQuery({
+  const {
+    data: labels = [],
+    isLoading: isLoadingLabels,
+    error: labelsError,
+    refetch: refetchLabels,
+  } = useQuery({
     queryKey: labelKeys.lists(currentProject?.id ?? ""),
     queryFn: () => labelsApi.listLabels({ projectId: currentProject!.id }),
     enabled: !!currentProject?.id,
@@ -398,7 +405,9 @@ export function useLabels(): UseLabelsReturn {
     activeLabelId,
     isLoadingLabels,
     isLoadingLabel,
+    labelsError: labelsError as Error | null,
     setActiveLabelId,
+    refetchLabels,
     invalidateLabels,
     updateDialogue,
     isUpdatingDialogue: updateDialogueMutation.isPending,

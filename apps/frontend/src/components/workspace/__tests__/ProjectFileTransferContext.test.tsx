@@ -24,6 +24,13 @@ vi.mock("@/components/script-mode/GitLabSyncDialog", () => ({
   GitLabSyncDialog: () => null,
 }));
 
+vi.mock("@/hooks/useExports", () => ({
+  useExports: () => ({
+    generateAndDownload: vi.fn(),
+    isGeneratingAndDownloading: false,
+  }),
+}));
+
 function TransferActionsProbe() {
   const { actions } = useProjectFileTransferActions();
   return (

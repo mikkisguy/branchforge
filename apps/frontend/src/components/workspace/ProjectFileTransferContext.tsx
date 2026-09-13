@@ -13,7 +13,11 @@ import { GitLabSyncDialog } from "@/components/script-mode/GitLabSyncDialog";
 import type { SyncOperationType } from "@/components/script-mode/GitLabSyncDialog";
 import { ZipImportFilesDialog } from "@/components/ide-shared/ZipImportFilesDialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { projectFilesApi } from "@/lib/api/project-files";
+import { useExports } from "@/hooks/useExports";
+import {
+  EXPORT_ERROR_TITLE,
+  getExportErrorMessage,
+} from "@/lib/export-project";
 
 export interface ProjectFileTransferActions {
   onPullGitLab?: () => void;
@@ -58,9 +62,10 @@ export function ProjectFileTransferProvider({
     useState<SyncOperationType>("import");
   const [zipImportOpen, setZipImportOpen] = useState(false);
   const [exportConfirmOpen, setExportConfirmOpen] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   const isExportingRef = useRef(false);
   const { error: showErrorToast } = useToast();
+  const { generateAndDownload, isGeneratingAndDownloading } =
+    useExports(projectId);
 
   const openSync = useCallback((operationType: SyncOperationType) => {
     setSyncOperationType(operationType);
@@ -73,19 +78,16 @@ export function ProjectFileTransferProvider({
     if (!projectId || isExportingRef.current) return;
 
     isExportingRef.current = true;
-    setIsExporting(true);
     try {
-      const result = await projectFilesApi.generateExport(projectId);
-      await projectFilesApi.downloadExport(projectId, result.id);
+      await generateAndDownload();
       setExportConfirmOpen(false);
     } catch (error) {
       console.error("Export failed:", error);
-      showErrorToast("Export failed. Please try again.", "Export Error");
+      showErrorToast(getExportErrorMessage(error), EXPORT_ERROR_TITLE);
     } finally {
       isExportingRef.current = false;
-      setIsExporting(false);
     }
-  }, [projectId, showErrorToast]);
+  }, [generateAndDownload, projectId, showErrorToast]);
 
   const defaultActions = useMemo<ProjectFileTransferActions>(
     () => ({
@@ -98,11 +100,11 @@ export function ProjectFileTransferProvider({
           ? () => setZipImportOpen(true)
           : undefined,
       onExportZip: projectId ? openZipExport : undefined,
-      isExporting,
+      isExporting: isGeneratingAndDownloading,
     }),
     [
       fileSourceType,
-      isExporting,
+      isGeneratingAndDownloading,
       isProjectOwner,
       openSync,
       openZipExport,
@@ -151,7 +153,7 @@ export function ProjectFileTransferProvider({
         title="Export Project Files"
         description="Download all project files as a ZIP archive?"
         confirmLabel="Export"
-        isLoading={isExporting}
+        isLoading={isGeneratingAndDownloading}
         loadingLabel="Exporting..."
         isNonDestructive
       />

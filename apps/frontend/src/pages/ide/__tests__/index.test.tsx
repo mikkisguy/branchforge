@@ -20,6 +20,7 @@ const {
   flushModeBeforeTransition,
   showErrorToast,
   setCurrentProject,
+  deleteProject,
   logout,
   projectState,
   writeModeSimulation,
@@ -29,6 +30,7 @@ const {
     name: "Test Project",
     source: "ZIP",
     duoEndingEnabled: false,
+    visibility: "OWNER",
     createdAt: "2024-01-01T00:00:00.000Z",
     updatedAt: "2024-01-01T00:00:00.000Z",
   };
@@ -63,6 +65,7 @@ const {
     flushModeBeforeTransition: vi.fn(async () => true),
     showErrorToast: vi.fn(),
     setCurrentProject: vi.fn(),
+    deleteProject: vi.fn(async () => undefined),
     logout: vi.fn(),
     projectState,
     writeModeSimulation,
@@ -99,6 +102,13 @@ vi.mock("@/hooks/useLabels", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useGitLab", () => ({
+  useGitLab: () => ({
+    hasIntegration: false,
+    isLoadingIntegration: false,
+  }),
+}));
+
 vi.mock("@/contexts/useTheme", () => ({
   useTheme: () => ({
     theme: "periwinkle",
@@ -115,7 +125,7 @@ vi.mock("@/hooks/useProject", () => ({
     setCurrentProject,
     isLoadingProjects: false,
     updateProject: vi.fn(),
-    deleteProject: vi.fn(),
+    deleteProject,
     refreshProjects: vi.fn(),
   }),
 }));
@@ -315,5 +325,75 @@ describe("HomePageIDE", () => {
     expect(
       screen.getAllByRole("navigation", { name: "Workspace views" })
     ).not.toHaveLength(0);
+  });
+
+  async function openProjectsSettingsAndConfirmDelete(projectName: string) {
+    const user = userEvent.setup();
+
+    window.dispatchEvent(
+      new CustomEvent("open-settings", { detail: { tab: "projects" } })
+    );
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: `Delete ${projectName}`,
+      })
+    );
+    await user.click(screen.getByRole("button", { name: "Delete Project" }));
+  }
+
+  it("deleting the current project flushes the active editor mode first", async () => {
+    renderHomePage();
+
+    await openProjectsSettingsAndConfirmDelete("Test Project");
+
+    await waitFor(() => {
+      expect(flushModeBeforeTransition).toHaveBeenCalledWith("write");
+      expect(deleteProject).toHaveBeenCalledWith("proj-1");
+    });
+  });
+
+  it("blocks deleting the current project when the flush fails", async () => {
+    flushModeBeforeTransition.mockResolvedValueOnce(false);
+
+    renderHomePage();
+
+    await openProjectsSettingsAndConfirmDelete("Test Project");
+
+    await waitFor(() => {
+      expect(showErrorToast).toHaveBeenCalledWith(
+        "Could not save pending edits. Resolve the save error before deleting this project.",
+        "Project delete blocked"
+      );
+    });
+    expect(flushModeBeforeTransition).toHaveBeenCalledWith("write");
+    expect(deleteProject).not.toHaveBeenCalled();
+  });
+
+  it("blocks deleting the current project when the flush throws", async () => {
+    flushModeBeforeTransition.mockRejectedValueOnce(new Error("flush blew up"));
+
+    renderHomePage();
+
+    await openProjectsSettingsAndConfirmDelete("Test Project");
+
+    await waitFor(() => {
+      expect(showErrorToast).toHaveBeenCalledWith(
+        "An error occurred while saving pending edits before deleting this project. Please try again.",
+        "Project delete failed"
+      );
+    });
+    expect(deleteProject).not.toHaveBeenCalled();
+  });
+
+  it("deleting another project does not flush the active editor mode", async () => {
+    renderHomePage();
+
+    await openProjectsSettingsAndConfirmDelete("Second Project");
+
+    await waitFor(() => {
+      expect(deleteProject).toHaveBeenCalledWith("proj-2");
+    });
+    expect(flushModeBeforeTransition).not.toHaveBeenCalled();
   });
 });

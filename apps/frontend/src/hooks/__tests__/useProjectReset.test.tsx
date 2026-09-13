@@ -46,14 +46,14 @@ describe("useProjectReset", () => {
     expect(showErrorToast).not.toHaveBeenCalled();
   });
 
-  it("shows warning toast when save flush fails", async () => {
+  it("blocks reset and shows blocking toast when save flush fails", async () => {
     const triggerSave = vi.fn().mockResolvedValue(false);
     const onReset = vi.fn();
     const showErrorToast = vi.fn();
+    const setSkipSave = vi.fn();
 
     renderHook(() => {
       const isResettingRef = useRef(false);
-      const [_skipSave, setSkipSaveState] = useState(false);
 
       useProjectReset({
         projectId: "project-1",
@@ -61,17 +61,55 @@ describe("useProjectReset", () => {
         hasPendingSave: true,
         triggerSave,
         showErrorToast,
-        setSkipSave: setSkipSaveState,
+        setSkipSave,
         onReset,
       });
     });
 
     await waitFor(() => {
       expect(showErrorToast).toHaveBeenCalledWith(
-        "Could not save pending edits. The save failed when switching projects.",
-        "Project switch warning"
+        "Could not save pending edits. Resolve the save error before switching projects.",
+        "Project switch blocked"
       );
-      expect(onReset).toHaveBeenCalledTimes(1);
+    });
+    expect(triggerSave).toHaveBeenCalledTimes(1);
+    expect(onReset).not.toHaveBeenCalled();
+    // Reset flags must be cleared so future transitions are not stuck.
+    await waitFor(() => {
+      expect(setSkipSave).toHaveBeenLastCalledWith(false);
+    });
+  });
+
+  it("blocks reset and shows blocking toast when save flush throws", async () => {
+    const triggerSave = vi.fn().mockRejectedValue(new Error("save exploded"));
+    const onReset = vi.fn();
+    const showErrorToast = vi.fn();
+    const setSkipSave = vi.fn();
+
+    renderHook(() => {
+      const isResettingRef = useRef(false);
+
+      useProjectReset({
+        projectId: "project-1",
+        isResettingRef,
+        hasPendingSave: true,
+        triggerSave,
+        showErrorToast,
+        setSkipSave,
+        onReset,
+      });
+    });
+
+    await waitFor(() => {
+      expect(showErrorToast).toHaveBeenCalledWith(
+        "Could not save pending edits. Resolve the save error before switching projects.",
+        "Project switch blocked"
+      );
+    });
+    expect(triggerSave).toHaveBeenCalledTimes(1);
+    expect(onReset).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(setSkipSave).toHaveBeenLastCalledWith(false);
     });
   });
 });

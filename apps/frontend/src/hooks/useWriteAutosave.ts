@@ -51,6 +51,7 @@ interface UseWriteAutosaveProps {
   isUpdatingDialogue: boolean;
   skipSaveRef?: RefObject<boolean>;
   onUpdateDialogue: UpdateDialogue;
+  onRefetchLabel?: (labelId: string) => Promise<LabelDetail | undefined>;
   showErrorToast: (message: string, title: string) => void;
 }
 
@@ -61,6 +62,8 @@ interface UseWriteAutosaveReturn {
   resetSavedHash: (draft?: LabelDialogueDraft) => void;
   lastSaved: Date | null;
   conflictByLabel: Map<string, boolean>;
+  reloadScene: (labelId: string) => Promise<LabelDetail | undefined>;
+  discardDraft: (activeLabel: LabelDetail) => DialogueEntry[];
 }
 
 class WriteConflictError extends Error {
@@ -264,6 +267,7 @@ export function useWriteAutosave({
   isUpdatingDialogue,
   skipSaveRef,
   onUpdateDialogue,
+  onRefetchLabel,
   showErrorToast,
 }: UseWriteAutosaveProps): UseWriteAutosaveReturn {
   const [state, dispatch] = useReducer(autosaveReducer, INITIAL_AUTOSAVE_STATE);
@@ -548,6 +552,70 @@ export function useWriteAutosave({
     };
   }, []);
 
+  const syncBaselineFromLabel = useCallback(
+    (label: LabelDetail, entries: DialogueEntry[]) => {
+      const labelId = label.id;
+
+      savedHashesRef.current!.set(labelId, hashDialogueEntries(entries));
+
+      if (typeof label.contentHash === "string") {
+        serverContentHashesRef.current!.set(labelId, label.contentHash);
+      } else {
+        serverContentHashesRef.current!.delete(labelId);
+      }
+
+      if (typeof label.version === "number") {
+        dispatch({
+          type: "SET_VERSION",
+          labelId,
+          version: label.version,
+        });
+        lastKnownVersionByLabelRef.current.set(labelId, label.version);
+      }
+    },
+    []
+  );
+
+  const reloadScene = useCallback(
+    async (labelId: string): Promise<LabelDetail | undefined> => {
+      const label = await onRefetchLabel?.(labelId);
+      if (!label) {
+        return undefined;
+      }
+
+      const persistedDialogue = getPersistedDialogueFromLabel(label);
+      const serverDraft: LabelDialogueDraft = {
+        labelId: label.id,
+        entries: persistedDialogue,
+      };
+
+      syncBaselineFromLabel(label, persistedDialogue);
+      dispatch({ type: "CLEAR_CONFLICT", labelId: label.id });
+      resetSavedHash(serverDraft);
+
+      return label;
+    },
+    [onRefetchLabel, resetSavedHash, syncBaselineFromLabel]
+  );
+
+  const discardDraft = useCallback(
+    (activeLabel: LabelDetail): DialogueEntry[] => {
+      const labelId = activeLabel.id;
+      const persistedDialogue = getPersistedDialogueFromLabel(activeLabel);
+      const serverDraft: LabelDialogueDraft = {
+        labelId,
+        entries: persistedDialogue,
+      };
+
+      syncBaselineFromLabel(activeLabel, persistedDialogue);
+      dispatch({ type: "CLEAR_CONFLICT", labelId });
+      resetSavedHash(serverDraft);
+
+      return persistedDialogue;
+    },
+    [resetSavedHash, syncBaselineFromLabel]
+  );
+
   return {
     saveStatus,
     isDirty,
@@ -555,5 +623,7 @@ export function useWriteAutosave({
     resetSavedHash,
     lastSaved,
     conflictByLabel,
+    reloadScene,
+    discardDraft,
   };
 }

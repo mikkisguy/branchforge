@@ -39,12 +39,12 @@ export function LoadingLabels() {
   );
 }
 
-interface ProjectFilesErrorProps {
+interface LoadErrorProps {
   onRetry: () => void;
 }
 
 // react-doctor-disable-next-line react-doctor/no-multi-comp -- related variants co-located
-export function ProjectFilesError({ onRetry }: ProjectFilesErrorProps) {
+export function ProjectFilesError({ onRetry }: LoadErrorProps) {
   return (
     <div className="h-full flex flex-col items-center justify-center">
       <div className="size-20 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
@@ -53,6 +53,29 @@ export function ProjectFilesError({ onRetry }: ProjectFilesErrorProps) {
       <p className="text-foreground font-medium">
         Failed to load project files
       </p>
+      <p className="text-sm text-muted-foreground/70 mt-1 text-center max-w-md px-4">
+        Check your connection and try again.
+      </p>
+      <Button
+        type="button"
+        variant="outline"
+        className="mt-4"
+        onClick={onRetry}
+      >
+        Retry
+      </Button>
+    </div>
+  );
+}
+
+// react-doctor-disable-next-line react-doctor/no-multi-comp -- related variants co-located
+export function LabelsError({ onRetry }: LoadErrorProps) {
+  return (
+    <div className="h-full flex flex-col items-center justify-center">
+      <div className="size-20 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+        <TriangleAlert className="size-10 text-destructive/80" />
+      </div>
+      <p className="text-foreground font-medium">Failed to load labels</p>
       <p className="text-sm text-muted-foreground/70 mt-1 text-center max-w-md px-4">
         Check your connection and try again.
       </p>

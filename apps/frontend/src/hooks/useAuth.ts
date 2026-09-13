@@ -98,8 +98,7 @@ export function useAuth(): UseAuthReturn {
       email: string;
       password: string;
     }) => {
-      const response = await authApi.register({ email, password });
-      return response.user;
+      return authApi.register({ email, password });
     },
     onSuccess: (data) => {
       // Set the user data in cache

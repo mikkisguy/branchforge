@@ -50,6 +50,7 @@ export function HomePageIDE() {
   );
   const [isFocusMode, setIsFocusMode] = useState(false);
   const isFlushing = useRef(false);
+  const isDeletingRef = useRef(false);
   const previousProjectIdRef = useRef<string | undefined>(undefined);
 
   const {
@@ -57,6 +58,7 @@ export function HomePageIDE() {
     projects,
     setCurrentProject,
     isLoadingProjects,
+    projectsError,
     updateProject,
     deleteProject,
     refreshProjects,
@@ -171,6 +173,48 @@ export function HomePageIDE() {
     })();
   };
 
+  const handleDeleteProject = async (projectId: string): Promise<void> => {
+    if (isDeletingRef.current) {
+      return;
+    }
+    isDeletingRef.current = true;
+
+    try {
+      // Deleting the currently open project must flush the active editor
+      // mode first so pending edits are not lost. Deleting another project
+      // does not touch the active editor and needs no flush.
+      if (projectId === currentProject?.id && isEditorView(view)) {
+        isFlushing.current = true;
+
+        let flushed: boolean;
+        try {
+          flushed = await flushModeBeforeTransition(view);
+        } catch (error) {
+          showErrorToast(
+            "An error occurred while saving pending edits before deleting this project. Please try again.",
+            "Project delete failed"
+          );
+          console.error("Error flushing before project delete:", error);
+          return;
+        } finally {
+          isFlushing.current = false;
+        }
+
+        if (!flushed) {
+          showErrorToast(
+            "Could not save pending edits. Resolve the save error before deleting this project.",
+            "Project delete blocked"
+          );
+          return;
+        }
+      }
+
+      await deleteProject(projectId);
+    } finally {
+      isDeletingRef.current = false;
+    }
+  };
+
   const handleScriptModeRetry = () => {
     setScriptModeKey((prev) => prev + 1);
   };
@@ -225,8 +269,9 @@ export function HomePageIDE() {
           projects={projects}
           setCurrentProject={handleSetProject}
           isLoadingProjects={isLoadingProjects}
+          projectsError={projectsError}
           updateProject={updateProject}
-          deleteProject={deleteProject}
+          deleteProject={handleDeleteProject}
           refetchProjects={refreshProjects}
           isSettingsOpenExternally={isSettingsOpen}
           onSettingsOpenChangeExternally={handleSetIsSettingsOpen}

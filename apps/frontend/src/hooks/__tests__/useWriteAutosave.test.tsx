@@ -443,4 +443,237 @@ describe("useWriteAutosave", () => {
       document.body.removeChild(dialog);
     }
   });
+
+  it("reloadScene refetches the label, clears conflict, and resets baseline", async () => {
+    const onUpdateDialogue = vi
+      .fn()
+      .mockResolvedValueOnce({
+        success: false,
+        conflict: {
+          reason: "STALE_CONTENT_HASH",
+          currentVersion: 9,
+          currentContentHash: "server-hash-9",
+        },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        version: 11,
+        contentHash: "server-hash-11",
+        fileContentHash: "file-hash-11",
+        fileUpdatedAt: "2024-01-01T00:00:00.000Z",
+      });
+
+    const refreshedLabel = createLabel("label-1", 10, "server-hash-10");
+    refreshedLabel.lines = [
+      {
+        id: "line-label-1",
+        labelId: "label-1",
+        sequence: 1,
+        contentType: "DIALOGUE",
+        content: "Reloaded from server",
+        visualType: "GENERATED",
+        visualPrompt: null,
+        speakerId: null,
+        speakerName: null,
+        speakerTag: null,
+        createdAt: "2024-01-01T00:00:00.000Z",
+        updatedAt: "2024-01-01T00:00:00.000Z",
+        conditions: null,
+        visualStatements: null,
+      },
+    ];
+
+    const onRefetchLabel = vi.fn().mockResolvedValue(refreshedLabel);
+    const showErrorToast = vi.fn();
+    const label = createLabel("label-1", 2, "server-hash-2");
+
+    const { result, rerender } = renderHook(
+      (props: {
+        draft: LabelDialogueDraft;
+        activeLabel: LabelDetail | undefined;
+      }) =>
+        useWriteAutosave({
+          projectId: "project-1",
+          draft: props.draft,
+          labels: [label],
+          activeLabel: props.activeLabel,
+          isUpdatingDialogue: false,
+          onUpdateDialogue,
+          onRefetchLabel,
+          showErrorToast,
+        }),
+      {
+        initialProps: {
+          draft: {
+            labelId: "label-1",
+            entries: [{ id: "line-1", speakerId: null, text: "Original" }],
+          },
+          activeLabel: label,
+        },
+      }
+    );
+
+    rerender({
+      draft: {
+        labelId: "label-1",
+        entries: [{ id: "line-1", speakerId: null, text: "Conflict edit" }],
+      },
+      activeLabel: label,
+    });
+
+    await act(async () => {
+      const saved = await result.current.triggerSave();
+      expect(saved).toBe(false);
+    });
+
+    await waitFor(() => {
+      expect(result.current.conflictByLabel.get("label-1")).toBe(true);
+    });
+
+    let reloaded: LabelDetail | undefined;
+    await act(async () => {
+      reloaded = await result.current.reloadScene("label-1");
+    });
+
+    expect(reloaded).toBe(refreshedLabel);
+    expect(onRefetchLabel).toHaveBeenCalledWith("label-1");
+
+    if (!reloaded) {
+      return;
+    }
+
+    await waitFor(() => {
+      expect(result.current.conflictByLabel.get("label-1")).toBeUndefined();
+    });
+
+    const serverDraft = {
+      labelId: "label-1",
+      entries: [
+        { id: "line-label-1", speakerId: null, text: "Reloaded from server" },
+      ],
+    };
+
+    rerender({
+      draft: serverDraft,
+      activeLabel: reloaded,
+    });
+
+    await waitFor(() => {
+      expect(result.current.isDirty).toBe(false);
+    });
+
+    expect(onUpdateDialogue).toHaveBeenCalledTimes(1);
+  });
+
+  it("discardDraft restores server dialogue, clears conflict, and prevents a stale autosave", async () => {
+    const onUpdateDialogue = vi
+      .fn()
+      .mockResolvedValueOnce({
+        success: false,
+        conflict: {
+          reason: "STALE_CONTENT_HASH",
+          currentVersion: 9,
+          currentContentHash: "server-hash-9",
+        },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        version: 11,
+        contentHash: "server-hash-11",
+        fileContentHash: "file-hash-11",
+        fileUpdatedAt: "2024-01-01T00:00:00.000Z",
+      });
+
+    const showErrorToast = vi.fn();
+    const label = createLabel("label-1", 3, "server-hash-3");
+    label.lines = [
+      {
+        id: "line-label-1",
+        labelId: "label-1",
+        sequence: 1,
+        contentType: "DIALOGUE",
+        content: "Server version",
+        visualType: "GENERATED",
+        visualPrompt: null,
+        speakerId: null,
+        speakerName: null,
+        speakerTag: null,
+        createdAt: "2024-01-01T00:00:00.000Z",
+        updatedAt: "2024-01-01T00:00:00.000Z",
+        conditions: null,
+        visualStatements: null,
+      },
+    ];
+
+    const { result, rerender } = renderHook(
+      (props: {
+        draft: LabelDialogueDraft;
+        activeLabel: LabelDetail | undefined;
+      }) =>
+        useWriteAutosave({
+          projectId: "project-1",
+          draft: props.draft,
+          labels: [label],
+          activeLabel: props.activeLabel,
+          isUpdatingDialogue: false,
+          onUpdateDialogue,
+          showErrorToast,
+        }),
+      {
+        initialProps: {
+          draft: {
+            labelId: "label-1",
+            entries: [{ id: "line-1", speakerId: null, text: "Original" }],
+          },
+          activeLabel: label,
+        },
+      }
+    );
+
+    rerender({
+      draft: {
+        labelId: "label-1",
+        entries: [{ id: "line-1", speakerId: null, text: "Conflict edit" }],
+      },
+      activeLabel: label,
+    });
+
+    await act(async () => {
+      const saved = await result.current.triggerSave();
+      expect(saved).toBe(false);
+    });
+
+    await waitFor(() => {
+      expect(result.current.conflictByLabel.get("label-1")).toBe(true);
+    });
+
+    let serverEntries: ReturnType<typeof result.current.discardDraft>;
+    await act(() => {
+      serverEntries = result.current.discardDraft(label);
+    });
+
+    expect(serverEntries!).toEqual([
+      { id: "line-label-1", speakerId: null, text: "Server version" },
+    ]);
+
+    await waitFor(() => {
+      expect(result.current.conflictByLabel.get("label-1")).toBeUndefined();
+    });
+
+    rerender({
+      draft: {
+        labelId: "label-1",
+        entries: [
+          { id: "line-label-1", speakerId: null, text: "Server version" },
+        ],
+      },
+      activeLabel: label,
+    });
+
+    await waitFor(() => {
+      expect(result.current.isDirty).toBe(false);
+    });
+
+    expect(onUpdateDialogue).toHaveBeenCalledTimes(1);
+  });
 });
