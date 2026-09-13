@@ -178,8 +178,8 @@ describe("WriteModeView chrome", () => {
       />
     );
 
-    expect(screen.getByText("Reload scene")).toBeInTheDocument();
-    expect(screen.getByText("Discard draft")).toBeInTheDocument();
+    expect(screen.getAllByText("Reload scene")).toHaveLength(2);
+    expect(screen.getAllByText("Discard draft")).toHaveLength(2);
   });
 
   it("calls the correct handlers from toolbar conflict controls", () => {
@@ -201,10 +201,10 @@ describe("WriteModeView chrome", () => {
       />
     );
 
-    fireEvent.click(screen.getByText("Reload scene"));
+    fireEvent.click(screen.getAllByText("Reload scene")[0]!);
     expect(onReloadScene).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByText("Discard draft"));
+    fireEvent.click(screen.getAllByText("Discard draft")[0]!);
     expect(onDiscardDraft).toHaveBeenCalledTimes(1);
   });
 
