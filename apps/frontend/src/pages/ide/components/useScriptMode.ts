@@ -182,8 +182,6 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     const fileId = pendingSelectFileId;
     let cancelled = false;
     pendingSelectionIdRef.current = fileId;
-    // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change -- consume the pending selection only after its cache-backed file becomes available
-    setPendingSelectFileId(null);
     void (async () => {
       const selected = await selectFileTab(fileId);
       // Ignore stale resolutions: only the most recent pending selection
@@ -197,13 +195,11 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
         return;
       }
       pendingSelectionIdRef.current = null;
+      setPendingSelectFileId(null);
       setGeneratedPreview(null);
     })();
     return () => {
-      // Consuming pendingSelectFileId re-runs this effect; retain the active
-      // operation in that case, but cancel when reset or another selection
-      // has replaced its token.
-      cancelled = pendingSelectionIdRef.current !== fileId;
+      cancelled = true;
     };
   }, [pendingSelectFileId, projectFiles, selectFileTab]);
 
@@ -216,6 +212,7 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
   const handleResetState = useCallback(() => {
     resetRefreshState();
     pendingSelectionIdRef.current = null;
+    setPendingSelectFileId(null);
     clearTabsState();
     void clearEditorState();
     setScrollToLine(null);
