@@ -72,10 +72,16 @@ export function useProjectReset({
             console.error("Error saving pending edits:", error);
           }
           if (!flushed) {
+            // A failed or thrown pending-save flush blocks the reset
+            // completely: no onReset and no editor/tabs clearing.
+            if (resetId !== currentResetIdRef.current) {
+              return;
+            }
             showErrorToastRef.current(
-              "Could not save pending edits. The save failed when switching projects.",
-              "Project switch warning"
+              "Could not save pending edits. Resolve the save error before switching projects.",
+              "Project switch blocked"
             );
+            return;
           }
         }
 
