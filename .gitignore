@@ -17,7 +17,7 @@ build/
 
 # Generated docs (synced from docs/ by sync-source-docs.js)
 apps/docs/dev/architecture.md
-apps/docs/dev/changelog.md
+apps/docs/changelog.md
 
 # Environment
 .env

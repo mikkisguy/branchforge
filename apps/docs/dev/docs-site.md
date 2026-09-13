@@ -38,15 +38,17 @@ protocol and trailing slashes. Local builds default to `http://localhost:5173`.
 ## Theme
 
 The site extends the default VitePress theme under
-`.vitepress/theme/`. The home page is a custom Vue component with responsive
-CSS; all other pages use the standard documentation layout (nav, sidebar,
+`.vitepress/theme/`. The home page is a custom Vue component injected into the
+default home layout slot (so the shared navbar and client-side routing stay
+intact). All other pages use the standard documentation layout (nav, sidebar,
 search, appearance toggle).
 
 ## Generated source pages
 
-`apps/docs/scripts/sync-source-docs.js` copies `docs/ARCHITECTURE.md` and the
-root `CHANGELOG.md` into VitePress before dev/build. Do not edit the generated
-files directly; update their source documents instead.
+`apps/docs/scripts/sync-source-docs.js` copies `docs/ARCHITECTURE.md` into
+`dev/architecture.md` and the root `CHANGELOG.md` into the user-facing
+`/changelog` page before dev/build. Do not edit the generated files directly;
+update their source documents instead.
 
 ## Demo data for screenshots
 

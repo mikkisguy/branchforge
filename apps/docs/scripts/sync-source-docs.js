@@ -29,7 +29,7 @@ try {
     `---\ntitle: Architecture\n---\n\n${readFileSync(architectureSrc, "utf-8")}`
   );
   writeFileSync(
-    resolve(docsDst, "dev/changelog.md"),
+    resolve(docsDst, "changelog.md"),
     `---\ntitle: Changelog\n---\n\n${readFileSync(changelogSrc, "utf-8")}`
   );
 } catch (err) {

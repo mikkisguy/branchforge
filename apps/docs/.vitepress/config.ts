@@ -46,6 +46,18 @@ export default defineConfig({
   ],
   head: [
     ["link", { rel: "icon", href: "/favicon.png", type: "image/png" }],
+    ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
+    [
+      "link",
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" },
+    ],
+    [
+      "link",
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap",
+      },
+    ],
     ["meta", { property: "og:type", content: "website" }],
     ["meta", { property: "og:site_name", content: "BranchForge" }],
     ["meta", { property: "og:image", content: `${siteUrl}/favicon.png` }],
@@ -60,6 +72,7 @@ export default defineConfig({
     siteTitle: "BranchForge",
     nav: [
       { text: "Home", link: "/" },
+      { text: "Changelog", link: "/changelog" },
       { text: "User Guide", link: "/user/getting-started" },
       { text: "Developer Guide", link: "/dev/architecture" },
       { text: "GitHub", link: REPO_URL },
@@ -118,7 +131,6 @@ export default defineConfig({
             { text: "Database", link: "/dev/database" },
             { text: "API Reference", link: "/dev/api" },
             { text: "Docs Site", link: "/dev/docs-site" },
-            { text: "Changelog", link: "/dev/changelog" },
             { text: "Decision Records", link: "/dev/adrs" },
           ],
         },
