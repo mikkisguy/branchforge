@@ -1500,6 +1500,155 @@ describe("GitLabSyncService (Integration)", () => {
       expect(fileRow?.lastPushedContentHash).toBe("hash-reconciled");
       expect(fileRow?.remoteFilePath).toBe("game/reconciled_dst.rpy");
     });
+
+    it("deletes only planned pending ops and preserves concurrent ops (H2)", async () => {
+      const createdFile = createProjectFileFixture({
+        id: testUuid("56000000", 96),
+        filePath: "game/planned_create.rpy",
+        content: 'label planned:\n    "New"\n    return',
+        contentHash: "hash-planned",
+      });
+      await db.insert(projectFiles).values(createdFile);
+
+      const concurrentFile = createProjectFileFixture({
+        id: testUuid("56000000", 97),
+        filePath: "game/concurrent_create.rpy",
+        content: 'label concurrent:\n    "Later"\n    return',
+        contentHash: "hash-concurrent",
+      });
+      await db.insert(projectFiles).values(concurrentFile);
+
+      const plannedOp = await insertPendingOp({
+        projectId: testProjectId,
+        projectFileId: createdFile.id,
+        operation: "CREATE",
+        remoteBasePath: "game/planned_create.rpy",
+        localPath: "game/planned_create.rpy",
+      });
+
+      let concurrentOpId: string | null = null;
+      vi.spyOn(gitlabFileService, "batchCommitFiles").mockImplementation(
+        async () => {
+          const concurrentOp = await insertPendingOp({
+            projectId: testProjectId,
+            projectFileId: concurrentFile.id,
+            operation: "CREATE",
+            remoteBasePath: "game/concurrent_create.rpy",
+            localPath: "game/concurrent_create.rpy",
+          });
+          concurrentOpId = concurrentOp.id;
+          return "commit-h2-scoped";
+        }
+      );
+
+      vi.spyOn(
+        gitlabRepoService,
+        "getFileContentWithMetadata"
+      ).mockResolvedValue({
+        content: null,
+        lastCommitId: null,
+        contentSha256: null,
+        blobId: null,
+      });
+
+      const result = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "Scoped finalize"
+      );
+
+      expect(result.status).toBe("COMPLETED");
+      expect(concurrentOpId).not.toBeNull();
+
+      const pendingRows = await db
+        .select()
+        .from(projectFilePendingOperations)
+        .where(eq(projectFilePendingOperations.projectId, testProjectId));
+      expect(pendingRows).toHaveLength(1);
+      expect(pendingRows[0]?.id).toBe(concurrentOpId);
+      expect(pendingRows[0]?.id).not.toBe(plannedOp.id);
+      expect(pendingRows[0]?.attemptStartedAt).toBeNull();
+    });
+
+    it("marks attempt metadata only on planned pending ops (H2)", async () => {
+      const plannedFile = createProjectFileFixture({
+        id: testUuid("56000000", 98),
+        filePath: "game/mark_planned.rpy",
+        content: "label planned:\n    return",
+        contentHash: "hash-mark-planned",
+      });
+      await db.insert(projectFiles).values(plannedFile);
+
+      const skippedFile = {
+        ...createProjectFileFixture({
+          id: testUuid("56000000", 99),
+          filePath: "game/mark_skipped.rpy",
+          content: "label skipped:\n    return",
+          contentHash: "hash-mark-skipped",
+        }),
+        // Not tombstoned: DELETE op is skipped by the planner.
+        deletedAt: null,
+      };
+      await db.insert(projectFiles).values(skippedFile);
+
+      const plannedOp = await insertPendingOp({
+        projectId: testProjectId,
+        projectFileId: plannedFile.id,
+        operation: "CREATE",
+        remoteBasePath: "game/mark_planned.rpy",
+        localPath: "game/mark_planned.rpy",
+      });
+      const skippedOp = await insertPendingOp({
+        projectId: testProjectId,
+        projectFileId: skippedFile.id,
+        operation: "DELETE",
+        remoteBasePath: "game/mark_skipped.rpy",
+        localPath: "game/mark_skipped.rpy",
+      });
+
+      vi.spyOn(gitlabFileService, "batchCommitFiles").mockImplementation(
+        async () => {
+          const [plannedRow] = await db
+            .select()
+            .from(projectFilePendingOperations)
+            .where(eq(projectFilePendingOperations.id, plannedOp.id));
+          const [skippedRow] = await db
+            .select()
+            .from(projectFilePendingOperations)
+            .where(eq(projectFilePendingOperations.id, skippedOp.id));
+          expect(plannedRow?.attemptStartedAt).not.toBeNull();
+          expect(plannedRow?.attemptBranch).toBe(testBranch);
+          expect(skippedRow?.attemptStartedAt).toBeNull();
+          return "commit-h2-mark";
+        }
+      );
+      vi.spyOn(
+        gitlabRepoService,
+        "getFileContentWithMetadata"
+      ).mockResolvedValue({
+        content: null,
+        lastCommitId: null,
+        contentSha256: null,
+        blobId: null,
+      });
+
+      const result = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "Mark planned only"
+      );
+
+      expect(result.status).toBe("COMPLETED");
+
+      const pendingRows = await db
+        .select()
+        .from(projectFilePendingOperations)
+        .where(eq(projectFilePendingOperations.projectId, testProjectId));
+      expect(pendingRows).toHaveLength(1);
+      expect(pendingRows[0]?.id).toBe(skippedOp.id);
+    });
   });
 
   describe("importFromGitlab", () => {
