@@ -65,7 +65,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          'node -e "const configuredBasePath = process.env.BASE_PATH || ''/api''; const basePath = configuredBasePath.endsWith(''/'') ? configuredBasePath.slice(0, -1) : configuredBasePath; require(''http'').get(''http://localhost:3000'' + basePath + ''/health'', (response) => { process.exit(response.statusCode === 200 ? 0 : 1); }).on(''error'', () => process.exit(1));"',
+          'node -e "const configuredBasePath = process.env.BASE_PATH || ''/api''; const basePath = configuredBasePath.endsWith(''/'') ? configuredBasePath.slice(0, -1) : configuredBasePath; require(''http'').get(''http://localhost:3000'' + basePath + ''/health/ready'', (response) => { process.exit(response.statusCode === 200 ? 0 : 1); }).on(''error'', () => process.exit(1));"',
         ]
       interval: 30s
       timeout: 3s

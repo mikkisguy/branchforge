@@ -82,10 +82,67 @@ export async function closeDb(): Promise<void> {
 }
 
 /**
- * Check if the database connection is open
+ * Check if the database connection pool has been created.
  *
- * @returns true if the database is connected
+ * This is not a readiness probe — use {@link checkDatabaseReady} to verify
+ * Postgres actually answers queries.
+ *
+ * @returns true if the database pool object exists
  */
 export function isDbConnected(): boolean {
   return db !== null && pool !== null;
+}
+
+const DEFAULT_READY_TIMEOUT_MS = 2000;
+
+/**
+ * Verify Postgres is reachable with a bounded `SELECT 1`.
+ *
+ * @returns true when the database answers within the timeout
+ */
+export async function checkDatabaseReady(
+  timeoutMs: number = DEFAULT_READY_TIMEOUT_MS
+): Promise<boolean> {
+  try {
+    // Ensure the pool exists even if no prior request created it.
+    getDb();
+    if (!pool) {
+      return false;
+    }
+
+    const client = await Promise.race([
+      pool.connect(),
+      new Promise<never>((_, reject) => {
+        setTimeout(
+          () => reject(new Error("database readiness timeout")),
+          timeoutMs
+        );
+      }),
+    ]);
+
+    try {
+      await Promise.race([
+        client.query("SELECT 1"),
+        new Promise<never>((_, reject) => {
+          setTimeout(
+            () => reject(new Error("database readiness timeout")),
+            timeoutMs
+          );
+        }),
+      ]);
+      return true;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    logError(
+      LogEventType.DB_CONNECTION_ERROR,
+      {
+        event: "db.readiness_check_failed",
+        error: error instanceof Error ? error.message : String(error),
+      },
+      error
+    );
+    return false;
+  }
 }

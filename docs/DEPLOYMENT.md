@@ -375,10 +375,20 @@ Check if services are running:
 docker compose ps
 ```
 
-Check backend health:
+BranchForge exposes two backend probes:
+
+- `GET /api/health` — **liveness**. Confirms the Node process is up. It does
+  not check Postgres.
+- `GET /api/health/ready` — **readiness**. Confirms Postgres answers
+  `SELECT 1`. Compose and the backend image healthchecks use this endpoint
+  so the frontend only starts once the API can serve database-backed traffic.
 
 ```bash
+# Liveness
 curl http://localhost:3000/api/health
+
+# Readiness (used by Docker healthchecks)
+curl http://localhost:3000/api/health/ready
 ```
 
 ## Performance Optimization
