@@ -60,7 +60,7 @@ describe("session-expiry", () => {
     expect(isAuthRoute("/branchforge/projects")).toBe(false);
   });
 
-  it("does not set the expiry guard when already on an auth route", () => {
+  it("does not clear observed queries or set the expiry guard on an auth route", () => {
     Object.defineProperty(window, "location", {
       configurable: true,
       value: {
@@ -74,20 +74,22 @@ describe("session-expiry", () => {
     queryClient.setQueryData(["cached"], { value: 1 });
 
     handleSessionExpired(queryClient);
-    expect(queryClient.getQueryData(["cached"])).toBeUndefined();
+    expect(queryClient.getQueryData(["cached"])).toEqual({ value: 1 });
     expect(navigateSpy).not.toHaveBeenCalled();
 
     queryClient.setQueryData(["cached"], { value: 2 });
     handleSessionExpired(queryClient);
-    expect(queryClient.getQueryData(["cached"])).toBeUndefined();
+    expect(queryClient.getQueryData(["cached"])).toEqual({ value: 2 });
     expect(navigateSpy).not.toHaveBeenCalled();
   });
 
   it("navigates to the normalized login path from a protected route", () => {
     const queryClient = new QueryClient();
+    queryClient.setQueryData(["cached"], { value: 1 });
 
     handleSessionExpired(queryClient);
 
     expect(navigateSpy).toHaveBeenCalledWith("/branchforge/login");
+    expect(queryClient.getQueryData(["cached"])).toEqual({ value: 1 });
   });
 });

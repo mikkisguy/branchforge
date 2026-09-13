@@ -39,20 +39,25 @@ export function isAuthRoute(pathname = window.location.pathname): boolean {
   );
 }
 
-export function handleSessionExpired(queryClient: QueryClient): void {
+export function handleSessionExpired(_queryClient: QueryClient): void {
   if (handlingSessionExpiry) {
     return;
   }
 
   if (isAuthRoute()) {
     clearCsrfToken();
-    queryClient.clear();
+    // Keep the failed query in the cache. ThemeProvider is mounted on auth
+    // routes and queries user settings; clearing its observed 401 query here
+    // removes it while the observer is still mounted, causing TanStack Query
+    // to create and fetch it again in a tight loop.
     return;
   }
 
   handlingSessionExpiry = true;
   clearCsrfToken();
-  queryClient.clear();
+  // Navigation below reloads the document, which discards the query cache.
+  // Do not clear it first: removing an observed query can recreate it and
+  // trigger another request while the redirect is in progress.
 
   const loginPath = buildLoginPath();
   if (window.location.pathname !== loginPath) {

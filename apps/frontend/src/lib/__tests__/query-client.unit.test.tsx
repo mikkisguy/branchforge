@@ -12,6 +12,10 @@ import {
   setNavigateToLoginForTests,
 } from "../session-expiry";
 
+vi.mock("../constants", () => ({
+  BASE_URL: "/",
+}));
+
 describe("query-client", () => {
   describe("mutation defaults", () => {
     it("sets default mutations.retry to false", () => {
@@ -52,30 +56,17 @@ describe("query-client", () => {
       setNavigateToLoginForTests(navigateSpy);
 
       originalPathname = window.location.pathname;
-      Object.defineProperty(window, "location", {
-        configurable: true,
-        value: {
-          ...window.location,
-          pathname: "/projects",
-          assign: vi.fn(),
-        },
-      });
+      window.history.replaceState({}, "", "/projects");
     });
 
     afterEach(() => {
-      Object.defineProperty(window, "location", {
-        configurable: true,
-        value: {
-          ...window.location,
-          pathname: originalPathname,
-        },
-      });
+      window.history.replaceState({}, "", originalPathname);
       resetSessionExpiryHandling();
       resetNavigateToLoginForTests();
       clearCsrfToken();
     });
 
-    it("clears cache, CSRF token, and navigates on query 401", async () => {
+    it("clears the CSRF token and navigates on query 401", async () => {
       const client = createAppQueryClient();
       client.setQueryData(["cached"], { value: 1 });
 
@@ -88,13 +79,13 @@ describe("query-client", () => {
         })
       ).rejects.toThrow("Unauthorized");
 
-      expect(client.getQueryData(["cached"])).toBeUndefined();
+      expect(client.getQueryData(["cached"])).toEqual({ value: 1 });
       expect(getCsrfToken()).toBeNull();
       expect(navigateSpy).toHaveBeenCalledWith("/login");
       client.clear();
     });
 
-    it("clears cache, CSRF token, and navigates on mutation 401", async () => {
+    it("clears the CSRF token and navigates on mutation 401", async () => {
       const client = createAppQueryClient();
       client.setQueryData(["cached"], { value: 1 });
 
@@ -116,7 +107,7 @@ describe("query-client", () => {
       );
 
       await waitFor(() => {
-        expect(client.getQueryData(["cached"])).toBeUndefined();
+        expect(client.getQueryData(["cached"])).toEqual({ value: 1 });
       });
       expect(getCsrfToken()).toBeNull();
       expect(navigateSpy).toHaveBeenCalledWith("/login");
@@ -124,16 +115,10 @@ describe("query-client", () => {
     });
 
     it("does not navigate when already on an auth route", async () => {
-      Object.defineProperty(window, "location", {
-        configurable: true,
-        value: {
-          ...window.location,
-          pathname: "/login",
-          assign: vi.fn(),
-        },
-      });
+      window.history.replaceState({}, "", "/login");
 
       const client = createAppQueryClient();
+      client.setQueryData(["cached"], { value: 1 });
 
       await expect(
         client.fetchQuery({
@@ -145,6 +130,7 @@ describe("query-client", () => {
       ).rejects.toThrow("Unauthorized");
 
       expect(navigateSpy).not.toHaveBeenCalled();
+      expect(client.getQueryData(["cached"])).toEqual({ value: 1 });
       client.clear();
     });
 
