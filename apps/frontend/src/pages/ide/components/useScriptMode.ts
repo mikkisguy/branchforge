@@ -208,6 +208,7 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
 
   const handleResetState = useCallback(() => {
     resetRefreshState();
+    pendingSelectionIdRef.current = null;
     clearTabsState();
     void clearEditorState();
     setScrollToLine(null);
@@ -345,12 +346,10 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     () =>
       canModifyFiles
         ? {
-            onRenameRequest: (file: ProjectFileNode) => {
-              void fileActions.requestRename(file);
-            },
-            onDeleteRequest: (file: ProjectFileNode) => {
-              void fileActions.requestDelete(file);
-            },
+            onRenameRequest: (file: ProjectFileNode) =>
+              fileActions.requestRename(file),
+            onDeleteRequest: (file: ProjectFileNode) =>
+              fileActions.requestDelete(file),
           }
         : undefined,
     [canModifyFiles, fileActions]
