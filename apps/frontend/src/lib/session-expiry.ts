@@ -35,13 +35,17 @@ export function isAuthRoute(pathname = window.location.pathname): boolean {
 }
 
 export function handleSessionExpired(queryClient: QueryClient): void {
-  if (handlingSessionExpiry || isAuthRoute()) {
+  if (handlingSessionExpiry) {
     return;
   }
 
   handlingSessionExpiry = true;
   clearCsrfToken();
   queryClient.clear();
+
+  if (isAuthRoute()) {
+    return;
+  }
 
   const loginPath = buildLoginPath();
   if (window.location.pathname !== loginPath) {
