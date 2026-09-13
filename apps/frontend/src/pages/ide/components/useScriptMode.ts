@@ -180,6 +180,7 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     }
 
     const fileId = pendingSelectFileId;
+    let cancelled = false;
     pendingSelectionIdRef.current = fileId;
     // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change -- consume the pending selection only after its cache-backed file becomes available
     setPendingSelectFileId(null);
@@ -189,15 +190,21 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
       // may clear the generated preview, and never after unmount.
       if (
         !selected ||
+        cancelled ||
         isUnmountedRef.current ||
         pendingSelectionIdRef.current !== fileId
       ) {
         return;
       }
       pendingSelectionIdRef.current = null;
-      // react-doctor-disable-next-line react-doctor/no-set-state-after-await-in-effect -- the unmount and operation-identity guards above reject stale completions
       setGeneratedPreview(null);
     })();
+    return () => {
+      // Consuming pendingSelectFileId re-runs this effect; retain the active
+      // operation in that case, but cancel when reset or another selection
+      // has replaced its token.
+      cancelled = pendingSelectionIdRef.current !== fileId;
+    };
   }, [pendingSelectFileId, projectFiles, selectFileTab]);
 
   const { resetRefreshState } = useScriptModeRefresh({
