@@ -164,11 +164,11 @@ async function lockLabelsByIds(
  * create/rename/import are serialized. Case-only renames of the same file
  * ID are allowed; every other active collision is rejected.
  */
-async function assertCaseInsensitiveUnique(
+export async function assertCaseInsensitiveUnique(
   tx: Transaction,
   projectId: string,
   newPath: string,
-  excludeFileId: string
+  excludeFileId?: string
 ): Promise<void> {
   const duplicate = await tx
     .select({ id: projectFiles.id })
@@ -177,7 +177,7 @@ async function assertCaseInsensitiveUnique(
       and(
         eq(projectFiles.projectId, projectId),
         isNull(projectFiles.deletedAt),
-        ne(projectFiles.id, excludeFileId),
+        ...(excludeFileId ? [ne(projectFiles.id, excludeFileId)] : []),
         sql`lower(${projectFiles.filePath}) = ${newPath.toLowerCase()}`
       )
     )
@@ -308,7 +308,8 @@ async function getPendingOperation(
 async function collapseRename(
   tx: Transaction,
   file: ProjectFile,
-  newPath: string
+  newPath: string,
+  originalRemotePath: string
 ): Promise<ProjectFileOperation | null> {
   const pending = await getPendingOperation(tx, file.id);
   const now = new Date();
@@ -343,7 +344,7 @@ async function collapseRename(
         projectId: file.projectId,
         projectFileId: file.id,
         operation: "RENAME",
-        remoteBasePath: file.remoteFilePath ?? file.filePath,
+        remoteBasePath: originalRemotePath,
         localPath: newPath,
       })
       .returning();
@@ -455,6 +456,7 @@ export async function renameProjectFile(
       canonicalPath
     );
 
+    const originalRemotePath = lockedFile.remoteFilePath ?? lockedFile.filePath;
     const [updated] = await tx
       .update(projectFiles)
       .set({
@@ -468,7 +470,12 @@ export async function renameProjectFile(
       throw new NotFoundError("File");
     }
 
-    const operation = await collapseRename(tx, updated, canonicalPath);
+    const operation = await collapseRename(
+      tx,
+      updated,
+      canonicalPath,
+      originalRemotePath
+    );
 
     return { file: updated, operation };
   });
@@ -524,6 +531,8 @@ async function recomputeIncomingReferences(
   tx: Transaction,
   projectId: string
 ): Promise<void> {
+  const savepoint = "incoming_reference_recompute";
+  await tx.execute(sql.raw(`SAVEPOINT ${savepoint}`));
   try {
     const { updateIncomingJumpsForLabels } =
       await import("./labels/incoming-jumps.js");
@@ -536,7 +545,10 @@ async function recomputeIncomingReferences(
       activeLabels.map((l) => l.id),
       projectId
     );
+    await tx.execute(sql.raw(`RELEASE SAVEPOINT ${savepoint}`));
   } catch (error) {
+    await tx.execute(sql.raw(`ROLLBACK TO SAVEPOINT ${savepoint}`));
+    await tx.execute(sql.raw(`RELEASE SAVEPOINT ${savepoint}`));
     // Best-effort: a recompute failure must not invalidate the
     // delete/restore transaction that already committed its rows.
     logWarn("project_files.incoming_reference_recompute_failed", {
@@ -654,6 +666,18 @@ export function buildOccurrences(
   const sourcesById = new Map<string, SourceLabel>(
     sourceLabels.map((s) => [s.id, s])
   );
+  const patternsByTargetId = new Map(
+    targetLabels.map((target) => {
+      const name = target.labelName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return [
+        target.id,
+        {
+          jumpPattern: new RegExp(`\\bjump\\s+${name}\\b`, "i"),
+          callPattern: new RegExp(`\\bcall\\s+${name}\\b`, "i"),
+        },
+      ] as const;
+    })
+  );
 
   const occurrences: ProjectFileDeleteImpact["occurrences"] = [];
 
@@ -703,9 +727,7 @@ export function buildOccurrences(
 
     // Direct jump/call references in label-line content, case-insensitive.
     for (const target of targetLabels) {
-      const name = target.labelName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const jumpPattern = new RegExp(`\\bjump\\s+${name}\\b`, "i");
-      const callPattern = new RegExp(`\\bcall\\s+${name}\\b`, "i");
+      const { jumpPattern, callPattern } = patternsByTargetId.get(target.id)!;
       if (jumpPattern.test(line.content) || callPattern.test(line.content)) {
         occurrences.push({
           referenceType: jumpPattern.test(line.content) ? "JUMP" : "CALL",

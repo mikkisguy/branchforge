@@ -353,6 +353,10 @@ async function updateFileContentHandler(
       reply.status(403).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
+    if (err instanceof ConflictError) {
+      reply.status(409).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
     if (err instanceof ValidationError) {
       reply.status(400).send({ error: err.userMessage } as ErrorResponse);
       return;

@@ -176,8 +176,8 @@ function toGitlabCommitAction(
     return {
       action: "move",
       previous_path: action.previousPath ?? action.filePath,
-      new_path: action.filePath,
-      content: action.content ?? "",
+      file_path: action.filePath,
+      ...(action.content === undefined ? {} : { content: action.content }),
     };
   }
   if (action.action === "delete") {
@@ -186,7 +186,7 @@ function toGitlabCommitAction(
   return {
     action: action.action,
     file_path: action.filePath,
-    content: action.content ?? "",
+    ...(action.content === undefined ? {} : { content: action.content }),
   };
 }
 

@@ -124,6 +124,7 @@ export function useProjectFileActions({
   const projectIdRef = useRef(projectId);
   useEffect(() => {
     projectIdRef.current = projectId;
+    setPendingAction(null);
   }, [projectId]);
 
   /**
@@ -133,9 +134,12 @@ export function useProjectFileActions({
    */
   const flushBeforeStructuralChange = useCallback(
     async (fileId: string): Promise<"clean" | "blocked"> => {
+      const operationProjectId = projectIdRef.current;
+      if (!operationProjectId) return "blocked";
       const flush = flushAutosaveRef.current;
       if (!flush) return "clean";
       const flushed = await flush(fileId);
+      if (projectIdRef.current !== operationProjectId) return "blocked";
       return flushed ? "clean" : "blocked";
     },
     []
@@ -143,10 +147,12 @@ export function useProjectFileActions({
 
   const requestRename = useCallback(
     async (file: ProjectFileNode) => {
-      if (!canModifyRef.current || !projectIdRef.current) return;
+      const operationProjectId = projectIdRef.current;
+      if (!canModifyRef.current || !operationProjectId) return;
       if (isGeneratedPreviewFilePath(file.filePath)) return;
 
       const flushResult = await flushBeforeStructuralChange(file.id);
+      if (projectIdRef.current !== operationProjectId) return;
       if (flushResult === "blocked") {
         showErrorToastRef.current(
           "Resolve unsaved changes or save conflicts before renaming this file.",
@@ -163,12 +169,14 @@ export function useProjectFileActions({
 
   const requestDelete = useCallback(
     async (file: ProjectFileNode) => {
-      if (!canModifyRef.current || !projectIdRef.current) return;
+      const operationProjectId = projectIdRef.current;
+      if (!canModifyRef.current || !operationProjectId) return;
       if (isGeneratedPreviewFilePath(file.filePath)) return;
 
       // Wait for the autosave normally; a failed flush only enables the
       // force-delete pathway — it never silently discards changes.
       const flushResult = await flushBeforeStructuralChange(file.id);
+      if (projectIdRef.current !== operationProjectId) return;
       const forceAllowed = flushResult === "blocked";
       if (forceAllowed) {
         showErrorToastRef.current(

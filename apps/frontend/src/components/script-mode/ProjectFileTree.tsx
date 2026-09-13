@@ -165,8 +165,8 @@ export function ProjectFileTree({
   const contextMenuItems = useMemo(() => {
     if (!fileActions || !contextMenuFile) return [];
     return buildFileMenuItems({
-      onRename: () => void fileActions.onRenameRequest(contextMenuFile),
-      onDelete: () => void fileActions.onDeleteRequest(contextMenuFile),
+      onRename: () => fileActions.onRenameRequest(contextMenuFile),
+      onDelete: () => fileActions.onDeleteRequest(contextMenuFile),
       renameDisabled: fileActions.disabled,
       deleteDisabled: fileActions.disabled,
     });
@@ -314,10 +314,8 @@ export function ProjectFileTree({
                         <FileRowMenu
                           fileName={getFileName(file.filePath)}
                           items={buildFileMenuItems({
-                            onRename: () =>
-                              void fileActions.onRenameRequest(file),
-                            onDelete: () =>
-                              void fileActions.onDeleteRequest(file),
+                            onRename: () => fileActions.onRenameRequest(file),
+                            onDelete: () => fileActions.onDeleteRequest(file),
                             renameDisabled: fileActions.disabled,
                             deleteDisabled: fileActions.disabled,
                           })}

@@ -808,6 +808,17 @@ export interface PatchProjectFileRequest {
 export interface ProjectFileMutationResponse {
   file: ProjectFile;
   operation: ProjectFileOperation | null;
+  hardDeleted: boolean;
+}
+
+/** Response returned when deleting a project file. */
+export interface DeleteProjectFileResponse {
+  deletedLabelCount: number;
+}
+
+/** Response returned when renaming or moving a project file. */
+export interface RenameProjectFileResponse {
+  file: ProjectFileWithLabels;
 }
 
 export {

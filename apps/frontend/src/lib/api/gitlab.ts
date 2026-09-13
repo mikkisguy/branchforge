@@ -143,6 +143,12 @@ export interface PendingFileChangesResponse {
   contentChangedCount: number;
 }
 
+export interface ReversePendingOperationResponse {
+  success: boolean;
+  reversed: boolean;
+  operation: ProjectFileOperation | null;
+}
+
 function toPendingFileChange(
   operation: ProjectFileOperation
 ): PendingFileChange {
@@ -628,36 +634,10 @@ export const gitlabApi = {
    * Cancel a pending file creation. The file was created in BranchForge but
    * never pushed, so cancelling removes it entirely.
    */
-  async cancelPendingCreation(
+  async reversePendingOperation(
     projectId: string,
     fileId: string
-  ): Promise<void> {
-    validateRequired(projectId, "Project ID");
-    validateRequired(fileId, "File ID");
-
-    await request(`/projects/files/${fileId}/reverse`, { method: "POST" });
-  },
-
-  /**
-   * Undo a pending rename, restoring the file's previous path.
-   */
-  async undoPendingRename(
-    projectId: string,
-    fileId: string
-  ): Promise<PendingFileChangesResponse> {
-    validateRequired(projectId, "Project ID");
-    validateRequired(fileId, "File ID");
-
-    return request(`/projects/files/${fileId}/reverse`, { method: "POST" });
-  },
-
-  /**
-   * Restore a file with a pending deletion.
-   */
-  async restorePendingDeletedFile(
-    projectId: string,
-    fileId: string
-  ): Promise<PendingFileChangesResponse> {
+  ): Promise<ReversePendingOperationResponse> {
     validateRequired(projectId, "Project ID");
     validateRequired(fileId, "File ID");
 

@@ -96,7 +96,7 @@ interface ExportPlan {
   actions: PlannedAction[];
   operations: PlannedOperation[];
   /** Active files whose content was pushed as a plain update (no pending op). */
-  contentUpdatedFiles: ProjectFileRow[];
+  contentUpdatedFiles: Array<{ file: ProjectFileRow; content: string }>;
 }
 
 /** Last-pushed LOCAL baseline for a file, falling back to import-time content. */
@@ -118,7 +118,10 @@ function buildPlannedActions(
 ): ExportPlan {
   const actions: PlannedAction[] = [];
   const operations: PlannedOperation[] = [];
-  const contentUpdatedFiles: ProjectFileRow[] = [];
+  const contentUpdatedFiles: Array<{
+    file: ProjectFileRow;
+    content: string;
+  }> = [];
   const opsByFileId = new Map(ops.map((op) => [op.projectFileId, op]));
   const filesById = new Map(files.map((f) => [f.id, f]));
 
@@ -178,7 +181,7 @@ function buildPlannedActions(
       filePath: file.filePath,
       content: file.content,
     });
-    contentUpdatedFiles.push(file);
+    contentUpdatedFiles.push({ file, content: file.content });
   }
 
   return { actions, operations, contentUpdatedFiles };
@@ -236,24 +239,28 @@ async function verifyActionSetObserved(
     );
     const remotePaths = new Set(listing.map((f) => f.path));
 
+    const finalPaths = new Map<string, string | undefined>();
     for (const action of actions) {
       if (action.action === "delete") {
-        if (remotePaths.has(action.filePath)) return false;
-        continue;
+        finalPaths.delete(action.filePath);
+      } else if (action.action === "move") {
+        finalPaths.delete(action.previousPath ?? action.filePath);
+        finalPaths.set(action.filePath, action.content);
+      } else {
+        finalPaths.set(action.filePath, action.content);
       }
-      if (action.action === "move") {
-        if (remotePaths.has(action.previousPath!)) return false;
-      }
-      // create / update / move destination must exist with pushed content
-      if (!remotePaths.has(action.filePath)) return false;
-      if (action.content === undefined) continue;
+    }
+
+    for (const [filePath, content] of finalPaths) {
+      if (!remotePaths.has(filePath)) return false;
+      if (content === undefined) continue;
       const meta = await getFileContentWithMetadata(
         projectId,
         userId,
-        action.filePath,
+        filePath,
         branch
       );
-      if (meta.content !== action.content) return false;
+      if (meta.content !== content) return false;
     }
     return true;
   } catch (error) {
@@ -287,16 +294,32 @@ async function preflightConflicts(
 
   const mustNotExist = new Set<string>();
   const mustExist = new Set<string>();
+  const producedPaths = new Set<string>();
   for (const action of plan.actions) {
     if (action.action === "delete") {
       mustExist.add(action.filePath);
+      mustNotExist.delete(action.filePath);
+      producedPaths.delete(action.filePath);
     } else if (action.action === "create") {
       mustNotExist.add(action.filePath);
+      mustExist.delete(action.filePath);
+      producedPaths.add(action.filePath);
     } else if (action.action === "move") {
-      mustExist.add(action.previousPath ?? action.filePath);
+      const source = action.previousPath ?? action.filePath;
+      if (producedPaths.has(source)) {
+        mustExist.delete(source);
+        mustNotExist.delete(source);
+      } else {
+        mustExist.add(source);
+        mustNotExist.delete(source);
+      }
+      mustNotExist.add(action.filePath);
+      producedPaths.add(action.filePath);
     } else {
       // update: source must exist (and be the same file)
       mustExist.add(action.filePath);
+      mustNotExist.delete(action.filePath);
+      producedPaths.add(action.filePath);
     }
   }
   // Generated files are managed content and are overwritten unconditionally.
@@ -374,8 +397,7 @@ async function finalizeSuccessfulPush(
   }
 
   // Content-only updated files advance their local baseline too.
-  for (const file of plan.contentUpdatedFiles) {
-    const content = extractAndStripRpySymbols(file.content).cleanedContent;
+  for (const { file, content } of plan.contentUpdatedFiles) {
     await tx
       .update(projectFiles)
       .set({
@@ -587,6 +609,18 @@ export async function exportToGitlab(
         );
       }
     }
+    for (const item of plan.contentUpdatedFiles) {
+      item.content = buildPushedContent(
+        item.file,
+        labelsByFile.get(item.file.id) ?? []
+      );
+      const action = plan.actions.find(
+        (candidate) =>
+          candidate.action === "update" &&
+          candidate.filePath === item.file.filePath
+      );
+      if (action) action.content = item.content;
+    }
 
     // Determine the directory prefix for generated files (e.g. "game/")
     const fileDirPrefix = computeCommonDirectoryPrefix(
@@ -666,7 +700,7 @@ export async function exportToGitlab(
       // Durably mark the exact attempt BEFORE the remote call.
       await db.transaction(async (tx) => {
         await lockProject(tx, projectId);
-        await db
+        await tx
           .update(projectFilePendingOperations)
           .set({
             attemptBranch: targetBranch,
@@ -703,7 +737,7 @@ export async function exportToGitlab(
         ...plan.operations
           .filter((item) => item.file && !item.file.deletedAt)
           .map((item) => item.file!.id),
-        ...plan.contentUpdatedFiles.map((f) => f.id),
+        ...plan.contentUpdatedFiles.map((item) => item.file.id),
       ];
       await advanceLabelBaselines(db, projectId, exportedActiveFileIds);
 

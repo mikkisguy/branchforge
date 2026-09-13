@@ -13,6 +13,8 @@ import type {
   CreateProjectFileRequest,
   CreateProjectFileResponse,
   ProjectFileWithLabels,
+  DeleteProjectFileResponse,
+  RenameProjectFileResponse,
   SourceOrigin,
   ProjectFileDeleteImpact as SharedDeleteFileImpact,
 } from "@branchforge/shared";
@@ -100,18 +102,6 @@ export interface DeleteFileImpact {
   labels: DeleteFileImpactLabel[];
   referenceCount: number;
   references: DeleteFileImpactReference[];
-}
-
-export interface DeleteProjectFileResponse {
-  deletedLabelCount: number;
-}
-
-/**
- * Response for renaming/moving a project file.
- * Frontend-local contract until promoted to @branchforge/shared.
- */
-export interface RenameProjectFileResponse {
-  file: ProjectFileNode;
 }
 
 // ============================================================================
@@ -444,9 +434,9 @@ export const projectFilesApi = {
     validateRequired(projectId, "Project ID");
     validateRequired(fileId, "File ID");
 
-    void options;
     return request<DeleteProjectFileResponse>(`/projects/files/${fileId}`, {
       method: "DELETE",
+      body: JSON.stringify({ force: options?.force ?? false }),
     });
   },
 

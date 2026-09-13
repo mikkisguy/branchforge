@@ -402,8 +402,8 @@ function FileGroup({
           <FileRowMenu
             fileName={fileName}
             items={buildFileMenuItems({
-              onRename: () => void fileActions.onRenameRequest(fileRef),
-              onDelete: () => void fileActions.onDeleteRequest(fileRef),
+              onRename: () => fileActions.onRenameRequest(fileRef),
+              onDelete: () => fileActions.onDeleteRequest(fileRef),
               renameDisabled: fileActions.disabled,
               deleteDisabled: fileActions.disabled,
             })}
@@ -647,8 +647,8 @@ export function LabelNavigator({
     if (!fileActions || !fileContextMenu.file) return [];
     const file = fileContextMenu.file;
     return buildFileMenuItems({
-      onRename: () => void fileActions.onRenameRequest(file),
-      onDelete: () => void fileActions.onDeleteRequest(file),
+      onRename: () => fileActions.onRenameRequest(file),
+      onDelete: () => fileActions.onDeleteRequest(file),
       renameDisabled: fileActions.disabled,
       deleteDisabled: fileActions.disabled,
     });

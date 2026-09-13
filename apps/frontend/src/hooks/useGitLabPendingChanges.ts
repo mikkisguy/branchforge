@@ -84,23 +84,11 @@ export function useGitLabPendingChanges(
     mutationFn: async ({
       operationProjectId,
       fileId,
-      action,
     }: {
       operationProjectId: string;
       fileId: string;
-      action: "cancel-creation" | "undo-rename" | "restore";
     }) => {
-      switch (action) {
-        case "cancel-creation":
-          await gitlabApi.cancelPendingCreation(operationProjectId, fileId);
-          return;
-        case "undo-rename":
-          await gitlabApi.undoPendingRename(operationProjectId, fileId);
-          return;
-        case "restore":
-          await gitlabApi.restorePendingDeletedFile(operationProjectId, fileId);
-          return;
-      }
+      await gitlabApi.reversePendingOperation(operationProjectId, fileId);
     },
     onSuccess: (_result, variables) => {
       refreshCaches(variables.operationProjectId);
@@ -119,17 +107,13 @@ export function useGitLabPendingChanges(
   const changes = query.data?.changes ?? [];
 
   const runReverse = useCallback(
-    async (
-      fileId: string,
-      action: "cancel-creation" | "undo-rename" | "restore"
-    ) => {
+    async (fileId: string) => {
       if (!projectId) {
         throw new Error("Cannot reverse a pending change without a project");
       }
       await reverseMutation.mutateAsync({
         operationProjectId: projectId,
         fileId,
-        action,
       });
     },
     [projectId, reverseMutation]
@@ -150,9 +134,9 @@ export function useGitLabPendingChanges(
     refetch: query.refetch,
     contentChangedCount: query.data?.contentChangedCount ?? 0,
 
-    cancelCreation: (fileId: string) => runReverse(fileId, "cancel-creation"),
-    undoRename: (fileId: string) => runReverse(fileId, "undo-rename"),
-    restoreFile: (fileId: string) => runReverse(fileId, "restore"),
+    cancelCreation: runReverse,
+    undoRename: runReverse,
+    restoreFile: runReverse,
     discardAll,
     isReversing: reverseMutation.isPending,
     isDiscarding: discardAllMutation.isPending,

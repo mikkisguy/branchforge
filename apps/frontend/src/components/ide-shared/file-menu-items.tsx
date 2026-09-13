@@ -16,12 +16,12 @@ export interface FileMenuItem {
   icon: ReactNode;
   destructive: boolean;
   disabled: boolean;
-  onSelect: () => void;
+  onSelect: () => void | Promise<void>;
 }
 
 export interface BuildFileMenuItemsOptions {
-  onRename: () => void;
-  onDelete: () => void;
+  onRename: () => void | Promise<void>;
+  onDelete: () => void | Promise<void>;
   /** Disables rename (e.g. another file operation is in flight). */
   renameDisabled?: boolean;
   /** Disables delete (e.g. another file operation is in flight). */

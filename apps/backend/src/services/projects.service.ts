@@ -42,6 +42,7 @@ import type { SyncLabelsResult } from "./labels.service.js";
 import { calculateContentHash } from "../lib/hash.js";
 import { isUniqueConstraintViolation } from "../lib/db.js";
 import { parseRPYFileWithLabels } from "./rpy-parser.service.js";
+import { assertCaseInsensitiveUnique } from "./project-files-operations.service.js";
 
 /**
  * Project row type from database queries (with optional role for shared projects)
@@ -533,24 +534,7 @@ export async function createProjectFile(
 
       await requireProjectOwnership(projectId, userId, tx);
 
-      const existingFiles = await tx
-        .select({ filePath: projectFiles.filePath })
-        .from(projectFiles)
-        .where(
-          and(
-            eq(projectFiles.projectId, projectId),
-            isNull(projectFiles.deletedAt)
-          )
-        );
-
-      const normalizedNewPath = canonicalPath.toLowerCase();
-      const hasDuplicate = existingFiles.some(
-        (existing) => existing.filePath.toLowerCase() === normalizedNewPath
-      );
-
-      if (hasDuplicate) {
-        throw new ConflictError("A file with this path already exists");
-      }
+      await assertCaseInsensitiveUnique(tx, projectId, canonicalPath);
 
       const [createdFile] = await tx
         .insert(projectFiles)

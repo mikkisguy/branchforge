@@ -283,7 +283,13 @@ export function WriteMode({
       const remainingTabs = openTabs.filter(
         (tabId) => !affectedLabelIds.has(tabId)
       );
-      const fallbackLabelId = openTabs[index - 1] ?? remainingTabs[0] ?? null;
+      const fallbackLabelId =
+        openTabs
+          .slice(0, index)
+          .reverse()
+          .find((tabId) => !affectedLabelIds.has(tabId)) ??
+        remainingTabs[0] ??
+        null;
 
       isSwitchingLabelsRef.current = true;
       if (fallbackLabelId) {

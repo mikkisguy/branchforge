@@ -39,6 +39,12 @@ export interface FileRowMenuProps {
   disabled?: boolean;
 }
 
+function runFileAction(action: FileMenuItem["onSelect"]): void {
+  void Promise.resolve(action()).catch((error: unknown) => {
+    console.error("File action failed", error);
+  });
+}
+
 export function FileRowMenu({ fileName, items, disabled }: FileRowMenuProps) {
   return (
     <Menu>
@@ -58,7 +64,7 @@ export function FileRowMenu({ fileName, items, disabled }: FileRowMenuProps) {
             key={item.key}
             variant={item.destructive ? "destructive" : undefined}
             disabled={item.disabled}
-            onSelect={item.onSelect}
+            onSelect={() => runFileAction(item.onSelect)}
           >
             <span className="flex items-center gap-2">
               {item.icon}
@@ -123,7 +129,7 @@ export function FileContextMenu({
       const item = items[index];
       if (!item || item.disabled) return;
       onClose();
-      item.onSelect();
+      runFileAction(item.onSelect);
     },
     [items, onClose]
   );
